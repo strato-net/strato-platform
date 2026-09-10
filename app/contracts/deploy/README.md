@@ -226,6 +226,19 @@ The three token bridge configuration arguments must be provided together.
 - Calls `StratoNativeBridge.setTokenBridgeConfig(stratoToken, depositsDisabled, withdrawalsDisabled, maxOutstandingWithdrawal)` when the token bridge configuration arguments are provided
 - Prints a governance vote ID if the route update requires approval
 
+#### `refund-external-withdrawal.js`
+Submit an `AdminRegistry` governance vote to refund an expired unreserved or cancelled `ExternalAssetBridge` withdrawal.
+
+```bash
+npm run refund:external-withdrawal -- \
+  --bridge-address <external-asset-bridge> \
+  --withdrawal-id <id> \
+  [--admin-registry <address>] \
+  [--execute]
+```
+
+The command is a dry run unless `--execute` is supplied. Each required administrator must submit the same vote before the refund executes.
+
 #### `smoke-native-bridge.js`
 Run a read-only smoke check against the deployed native STRATO bridge route.
 

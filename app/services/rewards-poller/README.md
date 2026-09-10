@@ -50,6 +50,7 @@ cp .env.example .env
 - `NODE_URL` - STRATO node URL
 - `REWARDS_CONTRACT_ADDRESS` - Rewards contract address
 - `PRICE_ORACLE_ADDRESS` - Price Oracle contract address (required for Swap event USD conversion)
+- `TOKEN_ROUTER` - TokenRouter address used to correlate underlying swap, Forge, and vault events with the direct route caller; EAB-originated routes remain excluded
 
 ### Optional Environment Variables
 
@@ -57,6 +58,7 @@ cp .env.example .env
 - `PORT` - Service port (default: `3004`)
 
 #### Contract Addresses
+- `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address; required to distinguish EAB routes from directly submitted TokenRouter routes
 - `USDST_ADDRESS` - USDST token contract address (default: `937efa7e3a77e20bbdbd7c0d32b6514f368c1010`)
 - `VOUCHER_ADDRESS` - Voucher contract address (default: `000000000000000000000000000000000000100e`)
 
@@ -90,6 +92,8 @@ OPENID_DISCOVERY_URL=https://your-openid-provider/.well-known/openid-configurati
 
 # Contract Addresses
 REWARDS_CONTRACT_ADDRESS=0000000000000000000000000000000000000000
+EXTERNAL_ASSET_BRIDGE_ADDRESS=0000000000000000000000000000000000000000
+TOKEN_ROUTER=0000000000000000000000000000000000000000
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000000000
 USDST_ADDRESS=937efa7e3a77e20bbdbd7c0d32b6514f368c1010
 VOUCHER_ADDRESS=000000000000000000000000000000000000100e

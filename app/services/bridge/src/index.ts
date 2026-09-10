@@ -6,15 +6,23 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { logInfo, logError } from "./utils/logger";
 import { validateBridgeConfig } from "./utils/configValidator";
-import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
+import {
+  reconcileExternalDeposits,
+  startMultiChainDepositPolling,
+} from "./polling/alchemyPolling";
 import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
 import { initializeStratoPolling } from "./polling/stratoPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
+import { depositMetricsService } from "./services/depositMetricsService";
+import { confirmReviewedDeposit } from "./services/bridgeService";
+import { depositStateService } from "./services/depositStateService";
+import { getDepositStatusByIdentity } from "./services/cirrusService";
 
 const app = express();
 const port = process.env.PORT || 3003;
 
+app.set("env", "production");
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -39,6 +47,144 @@ app.get("/health", async (_, res) => {
   const errorFileExists = await healthMonitor.errorFileExists();
   res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
+
+app.get("/metrics/deposits", (_, res) => {
+  res.json(depositMetricsService.snapshot());
+});
+
+app.post("/webhooks/deposits/:chainId", async (req, res) => {
+  const webhookToken = process.env.DEPOSIT_WEBHOOK_TOKEN;
+  if (!webhookToken) {
+    res.status(503).json({ error: "Webhook authentication is not configured" });
+    return;
+  }
+  if (req.headers.authorization !== `Bearer ${webhookToken}`) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const chainId = Number(req.params.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    res.status(400).json({ error: "Invalid chain ID" });
+    return;
+  }
+  try {
+    await reconcileExternalDeposits(chainId);
+    res.status(202).json({ accepted: true });
+  } catch (error) {
+    logError("DepositWebhook", error as Error, { chainId });
+    res.status(503).json({ error: "Reconciliation failed" });
+  }
+});
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/confirm",
+  async (req, res) => {
+    const token = process.env.DEPOSIT_OPERATIONS_TOKEN;
+    if (!token) {
+      res.status(503).json({ error: "Deposit operations are not configured" });
+      return;
+    }
+    if (req.headers.authorization !== `Bearer ${token}`) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const transactionHash = await confirmReviewedDeposit(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      try {
+        await depositStateService.markSettledByIdentity(
+          chainId,
+          depositRouter,
+          depositId,
+        );
+      } catch (error) {
+        logError("DepositOperations", error as Error, {
+          operation: "markReviewedDepositSettled",
+          chainId,
+          depositRouter,
+          depositId,
+        });
+      }
+      res.status(200).json({ transactionHash });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit confirmation failed" });
+    }
+  },
+);
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/reset",
+  async (req, res) => {
+    const token = process.env.DEPOSIT_OPERATIONS_TOKEN;
+    if (!token) {
+      res.status(503).json({ error: "Deposit operations are not configured" });
+      return;
+    }
+    if (req.headers.authorization !== `Bearer ${token}`) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const onchainStatus = await getDepositStatusByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      if (onchainStatus !== undefined && onchainStatus !== "0") {
+        res.status(409).json({
+          error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
+        });
+        return;
+      }
+      await depositStateService.resetForRetryByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      res.status(202).json({ reset: true });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        operation: "resetDepositForRetry",
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit reset failed" });
+    }
+  },
+);
 
 app.listen(port, async () => {
   try {

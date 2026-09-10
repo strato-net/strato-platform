@@ -24,17 +24,26 @@ const {
   proposeBatch,
   chunkArray,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 } = require("./lib/depositRouterSafeOps");
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const MAPPINGS_TABLE = "BlockApps-MercataBridge-mappings";
 const CHAINS_TABLE = "BlockApps-MercataBridge-chains";
+const TOKENS_TABLE = "BlockApps-Token";
 const DEFAULT_BRIDGE_ADDRESS = "0x0000000000000000000000000000000000001008";
+const ACTIVE_TOKEN_STATUS = 2;
 
 function parseArgs() {
   const argv = process.argv.slice(2);
   const args = { apply: false };
-  const allowedWithValue = new Set(["env", "chains"]);
+  const allowedWithValue = new Set([
+    "env",
+    "chains",
+    "router-address",
+    "safe-address",
+  ]);
 
   for (let i = 0; i < argv.length; i++) {
     const item = argv[i];
@@ -365,6 +374,12 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
         externalToken,
         stratoToken,
         enabled: parseBool(row.value?.enabled),
+        externalDecimals: String(row.value?.externalDecimals ?? ""),
+        externalName: String(row.value?.externalName ?? "").trim(),
+        externalSymbol: String(row.value?.externalSymbol ?? "").trim(),
+        legacyStratoMaxPerWithdrawal: String(
+          row.value?.maxPerWithdrawal ?? "",
+        ),
         blockNumber: toBlockNumber(row),
       };
 
@@ -411,6 +426,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       externalToken: asset.externalToken,
       targetStratoToken: asset.stratoToken,
       enabled: asset.enabled,
+      externalDecimals: asset.externalDecimals,
+      externalName: asset.externalName,
+      externalSymbol: asset.externalSymbol,
+      legacyStratoMaxPerWithdrawal: asset.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -434,6 +453,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       externalToken: explicitRoute.externalToken,
       targetStratoToken: explicitRoute.targetStratoToken,
       enabled,
+      externalDecimals: asset.externalDecimals,
+      externalName: asset.externalName,
+      externalSymbol: asset.externalSymbol,
+      legacyStratoMaxPerWithdrawal: asset.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -451,6 +474,10 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
       target: route.targetStratoToken,
       minAmount: 0,
       isPermitted: true,
+      externalDecimals: route.externalDecimals,
+      externalName: route.externalName,
+      externalSymbol: route.externalSymbol,
+      legacyStratoMaxPerWithdrawal: route.legacyStratoMaxPerWithdrawal,
     });
   }
 
@@ -463,6 +490,50 @@ function buildSetterConfigFromMappings(rows, selectedChains) {
   }
 
   return byChain;
+}
+
+async function addStratoTokenStatuses(nodeUrl, token, configByChain) {
+  const addresses = [
+    ...new Set(
+      Object.values(configByChain)
+        .flatMap((chain) => chain.tokenUpdates)
+        .map((route) => route.target.replace(/^0x/, "").toLowerCase()),
+    ),
+  ];
+  if (!addresses.length) return;
+  const rows = await cirrusSearch(nodeUrl, token, TOKENS_TABLE, {
+    address: `in.(${addresses.join(",")})`,
+    select: "address,status,_symbol",
+    limit: String(addresses.length),
+  });
+  const statuses = new Map(
+    rows.map((row) => [
+      normalizeHexAddress(row.address),
+      {
+        status: Number(row.status),
+        symbol: String(row._symbol || "").trim(),
+      },
+    ]),
+  );
+  const inactive = [];
+  for (const chain of Object.values(configByChain)) {
+    for (const route of chain.tokenUpdates) {
+      const tokenState = statuses.get(normalizeHexAddress(route.target));
+      route.stratoTokenStatus = tokenState?.status ?? null;
+      if (route.stratoTokenStatus !== ACTIVE_TOKEN_STATUS) {
+        inactive.push(
+          `${route.target}${tokenState?.symbol ? ` (${tokenState.symbol})` : ""}: status=${
+            route.stratoTokenStatus ?? "NOT_FOUND"
+          }`,
+        );
+      }
+    }
+  }
+  if (inactive.length) {
+    throw new Error(
+      `Enabled legacy routes reference inactive STRATO tokens: ${inactive.join(", ")}`,
+    );
+  }
 }
 
 function buildTransactions(proxyAddress, chainConfig, chunkSize) {
@@ -486,6 +557,11 @@ function buildTransactions(proxyAddress, chainConfig, chunkSize) {
         target: row.target,
         minAmount: row.minAmount,
         isPermitted: !!row.isPermitted,
+        externalDecimals: row.externalDecimals,
+        externalName: row.externalName,
+        externalSymbol: row.externalSymbol,
+        legacyStratoMaxPerWithdrawal: row.legacyStratoMaxPerWithdrawal,
+        stratoTokenStatus: row.stratoTokenStatus,
       })),
     },
   }));
@@ -495,6 +571,12 @@ async function main() {
   const args = parseArgs();
   const chains = parseChains(args);
   if (!chains.length) throw new Error("No valid chains selected");
+  if ((args["router-address"] || args["safe-address"]) && chains.length !== 1) {
+    throw new Error("--router-address/--safe-address require exactly one chain");
+  }
+  if (Boolean(args["router-address"]) !== Boolean(args["safe-address"])) {
+    throw new Error("--router-address and --safe-address must be provided together");
+  }
 
   const apply = !!args.apply;
   const chunkSize = 20;
@@ -516,13 +598,14 @@ async function main() {
     topology.bridgeAddress,
   );
   const configByChain = buildSetterConfigFromMappings(mappingRows, chains);
+  await addStratoTokenStatuses(nodeUrl, token, configByChain);
 
   const summary = {
     env: envProfile.profile,
     nodeUrl,
     bridgeAddress: topology.bridgeAddress,
-    safeSource: "cirrus",
-    routerSource: "cirrus",
+    safeSource: args["safe-address"] ? "argument" : "cirrus",
+    routerSource: args["router-address"] ? "argument" : "cirrus",
     apply,
     chunkSize,
     chains,
@@ -537,9 +620,13 @@ async function main() {
       throw new Error(`Missing route config for chain ${chainId}`);
     }
 
-    const proxyAddress = normalizeAddress(topology.routersByChain.get(chainId));
+    const proxyAddress = normalizeAddress(
+      args["router-address"] || topology.routersByChain.get(chainId),
+    );
     if (!proxyAddress) throw new Error(`Missing proxy address for chain ${chainId}`);
-    const safeAddress = normalizeAddress(topology.safesByChain.get(chainId));
+    const safeAddress = normalizeAddress(
+      args["safe-address"] || topology.safesByChain.get(chainId),
+    );
     if (!safeAddress) throw new Error(`Missing Safe address for chain ${chainId}`);
 
     const artifact = loadDepositRouterArtifact();
@@ -559,9 +646,37 @@ async function main() {
       ownerIsSafe,
       routeCount: chainConfig.tokenUpdates.length,
       queuedCallCount: txs.length,
+      transactions: txs.map(({ meta, ...transaction }) => ({
+        ...transaction,
+        meta,
+      })),
+      transactionBuilderFiles: [],
       proposals: [],
       warning: ownerIsSafe ? null : "Proxy owner is not the Safe address",
     };
+    txs.forEach((tx, index) => {
+      const transaction = {
+        to: tx.to,
+        value: tx.value,
+        data: tx.data,
+        operation: tx.operation,
+      };
+      const transactionBuilder = buildTransactionBuilderBatch(
+        chainId,
+        safeAddress,
+        [transaction],
+        {
+          name: `DepositRouter token batch ${index + 1} (${chainId})`,
+          description: `${tx.meta.itemCount} token and route permission updates`,
+        },
+      );
+      chainResult.transactionBuilderFiles.push(
+        writeTransactionBuilderOutput(
+          `deposit-router-setters-${chainId}-${index + 1}`,
+          transactionBuilder,
+        ),
+      );
+    });
 
     if (apply) {
       if (!ownerIsSafe) {

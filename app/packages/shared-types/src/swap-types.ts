@@ -146,6 +146,7 @@ export interface SwapHistoryEntry {
   amountOut: string;
   impliedPrice: string;
   sender: string;
+  transactionHash?: string;
   /** V3 pair-scoped history only: which pool (fee tier) the swap executed in */
   poolAddress?: string;
   poolName?: string;
@@ -178,6 +179,7 @@ export interface SwapToken {
   price: string; // Token price
   poolBalance: string; // Pool balance of this token
   images: Array<{ value: string }>; // Token images (filtered to exclude empty values)
+  routableSource?: boolean; // TokenRouter has at least one outgoing route
 }
 
 /**
@@ -387,6 +389,7 @@ export interface RawSwapEvent {
   amountIn: string;
   amountOut: string;
   sender: string;
+  transaction_hash?: string;
   block_timestamp: string;
   pool: {
     tokenA: {

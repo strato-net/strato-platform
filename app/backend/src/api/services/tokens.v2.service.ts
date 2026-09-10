@@ -17,9 +17,9 @@ import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPair
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/vaultPerformance.helper";
 
-const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
+const { Token, CollateralVault, CDPEngine, ExternalAssetBridge, externalAssetBridge, DECIMALS, priceOracle } = constants;
 
-// Queries MercataBridge config for the unanimous externalSymbol for each given strato token address.
+// Queries ExternalAssetBridge routes for the unanimous externalSymbol for each STRATO token.
 // Returns a map of stratoToken -> externalSymbol.
 // Used to display the equivalent quantity of an external rebasing token in the UI.
 // Omits tokens who map to multiple different externalSymbol values for different chains.
@@ -27,10 +27,10 @@ const getRebasingExternalSymbols = async (
   accessToken: string,
   stratoTokenAddresses: string[]
 ): Promise<Map<string, string>> => {
-  if (!stratoTokenAddresses.length || !mercataBridge) return new Map();
-  const { data } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
+  if (!stratoTokenAddresses.length || !externalAssetBridge) return new Map();
+  const { data } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-routes`, {
     params: {
-      address: `eq.${mercataBridge}`,
+      address: `eq.${externalAssetBridge}`,
       "value->>stratoToken": `in.(${stratoTokenAddresses.join(",")})`,
       select: "value->>stratoToken,value->>externalSymbol",
     },

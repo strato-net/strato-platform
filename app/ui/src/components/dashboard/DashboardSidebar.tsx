@@ -49,6 +49,7 @@ const NAV_CATEGORIES: NavCategory[] = [
     items: [
       { icon: ArrowDownToLine, label: 'Fund', path: '/dashboard/deposits' },
       { icon: ArrowLeftRight, label: 'Trade', path: '/dashboard/swap' },
+      { icon: ArrowLeftRight, label: 'Trade-New', path: '/dashboard/unified-trade' },
       { icon: Landmark, label: 'Borrow', path: '/dashboard/borrow' },
       { icon: Send, label: 'Send', path: '/dashboard/transfer' },
       { icon: Download, label: 'Bridge Out', path: '/dashboard/withdrawals' },

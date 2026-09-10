@@ -641,31 +641,36 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
-      return token ? [token] : [];
+      return [token, event.finalToken].filter(Boolean) as string[];
     },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
       const stratoToken = event.attributes.stratoToken || event.attributes.strato_token;
-      const tokenSymbol = stratoToken ? tokenSymbols.get(stratoToken) : undefined;
+      const isRouted = event.depositOutcome === "route" && !!event.finalToken;
+      const isFallback = event.depositOutcome === "fallback" && !!event.finalToken;
+      const displayedToken = isRouted || isFallback ? event.finalToken : stratoToken;
+      const displayedAmount = isRouted || isFallback
+        ? event.finalAmount || "0"
+        : event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
+      const tokenSymbol = displayedToken ? tokenSymbols.get(displayedToken) : undefined;
       const stratoRecipient = event.attributes.stratoRecipient || event.attributes.strato_recipient || "";
       const externalSender = event.attributes.externalSender || event.attributes.external_sender || "";
-      const stratoTokenAmount = event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
       const externalChainId = event.attributes.externalChainId || event.attributes.external_chain_id || "";
       const externalTxHash = event.attributes.externalTxHash || event.attributes.external_tx_hash || "";
 
       const chainName = externalChainId ? getChainName(parseInt(externalChainId)) : "Unknown Chain";
 
-      const stratoTokenImage = stratoToken ? tokenImages?.get(stratoToken) : undefined;
+      const stratoTokenImage = displayedToken ? tokenImages?.get(displayedToken) : undefined;
 
       const fields: ActivityField[] = [
         // Amount first (for line 1)
-        stratoToken ? {
+        displayedToken ? {
           label: "Amount",
-          value: formatValue(stratoTokenAmount, stratoToken),
+          value: formatValue(displayedAmount, displayedToken),
           type: "amount",
           badge: tokenSymbol,
           image: stratoTokenImage,
-          imageFallback: tokenSymbol || stratoToken,
-          rawAmount: getFullAmount(stratoTokenAmount),
+          imageFallback: tokenSymbol || displayedToken,
+          rawAmount: getFullAmount(displayedAmount),
         } : null,
         // From, To, Tx for line 2
         {
@@ -695,7 +700,11 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ].filter(Boolean) as ActivityField[];
 
       return {
-        title: "Non-native Deposit",
+        title: isRouted
+          ? "Deposit & Trade"
+          : isFallback
+            ? "Deposit (Fallback)"
+            : "Non-native Deposit",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -708,6 +717,79 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           line2: {
             fieldLabels: externalTxHash ? ["From", "To", "Tx"] : ["From", "To"],
             renderer: externalTxHash ? "addresses-with-arrow-and-text" : "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
+  "ExternalDeposit": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "DepositCompleted",
+    displayName: "Non-native Deposit",
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    getTokenAddress: (event: Event) =>
+      activityTypes.Deposit.getTokenAddress(event),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>) =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
+  },
+  "RoutedTrade": {
+    contract_name: "TokenRouter",
+    event_name: "RouteExecuted",
+    displayName: "Routed Trade",
+    iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
+    getTokenAddress: (event: Event) =>
+      [event.attributes.tokenIn, event.attributes.tokenOut].filter(
+        Boolean
+      ) as string[],
+    handler: (
+      event: Event,
+      tokenSymbols: Map<string, string>,
+      userAddress?: string | null,
+      tokenImages?: Map<string, string>
+    ): ActivityCardData => {
+      const tokenIn = event.attributes.tokenIn || "";
+      const tokenOut = event.attributes.tokenOut || "";
+      const caller = event.attributes.caller || "";
+      const recipient = event.attributes.recipient || "";
+      return {
+        title: "Routed Trade",
+        fields: [
+          addImageToField(
+            {
+              label: "From Amount",
+              value: formatValue(event.attributes.amountIn || "0", tokenIn),
+              type: "amount",
+              badge: tokenSymbols.get(tokenIn),
+            },
+            tokenIn,
+            tokenImages,
+            tokenSymbols
+          ),
+          addImageToField(
+            {
+              label: "To Amount",
+              value: formatValue(event.attributes.amountOut || "0", tokenOut),
+              type: "amount",
+              badge: tokenSymbols.get(tokenOut),
+            },
+            tokenOut,
+            tokenImages,
+            tokenSymbols
+          ),
+          addressField("From", caller, userAddress),
+          addressField("To", recipient, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["From Amount", "To Amount"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["From", "To"],
+            renderer: "addresses-with-arrow",
           },
         },
       };
@@ -818,6 +900,33 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         },
       };
     },
+  },
+  "ExternalWithdraw": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "WithdrawalRequested",
+    displayName: "Non-native Bridge Out",
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      const externalToken = event.attributes.externalToken || event.attributes.external_token;
+      return [token, externalToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
+      activityTypes.Withdraw.handler(
+        {
+          ...event,
+          attributes: {
+            ...event.attributes,
+            token: event.attributes.stratoToken || event.attributes.strato_token,
+            user: event.attributes.stratoSender || event.attributes.strato_sender,
+            dest: event.attributes.externalRecipient || event.attributes.external_recipient,
+            destChainId: event.attributes.externalChainId || event.attributes.external_chain_id,
+          },
+        },
+        tokenSymbols,
+        userAddress,
+        tokenImages,
+      ),
   },
   "NativeWithdraw": {
     contract_name: "StratoNativeBridge",

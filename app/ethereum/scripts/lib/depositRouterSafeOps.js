@@ -218,6 +218,48 @@ function writeOutput(filePrefix, payload) {
   return outPath;
 }
 
+function buildTransactionBuilderBatch(
+  chainId,
+  safeAddress,
+  transactions,
+  { name, description = "" } = {},
+) {
+  const normalizedSafe = normalizeAddress(safeAddress);
+  if (!normalizedSafe) throw new Error("Invalid Safe address");
+  const normalizedTransactions = transactions.map((transaction) => {
+    if (Number(transaction.operation || 0) !== 0) {
+      throw new Error("Safe Transaction Builder export supports CALL operations only");
+    }
+    const to = normalizeAddress(transaction.to);
+    if (!to) throw new Error("Invalid Safe transaction target");
+    return {
+      to,
+      value: String(transaction.value || "0"),
+      data: transaction.data || "0x",
+      contractMethod: null,
+      contractInputsValues: null,
+    };
+  });
+  return {
+    version: "1.0",
+    chainId: String(chainId),
+    createdAt: Date.now(),
+    meta: {
+      name: name || "External Asset Bridge Safe operations",
+      description,
+      txBuilderVersion: "1.18.0",
+      createdFromSafeAddress: normalizedSafe,
+      createdFromOwnerAddress: "",
+      checksum: "",
+    },
+    transactions: normalizedTransactions,
+  };
+}
+
+function writeTransactionBuilderOutput(filePrefix, payload) {
+  return writeOutput(`${filePrefix}-txbuilder`, payload);
+}
+
 module.exports = {
   CHAIN_CONFIG,
   normalizeAddress,
@@ -228,4 +270,6 @@ module.exports = {
   proposeBatch,
   chunkArray,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 };

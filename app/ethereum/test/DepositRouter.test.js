@@ -1,14 +1,20 @@
 const { expect } = require("chai");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const { ethers, upgrades } = require("hardhat");
+const {
+  verifyFromManifest,
+} = require("../scripts/scanTokenConfig");
 
 describe("DepositRouter", function () {
   async function deployFixture() {
-    const [owner, safe, user] = await ethers.getSigners();
+    const [owner, vault, user, replacementVault] = await ethers.getSigners();
     const token = await (await ethers.getContractFactory("MockDepositToken")).deploy();
     const permit2 = await (await ethers.getContractFactory("MockPermit2")).deploy();
     const router = await upgrades.deployProxy(
       await ethers.getContractFactory("DepositRouter"),
-      [await permit2.getAddress(), safe.address, owner.address],
+      [await permit2.getAddress(), vault.address, owner.address],
       { kind: "uups" }
     );
     const targetStratoToken = ethers.Wallet.createRandom().address;
@@ -19,7 +25,16 @@ describe("DepositRouter", function () {
     await token.mint(user.address, amount * 2n);
     await token.connect(user).approve(await permit2.getAddress(), amount * 2n);
 
-    return { router, token, safe, user, targetStratoToken, amount };
+    return {
+      owner,
+      router,
+      token,
+      vault,
+      user,
+      replacementVault,
+      targetStratoToken,
+      amount,
+    };
   }
 
   function routerEvents(router, receipt) {
@@ -35,7 +50,7 @@ describe("DepositRouter", function () {
   }
 
   it("emits only the action event and shares the deposit counter", async function () {
-    const { router, token, safe, user, targetStratoToken, amount } =
+    const { router, token, vault, user, targetStratoToken, amount } =
       await deployFixture();
     const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
 
@@ -45,7 +60,7 @@ describe("DepositRouter", function () {
         amount,
         user.address,
         targetStratoToken,
-        2,
+        4,
         ethers.Wallet.createRandom().address,
         1,
         1,
@@ -59,7 +74,8 @@ describe("DepositRouter", function () {
       "DepositRoutedWithAction",
     ]);
     expect(actionEvents[0].args.depositId).to.equal(1);
-    expect(await token.balanceOf(safe.address)).to.equal(amount);
+    expect(await token.balanceOf(vault.address)).to.equal(amount);
+    expect(await router.externalBridgeVault()).to.equal(vault.address);
 
     const standardReceipt = await (
       await router.connect(user).deposit(
@@ -78,6 +94,228 @@ describe("DepositRouter", function () {
       "DepositRouted",
     ]);
     expect(standardEvents[0].args.depositId).to.equal(2);
-    expect(await router.version()).to.equal("3.0.0");
+    expect(await router.version()).to.equal("3.2.0");
+  });
+
+  it("routes ETH with an action intent into the external vault", async function () {
+    const { router, vault, user, targetStratoToken } = await deployFixture();
+    const amount = ethers.parseEther("1");
+    const actionToken = ethers.Wallet.createRandom().address;
+    await router.setPermitted(ethers.ZeroAddress, true);
+    await router.setRoutePermitted(
+      ethers.ZeroAddress,
+      targetStratoToken,
+      true
+    );
+
+    const vaultBalanceBefore = await ethers.provider.getBalance(vault.address);
+    const receipt = await (
+      await router.connect(user).depositETHWithAction(
+        user.address,
+        targetStratoToken,
+        4,
+        actionToken,
+        1,
+        { value: amount }
+      )
+    ).wait();
+    const events = routerEvents(router, receipt);
+
+    expect(events.map((event) => event.name)).to.deep.equal([
+      "DepositRoutedWithAction",
+    ]);
+    expect(events[0].args.token).to.equal(ethers.ZeroAddress);
+    expect(events[0].args.amount).to.equal(amount);
+    expect(events[0].args.depositId).to.equal(1);
+    expect(events[0].args.action).to.equal(4);
+    expect(events[0].args.actionToken).to.equal(actionToken);
+    expect(events[0].args.minFinalOut).to.equal(1);
+    expect(await ethers.provider.getBalance(vault.address)).to.equal(
+      vaultBalanceBefore + amount
+    );
+  });
+
+  it("rejects invalid action intents before moving custody", async function () {
+    const { router, token, vault, user, targetStratoToken, amount } =
+      await deployFixture();
+    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
+    const actionToken = ethers.Wallet.createRandom().address;
+    const tokenAddress = await token.getAddress();
+
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        3,
+        actionToken,
+        1,
+        1,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAction");
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        4,
+        ethers.ZeroAddress,
+        1,
+        2,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAddress");
+    await expect(
+      router.connect(user).depositWithAction(
+        tokenAddress,
+        amount,
+        user.address,
+        targetStratoToken,
+        4,
+        actionToken,
+        0,
+        3,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "ZeroAmount");
+    expect(await token.balanceOf(vault.address)).to.equal(0);
+  });
+
+  it("rejects zero and unpermitted STRATO targets", async function () {
+    const { router, token, user, amount } = await deployFixture();
+    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
+    const tokenAddress = await token.getAddress();
+
+    await expect(
+      router.connect(user).deposit(
+        tokenAddress,
+        amount,
+        user.address,
+        ethers.ZeroAddress,
+        1,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "InvalidAddress");
+    await expect(
+      router.connect(user).deposit(
+        tokenAddress,
+        amount,
+        user.address,
+        ethers.Wallet.createRandom().address,
+        2,
+        deadline,
+        "0x"
+      )
+    ).to.be.revertedWithCustomError(router, "NotPermitted");
+  });
+
+  it("moves subsequent deposits when governance updates the vault", async function () {
+    const {
+      router,
+      token,
+      vault,
+      user,
+      replacementVault,
+      targetStratoToken,
+      amount,
+    } = await deployFixture();
+    const deadline = (await ethers.provider.getBlock("latest")).timestamp + 3600;
+
+    await expect(router.setExternalBridgeVault(replacementVault.address))
+      .to.emit(router, "ExternalBridgeVaultUpdated")
+      .withArgs(vault.address, replacementVault.address);
+
+    await router.connect(user).deposit(
+      await token.getAddress(),
+      amount,
+      user.address,
+      targetStratoToken,
+      1,
+      deadline,
+      "0x"
+    );
+
+    expect(await token.balanceOf(vault.address)).to.equal(0);
+    expect(await token.balanceOf(replacementVault.address)).to.equal(amount);
+  });
+
+  it("verifies deployed configuration against a rollout manifest", async function () {
+    const { owner, router, token, vault, targetStratoToken } =
+      await deployFixture();
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "router-scan-"));
+    const chainId = Number((await ethers.provider.getNetwork()).chainId);
+    const deploymentBlock = (
+      await router.deploymentTransaction().wait()
+    ).blockNumber;
+    const routerAddress = await router.getAddress();
+    const tokenAddress = await token.getAddress();
+    const bridgeConfigPath = path.join(directory, "bridge.json");
+    const vaultConfigPath = path.join(directory, "vault.json");
+    const manifestPath = path.join(directory, "manifest.json");
+    fs.writeFileSync(
+      bridgeConfigPath,
+      JSON.stringify({
+        chains: [{
+          externalChainId: String(chainId),
+          lastProcessedBlock: String(deploymentBlock),
+        }],
+      }),
+    );
+    fs.writeFileSync(
+      vaultConfigPath,
+      JSON.stringify({
+        chains: [{
+          chainId,
+          depositRouterAddress: routerAddress,
+          safeAddress: owner.address,
+          vaultAddress: vault.address,
+        }],
+      }),
+    );
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        chainId,
+        depositRouterUpdates: [{
+          token: tokenAddress,
+          targetStratoToken,
+          minDepositAmount: "0",
+          permitted: true,
+        }],
+        outputs: { bridgeConfigPath, vaultConfigPath },
+      }),
+    );
+    await router.pause();
+
+    const originalLog = console.log;
+    console.log = () => {};
+    try {
+      const report = await verifyFromManifest(manifestPath);
+      expect(report.status).to.equal("PASSED");
+
+      await router.setRoutePermitted(
+        tokenAddress,
+        ethers.Wallet.createRandom().address,
+        true,
+      );
+      let verificationError;
+      try {
+        await verifyFromManifest(manifestPath);
+      } catch (error) {
+        verificationError = error;
+      }
+      expect(verificationError.message).to.include(
+        "DepositRouter verification failed",
+      );
+    } finally {
+      console.log = originalLog;
+    }
   });
 });

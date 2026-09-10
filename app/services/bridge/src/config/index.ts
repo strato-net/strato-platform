@@ -4,6 +4,8 @@ import { id } from "ethers";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
 export const WAD = 10n ** 18n;
+export const VERIFIER_REQUEST_TIMEOUT_MS = 60_000;
+export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
@@ -39,8 +41,25 @@ const config = {
     clientId: process.env.CLIENT_ID,
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
   },
+  relayerAuth: {
+    baUsername: process.env.RELAYER_BA_USERNAME,
+    baPassword: process.env.RELAYER_BA_PASSWORD,
+    clientSecret: process.env.RELAYER_CLIENT_SECRET,
+    clientId: process.env.RELAYER_CLIENT_ID,
+    openIdDiscoveryUrl: process.env.RELAYER_OPENID_DISCOVERY_URL,
+  },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+  },
+  externalAssetBridge: {
+    address: process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS,
+    manualReviewValiditySeconds: Number(
+      process.env.EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS ||
+        7 * 24 * 60 * 60,
+    ),
+  },
+  tokenRouter: {
+    address: process.env.TOKEN_ROUTER,
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
@@ -55,7 +74,8 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
-    safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
+    safeProposerKmsKeyId: process.env.SAFE_PROPOSER_KMS_KEY_ID,
+    safeProposerKmsRegion: process.env.SAFE_PROPOSER_KMS_REGION,
     apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
@@ -90,6 +110,7 @@ const config = {
   },
   api: {
     nodeUrl: process.env.NODE_URL,
+    appUrl: process.env.STRATO_APP_API_URL,
     errorCodes: {
       ECONNREFUSED: "Connection refused",
       ENOTFOUND: "DNS lookup failed",
@@ -116,6 +137,45 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
 
   return rpcUrl;
 };
+
+export const getChainRpcUrls = (chainId: number | bigint): string[] => [
+  getChainRpcUrl(chainId),
+  ...(process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] || "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
+];
+
+export const getDepositConfirmationPolicy = (
+  chainId: number | bigint,
+): number => {
+  const value =
+    process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`] ||
+    process.env.DEPOSIT_CONFIRMATIONS ||
+    "0";
+  const confirmations = Number(value);
+  if (!Number.isSafeInteger(confirmations) || confirmations < 0) {
+    throw new Error(`Invalid deposit confirmation policy for chain ${chainId}`);
+  }
+  return confirmations;
+};
+
+export const getDepositReconciliationDepth = (): number =>
+  Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);
+
+export const getMissingReceiptGraceMs = (): number =>
+  Number(process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000);
+
+export const getSettlementRetryGraceMs = (): number =>
+  Number(process.env.DEPOSIT_SETTLEMENT_RETRY_GRACE_MS || 15 * 60 * 1000);
+
+export const getReviewRecordRetryMs = (): number =>
+  Number(process.env.DEPOSIT_REVIEW_RECORD_RETRY_MS || 60 * 1000);
+
+export const getChainWsRpcUrl = (
+  chainId: number | bigint,
+): string | undefined =>
+  process.env[`CHAIN_${chainId}_WS_RPC_URL`];
 
 export const getNativeRepresentationBridgeAddress = (
   chainId: number | bigint,
@@ -165,6 +225,45 @@ export const getNativeBridgePrivateKeys = (
   return keys;
 };
 
+export const getExternalBridgeVerifierUrls = (
+  chainId: number | bigint,
+): string[] =>
+  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || "")
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+export const getExternalBridgeVerifierApiTokens = (
+  chainId: number | bigint,
+): string[] =>
+  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+export const getExternalBridgeExecutorPrivateKey = (
+  chainId: number | bigint,
+): string | undefined =>
+  process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`]?.trim();
+
+export interface ExternalBridgeExecutorKmsConfig {
+  address: string;
+  keyId: string;
+  region: string;
+}
+
+export const getExternalBridgeExecutorKmsConfig = (
+  chainId: number | bigint,
+): ExternalBridgeExecutorKmsConfig | undefined => {
+  const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
+  const address = process.env[`${prefix}_ADDRESS`]?.trim();
+  const keyId = process.env[`${prefix}_KMS_KEY_ID`]?.trim();
+  const region = process.env[`${prefix}_KMS_REGION`]?.trim();
+
+  if (!address && !keyId && !region) return undefined;
+  return { address: address || "", keyId: keyId || "", region: region || "" };
+};
+
 // Validate required environment variables
 const requiredEnvVars = [
   "BA_USERNAME",
@@ -172,11 +271,18 @@ const requiredEnvVars = [
   "CLIENT_SECRET",
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
+  "RELAYER_BA_USERNAME",
+  "RELAYER_BA_PASSWORD",
+  "RELAYER_CLIENT_SECRET",
+  "RELAYER_CLIENT_ID",
+  "RELAYER_OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
+  "EXTERNAL_ASSET_BRIDGE_ADDRESS",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_PRIVATE_KEY",
+  "SAFE_PROPOSER_KMS_KEY_ID",
+  "SAFE_PROPOSER_KMS_REGION",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);

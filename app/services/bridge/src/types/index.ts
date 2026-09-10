@@ -53,6 +53,7 @@ export interface ClientOptions {
   authenticated?: boolean;
   timeout?: number;
   logPrefix?: string;
+  tokenProvider?: () => Promise<string>;
 }
 
 export interface ApiClient {
@@ -90,10 +91,18 @@ export interface PreparedWithdrawal {
 
 export interface DepositArgs {
   externalChainId: string | number;
+  depositRouter: string;
+  depositId: string;
   externalSender: string;
   externalToken: string;
   externalTokenAmount: string;
+  observedExternalTokenAmount: string;
   externalTxHash: string;
+  externalBlockHash: string;
+  externalBlockNumber: number;
+  externalBlockTimestamp: number;
+  externalLogIndex: number;
+  detectedAt: number;
   stratoRecipient: string;
   targetStratoToken: string;
 }
@@ -104,9 +113,15 @@ export interface ActionDepositArgs extends DepositArgs {
   minFinalOut: string;
 }
 
+export interface RouteDepositArgs extends ActionDepositArgs {
+  steps: import("@strato/shared-types").RouteStep[];
+}
+
 export interface ConfirmDepositArgs {
   externalChainId: string | number;
   externalTxHash: string;
+  depositRouter: string;
+  depositId: string;
   stratoRecipient: string;
   verified: boolean;
 }
@@ -143,8 +158,10 @@ export interface DepositInfo {
 
   externalChainId: string | number;
   externalTxHash: string;
+  depositId: string;
   externalDecimals: number;
   depositRouter: string;
+  custodyAddress: string;
 }
 
 export interface NativeDepositInfo {
@@ -166,11 +183,21 @@ export interface NativeDepositInfo {
 
 export interface WithdrawalInfo {
   bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
-  custodyTxHash: string;
+  custodyTxHash?: string;
+  authorizationNotBefore?: string;
+  authorizationDeadline?: string;
+  cancellationTxHash?: string;
   externalChainId: string | number;
   externalRecipient: string;
   externalToken: string;
   externalTokenAmount: string;
+  requiresManualReview?: boolean;
+  reservationId?: string;
+  reservationTxHash?: string;
+  reviewApprovalDeadline?: string;
+  reviewDigest?: string;
+  reviewProposalHash?: string;
+  signerSetVersion?: string;
   requestedAt: string;
   stratoSender: string;
   stratoToken: string;
@@ -179,6 +206,7 @@ export interface WithdrawalInfo {
 
   withdrawalId: string;
   useHotWallet?: boolean;
+  vault?: string;
 }
 
 export interface NativeWithdrawalInfo {
@@ -204,9 +232,11 @@ export interface NativeWithdrawalInfo {
 export interface ChainInfo {
   externalChainId: number;
   depositRouter: string;
+  depositRouters?: string[];
   lastProcessedBlock: number;
   enabled: boolean;
-  custody: string;
+  custody?: string;
+  vault?: string;
   chainName: string;
 }
 
@@ -231,3 +261,13 @@ export interface BridgeInfo {
   withdrawalCounter: number;
   withdrawalsPaused: boolean;
 }
+
+export type EthCustodyDeposit = Pick<DepositArgs,
+  "depositId" | "depositRouter" | "externalSender" | "observedExternalTokenAmount"
+>;
+
+export type RecordedDepositReview = Pick<ActionDepositArgs,
+  "externalChainId" | "depositRouter" | "depositId" | "externalTxHash" |
+  "externalSender" | "externalToken" | "externalTokenAmount" | "stratoRecipient" |
+  "targetStratoToken" | "action" | "actionToken" | "minFinalOut"
+>;

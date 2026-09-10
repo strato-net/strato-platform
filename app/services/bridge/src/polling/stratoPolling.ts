@@ -1,7 +1,5 @@
 import { config } from "../config";
 import {
-  confirmDepositBatch,
-  reviewDepositBatch,
   confirmNativeDepositBatch,
   reviewNativeDepositBatch,
   finalizeNativeWithdrawalBatch,
@@ -9,19 +7,21 @@ import {
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
+  processExternalWithdrawal,
+  processPendingExternalWithdrawalReview,
+  queueExternalWithdrawalReview,
 } from "../services/bridgeService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, NativeDepositInfo, ConfirmNativeDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
+  getExternalWithdrawalsByStatus,
   getNativeWithdrawalsByStatus,
-  getDepositsByStatus,
   getNativeDepositsByStatus,
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatusBatch } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
-import { verifyDepositsBatch } from "../services/verificationService";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 
@@ -81,62 +81,63 @@ export const startWithdrawalRequestPolling = (): void => {
   );
 };
 
-export const startDepositInitiatedPolling = (): void => {
-  const pollingInterval =
-    Number((config as any)?.polling?.withdrawalInterval) || 5 * 60 * 1000;
+export const startExternalWithdrawalPolling = (): void => {
+  const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
 
   const poll = async () => {
-    try {
-      const deposits: DepositInfo[] = await getDepositsByStatus("1");
-      if (!Array.isArray(deposits) || deposits.length === 0) return;
+    const [initiated, pendingReview, ready] = await Promise.all([
+      getExternalWithdrawalsByStatus("1"),
+      getExternalWithdrawalsByStatus("2"),
+      getExternalWithdrawalsByStatus("3"),
+    ]);
+    const routineWithdrawals = [...initiated, ...ready].filter(
+      (withdrawal) => !withdrawal.requiresManualReview,
+    );
 
-      const verificationResults = await verifyDepositsBatch(deposits);
-      
-      const results: ConfirmDepositArgs[] = deposits.map((deposit) => {
-        const error = verificationResults.get(deposit.externalTxHash);
-        if (error) {
-          logError("StratoPolling", error, {
-            operation: "verifyDepositTransferEvents",
-            externalChainId: deposit.externalChainId,
-            externalTxHash: deposit.externalTxHash,
-          });
-          return { externalChainId: deposit.externalChainId, externalTxHash: deposit.externalTxHash, stratoRecipient: deposit.stratoRecipient, verified: false as const };
-        }
-        return { externalChainId: deposit.externalChainId, externalTxHash: deposit.externalTxHash, stratoRecipient: deposit.stratoRecipient, verified: true as const };
-      });
-
-      const { verifiedDeposits, failedDeposits } = results.reduce(
-        (acc, r) => {
-          if (r.verified) {
-            acc.verifiedDeposits.push(r);
-          } else {
-            acc.failedDeposits.push(r);
-          }
-          return acc;
-        },
-        { verifiedDeposits: [] as ConfirmDepositArgs[], failedDeposits: [] as ConfirmDepositArgs[] }
-      );
-
-      if (verifiedDeposits.length > 0) {
-        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
-          await confirmDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
-        }
+    for (const withdrawal of routineWithdrawals) {
+      try {
+        await processExternalWithdrawal(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "processExternalWithdrawal",
+          withdrawalId: withdrawal.withdrawalId,
+        });
       }
-
-      if (failedDeposits.length > 0) {
-        for (const batch of chunk(failedDeposits, POLLING_BATCH_SIZE)) {
-          await reviewDepositBatch(batch as NonEmptyArray<ConfirmDepositArgs>);
-        }
+    }
+    for (const withdrawal of initiated.filter((item) => item.requiresManualReview)) {
+      try {
+        await queueExternalWithdrawalReview(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "queueExternalWithdrawalReview",
+          withdrawalId: withdrawal.withdrawalId,
+        });
       }
-    } catch (e: any) {
-      logError("StratoPolling", e as Error, {
-        operation: "startDepositInitiatedPolling",
-      });
+    }
+    for (const withdrawal of pendingReview) {
+      try {
+        await processPendingExternalWithdrawalReview(withdrawal);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "processPendingExternalWithdrawalReview",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
+    }
+    for (const withdrawal of ready.filter((item) => item.requiresManualReview)) {
+      try {
+        await processExternalWithdrawal(withdrawal, true);
+      } catch (error) {
+        logError("StratoPolling", error as Error, {
+          operation: "resumeApprovedExternalWithdrawal",
+          withdrawalId: withdrawal.withdrawalId,
+        });
+      }
     }
   };
 
   startNonOverlappingPolling(
-    "startDepositInitiatedPolling",
+    "startExternalWithdrawalPolling",
     pollingInterval,
     poll,
   );
@@ -373,9 +374,9 @@ export const startNativeWithdrawalTxPolling = (): void => {
 export const initializeStratoPolling = async () => {
   logInfo("StratoPolling", "Initializing STRATO polling...");
 
-  startDepositInitiatedPolling();
   startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
+  startExternalWithdrawalPolling();
   startNativeWithdrawalRequestPolling();
   startWithdrawalTxPolling();
   startNativeWithdrawalTxPolling();

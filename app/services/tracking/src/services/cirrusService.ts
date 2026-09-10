@@ -57,7 +57,7 @@ export const parseCirrusTimestamp = (raw: unknown): number => {
 };
 
 export interface BridgeInEvent {
-  bridge: "MercataBridge" | "StratoNativeBridge";
+  bridge: "MercataBridge" | "ExternalAssetBridge" | "StratoNativeBridge";
   externalSender: string;
   stratoRecipient: string;
   stratoToken: string;
@@ -71,6 +71,7 @@ export interface BridgeInEvent {
 
 const DEPOSIT_TABLES: { bridge: BridgeInEvent["bridge"]; table: string }[] = [
   { bridge: "MercataBridge", table: `${PREFIX}MercataBridge-DepositCompleted` },
+  { bridge: "ExternalAssetBridge", table: `${PREFIX}ExternalAssetBridge-DepositCompleted` },
   { bridge: "StratoNativeBridge", table: `${PREFIX}StratoNativeBridge-NativeDepositCompleted` },
 ];
 
@@ -194,6 +195,7 @@ const ACTIVITY_PAIRS: {
   category: ActivityCategory;
 }[] = [
   { contract: "MercataBridge", event: "WithdrawalRequested", userAttr: "user", category: "bridge_out" },
+  { contract: "ExternalAssetBridge", event: "WithdrawalRequested", userAttr: "stratoSender", category: "bridge_out" },
   { contract: "StratoNativeBridge", event: "NativeWithdrawalRequested", userAttr: "stratoSender", category: "bridge_out" },
   { contract: "Pool", event: "Swap", userAttr: "sender", category: "swap" },
   { contract: "Pool", event: "AddLiquidity", userAttr: "provider", category: "liquidity_add" },

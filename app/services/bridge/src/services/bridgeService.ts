@@ -1,12 +1,13 @@
+import { recoverReviewedDeposit } from "./depositRecoveryService";
 import {
   config,
   getChainRpcUrl,
   getNativeRepresentationBridgeAddress,
 } from "../config";
 import { JsonRpcProvider } from "ethers";
-import { execute } from "../utils/stratoHelper";
+import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -18,7 +19,34 @@ import {
   getNativeMintProposalExecution,
   proposeNativeMint,
 } from "./nativeMintService";
-import { buildActionDepositBatchArgs } from "./depositEventService";
+import {
+  buildWithdrawalReview,
+  buildWithdrawalAuthorization,
+  cancelExpiredWithdrawal,
+  getExternalChainLatestTimestamp,
+  getReservationId,
+  getReservationState,
+  proposeWithdrawalReview,
+  releaseWithdrawal,
+  reserveWithdrawal,
+} from "./externalWithdrawalService";
+import {
+  getDepositStatusByIdentity,
+  getDepositSettlementInfoByIdentity,
+  getEnabledChains,
+} from "./cirrusService";
+import { depositStateService } from "./depositStateService";
+import { getCurrentBlockNumber } from "./rpcService";
+import {
+  depositIdentity,
+  verifyDetectedDepositsBatch,
+} from "./verificationService";
+import { fetchRouteSteps } from "./routeQuoteService";
+import { isTransportRouteError } from "../utils/routeFailure";
+import {
+  attestDepositSettlement,
+  attestWithdrawalRelease,
+} from "./settlementAttestationService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -32,7 +60,7 @@ const normalizeOptionalHash = (value?: string | null): string | null => {
   return /^0+$/.test(withoutPrefix) ? null : normalized;
 };
 
-const getStratoNetworkId = async (): Promise<bigint> => {
+export const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
     return cachedStratoNetworkId;
   }
@@ -190,133 +218,268 @@ const recordNativeWithdrawalProposal = async (
 const isDuplicateDepositError = (error: unknown): boolean => {
   const message = (error as Error).message;
   return (
+    message.includes("EAB: duplicate deposit") ||
     message.includes("MB: dup key") ||
     message.includes("MB: duplicate deposit")
   );
 };
 
-const recordStandardDeposit = async (deposit: DepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "deposit",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-    },
-  });
-};
-
-const recordActionDeposit = async (deposit: ActionDepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "depositWithAction",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-      action: deposit.action,
-      actionToken: deposit.actionToken,
-      minFinalOut: deposit.minFinalOut,
-    },
-  });
-};
-
-const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
-  deposits: NonEmptyArray<T>,
-  recordOne: (deposit: T) => Promise<void>,
-) => {
-  for (const deposit of deposits) {
-    try {
-      await recordOne(deposit);
-    } catch (error) {
-      if (!isDuplicateDepositError(error)) throw error;
-      logInfo(
-        "BridgeService",
-        `Deposit already recorded: ${deposit.externalTxHash}`,
-      );
-    }
-  }
-};
-
-export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
-  const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
-  const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
-  const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
-  const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
-  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
-  const targetStratoTokens = depositArgs.map((deposit) => deposit.targetStratoToken);
-
+export const settleDeposit = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<string | null> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
   try {
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "depositBatch",
+    await attestDepositSettlement(deposit);
+    const submit = actionDeposit.action && actionDeposit.action !== "0"
+      ? execute
+      : executeAsRelayer;
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "settleDeposit",
       args: {
-        externalChainIds,
-        externalTxHashes,
-        externalTokens,
-        externalTokenAmounts,
-        stratoRecipients,
-        externalSenders,
-        targetStratoTokens,
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
+        attestationProof: "0x",
       },
     });
-
     logInfo(
       "BridgeService",
-      `Successfully deposited ${depositArgs.length} deposits`,
+      `Settled deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
     );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
   } catch (error) {
     if (isDuplicateDepositError(error)) {
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
+      );
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
       logInfo(
         "BridgeService",
-        `Standard deposit batch contained an existing deposit; recovering item-by-item`,
+        `Deposit already settled: ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
       );
-      await recoverMixedDuplicateBatch(depositArgs, recordStandardDeposit);
-      return;
+      return null;
     }
     throw error;
   }
 };
 
-export const depositBatchWithAction = async (
-  depositArgs: NonEmptyArray<ActionDepositArgs>,
-) => {
-  const args = buildActionDepositBatchArgs(depositArgs);
-
+export const settleRoutedDeposit = async (
+  deposit: RouteDepositArgs,
+): Promise<string | null> => {
   try {
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "depositBatchWithAction",
-      args,
+    await attestDepositSettlement(deposit);
+    const result = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "settleDepositWithRoute",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        expectedTokenOut: deposit.actionToken,
+        minFinalOut: deposit.minFinalOut,
+        steps: deposit.steps,
+        attestationProof: "0x",
+      },
     });
     logInfo(
       "BridgeService",
-      `Successfully recorded ${depositArgs.length} action deposits`,
+      `Settled routed deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
     );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
   } catch (error) {
     if (isDuplicateDepositError(error)) {
-      logInfo(
-        "BridgeService",
-        `Action deposit batch contained an existing deposit; recovering item-by-item`,
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
       );
-      await recoverMixedDuplicateBatch(depositArgs, recordActionDeposit);
-      return;
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
+      return null;
     }
     throw error;
+  }
+};
+
+export const recordDepositForReview = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<void> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
+  try {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordDepositForReview",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
+      },
+    });
+  } catch (error) {
+    if (!isDuplicateDepositError(error)) throw error;
+  }
+};
+
+export const confirmReviewedDeposit = async (
+  externalChainId: number,
+  depositRouter: string,
+  depositId: string,
+): Promise<string> => {
+  let pending = await depositStateService.getByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (!pending || pending.status !== "review") {
+    pending = await recoverReviewedDeposit(externalChainId, depositRouter, depositId);
+  }
+  const onchainStatus = await getDepositStatusByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (onchainStatus !== "2") {
+    throw new Error(
+      `Deposit is not pending review on STRATO (status ${onchainStatus || "unavailable"})`,
+    );
+  }
+  const chain = (await getEnabledChains()).get(externalChainId);
+  const custodyAddress = chain?.vault || chain?.custody;
+  if (!chain || !custodyAddress) {
+    throw new Error("Enabled chain custody configuration is unavailable");
+  }
+  const latestBlock = await getCurrentBlockNumber(externalChainId);
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification entry ${depositIdentity(pending.deposit)}`,
+    { latestBlock, custodyAddress },
+  );
+  const verification = (
+    await verifyDetectedDepositsBatch(
+      [pending.deposit],
+      latestBlock,
+      custodyAddress,
+    )
+  ).get(depositIdentity(pending.deposit));
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification exit ${depositIdentity(pending.deposit)} state=${verification?.state || "unknown"}`,
+  );
+  if (verification?.state !== "verified") {
+    const reason =
+      verification?.state === "invalid"
+        ? verification.error.message
+        : verification?.state || "unknown";
+    throw new Error(`Reviewed deposit re-verification failed: ${reason}`);
+  }
+  await attestDepositSettlement(pending.deposit);
+  const actionDeposit = pending.deposit as Partial<ActionDepositArgs>;
+  const submit = actionDeposit.action && actionDeposit.action !== "0"
+    ? execute
+    : executeAsRelayer;
+  let method = "confirmReviewedDeposit";
+  let args: Record<string, unknown> = {
+    externalChainId,
+    depositRouter,
+    depositId,
+    attestationProof: "0x",
+  };
+  if (actionDeposit.action === "4") {
+    const settlementInfo = await getDepositSettlementInfoByIdentity(
+      externalChainId,
+      depositRouter,
+      depositId,
+    );
+    if (!settlementInfo || settlementInfo.status !== "2") {
+      throw new Error("Reviewed deposit settlement data is unavailable");
+    }
+    try {
+      const steps = await fetchRouteSteps({
+        tokenIn: settlementInfo.stratoToken,
+        tokenOut: actionDeposit.actionToken!,
+        amountIn: settlementInfo.stratoTokenAmount,
+        minFinalOut: actionDeposit.minFinalOut!,
+      });
+      method = "confirmReviewedDepositWithRoute";
+      args = { ...args, steps };
+    } catch (error) {
+      if (isTransportRouteError(error)) throw error;
+      logInfo(
+        "BridgeService",
+        `Reviewed routed deposit ${depositIdentity(pending.deposit)} will use source-token fallback: ${(error as Error).message}`,
+      );
+    }
+  }
+  try {
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method,
+      args,
+    });
+    return result.hash;
+  } catch (error) {
+    if (
+      method !== "confirmReviewedDepositWithRoute" ||
+      isTransportRouteError(error)
+    ) {
+      throw error;
+    }
+    logInfo(
+      "BridgeService",
+      `Reviewed routed settlement ${depositIdentity(pending.deposit)} failed deterministically; using source-token fallback: ${(error as Error).message}`,
+    );
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "confirmReviewedDeposit",
+      args: {
+        externalChainId,
+        depositRouter,
+        depositId,
+        attestationProof: "0x",
+      },
+    });
+    return result.hash;
   }
 };
 
@@ -369,53 +532,6 @@ export const recordNativeDepositBatch = async (
       return;
     }
 
-    throw error;
-  }
-};
-
-export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
-  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
-
-  try {
-    const result = await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "confirmDepositBatch",
-      args: {
-        externalChainIds,
-        externalTxHashes,
-      },
-    });
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} deposits`,
-      );
-      return;
-    }
-
-    logInfo(
-      "BridgeService",
-      `Successfully confirmed ${deposits.length} deposits`,
-    );
-
-    await mintVouchersForDeposits(stratoRecipients);
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-    
-    // Check if this is a bad state error (expected when multiple servers confirm same deposits)
-    if (errorMessage.includes("MB: bad state")) {
-      logInfo(
-        "BridgeService",
-        `Deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
-      );
-      return; // Gracefully handle already confirmed deposits
-    }
-    
-    // Re-throw other errors
     throw error;
   }
 };
@@ -473,42 +589,6 @@ export const confirmNativeDepositBatch = async (
   }
 };
 
-export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
-  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
-
-  try {
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "reviewDepositBatch",
-      args: {
-        externalChainIds,
-        externalTxHashes,
-      },
-    });
-
-    logInfo(
-      "BridgeService",
-      `Successfully set ${deposits.length} deposits to pending review`,
-    );
-  } catch (error) {
-    const errorMessage = (error as Error).message;
-    
-    // Check if this is a bad state error (expected when multiple servers review same deposits)
-    if (errorMessage.includes("MB: bad state")) {
-      logInfo(
-        "BridgeService",
-        `Deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
-      );
-      return; // Gracefully handle already reviewed deposits
-    }
-    
-    // Re-throw other errors
-    throw error;
-  }
-};
-
 export const reviewNativeDepositBatch = async (
   deposits: NonEmptyArray<ConfirmNativeDepositArgs>
 ) => {
@@ -549,6 +629,228 @@ export const reviewNativeDepositBatch = async (
 
     throw error;
   }
+};
+
+export const processExternalWithdrawal = async (
+  withdrawal: WithdrawalInfo,
+  manualReviewApproved = false,
+): Promise<void> => {
+  if (withdrawal.requiresManualReview && !manualReviewApproved) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
+    );
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+  const authorization = await buildWithdrawalAuthorization(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+
+  if (
+    String(withdrawal.bridgeStatus) === "1" ||
+    (String(withdrawal.bridgeStatus) === "2" && manualReviewApproved)
+  ) {
+    const readyResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "markWithdrawalReady",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        authorizationNotBefore: authorization.notBefore,
+        authorizationDeadline: authorization.deadline,
+        signerSetVersion: authorization.signerSetVersion,
+      },
+    });
+    if (readyResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal ${withdrawal.withdrawalId} remains ${readyResult.status}`,
+      );
+    }
+  }
+
+  let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
+  const authorizationExpired =
+    reservationState.latestTimestamp > BigInt(authorization.deadline);
+  let reservationId = withdrawal.reservationId;
+  if (!reservationId) {
+    if (reservationState.status === 0 && authorizationExpired) {
+      logInfo(
+        "BridgeService",
+        `External withdrawal ${withdrawal.withdrawalId} expired without a reservation and is ready for governance refund`,
+      );
+      return;
+    }
+    const reservation =
+      reservationState.status === 0
+        ? await reserveWithdrawal(authorization)
+        : {
+            reservationId: reservationState.reservationId,
+            transactionHash: reservationState.reservationTxHash!,
+          };
+    reservationId = reservation.reservationId;
+    const reservationResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalReservation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        reservationTxHash: reservation.transactionHash,
+      },
+    });
+    if (reservationResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal reservation ${reservationId} remains ${reservationResult.status}`,
+      );
+    }
+    if (reservationState.status === 0) {
+      reservationState = { ...reservationState, status: 1 };
+    }
+  } else if (
+    reservationId.toLowerCase().replace(/^0x/, "") !==
+    getReservationId(authorization).toLowerCase().replace(/^0x/, "")
+  ) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} has a mismatched reservation`,
+    );
+  }
+
+  if (
+    reservationState.status === 3 ||
+    (reservationState.status === 1 && authorizationExpired)
+  ) {
+    const cancellationTxHash = await cancelExpiredWithdrawal(
+      authorization,
+      reservationId,
+    );
+    const cancellationResult = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalCancellation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        cancellationTxHash,
+      },
+    });
+    if (cancellationResult.status !== "Success") {
+      throw new Error(
+        `Withdrawal cancellation ${reservationId} remains ${cancellationResult.status}`,
+      );
+    }
+    logInfo(
+      "BridgeService",
+      `Cancelled expired external withdrawal ${withdrawal.withdrawalId}; governance refund is now available`,
+      { reservationId, cancellationTxHash },
+    );
+    return;
+  }
+
+  const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
+  await attestWithdrawalRelease(
+    authorization,
+    reservationId,
+    releaseTxHash,
+  );
+  const finalizeResult = await executeAsRelayer({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "finalizeWithdrawal",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reservationId,
+      externalTxHash: releaseTxHash,
+      attestationProof: "0x",
+    },
+  });
+  if (finalizeResult.status !== "Success") {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} finalization remains ${finalizeResult.status}`,
+    );
+  }
+
+  logInfo(
+    "BridgeService",
+    `Released and finalized external withdrawal ${withdrawal.withdrawalId}`,
+    { reservationId, releaseTxHash },
+  );
+};
+
+export const queueExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.requiresManualReview) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} does not require manual review`,
+    );
+  }
+  const sourceChainId = await getStratoNetworkId();
+  const review = buildWithdrawalReview(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+  const proposal = await proposeWithdrawalReview(review);
+  const result = await execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "recordWithdrawalReview",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reviewDigest: proposal.reviewDigest,
+      approvalDeadline: proposal.approvalDeadline,
+      proposalHash: proposal.proposalHash,
+    },
+  });
+  if (result.status !== "Success") {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} review remains ${result.status}`,
+    );
+  }
+};
+
+export const processPendingExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.reviewProposalHash || !withdrawal.reviewApprovalDeadline) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} is missing manual review state`,
+    );
+  }
+  const destinationTimestamp = await getExternalChainLatestTimestamp(
+    withdrawal.externalChainId,
+  );
+  if (
+    destinationTimestamp > BigInt(withdrawal.reviewApprovalDeadline)
+  ) {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "expireWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+  const proposal = await getNativeMintProposalExecution(
+    withdrawal.reviewProposalHash,
+    withdrawal.externalChainId,
+  );
+  if (proposal.status === "pending") {
+    return;
+  }
+  if (proposal.status === "rejected") {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "rejectWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+
+  await processExternalWithdrawal(withdrawal, true);
 };
 
 export const confirmWithdrawalBatch = async (

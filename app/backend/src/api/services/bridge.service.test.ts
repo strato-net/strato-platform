@@ -17,6 +17,10 @@ import {
   parseNativeBridgeAssets,
   parseNativeLockedBalances,
   parseNativeTokenBridgeConfigs,
+  parseBridgeRouteMappings,
+  LEGACY_QUERY_CONFIGS,
+  getDepositOutcomeIdentity,
+  QUERY_CONFIGS,
 } from "../helpers/bridge.helper";
 import type { BridgeToken } from "@strato/shared-types";
 
@@ -38,7 +42,32 @@ const route = (
   externalDecimals: "18",
   maxPerWithdrawal: "0",
   enabled,
-  isDefaultRoute: true,
+});
+
+test("selects router-scoped deposit identity and transaction metadata", () => {
+  assert.match(QUERY_CONFIGS.deposit.selectFields, /depositRouter:key2/);
+  assert.match(QUERY_CONFIGS.deposit.selectFields, /depositId:key3/);
+  assert.match(
+    QUERY_CONFIGS.deposit.selectFields,
+    /externalTxHash:value->>externalTxHash/,
+  );
+});
+
+test("keeps the legacy MercataBridge deposit query on its original keys", () => {
+  assert.match(LEGACY_QUERY_CONFIGS.deposit.selectFields, /externalTxHash:key2/);
+  assert.doesNotMatch(LEGACY_QUERY_CONFIGS.deposit.selectFields, /key3/);
+});
+
+test("correlates action outcomes by router-scoped deposit identity", () => {
+  const txHash = "0xabc";
+  assert.notEqual(
+    getDepositOutcomeIdentity("1", "0x1111111111111111111111111111111111111111", "1", txHash),
+    getDepositOutcomeIdentity("1", "0x1111111111111111111111111111111111111111", "2", txHash),
+  );
+  assert.equal(
+    getDepositOutcomeIdentity(undefined, undefined, undefined, txHash),
+    txHash,
+  );
 });
 
 test("builds actions only for eligible routes and configured products", () => {
@@ -58,7 +87,7 @@ test("builds actions only for eligible routes and configured products", () => {
         String(item.externalChainId),
         item.stratoToken.toLowerCase().replace(/^0x/, ""),
       ].join(":"),
-      { autoForge: true, autoSave: true },
+      { autoForge: false, autoSave: false, autoRoute: true },
     ])
   );
   const base = {
@@ -102,11 +131,11 @@ test("builds actions only for eligible routes and configured products", () => {
   const actions = buildDepositActionCatalog(base);
 
   assert.equal(actions.length, 4);
-  assert.deepEqual(new Set(actions.map(({ action }) => action)), new Set([2, 3]));
+  assert.deepEqual(new Set(actions.map(({ action }) => action)), new Set([4]));
   assert.ok(actions.every(({ externalChainIds }) => externalChainIds.join() === "1"));
   assert.ok(actions.filter(({ payToken }) => payToken === usdc).every(({ psmFeeBps }) => psmFeeBps === "25"));
   assert.ok(actions.filter(({ payToken }) => payToken === constants.USDST).every(({ psmFeeBps }) => psmFeeBps === "0"));
-  assert.ok(actions.filter(({ action }) => action === 3).every(({ oraclePrice }) => oraclePrice === "1000000000000000000"));
+  assert.ok(actions.filter(({ id }) => id.startsWith("save-")).every(({ oraclePrice }) => oraclePrice === "1000000000000000000"));
 
   const pausedPsmActions = buildDepositActionCatalog({
     ...base,
@@ -114,24 +143,49 @@ test("builds actions only for eligible routes and configured products", () => {
   });
   assert.ok(pausedPsmActions.every(({ payToken }) => payToken === constants.USDST));
 
-  const saveOnlyRoutes = new Map(bridgeActionRoutes);
+  const disabledRouteActions = new Map(bridgeActionRoutes);
   const usdcRoute = routes[0];
-  saveOnlyRoutes.set(
+  disabledRouteActions.set(
     [
       usdcRoute.externalToken?.toLowerCase().replace(/^0x/, ""),
       String(usdcRoute.externalChainId),
       usdcRoute.stratoToken.toLowerCase().replace(/^0x/, ""),
     ].join(":"),
-    { autoForge: false, autoSave: true }
+    { autoForge: false, autoSave: false, autoRoute: false }
   );
-  const saveOnlyActions = buildDepositActionCatalog({
+  const routeDisabledActions = buildDepositActionCatalog({
     ...base,
-    bridgeActionRoutes: saveOnlyRoutes,
+    bridgeActionRoutes: disabledRouteActions,
   });
-  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 2).length, 0);
-  assert.equal(saveOnlyActions.filter(({ payToken, action }) => payToken === usdc && action === 3).length, 1);
+  assert.equal(
+    routeDisabledActions.filter(({ payToken }) => payToken === usdc).length,
+    0
+  );
 
   assert.deepEqual(buildDepositActionCatalog({ ...base, actionChainIds: new Set() }), []);
+});
+
+test("parses ExternalAssetBridge route controls", () => {
+  const routes = parseBridgeRouteMappings([{
+    externalToken: "1111111111111111111111111111111111111111",
+    externalChainId: "1",
+    targetStratoToken: "2222222222222222222222222222222222222222",
+    mappingValue: {
+      depositsEnabled: true,
+      withdrawalsEnabled: false,
+      externalDecimals: "6",
+      externalName: "USD Coin",
+      externalSymbol: "USDC",
+      maxPerWithdrawal: "1000000",
+      manualReviewThreshold: "500000",
+    },
+  }]);
+
+  assert.equal(routes.length, 1);
+  assert.equal(routes[0].AssetInfo.enabled, true);
+  assert.equal(routes[0].AssetInfo.depositsEnabled, true);
+  assert.equal(routes[0].AssetInfo.withdrawalsEnabled, false);
+  assert.equal(routes[0].AssetInfo.manualReviewThreshold, "500000");
 });
 
 test("adds token-specific native bridge controls to routes", () => {
@@ -231,7 +285,7 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
   t.mock.method(cirrus, "get", async (_token: string, path: string, request?: any) => {
     const params = request?.params || {};
 
-    if (path === "/mapping") {
+    if (path === "/mapping" || path === `/${constants.ExternalAssetBridge}-routes` || path === `/${constants.ExternalAssetBridge}-routeRebaseRequired`) {
       return { status: 200, data: [] };
     }
 
@@ -291,6 +345,7 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
 
     if (
       path === `/${constants.MercataBridge}-withdrawals`
+      || path === `/${constants.ExternalAssetBridge}-withdrawals`
       || path === `/${constants.StratoNativeBridge}-withdrawals`
     ) {
       return { status: 200, data: [] };
@@ -330,4 +385,44 @@ test("getDepositRouterMajor tries the fallback RPC when the primary returns a JS
   const major = await getDepositRouterMajor("1", "0x1111111111111111111111111111111111111111");
   assert.equal(major, 3);
   assert.deepEqual(calls, [upstream, fallback]);
+});
+
+test("keeps pending and completed withdrawal totals separate across bridge types", async () => {
+  const bridge = await import("./bridge.service");
+  const oracle = await import("../helpers/oracle.helper");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const token = "9".repeat(40);
+  const wad = constants.DECIMALS;
+  const originalRoutes = bridge.getBridgeableTokens;
+  const originalPrices = oracle.getCompletePriceMap;
+  const originalGet = cirrus.get;
+  const originalNativeBridge = Object.getOwnPropertyDescriptor(constants, "stratoNativeBridge")!;
+  (bridge as any).getBridgeableTokens = async () => [];
+  (oracle as any).getCompletePriceMap = async () => new Map([[token, wad.toString()]]);
+  Object.defineProperty(constants, "stratoNativeBridge", { configurable: true, get: () => "8".repeat(40) });
+  (cirrus as any).get = async (_accessToken: string, path: string, { params }: any) => {
+    let amount: bigint;
+    if (path === `/${constants.ExternalAssetBridge}-withdrawals`) {
+      amount = params["value->>status"] === "eq.4" ? 200n : 100n;
+    } else if (path === `/${constants.MercataBridge}-withdrawals`) {
+      amount = params["value->>bridgeStatus"] === "eq.3" ? 20n : 10n;
+    } else {
+      assert.equal(path, `/${constants.StratoNativeBridge}-withdrawals`);
+      amount = params["value->>bridgeStatus"] === "eq.3" ? 2n : 1n;
+    }
+    const completed = params["value->>status"] === "eq.4" || params["value->>bridgeStatus"] === "eq.3";
+    assert.equal(typeof params.block_timestamp === "string", completed);
+    return { data: [{ stratoToken: token, stratoTokenAmount: (amount * wad).toString() }] };
+  };
+  try {
+    const summary = await bridge.getWithdrawalSummary("token", "user");
+    assert.equal(summary.pendingWithdrawals, (111n * wad).toString());
+    assert.equal(summary.totalWithdrawn30d, (222n * wad).toString());
+    assert.equal(summary.availableToWithdraw, "0");
+  } finally {
+    (bridge as any).getBridgeableTokens = originalRoutes;
+    (oracle as any).getCompletePriceMap = originalPrices;
+    cirrus.get = originalGet;
+    Object.defineProperty(constants, "stratoNativeBridge", originalNativeBridge);
+  }
 });

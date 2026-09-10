@@ -47,6 +47,7 @@ export const lendingPool = process.env.LENDING_POOL || "000000000000000000000000
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
+export const externalAssetBridge = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS || "";
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
@@ -242,6 +243,7 @@ export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let tokenRouter: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -379,6 +381,10 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+export function setTokenRouterConfig() {
+  tokenRouter = process.env.TOKEN_ROUTER || "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -408,7 +414,7 @@ export function setExecutedIssuesLookbackConfig(networkId: string) {
 
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
-  const { eth } = await import("../utils/appApiHelper");
+  const { eth, cirrus } = await import("../utils/appApiHelper");
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
@@ -432,6 +438,39 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setTokenRouterConfig();
+  if (!tokenRouter) {
+    throw new Error("TOKEN_ROUTER is required for unified routing");
+  }
+  const normalizedTokenRouter = tokenRouter.toLowerCase().replace(/^0x/, "");
+  const [{ data: bridgeRows }, { data: routerRows }] = await Promise.all([
+    cirrus.get(accessToken, "/BlockApps-ExternalAssetBridge", {
+      params: {
+        address: `eq.${externalAssetBridge}`,
+        select: "tokenRouter",
+        limit: 1,
+      },
+    }),
+    cirrus.get(accessToken, "/BlockApps-TokenRouter", {
+      params: {
+        address: `eq.${normalizedTokenRouter}`,
+        select: "initialized",
+        limit: 1,
+      },
+    }),
+  ]);
+  if (
+    bridgeRows?.[0]?.tokenRouter?.toLowerCase().replace(/^0x/, "") !==
+    normalizedTokenRouter
+  ) {
+    throw new Error("ExternalAssetBridge.tokenRouter does not match TOKEN_ROUTER");
+  }
+  if (
+    routerRows?.[0]?.initialized !== true &&
+    String(routerRows?.[0]?.initialized) !== "true"
+  ) {
+    throw new Error("Configured TokenRouter is not initialized");
+  }
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
@@ -449,6 +488,7 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    externalAssetBridge,
     stratoNativeBridge,
     stratoNativeCustodyVault,
     burnAddress,
@@ -465,7 +505,7 @@ export async function getInternalAddresses() {
     goldstYieldVault,
     silvstYieldVault
   );
-  addresses.push(directMintPsm);
+  addresses.push(directMintPsm, tokenRouter);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

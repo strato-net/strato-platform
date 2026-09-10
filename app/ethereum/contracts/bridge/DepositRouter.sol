@@ -29,12 +29,15 @@ contract DepositRouter is
     error SweepEthFailed();
     error NotPermitted();
     error FeesNotSupported();
+    error InvalidAction();
 
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
     // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public PERMIT2;
 
+    // Deprecated storage name retained to preserve the proxy layout and legacy getter.
+    // The value is the ExternalBridgeVault custody destination.
     address public gnosisSafe;
     uint96 public depositId;
     // address(0) represents ETH configuration for depositETH()
@@ -95,6 +98,10 @@ contract DepositRouter is
         bool isPermitted
     );
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+    event ExternalBridgeVaultUpdated(
+        address indexed oldVault,
+        address indexed newVault
+    );
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -103,12 +110,12 @@ contract DepositRouter is
 
     function initialize(
         address permit2_,
-        address gnosisSafe_,
+        address externalBridgeVault_,
         address owner_
     ) public initializer {
         if (
             owner_ == address(0) ||
-            gnosisSafe_ == address(0) ||
+            externalBridgeVault_ == address(0) ||
             permit2_ == address(0)
         ) revert InvalidAddress();
         __Ownable_init(owner_);
@@ -119,8 +126,9 @@ contract DepositRouter is
         // Set PERMIT2 once during initialization - this value persists across all upgrades
         PERMIT2 = IPermit2(permit2_);
 
-        gnosisSafe = gnosisSafe_;
-        emit GnosisSafeUpdated(address(0), gnosisSafe_);
+        gnosisSafe = externalBridgeVault_;
+        emit GnosisSafeUpdated(address(0), externalBridgeVault_);
+        emit ExternalBridgeVaultUpdated(address(0), externalBridgeVault_);
     }
 
     function deposit(
@@ -168,6 +176,7 @@ contract DepositRouter is
         intent.action = action;
         intent.actionToken = actionToken;
         intent.minFinalOut = minFinalOut;
+        _validateActionIntent(intent);
 
         DepositRequest memory request;
         request.token = token;
@@ -224,12 +233,12 @@ contract DepositRouter is
         if (!c.isPermitted) revert NotPermitted();
         if (!routePermitted[request.token][request.targetStratoToken]) revert NotPermitted();
 
-        address safe = gnosisSafe;
+        address vault = gnosisSafe;
         unchecked {
             id = ++depositId;
         }
 
-        uint256 balanceBefore = IERC20(request.token).balanceOf(safe);
+        uint256 balanceBefore = IERC20(request.token).balanceOf(vault);
 
         IPermit2.PermitTransferFrom memory permit = IPermit2
             .PermitTransferFrom({
@@ -241,7 +250,7 @@ contract DepositRouter is
                 deadline: request.deadline
             });
         IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
-            .SignatureTransferDetails({to: safe, requestedAmount: request.amount});
+            .SignatureTransferDetails({to: vault, requestedAmount: request.amount});
         PERMIT2.permitTransferFrom(
             permit,
             transferDetails,
@@ -249,7 +258,7 @@ contract DepositRouter is
             request.signature
         );
 
-        depositedAmount = IERC20(request.token).balanceOf(safe) - balanceBefore;
+        depositedAmount = IERC20(request.token).balanceOf(vault) - balanceBefore;
 
         if (depositedAmount == 0) revert ZeroAmount();
         if (depositedAmount < request.amount) revert FeesNotSupported();
@@ -260,6 +269,52 @@ contract DepositRouter is
         address stratoAddress,
         address targetStratoToken
     ) external payable whenNotPaused nonReentrant {
+        uint96 id = _processETHDeposit(stratoAddress, targetStratoToken);
+
+        emit DepositRouted(
+            address(0),
+            msg.value,
+            msg.sender,
+            stratoAddress,
+            targetStratoToken,
+            id
+        );
+    }
+
+    function depositETHWithAction(
+        address stratoAddress,
+        address targetStratoToken,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut
+    ) external payable whenNotPaused nonReentrant {
+        ActionIntent memory intent;
+        intent.action = action;
+        intent.actionToken = actionToken;
+        intent.minFinalOut = minFinalOut;
+        _validateActionIntent(intent);
+
+        uint96 id = _processETHDeposit(stratoAddress, targetStratoToken);
+        _emitDepositWithAction(
+            address(0),
+            msg.value,
+            stratoAddress,
+            targetStratoToken,
+            id,
+            intent
+        );
+    }
+
+    function _validateActionIntent(ActionIntent memory intent) internal pure {
+        if (intent.action != 4) revert InvalidAction();
+        if (intent.actionToken == address(0)) revert InvalidAddress();
+        if (intent.minFinalOut == 0) revert ZeroAmount();
+    }
+
+    function _processETHDeposit(
+        address stratoAddress,
+        address targetStratoToken
+    ) internal returns (uint96 id) {
         if (msg.value == 0) revert ZeroAmount();
         if (stratoAddress == address(0)) revert InvalidAddress();
         if (targetStratoToken == address(0)) revert InvalidAddress();
@@ -269,22 +324,13 @@ contract DepositRouter is
         if (!c.isPermitted) revert NotPermitted();
         if (!routePermitted[address(0)][targetStratoToken]) revert NotPermitted();
 
-        address safe = gnosisSafe;
+        address vault = gnosisSafe;
         unchecked {
-            ++depositId;
+            id = ++depositId;
         }
 
-        (bool success, ) = safe.call{value: msg.value}("");
+        (bool success, ) = vault.call{value: msg.value}("");
         if (!success) revert ETHTransferFailed();
-
-        emit DepositRouted(
-            address(0),
-            msg.value,
-            msg.sender,
-            stratoAddress,
-            targetStratoToken,
-            depositId
-        );
     }
 
     function setMinDepositAmount(
@@ -345,11 +391,24 @@ contract DepositRouter is
     }
 
     function setGnosisSafe(address newSafe) external onlyOwner {
-        if (newSafe == address(0)) revert InvalidAddress();
-        address old = gnosisSafe;
-        if (newSafe == old) revert SameAddressProposed();
-        gnosisSafe = newSafe;
-        emit GnosisSafeUpdated(old, newSafe);
+        _setExternalBridgeVault(newSafe);
+    }
+
+    function setExternalBridgeVault(address newVault) external onlyOwner {
+        _setExternalBridgeVault(newVault);
+    }
+
+    function externalBridgeVault() external view returns (address) {
+        return gnosisSafe;
+    }
+
+    function _setExternalBridgeVault(address newVault) internal {
+        if (newVault == address(0)) revert InvalidAddress();
+        address oldVault = gnosisSafe;
+        if (newVault == oldVault) revert SameAddressProposed();
+        gnosisSafe = newVault;
+        emit GnosisSafeUpdated(oldVault, newVault);
+        emit ExternalBridgeVaultUpdated(oldVault, newVault);
     }
 
     function pause() external onlyOwner {
@@ -376,7 +435,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "3.0.0";
+        return "3.2.0";
     }
 
     function _authorizeUpgrade(

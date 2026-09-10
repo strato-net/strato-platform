@@ -15,6 +15,21 @@ export function useTradeTokens() {
   });
 }
 
+/** Every asset that can be reached through TokenRouter. */
+export function useRouteAssets() {
+  return useQuery({
+    queryKey: ["trade", "route", "assets"],
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<SwapToken[]>("/trade/route/assets", {
+        signal,
+      });
+      return data ?? [];
+    },
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
 /** Tokens tradable against the given token. */
 export function useTradePairableTokens(tokenAddress?: string) {
   return useQuery({

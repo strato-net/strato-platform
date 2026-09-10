@@ -1,14 +1,15 @@
 # STRATO Bridge Service
 
-The STRATO Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO mainnet/testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
+The STRATO Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO mainnet/testnet. It manages vault-backed non-native transfers, native bridge transfers, and legacy Safe withdrawals while monitoring blockchain activity through dynamic RPC connections.
 
 ## Features
 
 * **Dynamic Chain Support**: Automatically detects and configures RPC endpoints for all enabled chains from the bridge contract
-* **Safe Multisig Integration**: Proposes and executes transactions through Gnosis Safe for secure asset management
+* **Safe Governance Integration**: Uses Safe governance for large-withdrawal approval and reviewed-deposit aborts
+* **External Vault Releases**: Reserves and releases routine non-native withdrawals using threshold-signed vault authorizations
 * **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
-* **Bridge Out Flow**: Complete STRATO → Ethereum asset transfer with Safe approval workflow
-* **Bridge In Flow**: Ethereum → STRATO deposit processing and confirmation
+* **Bridge Out Flow**: STRATO → external-chain transfers through route-local vaults, with manual review for large withdrawals
+* **Bridge In Flow**: External-chain → STRATO settlement with optional one-click TokenRouter execution
 * **Dynamic Asset Management**: Fetches enabled assets and chain information from on-chain bridge contract
 * **Email Notifications**: Sends transaction alerts to configured email addresses
 * **Comprehensive Logging**: Secure and contextual logging using Winston
@@ -50,10 +51,18 @@ cp .env.example .env
 - `CLIENT_SECRET` - OAuth client secret
 - `CLIENT_ID` - OAuth client ID
 - `OPENID_DISCOVERY_URL` - OpenID discovery endpoint
+- `RELAYER_BA_USERNAME`, `RELAYER_BA_PASSWORD` - Separate unprivileged STRATO settlement relayer account
+- `RELAYER_CLIENT_ID`, `RELAYER_CLIENT_SECRET`, `RELAYER_OPENID_DISCOVERY_URL` - OAuth client configuration for the relayer account
+
+The operator account records reviews, marks withdrawals ready and submits routed settlements. The relayer account can only submit threshold-attested plain deposit settlements and withdrawal finalizations. Startup rejects use of the same STRATO account for both roles or use of a settlement verifier as the relayer.
 
 #### Blockchain
 - `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
 - `BRIDGE_ADDRESS` - MercataBridge contract address
+- `EXTERNAL_ASSET_BRIDGE_ADDRESS` - ExternalAssetBridge proxy address used for non-native deposits
+- `EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS` - Safe approval validity for large withdrawals (defaults to seven days)
+- `STRATO_APP_API_URL` - Backend base URL used to refresh executable `AUTO_ROUTE` quotes
+- `TOKEN_ROUTER` - Initialized TokenRouter address; startup requires it to match `ExternalAssetBridge.tokenRouter`
 
 #### Chain RPC URLs (Dynamically Validated)
 The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:
@@ -65,7 +74,12 @@ The service automatically validates that RPC URLs are configured for all enabled
 #### Safe Wallet
 - `SAFE_ADDRESS` - Gnosis Safe wallet address
 - `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
-- `SAFE_PROPOSER_PRIVATE_KEY` - Safe Proposer private key
+- `SAFE_PROPOSER_KMS_KEY_ID` - AWS KMS key ID or alias for the Safe proposer
+- `SAFE_PROPOSER_KMS_REGION` - AWS region containing the Safe proposer key
+
+The bridge workload calls AWS KMS directly with its IAM role. No AWS access key, bearer-authenticated signing adapter, or Safe proposer private key is loaded by the service. The KMS public key and every returned signature are checked against `SAFE_PROPOSER_ADDRESS`.
+
+The separately run Ethereum `depositRouterSafeOps.js` deployment and upgrade tooling still accepts `SAFE_PROPOSER_PRIVATE_KEY`. This is an offline operational exception and must not share the bridge-service runtime or environment.
 
 #### Native Bridge Minting
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
@@ -75,10 +89,46 @@ The service automatically validates that RPC URLs are configured for all enabled
 
 Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
 
+#### External Vault Releases
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` - Unprivileged destination-chain gas executor address
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID` - AWS KMS key ID or alias for executor signing
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION` - AWS region containing the executor key
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS` - Comma-separated HTTPS URLs for three independent verifier services
+- `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS` - Comma-separated distinct tokens in the same order as the verifier URLs
+
+The executor workload calls AWS KMS directly through workload identity and verifies each signature against `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting.
+
+Run each verifier independently with `npm run start:verifier`. Each process must use its own `VERIFIER_RPC_URL`, AWS workload identity (`KMS_KEY_ID`, `KMS_REGION`, `VAULT_AUTHORIZATION_SIGNER_ADDRESS`), local `VERIFIER_POLICY_PATH`, inbound `EXTERNAL_BRIDGE_VERIFIER_API_TOKEN`, and STRATO settlement-attestor OAuth account (`SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL`, `SETTLEMENT_ATTESTOR_CLIENT_ID`, `SETTLEMENT_ATTESTOR_CLIENT_SECRET`, `SETTLEMENT_ATTESTOR_BA_USERNAME`, `SETTLEMENT_ATTESTOR_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Each verifier independently validates chain evidence, source state, contract limits, and its local policy. Amounts above a local automatic limit require the existing on-chain review approval before signing. Decision logs include the local policy version and SHA-256 digest.
+
+Verifier deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per verifier organization with a distinct RPC provider, AWS account or role, KMS key, policy file, API token, and HTTPS endpoint. Finalization generates `external-bridge-verifier-policy-<chainId>-1.json` through `-3.json`, each bound to one STRATO settlement attestor and one shared baseline hash. Each organization may tighten its local limits but must not raise them above the contract policy.
+
+`VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
+
+For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. At least two of the three configured signer RPCs must support this method for settlement, and all three should support it to preserve one-verifier fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
+
+Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
+Expired reservations are cancelled on the original destination vault and recorded on STRATO. Refunds additionally require threshold verifier attestations of confirmed external non-payment; an operator cancellation record alone is insufficient. `npm run refund:external-withdrawal` from `app/contracts` verifies evidence in dry-run mode, and collects `/v1/attest-refund` attestations before submitting a governance vote in execute mode. Configure `SOURCE_CHAIN_ID`, the external RPC URL and positive confirmation count for the refund tool, plus HTTPS verifier URLs/API tokens when executing. Verifier startup checks actual external and STRATO RPC network identities; mismatches fail closed.
+
 #### Optional
+- `CHAIN_${chainId}_WS_RPC_URL` - WebSocket RPC used for immediate deposit detection
+- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent receipt-verification RPCs; the primary `CHAIN_${chainId}_RPC_URL` must support `trace_transaction` for native ETH deposits
+- `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` - Per-chain confirmation count (defaults to `0` in development; production requires an explicit positive value)
+- `DEPOSIT_MISSING_RECEIPT_GRACE_MS` - Time a missing/lagging receipt remains retryable before review (defaults to `300000`)
+- `DEPOSIT_SETTLEMENT_RETRY_GRACE_MS` - Time a verified deposit settlement may retry before terminal quarantine/review (defaults to `900000`)
+- `DEPOSIT_REVIEW_RECORD_RETRY_MS` - Minimum interval between STRATO review-recording attempts (defaults to `60000`; persisted reviews retry independently of log reconciliation)
+- `DEPOSIT_WEBHOOK_TOKEN` - Required outside development/test for deposit webhook authentication
+- `DEPOSIT_OPERATIONS_TOKEN` - Required outside development/test to confirm reviewed deposits through the operator endpoint
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
 - `SENDGRID_API_KEY` - SendGrid API key for sending emails
+
+### Deposit cache recovery
+
+`data/pendingExternalDeposits.json` is a single-writer cache. Writes use atomic replacement. Pending deposits and reviews not yet recorded on STRATO hold the scan cursor before their external block, so their events can be replayed after cache loss. Retry grace periods restart when observations are reconstructed.
+
+Each chain poll reconciles STRATO pending reviews through Cirrus. Missing observations are reconstructed from external receipts and checked against the recorded identity, amounts, recipient and action. Recovered records remain in review; they are never automatically approved. Manual confirmation can perform the same reconstruction and still requires current STRATO review status, custody verification and verifier attestations. Unavailable or inconsistent receipts are retried without approving the deposit.
+
+This does not recover old unrecorded reviews if an earlier service version already advanced the cursor beyond them. Preserve existing cache files during rollout; those cases need an explicit historical replay. A corrupt committed JSON file still fails closed and must be preserved for investigation before recovery. No additional database is required.
 
 ### Dynamic Configuration
 
@@ -114,7 +164,7 @@ npm start
 1. **Bridge Service** (`bridgeService.ts`)
    - Core bridge contract interactions
    - Handles deposit and withdrawal confirmations
-   - Manages batch operations for efficiency
+   - Atomically settles independently verified deposits
 
 2. **Safe Service** (`safeService.ts`)
    - Centralized Safe multisig wallet operations
@@ -134,19 +184,18 @@ npm start
 ### Bridge Out Flow (STRATO → Ethereum)
 
 1. **Withdrawal Initiation**
-   - Service polls for withdrawals with status "1" (INITIATED)
-   - Groups withdrawals by destination chain and token
-   - Creates Safe transactions for each unique combination
+   - Service polls `ExternalAssetBridge` for initiated routine withdrawals
+   - Persists the vault signer-set version and authorization window on STRATO
 
-2. **Safe Transaction Processing**
-   - Generates Safe transaction with total amount and destination address
-   - Proposes transaction to Safe multisig for approval
-   - Monitors transaction status (executed/rejected/pending)
+2. **Vault Processing**
+   - Collects threshold-sorted EIP-712 validator signatures
+   - Reserves route-local vault liquidity and records the reservation on STRATO
+   - Releases the canonical external asset to the recipient
 
 3. **Finalization**
-   - **Executed**: Calls `finaliseWithdrawalBatch` on bridge contract
-   - **Rejected**: Calls `abortWithdrawalBatch` on bridge contract
-   - Sends email notifications for completed transactions
+   - Records the confirmed release transaction on STRATO
+   - Burns the escrowed STRATO representation only after release
+   - Leaves large withdrawals pending for the manual-review path
 
 ### Bridge In Flow (Ethereum → STRATO)
 
@@ -154,33 +203,49 @@ npm start
    - External-chain polling reads standard and action deposit events in one ordered block range
    - ABI-decodes the action intent
    - Deduplicates exact RPC log repeats
-   - Rejects unsupported multi-deposit transactions without advancing the cursor
+   - Groups deposit events by transaction and requires a unique custody movement for every event
+   - Deduplicates exact RPC evidence, but quarantines the whole transaction when an event or movement is malformed, reused, missing, or ambiguous
 
 2. **Processing**
-   - Records standard deposits with `depositBatch`
-   - Records action deposits with `depositBatchWithAction`
-   - Advances the cursor only after both recording paths succeed
+   - Fetches each transaction receipt and trace once, then validates token, sender, custody, exact amount, and execution ordering
+   - Settles no deposits from a transaction unless every event passes custody verification
+   - Calls `settleDeposit` once per verified deposit
+   - Keeps the cursor behind the oldest pending deposit
+   - Logs a failed settlement and continues processing later deposits
 
-### Action Deposit Rollout
+### Reviewed Deposits
 
-Before starting the updated relayer in dev, test, or production:
-
-1. Upgrade and configure `MercataBridge`.
-2. Dry-run the two required relayer whitelist operations:
+Use the review resolver in dry-run mode before submitting either decision:
 ```bash
 cd app/contracts/deploy
-node configure-bridge-relayer-actions.js \
-  --bridge-address <bridge-proxy> \
-  --relayer-address <relayer-address>
+node resolve-external-deposit.js \
+  --decision confirm \
+  --external-chain-id <chain-id> \
+  --deposit-router <router> \
+  --deposit-id <deposit-id> \
+  --bridge-service-url <bridge-service-url>
 ```
-3. Repeat with `--execute` as each required admin until governance executes both operations.
-4. Verify the relayer is whitelisted for `depositWithAction` and `depositBatchWithAction`.
-5. Start one relayer instance, validate standard and action deposits, then roll out remaining instances.
+
+Add `--execute` after review to call `confirmReviewedDeposit` through the authenticated bridge-operator endpoint. Use `--decision abort --bridge-address <bridge>` to submit the final `abortDeposit` decision through AdminRegistry governance. A reorg replacement requires a separate `--decision reuse --bridge-address <bridge> --bridge-service-url <bridge-service-url>` governance vote; only after `authorizeDepositReuse` executes does the tool reset the persisted observation for canonical reprocessing. The `/reset` endpoint cannot authorize reuse by itself.
+
+Configure `ExternalAssetBridge.setPriceOracle` and call `setRouteRebaseRequired(externalToken, chainId, stratoToken, true)` before enabling a rebasing route. The same route flag controls on-chain inbound division and outbound multiplication. The service preserves the raw verified external amount. Required-rebase routes fail closed unless `PriceOracle.rebaseFactors(stratoToken)` is nonzero; a failure is isolated to that deposit. Keep each xStock route disabled until the route flag, oracle, and factor are verified.
+
+### AUTO_ROUTE rollout
+
+1. Deploy and initialize the standalone `TokenRouter` proxy; do not initialize it from `BaseCodeCollection`.
+2. Transfer TokenRouter ownership to AdminRegistry and approve each supported YieldVault.
+3. Set the TokenRouter proxy on `ExternalAssetBridge`.
+4. Upgrade each external DepositRouter to 3.2 and verify both ERC-20 and native ETH action deposits.
+5. Set backend and bridge-service `TOKEN_ROUTER`, plus bridge-service `STRATO_APP_API_URL`.
+6. Verify `/api/trade/route/quote` for each intended Save, Forge, swap and YieldVault destination.
+7. Enable action 4 per source route with `setDepositAction(externalToken, chainId, stratoToken, 4, true)`.
+
+Save and Forge remain distinct UI destinations, but they are no longer distinct bridge execution modes. Both emit an `AUTO_ROUTE` intent. The service refreshes the route after external finality, derives every step minimum from the user's signed `minFinalOut`, and submits `settleDepositWithRoute`; quote or execution failure atomically falls back to the bridged source token.
 
 ### Key Components
 
 - **Dynamic RPC Management**: Uses `getChainRpcUrl(chainId)` for all chain interactions
-- **Safe Integration**: Leverages `@safe-global/protocol-kit` and `@safe-global/api-kit`
+- **Safe Integration**: Retained for governance and legacy withdrawal operations
 - **OAuth Authentication**: Secure STRATO access with JWT validation
 - **Error Handling**: Comprehensive error handling with detailed logging
 
@@ -208,7 +273,7 @@ The service logs important events and errors using Winston logger:
 ## Security Considerations
 
 - **Private Keys**: Stored securely in environment variables
-- **Safe Multisig**: All bridge operations require Safe approval
+- **Safe Multisig**: Safe remains available for governance, manual review, and legacy withdrawals
 - **OAuth**: Secure authentication with STRATO
 - **Contract Validation**: All operations filter by specific bridge contract address
 - **Error Handling**: Prevents service crashes and data corruption

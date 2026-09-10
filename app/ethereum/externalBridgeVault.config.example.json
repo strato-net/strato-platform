@@ -1,0 +1,31 @@
+{
+  "sourceChainId": "6909499098523985262",
+  "sourceBridge": "0x1111111111111111111111111111111111111111",
+  "chains": [
+    {
+      "chainId": 11155111,
+      "safeAddress": "0x2222222222222222222222222222222222222222",
+      "guardianAddress": "0x8888888888888888888888888888888888888888",
+      "vaultAddress": "0x3333333333333333333333333333333333333333",
+      "depositRouterAddress": "0x4444444444444444444444444444444444444444",
+      "attestationSigners": [
+        "0x5555555555555555555555555555555555555555",
+        "0x6666666666666666666666666666666666666666"
+      ],
+      "disabledAttestationSigners": [],
+      "attestationThreshold": 2,
+      "maxAuthorizationValiditySeconds": "1800",
+      "tokens": [
+        {
+          "token": "0x7777777777777777777777777777777777777777",
+          "enabled": true,
+          "maxPerWithdrawal": "1000000000",
+          "windowLimit": "10000000000",
+          "windowSeconds": "86400",
+          "manualReviewThreshold": "500000000",
+          "migrateAmount": "0"
+        }
+      ]
+    }
+  ]
+}

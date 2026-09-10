@@ -61,6 +61,7 @@ export const SWAP_HISTORY_SELECT_FIELDS = [
   "address",
   "id",
   "block_timestamp",
+  "transaction_hash",
   "sender",
   "tokenIn",
   "tokenOut", 
