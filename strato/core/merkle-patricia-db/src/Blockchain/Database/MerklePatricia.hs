@@ -41,6 +41,7 @@ module Blockchain.Database.MerklePatricia
     sha2StateRoot,
     unboxStateRoot,
     putKeyVal,
+    putKeyValExisted,
     getKeyVal,
     deleteKey,
     keyExists,
@@ -101,6 +102,15 @@ putKeyVal ::
   -- | The object containing the stateRoot to the data after the insert.
   m StateRoot
 putKeyVal sr = unsafePutKeyVal sr . keyToSafeKey
+
+-- | 'putKeyVal' that also reports whether the key already existed.
+putKeyValExisted ::
+  (StateRoot `Alters` NodeData) m =>
+  StateRoot ->
+  Key ->
+  Val ->
+  m (StateRoot, Bool)
+putKeyValExisted sr = unsafePutKeyValExisted sr . keyToSafeKey
 
 -- | Retrieves all key/value pairs whose key starts with the given parameter.
 getKeyVal ::

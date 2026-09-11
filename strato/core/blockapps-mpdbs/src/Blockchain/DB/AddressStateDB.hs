@@ -34,7 +34,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util
-import Control.Monad (liftM)
+import Control.Monad (liftM, unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -71,9 +71,10 @@ getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
 putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
 putAddressState address newState = do
-  hashDBPut addrNibbles
   sr <- getStateRoot Nothing
-  sr' <- MP.putKeyVal sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
+  (sr', existed) <- MP.putKeyValExisted sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
+  -- the hash->address entry is immutable; only new accounts need one
+  unless existed $ hashDBPut addrNibbles
   setStateDBStateRoot Nothing sr'
   where
     addrNibbles = addressAsNibbleString address

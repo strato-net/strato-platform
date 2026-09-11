@@ -37,7 +37,7 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
-import Control.Monad (forM_, join)
+import Control.Monad (forM_, join, unless)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Loops
@@ -237,12 +237,9 @@ putAllKeyValForStateRoot sr changes = do
       (allDeletes, allInserts) = partition ((== blankValRLP) . snd) changes
       deleteKeys = map fst allDeletes
 
-  for_ allInserts $ hashDBPut . fst
-
-  sr' <-
-    if True -- FEATUREFLAG  speed up putManyKeyVal
-      then putManyKeyVal sr allInserts
-      else putManyKeyValSlow sr allInserts
+  (sr', existed) <- putManyKeyValExisted sr allInserts
+  -- the hash->key entry is immutable; only newly created keys need one
+  for_ allInserts $ \(k, _) -> unless (k `elem` existed) $ hashDBPut k
 
   sr'' <- deleteManyKeyVal sr' deleteKeys
 
@@ -251,13 +248,6 @@ putAllKeyValForStateRoot sr changes = do
 deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
 deleteManyKeyVal sr listOfDeletes =
   concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
-
-putManyKeyValSlow :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [(MP.Key, MP.Val)] -> m MP.StateRoot
-putManyKeyValSlow sr listOfInserts =
-  concatM (map (flip putRawStorageKeyValDB) listOfInserts) sr
-
-putRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> (MP.Key, MP.Val) -> m MP.StateRoot
-putRawStorageKeyValDB sr (key, val) = MP.putKeyVal sr key val
 
 deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
