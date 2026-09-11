@@ -51,7 +51,6 @@ module Blockchain.VMContext
     mpPendingBlockHashRoot,
     mpFlushInterval,
     mpFlushCount,
-    hashCache,
     HasPendingMPNodes (..),
     runTestContextM,
     initContext,
@@ -242,8 +241,7 @@ data Context = Context
     _mpPendingNodes :: IORef (HM.HashMap B.ByteString MP.NodeData),
     _mpPendingBlockHashRoot :: IORef (Maybe B.ByteString),
     _mpFlushInterval :: !Int,
-    _mpFlushCount :: IORef Int,
-    _hashCache :: IORef (HM.HashMap B.ByteString N.NibbleString)
+    _mpFlushCount :: IORef Int
   }
   deriving (Generic)
 
@@ -401,7 +399,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
       pendingNodes <- newIORef HM.empty
       pendingBlockHashRoot <- newIORef Nothing
       flushCount <- newIORef 0
-      hCache <- newIORef HM.empty
       let ctx =
             Context
               { _dbs = cdbs,
@@ -411,8 +408,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                 _mpPendingNodes = pendingNodes,
                 _mpPendingBlockHashRoot = pendingBlockHashRoot,
                 _mpFlushInterval = 1,
-                _mpFlushCount = flushCount,
-                _hashCache = hCache
+                _mpFlushCount = flushCount
               }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
@@ -483,7 +479,6 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
   pendingNodes <- newIORef HM.empty
   pendingBlockHashRoot <- newIORef Nothing
   flushCount <- newIORef 0
-  hCache <- newIORef HM.empty
   pure
     Context
       { _dbs = cdbs,
@@ -493,8 +488,7 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
         _mpPendingNodes = pendingNodes,
         _mpPendingBlockHashRoot = pendingBlockHashRoot,
         _mpFlushInterval = flushInterval,
-        _mpFlushCount = flushCount,
-        _hashCache = hCache
+        _mpFlushCount = flushCount
       }
 
 runContextM ::

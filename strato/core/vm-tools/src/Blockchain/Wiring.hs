@@ -43,7 +43,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Util (nibbleString2ByteString)
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import qualified Blockchain.TxRunResultCache as TRC
@@ -288,31 +287,10 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (MonadUnliftIO m, HasContext m) => (N.NibbleString `A.Alters` N.NibbleString) m where
-  lookup _ k = do
-    cacheRef <- view hashCache <$> accessEnv
-    cache <- liftIO $ readIORef cacheRef
-    case HM.lookup (nibbleString2ByteString k) cache of
-      Just v -> pure (Just v)
-      Nothing -> do
-        mv <- genericLookupHashDB getHashDB k
-        liftIO $ for_ mv $ \v -> modifyIORef' cacheRef (HM.insert (nibbleString2ByteString k) v)
-        pure mv
-  insert _ k v = do
-    cacheRef <- view hashCache <$> accessEnv
-    let key = nibbleString2ByteString k
-    cache <- liftIO $ readIORef cacheRef
-    case HM.lookup key cache of
-      Just cached
-        | cached == v -> pure ()
-        | otherwise -> error "hash reverse-index collision: cached value differs"
-      Nothing -> do
-        genericInsertHashDB getHashDB k v
-        liftIO $ modifyIORef' cacheRef (HM.insert key v)
-  delete _ k = do
-    cacheRef <- view hashCache <$> accessEnv
-    liftIO $ modifyIORef' cacheRef (HM.delete (nibbleString2ByteString k))
-    genericDeleteHashDB getHashDB k
+instance HasContext m => (N.NibbleString `A.Alters` N.NibbleString) m where
+  lookup _ = genericLookupHashDB $ getHashDB
+  insert _ = genericInsertHashDB $ getHashDB
+  delete _ = genericDeleteHashDB $ getHashDB
 
 instance (HasContext m) => HasMemRawStorageDB m where
   getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
