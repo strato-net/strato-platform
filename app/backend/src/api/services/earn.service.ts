@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap, rewards as rewardsAddr, saveUsdstVault as saveUsdstVaultAddr } from "../../config/config";
+import { hiddenSwapPools, yieldBenchmarks, compositeYieldMap, rewards as rewardsAddr, saveUsdstVault as saveUsdstVaultAddr, poolV3Factory } from "../../config/config";
 import { toUTCTime, getMappingKeyParts, reassembleMappingStructRows } from "../helpers/cirrusHelpers";
 import {
   computeExchangeRateAPY, getYieldWindowBounds, getYieldExchangeRateRowsCached,
@@ -18,19 +18,27 @@ import {
 import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } from "../helpers/vaultPerformance.helper";
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getStratoStakingNetworkApy } from "./staking.service";
+import { getPools as getV3Pools } from "./poolV3.service";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
-import { ApySource, TokenApyEntry } from "@strato/shared-types";
+import { ApySource, TokenApyEntry, PoolV3 } from "@strato/shared-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const { Pool, DECIMALS, Token, ZERO_ADDRESS, DAY_MS, BPS_DIVISOR } = constants;
+
+/**
+ * V3 pools below this TVL are left out of the token APY feed. A pool's `apy` annualizes
+ * a single day of fees, so a near-empty pool with one swap posts a headline number that
+ * would win the Native max for both of its tokens.
+ */
+const V3_POOL_APY_MIN_TVL_USD = 1_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Phase1Data = Awaited<ReturnType<typeof fetchPhase1>>;
 type Phase1Ctx = ReturnType<typeof parsePhase1>;
 type Phase1bData = Awaited<ReturnType<typeof fetchPhase1b>>;
-type AddFn = (token: string, entry: ApySource) => void;
+export type AddFn = (token: string, entry: ApySource) => void;
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -40,6 +48,12 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const vaultAddr = constants.vault ?? "";
   const rewAddr = rewardsAddr ?? "";
   const saveUsdstVault = saveUsdstVaultAddr ?? "";
+
+  // V3 pools are an independent Cirrus read (pool rows + 24h swaps + prices); overlap it
+  // with the Phase 1 queries so it adds no latency to the endpoint.
+  const v3PoolsPromise: Promise<PoolV3[]> = poolV3Factory
+    ? getV3Pools(accessToken).catch(() => [])
+    : Promise.resolve([]);
 
   const phase1 = await fetchPhase1(accessToken, now, windowStart, windowEndExclusive, anchorsMs, vaultAddr, rewAddr, saveUsdstVault);
   const ctx = parsePhase1(phase1, vaultAddr, rewAddr, saveUsdstVault);
@@ -83,6 +97,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     : null;
 
   await addPoolApys(accessToken, add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
+  addV3PoolApys(add, await v3PoolsPromise, ctx.prices, baseYieldByAddr);
 
   if (ctx.shareTokenAddress) {
     if (isPositiveApy(vaultAPY)) add(ctx.shareTokenAddress, { source: "vault", apy: vaultAPY });
@@ -564,6 +579,42 @@ async function addPoolApys(
     const wApy = weightedBaseYield(tokenAddrs, balances, ctx.prices, baseYieldByAddr);
 
     emitPoolApys(add, poolAddress, lpTokenAddress, meta, tokenAddrs, swapApy, poolRewardApy, wApy, baseYieldByAddr);
+  }
+}
+
+/**
+ * Concentrated-liquidity (V3) pools as a Native APY venue for their two tokens.
+ *
+ * Reuses the pool's own `apy` from poolV3.service (24h LP fees / pool TVL × 365 — the
+ * same formula as V2 pools) so the Dashboard's Best Available APY and the V3 Pools tab
+ * never disagree. V3 has no LP token (positions are NFTs), so the pool address stands in
+ * as the pool-level key that V2 gives to the LP token, and there is no rewards activity
+ * to attach.
+ *
+ * The figure is a pool-wide average: only in-range liquidity earns fees, so a tight
+ * position earns more and an out-of-range one earns nothing.
+ *
+ * Exported for unit tests; production callers go through getTokenApys.
+ */
+export function addV3PoolApys(
+  add: AddFn, pools: PoolV3[], prices: Map<string, string>, baseYieldByAddr: Map<string, number>,
+) {
+  for (const pool of pools ?? []) {
+    if (pool.isPaused || pool.isDisabled) continue;
+    const poolAddress = normalizeAddress(pool.address);
+    if (!poolAddress || hiddenSwapPools.has(poolAddress)) continue;
+    if (!(pool.totalLiquidityUSD >= V3_POOL_APY_MIN_TVL_USD)) continue;
+
+    const tokenAddrs = [normalizeAddress(pool.token0.address), normalizeAddress(pool.token1.address)];
+    if (!tokenAddrs[0] || !tokenAddrs[1]) continue;
+
+    const meta = `${pool.token0.symbol}-${pool.token1.symbol} ${pool.fee / 10_000}% V3`;
+    const swapApy = Number.isFinite(pool.apy) && pool.apy > 0 ? pool.apy.toFixed(2) : ZERO_APY;
+    const wApy = baseYieldByAddr.size > 0
+      ? weightedBaseYield(tokenAddrs, [pool.token0Balance ?? "0", pool.token1Balance ?? "0"], prices, baseYieldByAddr)
+      : null;
+
+    emitPoolApys(add, poolAddress, poolAddress, meta, tokenAddrs, swapApy, null, wApy, baseYieldByAddr);
   }
 }
 
