@@ -97,6 +97,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
   cp /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
+  cp /tmp/tracing.lua /usr/local/openresty/nginx/lua/tracing.lua
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/server.pem /etc/ssl/certs/server.pem

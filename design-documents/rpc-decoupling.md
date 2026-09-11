@@ -65,7 +65,7 @@ identity guard).
 What a cell does not do: it does not reduce Postgres count, since each cell
 indexes for itself. That is the reason stage 3 exists.
 
-## Stage 3: `vm-query`, a SQL-backed query VM (spike before building)
+## Stage 3: `vm-query`, a SQL-backed query VM (spike done, see results below)
 
 ### Finding: the handlers are already monad-generic
 
@@ -123,3 +123,109 @@ vm-runner for the top 20 contracts. Then build `vm-query` as an executable in
 `core/vm-runner`, wire `ethereum-jsonrpc` to call it in-process (or over
 localhost) for `eth_call`, simulate and trace, and the RPC tier is
 Postgres-only.
+
+## Spike results (2026-09-10)
+
+Built as `core/vm-query`: `Blockchain.VmQuery.SqlContext` is a base monad
+satisfying `VMBase` from Postgres (accounts from `address_state_ref`, slots
+from `storage`, code from `code_ref`, headers from `block_data_ref`, writes
+into the per-command overlay, trie reads failing loudly), and vm-runner's
+`runJsonRpcCommand'` runs on it unchanged. `core/vm-query/spike/run-spike.sh`
+brings up a throwaway Postgres, migrates the eth tables, seeds a SolidVM
+contract with a scalar and a 256-key mapping through the same rows the
+indexer writes, and runs `eth_call` cold and warm.
+
+**Finding 1, a VM change was needed.** SolidVM's state machine has its own
+`Alters` instances for accounts and storage whose fallback called the
+memory-overlay helpers directly, and those hardcode the trie walk, so a SQL
+base was never consulted and every call failed with "no contract deployed".
+The fallbacks now delegate to the base monad's instances after the frames
+and the run's own overlay maps (`Blockchain.SolidVM.SM`). For vm-runner the
+base instance is the same overlay-then-trie lookup it called before, so
+consensus execution is unchanged; the change is what lets any other base
+serve state.
+
+**Finding 2, the mirror's value decoder was the bottleneck, not Postgres.**
+`basicParse` compiled seven regular expressions per value: about 90 µs per
+integer, 22 ms to decode 257 slots. It now compiles them once and takes a
+digits-only fast path: 0.3 µs per integer (300x), 9 µs per address (5x).
+strato-api's storage endpoint and the history service's Cirrus reads benefit
+equally; the change is semantics-preserving (the same patterns in the same
+order).
+
+**Finding 3, no handler path walked the trie.** The only trie read was the
+empty-trie root the sample's account carries as its contract root, which the
+context answers; the counter stayed at zero across every call. Real data
+(non-empty contract roots) will show whether any handler still walks a
+storage trie; that is the one thing this harness cannot prove.
+
+**Parity.** Every call returned the expected value, and `total(64)` matched
+the in-memory VM fed the same rows byte for byte.
+
+**Cost, warm, local Postgres, per call** (two round trips per call: the
+account row, cached per command, and one whole-contract prefetch of its
+storage, with a per-slot query only for contracts above 4096 rows):
+
+| Call | Slots touched | SQL round trips | p50 latency |
+|---|---|---|---|
+| `get()` | 1 | 2 | 2.2 ms |
+| `at(7)` | 1 | 2 | 2.1 ms |
+| `total(16)` | 16 | 2 | 3.1 ms |
+| `total(64)` | 64 | 2 | 3.9 ms |
+| `total(256)` | 256 | 2 | 5.6 ms |
+
+Before the caches and prefetch it was two round trips per slot (514 for
+`total(256)`, 230 ms), and before the decoder fix the prefetch alone cost
+30 ms. Against an Aurora reader at about 1 ms per round trip, a call costs
+roughly 2 ms plus the prefetch parse.
+
+**Go/no-go.** Go for the read path: the handlers run unchanged, results
+match, and a call is a handful of milliseconds. Before building it out:
+
+1. Run the harness's parity mode against a follower core's mirror on real
+   contracts (PriceOracle, the pools), where contract roots are real and
+   any remaining trie walk will throw `TrieAccess`.
+2. Decide the prefetch threshold from the mirror's row-count distribution;
+   contracts far above 4096 rows fall back to one query per slot.
+3. ~~Wrap it as a service.~~ Done, see below.
+
+## The service (2026-09-10)
+
+`vm-query serve` (port 8546) is the wrapper. It speaks the queue's own wire
+format: `POST /command` takes a Binary-encoded `JsonRpcCommand` and returns
+a Binary-encoded `JsonRpcResponse`, so ethereum-jsonrpc's `callVM'` posts the
+same bytes it would have put on `vm_tasks` and reads the same reply. Each
+request runs on a fresh context over a shared connection pool (its own
+overlay and caches; the code collection cache is process-wide); the best
+block header is re-read from the mirror at most once a second. A semaphore
+bounds concurrent commands (`--maxConcurrent`, 16); past twice that many
+waiting, requests are shed with 503. `GET /health` reports the mirror's best
+block and its age; `/metrics` has request counts by command and outcome, a
+latency histogram and the in-flight gauge. Request spans continue the
+caller's trace (`traceparent`).
+
+**Routing.** With `vmConfig.vmQueryUrl` set, ethereum-jsonrpc sends
+`eth_call`, `eth_call` v2, `strato_traceCall` and `strato_simulateV1` to the
+service and everything else to the queue as before. The service answers
+what the mirror holds and declines the rest with an error whose message
+starts with `vm-query:` (a historical block, a trace-bound read, a block
+replay), and ethereum-jsonrpc then falls back to the consensus VM for that
+command, as it does when the service is unreachable. Nothing is lost by
+turning it on; what is gained is that the read traffic leaves vm-runner.
+
+**Turning it on.** `strato-setup --vmQuery` adds the process to
+`commands.txt` and sets the URL in ethconf; the API container takes
+`VM_QUERY=true` (the api-tier app's `-c vmQuery=true`), and the API image
+ships the binary.
+
+**Measured through the service** (harness, local Postgres): 202 commands, a
+mean of 5.4 ms per command inside the service including the per-request
+context and the prefetch, against 2.2 ms for the same call in-process. The
+gap is the fresh context and two extra middleware layers per request; a
+context pool would close most of it if it matters.
+
+**Still open.** Parity on a follower core's real mirror before routing
+mainnet traffic; the prefetch threshold from real row counts; and the
+API-role directory today runs vm-query against its own `sqlConfig` (the
+writer endpoint), so point `sqlReaderConfig` at the reader before scaling
+it out.

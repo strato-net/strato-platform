@@ -147,7 +147,7 @@ app-backend:
 # refreshed here before every build (they are committed so that
 # `docker compose build` in app/ works too).
 app-nginx:
-	cp nginx-packager/openid.tpl.lua nginx-packager/csrf.lua app/nginx/
+	cp nginx-packager/openid.tpl.lua nginx-packager/csrf.lua nginx-packager/tracing.lua app/nginx/
 	@if $(call image_missing,$(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX)); then \
 		echo "Building app-nginx ($(VERSION)-$(HASH_APP_NGINX))..."; \
 		docker build -t $(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) ./app/nginx && \

@@ -4,6 +4,7 @@ import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
 import * as cwactions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as grafana from "aws-cdk-lib/aws-grafana";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as synthetics from "aws-cdk-lib/aws-synthetics";
@@ -111,6 +112,7 @@ export class ObservabilityStack extends Stack {
       ],
     });
     cellRole.addToPolicy(remoteWrite);
+    cellRole.addToPolicy(new iam.PolicyStatement({ actions: ["xray:PutTraceSegments", "xray:PutTelemetryRecords"], resources: ["*"] }));
     cellCollectorParam.grantRead(cellRole);
     cwAgentParam.grantRead(cellRole);
     new iam.InstanceProfile(this, "CellInstanceProfile", { role: cellRole, instanceProfileName: `${name}-cell-observability` });
@@ -158,6 +160,19 @@ export class ObservabilityStack extends Stack {
 
     // --- Synthetic end-to-end check ---
     if (config.edgeUrl) {
+      // Synthetics wants the handler inside node_modules; `npm run canary`
+      // installs the signing libraries there and copies canary/src in.
+      // Fail at synth, not at run time.
+      const assetModules = path.join(__dirname, "..", "canary", "nodejs", "node_modules");
+      if (!fs.existsSync(path.join(assetModules, "health.js"))) {
+        throw new Error("canary/nodejs/node_modules/health.js is missing: run `npm run canary` in infra/observability first");
+      }
+      if (config.canaryKeySecretName && !fs.existsSync(path.join(assetModules, "@noble", "curves"))) {
+        throw new Error("canaryKeySecretName is set but the signing libraries are not installed: run `npm run canary` in infra/observability first");
+      }
+      const canaryKey = config.canaryKeySecretName
+        ? secretsmanager.Secret.fromSecretNameV2(this, "CanaryKeySecret", config.canaryKeySecretName)
+        : undefined;
       const canary = new synthetics.Canary(this, "EdgeHealth", {
         canaryName: `${name}-edge`.slice(0, 21),
         schedule: synthetics.Schedule.rate(Duration.minutes(1)),
@@ -170,6 +185,13 @@ export class ObservabilityStack extends Stack {
           NODE_URL: config.edgeUrl,
           MAX_BLOCK_AGE_SECONDS: String(config.maxBlockAgeSeconds),
           ENV_NAME: config.envName,
+          ...(canaryKey
+            ? {
+                CANARY_KEY_SECRET_ID: canaryKey.secretName,
+                CANARY_MAX_INCLUSION_SECONDS: String(config.maxInclusionSeconds),
+                CANARY_GAS_LIMIT: String(config.canaryGasLimit),
+              }
+            : {}),
         },
         startAfterCreation: true,
         cleanup: synthetics.Cleanup.LAMBDA,
@@ -178,6 +200,28 @@ export class ObservabilityStack extends Stack {
       canary.role.addToPrincipalPolicy(
         new iam.PolicyStatement({ actions: ["cloudwatch:PutMetricData"], resources: ["*"], conditions: { StringEquals: { "cloudwatch:namespace": "STRATO" } } })
       );
+      if (canaryKey) {
+        canaryKey.grantRead(canary.role);
+        // Inclusion slower than 10 s on average over 5 minutes warns before the
+        // block-age page would fire: the chain still moves, but users wait.
+        const slow = new cloudwatch.Alarm(this, "InclusionSlow", {
+          alarmName: `${name}-inclusion-slow`,
+          alarmDescription: "The canary's transactions take over 10 s from submit to receipt: check ingest lag, the sequencer, and the indexers",
+          metric: new cloudwatch.Metric({
+            namespace: "STRATO",
+            metricName: "TimeToInclusionSeconds",
+            dimensionsMap: { Environment: config.envName },
+            statistic: "Average",
+            period: Duration.minutes(5),
+          }),
+          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+          threshold: 10,
+          evaluationPeriods: 2,
+          treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        });
+        slow.addAlarmAction(new cwactions.SnsAction(this.warnings));
+        slow.addOkAction(new cwactions.SnsAction(this.warnings));
+      }
       const failing = new cloudwatch.Alarm(this, "EdgeHealthFailing", {
         alarmName: `${name}-edge-health`,
         alarmDescription: "The synthetic end-to-end check against the edge failed: the edge is down, the chain is not producing, or the block age exceeded the limit",

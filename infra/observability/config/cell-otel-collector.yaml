@@ -7,6 +7,10 @@ extensions:
     service: aps
 
 receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 127.0.0.1:4317 }
+      http: { endpoint: 127.0.0.1:4318 }
   prometheus:
     config:
       global:
@@ -54,6 +58,8 @@ exporters:
       authenticator: sigv4auth
     resource_to_telemetry_conversion:
       enabled: true
+  awsxray:
+    region: __REGION__
 
 service:
   extensions: [sigv4auth]
@@ -62,3 +68,10 @@ service:
       receivers: [prometheus]
       processors: [resourcedetection, resource, batch]
       exporters: [prometheusremotewrite]
+    # Transaction-stage spans from strato-ingest and slipstream, and request
+    # spans from a cell that still runs the API, at OTEL_EXPORTER_OTLP_ENDPOINT
+    # = http://127.0.0.1:4318 in the processes' environment.
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, batch]
+      exporters: [awsxray]

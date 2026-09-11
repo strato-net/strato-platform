@@ -8,7 +8,8 @@
     "diff": "cdk diff",
     "deploy": "cdk deploy",
     "typecheck": "tsc --noEmit",
-    "dashboards": "./scripts/push-dashboards.sh"
+    "dashboards": "./scripts/push-dashboards.sh",
+    "canary": "cd canary/nodejs && npm ci --omit=dev && cp ../src/*.js node_modules/"
   },
   "devDependencies": {
     "aws-cdk": "^2.1100.0",

@@ -194,9 +194,9 @@ genEthConf role = do
   return runtimeConfig
     { apiConfig = roleApiConfig
     , busConfig = busConf
+    , vmConfig = roleVmConfig { vmQueryUrl = if flags_vmQuery then Just "http://127.0.0.1:8546" else Nothing }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
-    , vmConfig = roleVmConfig
     , sqlConfig = writerSql
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)

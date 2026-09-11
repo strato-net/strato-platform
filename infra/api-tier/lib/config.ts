@@ -36,6 +36,8 @@ export interface ApiTierConfig {
   nodeIpAddresses: string[];
   apiTierWeight: number;
   desiredCount: number;
+  /** Run vm-query in the task and serve latest-state calls from the mirror (phase 5). */
+  vmQuery: boolean;
   /** Observability (optional): SSM parameter holding the ADOT sidecar config and the IAM policy it needs, both outputs of the observability app. */
   otelConfigParameterName?: string;
   otelSidecarPolicyArn?: string;
@@ -88,6 +90,7 @@ export function loadConfig(app: App): ApiTierConfig {
     nodeIpAddresses: String(ctx(app, "nodeIpAddresses", "")).split(",").map((s) => s.trim()).filter(Boolean),
     apiTierWeight: Number(ctx(app, "apiTierWeight", "0")),
     desiredCount: Number(ctx(app, "desiredCount", "2")),
+    vmQuery: String(ctx(app, "vmQuery", "false")) === "true",
     otelConfigParameterName: optional(app, "otelConfigParameterName"),
     otelSidecarPolicyArn: optional(app, "otelSidecarPolicyArn"),
   };

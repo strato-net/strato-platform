@@ -19,6 +19,8 @@ executable strato-ingest
   ghc-options: -Wall -Werror -threaded -rtsopts
   build-depends:
       base
+    , blockDB
+    , blockapps-data
     , blockapps-init
     , common-log
     , containers
@@ -28,6 +30,8 @@ executable strato-ingest
     , prometheus-client
     , seqevents
     , strato-conf
+    , strato-model
+    , strato-tracing
     , streaming
     , streaming-kafka-hw
     , text

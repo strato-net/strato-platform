@@ -12,6 +12,16 @@ export interface ObservabilityConfig {
   edgeUrl?: string;
   /** Seconds of block age the synthetic check tolerates before failing. */
   maxBlockAgeSeconds: number;
+  /**
+   * Secrets Manager name of the canary's funded key, JSON {"privateKey": "0x..."}.
+   * Present, the canary also submits a no-op transaction each run and records
+   * its time to inclusion. Referenced by name; the value is read only by the
+   * canary at run time.
+   */
+  canaryKeySecretName?: string;
+  /** Seconds the canary waits for its transaction's receipt before failing. */
+  maxInclusionSeconds: number;
+  canaryGasLimit: number;
   /** Grafana authentication: AWS_SSO (IAM Identity Center) or SAML. */
   grafanaAuth: "AWS_SSO" | "SAML";
   grafanaVersion: string;
@@ -51,6 +61,9 @@ export function loadConfig(app: App): ObservabilityConfig {
     envName: ctx(app, "envName", "testnet"),
     edgeUrl: optional(app, "edgeUrl")?.replace(/\/$/, ""),
     maxBlockAgeSeconds: Number(ctx(app, "maxBlockAgeSeconds", "30")),
+    canaryKeySecretName: optional(app, "canaryKeySecretName"),
+    maxInclusionSeconds: Number(ctx(app, "maxInclusionSeconds", "30")),
+    canaryGasLimit: Number(ctx(app, "canaryGasLimit", "1000000")),
     grafanaAuth: ctx(app, "grafanaAuth", "AWS_SSO") as "AWS_SSO" | "SAML",
     grafanaVersion: ctx(app, "grafanaVersion", "10.4"),
     auroraClusterIdentifier: optional(app, "auroraClusterIdentifier"),

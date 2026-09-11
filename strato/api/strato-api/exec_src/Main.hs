@@ -75,6 +75,8 @@ import Data.String (fromString)
 import Network.Wai.Middleware.Cors
 import Network.Wai.Middleware.Prometheus
 import Network.Wai.Middleware.RequestLogger
+import Strato.Tracing (initTracing)
+import Strato.Tracing.Wai (tracingMiddleware)
 import SQLM
 import Servant
 import Servant.Multipart
@@ -242,7 +244,10 @@ main = do
       bindPort = Conf.apiPort (Conf.apiConfig ethConf)
   putStrLn $ "Starting strato-api on " ++ bindHost' ++ ":" ++ show bindPort
   let settings = setPort bindPort $ setHost (fromString bindHost') defaultSettings
-  runSettings settings $ app sqlDb cirrusDb env theDoc urlMap
+  -- Request traces: one server span per request, continuing nginx's
+  -- traceparent; enabled by OTEL_EXPORTER_OTLP_ENDPOINT.
+  initTracing "strato-api"
+  runSettings settings . tracingMiddleware "strato-api" $ app sqlDb cirrusDb env theDoc urlMap
 
 -- | Connections per database for the whole process. Twenty matches the
 -- per-request pool size this replaced; -N4 workers rarely hold more than a

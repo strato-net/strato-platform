@@ -63,7 +63,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find, findIndex)
+import Data.List (find, findIndex, isPrefixOf)
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -73,7 +73,9 @@ import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
-import LocalApi (formatClientError, runLocal)
+import LocalApi (formatClientError, runLocal, sharedManager)
+import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseTimeout, responseTimeoutMicro)
+import qualified Strato.Tracing as Tr
 import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
 
@@ -277,6 +279,51 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
+  case EthConf.vmQueryUrl (EthConf.vmConfig ethConf) of
+    Just url | routableToVmQuery c -> do
+      viaQuery <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      case viaQuery of
+        -- vm-query answers what the mirror holds and declines the rest
+        -- (historical blocks, trie-bound reads) with a "vm-query:" error,
+        -- which means: ask the consensus VM.
+        Right (Error _ msg) | "vm-query:" `isPrefixOf` msg -> do
+          putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
+          callVmRunner waitMicros c
+        Right resp -> pure resp
+        Left e -> do
+          putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ show e ++ "), using vm-runner"
+          callVmRunner waitMicros c
+    _ -> callVmRunner waitMicros c
+
+-- | The read commands the mirror can serve; the rest never leave the queue path.
+routableToVmQuery :: JsonRpcCommand -> Bool
+routableToVmQuery = \case
+  JRCCall {} -> True
+  JRCCallV2 {} -> True
+  JRCTraceCall {} -> True
+  JRCSimulate {} -> True
+  _ -> False
+
+-- | POST the command to vm-query as the same bytes the queue would carry,
+-- with the request's trace so the service's span nests under this one.
+callVmQuery :: String -> Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmQuery url waitMicros c = do
+  initial <- parseRequest (url ++ "/command")
+  ctx <- Tr.currentRequestContext
+  let req =
+        initial
+          { method = "POST",
+            requestHeaders = [("Content-Type", "application/octet-stream")] ++ maybe [] (\t -> [("traceparent", Tr.renderTraceparent t)]) ctx,
+            requestBody = RequestBodyLBS (Bin.encode c),
+            responseTimeout = responseTimeoutMicro waitMicros
+          }
+  resp <- httpLbs req sharedManager
+  case Bin.decodeOrFail (responseBody resp) of
+    Right (_, _, r) -> pure r
+    Left (_, _, err) -> pure $ Error (jrcId c) ("vm-query: undecodable response: " ++ err)
+
+callVmRunner :: Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmRunner waitMicros c = do
   result <- timeout waitMicros $ runStreamMPooled "ethereum-jsonrpc" $
     consumeFromLatest "jsonrpcresponse"
       (void $ writeSeqVmTasks [VmJsonRpcCommand c])

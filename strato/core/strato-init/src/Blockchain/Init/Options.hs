@@ -59,6 +59,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
+defineFlag "vmQuery" (False :: Bool) "Run vm-query (port 8546) next to ethereum-jsonrpc and route latest-state eth_call, simulations and call traces to it, against the SQL state mirror instead of the consensus VM"
 defineFlag "validatorBehavior" (True :: Bool) "Whether this node votes and proposes when its key is in the validator set. Pass --validatorBehavior=false for a read-only follower core (an RPC cell) that executes blocks and serves reads but never takes part in consensus"
 defineFlag "writer" (True :: Bool) "Whether strato-indexer claims the writer lease at startup (unheld, stale, or its own). false makes a standby core: it follows the chain against the shared Postgres cluster and writes nothing until promoted with strato-promote"
 defineFlag "cellId" ("" :: String) "This core's name among the cores sharing a Postgres cluster (writer lease holder, consumer group suffixes). Default: the hostname"

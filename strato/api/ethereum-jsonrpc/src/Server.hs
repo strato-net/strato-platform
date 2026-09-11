@@ -17,6 +17,8 @@ import qualified Data.CaseInsensitive as CI
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Strato.Tracing (initTracing)
+import Strato.Tracing.Wai (tracingMiddleware)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
@@ -30,7 +32,8 @@ startServer = do
   runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   putStrLn $ "Listening on " ++ bindHost ++ ":" ++ show port
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
-  runSettings (setHost (fromString bindHost) $ setPort port $ setTimeout 150 defaultSettings) app
+  initTracing "ethereum-jsonrpc"
+  runSettings (setHost (fromString bindHost) $ setPort port $ setTimeout 150 defaultSettings) (tracingMiddleware "ethereum-jsonrpc" app)
 
 corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
 corsHeaders =

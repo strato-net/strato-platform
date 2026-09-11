@@ -299,6 +299,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
   mv /tmp/rpc-guard.lua /usr/local/openresty/nginx/lua/rpc-guard.lua
+  mv /tmp/tracing.lua /usr/local/openresty/nginx/lua/tracing.lua
 fi
 
 echo 'Waiting for apex to be available...'

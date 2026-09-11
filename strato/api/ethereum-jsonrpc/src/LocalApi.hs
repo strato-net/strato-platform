@@ -5,6 +5,7 @@
 module LocalApi
   ( apiBaseUrl,
     runLocal,
+    sharedManager,
     formatClientError,
   )
 where

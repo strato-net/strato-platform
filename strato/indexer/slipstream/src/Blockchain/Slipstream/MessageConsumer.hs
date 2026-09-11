@@ -15,7 +15,10 @@ module Blockchain.Slipstream.MessageConsumer
 where
 
 import BlockApps.Logging
+import Blockchain.Data.DataDefs (TransactionResult (..))
 import Blockchain.Data.TransactionResult
+import Blockchain.Strato.Model.Keccak256 (keccak256ToByteString, keccak256ToHex)
+import qualified Strato.Tracing as Tr
 import Blockchain.Data.WriterLease (holdsWriterLease)
 import Blockchain.Slipstream.Data.CirrusTables
 -- import Blockchain.EthConf  -- UNUSED: was for solidvmevents
@@ -144,9 +147,36 @@ writeOutputChunk conn mBus slipstreamQueries transactionResults = do
   recordOutputBatch slipstreamQueries transactionResults
   timeSlipstreamPhase "cirrus" $ performSlipstreamQueries conn slipstreamQueries
   unless (null transactionResults) $ do
+    started <- liftIO Tr.nowNanos
     timeSlipstreamPhase "transaction_results" . void $ putTransactionResults transactionResults
     -- Results reach the bus only once Postgres has them.
     for_ mBus $ \bus -> publishResults bus transactionResults
+    liftIO $ recordResultSpans started transactionResults
+
+-- | One "tx.result" span per result in the transaction's trace (its id
+-- derives from the hash, as in strato-api's submit span): the moment the
+-- transaction's outcome is durable and published, which closes the
+-- submit-to-inclusion trace.
+recordResultSpans :: Integer -> [TransactionResult] -> IO ()
+recordResultSpans started results = do
+  enabled <- Tr.tracingEnabled
+  if not enabled
+    then pure ()
+    else do
+      end <- Tr.nowNanos
+      for_ results $ \r -> do
+        let h = transactionResultTransactionHash r
+            failed = case transactionResultMessage r of
+              "Success!" -> Nothing
+              m -> Just (T.pack m)
+        Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.result" Tr.Consumer started end
+          [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+            Tr.attrText "strato.block_hash" (T.pack (keccak256ToHex (transactionResultBlockHash r))),
+            Tr.attrText "strato.stage" "slipstream",
+            Tr.attrText "strato.result" (T.pack (transactionResultMessage r))
+          ]
+          []
+          failed
 
 sinkSlipstreamOutputChunks ::
   MonadIO m =>

@@ -104,6 +104,7 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
+import qualified Strato.Tracing as Tr
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
@@ -503,8 +504,10 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
         let txTypeCounter = if isContractCreationTX bt then vmTxsCreation else vmTxsCall
         P.incCounter txTypeCounter
 
+        started <- liftIO Tr.nowNanos
         execResults <- runCodeForTransaction b availableGas tAddr t proposer
         P.incCounter vmTxsProcessed
+        liftIO $ recordExecuteSpan started b t (fromIntegral availableGas) execResults
 
         case erException execResults of
           Just e -> do
@@ -517,6 +520,27 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
               A.delete (Proxy @AddressState) address'
             P.incCounter vmTxsSuccessful
         pure execResults
+
+-- | "tx.execute" in the transaction's trace (Strato.Tracing: the trace id
+-- derives from the hash): the VM's part, with the gas it used and any
+-- exception as the span's error. Costs one queue write when tracing is
+-- enabled and an IORef read otherwise.
+recordExecuteSpan :: Integer -> BlockHeader -> OutputTx -> Integer -> ExecResults -> IO ()
+recordExecuteSpan started b t availableGas er = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    end <- Tr.nowNanos
+    let h = otHash t
+    Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.execute" Tr.Internal started end
+      ( [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+          Tr.attrText "strato.stage" "vm-runner",
+          Tr.attrInt "strato.block_number" (number b),
+          Tr.attrInt "strato.gas_used" (availableGas - erRemainingTxGas er)
+        ]
+          ++ maybe [] (\a -> [Tr.attrText "strato.contract_created" (T.pack (format a))]) (erNewContractAddress er)
+      )
+      []
+      (T.pack . show <$> erException er)
 
 runCodeForTransaction ::
   (VMBase m) =>

@@ -44,6 +44,7 @@ executables:
     - sql-monad
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - openapi3
     - text
     - transformers

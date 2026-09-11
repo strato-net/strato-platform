@@ -390,6 +390,11 @@ data VmConf = VmConf
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
+  -- | Base URL of a vm-query service (phase 5). Set, ethereum-jsonrpc sends
+  -- latest-state calls, simulations and call traces there, against the SQL
+  -- state mirror, and falls back to the consensus VM only for what it
+  -- declines. Unset, everything goes to vm-runner as before.
+  , vmQueryUrl :: Maybe String
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -401,6 +406,7 @@ instance FromJSON VmConf where
     <*> v .:? "diffPublish" .!= True
     <*> v .:? "vmJsonRpcUrl" .!= "http://localhost:8545"
     <*> v .:? "simMaxConcurrent" .!= 8
+    <*> v .:? "vmQueryUrl"
 
 -- Default instances
 
@@ -479,6 +485,7 @@ instance Default VmConf where
     , diffPublish = True
     , vmJsonRpcUrl = "http://localhost:8545"
     , simMaxConcurrent = 8
+    , vmQueryUrl = Nothing
     }
 
 instance Default ContractsConf where

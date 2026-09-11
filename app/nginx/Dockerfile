@@ -13,7 +13,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
         exit 1
 
 # openid.tpl.lua and csrf.lua are copies of nginx-packager's (refreshed by `make app-nginx`).
-COPY nginx.tpl.conf openid.tpl.lua csrf.lua /tmp/
+COPY nginx.tpl.conf openid.tpl.lua csrf.lua tracing.lua /tmp/
 
 COPY docker-run.sh /
 

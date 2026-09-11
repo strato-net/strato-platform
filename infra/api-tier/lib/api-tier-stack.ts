@@ -99,6 +99,7 @@ export class ApiTierStack extends Stack {
         kafkaPort: String(config.kafkaPort),
         EDGE_REDIS_HOST: redis.attrPrimaryEndPointAddress,
         EDGE_REDIS_PORT: redis.attrPrimaryEndPointPort,
+        VM_QUERY: config.vmQuery ? "true" : "false",
         ...(config.busHost
           ? { BUS_HOST: config.busHost, BUS_PORT: String(config.busPort), BUS_SECURITY: "sasl_ssl", BUS_SUBMIT_MODE: config.busSubmitMode }
           : {}),
@@ -210,6 +211,10 @@ export class ApiTierStack extends Stack {
       });
       if (config.otelSidecarPolicyArn) {
         task.taskRole.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, "OtelSidecarPolicy", config.otelSidecarPolicyArn));
+      }
+      // The instrumented processes export spans to the sidecar over localhost.
+      for (const containerName of ["strato-api", "nginx", "backend"]) {
+        task.findContainer(containerName)?.addEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318");
       }
     }
 

@@ -44,6 +44,7 @@ import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import qualified Strato.Tracing as Tr
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
@@ -232,11 +233,30 @@ instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
   output txs = do
     let mode = maybe "core" busSubmitMode (busConfig ethConf)
     mBus <- liftIO $ readIORef busSubmitEnv
+    started <- liftIO Tr.nowNanos
     case (mode, mBus) of
       ("bus", Just (env, topic)) -> submitToBus env topic
       ("shadow", Just (env, topic)) -> submitToBus env topic >> submitToCore
       _ -> submitToCore
+    liftIO $ recordSubmitSpans started mode
     where
+      -- One "tx.submit" span per transaction, in the transaction's own trace
+      -- (its id derives from the hash), linked to the request trace it
+      -- arrived in. strato-ingest and slipstream add the later stages.
+      recordSubmitSpans started mode = do
+        enabled <- Tr.tracingEnabled
+        when enabled $ do
+          end <- Tr.nowNanos
+          request <- Tr.currentRequestContext
+          for_ [(ts, itTransaction it) | IETx ts it <- txs] $ \(_, tx) -> do
+            let h = transactionHash tx
+            Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.submit" Tr.Producer started end
+              [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+                Tr.attrText "strato.submit_mode" (T.pack mode),
+                Tr.attrText "strato.stage" "api"
+              ]
+              (maybe [] pure request)
+              Nothing
       submitToCore = do
         $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
         resps <- liftIO $ runStreamMPooled "strato-api" $ writeUnseqEvents txs

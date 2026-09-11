@@ -13,6 +13,8 @@ executables:
     ghc-options: -Wall -Werror -threaded -rtsopts
     dependencies:
     - blockapps-init
+    - blockapps-data
+    - blockDB
     - common-log
     - containers
     - hflags
@@ -21,6 +23,8 @@ executables:
     - prometheus-client
     - seqevents
     - strato-conf
+    - strato-model
+    - strato-tracing
     - streaming
     - streaming-kafka-hw
     - text

@@ -39,6 +39,7 @@ COPY \
   ./usr/local/bin/ethereum-discover \
   ./usr/local/bin/ethereum-jsonrpc \
   ./usr/local/bin/strato-ingest \
+  ./usr/local/bin/vm-query \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/strato-barometer \

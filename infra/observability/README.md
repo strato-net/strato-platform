@@ -18,6 +18,13 @@ routing, Managed Grafana, collector configs in SSM, collector IAM, the
 synthetic edge check) and `StratoObs-<env>-Alarms` (CloudWatch alarms on the
 managed services; each group appears only when its identifier is passed).
 
+With `-c canaryKeySecretName=strato/testnet/canary-key` the canary also
+submits a no-op transaction every minute and records its time to inclusion.
+Run `npm run canary` first (installs the signing libraries and copies the
+handler from canary/src next to them; synth refuses otherwise), create the secret as JSON
+`{"privateKey":"0x..."}`, and fund the address the canary logs on its first
+run. See `design-documents/observability.md`.
+
 After deploy:
 
 1. Subscribe PagerDuty to the `PagesTopicArn` output and Slack to

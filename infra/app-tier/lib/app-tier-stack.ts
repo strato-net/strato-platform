@@ -153,6 +153,10 @@ export class AppTierStack extends Stack {
       if (config.otelSidecarPolicyArn) {
         task.taskRole.addManagedPolicy(iam.ManagedPolicy.fromManagedPolicyArn(this, "OtelSidecarPolicy", config.otelSidecarPolicyArn));
       }
+      // The instrumented processes export spans to the sidecar over localhost.
+      for (const containerName of ["strato-api", "nginx", "backend"]) {
+        task.findContainer(containerName)?.addEnvironment("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318");
+      }
     }
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });

@@ -97,6 +97,11 @@ override     '.apiConfig.apiListenAddress'     "$API_LISTEN_ADDRESS"
 override     '.apiConfig.rpcListenAddress'     "$RPC_LISTEN_ADDRESS"
 # bloc reaches the JSON-RPC server in this same container for simulations.
 override     '.vmConfig.vmJsonRpcUrl'          "http://127.0.0.1:8545"
+# vm-query (phase 5): latest-state calls served from the mirror in this
+# same container when VM_QUERY=true.
+if [[ "${VM_QUERY:-false}" == "true" ]]; then
+  override   '.vmConfig.vmQueryUrl'            "http://127.0.0.1:8546"
+fi
 export STRATO_CONF="$CONF"
 
 # OAuth client credentials for strato-api's service-to-service calls: a
@@ -131,6 +136,9 @@ cat > commands.txt << EOC
 strato-api +RTS -T -N -maxN4 -RTS
 ethereum-jsonrpc +RTS -T -N -maxN4 -RTS
 EOC
+if [[ "${VM_QUERY:-false}" == "true" ]]; then
+  echo "@restart vm-query serve +RTS -T -N -maxN4 -RTS" >> commands.txt
+fi
 
 echo -e "${Green}Starting API tier processes via convoke...${NC}"
 exec convoke --no-docker

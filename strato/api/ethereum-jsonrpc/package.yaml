@@ -43,6 +43,7 @@ executables:
       - strato-conf
       - strato-model
       - strato-p2p
+      - strato-tracing
       - text
       - time
       - wai
