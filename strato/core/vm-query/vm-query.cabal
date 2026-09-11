@@ -14,6 +14,7 @@ library
   exposed-modules:
       Blockchain.VmQuery.SqlContext
       Blockchain.VmQuery.Seed
+      Blockchain.VmQuery.Import
       Blockchain.VmQuery.Server
   other-modules:
       Paths_vm_query
@@ -35,6 +36,8 @@ library
     , data-default
     , debugger
     , exceptions
+    , http-client
+    , http-client-tls
     , http-types
     , merkle-patricia-db
     , monad-alter
@@ -43,17 +46,24 @@ library
     , nibblestring
     , persistent
     , persistent-postgresql
+    , postgresql-simple
     , prometheus-client
+    , resource-pool
+    , resourcet
     , seqevents
     , solid-vm-model
     , sql-monad
+    , stm
     , strato-conf
     , strato-model
     , strato-tracing
     , text
     , time
+    , transformers
     , unliftio
     , unliftio-core
+    , unordered-containers
+    , vector
     , vm-runner
     , vm-tools
     , wai

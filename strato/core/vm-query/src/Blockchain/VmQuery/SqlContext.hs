@@ -31,7 +31,15 @@ module Blockchain.VmQuery.SqlContext
     bestHeaderFromDb,
     runSqlQueryM,
     withFreshOverlay,
+    resetForRequest,
     readRoundTrips,
+    readSqlNanos,
+    setSnapshot,
+    setCacheMaxRows,
+    setPrefetchMaxRows,
+    setPrefetchAfterSlots,
+    cacheSizes,
+    defaultCacheMaxRows,
     readEmptyTrieReads,
     resetRoundTrips,
     bestHeader,
@@ -70,20 +78,28 @@ import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base (AccessibleEnv (..))
-import Control.Monad.IO.Unlift (MonadUnliftIO)
+import Control.Concurrent.MVar (MVar, withMVar)
+import Control.Monad.IO.Unlift (MonadUnliftIO, withRunInIO)
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Control.Monad.Logger
 import Control.Monad.Reader
+import Control.Monad (when)
 import Data.Foldable (forM_)
 import Data.Default (def)
 import Data.IORef
+import System.Environment (lookupEnv)
+import GHC.Clock (getMonotonicTimeNSec)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust, isNothing)
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist ((==.))
 import qualified Database.Persist as P
+import qualified Database.Persist.Sql as SQL
+import Database.Persist.Sql (SqlBackend)
 import Debugger (DebugSettings)
+import Prometheus (Counter, Gauge, Histogram, Info (..), counter, gauge, histogram, incCounter, observe, setGauge, unsafeRegister)
 import SolidVM.Model.Storable (BasicValue (..))
 import UnliftIO.Exception (Exception, throwIO)
 
@@ -110,22 +126,89 @@ data SqlQueryEnv = SqlQueryEnv
     -- address (so a slot costs one query, not two) and the addresses whose
     -- storage was prefetched whole (so a contract's slots cost one query).
     sqeAccountIds :: IORef (M.Map Address (Maybe AddressStateRefId)),
+    -- | Per address: n >= 0 means its storage was prefetched whole (n
+    -- rows); n < 0 means it was too large for the threshold and has been
+    -- read slot by slot -n times this epoch (see 'sqePrefetchAfterSlots').
     sqePrefetched :: IORef (M.Map Address Int),
     -- | Account rows read during this command; the handlers read the same
     -- account several times per call (resolution, then execution).
-    sqeAccounts :: IORef (M.Map Address (Maybe AddressState))
+    sqeAccounts :: IORef (M.Map Address (Maybe AddressState)),
+    -- | Nanoseconds spent inside SQL queries this command (wall clock).
+    sqeSqlNanos :: IORef Integer,
+    -- | Mirror rows read so far, kept across requests while the mirror's
+    -- best block is unchanged (the indexer commits a block's header and its
+    -- state diffs in one transaction, so the same best block means the same
+    -- rows). Consulted after the command's overlay, before SQL.
+    sqeStorageCache :: IORef (M.Map RawStorageKey (Maybe RawStorageValue)),
+    sqeCacheBlock :: IORef (Maybe Keccak256),
+    -- | When set, mirror reads run on this pinned connection (a repeatable
+    -- read transaction opened at the block epoch) instead of the pool, so
+    -- every row of the epoch is one consistent state with its header. The
+    -- connection is shared by the epoch's requests and serialised by the
+    -- MVar; only cache misses reach it.
+    sqeSnapshot :: IORef (Maybe (MVar SqlBackend)),
+    -- | Cap on cached storage rows per context. Past it the row cache and
+    -- the prefetched set are dropped whole and refilled on demand, so a
+    -- context's memory is bounded by the cap however much a block's
+    -- requests touch. Accounts are capped at a tenth of it.
+    sqeCacheMaxRows :: IORef Int,
+    -- | Contracts with at most this many storage rows are read whole on
+    -- their first slot access ('prefetchStorage'); larger ones slot by slot.
+    sqePrefetchMaxRows :: IORef Int,
+    -- | A contract above the threshold whose slots a context has read this
+    -- many times in one epoch is prefetched whole after all (up to the
+    -- cache cap): a call walking an array pays one query, not one per
+    -- element. 0 disables promotion.
+    sqePrefetchAfterSlots :: IORef Int
   }
 
--- | Contracts with at most this many storage rows are read in one query on
--- their first slot access; larger ones are read slot by slot.
-prefetchLimit :: Int
-prefetchLimit = 4096
+-- | Default cap: a row is a few hundred bytes, so this is tens of MB.
+defaultCacheMaxRows :: Int
+defaultCacheMaxRows = 200000
+
+{-# NOINLINE cacheEvictions #-}
+cacheEvictions :: Counter
+cacheEvictions = unsafeRegister . counter $ Info "vm_query_cache_evictions_total" "Times a context's row cache was dropped for exceeding the cap"
+
+{-# NOINLINE cacheRowsGauge #-}
+cacheRowsGauge :: Gauge
+cacheRowsGauge = unsafeRegister . gauge $ Info "vm_query_cache_rows" "Storage rows cached by the context that most recently finished a request"
+
+-- | Default for 'sqePrefetchMaxRows': contracts with at most this many
+-- storage rows are read in one query on their first slot access, larger
+-- ones slot by slot. See the design document for how it was chosen.
+defaultPrefetchMaxRows :: Int
+defaultPrefetchMaxRows = 4096
+
+-- | Default for 'sqePrefetchAfterSlots'.
+defaultPrefetchAfterSlots :: Int
+defaultPrefetchAfterSlots = 64
+
+{-# NOINLINE prefetchRowsHistogram #-}
+prefetchRowsHistogram :: Histogram
+prefetchRowsHistogram = unsafeRegister . histogram (Info "vm_query_prefetch_rows" "Rows loaded by whole-contract prefetches") $ [16, 64, 256, 1024, 4096, 16384, 65536]
+
+{-# NOINLINE prefetchDeclined #-}
+prefetchDeclined :: Counter
+prefetchDeclined = unsafeRegister . counter $ Info "vm_query_prefetch_declined_total" "Contracts read slot by slot because they exceed the prefetch threshold (once per contract per epoch per context)"
+
+{-# NOINLINE prefetchPromoted #-}
+prefetchPromoted :: Counter
+prefetchPromoted = unsafeRegister . counter $ Info "vm_query_prefetch_promoted_total" "Contracts above the threshold prefetched whole after enough slot reads in one epoch"
 
 newtype SqlQueryM a = SqlQueryM {unSqlQueryM :: ReaderT SqlQueryEnv (LoggingT IO) a}
   deriving (Functor, Applicative, Monad, MonadIO, MonadReader SqlQueryEnv, MonadLogger, MonadLoggerIO, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO)
 
+-- | VMQ_LOG=debug|info shows the handlers' own logging (function
+-- resolution, proxy following); the default is warnings only.
 runSqlQueryM :: SqlQueryEnv -> SqlQueryM a -> IO a
-runSqlQueryM env m = runStderrLoggingT . filterLogger (\_ lvl -> lvl >= LevelWarn) $ runReaderT (unSqlQueryM m) env
+runSqlQueryM env m = do
+  level <- lookupEnv "VMQ_LOG"
+  let minLevel = case level of
+        Just "debug" -> LevelDebug
+        Just "info" -> LevelInfo
+        _ -> LevelWarn
+  runStderrLoggingT . filterLogger (\_ lvl -> lvl >= minLevel) $ runReaderT (unSqlQueryM m) env
 
 -- | A context over the given pool, positioned at the mirror's best block.
 newSqlQueryEnv :: SQLDB -> IO SqlQueryEnv
@@ -153,10 +236,45 @@ newSqlQueryEnvWith db mHeader = do
   ids <- newIORef M.empty
   pre <- newIORef M.empty
   accts <- newIORef M.empty
-  let env = SqlQueryEnv db stateRef bhr code sums trips emptyReads ids pre accts
+  sqlNanos <- newIORef 0
+  storageCache <- newIORef M.empty
+  cacheBlock <- newIORef Nothing
+  snapshot <- newIORef Nothing
+  maxRows <- newIORef defaultCacheMaxRows
+  prefetchRows <- newIORef defaultPrefetchMaxRows
+  afterSlots <- newIORef defaultPrefetchAfterSlots
+  let env = SqlQueryEnv db stateRef bhr code sums trips emptyReads ids pre accts sqlNanos storageCache cacheBlock snapshot maxRows prefetchRows afterSlots
   forM_ mHeader $ \header ->
     modifyIORef' stateRef (\s -> s {_bestBlockInfo = ContextBestBlockInfo (blockHeaderHash header) header 0})
   pure env
+
+-- | Make a pooled context ready for the next request. Per-command state
+-- always goes: the overlay, code added by a sandboxed create, a trace
+-- command's tracer and debug settings, the gas cap, the counters. The
+-- mirror caches (account rows, storage rows, prefetched addresses) go only
+-- when the best block has changed since they were filled; the block summary
+-- and tx-run caches are keyed by immutable hashes and stay.
+resetForRequest :: Maybe BlockHeader -> SqlQueryM ()
+resetForRequest mHeader = do
+  env <- ask
+  liftIO $ do
+    modifyIORef' (sqeState env) $ \s ->
+      (def {_txRunResultsCache = _txRunResultsCache s})
+        { _bestBlockInfo = maybe Unspecified (\h -> ContextBestBlockInfo (blockHeaderHash h) h 0) mHeader }
+    writeIORef (sqeBlockHashRoot env) (BlockHashRoot MP.emptyTriePtr)
+    writeIORef (sqeCodeOverlay env) M.empty
+    writeIORef (sqeRoundTrips env) 0
+    writeIORef (sqeEmptyTrieReads env) 0
+    writeIORef (sqeSqlNanos env) 0
+    writeIORef (sqeSnapshot env) Nothing
+    let block = blockHeaderHash <$> mHeader
+    cachedFor <- readIORef (sqeCacheBlock env)
+    when (block /= cachedFor || block == Nothing) $ do
+      writeIORef (sqeAccountIds env) M.empty
+      writeIORef (sqePrefetched env) M.empty
+      writeIORef (sqeAccounts env) M.empty
+      writeIORef (sqeStorageCache env) M.empty
+      writeIORef (sqeCacheBlock env) block
 
 -- | Drop the command's overlay so the next command starts from the mirror.
 withFreshOverlay :: SqlQueryM a -> SqlQueryM a
@@ -168,6 +286,8 @@ withFreshOverlay act = do
     writeIORef (sqeAccountIds env) M.empty
     writeIORef (sqePrefetched env) M.empty
     writeIORef (sqeAccounts env) M.empty
+    writeIORef (sqeStorageCache env) M.empty
+    writeIORef (sqeCacheBlock env) Nothing
   act
 
 readRoundTrips :: SqlQueryM Int
@@ -177,10 +297,68 @@ readEmptyTrieReads :: SqlQueryM Int
 readEmptyTrieReads = asks sqeEmptyTrieReads >>= liftIO . readIORef
 
 resetRoundTrips :: SqlQueryM ()
-resetRoundTrips = asks sqeRoundTrips >>= liftIO . flip writeIORef 0
+resetRoundTrips = do
+  asks sqeRoundTrips >>= liftIO . flip writeIORef 0
+  asks sqeSqlNanos >>= liftIO . flip writeIORef 0
+
+readSqlNanos :: SqlQueryM Integer
+readSqlNanos = asks sqeSqlNanos >>= liftIO . readIORef
 
 countTrip :: SqlQueryM ()
 countTrip = asks sqeRoundTrips >>= liftIO . flip modifyIORef' (+ 1)
+
+-- | A mirror read: on the epoch's pinned snapshot connection when there is
+-- one, else on the pool in its own transaction. Counted and timed.
+mirrorQuery :: SQL.SqlPersistT (ResourceT SqlQueryM) a -> SqlQueryM a
+mirrorQuery q = do
+  countTrip
+  t0 <- liftIO getMonotonicTimeNSec
+  snap <- asks sqeSnapshot >>= liftIO . readIORef
+  r <- case snap of
+    Just conn -> withRunInIO $ \runIO -> withMVar conn $ \backend -> runIO (runResourceT (runReaderT q backend))
+    Nothing -> sqlQuery q
+  t1 <- liftIO getMonotonicTimeNSec
+  asks sqeSqlNanos >>= liftIO . flip modifyIORef' (+ fromIntegral (t1 - t0))
+  pure r
+
+-- | Pin (or unpin) the epoch's snapshot connection for this context.
+setSnapshot :: Maybe (MVar SqlBackend) -> SqlQueryM ()
+setSnapshot m = asks sqeSnapshot >>= liftIO . flip writeIORef m
+
+setCacheMaxRows :: Int -> SqlQueryM ()
+setCacheMaxRows n = asks sqeCacheMaxRows >>= liftIO . flip writeIORef (max 1 n)
+
+setPrefetchMaxRows :: Int -> SqlQueryM ()
+setPrefetchMaxRows n = asks sqePrefetchMaxRows >>= liftIO . flip writeIORef (max 0 n)
+
+setPrefetchAfterSlots :: Int -> SqlQueryM ()
+setPrefetchAfterSlots n = asks sqePrefetchAfterSlots >>= liftIO . flip writeIORef (max 0 n)
+
+-- | Sizes of the per-block caches: (storage rows, accounts).
+cacheSizes :: SqlQueryM (Int, Int)
+cacheSizes = do
+  env <- ask
+  liftIO $ (,) <$> (M.size <$> readIORef (sqeStorageCache env)) <*> (M.size <$> readIORef (sqeAccounts env))
+
+-- | Drop the caches whole when past the cap. Called before a fill, never
+-- between a fill and the read that needed it, so a read always sees what
+-- it just loaded; a fill may therefore overshoot the cap by one contract's
+-- rows (at most the cap itself, see prefetchStorage), which bounds a
+-- context's memory at twice the cap.
+enforceCacheCap :: SqlQueryM ()
+enforceCacheCap = do
+  env <- ask
+  liftIO $ do
+    cap <- readIORef (sqeCacheMaxRows env)
+    rows <- M.size <$> readIORef (sqeStorageCache env)
+    accounts <- M.size <$> readIORef (sqeAccounts env)
+    when (rows > cap || accounts > max 1 (cap `div` 10)) $ do
+      writeIORef (sqeStorageCache env) M.empty
+      writeIORef (sqePrefetched env) M.empty
+      writeIORef (sqeAccounts env) M.empty
+      writeIORef (sqeAccountIds env) M.empty
+      incCounter cacheEvictions
+    setGauge cacheRowsGauge . fromIntegral =<< (M.size <$> readIORef (sqeStorageCache env))
 
 -- --- SQL reads ---
 
@@ -190,8 +368,7 @@ bdrToHeader bdr = blockBlockData (blockDataRefToBlock bdr [] [] [] [] [] [])
 -- | The highest block the mirror holds becomes the context's best block.
 loadBestHeader :: SqlQueryM ()
 loadBestHeader = do
-  countTrip
-  mBdr <- sqlQuery $ P.selectFirst [] [P.Desc BlockDataRefNumber]
+  mBdr <- mirrorQuery $ P.selectFirst [] [P.Desc BlockDataRefNumber]
   case mBdr of
     Nothing -> logWarnN "vm-query: block_data_ref is empty, eth_call has no best block"
     Just (P.Entity _ bdr) -> do
@@ -213,8 +390,8 @@ loadAddressState addr = do
   case M.lookup addr cached of
     Just st -> pure st
     Nothing -> do
-      countTrip
-      mRow <- sqlQuery $ P.getBy (UniqueAddress addr)
+      enforceCacheCap
+      mRow <- mirrorQuery $ P.getBy (UniqueAddress addr)
       let st = flip fmap mRow $ \(P.Entity _ r) ->
             AddressState
               { addressStateNonce = addressStateRefNonce r,
@@ -237,61 +414,86 @@ accountId addr = do
   case M.lookup addr cached of
     Just sid -> pure sid
     Nothing -> do
-      countTrip
-      sid <- fmap P.entityKey <$> sqlQuery (P.getBy (UniqueAddress addr))
+      sid <- fmap P.entityKey <$> mirrorQuery (P.getBy (UniqueAddress addr))
       liftIO $ modifyIORef' ref (M.insert addr sid)
       pure sid
 
 -- | Whole-contract prefetch: the first slot read of an address with at most
--- 'prefetchLimit' rows pulls every row into the overlay in one query, and
+-- 'sqePrefetchMaxRows' rows pulls every row into the cache in one query, and
 -- every later slot of that address is an overlay hit. Returns the number of
 -- rows loaded, or Nothing when the contract is too large for it.
 prefetchStorage :: Address -> AddressStateRefId -> SqlQueryM (Maybe Int)
 prefetchStorage addr sid = do
   ref <- asks sqePrefetched
   done <- liftIO $ readIORef ref
+  cap <- asks sqeCacheMaxRows >>= liftIO . readIORef
+  prefetchMax <- asks sqePrefetchMaxRows >>= liftIO . readIORef
+  after <- asks sqePrefetchAfterSlots >>= liftIO . readIORef
   case M.lookup addr done of
-    Just n -> pure (Just n)
+    Just n | n >= 0 -> pure (Just n)
+    -- Too large for the threshold: slot by slot, unless this context has
+    -- read enough of its slots this epoch to make one query the cheaper
+    -- path, in which case it is prefetched whole up to the cache cap.
+    Just slotReads
+      | after > 0 && negate slotReads >= after -> do
+          r <- fetch cap
+          when (isJust r) $ liftIO (incCounter prefetchPromoted)
+          pure r
+      | otherwise -> pure Nothing
     Nothing -> do
-      countTrip
-      rows <- sqlQuery $ P.selectList [StorageAddressStateRefId ==. sid] [P.LimitTo (prefetchLimit + 1)]
-      if length rows > prefetchLimit
-        then pure Nothing
+      r <- fetch (min prefetchMax cap)
+      when (isNothing r) $ liftIO (incCounter prefetchDeclined)
+      pure r
+  where
+    fetch limit = do
+      ref <- asks sqePrefetched
+      enforceCacheCap
+      rows <- mirrorQuery $ P.selectList [StorageAddressStateRefId ==. sid] [P.LimitTo (limit + 1)]
+      if length rows > limit
+        then do
+          liftIO $ modifyIORef' ref (M.insertWith (\_ old -> min old (-1)) addr (-1))
+          pure Nothing
         else do
-          txMap <- getMemRawStorageTxDB
-          putMemRawStorageTxMap $ foldr (\(P.Entity _ st) -> M.insert (addr, storageKey st) (storageValue st)) txMap rows
+          cacheRef <- asks sqeStorageCache
+          liftIO $ modifyIORef' cacheRef $ \cache ->
+            foldr (\(P.Entity _ st) -> M.insert (addr, storageKey st) (Just (storageValue st))) cache rows
           liftIO $ modifyIORef' ref (M.insert addr (length rows))
+          liftIO $ observe prefetchRowsHistogram (fromIntegral (length rows))
           pure (Just (length rows))
 
 loadStorage :: Address -> RawStorageKey -> SqlQueryM (Maybe RawStorageValue)
-loadStorage addr (_, path) = do
-  mSid <- accountId addr
-  case mSid of
-    Nothing -> pure Nothing
-    Just sid -> do
-      prefetched <- prefetchStorage addr sid
-      case prefetched of
-        Just _ -> do
-          -- Everything the contract has is in the overlay now; absent means empty.
-          txMap <- getMemRawStorageTxDB
-          pure (M.lookup (addr, path) txMap)
-        Nothing -> do
-          countTrip
-          rows <- sqlQuery $ P.selectList [StorageAddressStateRefId ==. sid, StorageKey ==. path] [P.LimitTo 1]
-          pure $ case rows of
-            (P.Entity _ st : _) -> Just (storageValue st)
-            [] -> Nothing
+loadStorage addr key@(_, path) = do
+  cacheRef <- asks sqeStorageCache
+  cache <- liftIO $ readIORef cacheRef
+  case M.lookup key cache of
+    Just v -> pure v
+    Nothing -> do
+      mSid <- accountId addr
+      case mSid of
+        Nothing -> pure Nothing
+        Just sid -> do
+          prefetched <- prefetchStorage addr sid
+          case prefetched of
+            -- Everything the contract has is cached now; absent means empty.
+            Just _ -> M.findWithDefault Nothing key <$> liftIO (readIORef cacheRef)
+            Nothing -> do
+              enforceCacheCap
+              rows <- mirrorQuery $ P.selectList [StorageAddressStateRefId ==. sid, StorageKey ==. path] [P.LimitTo 1]
+              let v = case rows of
+                    (P.Entity _ st : _) -> Just (storageValue st)
+                    [] -> Nothing
+              liftIO $ modifyIORef' cacheRef (M.insert key v)
+              asks sqePrefetched >>= liftIO . flip modifyIORef' (M.adjust (subtract 1) addr)
+              pure v
 
 loadCode :: Keccak256 -> SqlQueryM (Maybe DBCode)
 loadCode h = do
-  countTrip
-  mRow <- sqlQuery $ P.getBy (UniqueCodeHash h)
+  mRow <- mirrorQuery $ P.getBy (UniqueCodeHash h)
   pure $ encodeUtf8 . codeRefCode . P.entityVal <$> mRow
 
 loadSummary :: Keccak256 -> SqlQueryM (Maybe BlockSummary)
 loadSummary h = do
-  countTrip
-  mBdr <- sqlQuery $ P.selectFirst [BlockDataRefHash ==. h] []
+  mBdr <- mirrorQuery $ P.selectFirst [BlockDataRefHash ==. h] []
   pure $ flip fmap mBdr $ \(P.Entity _ bdr) ->
     blockHeaderToBSum (fromIntegral (Conf.chainId (Conf.networkConfig ethConf))) noProposalFacts (bdrToHeader bdr) 0
 
@@ -384,14 +586,7 @@ instance (RawStorageKey `A.Alters` RawStorageValue) SqlQueryM where
         blk <- getMemRawStorageBlockDB
         case M.lookup key blk of
           Just v -> pure (Just v)
-          Nothing -> do
-            mv <- loadStorage (fst key) key
-            let v = fromMaybe BDefault mv
-            -- loadStorage may have prefetched the contract into the overlay:
-            -- re-read the map rather than writing back the one from above.
-            tx' <- getMemRawStorageTxDB
-            putMemRawStorageTxMap (M.insert key v tx')
-            pure (Just v)
+          Nothing -> Just . fromMaybe BDefault <$> loadStorage (fst key) key
   insert _ key v = getMemRawStorageTxDB >>= putMemRawStorageTxMap . M.insert key v
   delete _ key = getMemRawStorageTxDB >>= putMemRawStorageTxMap . M.insert key BDefault
   lookupWithDefault p key = fromMaybe BDefault <$> A.lookup p key

@@ -33,6 +33,7 @@ import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.VMContext (ContextBestBlockInfo (..), ContextState (..))
 import Blockchain.VMOptions ()
+import Blockchain.VmQuery.Import (importFromNode)
 import Blockchain.VmQuery.Seed
 import Blockchain.VmQuery.Server (ServerConfig (..), serve)
 import Blockchain.VmQuery.SqlContext
@@ -53,6 +54,7 @@ import qualified Database.Persist as P
 import Data.Text.Encoding (encodeUtf8)
 import GHC.Clock (getMonotonicTimeNSec)
 import HFlags
+import System.Environment (lookupEnv)
 import System.Exit (exitFailure)
 import Text.Printf (printf)
 
@@ -60,6 +62,10 @@ defineFlag "port" (8546 :: Int) "Port for `vm-query serve`"
 defineFlag "maxConcurrent" (16 :: Int) "Commands executing at once in `vm-query serve`; twice this many may wait, the rest are shed"
 defineFlag "headerMaxAgeSeconds" (1.0 :: Double) "How long `vm-query serve` reuses the mirror's best block header before re-reading it"
 defineFlag "poolSize" (8 :: Int) "Postgres connections for `vm-query serve`"
+defineFlag "cacheMaxRows" (200000 :: Int) "Per-context cap on cached mirror storage rows in `vm-query serve`; past it the row cache is dropped and refilled"
+defineFlag "prefetchMaxRows" (4096 :: Int) "Contracts with at most this many storage rows are read whole on first access; larger ones slot by slot (`vm-query serve` and `call`)"
+defineFlag "prefetchAfterSlots" (64 :: Int) "A contract above the prefetch threshold is prefetched whole (up to the cache cap) once a context has read this many of its slots in one epoch; 0 disables"
+defineFlag "snapshotMaxAgeSeconds" (30.0 :: Double) "Longest `vm-query serve` holds a block epoch's repeatable-read snapshot open before re-pinning on the same block"
 
 -- HFlags only sees flags from earlier declaration groups; this splice ends the group.
 $(return [])
@@ -73,42 +79,68 @@ main = do
 dispatch :: [String] -> IO ()
 dispatch = \case
   ["seed"] -> withDb $ \db -> runLog (runSQLMWith db (migrateMirror >> seedSample)) >> putStrLn ("seeded " ++ show sampleAddress ++ " with " ++ show sampleMappingSize ++ " mapping keys")
+  -- Rebuild the mirror rows a contract needs from a node's public read API
+  -- (account, code, storage, best block), following proxies.
+  ("import" : nodeUrl : addrs@(_ : _)) -> withDb $ \db -> do
+    targets <- either die pure (mapM parseAddr addrs)
+    runLog (runSQLMWith db migrateMirror)
+    importFromNode db nodeUrl targets
   ["serve"] -> do
     db <- runLog (createSQLDB flags_poolSize)
-    serve db ServerConfig {scPort = flags_port, scMaxConcurrent = flags_maxConcurrent, scHeaderMaxAgeSeconds = flags_headerMaxAgeSeconds}
-  -- The wire exchange ethereum-jsonrpc makes, for the harness.
-  ["client", url, toHex, dat] -> do
+    serve db ServerConfig {scPort = flags_port, scMaxConcurrent = flags_maxConcurrent, scHeaderMaxAgeSeconds = flags_headerMaxAgeSeconds, scSnapshotMaxAgeSeconds = flags_snapshotMaxAgeSeconds, scCacheMaxRows = flags_cacheMaxRows, scPrefetchMaxRows = flags_prefetchMaxRows, scPrefetchAfterSlots = flags_prefetchAfterSlots}
+  -- The wire exchange ethereum-jsonrpc makes, for the harness; with a
+  -- count, the same call back to back over one keep-alive connection.
+  ("client" : url : toHex : dat : rest) -> do
+    let n = case rest of
+          (k : _) -> read k
+          [] -> 1 :: Int
     cmd <- either die pure (mkCall toHex dat)
     manager <- newManager defaultManagerSettings
     initial <- parseRequest (url ++ "/command")
-    resp <- httpLbs initial {method = "POST", requestHeaders = [("Content-Type", "application/octet-stream")], requestBody = RequestBodyLBS (Bin.encode cmd)} manager
-    case Bin.decodeOrFail (responseBody resp) of
-      Left (_, _, err) -> die ("undecodable response: " ++ err ++ " " ++ show (BL.take 200 (responseBody resp)))
-      Right (_, _, r) -> putStrLn ("result: " ++ showResp r)
+    let req = initial {method = "POST", requestHeaders = [("Content-Type", "application/octet-stream")], requestBody = RequestBodyLBS (Bin.encode cmd)}
+    t0 <- getMonotonicTimeNSec
+    results <- forM [1 .. n] $ \_ -> do
+      resp <- httpLbs req manager
+      case Bin.decodeOrFail (responseBody resp) of
+        Left (_, _, err) -> die ("undecodable response: " ++ err ++ " " ++ show (BL.take 200 (responseBody resp)))
+        Right (_, _, r) -> pure r
+    t1 <- getMonotonicTimeNSec
+    forM_ (take 1 results) $ \r -> putStrLn ("result: " ++ showResp r)
+    if n > 1 then printf "%d round trips over one connection: %.2f ms each\n" n (fromIntegral (t1 - t0) / 1e6 / fromIntegral n :: Double) else pure ()
   ["selector", sig] -> BC.putStrLn $ "0x" <> B16.encode (B.take 4 (keccak256ToByteString (hash (BC.pack sig))))
   ("call" : toHex : dat : rest) -> withDb $ \db -> do
     let n = case rest of
           (k : _) -> read k
           [] -> 1 :: Int
     env <- newSqlQueryEnv db
+    runSqlQueryM env (setCacheMaxRows flags_cacheMaxRows >> setPrefetchMaxRows flags_prefetchMaxRows >> setPrefetchAfterSlots flags_prefetchAfterSlots)
     cmd <- either die pure (mkCall toHex dat)
-    results <- forM [1 .. n] $ \i -> runSqlQueryM env $ withFreshOverlay $ do
+    -- VMQ_CALL_MODE=service resets the context exactly as the service does
+    -- between requests, to compare the two entry points.
+    mode <- lookupEnv "VMQ_CALL_MODE"
+    best <- runSqlQueryM env bestHeader
+    let prepare = if mode == Just "service" then resetForRequest best else pure ()
+        wrap = if mode == Just "service" then id else withFreshOverlay
+    results <- forM [1 .. n] $ \i -> runSqlQueryM env $ wrap $ do
+      prepare
       resetRoundTrips
       t0 <- liftIO getMonotonicTimeNSec
       resp <- runJsonRpcCommand' cmd
       t1 <- liftIO getMonotonicTimeNSec
       trips <- readRoundTrips
-      pure (i, resp, trips, fromIntegral (t1 - t0) / 1e6 :: Double)
+      sqlNs <- readSqlNanos
+      pure (i, resp, trips, fromIntegral (t1 - t0) / 1e6 :: Double, fromIntegral sqlNs / 1e6 :: Double)
     emptyReads <- runSqlQueryM env readEmptyTrieReads
-    forM_ (take 1 results) $ \(_, resp, _, _) -> putStrLn ("result: " ++ showResp resp ++ "  (empty-trie root reads over all calls: " ++ show emptyReads ++ ")")
-    forM_ (take 3 results) $ \(i, _, trips, ms) -> printf "call %d: %d SQL round trips, %.2f ms\n" i trips ms
+    forM_ (take 1 results) $ \(_, resp, _, _, _) -> putStrLn ("result: " ++ showResp resp ++ "  (empty-trie root reads over all calls: " ++ show emptyReads ++ ")")
+    forM_ (take 3 results) $ \(i, _, trips, ms, sqlMs) -> printf "call %d: %d SQL round trips, %.2f ms (%.2f ms in SQL)\n" i trips ms sqlMs
     let warm = drop 1 results
     if null warm then pure () else do
-      let lat = sort [ms | (_, _, _, ms) <- warm]
+      let lat = sort [ms | (_, _, _, ms, _) <- warm]
           pct p = lat !! min (length lat - 1) (floor (p * fromIntegral (length lat) :: Double))
-          trips = [t | (_, _, t, _) <- warm]
-      printf "warm calls: %d, SQL round trips per call: %d..%d, latency p50 %.2f ms, p95 %.2f ms, max %.2f ms\n"
-        (length warm) (minimum trips) (maximum trips) (pct 0.5) (pct 0.95) (last lat)
+          trips = [t | (_, _, t, _, _) <- warm]
+          sqlMean = sum [q | (_, _, _, _, q) <- warm] / fromIntegral (length warm)
+      printf "warm calls: %d, SQL round trips per call: %d..%d, latency p50 %.2f ms, p95 %.2f ms, max %.2f ms, mean in SQL %.2f ms\n"
+        (length warm) (minimum trips) (maximum trips) (pct 0.5) (pct 0.95) (last lat) sqlMean
   ["parity", toHex, dat] -> withDb $ \db -> do
     env <- newSqlQueryEnv db
     cmd <- either die pure (mkCall toHex dat)
@@ -137,7 +169,7 @@ dispatch = \case
     putStrLn ("sql:    " ++ showResp sqlResp)
     putStrLn ("memory: " ++ showResp memResp)
     if showResp sqlResp == showResp memResp then putStrLn "parity: OK" else putStrLn "parity: MISMATCH" >> exitFailure
-  _ -> die "usage: vm-query seed | serve | selector <sig> | call <to> <data> [n] | parity <to> <data> | client <url> <to> <data>"
+  _ -> die "usage: vm-query seed | import <nodeUrl> <address>... | serve | selector <sig> | call <to> <data> [n] | parity <to> <data> | client <url> <to> <data> [n]"
   where
     runLog = runStderrLoggingT . filterLogger (\_ lvl -> lvl >= LevelWarn)
     runSqlQueryM' env m = liftIO (runSqlQueryM env m)

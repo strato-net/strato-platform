@@ -21,30 +21,45 @@ module Blockchain.VmQuery.Server
   )
 where
 
-import Blockchain.DB.SQLDB (SQLDB)
+import Blockchain.DB.SQLDB (SQLDB (..))
+import Blockchain.EthConf (connStr, readerConnStr)
+import Blockchain.Data.DataDefs (EntityField (BlockDataRefNumber))
 import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.JsonRpcCommand (runJsonRpcCommand')
 import Blockchain.Sequencer.Event (JsonRpcCommand (..), JsonRpcResponse (..))
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Blockchain.VmQuery.SqlContext
+import Control.Concurrent (runInBoundThread)
+import Control.Concurrent.MVar
 import Control.Concurrent.QSem
-import Control.Exception (SomeException, bracket_, displayException, fromException, try)
-import Control.Monad (void)
+import Control.Concurrent.STM
+import Control.Exception (IOException, SomeException, bracket, bracket_, displayException, fromException, throwIO, try)
+import Control.Monad (void, when)
+import Control.Monad.Trans.Reader (runReaderT)
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
+import Data.Pool (destroyResource, putResource, takeResource)
+import Database.Persist (Entity (..), SelectOpt (..), selectFirst)
+import Database.Persist.Sql (SqlBackend, SqlPersistT, rawExecute)
+import Database.PostgreSQL.Simple (SqlError (..))
 import qualified Data.Aeson as Aeson
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as B8
 import qualified Data.Binary as Bin
 import Data.Default (def)
 import Data.IORef
 import qualified Data.Text as T
-import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
+import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import GHC.Clock (getMonotonicTimeNSec)
+import System.Environment (lookupEnv)
 import Network.HTTP.Types (methodGet, methodPost, status200, status404, status405, status503)
 import Network.Wai
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Prometheus (prometheus)
 import Prometheus
 import Strato.Tracing (initTracing)
+import System.IO (BufferMode (..), hSetBuffering, stdout)
 import Strato.Tracing.Wai (tracingMiddleware)
 
 data ServerConfig = ServerConfig
@@ -53,7 +68,14 @@ data ServerConfig = ServerConfig
     -- many waiting the request is shed with 503.
     scMaxConcurrent :: Int,
     -- | How long the best block header is reused before being re-read.
-    scHeaderMaxAgeSeconds :: Double
+    scHeaderMaxAgeSeconds :: Double,
+    -- | Longest a block epoch's snapshot transaction is held open before
+    -- being re-pinned on the same block.
+    scSnapshotMaxAgeSeconds :: Double,
+    -- | Per-context cap on cached storage rows (see SqlContext).
+    scCacheMaxRows :: Int,
+    scPrefetchMaxRows :: Int,
+    scPrefetchAfterSlots :: Int
   }
 
 {-# NOINLINE requestsTotal #-}
@@ -68,7 +90,145 @@ commandSeconds = unsafeRegister . vector "command" . histogram (Info "vm_query_c
 inFlight :: Gauge
 inFlight = unsafeRegister . gauge $ Info "vm_query_in_flight" "Commands executing now"
 
-data BestBlock = BestBlock UTCTime (Maybe BlockHeader)
+{-# NOINLINE poolIdle #-}
+poolIdle :: Gauge
+poolIdle = unsafeRegister . gauge $ Info "vm_query_pool_idle" "Prepared contexts waiting for a request"
+
+-- | Contexts are reused across requests: allocating one costs a tx-run
+-- cache and a handful of references, and resetting it is cheaper. The
+-- semaphore already bounds how many are out at once, so the pool never
+-- holds more than that many.
+newtype ContextPool = ContextPool (TVar [SqlQueryEnv])
+
+withContext :: SQLDB -> ContextPool -> Maybe BlockHeader -> (SqlQueryEnv -> IO a) -> IO a
+withContext db (ContextPool ref) best act = bracket acquire release act
+  where
+    acquire = do
+      mEnv <- atomically $ readTVar ref >>= \case
+        (e : rest) -> writeTVar ref rest >> pure (Just e)
+        [] -> pure Nothing
+      env <- maybe (newSqlQueryEnvWith db Nothing) pure mEnv
+      runSqlQueryM env (resetForRequest best)
+      setGauge poolIdle . fromIntegral . length =<< readTVarIO ref
+      pure env
+    release env = do
+      atomically $ modifyTVar' ref (env :)
+      setGauge poolIdle . fromIntegral . length =<< readTVarIO ref
+
+-- | One block epoch's view of the mirror: a repeatable-read, read-only
+-- transaction held open on a pooled connection, with the best header read
+-- inside it. Every cache miss of the epoch runs on it, so the rows and the
+-- header are one consistent state. Requests hold it by reference count;
+-- when the best block advances the epoch is retired and its connection
+-- goes back to the pool once the last request using it has finished.
+data Snapshot = Snapshot
+  { snapHeader :: Maybe BlockHeader,
+    snapConn :: MVar SqlBackend,
+    snapUsers :: IORef Int,
+    snapRetired :: IORef Bool,
+    -- | Set when a query on the pinned connection failed (a reader endpoint
+    -- cancels transactions that conflict with replay, or drops them on a
+    -- failover): the next refresh replaces the epoch whatever the block.
+    snapBroken :: IORef Bool,
+    snapOpened :: UTCTime,
+    -- | Ends the transaction and returns the connection to the pool.
+    snapClose :: IO ()
+  }
+
+-- | Open an epoch on the mirror's read endpoint ('sqlReaderPool': the
+-- replica when 'sqlReaderConfig' is set, else the writer). Reads through
+-- the epoch are as fresh as that endpoint, and the header is read on the
+-- same connection so a call's rows always match the block it runs against.
+openSnapshot :: SQLDB -> IO Snapshot
+openSnapshot db = do
+  (backend, local) <- takeResource (sqlReaderPool db)
+  let onConn :: SqlPersistT (ResourceT IO) a -> IO a
+      onConn q = runResourceT (runReaderT q backend)
+  r <- try $ do
+    onConn $ rawExecute "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" []
+    fmap (bdrToHeader . entityVal) <$> onConn (selectFirst [] [Desc BlockDataRefNumber])
+  case r of
+    Left (e :: SomeException) -> do
+      -- A connection that failed to open a transaction is not reused.
+      destroyResource (sqlReaderPool db) local backend
+      throwIO e
+    Right header -> do
+      now <- getCurrentTime
+      conn <- newMVar backend
+      users <- newIORef 0
+      retired <- newIORef False
+      broken <- newIORef False
+      let close = do
+            wasBroken <- readIORef broken
+            ended <- try (withMVar conn $ \b -> runResourceT (runReaderT (rawExecute "ROLLBACK" []) b)) :: IO (Either SomeException ())
+            case ended of
+              Right () | not wasBroken -> putResource local backend
+              -- A connection whose transaction failed is not returned to
+              -- the pool: the failure may have been the connection itself.
+              _ -> destroyResource (sqlReaderPool db) local backend
+      pure Snapshot {snapHeader = header, snapConn = conn, snapUsers = users, snapRetired = retired, snapBroken = broken, snapOpened = now, snapClose = close}
+
+-- | Take a reference to the current epoch for the duration of a request.
+withSnapshot :: IORef Snapshot -> (Snapshot -> IO a) -> IO a
+withSnapshot ref act = bracket acquire release act
+  where
+    acquire = do
+      snap <- readIORef ref
+      atomicModifyIORef' (snapUsers snap) (\n -> (n + 1, ()))
+      pure snap
+    release snap = do
+      left <- atomicModifyIORef' (snapUsers snap) (\n -> (n - 1, n - 1))
+      retired <- readIORef (snapRetired snap)
+      when (retired && left == 0) $ snapClose snap
+
+-- | Every header refresh interval, look at the mirror through a fresh
+-- transaction. If the best block is unchanged and the epoch's transaction
+-- is younger than the maximum, keep the epoch (the candidate is closed);
+-- otherwise the candidate becomes the epoch, the old one is retired, and
+-- its connection returns to the pool once its last request finishes. A
+-- reader endpoint may cancel long transactions, which is what the maximum
+-- age is for: re-pinning on the same block keeps every cache valid.
+-- Rotation is serialised so two refreshes cannot both retire the epoch.
+refreshSnapshot :: SQLDB -> ServerConfig -> MVar () -> IORef UTCTime -> IORef Snapshot -> IO Snapshot
+refreshSnapshot db cfg lock lastCheck ref = do
+  now <- getCurrentTime
+  checked <- readIORef lastCheck
+  if realToFrac (now `diffUTCTime` checked) < scHeaderMaxAgeSeconds cfg
+    then readIORef ref
+    else withMVar lock $ \() -> do
+      checked' <- readIORef lastCheck
+      if realToFrac (now `diffUTCTime` checked') < scHeaderMaxAgeSeconds cfg
+        then readIORef ref
+        else do
+          current <- readIORef ref
+          candidate <- openSnapshot db
+          writeIORef lastCheck now
+          broken <- readIORef (snapBroken current)
+          let same = (blockHeaderHash <$> snapHeader candidate) == (blockHeaderHash <$> snapHeader current)
+              epochAge = realToFrac (now `diffUTCTime` snapOpened current) :: Double
+          if same && not broken && epochAge < scSnapshotMaxAgeSeconds cfg
+            then snapClose candidate >> pure current
+            else do
+              putStrLn $ "vm-query: epoch now block " ++ maybe "none" (show . number) (snapHeader candidate) ++ (if broken then " after a mirror failure" else "") ++ "; previous epoch was " ++ show (round epochAge :: Int) ++ " s old"
+              writeIORef ref candidate
+              writeIORef (snapRetired current) True
+              users <- readIORef (snapUsers current)
+              when (users == 0) $ snapClose current
+              pure candidate
+
+-- | Which eth endpoint the epochs read: "reader" when 'sqlReaderConfig'
+-- names one, else "writer".
+sqlEndpoint :: String
+sqlEndpoint = if readerConnStr == connStr then "writer" else "reader"
+
+-- | A failure of the mirror connection itself (as opposed to a VM error or
+-- a trie access): the epoch is unusable and the command is retried once on
+-- a fresh one.
+mirrorFailure :: SomeException -> Maybe String
+mirrorFailure e
+  | Just SqlError {sqlErrorMsg = msg, sqlExecStatus = st} <- fromException e = Just (if B.null msg then "connection lost, " ++ show st else B8.unpack msg)
+  | Just (io :: IOException) <- fromException e = Just (displayException io)
+  | otherwise = Nothing
 
 -- | Whether the mirror can answer the command: latest state only, and only
 -- the read commands. Anything else is declined for the consensus VM.
@@ -90,33 +250,24 @@ routable cmd best = case cmd of
 
 serve :: SQLDB -> ServerConfig -> IO ()
 serve db cfg = do
+  hSetBuffering stdout LineBuffering
   initTracing "vm-query"
-  now <- getCurrentTime
-  headerRef <- newIORef (BestBlock now Nothing)
-  void $ refreshHeader db cfg headerRef
+  snapRef <- newIORef =<< openSnapshot db
+  lastCheck <- newIORef =<< getCurrentTime
+  rotateLock <- newMVar ()
   sem <- newQSem (scMaxConcurrent cfg)
   waiting <- newIORef (0 :: Int)
-  putStrLn $ "vm-query serving on port " ++ show (scPort cfg)
-  run (scPort cfg) . prometheus def . tracingMiddleware "vm-query" $ app db cfg headerRef sem waiting
+  pool <- ContextPool <$> newTVarIO []
+  putStrLn $ "vm-query serving on port " ++ show (scPort cfg) ++ ", reading the mirror through the " ++ sqlEndpoint ++ " endpoint"
+  when (sqlEndpoint == "writer") $ putStrLn "vm-query: no sqlReaderConfig, so reads go to the writer; point sqlReaderConfig at the reader before scaling this out"
+  run (scPort cfg) . prometheus def . tracingMiddleware "vm-query" $ app db cfg (rotateLock, lastCheck, snapRef) sem waiting pool
 
--- | The best header, re-read from the mirror when older than the configured age.
-refreshHeader :: SQLDB -> ServerConfig -> IORef BestBlock -> IO (Maybe BlockHeader)
-refreshHeader db cfg ref = do
-  BestBlock at h <- readIORef ref
-  now <- getCurrentTime
-  if realToFrac (now `diffUTCTime` at) < scHeaderMaxAgeSeconds cfg && h /= Nothing
-    then pure h
-    else do
-      h' <- bestHeaderFromDb db
-      writeIORef ref (BestBlock now h')
-      pure h'
-
-app :: SQLDB -> ServerConfig -> IORef BestBlock -> QSem -> IORef Int -> Application
-app db cfg headerRef sem waiting req respond = case (requestMethod req, pathInfo req) of
+app :: SQLDB -> ServerConfig -> (MVar (), IORef UTCTime, IORef Snapshot) -> QSem -> IORef Int -> ContextPool -> Application
+app db cfg (rotateLock, lastCheck, snapRef) sem waiting pool req respond = case (requestMethod req, pathInfo req) of
   (m, ["health"]) | m == methodGet -> do
-    h <- refreshHeader db cfg headerRef
+    snap <- refreshSnapshot db cfg rotateLock lastCheck snapRef
     now <- getCurrentTime
-    let body = case h of
+    let body = case snapHeader snap of
           Nothing -> Aeson.object ["ok" .= False, "reason" .= ("mirror has no blocks" :: T.Text)]
           Just hdr ->
             Aeson.object
@@ -124,7 +275,12 @@ app db cfg headerRef sem waiting req respond = case (requestMethod req, pathInfo
                 "bestBlock" .= number hdr,
                 "bestBlockHash" .= keccak256ToHex (blockHeaderHash hdr),
                 "bestBlockAgeSeconds" .= (realToFrac (now `diffUTCTime` timestamp hdr) :: Double),
-                "bestBlockTimestamp" .= (realToFrac (utcTimeToPOSIXSeconds (timestamp hdr)) :: Double)
+                "bestBlockTimestamp" .= (realToFrac (utcTimeToPOSIXSeconds (timestamp hdr)) :: Double),
+                "snapshotAgeSeconds" .= (realToFrac (now `diffUTCTime` snapOpened snap) :: Double),
+                "cacheMaxRows" .= scCacheMaxRows cfg,
+                "prefetchMaxRows" .= scPrefetchMaxRows cfg,
+                "prefetchAfterSlots" .= scPrefetchAfterSlots cfg,
+                "sqlEndpoint" .= T.pack sqlEndpoint
               ]
     respond $ responseLBS status200 [("Content-Type", "application/json")] (Aeson.encode body)
   (m, ["command"]) | m == methodPost -> do
@@ -132,7 +288,9 @@ app db cfg headerRef sem waiting req respond = case (requestMethod req, pathInfo
     case Bin.decodeOrFail body of
       Left (_, _, err) -> reply (Error "?" ("vm-query: undecodable command: " ++ err))
       Right (_, _, cmd) -> do
-        best <- refreshHeader db cfg headerRef
+        void $ refreshSnapshot db cfg rotateLock lastCheck snapRef
+        snapNow <- readIORef snapRef
+        let best = snapHeader snapNow
         case routable cmd best of
           Left why -> do
             count cmd "declined"
@@ -145,7 +303,20 @@ app db cfg headerRef sem waiting req respond = case (requestMethod req, pathInfo
                 count cmd "shed"
                 respond $ responseLBS status503 [("Content-Type", "text/plain")] "vm-query: too many commands in flight"
               else do
-                resp <- bracket_ (waitQSem sem >> incGauge inFlight) (signalQSem sem >> decGauge inFlight >> atomicModifyIORef' waiting (\n -> (n - 1, ()))) $ execute db best cmd
+                resp <- bracket_ (waitQSem sem >> incGauge inFlight) (signalQSem sem >> decGauge inFlight >> atomicModifyIORef' waiting (\n -> (n - 1, ()))) $ do
+                  first <- withSnapshot snapRef $ \snap -> execute db cfg pool snap cmd
+                  case first of
+                    -- The epoch's connection failed under this command:
+                    -- rotate now (the refresh replaces a broken epoch) and
+                    -- run it once more on the new one.
+                    Left why -> do
+                      putStrLn $ "vm-query: mirror connection failed (" ++ why ++ "); reopening the snapshot"
+                      count cmd "mirror_failure"
+                      writeIORef lastCheck . addUTCTime (-86400) =<< getCurrentTime
+                      void $ refreshSnapshot db cfg rotateLock lastCheck snapRef
+                      second <- withSnapshot snapRef $ \snap -> execute db cfg pool snap cmd
+                      pure $ either (\why' -> Error (jrcId cmd) ("vm-query: mirror connection failed twice: " ++ why')) id second
+                    Right r -> pure r
                 count cmd (case resp of Error {} -> "error"; _ -> "ok")
                 reply resp
   _ -> respond $ responseLBS (if pathInfo req `elem` [["command"], ["health"]] then status405 else status404) [] ""
@@ -153,20 +324,37 @@ app db cfg headerRef sem waiting req respond = case (requestMethod req, pathInfo
     reply r = respond $ responseLBS status200 [("Content-Type", "application/octet-stream")] (Bin.encode r)
     count cmd outcome = withLabel requestsTotal (commandName cmd, outcome) incCounter
 
--- | One command on a fresh context over the shared pool: the overlay,
--- caches and best block are per request, the code collection cache global.
-execute :: SQLDB -> Maybe BlockHeader -> JsonRpcCommand -> IO JsonRpcResponse
-execute db best cmd = do
+-- | One command on a pooled context: the overlay, caches and best block are
+-- reset per request; the code collection cache is process-wide.
+execute :: SQLDB -> ServerConfig -> ContextPool -> Snapshot -> JsonRpcCommand -> IO (Either String JsonRpcResponse)
+execute db cfg pool snap cmd = do
   t0 <- getMonotonicTimeNSec
-  env <- newSqlQueryEnvWith db best
-  r <- try $ runSqlQueryM env (runJsonRpcCommand' cmd)
+  (r, tAcquired, tRan) <- withContext db pool (snapHeader snap) $ \env -> do
+    runSqlQueryM env (setSnapshot (Just (snapConn snap)) >> setCacheMaxRows (scCacheMaxRows cfg) >> setPrefetchMaxRows (scPrefetchMaxRows cfg) >> setPrefetchAfterSlots (scPrefetchAfterSlots cfg))
+    ta <- getMonotonicTimeNSec
+    -- On a bound thread: libpq's calls and socket waits from an unbound
+    -- warp thread cost about twice the time of the same round trips from a
+    -- bound one (measured 4.4 ms vs 2.3 ms for two queries).
+    r <- runInBoundThread $ try $ runSqlQueryM env (runJsonRpcCommand' cmd)
+    tr <- getMonotonicTimeNSec
+    trips <- runSqlQueryM env readRoundTrips
+    sqlNs <- runSqlQueryM env readSqlNanos
+    pure (r, ta, (tr, (trips, sqlNs)))
   t1 <- getMonotonicTimeNSec
+  timing <- lookupEnv "VM_QUERY_TIMING"
+  case timing of
+    Just _ -> putStrLn $ "timing " ++ T.unpack (commandName cmd) ++ ": acquire+reset " ++ show ((tAcquired - t0) `div` 1000) ++ " us, run " ++ show ((fst tRan - tAcquired) `div` 1000) ++ " us, " ++ show (fst (snd tRan)) ++ " sql round trips taking " ++ show (snd (snd tRan) `div` 1000) ++ " us, release " ++ show ((t1 - fst tRan) `div` 1000) ++ " us"
+    Nothing -> pure ()
   withLabel commandSeconds (commandName cmd) (`observe` (fromIntegral (t1 - t0) / 1e9))
-  pure $ case r of
-    Right resp -> resp
+  case r of
+    Right resp -> pure (Right resp)
     Left (e :: SomeException) -> case fromException e of
-      Just (TrieAccess what) -> Error (jrcId cmd) ("vm-query: trie access, not served from the mirror: " ++ what)
-      Nothing -> Error (jrcId cmd) ("vm-query: internal: " ++ displayException e)
+      Just (TrieAccess what) -> pure $ Right $ Error (jrcId cmd) ("vm-query: trie access, not served from the mirror: " ++ what)
+      Nothing -> case mirrorFailure e of
+        Just why -> do
+          writeIORef (snapBroken snap) True
+          pure (Left why)
+        Nothing -> pure $ Right $ Error (jrcId cmd) ("vm-query: internal: " ++ displayException e)
 
 commandName :: JsonRpcCommand -> T.Text
 commandName = \case

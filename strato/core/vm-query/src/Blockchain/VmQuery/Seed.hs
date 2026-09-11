@@ -55,7 +55,11 @@ sampleSource =
     ]
 
 migrateMirror :: HasSQLDB m => m ()
-migrateMirror = sqlQueryWriter $ runMigration migrateAll
+migrateMirror = do
+  sqlQueryWriter $ runMigration migrateAll
+  -- The indexer's indexes too (CREATE INDEX CONCURRENTLY cannot run in a
+  -- transaction), so the harness measures against the mirror's real plans.
+  sqlQueryNoTransaction $ runMigration indexAll
 
 -- | Idempotent: rows already present are left alone.
 seedSample :: HasSQLDB m => m ()

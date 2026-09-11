@@ -98,7 +98,8 @@ override     '.apiConfig.rpcListenAddress'     "$RPC_LISTEN_ADDRESS"
 # bloc reaches the JSON-RPC server in this same container for simulations.
 override     '.vmConfig.vmJsonRpcUrl'          "http://127.0.0.1:8545"
 # vm-query (phase 5): latest-state calls served from the mirror in this
-# same container when VM_QUERY=true.
+# same container when VM_QUERY=true. It reads through sqlReaderConfig, so
+# with postgres_reader_host set its snapshots run on the replica.
 if [[ "${VM_QUERY:-false}" == "true" ]]; then
   override   '.vmConfig.vmQueryUrl'            "http://127.0.0.1:8546"
 fi

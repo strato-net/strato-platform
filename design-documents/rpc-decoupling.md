@@ -218,14 +218,198 @@ turning it on; what is gained is that the read traffic leaves vm-runner.
 `VM_QUERY=true` (the api-tier app's `-c vmQuery=true`), and the API image
 ships the binary.
 
-**Measured through the service** (harness, local Postgres): 202 commands, a
-mean of 5.4 ms per command inside the service including the per-request
-context and the prefetch, against 2.2 ms for the same call in-process. The
-gap is the fresh context and two extra middleware layers per request; a
-context pool would close most of it if it matters.
+**Context pool and the per-block read cache.** Contexts are pooled and
+reset between requests (acquire and reset measured at 6 to 10 µs, so the
+per-request context was never the cost: about 90 percent of a warm call
+was its two Postgres round trips, 3 to 4 ms on a warp thread against 2.3 ms
+from a plain main thread, a runtime and IO-manager effect that running the
+command on a bound thread narrows only within run-to-run noise). What
+changes the picture is keeping the mirror reads: account rows, prefetched
+storage and single slots stay cached across requests while the mirror's
+best block is unchanged, and are dropped when it advances. That is sound
+because strato-indexer commits a block's header and its state diffs in one
+transaction, so an unchanged best block means unchanged rows. Measured
+through the service against local Postgres, 200 back-to-back calls over one
+connection: 0.15 ms per round trip including the HTTP hop, zero SQL round
+trips per call, 0.14 ms mean inside the service (the first call after a
+block advances pays the two queries, 2 to 4 ms). The command's own writes
+still live in the per-request overlay, consulted before the cache, so a
+sandboxed write never leaks between requests.
 
-**Still open.** Parity on a follower core's real mirror before routing
-mainnet traffic; the prefetch threshold from real row counts; and the
-API-role directory today runs vm-query against its own `sqlConfig` (the
-writer endpoint), so point `sqlReaderConfig` at the reader before scaling
-it out.
+**One snapshot per block epoch.** Each epoch is a `REPEATABLE READ`,
+read-only transaction held open on a pooled connection, with the best
+header read inside it; every cache miss of the epoch runs on that
+connection (serialised by an MVar, which only misses contend for), so the
+rows a call sees are exactly the state of the header it executes against,
+never a row from the next block. Every header refresh interval
+(`--headerMaxAgeSeconds`, 1 s) the service looks at the mirror through a
+fresh transaction: same best block and an epoch younger than
+`--snapshotMaxAgeSeconds` (30 s) keeps the epoch; otherwise the fresh
+transaction becomes the epoch, the old one is retired, and its connection
+returns to the pool once the last request holding it finishes (requests
+hold epochs by reference count). The maximum age exists because a reader
+endpoint may cancel a long transaction; re-pinning on the same block keeps
+every cache valid. `/health` reports `snapshotAgeSeconds`. The harness
+advances the mirror by a block mid-run and checks that the service reports
+the new block, drops its caches and pays its queries on the new snapshot.
+
+Reads are therefore consistent within an epoch and at most one refresh
+interval behind the mirror.
+
+**Cache cap.** Each pooled context caps its row cache (`--cacheMaxRows`,
+200000 by default, a few hundred bytes per row) and its account cache at a
+tenth of that. The cap is enforced before a fill, never between a fill and
+the read that needed it, so a read always sees what it just loaded; past
+the cap the caches are dropped whole and refilled on demand. A contract
+with more rows than the cap (or than the 4096-row prefetch limit) is read
+slot by slot instead of prefetched, and remembered as such for the epoch.
+A context's memory is therefore bounded at about twice the cap, and the
+service's at that times the pool size. `vm_query_cache_rows` and
+`vm_query_cache_evictions_total` show what it is doing; the harness runs
+the service with caps of 100 and 30 rows against a 257-row contract and a
+call touching 64 slots, checks the results are unchanged, and reads the
+eviction counter.
+
+**Parity against testnet (2026-09-10).** `spike/run-testnet-parity.sh`
+imports real contracts from a node's public read API (`vm-query import
+<nodeUrl> <address>...`: last block header, `/account`, `/code/{hash}` and
+`/storage` rows, proxies followed through their `logicContract` slot) into
+a throwaway Postgres and compares `eth_call` on the query VM with the node's
+own JSON-RPC, which runs the trie-backed consensus VM. Against
+`app.testnet.strato.nexus` at block 543180: the price oracle proxy (356
+rows), the lendUSDST token proxy (37 rows) and the native token (1056
+rows) plus their three logic contracts imported cleanly with every code
+hash verified, and all 16 calls matched byte for byte: queue size, oracle
+rates and rebase factors, total supplies, decimals, funded and unfunded
+balances, name and symbol. The query VM reproduces the node's answers even
+where those are quirks of the node itself (a populated public mapping whose
+getter answers zero, string getters that return only the offset word), which
+is the point: the handlers run unchanged, only the state provider differs.
+
+One importer lesson: the API serves stored code as JSON, so a single-file
+source arrives as a JSON string and a multi-file collection as a JSON
+array. The importer decodes the string form before storing it (the VM
+compiles the stored text as a literal source otherwise, which yields a
+contract with no functions), and it checks the keccak of what it stores
+against the account's code hash.
+
+The import is a snapshot of the mirror tables as a follower core would
+hold them, taken through the same decoder strato-api uses, so it exercises
+the SQL representation the service will read in production. What it does
+not exercise is the indexer writing those rows block by block; the
+follower-core deployment does that, and its parity run is this harness
+pointed at the follower's own database.
+
+**Reader endpoint (2026-09-10).** Epoch snapshots are opened on the eth
+database's read pool (`sqlReaderPool`), which `createSQLDB` points at
+`sqlReaderConfig` when ethconf names one and at the writer otherwise. On an
+API-role node `api-doit.sh` already derives `sqlReaderConfig` from
+`postgres_reader_host`, so vm-query in that container reads the Aurora
+reader with no further configuration; the service logs which endpoint it
+uses at startup and reports it as `sqlEndpoint` in `/health`. Because the
+header is read inside the snapshot transaction, a lagging replica only
+makes the service answer as of the replica's block, never with rows from
+one block and a header from another. A reader may also cancel a snapshot
+transaction that conflicts with replay, or drop it on a failover. The
+service treats a Postgres or socket error under a command as a mirror
+failure rather than a VM error: the epoch is marked broken (its connection
+is destroyed instead of returned to the pool), the refresh replaces it at
+once whatever the block, and the command runs a second time on the new
+epoch before any error reaches the caller. `vm_query_requests_total` counts
+these under `outcome="mirror_failure"`, and the log says when an epoch
+rotates and why. The harness runs its service with a distinct reader pool
+(the same database under another host spelling), terminates the epoch's
+backend with `pg_terminate_backend`, and checks that the next cold call is
+answered with one logged retry.
+
+**Prefetch threshold (2026-09-10).** The whole-contract prefetch reads a
+contract's rows in one query the first time a context touches one of its
+slots in an epoch; above the threshold the contract is read slot by slot.
+The threshold was set from two measurements.
+
+*What a prefetch costs.* `spike/run-prefetch-bench.sh` grows one contract
+from 256 to 262144 rows inside a 2M-row storage table (20k other contracts;
+testnet's table holds 2.27M rows) and times a cold call, in SQL, on local
+Postgres:
+
+| rows | prefetch | one slot, slot by slot | 64 slots, slot by slot |
+|---|---|---|---|
+| 256 | 3.5 ms | 3.1 ms | 36 ms |
+| 1024 | 8.6 ms | 3.1 ms | 33 ms |
+| 4096 | 21.6 ms | 2.9 ms | 36 ms |
+| 16384 | 70 ms | 15 ms | 37 ms |
+| 65536 | 251 ms | 6.2 ms | 44 ms |
+| 262144 | 698 ms | 6.5 ms | 43 ms |
+
+So a prefetch costs about 2 ms plus 3 to 5 µs per row (transfer plus row
+decode), and a slot read costs one round trip, 0.5 ms here in a batch and
+about 1 ms against an Aurora reader. In round trips, prefetching N rows
+costs roughly N/250. It is paid once per epoch per context (each pooled
+context has its own cache), so the tax of a threshold T is at most
+T x 4 µs on the first call after each block, per hot contract, per
+context.
+
+The same bench found that the mirror had no index on the storage table's
+`address_state_ref_id` column (only on `key`), so reading one contract's
+rows scanned the whole table: the 256-row prefetch cost 26 ms at 2M rows,
+and would grow with the mirror. `DataDefs.indexAll` now creates
+`storage_address_state_ref_id_key_idx` on `(address_state_ref_id, key)`,
+which the indexer applies at bootstrap (concurrently, so a live mirror
+gets it on its next indexer start) and which also serves the single-slot
+read and strato-api's `/storage?address=`. The table above is with that
+index; the harness seeds it too.
+
+*What contracts look like.* A survey of every storage row through the
+public read API (mainnet at 370k rows, testnet at 2.27M):
+
+| | mainnet | testnet |
+|---|---|---|
+| contracts with storage | 24323 | over 90000 (sampled) |
+| at most 100 rows | 99.9% | about 99.9% |
+| above 1024 rows | 7 | about 15 |
+| above 4096 rows | 4 | 12 |
+| largest | 34255 (OrderBook: `allOffers[]`, `isBookOffer[]`) | 247226 (RollupCore: `blocks[]`) |
+
+On mainnet the contracts that `eth_call` traffic concentrates on all sit
+under the threshold: the price oracle proxy at 241 rows, the native token
+at 1223 (887 balances), the token factory at 1755, the lending pools and
+tokens in the hundreds. The contracts above it are append-only logs and
+registries (the order book, a bridge's `processedEvents[]` at 12.7k, the
+deposits and withdrawals ledger at 12.7k, the market factory at 9.6k),
+whose calls read a few slots each; prefetching them would cost 45 to 150
+ms per epoch per context for nothing. Testnet, with six times the rows, tells the same story: the contracts above the threshold are five rollup cores (`blocks[]` and `batches[]` ledgers of 10k to 247k rows), two order books (177k and 64k), the same bridge and market-factory shapes, and the light client's `committeePubkeys[]` at 4.9k, while the oracle (356 rows), the native token (1056), the vault registry (459) and the lending token (37) all prefetch. The testnet numbers come from every tenth page of the table plus exact counts of the contracts the sample ranked highest; the mainnet ones from every row.
+
+*Decision.* The threshold stays at 4096 rows (`--prefetchMaxRows`), now
+for a reason: it holds every hot contract on both networks with headroom
+for the native token to triple its holders, its worst first-call penalty
+is about 20 ms, and everything above it is a log or registry. Two things
+guard the cliff at the threshold. `vm_query_prefetch_rows` (a histogram of
+prefetch sizes) and `vm_query_prefetch_declined_total` show when a hot
+contract grows past it. And a contract above the threshold is promoted: a
+context that has read 64 of its slots in one epoch (`--prefetchAfterSlots`)
+prefetches it whole after all, up to the cache cap, so a call that walks
+an array of offers pays one query instead of one per element
+(`vm_query_prefetch_promoted_total`). The harness checks this with a
+100-row threshold on its 257-row contract: `total(64)` costs 35 round
+trips with promotion after 32 slots and 67 without, and the next call
+none.
+
+**Live follower mirror (in progress, 2026-09-10).** `spike/run-follower-parity.sh`
+runs the same 16 calls with no import: `STRATO_CONF` points at an ethconf
+reaching a follower's eth database (an SSH tunnel to the node's loopback
+Postgres does), the service runs on it, each call goes over the wire twice
+(cold, then warm) and is compared with the node's JSON-RPC, and the report
+ends with the mirror's health and prefetch counters. Verified end to end
+against a locally imported mirror (16 of 16). The testnet app nodes
+(`testnet-node-app-a`/`-b`) are non-validator followers with their own
+indexer and a loopback-bound Postgres: their `block_data_ref`,
+`address_state_ref`, `storage` and `code_ref` columns match this branch's
+entities, the mirror was at block 543494 with 2.23M storage rows, and the
+storage table carries seven copies of the `key` index
+(`storage_key_idx`, `storage_key_idx1` to `6`, from repeated migrations)
+and no index on `address_state_ref_id`, so until the indexer restarts
+with the new `indexAll` every whole-contract prefetch there scans the
+table. The run itself needs database credentials for the node, which
+this session does not handle; see the runbook line in the README.
+
+**Still open.** The live-follower run above.

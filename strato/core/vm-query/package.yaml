@@ -12,9 +12,14 @@ library:
   exposed-modules:
     - Blockchain.VmQuery.SqlContext
     - Blockchain.VmQuery.Seed
+    - Blockchain.VmQuery.Import
     - Blockchain.VmQuery.Server
   dependencies:
     - base16-bytestring
+    - vector
+    - unordered-containers
+    - http-client-tls
+    - http-client
     - warp
     - wai-middleware-prometheus
     - wai
@@ -41,11 +46,16 @@ library:
     - nibblestring
     - persistent
     - persistent-postgresql
+    - postgresql-simple
     - solid-vm-model
+    - resource-pool
+    - resourcet
     - sql-monad
+    - stm
     - strato-conf
     - strato-model
     - text
+    - transformers
     - time
     - unliftio
     - unliftio-core

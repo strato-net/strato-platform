@@ -71,6 +71,12 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_tx_hash_idx ON raw_transaction (tx_hash);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_key_idx ON storage (key);"
+  -- The FK column has no index of its own, so reading one contract's rows
+  -- (vm-query's whole-contract prefetch, strato-api's /storage?address=)
+  -- was a scan of the whole table: 26 ms at 2M rows locally, growing with
+  -- the mirror. (address_state_ref_id, key) serves both that and the
+  -- single-slot lookup.
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_address_state_ref_id_key_idx ON storage (address_state_ref_id, key);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS transaction_result_transaction_hash_idx ON transaction_result (transaction_hash);"
 
