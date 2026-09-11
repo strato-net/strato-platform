@@ -87,3 +87,8 @@ export interface VaultDepositState {
   pricingAssets: string;
   maxDeposit: string;
 }
+
+export interface AnonymousQuoteCacheEntry {
+  expiresAt: number;
+  result: Promise<unknown>;
+}

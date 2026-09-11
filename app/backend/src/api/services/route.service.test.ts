@@ -260,3 +260,33 @@ test("Save USDST deposit state checks initialization and invalid empty-supply ac
   state._managedAssets = "0";
   assert.ok(BigInt((await getSaveUsdstActionState("token"))!.maxDeposit) > 0n);
 });
+
+test("anonymous route assets omit the balances relationship", async (t) => {
+  const { constants } = await import("../../config/constants");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const savings = await import("./saveUsdst.service");
+  const vaults = await import("./yieldVault.service");
+  const { getRouteAssets } = await import("./route.service");
+  const config = await import("../../config/config");
+  const previous = config.directMintPsm;
+  (config as any).directMintPsm = "1".repeat(40);
+  t.after(() => { (config as any).directMintPsm = previous; });
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: false, mintableToken: "2".repeat(40),
+    mintConfigs: new Map([["3".repeat(40), { isEnabled: true, feeBps: "0", maxBalance: "100" }]]) } as any));
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] } as any));
+  t.mock.method(savings, "getSaveUsdstActionState", async () => null);
+  t.mock.method(vaults, "listVaultDefs", () => []);
+  const selections: any[] = [];
+  t.mock.method(cirrus, "get", async (_token: string, path: string, options: any) => {
+    if (path === `/${constants.Token}`) selections.push(options.params);
+    return { data: [] };
+  });
+  await getRouteAssets("service-token");
+  assert.ok(selections.length > 0);
+  assert.equal(selections.at(-1).select.includes("balances:"), false);
+  await getRouteAssets("user-token", "4".repeat(40));
+  assert.equal(selections.at(-1).select.includes("balances:"), true);
+  assert.equal(selections.at(-1)["balances.key"], `eq.${"4".repeat(40)}`);
+});

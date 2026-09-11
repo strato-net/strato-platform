@@ -377,7 +377,7 @@ export const getRouteAssets = async (
         "_totalSupply::text",
         "customDecimals",
         `images:${constants.Token}-images(value)`,
-        `balances:${constants.Token}-_balances(user:key,balance:value::text)`,
+        ...(userAddress ? [`balances:${constants.Token}-_balances(user:key,balance:value::text)`] : []),
       ].join(","),
       ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
     },

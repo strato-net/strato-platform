@@ -9,6 +9,8 @@ import {
 
 export const MAX_UINT256 = (1n << 256n) - 1n;
 
+export const ANONYMOUS_QUOTE_TTL_MS = 1_000;
+export const ANONYMOUS_QUOTE_CACHE_SIZE = 128;
 export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
 
 export enum StratoPaths {

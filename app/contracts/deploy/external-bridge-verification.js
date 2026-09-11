@@ -154,6 +154,10 @@ function compareInitialization(settings, state) {
 
 function compareRoutes(settings, state) {
   const errors = [];
+  for (const policy of settings.mintPolicies || []) {
+    const actual = state.mintPolicies?.get(normalizeAddress(policy.token));
+    if (!actual || String(actual.capacity) !== policy.capacity || String(actual.refillRate) !== policy.refillRate) errors.push(`Mint policy mismatch for ${policy.token}`);
+  }
   for (const expectedChain of settings.chains) {
     const actualChain = state.chains.get(String(expectedChain.externalChainId));
     if (!actualChain) {
@@ -370,7 +374,7 @@ async function fetchInitializationState(settings, nodeUrl, token, fetchImpl) {
         {
           address: `eq.${bridgeAddress}`,
           select:
-            "initialized,tokenFactory,bridgeOperator,guardian,USDST_ADDRESS,priceOracle,tokenRouter,settlementVerifierCount,settlementVerifierThreshold",
+            "initialized,tokenFactory,bridgeOperator,guardian,USDST_ADDRESS,priceOracle,tokenRouter,settlementVerifierCount,settlementVerifierThreshold,depositsPaused,withdrawalsPaused",
           limit: 1,
         },
         fetchImpl,
@@ -436,7 +440,7 @@ async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
     select: "key,key2,key3,value",
     limit: 20000,
   };
-  const [chainRows, routeRows, rebaseRows] = await Promise.all([
+  const [chainRows, routeRows, rebaseRows, mintRows] = await Promise.all([
     cirrusSearch(
       nodeUrl,
       token,
@@ -463,8 +467,12 @@ async function fetchRouteState(settings, nodeUrl, token, fetchImpl) {
       { ...filters, value: "eq.true" },
       fetchImpl,
     ),
+    cirrusSearch(nodeUrl, token, "BlockApps-ExternalAssetBridge-mintPolicies", {
+      address: `eq.${bridgeAddress}`, select: "key,value", limit: 20000,
+    }, fetchImpl),
   ]);
   return {
+    mintPolicies: new Map(mintRows.map((row) => [normalizeAddress(row.key), parseValue(row.value)])),
     chains: new Map(
       chainRows.map((row) => [String(row.key), parseValue(row.value)]),
     ),
@@ -512,6 +520,7 @@ async function verifyConfiguration(settings, step, options) {
     options.token,
     options.fetchImpl,
   ];
+  await validateDeploymentDependencies(...args);
   let state;
   let errors;
   if (step === "verify-initialize") {
@@ -532,7 +541,28 @@ async function verifyConfiguration(settings, step, options) {
   };
 }
 
+async function validateDeploymentDependencies(settings, nodeUrl, token, fetchImpl = fetch) {
+  const response = await fetchImpl(`${nodeUrl.replace(/\/$/, "")}/eth/v1.2/metadata`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000),
+  });
+  if (!response.ok) throw new Error("STRATO metadata unavailable");
+  const metadata = await response.json();
+  if ((typeof metadata.networkID === "number" && !Number.isSafeInteger(metadata.networkID)) ||
+      String(metadata.networkID) !== settings.sourceChainId) throw new Error("STRATO source chain ID mismatch");
+  for (const [name, address] of [["TokenFactory", settings.bridge.tokenFactory], ["PriceOracle", settings.bridge.priceOracle], ["Token", settings.bridge.usdst]]) {
+    const rows = await cirrusSearch(nodeUrl, token, `BlockApps-${name}`, {
+      address: `eq.${normalizeAddress(address)}`, select: name === "Token" ? "address,status,_symbol,tokenFactory" : "address", limit: 1,
+    }, fetchImpl);
+    if (rows.length !== 1 || normalizeAddress(rows[0].address) !== normalizeAddress(address)) throw new Error(`${name} dependency is not deployed at ${address}`);
+    if (name === "Token" && (Number(rows[0].status) !== 2 || rows[0]._symbol !== "USDST" || normalizeAddress(rows[0].tokenFactory) !== normalizeAddress(settings.bridge.tokenFactory))) throw new Error("USDST dependency must be the active USDST token");
+  }
+}
+
 module.exports = {
+  validateDeploymentDependencies,
+  fetchInitializationState,
+  fetchRouteState,
+  fetchActionState,
   requiredRoutePermissions,
   validateRoutePermissions,
   compareInitialization,

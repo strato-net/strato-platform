@@ -196,7 +196,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             "mint",
             address(metalForge)
         );
-        bridge.setMetalForge(address(metalForge));
 
         poolFactory = new PoolFactory(address(this));
         poolFactory.initialize(
@@ -235,6 +234,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bridge.setSettlementVerifier(address(verifierTwo), true);
         bridge.setSettlementVerifier(address(verifierThree), true);
         bridge.setSettlementVerifierThreshold(2);
+        bridge.setMintPolicy(address(stratoToken), 1000000e18, 1000e18);
     }
 
     function _depositSignatures(
@@ -264,7 +264,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             targetToken,
             action,
             actionToken,
-            minFinalOut
+            minFinalOut,
+            bridge.depositGenerations(externalChainId, router, id)
         );
         verifierTwo.do(
             address(bridge),
@@ -280,7 +281,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             targetToken,
             action,
             actionToken,
-            minFinalOut
+            minFinalOut,
+            bridge.depositGenerations(externalChainId, router, id)
         );
         return new bytes(0);
     }
@@ -415,7 +417,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0
+            0,
+            bridge.depositGenerations(externalChainId, depositRouter, 1)
         ) {
         } catch {
             reverted = true;
@@ -436,7 +439,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0
+            0,
+            bridge.depositGenerations(externalChainId, depositRouter, 1)
         );
         reverted = false;
         try user.do(
@@ -475,7 +479,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0
+            0,
+            bridge.depositGenerations(externalChainId, depositRouter, 1)
         );
         user.do(
             address(bridge),
@@ -961,6 +966,18 @@ contract Describe_ExternalAssetBridge is Authorizable {
         require(reverted, "Only owner should authorize reuse");
 
         bridge.authorizeDepositReuse(externalChainId, depositRouter, 1);
+        bool staleRejected = false;
+        try relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 1,
+            address(0x2222), externalToken, 15e18, "0xbbbb", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0, new bytes(0)) {} catch { staleRejected = true; }
+        require(staleRejected, "Reuse must invalidate old attestations");
+        staleRejected = false;
+        try verifierOne.do(address(bridge), "attestDepositSettlement", externalChainId, depositRouter, 1,
+            address(0x2222), externalToken, 15e18, "0xbbbb", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0, 0) {} catch { staleRejected = true; }
+        require(staleRejected, "In-flight attestations must be bound to the old generation");
+        _depositSignatures(depositRouter, 1, address(0x2222), externalToken, 15e18, "0xbbbb",
+            address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -1317,6 +1334,10 @@ contract Describe_ExternalAssetBridge is Authorizable {
             reverted,
             "Unprivileged relayer should not force reviewed fallback"
         );
+        bridge.approveReviewedDeposit(externalChainId, depositRouter, 1, bridge.getDepositSettlementDigest(
+            externalChainId, depositRouter, 1, address(0x1111), externalToken, 10e18, "0x3456",
+            address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 10e18
+        ));
         bridge.confirmReviewedDepositWithRoute(
             externalChainId,
             depositRouter,
@@ -1600,11 +1621,11 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bool rejected = false;
         try { refundBridge.refundWithdrawal(1); } catch { rejected = true; }
         require(rejected, "Refund without proof must fail");
-        verifierOne.do(address(refundBridge), "attestWithdrawalRefund", 1);
+        verifierOne.do(address(refundBridge), "attestWithdrawalRefund", 1, refundBridge.getWithdrawalRefundDigest(1));
         rejected = false;
         try { refundBridge.refundWithdrawal(1); } catch { rejected = true; }
         require(rejected, "One verifier must not authorize refund");
-        verifierTwo.do(address(refundBridge), "attestWithdrawalRefund", 1);
+        verifierTwo.do(address(refundBridge), "attestWithdrawalRefund", 1, refundBridge.getWithdrawalRefundDigest(1));
         uint256 beforeBalance = stratoToken.balanceOf(address(user));
         refundBridge.refundWithdrawal(1);
         require(stratoToken.balanceOf(address(user)) == beforeBalance + 100, "Attested refund must return escrow");
@@ -1833,4 +1854,124 @@ contract Describe_ExternalAssetBridge is Authorizable {
             "Failed finalization should preserve escrow"
         );
     }
+    function it_finalizes_multiple_releases_in_one_transaction_despite_cancellation_metadata() {
+        stratoToken.mint(address(user), 20e18);
+        user.do(address(stratoToken), "approve", address(bridge), 20e18);
+        for (uint256 i = 1; i <= 2; i++) {
+            uint256 id = user.do(address(bridge), "requestWithdrawal", externalChainId,
+                externalRecipient, externalToken, address(stratoToken), 10e18);
+            relayer.do(address(bridge), "markWithdrawalReady", id, block.timestamp, block.timestamp + 10, 1);
+            string reservation = i == 1 ? "0xaaaa" : "0xbbbb";
+            relayer.do(address(bridge), "recordWithdrawalReservation", id, reservation, "0xdddd");
+            fastForward(11);
+            relayer.do(address(bridge), "recordWithdrawalCancellation", id, reservation, "0xeeee");
+            bridge.finalizeWithdrawal(id, reservation, "0xcccc", _withdrawalSignatures(id, reservation, "0xcccc"));
+        }
+        require(stratoToken.balanceOf(address(bridge)) == 0, "Both released withdrawals must finalize and burn escrow");
+    }
+
+    function it_requires_governance_approval_for_reviewed_plain_deposits() {
+        relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        bytes proof = _depositSignatures(depositRouter, 1, address(0x1111), externalToken, 10e18,
+            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
+        bytes32 digest = bridge.getDepositSettlementDigest(externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        bool reverted = false;
+        try user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1, proof) {}
+        catch { reverted = true; }
+        require(reverted, "Attestations must not substitute for governance review");
+        reverted = false;
+        try relayer.do(address(bridge), "approveReviewedDeposit", externalChainId, depositRouter, 1, digest) {}
+        catch { reverted = true; }
+        require(reverted, "Operator must not approve its own review");
+        bridge.approveReviewedDeposit(externalChainId, depositRouter, 1, digest);
+        user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1, proof);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Approved review must settle");
+    }
+
+    function it_bounds_governance_recovery_delays() {
+        bool reverted = false;
+        try bridge.setWithdrawalAbortDelay(172801) {} catch { reverted = true; }
+        require(reverted, "Abort delay must be bounded");
+        reverted = false;
+        try bridge.setMaxAuthorizationValiditySeconds(1801) {} catch { reverted = true; }
+        require(reverted, "Authorization validity must be bounded");
+    }
+
+    function it_rejects_future_ready_authorizations_without_locking_escrow() {
+        stratoToken.mint(address(user), 10e18);
+        user.do(address(stratoToken), "approve", address(bridge), 10e18);
+        uint256 id = user.do(address(bridge), "requestWithdrawal", externalChainId,
+            externalRecipient, externalToken, address(stratoToken), 10e18);
+        bool reverted = false;
+        try relayer.do(address(bridge), "markWithdrawalReady", id, block.timestamp + 1000000, block.timestamp + 1000010, 1) {}
+        catch { reverted = true; }
+        require(reverted, "Operator must not lock a withdrawal behind a future authorization");
+        fastForward(172801);
+        user.do(address(bridge), "abortWithdrawal", id);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Rejected READY transition must preserve abort");
+    }
+
+    function it_rejects_non_18_decimal_representations() {
+        address lowDecimalToken = tokenFactory.createTokenWithInitialOwner("Low", "LOW", [], [], [], "LOW", 0, 6, address(adminRegistry));
+        Token(lowDecimalToken).setStatus(2);
+        bool reverted = false;
+        try bridge.setRoute(externalToken, externalChainId, lowDecimalToken, true, true, 6, "Low", "LOW", 100, 10) {}
+        catch { reverted = true; }
+        require(reverted, "Non-18 representation must not be configured");
+    }
+
+    function it_requires_token_unpause_before_returning_withdrawal_escrow() {
+        stratoToken.mint(address(user), 10e18);
+        user.do(address(stratoToken), "approve", address(bridge), 10e18);
+        uint256 id = user.do(address(bridge), "requestWithdrawal", externalChainId,
+            externalRecipient, externalToken, address(stratoToken), 10e18);
+        stratoToken.pause();
+        fastForward(172801);
+        bool reverted = false;
+        try user.do(address(bridge), "abortWithdrawal", id) {} catch { reverted = true; }
+        require(reverted, "Token pause must block escrow refunds");
+        require(stratoToken.balanceOf(address(user)) == 0, "Failed refund must not return tokens");
+        require(stratoToken.balanceOf(address(bridge)) == 10e18, "Failed refund must preserve escrow");
+        stratoToken.unpause();
+        user.do(address(bridge), "abortWithdrawal", id);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Unpausing must allow the escrow refund");
+        require(stratoToken.balanceOf(address(bridge)) == 0, "Refund must empty escrow");
+    }
+
+    function it_limits_all_mints_and_preserves_consumption_on_policy_updates() {
+        bridge.setMintPolicy(address(stratoToken), 10e18, 1e18);
+        _depositSignatures(depositRouter, 1, address(0x1111), externalToken, 6e18, "0xaaaa",
+            address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
+        relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 1, address(0x1111), externalToken, 6e18,
+            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0, bytes(""));
+        bridge.setMintPolicy(address(stratoToken), 10e18, 1e18);
+        _depositSignatures(depositRouter, 2, address(0x1111), externalToken, 6e18, "0xbbbb",
+            address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1);
+        bool rejected = false;
+        try relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 2, address(0x1111), externalToken, 6e18,
+            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1, bytes("")) {} catch { rejected = true; }
+        require(rejected, "Fallback mint must share the plain mint limit; resetting policy must not refill it");
+        require(stratoToken.balanceOf(address(user)) == 6e18, "Failed mint must be atomic");
+        fastForward(2);
+        relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 2, address(0x1111), externalToken, 6e18,
+            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1, bytes(""));
+        require(stratoToken.balanceOf(address(user)) == 12e18, "Elapsed refill must permit retry");
+    }
+
+    function it_rejects_refund_attestations_for_a_changed_source_digest() {
+        fastForward(2);
+        RefundTestBridge refundBridge = new RefundTestBridge(address(this));
+        refundBridge.seedRefund(address(stratoToken), address(user), externalVault);
+        refundBridge.setSettlementVerifier(address(verifierOne), true);
+        bytes32 digest = refundBridge.getWithdrawalRefundDigest(1);
+        refundBridge.seedRefund(address(stratoToken), address(relayer), externalVault);
+        bool rejected = false;
+        try verifierOne.do(address(refundBridge), "attestWithdrawalRefund", 1, digest) {} catch { rejected = true; }
+        require(rejected, "Verifier must never attest different source state than it validated");
+    }
+
 }

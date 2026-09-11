@@ -14,15 +14,11 @@ const {
   validateInitialRollout,
 } = require("./lib/externalBridgeRolloutPlan");
 
-const BRIDGE_DEFAULTS_PATH = path.resolve(
-  __dirname,
-  "../../contracts/deploy/external-bridge.helium.example.json",
-);
-
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {};
   const allowed = new Set([
     "mode",
+    "stage",
     "settings",
     "deposit-plan",
     "bridge-template",
@@ -43,6 +39,7 @@ function parseArgs(argv = process.argv.slice(2)) {
     args[item.slice(2)] = value;
     index += 1;
   }
+  if (args.stage && !["initial", "activation"].includes(args.stage)) throw new Error("--stage must be initial|activation");
   const mode = args.mode || "generate";
   if (!["generate", "prepare", "finalize"].includes(mode)) {
     throw new Error("--mode must be generate|prepare|finalize");
@@ -92,7 +89,7 @@ function loadSettingsInputs(settingsPath) {
   const absoluteSettingsPath = path.resolve(settingsPath);
   const settings = readJson(absoluteSettingsPath, "rollout settings");
   const settingsDirectory = path.dirname(absoluteSettingsPath);
-  for (const required of ["externalDeployment", "depositPlan"]) {
+  for (const required of ["externalDeployment", "depositPlan", "bridgeTemplate"]) {
     if (!settings[required]) {
       throw new Error(`Rollout settings require ${required}`);
     }
@@ -106,8 +103,8 @@ function loadSettingsInputs(settingsPath) {
     settings,
     deployment: readJson(deploymentPath, "external deployment"),
     bridgeDefaults: readJson(
-      BRIDGE_DEFAULTS_PATH,
-      "Helium ExternalAssetBridge defaults",
+      resolveFrom(settingsDirectory, settings.bridgeTemplate),
+      "Explicit STRATO bridge dependencies",
     ),
   });
   return {
@@ -296,7 +293,7 @@ function main() {
     policy: readJson(args.policy, "rollout policy"),
     chainId,
   });
-  if (args.mode === "finalize") validateInitialRollout(rollout);
+  validateInitialRollout(rollout, { activation: args.stage === "activation" });
   const bridgeConfigPath = writeJson(
     outputDirectory,
     `external-bridge-${chainId}.json`,
@@ -341,6 +338,7 @@ function main() {
       chainId,
       sourceDepositPlan: depositPlanPath,
       sourcePolicy: path.resolve(args.policy),
+      stage: args.stage || "initial",
       ...(args.settings
         ? { sourceSettings: path.resolve(args.settings) }
         : {}),

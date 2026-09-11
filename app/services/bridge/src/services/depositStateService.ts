@@ -10,6 +10,7 @@ export interface PendingDeposit {
   status: "pending" | "review" | "settled";
   reviewReason?: string;
   reviewRecordedOnchain?: boolean;
+  settlementIndexed?: boolean;
   reviewRecordLastAttemptAt?: number;
   settlementFirstFailedAt?: number;
   settlementLastFailedAt?: number;
@@ -60,6 +61,7 @@ export const resetPendingForRetry = (
   now = Date.now(),
 ): void => {
   pending.status = "pending";
+  pending.settlementIndexed = false;
   pending.reviewReason = undefined;
   pending.reviewRecordedOnchain = undefined;
   pending.reviewRecordLastAttemptAt = undefined;
@@ -187,6 +189,20 @@ export const depositStateService = {
       return state[key];
     }),
 
+  listTracked: async (externalChainId: number): Promise<PendingDeposit[]> =>
+    Object.values(await readState()).filter(({ deposit }) => Number(deposit.externalChainId) === externalChainId),
+
+  markIndexedSettlements: (externalChainId: number, identities: Pick<DepositArgs, "depositRouter" | "depositId">[]) =>
+    updateState((state) => {
+      const keys = new Set(identities.map(({ depositRouter, depositId }) => `${depositRouter.replace(/^0x/i, "").toLowerCase()}:${depositId}`));
+      for (const pending of Object.values(state)) {
+        if (Number(pending.deposit.externalChainId) === externalChainId && keys.has(`${pending.deposit.depositRouter.replace(/^0x/i, "").toLowerCase()}:${pending.deposit.depositId}`)) {
+          pending.status = "settled";
+          pending.settlementIndexed = true;
+        }
+      }
+    }),
+
   list: async (externalChainId: number): Promise<PendingDeposit[]> =>
     Object.values(await readState()).filter(
       ({ deposit, status }) =>
@@ -297,6 +313,7 @@ export const depositStateService = {
   restoreRecordedReview: (deposit: DetectedDeposit) =>
     updateState((state) => {
       const existing = state[identity(deposit)];
+      if (existing?.status === "settled") return existing;
       state[identity(deposit)] = {
         ...existing,
         deposit,
@@ -344,7 +361,7 @@ export const depositStateService = {
     updateState((state) => {
       for (const [key, pending] of Object.entries(state)) {
         if (
-          pending.status === "settled" &&
+          pending.status === "settled" && pending.settlementIndexed &&
           Number(pending.deposit.externalChainId) === externalChainId &&
           pending.deposit.externalBlockNumber < beforeBlock
         ) {

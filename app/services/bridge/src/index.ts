@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import { verifierAccessControl } from "./signer/accessControl";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { logInfo, logError } from "./utils/logger";
@@ -24,6 +25,8 @@ const port = process.env.PORT || 3003;
 
 app.set("env", "production");
 app.use(cors());
+app.use("/webhooks/deposits", verifierAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
+app.use("/operations/deposits", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
 app.use(bodyParser.json());
 
 // Global error handler
@@ -53,15 +56,6 @@ app.get("/metrics/deposits", (_, res) => {
 });
 
 app.post("/webhooks/deposits/:chainId", async (req, res) => {
-  const webhookToken = process.env.DEPOSIT_WEBHOOK_TOKEN;
-  if (!webhookToken) {
-    res.status(503).json({ error: "Webhook authentication is not configured" });
-    return;
-  }
-  if (req.headers.authorization !== `Bearer ${webhookToken}`) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
   const chainId = Number(req.params.chainId);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) {
     res.status(400).json({ error: "Invalid chain ID" });
@@ -79,15 +73,6 @@ app.post("/webhooks/deposits/:chainId", async (req, res) => {
 app.post(
   "/operations/deposits/:chainId/:depositRouter/:depositId/confirm",
   async (req, res) => {
-    const token = process.env.DEPOSIT_OPERATIONS_TOKEN;
-    if (!token) {
-      res.status(503).json({ error: "Deposit operations are not configured" });
-      return;
-    }
-    if (req.headers.authorization !== `Bearer ${token}`) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
     const chainId = Number(req.params.chainId);
     const depositId = req.params.depositId;
     const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
@@ -135,15 +120,6 @@ app.post(
 app.post(
   "/operations/deposits/:chainId/:depositRouter/:depositId/reset",
   async (req, res) => {
-    const token = process.env.DEPOSIT_OPERATIONS_TOKEN;
-    if (!token) {
-      res.status(503).json({ error: "Deposit operations are not configured" });
-      return;
-    }
-    if (req.headers.authorization !== `Bearer ${token}`) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
     const chainId = Number(req.params.chainId);
     const depositId = req.params.depositId;
     const depositRouter = req.params.depositRouter.replace(/^0x/i, "");

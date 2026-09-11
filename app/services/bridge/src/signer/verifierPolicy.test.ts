@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { depositSettlementDigest } from "./authorizationValidation";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { getAddress, TypedDataEncoder } from "ethers";
 import {
+  loadVerifierPolicy,
   evaluateDepositPolicy,
   evaluateWithdrawalPolicy,
   type VerifierPolicy,
@@ -271,4 +275,83 @@ test("refund attestations reject paid, reserved, unconfirmed, or mismatched vaul
   digest = TypedDataEncoder.hash(checks.domain(authorization), checks.AUTHORIZATION_TYPES, authorization);
   await checks.validateRefundDestination(authorization);
   await assert.rejects(checks.validateRefundDestination({ ...authorization, amount: "101" }), /not refundable/);
+});
+
+test("AUTO_ROUTE requires a positive minimum even for manually reviewed amounts", () => {
+  const enabled = structuredClone(policy);
+  enabled.routes[0].autoRouteEnabled = true;
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  assert.equal(evaluateDepositPolicy(enabled, routed).decision, "approve");
+  for (const minFinalOut of ["0", "-1", "invalid"]) {
+    assert.throws(() => evaluateDepositPolicy(enabled, { ...routed, minFinalOut, externalTokenAmount: "101" }));
+  }
+  assert.throws(() => evaluateDepositPolicy(enabled, { ...routed, actionToken: "0".repeat(40) }));
+});
+
+
+test("runtime recomputes the baseline hash and rejects changed limits", () => {
+  const directory = mkdtempSync(resolve(tmpdir(), "verifier-policy-"));
+  const file = resolve(directory, "policy.json");
+  const baseline = { version: policy.version, sourceChainId: policy.sourceChainId, sourceBridge: policy.sourceBridge,
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    routes: policy.routes, tokens: policy.tokens };
+  const input = { ...baseline, verifierIndex: 1, settlementAttestor: policy.settlementAttestor,
+    baselinePolicyHash: `sha256:${createHash("sha256").update(JSON.stringify(baseline)).digest("hex")}` };
+  try {
+    writeFileSync(file, JSON.stringify(input));
+    assert.equal(loadVerifierPolicy(file).policy.routes[0].maxAutoDepositAmount, "100");
+    writeFileSync(file, JSON.stringify({ ...input, tokens: [{ ...input.tokens[0], maxAutoWithdrawalAmount: "500" }] }));
+    assert.throws(() => loadVerifierPolicy(file), /does not match policy limits/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("pending review alone cannot authorize a deposit; approval binds the exact generation and fields", async () => {
+  const statement = signerSource.statements.find((item) => ts.isVariableStatement(item) &&
+    item.declarationList.declarations.some((d) => d.name.getText(signerSource) === "isDepositReviewApproved"));
+  assert.ok(statement);
+  let approvedDigest: string | undefined;
+  const check = runInNewContext(ts.transpileModule(statement.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + "\nisDepositReviewApproved", {
+    sourceBridge: policy.sourceBridge, sourceChainId: BigInt(policy.sourceChainId), depositSettlementDigest,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    stratoGet: async (path: string) => ({ data: path.endsWith("depositReviewApprovals") ?
+      (approvedDigest ? [{ value: approvedDigest }] : []) : [{ settlementVerifierSetVersion: "1" }] }),
+  });
+  assert.equal(await check(deposit, "0"), false);
+  approvedDigest = depositSettlementDigest(deposit, policy.sourceChainId, policy.sourceBridge, "1", "0");
+  assert.equal(await check(deposit, "0"), true);
+  assert.equal(await check(deposit, "1"), false);
+  assert.equal(await check({ ...deposit, externalTokenAmount: "101" }, "0"), false);
+  assert.equal(await check({ ...deposit, stratoRecipient: policy.sourceBridge }, "0"), false);
+});
+
+test("withdrawal review dissent takes precedence over two returned signatures", async () => {
+  const source = ts.createSourceFile("externalWithdrawalService.ts",
+    readFileSync(resolve(__dirname, "../../src/services/externalWithdrawalService.ts"), "utf8"), ts.ScriptTarget.Latest, true);
+  const statement = source.statements.find((item) => ts.isVariableStatement(item) &&
+    item.declarationList.declarations.some((d) => d.name.getText(source) === "signWithdrawalAuthorization"));
+  assert.ok(statement);
+  let reviews = 0;
+  const sign = runInNewContext(ts.transpileModule(statement.getText(source).replace(/^export /, ""), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + "\nsignWithdrawalAuthorization", {
+    getExternalBridgeVerifierUrls: () => ["one", "two", "three"],
+    getExternalBridgeVerifierApiTokens: () => ["a", "b", "c"],
+    VERIFIER_REQUEST_TIMEOUT_MS: 1000, AbortSignal,
+    Signature: { from: (signature: string) => ({ serialized: signature }) },
+    verifyTypedData: (_domain: unknown, _types: unknown, _auth: unknown, signature: string) => signature,
+    authorizationDomain: () => ({}), WITHDRAWAL_AUTHORIZATION_TYPES: {}, logError: () => {},
+    proposeWithdrawalReview: async () => { reviews++; },
+    axios: {
+      isAxiosError: () => true,
+      post: async (url: string) => {
+        const signer = url.split("/")[0];
+        if (signer === "three") throw { response: { status: 409, data: { decision: "manual_review" } } };
+        return { data: { signature: signer, authorizationSigner: signer } };
+      },
+    },
+  });
+  await assert.rejects(sign({ destinationChainId: "1", sourceWithdrawalId: "7" }), /executed Safe approval/);
+  assert.equal(reviews, 1);
 });

@@ -187,3 +187,13 @@ export interface BridgeContext {
   depositAmount: bigint;
   isNative: boolean;
 }
+
+export interface AutoRouteQuoteBinding {
+  externalChainId: string;
+  externalToken: string;
+  targetStratoToken: string;
+  externalAmount: bigint;
+  externalDecimals: number;
+  tokenOut: string;
+  slippageBps: number;
+}

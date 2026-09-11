@@ -61,6 +61,11 @@ test("persists deposit state atomically and orders reads after pending writes", 
     const restarted = require("./depositStateService").depositStateService;
     assert.equal((await restarted.listReviews(1))[0].reviewReason, "review required");
     assert.equal((await restarted.list(1)).length, 2);
+    await restarted.markSettled(deposit);
+    await restarted.pruneSettled(1, 1000);
+    assert.equal((await restarted.getByIdentity(1, "router", "1")).status, "settled", "Keep tombstone until indexed completion");
+    await restarted.restoreRecordedReview(deposit);
+    assert.equal((await restarted.listReviews(1)).length, 0, "Lagging Cirrus review must not resurrect settled state");
   } finally {
     fs.rename = originalRename;
     process.chdir(previousDirectory);

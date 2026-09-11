@@ -115,6 +115,13 @@ export const loadVerifierPolicy = (
   if (new Set(tokenKeys).size !== tokenKeys.length) {
     throw new Error("Verifier policy contains duplicate tokens");
   }
+  const baseline = {
+    version: input.version, sourceChainId: input.sourceChainId, sourceBridge: input.sourceBridge,
+    destinationChainId: input.destinationChainId, destinationVault: input.destinationVault,
+    routes: input.routes, tokens: input.tokens,
+  };
+  const baselineHash = `sha256:${createHash("sha256").update(JSON.stringify(baseline)).digest("hex")}`;
+  if (input.baselinePolicyHash !== baselineHash) throw new Error("Verifier baseline policy hash does not match policy limits");
   return {
     policy: {
       version: input.version.trim(),
@@ -158,6 +165,10 @@ export const evaluateDepositPolicy = (
   const action = Number(deposit.action);
   if (action !== 0 && !(action === 4 && route.autoRouteEnabled)) {
     throw new Error("Local verifier policy rejects the deposit action");
+  }
+  if (action === 4 && (BigInt(uint(deposit.minFinalOut, "deposit.minFinalOut")) === 0n ||
+      /^0+$/.test(stratoAddress(deposit.actionToken, "deposit.actionToken")))) {
+    throw new Error("AUTO_ROUTE requires a destination token and positive minFinalOut");
   }
   if (BigInt(deposit.externalTokenAmount) > BigInt(route.maxAutoDepositAmount)) {
     return {

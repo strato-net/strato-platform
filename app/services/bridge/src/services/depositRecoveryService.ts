@@ -1,4 +1,4 @@
-import { getRecordedDepositReviews } from "./cirrusService";
+import { getRecordedDepositReviews, getIndexedDepositSettlements } from "./cirrusService";
 import { getTransactionReceiptsBatch } from "./rpcService";
 import { recoverDepositObservation, matchesRecordedDepositReview } from "./depositEventService";
 import { depositStateService } from "./depositStateService";
@@ -18,10 +18,14 @@ export const recoverReviewedDeposit = async (
 };
 
 export const reconcileRecordedDepositReviews = async (externalChainId: number): Promise<void> => {
-  const [records, localReviews] = await Promise.all([
+  const [records, localEntries] = await Promise.all([
     getRecordedDepositReviews(externalChainId),
-    depositStateService.listReviews(externalChainId),
+    depositStateService.listTracked(externalChainId),
   ]);
+  const indexed = await getIndexedDepositSettlements(externalChainId,
+    localEntries.filter((entry) => !entry.settlementIndexed).map(({ deposit }) => deposit));
+  if (indexed.length) await depositStateService.markIndexedSettlements(externalChainId, indexed);
+  const localReviews = localEntries.filter((entry) => entry.status === "review");
   const identity = (router: string, id: string) => `${router.toLowerCase().replace(/^0x/, "")}:${id}`;
   const cached = new Map(localReviews.filter((review) => review.reviewRecordedOnchain)
     .map(({ deposit }) => [identity(deposit.depositRouter, deposit.depositId), deposit]));

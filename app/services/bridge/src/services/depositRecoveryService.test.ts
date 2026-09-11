@@ -69,9 +69,11 @@ test("reconstructs recorded reviews after cache loss without authorizing settlem
   let receiptAvailable = true;
   let rpcCalls = 0;
   let sourceReviewed = true;
+  let sourceCompleted = false;
   (cirrus as any).get = async (table: string, { params }: any) => {
     assert.equal(params.key, "eq.1");
     if (table.endsWith("-deposits")) {
+      if (params["value->>status"] === "eq.4") return sourceCompleted ? [{ key2: router, key3: "2" }] : [];
       assert.equal(params["value->>status"], "eq.2");
       assert.equal(params.offset, 0);
       if (params.key2) assert.equal(params.key2, `eq.${router}`);
@@ -122,6 +124,12 @@ test("reconstructs recorded reviews after cache loss without authorizing settlem
     await reconcileRecordedDepositReviews(1);
     assert.equal((await state.listReviews(1)).length, 1);
     sourceReviewed = false;
+    sourceCompleted = true;
+    await reconcileRecordedDepositReviews(1);
+    assert.equal((await state.listReviews(1)).length, 0, "Indexed completion clears recovered phantom reviews");
+    assert.equal((await state.getByIdentity(1, router, "2"))?.settlementIndexed, true);
+    await state.pruneSettled(1, 1000);
+    assert.equal(await state.getByIdentity(1, router, "2"), undefined);
     await assert.rejects(recoverReviewedDeposit(1, router, "2"), /pending review is unavailable/);
   } finally {
     cirrus.get = originalGet;

@@ -318,4 +318,12 @@ describe("DepositRouter", function () {
       console.log = originalLog;
     }
   });
+  it("rejects an AUTO_ROUTE with no minimum before accepting custody", async function () {
+    const { router, vault, user, targetStratoToken } = await deployFixture();
+    const before = await ethers.provider.getBalance(vault.address);
+    await expect(router.connect(user).depositETHWithAction(user.address, targetStratoToken, 4,
+      ethers.Wallet.createRandom().address, 0, { value: 1n })).to.be.revertedWithCustomError(router, "ZeroAmount");
+    expect(await ethers.provider.getBalance(vault.address)).to.equal(before);
+  });
+
 });

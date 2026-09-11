@@ -3,6 +3,7 @@ import { config } from "../config";
 import { logInfo } from "../utils/logger";
 import {
   ChainInfo,
+  DepositArgs,
   RecordedDepositReview,
   WithdrawalInfo,
   NativeWithdrawalInfo,
@@ -661,6 +662,23 @@ export const getRecordedDepositReviews = async (
       });
     }
     if (rows.length < limit || identity) break;
+  }
+  return result;
+};
+
+export const getIndexedDepositSettlements = async (
+  externalChainId: number,
+  deposits: Pick<DepositArgs, "depositRouter" | "depositId">[],
+): Promise<Pick<DepositArgs, "depositRouter" | "depositId">[]> => {
+  const result: Pick<DepositArgs, "depositRouter" | "depositId">[] = [];
+  for (let offset = 0; offset < deposits.length; offset += 100) {
+    const batch = deposits.slice(offset, offset + 100);
+    const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, { params: {
+      address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
+      "value->>status": "eq.4", select: "key2,key3", limit: batch.length,
+      or: `(${batch.map(({ depositRouter, depositId }) => `and(key2.eq.${toCirrusAddress(depositRouter)},key3.eq.${depositId})`).join(",")})`,
+    } });
+    result.push(...rows.map((row: any) => ({ depositRouter: row.key2, depositId: String(row.key3) })));
   }
   return result;
 };

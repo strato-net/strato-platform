@@ -1,3 +1,6 @@
+import { promises as fs } from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
 import { getChainProvider } from "./rpcService";
 import {
   AbiCoder,
@@ -19,7 +22,7 @@ import {
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
-import { WithdrawalInfo } from "../types";
+import { PersistedWithdrawalReview, WithdrawalInfo } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
 import { fetch as http, retry } from "../utils/api";
 import { initializeSafeForChain } from "../utils/safeHelper";
@@ -90,7 +93,7 @@ const WITHDRAWAL_REVIEW_TYPES = {
 };
 
 const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
-const localReviewProposals = new Set<string>();
+const pendingReviewProposals = new Map<string, ReturnType<typeof createWithdrawalReviewProposal>>();
 
 const authorizationDomain = (authorization: WithdrawalAuthorization) => ({
   name: "ExternalBridgeVault",
@@ -144,7 +147,7 @@ export const getExternalChainLatestTimestamp = async (
   return BigInt(latestBlock.timestamp);
 };
 
-export const proposeWithdrawalReview = async (
+const createWithdrawalReviewProposal = async (
   review: WithdrawalReview,
 ): Promise<{
   reviewDigest: string;
@@ -172,11 +175,47 @@ export const proposeWithdrawalReview = async (
     chainId,
     safeAddress,
   );
-  const nonce = Number(
+  const journalPath = path.join(process.cwd(), "data", "safe-reviews", `${chainId}-${safeAddress.toLowerCase()}-${reviewDigest}.json`);
+  let saved: PersistedWithdrawalReview | undefined;
+  try {
+    saved = JSON.parse(await fs.readFile(journalPath, "utf8"));
+  } catch (error: any) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (saved) {
+    if (saved.reviewDigest !== reviewDigest || saved.proposal?.safeAddress !== safeAddress ||
+        !/^\d+$/.test(saved.approvalDeadline) || !/^0x[0-9a-f]{64}$/i.test(saved.proposal.safeTxHash)) {
+      throw new Error("Invalid persisted Safe review proposal");
+    }
+    if (BigInt(saved.approvalDeadline) > BigInt(latestBlock.timestamp)) {
+      try {
+        await apiKit.getTransaction(saved.proposal.safeTxHash);
+      } catch (error: any) {
+        if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
+        await apiKit.proposeTransaction(saved.proposal);
+      }
+      return { reviewDigest, approvalDeadline: saved.approvalDeadline, proposalHash: saved.proposal.safeTxHash };
+    }
+  }
+  let nonce = Number(
     await retry(() => apiKit.getNextNonce(safeAddress), {
       logPrefix: "ExternalWithdrawalService",
     }),
   );
+  // Journals reserve nonces even when the Safe service has not indexed a proposal yet.
+  const journalDirectory = path.dirname(journalPath);
+  await fs.mkdir(journalDirectory, { recursive: true });
+  const prefix = `${chainId}-${safeAddress.toLowerCase()}-`;
+  for (const name of await fs.readdir(journalDirectory)) {
+    if (!name.startsWith(prefix) || !name.endsWith(".json")) continue;
+    const entry = JSON.parse(await fs.readFile(path.join(journalDirectory, name), "utf8")) as PersistedWithdrawalReview;
+    const reservedNonce = Number(entry.proposal?.safeTransactionData?.nonce);
+    if (entry.proposal?.safeAddress !== safeAddress || !Number.isSafeInteger(reservedNonce) || reservedNonce < 0) {
+      throw new Error("Invalid persisted Safe review nonce; restore the journal before proposing");
+    }
+    nonce = Math.max(nonce, reservedNonce + 1);
+  }
+  if (!Number.isSafeInteger(nonce) || nonce < 0) throw new Error("Invalid Safe nonce");
   const safeTransaction = await protocolKit.createTransaction({
     transactions: [{
       to: review.destinationVault,
@@ -191,23 +230,46 @@ export const proposeWithdrawalReview = async (
   });
   const proposalHash = await protocolKit.getTransactionHash(safeTransaction);
   const signature = await protocolKit.signHash(proposalHash);
-  await retry(
-    () =>
-      apiKit.proposeTransaction({
-        safeAddress,
-        safeTransactionData: safeTransaction.data,
-        safeTxHash: proposalHash,
-        senderAddress: relayer,
-        senderSignature: signature.data,
-      }),
-    { logPrefix: "ExternalWithdrawalService" },
-  );
+  const proposal = {
+    safeAddress,
+    safeTransactionData: safeTransaction.data,
+    safeTxHash: proposalHash,
+    senderAddress: relayer,
+    senderSignature: signature.data,
+  };
+  const temporaryPath = `${journalPath}.${randomUUID()}.tmp`;
+  const file = await fs.open(temporaryPath, "wx", 0o600);
+  try {
+    await file.writeFile(JSON.stringify({ reviewDigest, approvalDeadline: approvalDeadline.toString(), proposal }));
+    await file.sync();
+  } finally { await file.close(); }
+  await fs.rename(temporaryPath, journalPath);
+  const directory = await fs.open(path.dirname(journalPath), "r");
+  try { await directory.sync(); } finally { await directory.close(); }
+  await retry(() => apiKit.proposeTransaction(proposal), { logPrefix: "ExternalWithdrawalService" });
 
   return {
     reviewDigest,
     approvalDeadline: approvalDeadline.toString(),
     proposalHash,
   };
+};
+
+const safeReviewQueues = new Map<string, Promise<unknown>>();
+
+export const proposeWithdrawalReview = (review: WithdrawalReview) => {
+  const key = `${config.safe.address}:${getWithdrawalReviewDigest(review)}`;
+  const existing = pendingReviewProposals.get(key);
+  if (existing) return existing;
+  const safeKey = `${review.destinationChainId}:${(config.safe.address || "").toLowerCase()}`;
+  const previous = safeReviewQueues.get(safeKey) || Promise.resolve();
+  const pending = previous.catch(() => undefined).then(() => createWithdrawalReviewProposal(review)).finally(() => {
+    pendingReviewProposals.delete(key);
+    if (safeReviewQueues.get(safeKey) === pending) safeReviewQueues.delete(safeKey);
+  });
+  safeReviewQueues.set(safeKey, pending);
+  pendingReviewProposals.set(key, pending);
+  return pending;
 };
 
 export const signWithdrawalAuthorization = async (
@@ -300,19 +362,7 @@ export const signWithdrawalAuthorization = async (
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, signature]) => signature);
   if (manualReviewRequired > 0) {
-    const provider = getChainProvider(BigInt(authorization.destinationChainId));
-    const vault = new Contract(
-      authorization.destinationVault,
-      EXTERNAL_VAULT_ABI,
-      provider,
-    );
-    const threshold = Number(await vault.attestationThreshold());
-    if (sorted.length >= threshold) return sorted;
-    const digest = getWithdrawalReviewDigest(authorization);
-    if (!localReviewProposals.has(digest)) {
-      await proposeWithdrawalReview(authorization);
-      localReviewProposals.add(digest);
-    }
+    await proposeWithdrawalReview(authorization);
     throw new Error(
       `Local verifier manual review requires executed Safe approval for withdrawal ${authorization.sourceWithdrawalId}`,
     );

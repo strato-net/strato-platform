@@ -975,3 +975,14 @@ test("waits for capacity before authorizing either withdrawal path and leaves re
   await assert.rejects(processExternalWithdrawal({ bridgeStatus: "3" } as any), /authorization reached/);
   assert.deepEqual(requested, ["1", "2"], "already-authorized recovery must bypass the capacity wait");
 });
+
+
+test("app quote client never forwards operator credentials", async (t) => {
+  const axios = (await import("axios")).default;
+  const { app } = await import("../utils/api");
+  t.mock.method(axios, "request", async (request: any) => {
+    assert.equal(request.headers.Authorization, undefined);
+    return { data: { quote: true } } as any;
+  });
+  assert.deepEqual(await app.get("/api/trade/route/quote"), { quote: true });
+});

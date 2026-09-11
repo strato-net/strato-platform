@@ -16,12 +16,15 @@ const {
   compareRoutes,
   compareActions,
   validateActiveRouteTokens,
+  validateDeploymentDependencies,
   verifyConfiguration,
 } = require("./external-bridge-verification");
 
 const ADDRESS = "1".repeat(40);
 
 const settings = {
+  sourceChainId: "114784819836269",
+  mintPolicies: [{ token: "9".repeat(40), capacity: "1000", refillRate: "1" }],
   adminRegistry: "2".repeat(40),
   tokenRouter: {
     address: "3".repeat(40),
@@ -168,9 +171,9 @@ test("keeps action enablement in a separate plan", () => {
   const actions = buildPlan(settings, "actions");
   assert.deepEqual(
     routes.map((call) => call.args._func),
-    ["addWhitelist", "addWhitelist", "setChain", "setRoute", "setRouteRebaseRequired"],
+    ["setMintPolicy", "addWhitelist", "addWhitelist", "setChain", "setRoute", "setRouteRebaseRequired"],
   );
-  assert.equal(routes[4].args._args[3].value, false);
+  assert.equal(routes[5].args._args[3].value, false);
   assert.deepEqual(
     actions.map((call) => call.args._func),
     ["setDepositAction"],
@@ -226,6 +229,7 @@ test("verifies chains, routes, and rebase policy independently of actions", () =
   const route = settings.chains[0].routes[0];
   const key = `${route.externalToken}:11155111:${route.stratoToken}`;
   const state = {
+    mintPolicies: new Map(settings.mintPolicies.map((policy) => [policy.token, policy])),
     chains: new Map([
       ["11155111", {
         chainName: "sepolia",
@@ -305,6 +309,9 @@ test("loads verification state from Cirrus", async () => {
   });
   let actionsEnabled = false;
   const fetchImpl = async (url) => {
+    if (url.includes("/eth/v1.2/metadata")) return response({ networkID: settings.sourceChainId });
+    if (/BlockApps-(TokenFactory|PriceOracle|Token)\?/.test(url)) return response([{ address: ADDRESS, status: 2, _symbol: "USDST", tokenFactory: ADDRESS }]);
+    if (url.includes("ExternalAssetBridge-mintPolicies")) return response(settings.mintPolicies.map((policy) => ({ key: policy.token, value: policy })));
     if (url.includes("AdminRegistry-whitelist")) {
       return response(["mint", "burn"].map((func) => ({
         key: "9".repeat(40), key2: func, key3: settings.bridge.address, value: true,
@@ -437,7 +444,7 @@ test("grants only required token permissions before enabling routes, without dup
   const grants = plan.filter((call) => call.args._func === "addWhitelist");
   assert.equal(grants.length, 2);
   for (const [index, func] of ["mint", "burn"].entries()) {
-    assert.deepEqual(plan[index], {
+    assert.deepEqual(grants[index], {
       contract: settings.adminRegistry, method: "castVoteOnIssue",
       args: {
         _target: settings.adminRegistry, _func: "addWhitelist",
@@ -474,4 +481,24 @@ test("rejects missing, revoked, or wrong-caller token permissions", async () => 
   rows[0].value = true;
   rows[0].key3 = ADDRESS;
   assert.match((await check())[0], /Missing bridge mint permission/);
+});
+
+test("validates deployment dependencies independently of generated bridge state", async () => {
+  let networkID = settings.sourceChainId;
+  let tokenFactory = ADDRESS;
+  let missingOracle = false;
+  const read = async (url) => ({ ok: true, json: async () => {
+    if (url.endsWith("/metadata")) return { networkID };
+    if (url.includes("BlockApps-PriceOracle") && missingOracle) return [];
+    return [{ address: ADDRESS, status: 2, _symbol: "USDST", tokenFactory }];
+  } });
+  await validateDeploymentDependencies(settings, "https://strato.example", "token", read);
+  networkID = "1";
+  await assert.rejects(validateDeploymentDependencies(settings, "https://strato.example", "token", read), /chain ID mismatch/);
+  networkID = settings.sourceChainId;
+  tokenFactory = "f".repeat(40);
+  await assert.rejects(validateDeploymentDependencies(settings, "https://strato.example", "token", read), /USDST dependency/);
+  tokenFactory = ADDRESS;
+  missingOracle = true;
+  await assert.rejects(validateDeploymentDependencies(settings, "https://strato.example", "token", read), /PriceOracle dependency/);
 });

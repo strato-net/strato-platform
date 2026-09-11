@@ -92,7 +92,7 @@ function buildExpectedConfiguration(manifest, manifestDirectory) {
   };
 }
 
-async function verifyFromManifest(manifestPath) {
+async function verifyFromManifest(manifestPath, { expectedPaused = true, provider = ethers.provider, quiet = false } = {}) {
   const absoluteManifestPath = path.resolve(manifestPath);
   const manifest = readJson(absoluteManifestPath, "rollout manifest");
   const expected = buildExpectedConfiguration(
@@ -113,13 +113,10 @@ async function verifyFromManifest(manifestPath) {
 
   const artifact =
     require("../artifacts/contracts/bridge/DepositRouter.sol/DepositRouter.json");
-  const contract = await ethers.getContractAt(
-    artifact.abi,
-    expected.depositRouterAddress,
-  );
+  const contract = new ethers.Contract(expected.depositRouterAddress, artifact.abi, provider);
   const [network, code, paused, owner, vault, routeEvents] = await Promise.all([
-    ethers.provider.getNetwork(),
-    ethers.provider.getCode(expected.depositRouterAddress),
+    provider.getNetwork(),
+    provider.getCode(expected.depositRouterAddress),
     contract.paused(),
     contract.owner(),
     contract.externalBridgeVault(),
@@ -136,7 +133,7 @@ async function verifyFromManifest(manifestPath) {
     );
   }
   if (code === "0x") errors.push("DepositRouter has no deployed bytecode");
-  if (!paused) errors.push("DepositRouter is not paused");
+  if (paused !== expectedPaused) errors.push(expectedPaused ? "DepositRouter is not paused" : "DepositRouter is paused");
   if (keyAddress(owner) !== keyAddress(expected.ownerAddress)) {
     errors.push(`Owner mismatch: expected ${expected.ownerAddress}, got ${owner}`);
   }
@@ -210,8 +207,8 @@ async function verifyFromManifest(manifestPath) {
     status: errors.length ? "FAILED" : "PASSED",
     errors,
   };
-  console.log(JSON.stringify(report, null, 2));
-  if (errors.length) {
+  if (!quiet) console.log(JSON.stringify(report, null, 2));
+  if (errors.length && !quiet) {
     throw new Error(
       `DepositRouter verification failed with ${errors.length} error(s)`,
     );

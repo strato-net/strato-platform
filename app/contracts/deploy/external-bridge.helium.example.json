@@ -1,4 +1,9 @@
 {
+  "sourceChainId": "114784819836269",
+  "mintPolicies": [
+    { "token": "6aeacaa19c68e53035bf495d15e0a328fc600ba8", "capacity": "REVIEW_REQUIRED", "refillRate": "REVIEW_REQUIRED" },
+    { "token": "93fb7295859b2d70199e0a4883b7c320cf874e6c", "capacity": "REVIEW_REQUIRED", "refillRate": "REVIEW_REQUIRED" }
+  ],
   "adminRegistry": "000000000000000000000000000000000000100c",
   "tokenRouter": {
     "address": "0000000000000000000000000000000000000000",

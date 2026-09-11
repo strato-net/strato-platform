@@ -9,6 +9,7 @@ import {
   BridgeToken,
   CompositeRouteQuoteResponse,
 } from "@strato/shared-types";
+import { assertAutoRouteQuote } from "@/lib/bridge/utils";
 import { NetworkSummary } from "@/lib/bridge/types";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
@@ -51,13 +52,25 @@ export function useAutoRouteDeposit() {
     amount,
     quote,
     outputSymbol,
+    outputAddress,
+    slippageBps,
   }: {
     route: BridgeToken;
     network: NetworkSummary;
     amount: string;
     quote: CompositeRouteQuoteResponse;
     outputSymbol: string;
+    outputAddress: string;
+    slippageBps: number;
   }) => {
+    quote = structuredClone(quote);
+    const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
+    const assertCurrentQuote = () => assertAutoRouteQuote(quote, {
+      externalChainId: network.chainId, externalToken: route.externalToken,
+      targetStratoToken: route.stratoToken, externalAmount: amountWei,
+      externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
+    });
+    assertCurrentQuote();
     if (
       !isExternalEvmWalletConnected ||
       !externalEvmWalletAddress ||
@@ -88,10 +101,6 @@ export function useAutoRouteDeposit() {
     setIsPending(true);
     try {
       const isNative = BigInt(route.externalToken || "0") === 0n;
-      const amountWei = safeParseUnits(
-        amount,
-        Number(route.externalDecimals || 18)
-      );
       const validation = await validateRouterContract({
         depositRouterAddress: network.depositRouter,
         amount,
@@ -129,6 +138,7 @@ export function useAutoRouteDeposit() {
           chainId: network.chainId,
           actionIntent,
         });
+        assertCurrentQuote();
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),
@@ -165,6 +175,7 @@ export function useAutoRouteDeposit() {
           chainId: network.chainId,
         });
         if (!approval.isApproved) {
+          assertCurrentQuote();
           const approvalHash = await writeContractAsync({
             address: ensureHexPrefix(route.externalToken),
             abi: ERC20_ABI,
@@ -182,7 +193,8 @@ export function useAutoRouteDeposit() {
         }
 
         const nonce = getPermit2Nonce();
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + 900);
+        assertCurrentQuote();
+        const deadline = BigInt(Math.min(quote.deadline, Math.floor(Date.now() / 1000) + 900));
         const signature = await signTypedDataAsync({
           domain: getPermit2Domain(network.chainId),
           types: getPermit2Types(),
@@ -215,6 +227,7 @@ export function useAutoRouteDeposit() {
           ensureHexPrefix(recipient),
           ensureHexPrefix(route.stratoToken),
         ] as const;
+        assertCurrentQuote();
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),

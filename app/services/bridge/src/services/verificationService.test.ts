@@ -605,7 +605,7 @@ test("normalizes hex casing when comparing RPC receipts", async () => {
   assert.equal(receiptFingerprint(lower), receiptFingerprint(upper));
 });
 
-test("requests internal traces from the primary RPC only", async () => {
+test("requests internal traces from every verification RPC", async () => {
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] = "https://secondary-rpc";
   const api = await import("../utils/api");
@@ -617,7 +617,7 @@ test("requests internal traces from the primary RPC only", async () => {
 
   const { getInternalTransactionsBatch } = await import("./rpcService");
   await getInternalTransactionsBatch(chainId, [`0x${"dd".repeat(32)}`]);
-  assert.deepEqual(requestedUrls, ["https://primary-rpc"]);
+  assert.deepEqual(requestedUrls, ["https://primary-rpc", "https://secondary-rpc"]);
   delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });
 
@@ -741,4 +741,21 @@ test("fetches ETH traces from the full receipt even when only the ERC-20 deposit
   const results = await verifyDetectedDepositsBatch([token], 100, custodyAddress);
   assert.equal(traces, 1);
   assert.equal(results.get(depositIdentity(token))?.state, "verified");
+});
+
+test("rejects mismatching traces and missing independent RPCs", async () => {
+  process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] = "https://secondary-rpc";
+  const api = await import("../utils/api");
+  const { getInternalTransactionsBatch, validateVerificationRpcEndpoints } = await import("./rpcService");
+  (api.fetch as any).post = async (url: string, requests: any) => Array.isArray(requests)
+    ? requests.map((request) => ({ id: request.id, result: [{ type: "call", traceAddress: [], action: { value: url.includes("primary") ? "0x1" : "0x2" } }] }))
+    : { result: "0x1" };
+  await assert.rejects(getInternalTransactionsBatch(chainId, [`0x${"dd".repeat(32)}`]), /Trace RPC disagreement/);
+  process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] = "https://primary-rpc/different-key";
+  await assert.rejects(validateVerificationRpcEndpoints(chainId), /two distinct/);
+  process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] = "https://secondary-rpc";
+  (api.fetch as any).post = async () => ({ result: "0xffff" });
+  await assert.rejects(validateVerificationRpcEndpoints(chainId), /chain ID mismatch/);
+  delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });

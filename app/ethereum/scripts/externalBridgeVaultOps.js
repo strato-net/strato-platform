@@ -106,8 +106,7 @@ function encodeOperations(operations, vaultInterface, routerInterface) {
   });
 }
 
-async function readState(config, chain, vaultArtifact, routerArtifact) {
-  const provider = new ethers.JsonRpcProvider(getRpcUrl(chain.chainId));
+async function readState(config, chain, vaultArtifact, routerArtifact, provider = new ethers.JsonRpcProvider(getRpcUrl(chain.chainId))) {
   const [vaultCode, routerCode] = await Promise.all([
     provider.getCode(chain.vaultAddress),
     provider.getCode(chain.depositRouterAddress),
@@ -384,4 +383,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { parseArgs, loadConfig, selectChains, encodeOperations };
+module.exports = { parseArgs, loadConfig, selectChains, encodeOperations, readState };

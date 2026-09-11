@@ -149,6 +149,7 @@ export const eth = createClient(`${config.api.nodeUrl}/strato-api/eth/v1.2`, {
   logPrefix: "Eth",
 });
 export const app = createClient(config.api.appUrl || "", {
+  authenticated: false,
   logPrefix: "App",
 });
 export const fetch = createClient("", {

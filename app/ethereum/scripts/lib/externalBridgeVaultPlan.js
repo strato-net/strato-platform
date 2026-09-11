@@ -82,12 +82,12 @@ function normalizeConfig(input) {
     const threshold = Number(chain.attestationThreshold);
     if (
       !Number.isSafeInteger(threshold) ||
-      threshold <= 0 ||
+      threshold < 2 ||
       threshold > 255 ||
       threshold > attestationSigners.length
     ) {
       throw new Error(
-        `${prefix}.attestationThreshold must be between 1 and the configured signer count`,
+        `${prefix}.attestationThreshold must be between 2 and the configured signer count`,
       );
     }
 
@@ -140,6 +140,9 @@ function normalizeConfig(input) {
       throw new Error(`${prefix}.tokens contains duplicate token addresses`);
     }
 
+    const maxAuthorizationValiditySeconds = asUint(chain.maxAuthorizationValiditySeconds ?? 1800,
+      `${prefix}.maxAuthorizationValiditySeconds`, { positive: true });
+    if (maxAuthorizationValiditySeconds > 1800n) throw new Error(`${prefix}.maxAuthorizationValiditySeconds exceeds 1800`);
     return {
       chainId,
       safeAddress: asAddress(chain.safeAddress, `${prefix}.safeAddress`),
@@ -155,11 +158,7 @@ function normalizeConfig(input) {
       attestationSigners,
       disabledAttestationSigners,
       attestationThreshold: threshold,
-      maxAuthorizationValiditySeconds: asUint(
-        chain.maxAuthorizationValiditySeconds || 1800,
-        `${prefix}.maxAuthorizationValiditySeconds`,
-        { positive: true },
-      ),
+      maxAuthorizationValiditySeconds,
       tokens,
     };
   });

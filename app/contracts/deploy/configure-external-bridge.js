@@ -16,6 +16,7 @@ const {
   requiredRoutePermissions,
   validateRoutePermissions,
   validateActiveRouteTokens,
+  validateDeploymentDependencies,
   verifyConfiguration,
 } = require("./external-bridge-verification");
 
@@ -256,7 +257,18 @@ function loadConfig(configPath) {
   ) {
     throw new Error("route externalName/externalSymbol must not be empty");
   }
-  return { absolutePath, adminRegistry, tokenRouter, bridge, chains };
+  const sourceChainId = uint(input.sourceChainId, "sourceChainId", { positive: true });
+  const mintPolicies = (input.mintPolicies || []).map((policy) => ({
+    token: address(policy.token, "mintPolicies.token"),
+    capacity: uint(policy.capacity, "mintPolicies.capacity", { positive: true }),
+    refillRate: uint(policy.refillRate, "mintPolicies.refillRate", { positive: true }),
+  }));
+  if (new Set(mintPolicies.map((policy) => policy.token)).size !== mintPolicies.length ||
+      mintPolicies.some((policy) => BigInt(policy.refillRate) > BigInt(policy.capacity))) throw new Error("Invalid mint policies");
+  for (const chain of chains) for (const route of chain.routes) {
+    if (route.depositsEnabled && !mintPolicies.some((policy) => policy.token === route.stratoToken)) throw new Error(`Missing mint policy for ${route.stratoToken}`);
+  }
+  return { absolutePath, sourceChainId, adminRegistry, tokenRouter, bridge, chains, mintPolicies };
 }
 
 function buildPlan(settings, step) {
@@ -303,6 +315,9 @@ function buildPlan(settings, step) {
   }
 
   if (step === "routes") {
+    settings.mintPolicies.forEach((policy) => add(bridge.address, "setMintPolicy", [
+      parameter("address", policy.token), parameter("uint256", policy.capacity), parameter("uint256", policy.refillRate),
+    ]));
     requiredRoutePermissions(settings).forEach(({ token, func }) =>
       add(adminRegistry, "addWhitelist", [
         parameter("address", token),
@@ -372,7 +387,7 @@ function selectPlanCalls(plan, startCall = "1") {
   };
 }
 
-async function submit(tokenObj, call) {
+async function submit(tokenObj, call, onSubmitted = () => {}) {
   const response = await rest.call(
     tokenObj,
     {
@@ -387,6 +402,7 @@ async function submit(tokenObj, call) {
     .map((item) => item?.hash)
     .filter(Boolean);
   if (!hashes.length) throw new Error("Governance vote returned no transaction hash");
+  await onSubmitted(hashes);
   const results = await util.until(
     (items) =>
       Array.isArray(items) &&
@@ -486,6 +502,7 @@ async function main() {
       process.env.GLOBAL_ADMIN_NAME,
       process.env.GLOBAL_ADMIN_PASSWORD,
     );
+    await validateDeploymentDependencies(settings, process.env.NODE_URL, token);
     if (args.step === "routes") {
       const inactiveTokens = await validateActiveRouteTokens(
         settings,
@@ -545,6 +562,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  submit,
   parseArgs,
   loadConfig,
   buildPlan,

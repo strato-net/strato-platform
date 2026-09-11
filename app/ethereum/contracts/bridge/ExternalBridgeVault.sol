@@ -401,9 +401,8 @@ contract ExternalBridgeVault is
         if (currentlyEnabled == enabled) return;
 
         if (enabled) {
-            unchecked {
-                ++attestationSignerCount;
-            }
+            if (attestationSignerCount == type(uint8).max) revert InvalidAttestationThreshold();
+            ++attestationSignerCount;
         } else {
             uint8 newSignerCount = attestationSignerCount - 1;
             if (attestationThreshold > newSignerCount) {
@@ -420,7 +419,7 @@ contract ExternalBridgeVault is
     function setAttestationThreshold(
         uint8 threshold
     ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
-        if (threshold == 0 || threshold > attestationSignerCount) {
+        if (threshold < 2 || threshold > attestationSignerCount) {
             revert InvalidAttestationThreshold();
         }
 
@@ -432,7 +431,7 @@ contract ExternalBridgeVault is
     function setMaxAuthorizationValiditySeconds(
         uint256 validitySeconds
     ) external onlyRole(ATTESTATION_ADMIN_ROLE) {
-        if (validitySeconds == 0) revert InvalidAuthorization();
+        if (validitySeconds == 0 || validitySeconds > 30 minutes) revert InvalidAuthorization();
         uint256 previousValiditySeconds = maxAuthorizationValiditySeconds;
         maxAuthorizationValiditySeconds = validitySeconds;
         emit MaxAuthorizationValidityUpdated(
@@ -572,7 +571,7 @@ contract ExternalBridgeVault is
         bytes[] calldata signatures
     ) internal view {
         uint8 threshold = attestationThreshold;
-        if (threshold == 0 || signatures.length < threshold) {
+        if (threshold < 2 || signatures.length < threshold) {
             revert InvalidAttestationThreshold();
         }
 
@@ -631,7 +630,7 @@ contract ExternalBridgeVault is
     ) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
-        return "1.0.0";
+        return "2.0.0";
     }
 
     receive() external payable {}

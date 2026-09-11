@@ -22,6 +22,8 @@
     "router:ops": "node scripts/depositRouterOps.js",
     "router:ops:testnet": "node scripts/depositRouterOps.js --env testnet",
     "router:ops:prod": "node scripts/depositRouterOps.js --env prod",
+    "external:rollout": "node scripts/externalBridgeRollout.js",
+    "external:orchestration:test": "npm run compile && node --test test/ExternalBridgeOrchestration.test.js",
     "external:rollout:generate": "node scripts/generateExternalBridgeRollout.js",
     "external:rollout:prepare": "node scripts/generateExternalBridgeRollout.js --mode prepare",
     "external:rollout:finalize": "node scripts/generateExternalBridgeRollout.js --mode finalize",

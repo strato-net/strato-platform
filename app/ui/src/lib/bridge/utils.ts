@@ -1,7 +1,8 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
-import { BridgeError } from "./types";
+import type { CompositeRouteQuoteResponse } from "@strato/shared-types";
+import { AutoRouteQuoteBinding, BridgeError } from "./types";
 
 export const ExternalBridgeStatus = {
   NONE: 0,
@@ -243,4 +244,36 @@ export function mergePendingDeposits(apiDeposits: any[]): {
   const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
   localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
   return { remaining };
+}
+
+export function assertAutoRouteQuote(
+  quote: CompositeRouteQuoteResponse,
+  binding: AutoRouteQuoteBinding,
+  now = Math.floor(Date.now() / 1000),
+): void {
+  const address = (value: string) => {
+    const normalized = value.replace(/^0x/i, "").toLowerCase();
+    if (!/^[0-9a-f]{40}$/.test(normalized)) throw new Error("Invalid quote token address");
+    return normalized;
+  };
+  if (!Number.isSafeInteger(quote.deadline) || quote.deadline <= now) throw new Error("Quote expired; request a new quote");
+  if (BigInt(quote.bridge.externalChainId) !== BigInt(binding.externalChainId) ||
+      address(quote.bridge.externalToken) !== address(binding.externalToken) ||
+      address(quote.bridge.targetStratoToken) !== address(binding.targetStratoToken) ||
+      address(quote.tokenIn) !== address(binding.targetStratoToken) ||
+      address(quote.tokenOut) !== address(binding.tokenOut) ||
+      address(quote.depositAction.actionToken) !== address(binding.tokenOut)) throw new Error("Quote does not match the selected route and output token");
+  if (binding.externalAmount <= 0n || BigInt(quote.bridge.externalAmount) !== binding.externalAmount ||
+      Number(quote.bridge.externalDecimals) !== binding.externalDecimals ||
+      BigInt(quote.amountIn) !== BigInt(quote.bridge.bridgedAmount) || BigInt(quote.amountIn) <= 0n) throw new Error("Quote does not match the deposit amount");
+  if (!Number.isInteger(binding.slippageBps) || binding.slippageBps < 0 || binding.slippageBps >= 10000 ||
+      quote.slippageBps !== binding.slippageBps) throw new Error("Quote slippage does not match");
+  const minimum = BigInt(quote.depositAction.minFinalOut);
+  const output = BigInt(quote.amountOut);
+  if (minimum <= 0n || minimum !== BigInt(quote.minFinalOut) || minimum > output ||
+      minimum < output * BigInt(10000 - binding.slippageBps) / 10000n) throw new Error("Invalid quote minimum output");
+  const plain = address(binding.targetStratoToken) === address(binding.tokenOut);
+  if (quote.depositAction.action !== (plain ? 0 : 4) || (plain && (output !== BigInt(quote.amountIn) || minimum !== output))) {
+    throw new Error("Quote action does not match the selected output token");
+  }
 }

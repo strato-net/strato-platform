@@ -14,7 +14,7 @@ require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
-const { Contract, JsonRpcProvider } = require('ethers');
+const { Contract, JsonRpcProvider, AbiCoder, keccak256, toUtf8Bytes } = require('ethers');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
 
@@ -81,6 +81,24 @@ async function callAndWait(tokenObj, registry, args) {
   return final;
 }
 
+function withdrawalRefundDigest(authorization, withdrawal, verifierSetVersion) {
+  const hash = (types, values) => keccak256(AbiCoder.defaultAbiCoder().encode(types, values));
+  const address = (value) => `0x${normalizeAddress(value, 'refund address')}`;
+  const withdrawalHash = hash(
+    ['uint256', 'uint256', 'address', 'uint256', 'address', 'address', 'address', 'uint256'],
+    [authorization.sourceWithdrawalId, authorization.destinationChainId, address(authorization.token),
+      authorization.amount, address(authorization.recipient), address(withdrawal.stratoSender),
+      address(withdrawal.stratoToken), withdrawal.stratoTokenAmount],
+  );
+  return hash(
+    ['bytes32', 'uint256', 'address', 'uint256', 'bytes32', 'uint8', 'uint256', 'uint256', 'uint256', 'address', 'bytes32', 'bytes32'],
+    [keccak256(toUtf8Bytes('EAB_WITHDRAWAL_REFUND_V1')), authorization.sourceChainId,
+      address(authorization.sourceBridge), verifierSetVersion, withdrawalHash, withdrawal.status,
+      authorization.notBefore, authorization.deadline, authorization.signerSetVersion, address(authorization.destinationVault),
+      keccak256(toUtf8Bytes(withdrawal.reservationId || '')), keccak256(toUtf8Bytes(withdrawal.cancellationTxHash || ''))],
+  );
+}
+
 async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
   const nodeUrl = (options.nodeUrl || process.env.NODE_URL || '').replace(/\/$/, '');
   const fetchImpl = options.fetchImpl || fetch;
@@ -96,7 +114,7 @@ async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
     read('/cirrus/search/BlockApps-ExternalAssetBridge-withdrawals', identity),
     read('/cirrus/search/BlockApps-ExternalAssetBridge-withdrawalAuthorizations', identity),
     read('/strato-api/eth/v1.2/metadata'),
-    read('/cirrus/search/BlockApps-ExternalAssetBridge', { address: `eq.${bridgeAddress}`, select: 'settlementVerifierThreshold', limit: '1' }),
+    read('/cirrus/search/BlockApps-ExternalAssetBridge', { address: `eq.${bridgeAddress}`, select: 'settlementVerifierThreshold,settlementVerifierSetVersion', limit: '1' }),
   ]);
   const expectedSourceChainId = options.sourceChainId || process.env.SOURCE_CHAIN_ID;
   if (!expectedSourceChainId || metadata.networkID == null || BigInt(metadata.networkID) !== BigInt(expectedSourceChainId)) {
@@ -107,7 +125,7 @@ async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
   const withdrawal = withdrawals?.[0]?.value;
   const stored = authorizations?.[0]?.value;
   if (!withdrawal || !stored?.destinationVault ||
-      !(Number(withdrawal.status) === 5 || (Number(withdrawal.status) === 3 && !withdrawal.reservationId))) {
+      !(Number(withdrawal.status) === 5 || Number(withdrawal.status) === 3)) {
     throw new Error('Withdrawal is not eligible for an attested refund');
   }
   const authorization = {
@@ -144,13 +162,13 @@ async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
     if (status === 3 && reservation.authorizationDigest.toLowerCase() !== (await vault.authorizationDigest(authorization, { blockTag })).toLowerCase()) {
       throw new Error('Cancelled reservation authorization mismatch');
     }
-    return { authorization, threshold, reservationId, externalBlockNumber: blockTag, externalBlockHash: block.hash, reservationStatus: status };
+    return { authorization, threshold, digest: withdrawalRefundDigest(authorization, withdrawal, bridges[0].settlementVerifierSetVersion), reservationId, externalBlockNumber: blockTag, externalBlockHash: block.hash, reservationStatus: status };
   } finally {
     if (!options.provider) provider.destroy();
   }
 }
 
-async function collectRefundAttestations(evidence) {
+async function collectRefundAttestations(evidence, token) {
   const chainId = evidence.authorization.destinationChainId;
   const urls = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
   const tokens = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
@@ -165,9 +183,21 @@ async function collectRefundAttestations(evidence) {
     if (!response.ok) throw new Error(`Refund verifier rejected evidence: ${response.status}`);
     return response.json();
   }));
-  const accepted = new Set(results.filter((result) => result.status === 'fulfilled' && result.value.transactionHash)
+  const accepted = new Set(results.filter((result) => result.status === 'fulfilled' &&
+    result.value.transactionHash && result.value.digest === evidence.digest)
     .map((result) => String(result.value.settlementAttestor || '').toLowerCase()).filter(Boolean));
-  if (accepted.size < evidence.threshold) throw new Error('Refund verifier quorum was not reached; no governance vote submitted');
+  if (accepted.size < evidence.threshold) throw new Error('Refund verifier quorum for the expected source digest was not reached; no governance vote submitted');
+  const digest = evidence.digest;
+  const nodeUrl = process.env.NODE_URL.replace(/\/$/, '');
+  const query = new URLSearchParams({ address: `eq.${normalizeAddress(evidence.authorization.sourceBridge, 'bridge')}`,
+    or: `(key.eq.${digest},key.eq.${digest.replace(/^0x/, '')})`, select: 'value' });
+  const response = await fetch(`${nodeUrl}/cirrus/search/BlockApps-ExternalAssetBridge-settlementAttestationCounts?${query}`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000),
+  });
+  const count = response.ok ? Number((await response.json())?.[0]?.value) : NaN;
+  if (!Number.isSafeInteger(count) || count < evidence.threshold) {
+    throw new Error('Refund quorum is not recorded on chain; wait for indexing and retry');
+  }
 }
 
 async function main() {
@@ -213,7 +243,7 @@ async function main() {
     console.log('Evidence verified. Dry run only; no attestations or governance votes submitted.');
     return;
   }
-  await collectRefundAttestations(evidence);
+  await collectRefundAttestations(evidence, token);
   const result = await callAndWait({ token }, adminRegistry, voteArgs);
   console.log(`Refund vote submitted successfully (${result.hash})`);
 }
@@ -227,3 +257,6 @@ if (require.main === module) {
 
 module.exports = main;
 module.exports.prepareRefund = prepareRefund;
+
+module.exports.withdrawalRefundDigest = withdrawalRefundDigest;
+module.exports.collectRefundAttestations = collectRefundAttestations;

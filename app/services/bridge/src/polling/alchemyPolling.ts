@@ -147,7 +147,11 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   const depositRouters = chainInfo.depositRouters?.length
     ? chainInfo.depositRouters
     : [chainInfo.depositRouter];
-  await reconcileRecordedDepositReviews(externalChainId);
+  try {
+    await reconcileRecordedDepositReviews(externalChainId);
+  } catch (error) {
+    logError("DepositRecovery", error as Error, { externalChainId });
+  }
   const reviewRetryMs = getReviewRecordRetryMs();
   const reviewedDeposits =
     await depositStateService.listReviews(externalChainId);

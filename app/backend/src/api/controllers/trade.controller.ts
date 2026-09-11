@@ -1,3 +1,4 @@
+import { cachedAnonymousQuote } from "../services/anonymousQuoteCache.service";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -63,12 +64,16 @@ class TradeController {
     try {
       const { accessToken, query } = req;
       validateTradeQuoteArgs(query);
-      const response = await getTradeQuotes(
-        accessToken,
-        query.tokenIn as string,
-        query.tokenOut as string,
-        BigInt(query.amount as string),
-        query.type as "EXACT_INPUT" | "EXACT_OUTPUT"
+      const response = await cachedAnonymousQuote(
+        "getTradeQuotes:" + JSON.stringify([query.tokenIn, query.tokenOut, query.amount, query.type]),
+        req.address as string | undefined,
+        () => getTradeQuotes(
+          accessToken,
+          query.tokenIn as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.type as "EXACT_INPUT" | "EXACT_OUTPUT"
+        )
       );
       res.status(RestStatus.OK).json(response);
     } catch (error) {
@@ -91,12 +96,16 @@ class TradeController {
     try {
       const { accessToken, query } = req;
       validateRouteQuoteArgs(query);
-      const result = await getRouteQuote(
-        accessToken,
-        query.tokenIn as string,
-        query.tokenOut as string,
-        BigInt(query.amount as string),
-        query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+      const result = await cachedAnonymousQuote(
+        "getRouteQuote:" + JSON.stringify([query.tokenIn, query.tokenOut, query.amount, query.slippageBps]),
+        req.address as string | undefined,
+        () => getRouteQuote(
+          accessToken,
+          query.tokenIn as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+        )
       );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -120,14 +129,18 @@ class TradeController {
     try {
       const { accessToken, query } = req;
       validateCompositeRouteQuoteArgs(query);
-      const result = await getCompositeBridgeRouteQuote(
-        accessToken,
-        query.externalChainId as string,
-        query.externalToken as string,
-        query.targetStratoToken as string,
-        query.tokenOut as string,
-        BigInt(query.amount as string),
-        query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+      const result = await cachedAnonymousQuote(
+        "getCompositeBridgeRouteQuote:" + JSON.stringify([query.externalChainId, query.externalToken, query.targetStratoToken, query.tokenOut, query.amount, query.slippageBps]),
+        req.address as string | undefined,
+        () => getCompositeBridgeRouteQuote(
+          accessToken,
+          query.externalChainId as string,
+          query.externalToken as string,
+          query.targetStratoToken as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+        )
       );
       res.status(RestStatus.OK).json(result);
     } catch (error) {

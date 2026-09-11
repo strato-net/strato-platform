@@ -4,13 +4,15 @@ dotenv.config();
 import axios from "axios";
 import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
+import { ConsensusProvider } from "./consensusProvider";
+import { depositSettlementDigest } from "./authorizationValidation";
+import { verifierAccessControl } from "./accessControl";
 import {
   Contract,
-  JsonRpcProvider,
   TypedDataEncoder,
   getAddress,
 } from "ethers";
-import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
+import { withdrawalRefundDigest, matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
 import {
   DepositSettlementAttestation,
   validateDepositSettlement,
@@ -87,7 +89,8 @@ const destinationVault = getAddress(required("DESTINATION_VAULT_ADDRESS"));
 const authorizationSignerAddress = getAddress(
   required("VAULT_AUTHORIZATION_SIGNER_ADDRESS"),
 );
-const provider = new JsonRpcProvider(required("VERIFIER_RPC_URL"));
+const verifierRpcUrls = [required("VERIFIER_RPC_URL"), ...required("VERIFIER_INDEPENDENT_RPC_URLS").split(",").map((url) => url.trim())];
+const provider = new ConsensusProvider(verifierRpcUrls);
 const vault = new Contract(destinationVault, VAULT_ABI, provider);
 const kmsConfig = {
   address: authorizationSignerAddress,
@@ -311,7 +314,7 @@ const validateSourceWithdrawal = async (
   authorization: WithdrawalAuthorization,
   allowedStatuses = [3],
   requireEnabledChain = true,
-): Promise<void> => {
+) => {
   if (normalize(authorization.sourceBridge) !== normalize(sourceBridge)) {
     throw new Error("Source bridge mismatch");
   }
@@ -368,6 +371,7 @@ const validateSourceWithdrawal = async (
   ) {
     throw new Error("Destination vault is not enabled by the source bridge");
   }
+  return withdrawal;
 };
 
 const validateSourceDepositRoute = async (
@@ -403,20 +407,24 @@ const validateSourceDepositRoute = async (
   }
 };
 
-const isDepositPendingReview = async (
+const isDepositReviewApproved = async (
   deposit: DepositSettlementAttestation,
+  generation: string,
 ): Promise<boolean> => {
-  const response = await stratoGet(
-    "/cirrus/search/BlockApps-ExternalAssetBridge-deposits",
-    {
-      address: `eq.${sourceBridge}`,
-      key: `eq.${deposit.externalChainId}`,
-      key2: `eq.${normalize(deposit.depositRouter)}`,
-      key3: `eq.${deposit.depositId}`,
-      select: "value",
-    },
-  );
-  return Number(response.data?.[0]?.value?.status) === 2;
+  const [approval, bridge] = await Promise.all([
+    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-depositReviewApprovals", {
+      address: `eq.${sourceBridge}`, key: `eq.${deposit.externalChainId}`,
+      key2: `eq.${normalize(deposit.depositRouter)}`, key3: `eq.${deposit.depositId}`, select: "value",
+    }),
+    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge", {
+      address: `eq.${sourceBridge}`, select: "settlementVerifierSetVersion",
+    }),
+  ]);
+  const version = bridge.data?.[0]?.settlementVerifierSetVersion;
+  if (version == null || !approval.data?.[0]?.value) return false;
+  return normalize(approval.data[0].value) === normalize(depositSettlementDigest(
+    deposit, sourceChainId.toString(), sourceBridge, String(version), generation,
+  ));
 };
 
 const validateDestinationIdentity = (
@@ -532,6 +540,16 @@ const enforceWithdrawalPolicy = async (
 };
 
 const validatePolicyAgainstContracts = async (): Promise<void> => {
+  const [source, destinationValidity] = await Promise.all([
+    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge", {
+      address: `eq.${sourceBridge}`, select: "MAX_AUTHORIZATION_VALIDITY_SECONDS",
+    }),
+    vault.maxAuthorizationValiditySeconds(),
+  ]);
+  const sourceValidity = source.data?.[0]?.MAX_AUTHORIZATION_VALIDITY_SECONDS;
+  if (sourceValidity == null || BigInt(sourceValidity) !== BigInt(destinationValidity)) {
+    throw new Error("Source and vault authorization validity must match");
+  }
   await Promise.all([
     ...verifierPolicy.routes
       .filter(({ depositsEnabled }) => depositsEnabled)
@@ -601,14 +619,8 @@ const auditDecision = (
 
 const app = express();
 app.set("env", "production");
-app.use(express.json());
-app.use((req, res, next) => {
-  if (req.headers.authorization !== `Bearer ${verifierApiToken}`) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  next();
-});
+app.use(verifierAccessControl(verifierApiToken));
+app.use(express.json({ limit: "32kb" }));
 
 app.get("/health", (_, res) => {
   res.json({
@@ -616,6 +628,7 @@ app.get("/health", (_, res) => {
     authorizationSigner: authorizationSignerAddress,
     settlementAttestor: settlementAttestorAddress,
     verifierConfirmations,
+    verificationRpcHostCount: new Set(verifierRpcUrls.map((url) => new URL(url).hostname)).size,
     destinationChainId: destinationChainId.toString(),
     destinationVault,
     policyVersion: verifierPolicy.version,
@@ -660,6 +673,11 @@ app.post("/v1/sign-withdrawal", async (req, res) => {
 app.post("/v1/attest-deposit", async (req, res) => {
   try {
     const deposit = req.body as DepositSettlementAttestation;
+    const generationResponse = await stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-depositGenerations", {
+      address: `eq.${sourceBridge}`, key: `eq.${deposit.externalChainId}`,
+      key2: `eq.${normalize(deposit.depositRouter)}`, key3: `eq.${deposit.depositId}`, select: "value",
+    });
+    const expectedGeneration = String(generationResponse.data?.[0]?.value ?? "0");
     if (BigInt(deposit.externalChainId) !== destinationChainId) {
       throw new Error("Deposit destination chain mismatch");
     }
@@ -670,7 +688,7 @@ app.post("/v1/attest-deposit", async (req, res) => {
     const policyDecision = evaluateDepositPolicy(verifierPolicy, deposit);
     const manuallyReviewed =
       policyDecision.decision === "manual_review" &&
-      (await isDepositPendingReview(deposit));
+      (await isDepositReviewApproved(deposit, expectedGeneration));
     if (policyDecision.decision === "manual_review" && !manuallyReviewed) {
       throw new ManualReviewRequiredError(policyDecision.reason);
     }
@@ -697,6 +715,7 @@ app.post("/v1/attest-deposit", async (req, res) => {
         action: deposit.action,
         actionToken: deposit.actionToken,
         minFinalOut: deposit.minFinalOut,
+        expectedGeneration,
       },
     );
     auditDecision(
@@ -704,7 +723,7 @@ app.post("/v1/attest-deposit", async (req, res) => {
       `${deposit.externalChainId}:${deposit.depositId}`,
       "approve",
       manuallyReviewed
-        ? "STRATO operator review satisfies local deposit policy"
+        ? "STRATO governance approval satisfies local deposit policy"
         : policyDecision.reason,
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
@@ -796,15 +815,22 @@ app.post("/v1/attest-refund", async (req, res) => {
   try {
     const authorization = req.body.authorization as WithdrawalAuthorization;
     await validateRpcIdentity();
-    await Promise.all([
+    const [withdrawal, bridgeResponse] = await Promise.all([
       validateSourceWithdrawal(authorization, [3, 5], false),
+      stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge", {
+        address: `eq.${sourceBridge}`, select: "settlementVerifierSetVersion",
+      }),
       validateRefundDestination(authorization),
     ]);
+    const expectedDigest = withdrawalRefundDigest(authorization, withdrawal,
+      bridgeResponse.data?.[0]?.settlementVerifierSetVersion);
     const transactionHash = await submitStratoAttestation("attestWithdrawalRefund", {
-      withdrawalId: authorization.sourceWithdrawalId,
+      withdrawalId: authorization.sourceWithdrawalId, expectedDigest,
     });
-    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
+    auditDecision("attest_refund", authorization.sourceWithdrawalId, "approve", "Confirmed non-payment and bound source state");
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest: expectedDigest });
   } catch (error) {
+    auditDecision("attest_refund", String(req.body?.authorization?.sourceWithdrawalId || ""), "reject", (error as Error).message);
     res.status(422).json({ error: (error as Error).message });
   }
 });

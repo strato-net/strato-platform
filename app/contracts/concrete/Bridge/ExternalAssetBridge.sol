@@ -4,10 +4,7 @@ import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../../libraries/Bridge/ExternalBridgeTypes.sol";
 import "../../libraries/Router/RouterTypes.sol";
 import "../Lending/PriceOracle.sol";
-import "../Metals/MetalForge.sol";
-import "../Pools/DirectMintPSM.sol";
 import "../Router/TokenRouter.sol";
-import "../Savings/SaveUSDSTVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 
@@ -85,6 +82,7 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalChainId,
         string externalTxHash
     );
+    event DepositReviewApproved(uint256 externalChainId, address depositRouter, uint256 depositId, bytes32 digest);
     event DepositCompleted(
         uint256 externalChainId,
         address externalSender,
@@ -181,9 +179,6 @@ contract record ExternalAssetBridge is Ownable {
     event WithdrawalAborted(uint256 withdrawalId);
     event TokenFactoryUpdated(address newFactory, address oldFactory);
     event USDSTAddressUpdated(address newAddress, address oldAddress);
-    event DirectMintPsmUpdated(address newPsm, address oldPsm);
-    event SaveUsdstVaultUpdated(address newVault, address oldVault);
-    event MetalForgeUpdated(address newForge, address oldForge);
     event TokenRouterUpdated(address newRouter, address oldRouter);
     event AutoRouted(
         uint256 externalChainId,
@@ -238,9 +233,6 @@ contract record ExternalAssetBridge is Ownable {
     address public bridgeOperator;
     address public guardian;
     address public USDST_ADDRESS;
-    address public directMintPsm;
-    address public saveUsdstVault;
-    address public metalForge;
 
     uint256 public withdrawalCounter;
 
@@ -254,7 +246,6 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => WithdrawalAuthorizationInfo) public record withdrawalAuthorizations;
     mapping(uint256 => WithdrawalManualReview) public record withdrawalManualReviews;
     mapping(string => uint256) public withdrawalByReservationId;
-    mapping(string => uint256) public withdrawalByExternalTxHash;
     address public priceOracle;
     mapping(address => mapping(uint256 => mapping(address => bool))) public record routeRebaseRequired;
     address public tokenRouter;
@@ -266,6 +257,29 @@ contract record ExternalAssetBridge is Ownable {
     uint256 public settlementVerifierSetVersion;
     mapping(bytes32 => mapping(address => bool)) public record settlementAttestations;
     mapping(bytes32 => uint8) public record settlementAttestationCounts;
+    mapping(uint256 => mapping(address => mapping(uint256 => uint256))) public record depositGenerations;
+    mapping(uint256 => mapping(address => mapping(uint256 => bytes32))) public record depositReviewApprovals;
+
+    mapping(address => MintPolicy) public record mintPolicies;
+    event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
+
+    function setMintPolicy(address token, uint256 capacity, uint256 refillRate) external onlyOwner {
+        require(token != address(0) && capacity > 0 && refillRate > 0 && refillRate <= capacity, "EAB: invalid mint policy");
+        MintPolicy policy = mintPolicies[token];
+        _refillMintBucket(policy);
+        policy.capacity = capacity;
+        policy.refillRate = refillRate;
+        emit MintPolicyUpdated(token, capacity, refillRate);
+    }
+
+    function _refillMintBucket(MintPolicy policy) internal {
+        uint256 elapsed = block.timestamp - policy.lastRefillAt;
+        if (policy.refillRate > 0) {
+            policy.consumed = elapsed > policy.consumed / policy.refillRate
+                ? 0 : policy.consumed - elapsed * policy.refillRate;
+        }
+        policy.lastRefillAt = block.timestamp;
+    }
 
     modifier onlyBridgeOperator() {
         require(
@@ -444,6 +458,7 @@ contract record ExternalAssetBridge is Ownable {
             "EAB: chain missing"
         );
         require(stratoToken != address(0), "EAB: zero strato token");
+        require(Token(stratoToken).decimals() == DECIMAL_PLACES, "EAB: representation must have 18 decimals");
         require(externalDecimals <= DECIMAL_PLACES, "EAB: decimals exceed max");
         require(externalName.length > 0, "EAB: invalid external name");
         require(externalSymbol.length > 0, "EAB: invalid external symbol");
@@ -560,32 +575,6 @@ contract record ExternalAssetBridge is Ownable {
         USDST_ADDRESS = newAddress;
     }
 
-    function setDirectMintPsm(address newPsm) external onlyOwner {
-        require(newPsm != address(0), "EAB: zero PSM");
-        require(
-            DirectMintPSM(newPsm).mintableToken() == USDST_ADDRESS,
-            "EAB: PSM token mismatch"
-        );
-        emit DirectMintPsmUpdated(newPsm, directMintPsm);
-        directMintPsm = newPsm;
-    }
-
-    function setSaveUsdstVault(address newVault) external onlyOwner {
-        require(newVault != address(0), "EAB: zero save vault");
-        require(
-            SaveUSDSTVault(newVault).asset() == USDST_ADDRESS,
-            "EAB: save asset mismatch"
-        );
-        emit SaveUsdstVaultUpdated(newVault, saveUsdstVault);
-        saveUsdstVault = newVault;
-    }
-
-    function setMetalForge(address newForge) external onlyOwner {
-        require(newForge != address(0), "EAB: zero forge");
-        emit MetalForgeUpdated(newForge, metalForge);
-        metalForge = newForge;
-    }
-
     function setTokenRouter(address newRouter) external onlyOwner {
         require(newRouter != address(0), "EAB: zero token router");
         require(
@@ -599,6 +588,7 @@ contract record ExternalAssetBridge is Ownable {
     function setWithdrawalAbortDelay(
         uint256 newDelay
     ) external onlyOwner {
+        require(newDelay <= 172800, "EAB: abort delay exceeds 48 hours");
         emit WithdrawalAbortDelayUpdated(WITHDRAWAL_ABORT_DELAY, newDelay);
         WITHDRAWAL_ABORT_DELAY = newDelay;
     }
@@ -606,7 +596,7 @@ contract record ExternalAssetBridge is Ownable {
     function setMaxAuthorizationValiditySeconds(
         uint256 newValidity
     ) external onlyOwner {
-        require(newValidity > 0, "EAB: zero validity");
+        require(newValidity > 0 && newValidity <= 1800, "EAB: validity must be 1 to 1800 seconds");
         emit AuthorizationValidityUpdated(
             MAX_AUTHORIZATION_VALIDITY_SECONDS,
             newValidity
@@ -675,8 +665,10 @@ contract record ExternalAssetBridge is Ownable {
         address stratoToken,
         uint256 action,
         address actionToken,
-        uint256 minFinalOut
+        uint256 minFinalOut,
+        uint256 expectedGeneration
     ) external {
+        require(expectedGeneration == depositGenerations[externalChainId][depositRouter][depositId], "EAB: stale deposit generation");
         _recordSettlementAttestation(
             getDepositSettlementDigest(
                 externalChainId,
@@ -872,15 +864,49 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function getReviewedDepositDigest(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId
+    ) public view returns (bytes32) {
+        DepositInfo depositInfo = deposits[externalChainId][depositRouter][depositId];
+        DepositActionIntent intent = depositActions[externalChainId][depositRouter][depositId];
+        require(depositInfo.status == Status.PENDING_REVIEW, "EAB: bad state");
+        return getDepositSettlementDigest(
+            externalChainId, depositRouter, depositId, depositInfo.externalSender,
+            depositInfo.externalToken, depositInfo.externalTokenAmount, depositInfo.externalTxHash,
+            depositInfo.stratoRecipient, depositInfo.stratoToken, intent.action, intent.actionToken, intent.minFinalOut
+        );
+    }
+
+    function approveReviewedDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        bytes32 expectedDigest
+    ) external onlyOwner {
+        require(expectedDigest == getReviewedDepositDigest(externalChainId, depositRouter, depositId), "EAB: review digest mismatch");
+        depositReviewApprovals[externalChainId][depositRouter][depositId] = expectedDigest;
+        emit DepositReviewApproved(externalChainId, depositRouter, depositId, expectedDigest);
+    }
+
+    function _requireReviewedDepositAttestations(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        bytes attestationProof
+    ) internal view {
+        bytes32 digest = getReviewedDepositDigest(externalChainId, depositRouter, depositId);
+        require(depositReviewApprovals[externalChainId][depositRouter][depositId] == digest, "EAB: owner review required");
+        _requireSettlementAttestations(digest, attestationProof);
+    }
+
     function confirmReviewedDeposit(
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId,
         bytes attestationProof
     ) external whenDepositsOpen {
-        DepositInfo depositInfo = deposits[
-            externalChainId
-        ][depositRouter][depositId];
         DepositActionIntent intent = depositActions[
             externalChainId
         ][depositRouter][depositId];
@@ -890,23 +916,7 @@ contract record ExternalAssetBridge is Ownable {
                 msg.sender == bridgeOperator,
             "EAB: routed settlement requires operator"
         );
-        _requireSettlementAttestations(
-            getDepositSettlementDigest(
-                externalChainId,
-                depositRouter,
-                depositId,
-                depositInfo.externalSender,
-                depositInfo.externalToken,
-                depositInfo.externalTokenAmount,
-                depositInfo.externalTxHash,
-                depositInfo.stratoRecipient,
-                depositInfo.stratoToken,
-                intent.action,
-                intent.actionToken,
-                intent.minFinalOut
-            ),
-            attestationProof
-        );
+        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, attestationProof);
         _confirmDeposit(
             externalChainId,
             depositRouter,
@@ -921,33 +931,7 @@ contract record ExternalAssetBridge is Ownable {
         RouteStep[] steps,
         bytes attestationProof
     ) external onlyBridgeOperator whenDepositsOpen {
-        DepositInfo depositInfo = deposits[
-            externalChainId
-        ][depositRouter][depositId];
-        require(
-            depositInfo.status == Status.PENDING_REVIEW,
-            "EAB: bad state"
-        );
-        DepositActionIntent intent = depositActions[
-            externalChainId
-        ][depositRouter][depositId];
-        _requireSettlementAttestations(
-            getDepositSettlementDigest(
-                externalChainId,
-                depositRouter,
-                depositId,
-                depositInfo.externalSender,
-                depositInfo.externalToken,
-                depositInfo.externalTokenAmount,
-                depositInfo.externalTxHash,
-                depositInfo.stratoRecipient,
-                depositInfo.stratoToken,
-                intent.action,
-                intent.actionToken,
-                intent.minFinalOut
-            ),
-            attestationProof
-        );
+        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, attestationProof);
         _recordDepositRoute(
             externalChainId,
             depositRouter,
@@ -1087,6 +1071,7 @@ contract record ExternalAssetBridge is Ownable {
             externalChainId
         ][depositRouter][depositId];
         require(depositInfo.status == Status.ABORTED, "EAB: bad state");
+        depositGenerations[externalChainId][depositRouter][depositId]++;
         depositInfo.status = Status.NONE;
         depositInfo.timestamp = block.timestamp;
         emit DepositReuseAuthorized(
@@ -1213,7 +1198,8 @@ contract record ExternalAssetBridge is Ownable {
             "EAB: bad state"
         );
         require(
-            authorizationDeadline > block.timestamp &&
+            authorizationNotBefore <= block.timestamp &&
+                authorizationDeadline > block.timestamp &&
                 authorizationDeadline >= authorizationNotBefore &&
                 authorizationDeadline <=
                 authorizationNotBefore +
@@ -1370,10 +1356,6 @@ contract record ExternalAssetBridge is Ownable {
             "EAB: reservation mismatch"
         );
         string normalizedExternalTxHash = externalTxHash.normalizeHex();
-        require(
-            withdrawalByExternalTxHash[normalizedExternalTxHash] == 0,
-            "EAB: duplicate external tx"
-        );
         _requireSettlementAttestations(
             getWithdrawalReleaseDigest(
                 withdrawalId,
@@ -1387,9 +1369,6 @@ contract record ExternalAssetBridge is Ownable {
         withdrawal.status = Status.COMPLETED;
         withdrawal.externalTxHash = normalizedExternalTxHash;
         withdrawal.timestamp = block.timestamp;
-        withdrawalByExternalTxHash[
-            normalizedExternalTxHash
-        ] = withdrawalId;
 
         emit WithdrawalCompleted(
             withdrawalId,
@@ -1424,7 +1403,6 @@ contract record ExternalAssetBridge is Ownable {
             withdrawal.reservationId == normalizedReservationId,
             "EAB: reservation mismatch"
         );
-        withdrawal.status = Status.CANCELLED;
         withdrawal.cancellationTxHash = cancellationTxHash.normalizeHex();
         withdrawal.timestamp = block.timestamp;
 
@@ -1435,14 +1413,16 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
-    function attestWithdrawalRefund(uint256 withdrawalId) external {
+    function attestWithdrawalRefund(uint256 withdrawalId, bytes32 expectedDigest) external {
         WithdrawalInfo withdrawal = withdrawals[withdrawalId];
         require(
             withdrawal.status == Status.READY || withdrawal.status == Status.CANCELLED,
             "EAB: not refundable"
         );
         require(block.timestamp > withdrawal.authorizationDeadline, "EAB: authorization active");
-        _recordSettlementAttestation(getWithdrawalRefundDigest(withdrawalId));
+        bytes32 digest = getWithdrawalRefundDigest(withdrawalId);
+        require(digest == expectedDigest, "EAB: stale refund digest");
+        _recordSettlementAttestation(digest);
     }
 
     function getWithdrawalRefundDigest(uint256 withdrawalId) public view returns (bytes32) {
@@ -1469,12 +1449,11 @@ contract record ExternalAssetBridge is Ownable {
         ];
         bool cancelled =
             withdrawal.status == Status.CANCELLED;
-        bool readyWithoutReservation =
+        bool expiredReady =
             withdrawal.status == Status.READY &&
-            withdrawal.reservationId.length == 0 &&
             block.timestamp > withdrawal.authorizationDeadline;
         require(
-            cancelled || readyWithoutReservation,
+            cancelled || expiredReady,
             "EAB: not refundable"
         );
 
@@ -1513,7 +1492,7 @@ contract record ExternalAssetBridge is Ownable {
             require(
                 block.timestamp >=
                     withdrawal.requestedAt + WITHDRAWAL_ABORT_DELAY,
-                "EAB: wait 48h"
+                "EAB: withdrawal abort delay not elapsed"
             );
         }
 
@@ -1563,10 +1542,11 @@ contract record ExternalAssetBridge is Ownable {
         );
         return keccak256(
             abi.encode(
-                keccak256("EAB_DEPOSIT_SETTLEMENT_V1"),
+                keccak256("EAB_DEPOSIT_SETTLEMENT_V2"),
                 block.chainid,
                 address(this),
                 settlementVerifierSetVersion,
+                depositGenerations[externalChainId][depositRouter][depositId],
                 sourceHash,
                 destinationHash
             )
@@ -1935,6 +1915,10 @@ contract record ExternalAssetBridge is Ownable {
         address to,
         uint256 amount
     ) internal returns (uint256 actualAmount) {
+        MintPolicy policy = mintPolicies[token];
+        _refillMintBucket(policy);
+        require(policy.capacity > 0 && policy.consumed <= policy.capacity && amount <= policy.capacity - policy.consumed, "EAB: mint limit exceeded");
+        policy.consumed += amount;
         uint256 balanceBefore = IERC20(token).balanceOf(to);
         Token(token).mint(to, amount);
         actualAmount = IERC20(token).balanceOf(to) - balanceBefore;

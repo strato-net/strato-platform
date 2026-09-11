@@ -1,11 +1,12 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { prepareRefund } = require('./refund-external-withdrawal');
+const { prepareRefund, collectRefundAttestations } = require('./refund-external-withdrawal');
 
 test('refund preflight checks confirmed state at the original vault and pins both networks', async () => {
   const bridge = '1'.repeat(40);
   const vaultAddress = '2'.repeat(40);
   const withdrawal = {
+    stratoSender: "5".repeat(40), stratoToken: "6".repeat(40), stratoTokenAmount: "100",
     status: 5, externalChainId: '1', externalToken: '3'.repeat(40),
     externalRecipient: '4'.repeat(40), externalTokenAmount: '100', authorizationDeadline: '1100',
   };
@@ -22,7 +23,7 @@ test('refund preflight checks confirmed state at the original vault and pins bot
       if (url.includes('-withdrawals?')) body = [{ value: withdrawal }];
       else if (url.includes('-withdrawalAuthorizations?')) body = [{ value: stored }];
       else if (url.includes('/metadata?')) body = { networkID: sourceId };
-      else body = [{ settlementVerifierThreshold: 2 }];
+      else body = [{ settlementVerifierThreshold: 2, settlementVerifierSetVersion: "3" }];
       return { ok: true, json: async () => body };
     },
     provider: {
@@ -61,8 +62,40 @@ test('refund preflight checks confirmed state at the original vault and pins bot
   withdrawal.status = 3;
   reservationStatus = 0;
   assert.equal((await check()).reservationStatus, 0);
-  withdrawal.reservationId = 'recorded';
-  await assert.rejects(check(), /not eligible/);
+  withdrawal.reservationId = '0xaaaa';
+  assert.equal((await check()).reservationStatus, 0);
   withdrawal.status = 4;
   await assert.rejects(check(), /not eligible/);
+});
+
+test('refund quorum requires the expected digest and indexed on-chain attestations', async () => {
+  const names = ['NODE_URL', 'CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS', 'CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS'];
+  const previous = names.map((name) => process.env[name]);
+  const originalFetch = global.fetch;
+  process.env.NODE_URL = 'https://source.example';
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = 'https://one.example,https://two.example';
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = 'one,two';
+  const evidence = { threshold: 2, digest: `0x${'a'.repeat(64)}`,
+    authorization: { destinationChainId: '1', sourceBridge: '1'.repeat(40) } };
+  let count = 1;
+  let responseDigest = evidence.digest;
+  global.fetch = async (url) => {
+    if (url.includes('/attest-refund')) return { ok: true, json: async () => ({
+      digest: responseDigest, transactionHash: 'recorded-tx', settlementAttestor: url.includes('one.') ? 'one' : 'two',
+    }) };
+    assert.equal(new URL(url).searchParams.get('or'), `(key.eq.${evidence.digest},key.eq.${evidence.digest.slice(2)})`);
+    return { ok: true, json: async () => [{ value: count }] };
+  };
+  try {
+    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /not recorded on chain/);
+    count = 'invalid';
+    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /not recorded on chain/);
+    count = 2;
+    await collectRefundAttestations(evidence, 'source-token');
+    responseDigest = `0x${'b'.repeat(64)}`;
+    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /expected source digest/);
+  } finally {
+    global.fetch = originalFetch;
+    names.forEach((name, i) => previous[i] === undefined ? delete process.env[name] : process.env[name] = previous[i]);
+  }
 });

@@ -1,3 +1,5 @@
+import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
+import { validateVerificationRpcEndpoints } from "../services/rpcService";
 import { logInfo, logError } from "./logger";
 import { Contract, JsonRpcProvider, Wallet } from "ethers";
 import {
@@ -131,6 +133,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
   }
   if (!process.env.DEPOSIT_OPERATIONS_TOKEN) {
     errors.push("Missing required environment variable: DEPOSIT_OPERATIONS_TOKEN");
+  }
+
+  for (const name of ["DEPOSIT_WEBHOOK_TOKEN", "DEPOSIT_OPERATIONS_TOKEN"]) {
+    if (process.env[name] && process.env[name]!.length < MIN_SERVICE_TOKEN_LENGTH) {
+      errors.push(`${name} must contain at least ${MIN_SERVICE_TOKEN_LENGTH} characters`);
+    }
   }
 
   // Initialize OAuth first (required for chain/asset validation)
@@ -394,34 +402,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
         } else {
           // Test RPC URL accessibility
           try {
-            const rpcUrl = process.env[envVarName]!;
-            const response = await fetch(rpcUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 1,
-                method: "eth_blockNumber",
-                params: [],
-              }),
-            });
-
-            if (!response.ok) {
-              throw new Error(
-                `HTTP ${response.status}: ${response.statusText}`,
-              );
-            }
-
-            const result = (await response.json()) as any;
-            if (result.error) {
-              throw new Error(
-                `RPC Error: ${result.error.message || JSON.stringify(result.error)}`,
-              );
-            }
+            await validateVerificationRpcEndpoints(externalChainId);
           } catch (error) {
-            warnings.push(
+            errors.push(
               `RPC URL for chain ${externalChainId} is not accessible: ${(error as Error).message}`,
             );
           }
@@ -638,7 +621,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
             );
           }
           const enabledSignerCount = signerStatuses.filter(Boolean).length;
-          if (Number(threshold) <= 0 || Number(threshold) > enabledSignerCount) {
+          if (Number(threshold) < 2 || Number(threshold) > enabledSignerCount) {
             errors.push(
               `External vault on chain ${chainId} requires ${String(threshold)} signatures; ${enabledSignerCount} independent signer(s) are enabled`,
             );

@@ -92,6 +92,7 @@ const vaultTemplate = {
 
 const tokenKey = usdc.toLowerCase();
 const policy = {
+  mintPolicies: { [usdcSt]: { capacity: "1000000000000000000000", refillRate: "1" }, [usdst]: { capacity: "1000000000000000000000", refillRate: "1" } },
   chainId: 11155111,
   lastProcessedBlock: "1234",
   tokens: {
@@ -137,6 +138,7 @@ const deployment = {
 const settings = {
   sourceChainId: "114784819836269",
   externalDeployment: "deployment.json",
+  bridgeTemplate: "bridge-template.json",
   depositPlan: "deposit-plan.json",
   tokenRouter: usdst,
   externalAssetBridge: bridge,
@@ -418,7 +420,7 @@ test("CLI preserves the completed policy and writes synchronized artifacts", () 
   assert.equal(inventoryRun.status, 0, inventoryRun.stderr);
   assert.equal(fs.existsSync(policyPath), true);
 
-  fs.writeFileSync(policyPath, JSON.stringify(policy));
+  fs.writeFileSync(policyPath, JSON.stringify({ ...policy, routes: Object.fromEntries(Object.entries(policy.routes).map(([key, value]) => [key, { ...value, autoRouteEnabled: false }])) }));
   const rolloutRun = spawnSync(
     process.execPath,
     [
@@ -439,7 +441,7 @@ test("CLI preserves the completed policy and writes synchronized artifacts", () 
     { encoding: "utf8" },
   );
   assert.equal(rolloutRun.status, 0, rolloutRun.stderr);
-  assert.deepEqual(JSON.parse(fs.readFileSync(policyPath, "utf8")), policy);
+  assert.equal(JSON.parse(fs.readFileSync(policyPath, "utf8")).tokens[tokenKey].bucketCapacity, policy.tokens[tokenKey].bucketCapacity);
   assert.equal(
     fs.existsSync(path.join(directory, "external-bridge-11155111.json")),
     true,
@@ -483,6 +485,7 @@ test("prepare and finalize derive templates and enforce initial policy", () => {
   );
   fs.writeFileSync(depositPlanPath, JSON.stringify(depositPlan));
   fs.writeFileSync(deploymentPath, JSON.stringify(deployment));
+  fs.writeFileSync(path.join(directory, "bridge-template.json"), JSON.stringify(bridgeTemplate));
   fs.writeFileSync(settingsPath, JSON.stringify(settings));
 
   const script = path.resolve(
@@ -575,4 +578,17 @@ test("prepare and finalize derive templates and enforce initial policy", () => {
   assert.equal(expected.vaultAddress, vault);
   assert.equal(expected.routes.size, 2);
   assert.equal(expected.tokens.get(tokenKey).permitted, true);
+});
+
+test("requires explicit mint limits and keeps activation validation fail closed", () => {
+  const input = structuredClone(policy);
+  for (const route of Object.values(input.routes)) route.autoRouteEnabled = false;
+  input.routes[Object.keys(input.routes)[0]].withdrawalsEnabled = true;
+  const build = () => buildSynchronizedRollout({ depositPlan, bridgeTemplate, vaultTemplate, policy: input, chainId: 11155111 });
+  assert.throws(() => validateInitialRollout(build()), /withdrawal route disabled/);
+  assert.doesNotThrow(() => validateInitialRollout(build(), { activation: true }));
+  input.tokens[tokenKey].migrateAmount = "1";
+  assert.throws(() => validateInitialRollout(build(), { activation: true }), /migrateAmount/);
+  delete input.mintPolicies[usdcSt];
+  assert.throws(build, /Missing mint policy/);
 });

@@ -52,7 +52,7 @@ const RouterWidget = ({
         [
           ...bridgeableTokens
             .filter(
-              (route) => route.routeType === "standard" && route.enabled
+              (route) => route.routeType === "standard" && route.depositsEnabled
             )
             .map((route) => ({
               address: route.stratoToken,
@@ -103,7 +103,7 @@ const RouterWidget = ({
     availableNetworks.find(({ chainName }) => chainName === selectedNetwork) ??
     availableNetworks[0];
   const externalRoutes = bridgeableTokens.filter(
-    (route) => route.routeType === "standard" && route.enabled
+    (route) => route.routeType === "standard" && route.depositsEnabled
   );
   const externalRoute =
     externalRoutes.find((route) => route.id === externalRouteId) ??
@@ -214,6 +214,8 @@ const RouterWidget = ({
           amount,
           quote: compositeQuote.data,
           outputSymbol: tokenOut._symbol,
+          outputAddress: tokenOut.address,
+          slippageBps,
         });
         toast({
           title: "Deposit submitted",

@@ -1,3 +1,5 @@
+import type { ProposeTransactionProps } from "@safe-global/api-kit";
+
 // ---------------- Utility Types ----------------
 export type NonEmptyArray<T> = [T, ...T[]];
 
@@ -271,3 +273,9 @@ export type RecordedDepositReview = Pick<ActionDepositArgs,
   "externalSender" | "externalToken" | "externalTokenAmount" | "stratoRecipient" |
   "targetStratoToken" | "action" | "actionToken" | "minFinalOut"
 >;
+
+export interface PersistedWithdrawalReview {
+  reviewDigest: string;
+  approvalDeadline: string;
+  proposal: ProposeTransactionProps;
+}

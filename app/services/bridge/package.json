@@ -7,8 +7,8 @@
     "start": "ts-node src/index.ts",
     "start:verifier": "ts-node src/signer/index.ts",
     "dev": "nodemon src/index.ts",
-    "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/depositRecoveryService.test.js dist/services/depositStateService.test.js dist/services/externalBridgeWiring.test.js dist/services/withdrawalRecovery.test.js dist/services/routeQuoteService.test.js dist/services/verificationService.test.js dist/services/settlementAttestationService.test.js dist/signer/authorizationValidation.test.js dist/signer/settlementValidation.test.js dist/signer/verifierPolicy.test.js dist/utils/kmsSigner.test.js"
+    "build": "tsc --project ../../packages/shared-types/tsconfig.json && tsc",
+    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js dist/services/depositRecoveryService.test.js dist/services/depositStateService.test.js dist/services/externalBridgeWiring.test.js dist/services/withdrawalRecovery.test.js dist/services/routeQuoteService.test.js dist/services/verificationService.test.js dist/services/settlementAttestationService.test.js dist/signer/authorizationValidation.test.js dist/signer/settlementValidation.test.js dist/signer/verifierPolicy.test.js dist/signer/accessControl.test.js dist/signer/consensusProvider.test.js dist/services/safeReviewRecovery.test.js dist/utils/kmsSigner.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"
@@ -28,6 +28,7 @@
     "simple-oauth2": "^5.1.0"
   },
   "devDependencies": {
+    "@strato/shared-types": "file:../../packages/shared-types",
     "@types/bn.js": "^5.2.0",
     "@types/cors": "^2.8.18",
     "@types/estree": "^1.0.8",

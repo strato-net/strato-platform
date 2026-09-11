@@ -152,7 +152,7 @@ test("rejects an executor that is also an attestation signer", () => {
 test("rejects a threshold above the configured signer count", () => {
   assert.throws(
     () => config({ attestationThreshold: 3 }),
-    /attestationThreshold must be between 1 and the configured signer count/,
+    /attestationThreshold must be between 2 and the configured signer count/,
   );
 });
 
@@ -195,4 +195,8 @@ test("rejects zero buckets, excessive refill rates, and withdrawals larger than 
   delete legacy.bucketCapacity;
   delete legacy.refillRate;
   assert.throws(() => config({ tokens: [legacy] }), /bucketCapacity/);
+});
+
+test("rejects a one-signer vault threshold", () => {
+  assert.throws(() => config({ attestationThreshold: 1 }), /attestationThreshold/);
 });

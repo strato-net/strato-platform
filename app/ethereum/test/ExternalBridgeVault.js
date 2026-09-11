@@ -488,4 +488,21 @@ describe("ExternalBridgeVault", function () {
       balanceBefore + ethers.parseEther("0.5"),
     );
   });
+  it("rejects a one-signer threshold and prevents signer count wrap", async function () {
+    await expect(vault.connect(attestationAdmin).setAttestationThreshold(1)).to.be.revertedWithCustomError(vault, "InvalidAttestationThreshold");
+    for (let i = 0; i < 253; i++) {
+      await vault.connect(attestationAdmin).setAttestationSigner(ethers.getAddress(ethers.toBeHex(1000 + i, 20)), true);
+    }
+    expect(await vault.attestationSignerCount()).to.equal(255);
+    await expect(vault.connect(attestationAdmin).setAttestationSigner(ethers.getAddress(ethers.toBeHex(9999, 20)), true)).to.be.revertedWithCustomError(vault, "InvalidAttestationThreshold");
+    expect(await vault.attestationSignerCount()).to.equal(255);
+  });
+
+  it("bounds authorization validity to thirty minutes", async function () {
+    await expect(vault.connect(attestationAdmin).setMaxAuthorizationValiditySeconds(1801))
+      .to.be.revertedWithCustomError(vault, "InvalidAuthorization");
+    await vault.connect(attestationAdmin).setMaxAuthorizationValiditySeconds(900);
+    expect(await vault.maxAuthorizationValiditySeconds()).to.equal(900);
+  });
+
 });

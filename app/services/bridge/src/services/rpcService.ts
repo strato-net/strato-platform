@@ -1,3 +1,5 @@
+import { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
+export { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
 import { JsonRpcProvider } from "ethers";
 import { fetch } from "../utils/api";
 import { getChainRpcUrl, getChainRpcUrls } from "../config";
@@ -20,26 +22,6 @@ export const closeChainProviders = (): void => {
   for (const provider of chainProviders.values()) provider.destroy();
   chainProviders.clear();
 };
-
-const normalizeHex = (value: unknown): unknown =>
-  typeof value === "string" && value.toLowerCase().startsWith("0x")
-    ? value.toLowerCase()
-    : value;
-
-export const receiptFingerprint = (receipt: any): string =>
-  JSON.stringify({
-    transactionHash: normalizeHex(receipt?.transactionHash),
-    blockHash: normalizeHex(receipt?.blockHash),
-    blockNumber: normalizeHex(receipt?.blockNumber),
-    status: normalizeHex(receipt?.status),
-    to: normalizeHex(receipt?.to),
-    logs: (receipt?.logs || []).map((log: any) => ({
-      address: normalizeHex(log.address),
-      topics: (log.topics || []).map(normalizeHex),
-      data: normalizeHex(log.data),
-      logIndex: normalizeHex(log.logIndex),
-    })),
-  });
 
 // Get current block number for a chain
 export const getCurrentBlockNumber = async (
@@ -159,15 +141,27 @@ export const getInternalTransactionsBatch = async (
     params: [ensureHexPrefix(txHash)],
   }));
 
-  const response: any[] = await fetch.post(getChainRpcUrl(chainId), batchRequest);
-  const result = new Map<string, any[]>();
-  if (Array.isArray(response)) {
-    response.forEach((item) => {
+  const providers = await Promise.all(getChainRpcUrls(chainId).map(async (url) => {
+    const response: any[] = await fetch.post(url, batchRequest);
+    if (!Array.isArray(response)) throw new Error("Invalid trace RPC response");
+    const results = new Map<string, any[]>();
+    for (const item of response) {
       const index = Number(item.id) - 1;
-      if (item?.result && index >= 0 && index < txHashes.length) {
-        result.set(txHashes[index], item.result || []);
+      if (item.error || !Array.isArray(item.result) || index < 0 || index >= txHashes.length || results.has(txHashes[index])) {
+        throw new Error("Missing, duplicate or failed trace RPC response");
       }
-    });
+      results.set(txHashes[index], item.result);
+    }
+    return results;
+  }));
+  const result = new Map<string, any[]>();
+  for (const hash of txHashes) {
+    const traces = providers.map((provider) => provider.get(hash));
+    if (traces.some((value) => !value)) throw new Error("Missing trace RPC response");
+    if (traces.some((value) => traceFingerprint(value!) !== traceFingerprint(traces[0]!))) {
+      throw new Error("Trace RPC disagreement");
+    }
+    result.set(hash, traces[0]!);
   }
   return result;
 };
@@ -180,4 +174,16 @@ export const isChainConfigured = (chainId: number): boolean => {
   } catch {
     return false;
   }
+};
+
+export const validateVerificationRpcEndpoints = async (chainId: number): Promise<void> => {
+  const urls = getChainRpcUrls(chainId);
+  if (new Set(urls.map((url) => new URL(url).hostname)).size < 2) {
+    throw new Error("At least two distinct verification RPC hosts are required");
+  }
+  await Promise.all(urls.map(async (url) => {
+    if (new URL(url).protocol !== "https:") throw new Error("Verification RPC must use HTTPS");
+    const result: any = await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] });
+    if (result.error || BigInt(result.result) !== BigInt(chainId)) throw new Error("Verification RPC chain ID mismatch");
+  }));
 };

@@ -98,26 +98,26 @@ Native withdrawal review delay and attestation validity are enforced by the nati
 
 The executor workload calls AWS KMS directly through workload identity and verifies each signature against `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` before broadcasting.
 
-Run each verifier independently with `npm run start:verifier`. Each process must use its own `VERIFIER_RPC_URL`, AWS workload identity (`KMS_KEY_ID`, `KMS_REGION`, `VAULT_AUTHORIZATION_SIGNER_ADDRESS`), local `VERIFIER_POLICY_PATH`, inbound `EXTERNAL_BRIDGE_VERIFIER_API_TOKEN`, and STRATO settlement-attestor OAuth account (`SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL`, `SETTLEMENT_ATTESTOR_CLIENT_ID`, `SETTLEMENT_ATTESTOR_CLIENT_SECRET`, `SETTLEMENT_ATTESTOR_BA_USERNAME`, `SETTLEMENT_ATTESTOR_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Each verifier independently validates chain evidence, source state, contract limits, and its local policy. Amounts above a local automatic limit require the existing on-chain review approval before signing. Decision logs include the local policy version and SHA-256 digest.
+Run each verifier independently with `npm run start:verifier`. Each process must use its own `VERIFIER_RPC_URL` plus comma-separated `VERIFIER_INDEPENDENT_RPC_URLS` (at least two distinct HTTPS hosts in total), AWS workload identity (`KMS_KEY_ID`, `KMS_REGION`, `VAULT_AUTHORIZATION_SIGNER_ADDRESS`), local `VERIFIER_POLICY_PATH`, inbound `EXTERNAL_BRIDGE_VERIFIER_API_TOKEN`, and STRATO settlement-attestor OAuth account (`SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL`, `SETTLEMENT_ATTESTOR_CLIENT_ID`, `SETTLEMENT_ATTESTOR_CLIENT_SECRET`, `SETTLEMENT_ATTESTOR_BA_USERNAME`, `SETTLEMENT_ATTESTOR_BA_PASSWORD`). Register three independent STRATO accounts with `ExternalAssetBridge.setSettlementVerifier` and configure threshold 2 before starting the bridge service. Each verifier independently validates chain evidence, source state, contract limits, and its local policy. Amounts above a local automatic limit require the existing on-chain review approval before signing. Decision logs include the local policy version and SHA-256 digest.
 
 Verifier deployments use `docker-compose.bridge-signer.tpl.yml`. Deploy one isolated stack per verifier organization with a distinct RPC provider, AWS account or role, KMS key, policy file, API token, and HTTPS endpoint. Finalization generates `external-bridge-verifier-policy-<chainId>-1.json` through `-3.json`, each bound to one STRATO settlement attestor and one shared baseline hash. Each organization may tighten its local limits but must not raise them above the contract policy.
 
-`VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit the settlement transaction.
+`VERIFIER_CONFIRMATIONS` controls the external-chain confirmation depth independently enforced by that verifier. Configure it per chain and risk policy. Deposit minting and withdrawal finalization require the on-chain verifier threshold; after that threshold is present, any STRATO account may submit plain settlement, with separate AdminRegistry approval required for recorded reviews.
 
-For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. At least two of the three configured signer RPCs must support this method for settlement, and all three should support it to preserve one-verifier fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
+For native ETH deposits, each verifier calls `trace_transaction` to prove the DepositRouter-to-vault custody movement. Every RPC endpoint used by a verifier must support this method. At least two independent verifiers must pass both-provider verification; configure all three for fault tolerance. Verify trace support with a real DepositRouter ETH transaction before enabling the route.
 
 Routine non-native withdrawals are marked ready on STRATO, reserved in the route-local vault, released externally, and only then finalized and burned on STRATO. Large withdrawals require an executed Safe approval over their stable review digest before receiving a fresh release authorization.
 Expired reservations are cancelled on the original destination vault and recorded on STRATO. Refunds additionally require threshold verifier attestations of confirmed external non-payment; an operator cancellation record alone is insufficient. `npm run refund:external-withdrawal` from `app/contracts` verifies evidence in dry-run mode, and collects `/v1/attest-refund` attestations before submitting a governance vote in execute mode. Configure `SOURCE_CHAIN_ID`, the external RPC URL and positive confirmation count for the refund tool, plus HTTPS verifier URLs/API tokens when executing. Verifier startup checks actual external and STRATO RPC network identities; mismatches fail closed.
 
 #### Optional
 - `CHAIN_${chainId}_WS_RPC_URL` - WebSocket RPC used for immediate deposit detection
-- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent receipt-verification RPCs; the primary `CHAIN_${chainId}_RPC_URL` must support `trace_transaction` for native ETH deposits
-- `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` - Per-chain confirmation count (defaults to `0` in development; production requires an explicit positive value)
+- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent verification RPCs; configure at least one in addition to the primary. Startup requires two distinct HTTPS provider hosts and matching chain IDs. Receipts and native ETH traces must agree across every configured provider; all must support `trace_transaction` for native ETH deposits.
+- `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` - Per-chain confirmation count (an explicit positive value is required in every environment)
 - `DEPOSIT_MISSING_RECEIPT_GRACE_MS` - Time a missing/lagging receipt remains retryable before review (defaults to `300000`)
 - `DEPOSIT_SETTLEMENT_RETRY_GRACE_MS` - Time a verified deposit settlement may retry before terminal quarantine/review (defaults to `900000`)
 - `DEPOSIT_REVIEW_RECORD_RETRY_MS` - Minimum interval between STRATO review-recording attempts (defaults to `60000`; persisted reviews retry independently of log reconciliation)
-- `DEPOSIT_WEBHOOK_TOKEN` - Required outside development/test for deposit webhook authentication
-- `DEPOSIT_OPERATIONS_TOKEN` - Required outside development/test to confirm reviewed deposits through the operator endpoint
+- `DEPOSIT_WEBHOOK_TOKEN` - Required in every environment for deposit webhook authentication
+- `DEPOSIT_OPERATIONS_TOKEN` - Required in every environment to confirm reviewed deposits through the operator endpoint
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
 - `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
 - `SENDGRID_API_KEY` - SendGrid API key for sending emails
@@ -126,7 +126,7 @@ Expired reservations are cancelled on the original destination vault and recorde
 
 `data/pendingExternalDeposits.json` is a single-writer cache. Writes use atomic replacement. Pending deposits and reviews not yet recorded on STRATO hold the scan cursor before their external block, so their events can be replayed after cache loss. Retry grace periods restart when observations are reconstructed.
 
-Each chain poll reconciles STRATO pending reviews through Cirrus. Missing observations are reconstructed from external receipts and checked against the recorded identity, amounts, recipient and action. Recovered records remain in review; they are never automatically approved. Manual confirmation can perform the same reconstruction and still requires current STRATO review status, custody verification and verifier attestations. Unavailable or inconsistent receipts are retried without approving the deposit.
+Each chain poll reconciles STRATO pending reviews through Cirrus. Missing observations are reconstructed from external receipts and checked against the recorded identity, amounts, recipient and action. Recovered records remain in review; they are never automatically approved. Manual confirmation can perform the same reconstruction and still requires current STRATO review status, a digest-bound AdminRegistry approval, custody verification and verifier attestations. Unavailable or inconsistent receipts are retried without approving the deposit.
 
 This does not recover old unrecorded reviews if an earlier service version already advanced the cursor beyond them. Preserve existing cache files during rollout; those cases need an explicit historical replay. A corrupt committed JSON file still fails closed and must be preserved for investigation before recovery. No additional database is required.
 
@@ -155,6 +155,12 @@ Build and run the service:
 ```bash
 npm run build
 npm start
+```
+
+Build the production image from the repository root (the `app` context includes shared types):
+
+```bash
+docker build -f app/services/bridge/Dockerfile -t bridge:local app
 ```
 
 ## Architecture
@@ -291,3 +297,21 @@ The service logs important events and errors using Winston logger:
 MIT 
 
 Withdrawal capacity is enforced by per-token buckets in the external vault for both routine and Safe-approved withdrawals. The service checks `withdrawalCapacity` before issuing a new authorization, leaves capacity-constrained requests pending, and logs available units and estimated retry seconds. Outstanding reservations hold capacity until release or cancellation; only released consumption refills. Existing READY withdrawals continue through the original expiry/recovery flow. Configure `bucketCapacity` in raw token units and `refillRate` in raw units per second; Safe policy changes remain immediate.
+
+Fresh-deployment security configuration:
+- STRATO mint policies are mandatory per representation token and shared by every deposit path. Apply the generated `setMintPolicy` AdminRegistry votes before activation.
+- Deploy the matching STRATO contract and verifier together: deposit attestations carry `expectedGeneration`; refund attestations carry `expectedDigest`. The verifier obtains these from the source state it validates.
+- Cancellation recording is metadata only. A released withdrawal can still finalize; refunds continue to require confirmed external non-payment and the on-chain verifier threshold.
+- Cirrus review reconciliation errors are logged without blocking external RPC discovery. A recovered review cannot overwrite a locally settled record. Settlement tombstones remain until Cirrus indexes completion; reconciliation also clears recovered reviews once indexed completion is observed.
+- The container runs as the `node` user (UID 1000). Give its persistent data/log mounts write access for that UID before starting it.
+
+
+Safe review proposals persist in `data/safe-reviews` before publication. Mount `data` persistently and run one writer. Recovery reuses the saved nonce, deadline, payload and Safe hash; service outages stop retry, while a confirmed 404 republishes the same signed transaction. An expired approval can generate a new proposal. Nonce allocation is serialized per chain/Safe and reserves all journaled nonces even before Safe indexing. A corrupt journal fails closed: preserve it and restore the verified signed payload from backup/Safe evidence before retrying; do not delete it to allocate a replacement nonce.
+
+Verifier, webhook and deposit-operations authentication use constant-time digest comparison before JSON parsing and require tokens of at least 32 characters. Each authentication scope limits authenticated requests to 120 per minute and failed authentication to 30 attempts per socket peer per minute (429 with Retry-After). Requests are limited to 32 KiB. The app-backend quote client is anonymous and never forwards the bridge operator token.
+
+Reviewed deposits require AdminRegistry approval of `approveReviewedDeposit(chainId, depositRouter, depositId, expectedDigest)`, using `getReviewedDepositDigest` for the current pending deposit. The approval binds its fields, verifier-set version and slot generation. Operator-created PENDING_REVIEW status is not approval. After governance quorum and verifier attestations, the operator endpoint can confirm; plain settlement remains permissionless only with both approvals present.
+
+Any withdrawal verifier's `409 manual_review` response causes Safe review instead of proceeding with other signatures. Policy files are checked against their recomputed baseline hash. Each verifier compares receipts, traces, contract reads and network identity across all configured RPCs, uses the slowest head for confirmations, and fails closed on disagreements or outages.
+
+New routes require 18-decimal STRATO representation tokens. Route governance grants only the required `mint`/`burn` permissions. Unpause the token before processing withdrawal refunds; token pause intentionally blocks escrow transfers. Authorization validity must match on STRATO and the vault (1–1800 seconds); the abort delay is capped at 172800 seconds. READY cannot use a future `notBefore`.

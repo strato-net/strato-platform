@@ -39,6 +39,13 @@ library ExternalBridgeTypes {
         uint256 manualReviewThreshold;
     }
 
+    struct MintPolicy {
+        uint256 capacity;
+        uint256 refillRate;
+        uint256 consumed;
+        uint256 lastRefillAt;
+    }
+
     struct DepositInfo {
         Status status;
         address externalSender;

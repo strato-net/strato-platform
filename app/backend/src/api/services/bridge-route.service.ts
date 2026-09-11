@@ -39,10 +39,8 @@ export const convertExternalToStratoAmount = (
   if (externalDecimals < 0 || externalDecimals > 18) {
     throw new Error("Unsupported external token decimals");
   }
-  const rebasedAmount = rebaseFactor
-    ? (amount * WAD) / BigInt(rebaseFactor)
-    : amount;
-  return rebasedAmount * 10n ** BigInt(18 - externalDecimals);
+  const scaledAmount = amount * 10n ** BigInt(18 - externalDecimals);
+  return rebaseFactor ? (scaledAmount * WAD) / BigInt(rebaseFactor) : scaledAmount;
 };
 
 const isRouteRebaseRequired = async (
@@ -82,6 +80,7 @@ export const getCompositeBridgeRouteQuote = async (
     (candidate) =>
       candidate.routeType === "standard" &&
       candidate.enabled &&
+      candidate.depositsEnabled === true &&
       normalizeAddress(candidate.externalToken) ===
         normalizeAddress(externalToken) &&
       normalizeAddress(candidate.stratoToken) ===

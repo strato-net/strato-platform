@@ -94,9 +94,11 @@ function buildPolicyTemplate(
   lastProcessedBlock = "REVIEW_REQUIRED",
 ) {
   const tokens = {};
+  const mintPolicies = {};
   const routes = {};
   for (const route of inventory) {
     const token = keyAddress(route.externalToken);
+    mintPolicies[keyAddress(route.stratoToken)] ||= { capacity: "REVIEW_REQUIRED", refillRate: "REVIEW_REQUIRED" };
     tokens[token] ||= {
       minDepositAmount: "REVIEW_REQUIRED",
       maxPerWithdrawal: "REVIEW_REQUIRED",
@@ -118,6 +120,7 @@ function buildPolicyTemplate(
   return {
     chainId: Number(chainId),
     lastProcessedBlock,
+    mintPolicies,
     tokens,
     routes,
   };
@@ -188,6 +191,7 @@ function buildRolloutTemplates({
     lastProcessedBlock,
     bridgeTemplate: {
       ...bridgeDefaults,
+      sourceChainId,
       tokenRouter: {
         ...bridgeDefaults.tokenRouter,
         address: tokenRouter.slice(2),
@@ -330,6 +334,8 @@ function buildSynchronizedRollout({
   if (Number(policy.chainId) !== Number(chainId)) {
     throw new Error(`Policy chainId must be ${chainId}`);
   }
+  const sourceChainId = uint(vaultTemplate.sourceChainId, "sourceChainId");
+  if (BigInt(sourceChainId) === 0n || (bridgeTemplate.sourceChainId != null && String(bridgeTemplate.sourceChainId) !== sourceChainId)) throw new Error("Source chain ID mismatch between templates");
   const inventory = collectInventory(depositPlan, chainId);
   const bridgeChain = selectedChain(
     bridgeTemplate,
@@ -453,8 +459,18 @@ function buildSynchronizedRollout({
     );
   });
 
+  const mintPolicies = [...new Set(inventory.map((route) => keyAddress(route.stratoToken)))].map((token) => {
+    const entry = policy.mintPolicies?.[token] || policy.mintPolicies?.[token.slice(2)];
+    if (!entry) throw new Error(`Missing mint policy for ${token}`);
+    const capacity = uint(entry.capacity, `mintPolicies.${token}.capacity`);
+    const refillRate = uint(entry.refillRate, `mintPolicies.${token}.refillRate`);
+    if (BigInt(capacity) === 0n || BigInt(refillRate) === 0n || BigInt(refillRate) > BigInt(capacity)) throw new Error(`Invalid mint policy for ${token}`);
+    return { token, capacity, refillRate };
+  });
   const bridgeConfig = {
     ...bridgeTemplate,
+    sourceChainId,
+    mintPolicies,
     chains: (bridgeTemplate.chains || []).map((chain) =>
       Number(chain.externalChainId) === Number(chainId)
         ? { ...chain, lastProcessedBlock, routes: bridgeRoutes }
@@ -522,11 +538,11 @@ function buildSynchronizedRollout({
   };
 }
 
-function validateInitialRollout(rollout) {
-  if (rollout.summary.withdrawalsEnabledCount !== 0) {
+function validateInitialRollout(rollout, { activation = false } = {}) {
+  if (!activation && rollout.summary.withdrawalsEnabledCount !== 0) {
     throw new Error("Initial rollout must keep every withdrawal route disabled");
   }
-  if (rollout.summary.autoRouteEnabledCount !== 0) {
+  if (!activation && rollout.summary.autoRouteEnabledCount !== 0) {
     throw new Error("Initial rollout must keep every AUTO_ROUTE route disabled");
   }
   const chain = rollout.vaultConfig.chains.find(

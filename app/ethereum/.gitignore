@@ -24,4 +24,6 @@ deployments/
 
 # IDE files
 .vscode/
-.idea/ 
+.idea/
+# Generated operational plans and Safe transaction batches
+scripts/output/
