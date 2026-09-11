@@ -38,6 +38,7 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
@@ -63,7 +64,7 @@ microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig e
 {-# NOINLINE microtimeCutoff #-}
 
 handleVmTasks ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
+  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m) =>
   ConduitT VmInEventBatch VmOutEvent m ()
 handleVmTasks = awaitForever $ \InBatch {..} -> do
   mpResps <- lift $ for mpNodesReqs $ \(o, srs) -> do
@@ -192,7 +193,7 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
   for_ mNewBlock $ yield . OutBlock
 
 processBlocks ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) =>
+  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m) =>
   [OutputBlock] ->
   ConduitT a VmOutEvent m ()
 processBlocks blocks = do
