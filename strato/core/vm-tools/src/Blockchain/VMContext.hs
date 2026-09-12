@@ -46,7 +46,6 @@ module Blockchain.VMContext
     dbs,
     state,
     stateDiffQueue,
-    mpNodeCache,
     mpPendingNodes,
     mpPendingBlockHashRoot,
     mpFlushInterval,
@@ -234,10 +233,7 @@ data Context = Context
   { _dbs :: ContextDBs,
     _state :: IORef ContextState,
     _stateDiffQueue :: (TQueue QueueEvent),
-    -- In-process Merkle Patricia node cache. Lookups hit here before LevelDB.
-    -- Inserts stay in RAM; SR verification uses the same nodes. Persistence is
-    -- durability, not the hash. Timed apply does not need a mid-run disk write.
-    _mpNodeCache :: IORef (HM.HashMap B.ByteString MP.NodeData),
+    -- Merkle Patricia nodes written this block, not yet in LevelDB; flushed as one batch.
     _mpPendingNodes :: IORef (HM.HashMap B.ByteString MP.NodeData),
     _mpPendingBlockHashRoot :: IORef (Maybe B.ByteString),
     _mpFlushInterval :: !Int,
@@ -395,7 +391,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _selfAddress = Address 0
             }
       que <- newTQueueIO
-      nodeCache <- newIORef HM.empty
       pendingNodes <- newIORef HM.empty
       pendingBlockHashRoot <- newIORef Nothing
       flushCount <- newIORef 0
@@ -404,7 +399,6 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               { _dbs = cdbs,
                 _state = cstate,
                 _stateDiffQueue = que,
-                _mpNodeCache = nodeCache,
                 _mpPendingNodes = pendingNodes,
                 _mpPendingBlockHashRoot = pendingBlockHashRoot,
                 _mpFlushInterval = 1,
@@ -475,7 +469,6 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       def
         & txRunResultsCache .~ cache
   que <- newTQueueIO
-  nodeCache <- newIORef HM.empty
   pendingNodes <- newIORef HM.empty
   pendingBlockHashRoot <- newIORef Nothing
   flushCount <- newIORef 0
@@ -484,7 +477,6 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       { _dbs = cdbs,
         _state = cstate,
         _stateDiffQueue = que,
-        _mpNodeCache = nodeCache,
         _mpPendingNodes = pendingNodes,
         _mpPendingBlockHashRoot = pendingBlockHashRoot,
         _mpFlushInterval = flushInterval,

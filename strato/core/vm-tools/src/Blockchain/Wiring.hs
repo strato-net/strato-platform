@@ -50,7 +50,6 @@ import Blockchain.VMContext
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
 import Control.Monad (join, void, when)
-import Data.Foldable (for_)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
@@ -187,34 +186,18 @@ instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Conte
   lookup _ sr@(MP.StateRoot key) = do
     pendingRef <- view mpPendingNodes <$> ask
     pending <- liftIO $ readIORef pendingRef
-    cacheRef <- view mpNodeCache <$> ask
-    cache <- liftIO $ readIORef cacheRef
     case HM.lookup key pending of
       Just nd -> pure (Just nd)
-      Nothing -> case HM.lookup key cache of
-        Just nd -> pure (Just nd)
-        Nothing -> do
-          mnd <- MP.genericLookupDB getStateDB sr
-          liftIO $ for_ mnd $ \nd -> modifyIORef' cacheRef (HM.insert key nd)
-          pure mnd
+      Nothing -> MP.genericLookupDB getStateDB sr
   insert _ (MP.StateRoot key) nd = do
-    cacheRef <- view mpNodeCache <$> ask
-    cache <- liftIO $ readIORef cacheRef
-    case HM.lookup key cache of
-      Just cached
-        | cached == nd -> pure ()
-        | otherwise -> error "MP node hash collision: cached node differs"
-      Nothing -> do
-        pendingRef <- view mpPendingNodes <$> ask
-        pending <- liftIO $ readIORef pendingRef
-        case HM.lookup key pending of
-          Just staged
-            | staged == nd -> pure ()
-            | otherwise -> error "MP node hash collision: pending node differs"
-          Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
+    pendingRef <- view mpPendingNodes <$> ask
+    pending <- liftIO $ readIORef pendingRef
+    case HM.lookup key pending of
+      Just staged
+        | staged == nd -> pure ()
+        | otherwise -> error "MP node hash collision: pending node differs"
+      Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
   delete _ sr@(MP.StateRoot key) = do
-    cacheRef <- view mpNodeCache <$> ask
-    liftIO $ modifyIORef' cacheRef (HM.delete key)
     pendingRef <- view mpPendingNodes <$> ask
     liftIO $ modifyIORef' pendingRef (HM.delete key)
     MP.genericDeleteDB getStateDB sr
@@ -245,10 +228,7 @@ flushPendingMPNodesNow = do
         ]
           ++ maybe [] (pure . DB.Put vmBlockHashRootKey) pendingRoot
       )
-    cacheRef <- view mpNodeCache <$> accessEnv
     liftIO $ do
-      modifyIORef' cacheRef $ \cache ->
-        HM.union pending $ if HM.size cache > 200000 then HM.empty else cache
       writeIORef pendingRef HM.empty
       writeIORef rootRef Nothing
     countRef <- view mpFlushCount <$> accessEnv
