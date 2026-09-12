@@ -156,7 +156,7 @@ function generate(context, outputDirectory) {
   const services = context.manifest.services;
   const bridgeEnvironment = {
     NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: context.settings.externalAssetBridge,
-    TOKEN_ROUTER: context.settings.tokenRouter, PRICE_ORACLE_ADDRESS: rollout.bridgeConfig.externalAssetBridge.priceOracle,
+    TOKEN_ROUTER: context.settings.tokenRouter, USDST_ADDRESS: rollout.bridgeConfig.externalAssetBridge.usdst, PRICE_ORACLE_ADDRESS: rollout.bridgeConfig.externalAssetBridge.priceOracle,
     SAFE_ADDRESS: chain.safeAddress,
     [`CHAIN_${rollout.chainId}_RPC_URL`]: reference(services.rpcUrlEnv),
     [`CHAIN_${rollout.chainId}_DEPOSIT_CONFIRMATIONS`]: services.confirmations,

@@ -171,7 +171,7 @@ test("keeps action enablement in a separate plan", () => {
   const actions = buildPlan(settings, "actions");
   assert.deepEqual(
     routes.map((call) => call.args._func),
-    ["setMintPolicy", "addWhitelist", "addWhitelist", "setChain", "setRoute", "setRouteRebaseRequired"],
+    ["addWhitelist", "addWhitelist", "setMintPolicy", "setChain", "setRoute", "setRouteRebaseRequired"],
   );
   assert.equal(routes[5].args._args[3].value, false);
   assert.deepEqual(
@@ -443,6 +443,12 @@ test("grants only required token permissions before enabling routes, without dup
   const plan = buildPlan(input, "routes");
   const grants = plan.filter((call) => call.args._func === "addWhitelist");
   assert.equal(grants.length, 2);
+  assert.deepEqual(plan.slice(0, grants.length), grants);
+  assert.equal(plan[grants.length].args._func, "setMintPolicy");
+  assert.equal(
+    plan.slice(grants.length).some((call) => call.args._func === "addWhitelist"),
+    false,
+  );
   for (const [index, func] of ["mint", "burn"].entries()) {
     assert.deepEqual(grants[index], {
       contract: settings.adminRegistry, method: "castVoteOnIssue",

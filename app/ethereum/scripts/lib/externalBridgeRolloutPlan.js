@@ -331,6 +331,9 @@ function buildSynchronizedRollout({
   policy,
   chainId,
 }) {
+  for (const [label, template] of [["Bridge", bridgeTemplate], ["Vault", vaultTemplate]]) {
+    if (template.chains?.length !== 1) throw new Error(`${label} template must contain exactly one selected chain; remove leftover example chains`);
+  }
   if (Number(policy.chainId) !== Number(chainId)) {
     throw new Error(`Policy chainId must be ${chainId}`);
   }

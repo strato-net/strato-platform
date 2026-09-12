@@ -244,6 +244,8 @@ function main() {
 
   const inventory = collectInventory(depositPlan, chainId);
   if (!args.policy) {
+    const existingPolicy = path.join(outputDirectory, `external-bridge-rollout-policy-${chainId}.json`);
+    if (fs.existsSync(existingPolicy)) throw new Error(`Policy already exists and was not overwritten: ${existingPolicy}`);
     const policyPath = writeJson(
       outputDirectory,
       `external-bridge-rollout-policy-${chainId}.json`,

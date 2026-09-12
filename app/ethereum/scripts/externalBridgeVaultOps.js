@@ -372,7 +372,7 @@ async function main() {
   console.log(JSON.stringify(summary, null, 2));
   console.log(`Output: ${outputPath}`);
   if (!args.apply) {
-    console.log("Dry run only. Re-run with --apply after reviewing the output.");
+    console.log("Dry run only. Import the generated Transaction Builder JSON into Safe and obtain approvals. --apply is a separate Safe API proposal workflow.");
   }
 }
 

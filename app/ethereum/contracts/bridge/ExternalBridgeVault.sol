@@ -630,7 +630,7 @@ contract ExternalBridgeVault is
     ) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
-        return "2.0.0";
+        return "1.0.0";
     }
 
     receive() external payable {}

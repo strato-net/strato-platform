@@ -145,3 +145,6 @@ app/contracts/.env.happy-eth-withdrawal
 # Generated rewards reconciliation state
 reconcile-*-activity-*.snapshot.json
 *.swp
+
+# Local verifier credentials
+/verifier.env

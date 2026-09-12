@@ -315,9 +315,6 @@ function buildPlan(settings, step) {
   }
 
   if (step === "routes") {
-    settings.mintPolicies.forEach((policy) => add(bridge.address, "setMintPolicy", [
-      parameter("address", policy.token), parameter("uint256", policy.capacity), parameter("uint256", policy.refillRate),
-    ]));
     requiredRoutePermissions(settings).forEach(({ token, func }) =>
       add(adminRegistry, "addWhitelist", [
         parameter("address", token),
@@ -325,6 +322,9 @@ function buildPlan(settings, step) {
         parameter("address", bridge.address),
       ]),
     );
+    settings.mintPolicies.forEach((policy) => add(bridge.address, "setMintPolicy", [
+      parameter("address", policy.token), parameter("uint256", policy.capacity), parameter("uint256", policy.refillRate),
+    ]));
     chains.forEach((chain) => {
       add(bridge.address, "setChain", [
         parameter("string", chain.chainName),

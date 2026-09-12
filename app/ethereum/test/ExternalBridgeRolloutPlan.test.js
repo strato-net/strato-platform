@@ -421,6 +421,12 @@ test("CLI preserves the completed policy and writes synchronized artifacts", () 
   assert.equal(fs.existsSync(policyPath), true);
 
   fs.writeFileSync(policyPath, JSON.stringify({ ...policy, routes: Object.fromEntries(Object.entries(policy.routes).map(([key, value]) => [key, { ...value, autoRouteEnabled: false }])) }));
+  const reviewedPolicy = fs.readFileSync(policyPath, "utf8");
+  const repeatedInventory = spawnSync(process.execPath, [script, "--deposit-plan", depositPlanPath,
+    "--chain", "11155111", "--output-dir", directory], { encoding: "utf8" });
+  assert.notEqual(repeatedInventory.status, 0);
+  assert.match(repeatedInventory.stderr, /Policy already exists/);
+  assert.equal(fs.readFileSync(policyPath, "utf8"), reviewedPolicy);
   const rolloutRun = spawnSync(
     process.execPath,
     [
@@ -591,4 +597,12 @@ test("requires explicit mint limits and keeps activation validation fail closed"
   assert.throws(() => validateInitialRollout(build(), { activation: true }), /migrateAmount/);
   delete input.mintPolicies[usdcSt];
   assert.throws(build, /Missing mint policy/);
+});
+
+test("rejects leftover template chains before building governance configuration", () => {
+  for (const field of ["bridgeTemplate", "vaultTemplate"]) {
+    const input = { depositPlan, bridgeTemplate: structuredClone(bridgeTemplate), vaultTemplate: structuredClone(vaultTemplate), policy, chainId: 11155111 };
+    input[field].chains.push({ ...input[field].chains[0], chainId: 1, externalChainId: "1" });
+    assert.throws(() => buildSynchronizedRollout(input), /exactly one selected chain/);
+  }
 });

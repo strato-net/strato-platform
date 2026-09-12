@@ -44,7 +44,7 @@ Operational controls:
 - Configure the bridge PriceOracle and mark the route rebase-required before enabling xStock. The flag is canonical for inbound division and outbound multiplication; required routes reject zero/missing factors.
 - The service never mutates the observed external amount for rebasing. Missing factors fail only the affected settlement or review-record attempt; the remaining chain batch continues.
 - TokenRouter-originated Forge and vault events are excluded from user activity and rewards attribution. The canonical ExternalAssetBridge completion attributes the deposit to its recipient without double counting.
-- DepositRouter 3.2 or newer is required for native ETH `AUTO_ROUTE`.
+- DepositRouter 3.2.0 is required for native ETH `AUTO_ROUTE`.
 
 
 Quote and service boundaries:
@@ -61,7 +61,9 @@ Follow-up TODO:
 
 ### Fresh deployment prerequisites
 
-Use reviewed addresses and chain IDs for the target environment. Deploy new TokenRouter and ExternalAssetBridge proxies under AdminRegistry, then install their implementations; creation and upgrades require the votes listed below. Deploy a new ExternalBridgeVault (version 2.0.0) and DepositRouter (3.2 or newer) using the external deployment tool and retain its deployment JSON.
+The operator runbook is [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md).
+
+Use reviewed addresses and chain IDs for the target environment. Deploy new TokenRouter and ExternalAssetBridge proxies under AdminRegistry, then install their implementations; creation and upgrades require the votes listed below. Deploy a new ExternalBridgeVault (version 1.0.0) and DepositRouter (exactly 3.2.0) using the external deployment tool and retain its deployment JSON.
 
 Run legacy route discovery without `--apply` and retain the resulting audit JSON as inventory only. Do not execute its discovery-time Safe batches: minimum deposits must come from the reviewed rollout policy. Keep the new DepositRouter paused until configuration, KMS/verifiers, live verification and activation gates pass. Existing legacy custody remains independent; every migration amount stays zero.
 
@@ -159,7 +161,7 @@ Complete `policy.mintPolicies` for every STRATO representation token:
 
 **AdminRegistry votes required:** the route plan includes `setMintPolicy` calls. Complete these votes before deposit activation; `verify-routes` checks the live policies. Use the same policy for a STRATO token shared by multiple external chains.
 
-All generator modes enforce rollout validation. The default `--stage initial` keeps withdrawals and AUTO_ROUTE disabled. For the fresh guide’s withdrawal-enabled configuration, explicitly use `--stage activation`; this allows withdrawal routes while retaining the zero-migration and disabled-AUTO_ROUTE checks. Generate configuration before activation and retain the pause/canary sequence. Regenerate artifacts after these contract/configuration changes.
+All generator modes enforce rollout validation. The default `--stage initial` keeps withdrawals and AUTO_ROUTE disabled. For the fresh guide’s withdrawal-enabled configuration, explicitly use `--stage activation`; this permits explicitly enabled withdrawal and AUTO_ROUTE routes while retaining the zero-migration check. Keep AUTO_ROUTE disabled in the fresh deployment policy; later enablement requires the activation gates below. Generate configuration before activation and retain the pause/canary sequence. Regenerate artifacts after these contract/configuration changes.
 
 Run each command from the repository root. Import your existing settings and
 reviewed policy once; omit `--policy` to create policy placeholders for review:
@@ -294,3 +296,23 @@ Tests:
 5. Set unique verifier, webhook and operations bearer tokens with at least 32 characters. Their authentication runs before request-body parsing and is rate limited.
 
 For each pending deposit requiring review: inspect the recorded deposit, read `getReviewedDepositDigest(chainId, depositRouter, depositId)`, then obtain **AdminRegistry quorum** for `approveReviewedDeposit(chainId, depositRouter, depositId, expectedDigest)`. After execution, run the existing deposit-confirm operation to obtain verifier attestations and settle. PENDING_REVIEW alone never grants approval; reuse or verifier-set changes require a fresh digest approval. Withdrawal verifier review dissent always routes to the existing Safe approval flow.
+
+### Operator configuration checks
+
+- Use exactly one selected chain in each rollout template. Edit the Sepolia example chain in place; never append a target chain while retaining the example. Inventory bootstrap refuses to overwrite an existing policy; resume with the completed policy.
+- Keep every fresh-deployment route autoRouteEnabled=false. Activation mode permits both withdrawals and AUTO_ROUTE; it does not override the reviewed flags. The policy mintPolicies map is converted into the generated bridge config array; never paste the map into the bridge template.
+- Install three distinct vault KMS signers at threshold 2. The generic vault plan also accepts two signers; that is not the three-verifier deployment topology.
+- The current external verification expects all seven roles on one Safe. This means shared pause/unpause authority, not independent role control; record governance acceptance of that model. A separate-role deployment requires corresponding verification changes.
+- Set the verified source-network USDST_ADDRESS for operator fee-balance checks; Compose forwards it. Keep STRATO_NATIVE_BRIDGE_ADDRESS empty for an EAB-only host. A combined native host needs its native representation addresses, RPCs and private-key secrets independently of EAB KMS configuration.
+- The EAB deploy targets are 1, 11155111, 8453, 84532, 59144 and 59141. Compose also forwards experimental Robinhood 46630 settings; that does not make it an EAB deploy target. Adding an environment variable for another chain does not forward it automatically.
+- CONFIRM_EXTERNAL_BRIDGE_DEPLOY is enforced for mainnet/base/linea execution. Import vault Transaction Builder JSON manually in this procedure; --apply instead proposes through the Safe API.
+
+### Deployment environment files
+
+Create app/ethereum/.env from app/ethereum/env.example and app/contracts/.env from app/contracts/.env.sample without overwriting existing files. The Ethereum example includes deployment paths, chain IDs, recorded addresses, stage/approval inputs, RPC/explorer settings, chain roles and vault-tool identities. Edit existing entries; do not duplicate keys. Keep PRIVATE_KEY blank for tests, supply it only for deployment, then clear it. Use full KMS key ARNs and unique verifier tokens of at least 32 characters.
+
+Run commands from the repository root. Load app/ethereum/.env inside each deployment command subshell. STRATO commands then load app/contracts/.env, so the source administrator’s NODE_URL and OAuth credentials take precedence. Keep secrets in protected files, never in Git; quote shell-sensitive values and use literal absolute paths. Policies, manifests and Safe transactions remain JSON.
+
+Runtime hosts use app/services/bridge/.env; each verifier host uses its own verifier.env at the repository root. Pass those files directly through Compose --env-file in a fresh shell. Never source the deployment env into a service shell: inherited values override Compose settings. No deployment env or administrator credentials are needed on the service hosts.
+
+The guide supplies app/services/bridge/compose.override.yml binding BRIDGE_DATA_DIRECTORY from Runtime .env to /app/data with create_host_path=false. Mount the persistent disk first and include the override with every Runtime Compose command. TLS requires ssl=true, sslCertFileType=pem, ssl/certs/server.pem and ssl/private/server.key under the repository root. Verifier policies must be readable by UID 1000; host env files remain mode 600.
