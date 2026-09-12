@@ -14,6 +14,7 @@ module Blockchain.DB.MemAddressStateDB
     runNewMemAddressStateDB,
     HasMemAddressStateDB (..),
     AddressStateModification (..),
+    DirtyFlag (..),
     getAddressStateMaybe,
     putAddressState,
     putAddressStates,
@@ -81,11 +82,17 @@ instance Format AddressStateModification where
   format (ASModification addressState) = "Address Modified:\n" ++ format addressState
   format ASDeleted = "Address Deleted"
 
+-- | Whether a block-map entry must be written to the trie at flush.  Values
+-- written by a transaction are Dirty; values read from the trie are Clean.
+data DirtyFlag = Clean | Dirty deriving (Show, Eq, Generic)
+
+instance NFData DirtyFlag
+
 class HasMemAddressStateDB m where
   getAddressStateTxDBMap :: m (M.Map Address AddressStateModification)
   putAddressStateTxDBMap :: M.Map Address AddressStateModification -> m ()
-  getAddressStateBlockDBMap :: m (M.Map Address AddressStateModification)
-  putAddressStateBlockDBMap :: M.Map Address AddressStateModification -> m ()
+  getAddressStateBlockDBMap :: m (M.Map Address (DirtyFlag, AddressStateModification))
+  putAddressStateBlockDBMap :: M.Map Address (DirtyFlag, AddressStateModification) -> m ()
 
 getAddressStateMaybe ::
   (MonadIO m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
@@ -99,17 +106,20 @@ getAddressStateMaybe address = do
     Nothing -> do
       theBMap <- getAddressStateBlockDBMap
       case M.lookup address theBMap of
-        Just (ASModification addressState) -> return $ Just addressState
-        Just ASDeleted -> return $ Just blankAddressState
+        Just (_, ASModification addressState) -> return $ Just addressState
+        Just (_, ASDeleted) -> return $ Just blankAddressState
         Nothing -> do
           root <- getStateRoot Nothing
           cache <- liftIO $ readIORef accountReadCache
-          case M.lookup (root, address) cache of
+          result <- case M.lookup (root, address) cache of
             Just result -> pure result
             Nothing -> do
               result <- DB.getAddressStateMaybe address
               liftIO $ cacheAccountRead (root, address) result
               pure result
+          forM_ result $ \addressState ->
+            putAddressStateBlockDBMap $ M.insert address (Clean, ASModification addressState) theBMap
+          return result
 
 putAddressState ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
@@ -134,7 +144,7 @@ flushMemAddressStateTxToBlockDB ::
 flushMemAddressStateTxToBlockDB = do
   txMap <- getAddressStateTxDBMap
   blkMap <- getAddressStateBlockDBMap
-  putAddressStateBlockDBMap $ txMap `M.union` blkMap
+  putAddressStateBlockDBMap $ M.map (Dirty,) txMap `M.union` blkMap
   putAddressStateTxDBMap M.empty
 
 flushMemAddressStateDB ::
@@ -144,8 +154,9 @@ flushMemAddressStateDB = do
   theMap <- getAddressStateBlockDBMap
   forM_ (M.toList theMap) $ \(address, modification) ->
     case modification of
-      ASModification addressState -> DB.putAddressState address addressState
-      ASDeleted -> DB.deleteAddressState address
+      (Dirty, ASModification addressState) -> DB.putAddressState address addressState
+      (Dirty, ASDeleted) -> DB.deleteAddressState address
+      (Clean, _) -> return ()
   putAddressStateBlockDBMap M.empty
 
 deleteAddressState ::

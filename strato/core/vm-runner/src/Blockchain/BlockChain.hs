@@ -360,7 +360,7 @@ sendNewActionMessage b trrs = do
         fmap (ActionData . SolidVMDiff)
         $ M.fromListWith M.union
         [ (addr, M.singleton path val)
-        | ((addr, path), val) <- M.toList theMap
+        | ((addr, path), (_, val)) <- M.toList theMap
         ]
 
       action :: Action

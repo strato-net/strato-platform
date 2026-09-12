@@ -175,9 +175,9 @@ makeLenses ''ContextDBs
 
 data MemDBs = MemDBs
   { _stateTxMap :: !(M.Map Address AddressStateModification),
-    _stateBlockMap :: !(M.Map Address AddressStateModification),
+    _stateBlockMap :: !(M.Map Address (DirtyFlag, AddressStateModification)),
     _storageTxMap :: !(M.Map (Address, StoragePath) BasicValue),
-    _storageBlockMap :: !(M.Map (Address, StoragePath) BasicValue),
+    _storageBlockMap :: !(M.Map (Address, StoragePath) (DirtyFlag, BasicValue)),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
     _currentBlock :: !(Maybe CurrentBlockHash)
   }

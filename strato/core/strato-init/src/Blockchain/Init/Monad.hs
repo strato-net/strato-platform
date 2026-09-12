@@ -29,7 +29,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
@@ -48,9 +47,9 @@ data SetupDBs = SetupDBs
     hashDB :: HashDB,
     codeDB :: CodeDB,
     localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
-    localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
+    localStorageBlock :: IORef (M.Map (Address, StoragePath) (DirtyFlag, BasicValue)),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
+    localAddressStateBlock :: IORef (M.Map Address (DirtyFlag, AddressStateModification))
   }
 
 type HasDBs m = Mod.Accessible SetupDBs m
@@ -70,8 +69,10 @@ runSetupDBMInDir baseDir mv = do
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
-  [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
-  [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
+  m1 <- liftIO $ newIORef M.empty
+  m2 <- liftIO $ newIORef M.empty
+  m3 <- liftIO $ newIORef M.empty
+  m4 <- liftIO $ newIORef M.empty
   runReaderT mv $ SetupDBs sdb srRef hdb cdb m1 m2 m3 m4
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where

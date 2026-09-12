@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -72,8 +73,8 @@ type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 class Monad m => HasMemRawStorageDB m where
   getMemRawStorageTxDB :: m (M.Map RawStorageKey RawStorageValue)
   putMemRawStorageTxMap :: M.Map RawStorageKey RawStorageValue -> m ()
-  getMemRawStorageBlockDB :: m (M.Map RawStorageKey RawStorageValue)
-  putMemRawStorageBlockMap :: M.Map RawStorageKey RawStorageValue -> m ()
+  getMemRawStorageBlockDB :: m (M.Map RawStorageKey (DirtyFlag, RawStorageValue))
+  putMemRawStorageBlockMap :: M.Map RawStorageKey (DirtyFlag, RawStorageValue) -> m ()
 
 type FullRawStorage m =
   ( HasMemAddressStateDB m,
@@ -122,10 +123,10 @@ genericLookupRawStorageDB key = do
     Nothing -> do
       theBMap <- getMemRawStorageBlockDB
       case M.lookup key theBMap of
-        Just val -> return $ Just val
+        Just (_, val) -> return $ Just val
         Nothing -> do
           mVal <- getRawStorageKeyValDBMaybe key
-          for_ mVal $ \value -> putMemRawStorageTxMap $ M.insert key value theMap
+          for_ mVal $ \value -> putMemRawStorageBlockMap $ M.insert key (Clean, value) theBMap
           return mVal
 
 genericLookupWithDefaultRawStorageDB ::
@@ -136,18 +137,7 @@ genericLookupWithDefaultRawStorageDB ::
   ) =>
   RawStorageKey ->
   m RawStorageValue
-genericLookupWithDefaultRawStorageDB key = do
-  theMap <- getMemRawStorageTxDB
-  case M.lookup key theMap of
-    Just val -> return val
-    Nothing -> do
-      theBMap <- getMemRawStorageBlockDB
-      case M.lookup key theBMap of
-        Just val -> return val
-        Nothing -> do
-          value <- getRawStorageKeyValDB key
-          putMemRawStorageTxMap $ M.insert key value theMap
-          return value
+genericLookupWithDefaultRawStorageDB key = maybe def id <$> genericLookupRawStorageDB key
 
 genericInsertRawStorageDB ::
   HasMemRawStorageDB m =>
@@ -181,7 +171,7 @@ flushMemRawStorageTxDBToBlockDB :: HasMemRawStorageDB m => m ()
 flushMemRawStorageTxDBToBlockDB = do
   txMap <- getMemRawStorageTxDB
   blkMap <- getMemRawStorageBlockDB
-  putMemRawStorageBlockMap $ txMap `M.union` blkMap
+  putMemRawStorageBlockMap $ M.map (Dirty,) txMap `M.union` blkMap
   putMemRawStorageTxMap M.empty
 
 flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
@@ -189,7 +179,7 @@ flushMemRawStorageDB = do
   theMap <- getMemRawStorageBlockDB
 
   let changesByAddress :: Map Address [(StoragePath, RawStorageValue)]
-      changesByAddress = M.fromListWith (++) $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList theMap
+      changesByAddress = M.fromListWith (++) [(a, [(k, v)]) | ((a, k), (Dirty, v)) <- M.toList theMap]
 
   forM_ (M.toList changesByAddress) $ \(a, changes) ->
     putAllRawStorageKeyValForAddress a changes
@@ -269,15 +259,6 @@ getRawStorageKeyValDBMaybe (owner, key) = do
         result <- fmap rlpDecode <$> MP.getKeyVal cr (N.EvenNibbleString $ unparsePath key)
         liftIO $ cacheStorageRead (cr, key) result
         pure result
-
-getRawStorageKeyValDB ::
-  ( MonadIO m,
-    (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
-  ) =>
-  RawStorageKey ->
-  m RawStorageValue
-getRawStorageKeyValDB key = maybe def id <$> getRawStorageKeyValDBMaybe key
 
 getAllRawStorageKeyValsDB :: FullRawStorage m => Address -> m [(MP.Key, RawStorageValue)]
 getAllRawStorageKeyValsDB owner = do
