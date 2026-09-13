@@ -1,0 +1,28 @@
+{
+  "sourceChainId": "REVIEW_REQUIRED",
+  "externalDeployment": "./external-bridge-deployment.json",
+  "depositPlan": "./deposit-plan.json",
+  "tokenRouter": "REVIEW_REQUIRED",
+  "externalAssetBridge": "REVIEW_REQUIRED",
+  "bridgeOperator": "REVIEW_REQUIRED",
+  "guardian": "REVIEW_REQUIRED",
+  "settlementVerifiers": [
+    "REVIEW_REQUIRED",
+    "REVIEW_REQUIRED",
+    "REVIEW_REQUIRED"
+  ],
+  "dependencies": {
+    "adminRegistry": "REVIEW_REQUIRED",
+    "poolFactory": "REVIEW_REQUIRED",
+    "poolV3Factory": "REVIEW_REQUIRED",
+    "directMintPsm": "REVIEW_REQUIRED",
+    "metalForge": "REVIEW_REQUIRED",
+    "saveUsdstVault": "REVIEW_REQUIRED",
+    "yieldVaults": [
+      "REVIEW_REQUIRED"
+    ],
+    "tokenFactory": "REVIEW_REQUIRED",
+    "usdst": "REVIEW_REQUIRED",
+    "priceOracle": "REVIEW_REQUIRED"
+  }
+}

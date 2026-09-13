@@ -25,15 +25,62 @@ function writeJson(file, value) {
   fs.renameSync(temporary, file);
 }
 
+function loadBridgeDefaults(settings, directory) {
+  if (settings.dependencies && settings.bridgeTemplate) {
+    throw new Error("Use settings.dependencies or settings.bridgeTemplate, not both");
+  }
+  if (settings.dependencies) {
+    const dependencies = settings.dependencies;
+    const required = [
+      "adminRegistry", "poolFactory", "poolV3Factory", "directMintPsm",
+      "metalForge", "saveUsdstVault", "yieldVaults", "tokenFactory", "usdst",
+      "priceOracle",
+    ];
+    const missing = required.filter((name) =>
+      dependencies[name] === undefined ||
+      dependencies[name] === null ||
+      dependencies[name] === "",
+    );
+    if (missing.length) {
+      throw new Error(`settings.dependencies requires ${missing.join(", ")}`);
+    }
+    if (!Array.isArray(dependencies.yieldVaults)) {
+      throw new Error("settings.dependencies.yieldVaults must be an array");
+    }
+    return {
+      adminRegistry: dependencies.adminRegistry,
+      tokenRouter: {
+        poolFactory: dependencies.poolFactory,
+        poolV3Factory: dependencies.poolV3Factory,
+        directMintPsm: dependencies.directMintPsm,
+        metalForge: dependencies.metalForge,
+        saveUsdstVault: dependencies.saveUsdstVault,
+        yieldVaults: dependencies.yieldVaults,
+      },
+      externalAssetBridge: {
+        tokenFactory: dependencies.tokenFactory,
+        usdst: dependencies.usdst,
+        priceOracle: dependencies.priceOracle,
+      },
+    };
+  }
+  if (!settings.bridgeTemplate) {
+    throw new Error("settings.dependencies is required");
+  }
+  settings.bridgeTemplate = path.resolve(directory, settings.bridgeTemplate);
+  return readJson(settings.bridgeTemplate);
+}
+
 function initializeManifest(settingsPath, policyPath, manifestPath) {
   if (fs.existsSync(manifestPath)) throw new Error("Manifest already exists; it was not overwritten");
   const settings = readJson(settingsPath);
-  for (const name of ["externalDeployment", "depositPlan", "bridgeTemplate"]) {
+  for (const name of ["externalDeployment", "depositPlan"]) {
     if (!settings[name]) throw new Error(`settings.${name} is required`);
     settings[name] = path.resolve(path.dirname(settingsPath), settings[name]);
   }
+  const bridgeDefaults = loadBridgeDefaults(settings, path.dirname(settingsPath));
   const deployment = readJson(settings.externalDeployment);
-  const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults: readJson(settings.bridgeTemplate) });
+  const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults });
   const inventory = collectInventory(readJson(settings.depositPlan), templates.chainId);
   const manifest = {
     schemaVersion: 1,
@@ -72,12 +119,23 @@ function loadManifest(file, stage = "initial") {
   for (const verifier of services.verifiers) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(verifier.tokenEnv || "")) throw new Error("Verifier tokenEnv must name an environment variable");
   }
+  if (services.verifiers.length) {
+    if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) {
+      throw new Error("services.confirmations must be a positive integer");
+    }
+    services.verifiers.forEach((verifier, index) => {
+      const confirmations = verifier.confirmations ?? services.confirmations;
+      if (!Number.isSafeInteger(confirmations) || confirmations < services.confirmations) {
+        throw new Error(`services.verifiers[${index}].confirmations must be an integer at least services.confirmations`);
+      }
+    });
+  }
   if (typeof manifest.settings?.sourceChainId !== "string") throw new Error("settings.sourceChainId must be a decimal string");
   const settings = { ...manifest.settings };
-  for (const name of ["externalDeployment", "depositPlan", "bridgeTemplate"]) settings[name] = path.resolve(path.dirname(file), settings[name]);
+  for (const name of ["externalDeployment", "depositPlan"]) settings[name] = path.resolve(path.dirname(file), settings[name]);
   const deployment = readJson(settings.externalDeployment);
   const depositPlan = readJson(settings.depositPlan);
-  const defaults = readJson(settings.bridgeTemplate);
+  const defaults = loadBridgeDefaults(settings, path.dirname(file));
   const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults: defaults });
   const signers = manifest.authorizationSigners || [];
   if (signers.length !== 0 && (signers.length !== 3 || new Set(signers.map(address)).size !== 3 || signers.some((signer) => !ethers.isAddress(signer)))) {
@@ -172,13 +230,14 @@ function generate(context, outputDirectory) {
   saveEnv("bridge.env.template", bridgeEnvironment);
   rollout.verifierPolicies.forEach((policy, index) => {
     const prefix = `VERIFIER_${index + 1}`;
+    const verifier = services.verifiers[index];
     saveEnv(`verifier-${index + 1}.env.template`, {
       BRIDGE_IMAGE: reference("BRIDGE_IMAGE"), PORT: 3004, SOURCE_CHAIN_ID: policy.sourceChainId,
       STRATO_NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: policy.sourceBridge,
       DESTINATION_CHAIN_ID: policy.destinationChainId, DESTINATION_VAULT_ADDRESS: policy.destinationVault,
       VAULT_AUTHORIZATION_SIGNER_ADDRESS: context.manifest.authorizationSigners[index] || "REVIEW_REQUIRED",
       KMS_KEY_ID: reference(`${prefix}_KMS_KEY_ID`), KMS_REGION: reference(`${prefix}_KMS_REGION`),
-      VERIFIER_RPC_URL: reference(`${prefix}_RPC_URL`), VERIFIER_INDEPENDENT_RPC_URLS: reference(`${prefix}_INDEPENDENT_RPC_URLS`), VERIFIER_CONFIRMATIONS: services.confirmations,
+      VERIFIER_RPC_URL: reference(`${prefix}_RPC_URL`), VERIFIER_INDEPENDENT_RPC_URLS: reference(`${prefix}_INDEPENDENT_RPC_URLS`), VERIFIER_CONFIRMATIONS: verifier?.confirmations ?? services.confirmations,
       VERIFIER_POLICY_PATH: "/run/secrets/eab-verifier-policy.json", VERIFIER_POLICY_PATH_HOST: reference("VERIFIER_POLICY_PATH_HOST"),
       SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL: reference(`${prefix}_OPENID_DISCOVERY_URL`),
       SETTLEMENT_ATTESTOR_CLIENT_ID: reference(`${prefix}_CLIENT_ID`), SETTLEMENT_ATTESTOR_CLIENT_SECRET: reference(`${prefix}_CLIENT_SECRET`),

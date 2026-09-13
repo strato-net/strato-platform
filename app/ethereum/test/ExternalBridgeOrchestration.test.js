@@ -17,15 +17,20 @@ function fixture(t) {
   const deployment = { chainId: "11155111", network: "sepolia", safeAddress: addr("1"),
     depositRouterDeploymentBlock: "1234", externalBridgeVault: { proxy: addr("2"), implementation: addr("a") },
     depositRouter: { proxy: addr("3"), implementation: addr("b") } };
-  const settings = { bridgeTemplate: "dependencies.json", sourceChainId: "114784819836269", externalDeployment: "deployment.json", depositPlan: "discovery.json",
+  const settings = { sourceChainId: "114784819836269", externalDeployment: "deployment.json", depositPlan: "discovery.json",
     tokenRouter: addr("4"), externalAssetBridge: addr("5"), bridgeOperator: addr("6"), guardian: addr("7"),
-    settlementVerifiers: [addr("8"), addr("9"), addr("a")] };
+    settlementVerifiers: [addr("8"), addr("9"), addr("a")],
+    dependencies: {
+      adminRegistry: addr("1"), poolFactory: addr("2"), poolV3Factory: addr("3"),
+      directMintPsm: addr("4"), metalForge: addr("5"), saveUsdstVault: addr("6"),
+      yieldVaults: [addr("7")], tokenFactory: addr("8"), usdst: addr("9"),
+      priceOracle: addr("a"),
+    } };
   const discovery = { operations: [{ chainId: 11155111, transactions: [{ meta: { items: [{
     token: addr("b"), target: addr("c"), isPermitted: true, externalDecimals: "6", externalName: "Test", externalSymbol: "TEST", stratoTokenStatus: 2,
   }] } }] }] };
   writeJson(path.join(directory, "deployment.json"), deployment);
   writeJson(path.join(directory, "discovery.json"), discovery);
-  writeJson(path.join(directory, "dependencies.json"), readJson(path.resolve(__dirname, "../../contracts/deploy/external-bridge.helium.example.json")));
   const settingsPath = path.join(directory, "settings.json");
   const manifestPath = path.join(directory, "manifest.json");
   writeJson(settingsPath, settings);
@@ -328,12 +333,34 @@ test("service templates derive shared addresses without storing secret values", 
   assert(!verifier.includes("NODE_ENV"));
 });
 
+test("each verifier can use a distinct confirmation count at least as strict as Runtime", (t) => {
+  const f = fixture(t);
+  f.manifest.services.confirmations = 12;
+  f.manifest.services.verifiers = [12, 18, 24].map((confirmations, index) => ({
+    url: `https://verifier-${index + 1}.example`,
+    tokenEnv: `VERIFIER_${index + 1}_TOKEN`,
+    confirmations,
+  }));
+  writeJson(f.manifestPath, f.manifest);
+  const context = loadManifest(f.manifestPath);
+  const artifacts = generate(context, path.join(f.directory, "confirmed-output"));
+  [12, 18, 24].forEach((confirmations, index) => {
+    const template = fs.readFileSync(path.join(artifacts.directory, `verifier-${index + 1}.env.template`), "utf8");
+    assert(template.includes(`VERIFIER_CONFIRMATIONS=${confirmations}`));
+  });
+
+  f.manifest.services.verifiers[1].confirmations = 11;
+  writeJson(f.manifestPath, f.manifest);
+  assert.throws(() => loadManifest(f.manifestPath), /at least services.confirmations/);
+});
+
 test("service URL line injection and secret literals in tokenEnv are rejected", (t) => {
   const f = fixture(t);
-  f.manifest.services.verifiers = [{ url: "https://verifier.invalid", tokenEnv: "secret-token-value" }];
+  f.manifest.services.confirmations = 12;
+  f.manifest.services.verifiers = [{ url: "https://verifier.invalid", tokenEnv: "secret-token-value", confirmations: 12 }];
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /tokenEnv/);
-  f.manifest.services.verifiers[0] = { url: "https://verifier.invalid\nINJECTED=value", tokenEnv: "TOKEN_1" };
+  f.manifest.services.verifiers[0] = { url: "https://verifier.invalid\nINJECTED=value", tokenEnv: "TOKEN_1", confirmations: 12 };
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /control characters/);
 });

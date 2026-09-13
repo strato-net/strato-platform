@@ -197,13 +197,17 @@ async function inspect(context, artifacts, options = {}) {
     const metadata = await Promise.all(services.verifiers.map(async (verifier, index) => {
       const data = await jsonFetch(`${verifier.url.replace(/\/$/, "")}/health`, process.env[verifier.tokenEnv], options.fetchImpl);
       const policy = context.rollout.verifierPolicies[index];
+      const expectedConfirmations = verifier.confirmations ?? services.confirmations;
+      const confirmationMismatch = verifier.confirmations === undefined
+        ? !Number.isSafeInteger(data.verifierConfirmations) || data.verifierConfirmations < expectedConfirmations
+        : data.verifierConfirmations !== expectedConfirmations;
       if (data.status !== "ok" || String(data.destinationChainId) !== String(context.rollout.chainId) ||
           address(data.destinationVault) !== address(policy.destinationVault) || address(data.authorizationSigner) !== address(context.manifest.authorizationSigners[index]) ||
           address(data.settlementAttestor) !== address(policy.settlementAttestor) || data.verifierIndex !== index + 1 ||
           data.baselinePolicyHash !== context.rollout.baselinePolicyHash ||
           data.policyDigest !== `sha256:${digest(fs.readFileSync(artifacts.verifierPolicyPaths[index], "utf8"))}` ||
           !Number.isSafeInteger(data.verificationRpcHostCount) || data.verificationRpcHostCount < 2 ||
-          !Number.isSafeInteger(data.verifierConfirmations) || data.verifierConfirmations < services.confirmations) throw new Error(`Verifier ${index + 1} identity, policy, or confirmation mismatch`);
+          confirmationMismatch) throw new Error(`Verifier ${index + 1} identity, policy, or confirmation mismatch`);
       return data;
     }));
     return metadata;
@@ -304,7 +308,7 @@ async function main(argv = process.argv.slice(2)) {
   const manifestPath = path.resolve(args.manifest);
   if (args.command === "init") {
     initializeManifest(path.resolve(args.settings), args.policy && path.resolve(args.policy), manifestPath);
-    console.log(`Created ${manifestPath}. Review policy, confirmation count, and service bindings there.`);
+    console.log(`Created ${manifestPath}. Review policy, confirmation counts, and service bindings there.`);
     return;
   }
   const output = path.resolve(args["output-dir"] || path.join(path.dirname(manifestPath), "deployment"));

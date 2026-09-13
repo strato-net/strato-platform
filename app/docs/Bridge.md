@@ -144,7 +144,50 @@ reviewed report. Rerun `resume` after quorum executes a dependency to reveal the
 next READY calls. The required number of admin votes comes from the live
 AdminRegistry policy, not the bridge's two-of-three settlement verifier threshold.
 
-Before generating artifacts, set `sourceChainId` explicitly and add `bridgeTemplate` to the settings JSON. It must point to a reviewed environment-specific template containing the STRATO dependencies, including `externalAssetBridge.tokenFactory`, `externalAssetBridge.usdst`, and `externalAssetBridge.priceOracle`. No template or node URL is selected automatically. Set `services.nodeUrl` explicitly in the manifest. Execution and verification check live network metadata, dependency contract types, and the active USDST token’s factory association.
+Before generating artifacts, set `sourceChainId` explicitly and put the reviewed
+STRATO dependencies directly in `settings.dependencies`. Do not create or edit a
+bridge or vault template. Required dependency fields are `adminRegistry`,
+`poolFactory`, `poolV3Factory`, `directMintPsm`, `metalForge`, `saveUsdstVault`,
+`yieldVaults`, `tokenFactory`, `usdst`, and `priceOracle`. The deployment artifact
+supplies the external Safe, vault, DepositRouter, implementation addresses, chain
+ID, and deployment block. No dependency or node URL is selected automatically.
+Set `services.nodeUrl` explicitly in the generated manifest. Execution and
+verification check live network metadata, dependency contract types, and the
+active USDST token’s factory association. Existing settings that reference
+`bridgeTemplate` remain readable, but new deployments must use inline dependencies.
+
+Copy `app/ethereum/externalBridgeRollout.settings.example.json` beside the retained
+deployment and discovery files, then replace every `REVIEW_REQUIRED` value. Example
+settings input:
+
+```json
+{
+  "sourceChainId": "<STRATO_NETWORK_ID_AS_DECIMAL_STRING>",
+  "externalDeployment": "./external-bridge-deployment-11155111.json",
+  "depositPlan": "./deposit-plan.json",
+  "tokenRouter": "0x<TOKEN_ROUTER>",
+  "externalAssetBridge": "0x<EXTERNAL_ASSET_BRIDGE>",
+  "bridgeOperator": "0x<OPERATOR>",
+  "guardian": "0x<STRATO_GUARDIAN>",
+  "settlementVerifiers": [
+    "0x<VERIFIER_1_STRATO>",
+    "0x<VERIFIER_2_STRATO>",
+    "0x<VERIFIER_3_STRATO>"
+  ],
+  "dependencies": {
+    "adminRegistry": "0x<ADMIN_REGISTRY>",
+    "poolFactory": "0x<POOL_FACTORY>",
+    "poolV3Factory": "0x<POOL_V3_FACTORY>",
+    "directMintPsm": "0x<PSM>",
+    "metalForge": "0x<METAL_FORGE>",
+    "saveUsdstVault": "0x<SAVE_USDST_VAULT>",
+    "yieldVaults": ["0x<YIELD_VAULT_1>"],
+    "tokenFactory": "0x<TOKEN_FACTORY>",
+    "usdst": "0x<USDST>",
+    "priceOracle": "0x<PRICE_ORACLE>"
+  }
+}
+```
 
 Complete `policy.mintPolicies` for every STRATO representation token:
 
@@ -187,18 +230,20 @@ KMS, then three addresses), and these service bindings:
   "executorAddress": "<KMS_EXECUTOR_ADDRESS>",
   "bridgeHealthUrl": "https://<BRIDGE_HOST>/health",
   "verifiers": [
-    { "url": "https://<VERIFIER_1_HOST>", "tokenEnv": "VERIFIER_1_API_TOKEN" },
-    { "url": "https://<VERIFIER_2_HOST>", "tokenEnv": "VERIFIER_2_API_TOKEN" },
-    { "url": "https://<VERIFIER_3_HOST>", "tokenEnv": "VERIFIER_3_API_TOKEN" }
+    { "url": "https://<VERIFIER_1_HOST>", "tokenEnv": "VERIFIER_1_API_TOKEN", "confirmations": 64 },
+    { "url": "https://<VERIFIER_2_HOST>", "tokenEnv": "VERIFIER_2_API_TOKEN", "confirmations": 72 },
+    { "url": "https://<VERIFIER_3_HOST>", "tokenEnv": "VERIFIER_3_API_TOKEN", "confirmations": 80 }
   ]
 }
 ```
 
-The example confirmation count is illustrative: approve it independently of
-contract-deployment confirmations. The order of endpoints, KMS signer addresses,
-and STRATO settlement verifiers must match. `sourceChainId` remains a decimal
-string. Importing an old window-based policy does not convert its risk limits:
-replace those fields with reviewed bucket capacity/refill values first.
+The example confirmation counts are illustrative. `services.confirmations` is the
+Runtime deposit threshold. Each verifier has its own independently approved
+confirmation count and must be at least as strict as Runtime. These values are
+independent of contract-deployment confirmations. The order of endpoints, KMS
+signer addresses, and STRATO settlement verifiers must match. `sourceChainId`
+remains a decimal string. Importing an old window-based policy does not convert its
+risk limits: replace those fields with reviewed bucket capacity/refill values first.
 
 Set the named access-token/RPC/verifier-token environment variables through your
 secret manager. Only variable **names**, never secret values, go in the manifest.
