@@ -27,6 +27,8 @@ executables:
     - core-api2
     - ethereum-discovery
     - format
+    - streaming-kafka-hw
+    - time
     - http-types
     - insert-ordered-containers
     - lens
@@ -41,6 +43,7 @@ executables:
     - sql-monad
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - openapi3
     - text
     - transformers

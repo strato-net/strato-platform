@@ -1,0 +1,30 @@
+{
+  "name": "strato-history-service",
+  "version": "1.0.0",
+  "description": "App history service: indexes prices, swaps and token balances over time into its own Postgres from the chain_events bus (with a Cirrus poller for backfill and completeness) and serves chart series",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "dev": "nodemon src/index.ts",
+    "build": "tsc",
+    "test": "ts-node test/apply.test.ts"
+  },
+  "engines": {
+    "node": ">=22.12 <23.0"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@types/pg": "^8.11.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}

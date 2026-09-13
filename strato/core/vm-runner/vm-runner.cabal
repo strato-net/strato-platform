@@ -17,12 +17,12 @@ library
   exposed-modules:
       Blockchain.BlockChain
       Blockchain.Event
+      Blockchain.JsonRpcCommand
       Blockchain.TraceReplay
       Executable.EthereumVM
       Executable.EthereumVM2
   other-modules:
       Blockchain.Bootstrap
-      Blockchain.JsonRpcCommand
       Blockchain.TheDAOFork
       Blockchain.Verifier
       Blockchain.VMConstants
@@ -66,6 +66,7 @@ library
     , strato-model
     , strato-redis-blockdb
     , strato-statediff
+    , strato-tracing
     , streaming
     , text
     , time
@@ -116,6 +117,7 @@ executable vm-runner
   ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto
   build-depends:
       async
+      , strato-tracing
     , base
     , blockapps-init
     , common-log

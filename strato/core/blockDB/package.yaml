@@ -35,6 +35,7 @@ library:
   - lens
   - mtl
   - persistent
+  - prometheus-client
   - raw-strings-qq
   - random
   - sql-monad
@@ -43,6 +44,7 @@ library:
   - openapi3
   - time
   - text
+  - unliftio
 
 tests:
   blockdb-test:

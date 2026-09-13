@@ -15,6 +15,7 @@ library:
   - Control.Monad.Composable.Streaming.Backend.DockerConfig
   - Control.Monad.Composable.Streaming.Kafka
   - Control.Monad.Composable.Streaming.Kafka.DockerConfig
+  - Control.Monad.Composable.Streaming.Bus
   dependencies:
   - aeson
   - binary

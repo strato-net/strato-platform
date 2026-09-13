@@ -14,7 +14,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Handlers.Transaction
-  ( TxsFilterParams (..),
+  ( initBusSubmit,
+    TxsFilterParams (..),
     txsFilterParams,
     API,
     postTxClient,
@@ -32,11 +33,18 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
-import Blockchain.EthConf (runStreamMConfigured)
+import Blockchain.EthConf (ethConf, runStreamMPooled)
+import Blockchain.EthConf.Model (BusConf (..), busConfig)
+import Control.Monad.Composable.Streaming.Bus (BusSettings (..), createBusEnv)
+import qualified Control.Monad.Composable.Streaming.Kafka as Bus
+import Data.Foldable (for_)
+import Data.String (fromString)
+import System.IO.Unsafe (unsafePerformIO)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
+import qualified Strato.Tracing as Tr
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
@@ -216,11 +224,62 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
 
       return . Just $ nub txs
 
+-- | Where submitted transactions go. Without a message bus, straight into
+-- the node's own broker (the historical path). With one, per the config's
+-- submit mode: "bus" (the ingest topic, which strato-ingest forwards into a
+-- core), "core", or "shadow" (both, while validating the bus path: the
+-- duplicate is dropped by the mempool's hash dedup).
 instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
   output txs = do
-    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
-    resps <- liftIO $ runStreamMConfigured "strato-api" $ writeUnseqEvents txs
-    $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+    let mode = maybe "core" busSubmitMode (busConfig ethConf)
+    mBus <- liftIO $ readIORef busSubmitEnv
+    started <- liftIO Tr.nowNanos
+    case (mode, mBus) of
+      ("bus", Just (env, topic)) -> submitToBus env topic
+      ("shadow", Just (env, topic)) -> submitToBus env topic >> submitToCore
+      _ -> submitToCore
+    liftIO $ recordSubmitSpans started mode
+    where
+      -- One "tx.submit" span per transaction, in the transaction's own trace
+      -- (its id derives from the hash), linked to the request trace it
+      -- arrived in. strato-ingest and slipstream add the later stages.
+      recordSubmitSpans started mode = do
+        enabled <- Tr.tracingEnabled
+        when enabled $ do
+          end <- Tr.nowNanos
+          request <- Tr.currentRequestContext
+          for_ [(ts, itTransaction it) | IETx ts it <- txs] $ \(_, tx) -> do
+            let h = transactionHash tx
+            Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.submit" Tr.Producer started end
+              [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
+                Tr.attrText "strato.submit_mode" (T.pack mode),
+                Tr.attrText "strato.stage" "api"
+              ]
+              (maybe [] pure request)
+              Nothing
+      submitToCore = do
+        $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
+        resps <- liftIO $ runStreamMPooled "strato-api" $ writeUnseqEvents txs
+        $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+      submitToBus env topic = do
+        $logDebugS "writeIngestTxBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to the bus"
+        _ <- liftIO . Bus.runStreamMUsingEnv env $ Bus.produceItems topic txs
+        pure ()
+
+-- | The bus producer used for submits, set once at startup by 'initBusSubmit'
+-- (the 'Outputs' instance above has no environment to carry it).
+{-# NOINLINE busSubmitEnv #-}
+busSubmitEnv :: IORef (Maybe (Bus.StreamEnv, Bus.TopicName))
+busSubmitEnv = unsafePerformIO $ newIORef Nothing
+
+-- | Connect the submit path to the configured bus and make sure its ingest
+-- topic exists. A no-op without a bus config.
+initBusSubmit :: IO ()
+initBusSubmit = for_ (busConfig ethConf) $ \conf -> do
+  env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
+  let topic = fromString (busIngestTopic conf)
+  Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
+  writeIORef busSubmitEnv (Just (env, topic))
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw) = do

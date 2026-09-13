@@ -25,6 +25,7 @@ library
       Blockchain.Data.Enode
       Blockchain.Data.EventDB
       Blockchain.Data.Extra
+      Blockchain.Data.IndexerProgress
       Blockchain.Data.Log
       Blockchain.Data.LogDB
       Blockchain.Data.LogsBloom
@@ -35,6 +36,7 @@ library
       Blockchain.Data.Transaction
       Blockchain.Data.TransactionDef
       Blockchain.Data.TransactionResult
+      Blockchain.Data.WriterLease
       Blockchain.DB.DetailsDB
       Blockchain.DB.SQLDB
       Blockchain.DBM
@@ -77,6 +79,8 @@ library
     , openapi3
     , persistent
     , persistent-postgresql
+    , persistent-sqlite
+    , postgresql-simple
     , quickcheck-instances
     , regex-compat
     , resourcet

@@ -246,25 +246,46 @@ instance MonadUnliftIO m => HasMemRawStorageDB (SM m) where
   getMemRawStorageBlockDB = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
+-- Reads fall through the call frames, then this run's own overlay maps,
+-- then the base monad's storage instance. In vm-runner that base instance
+-- is the same overlay-then-trie lookup this used to call directly; a
+-- SQL-backed base (vm-query) answers from the state mirror instead.
 instance
   ( MonadUnliftIO m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     MonadLogger m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
+    (N.NibbleString `A.Alters` N.NibbleString) m,
+    (RawStorageKey `A.Alters` RawStorageValue) m
   ) =>
   (RawStorageKey `A.Alters` RawStorageValue) (SM m)
   where
-  lookup _ k   = do
+  lookup p k   = do
     cs <- gets callStack
     case lookupStorageFrames k cs of
       Just v -> pure $ Just v
-      Nothing -> genericLookupRawStorageDB k
-  lookupWithDefault _ k   = do
+      Nothing -> do
+        txMap <- getMemRawStorageTxDB
+        case M.lookup k txMap of
+          Just v -> pure $ Just v
+          Nothing -> do
+            blkMap <- getMemRawStorageBlockDB
+            case M.lookup k blkMap of
+              Just v -> pure $ Just v
+              Nothing -> lift $ A.lookup p k
+  lookupWithDefault p k   = do
     cs <- gets callStack
     case lookupStorageFrames k cs of
       Just v -> pure v
-      Nothing -> genericLookupWithDefaultRawStorageDB k
+      Nothing -> do
+        txMap <- getMemRawStorageTxDB
+        case M.lookup k txMap of
+          Just v -> pure v
+          Nothing -> do
+            blkMap <- getMemRawStorageBlockDB
+            case M.lookup k blkMap of
+              Just v -> pure v
+              Nothing -> lift $ A.lookupWithDefault p k
   insert _ k v = do
     cs <- gets callStack
     case cs of
@@ -299,21 +320,34 @@ instance
           callStack = c':cs'
         }
 
+-- Same fall-through as storage: frames, this run's overlay, then the base
+-- monad's account instance (overlay-then-trie in vm-runner, SQL in vm-query).
 instance
   ( MonadUnliftIO m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     MonadLogger m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
+    (N.NibbleString `A.Alters` N.NibbleString) m,
+    (Address `A.Alters` AddressState) m
   ) =>
   (Address `A.Alters` AddressState) (SM m)
   where
-  lookup _ a = do
+  lookup p a = do
     cs <- gets callStack
     case lookupStateFrames a cs of
       Just (ASModification s) -> pure $ Just s
       Just ASDeleted -> pure $ Just blankAddressState
-      Nothing -> getAddressStateMaybe a
+      Nothing -> do
+        txMap <- getAddressStateTxDBMap
+        case M.lookup a txMap of
+          Just (ASModification s) -> pure $ Just s
+          Just ASDeleted -> pure $ Just blankAddressState
+          Nothing -> do
+            blkMap <- getAddressStateBlockDBMap
+            case M.lookup a blkMap of
+              Just (ASModification s) -> pure $ Just s
+              Just ASDeleted -> pure $ Just blankAddressState
+              Nothing -> lift $ A.lookup p a
   insert _ a s = do
     cs <- gets callStack
     case cs of
@@ -365,7 +399,8 @@ instance
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     MonadLogger m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
+    (N.NibbleString `A.Alters` N.NibbleString) m,
+    (Address `A.Alters` AddressState) m
   ) =>
   A.Selectable Address AddressState (SM m)
   where

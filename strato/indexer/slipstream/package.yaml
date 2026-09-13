@@ -34,6 +34,7 @@ library:
     - format
     - lens
     - streaming
+    - streaming-kafka-hw
     - network
     - persistent
     - persistent-postgresql
@@ -47,6 +48,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - text
     - time
     - transformers
@@ -63,6 +65,7 @@ executables:
       - blockapps-init
       - hflags
       - streaming
+      - streaming-kafka-hw
       - persistent-postgresql
       - process-monitor
       - resourcet

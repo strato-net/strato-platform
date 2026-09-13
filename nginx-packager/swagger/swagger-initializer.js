@@ -32,7 +32,10 @@ window.onload = function() {
   initializeCsrfToken().then(() => {
     // Initialize Swagger UI with CSRF token interceptor
     window.ui = SwaggerUIBundle({
-      url: "/openapi-ui/openapi.json",
+      // strato-api serves its spec at /openapi.json, which nginx exposes under
+      // /strato-api/. The spec has no servers entry, so Swagger UI resolves
+      // "Try it out" requests against this URL's directory: /strato-api/.
+      url: "/strato-api/openapi.json",
       dom_id: '#swagger-ui',
       deepLinking: true,
       presets: [

@@ -1,22 +1,43 @@
 #!/bin/sh
 set -e
 
-# Read OAuth credentials from mounted secrets file
+# OpenID configuration: the node mounts secrets/oauth_credentials.yaml; the app
+# tier (ECS) passes OAUTH_DISCOVERY_URL in the environment instead. Only the
+# discovery URL is required (to verify logged-in users' tokens); the client id
+# and secret are optional and only used for a service token on anonymous node
+# calls and for the bridge deposit password grant.
 if [ -f /run/secrets/oauth_credentials.yaml ]; then
   export OAUTH_DISCOVERY_URL=$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_ID=$(grep "clientId:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
   export OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
+elif [ -n "${OAUTH_DISCOVERY_URL:-}" ]; then
+  if [ -n "${OAUTH_CLIENT_ID:-}" ] && [ -n "${OAUTH_CLIENT_SECRET:-}" ]; then
+    echo "Using OpenID discovery URL and client credentials from the environment"
+  else
+    echo "Using OpenID discovery URL from the environment; no client credentials (anonymous node calls)"
+  fi
 else
-  echo "ERROR: /run/secrets/oauth_credentials.yaml not found. Cannot start without OAuth credentials."
+  echo "ERROR: /run/secrets/oauth_credentials.yaml not found and OAUTH_DISCOVERY_URL not set."
   exit 1
 fi
 
-STRATO_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
-STRATO_HOSTNAME=$(echo "$STRATO_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
-STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
-STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
-
-export NODE_URL='http://nginx:8081'
+# The node to talk to: on a node, the bundled nginx (the node's ethconf says
+# where strato-api listens); on the app tier there is no ethconf and NODE_URL
+# names the API tier's load balancer, so everything goes through it.
+if [ -f /config/ethconf.yaml ]; then
+  STRATO_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+  STRATO_HOSTNAME=$(echo "$STRATO_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+  STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
+  STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
+  export NODE_URL='http://nginx:8081'
+else
+  if [ -z "${NODE_URL:-}" ]; then
+    echo "ERROR: no /config/ethconf.yaml and NODE_URL is not set."
+    exit 1
+  fi
+  STRATO_API_URL="${NODE_URL%/}/strato-api/eth/v1.2"
+  echo "No ethconf mounted: using NODE_URL=${NODE_URL} (API at ${STRATO_API_URL})"
+fi
 
 # Read Postgres password for direct DB queries
 if [ -f /run/secrets/postgres_password ]; then

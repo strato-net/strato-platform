@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# Move a node's eth and cirrus databases from its Postgres container to an
+# external cluster (Phase 2 of the tiered deployment) and re-point the node.
+#
+#   strato-pg-migrate <node-dir> --writer <host> [--reader <host>] \
+#       (--password <pw> | --password-file <file>) [-- <original strato-setup flags>]
+#
+# Steps, each idempotent enough to re-run:
+#   1. refuse to run while the node is up (strato-down first)
+#   2. start only the node's postgres container and dump eth + cirrus
+#   3. create the databases on the cluster if missing and restore
+#   4. verify the indexer and Cirrus progress rows and the block tip match
+#   5. strato-setup --regenerate with --pghost/--pgReaderHost/--password, plus
+#      the original setup flags given after "--" (at least --network)
+# The local container and its data directory are left untouched; rolling back
+# is "strato-setup --regenerate --pghost=localhost" with the old password.
+set -euo pipefail
+
+PG_IMAGE=${PG_IMAGE:-postgres:14.18}
+JOBS=${JOBS:-4}
+
+die() { echo "error: $*" >&2; exit 1; }
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+
+NODE_DIR=""; WRITER=""; READER=""; PASSWORD=""; SETUP_FLAGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --writer) WRITER=$2; shift 2 ;;
+    --reader) READER=$2; shift 2 ;;
+    --password) PASSWORD=$2; shift 2 ;;
+    --password-file) PASSWORD=$(tr -d '[:space:]' < "$2"); shift 2 ;;
+    --) shift; SETUP_FLAGS=("$@"); break ;;
+    -h|--help) usage ;;
+    -*) die "unknown option $1" ;;
+    *) [[ -z "$NODE_DIR" ]] || die "unexpected argument $1"; NODE_DIR=$1; shift ;;
+  esac
+done
+[[ -n "$NODE_DIR" && -n "$WRITER" && -n "$PASSWORD" ]] || usage
+READER=${READER:-$WRITER}
+[[ -d "$NODE_DIR/.ethereumH" ]] || die "$NODE_DIR is not a node directory"
+cd "$NODE_DIR"
+
+# 1. The node must be down: the dump has to be a quiescent copy.
+if [[ -f .strato.pid ]]; then
+  source .strato.pid
+  if [[ -n "${CONVOKE_PID:-}" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+    die "STRATO is running (convoke PID $CONVOKE_PID); run strato-down first"
+  fi
+fi
+grep -q '^  postgres:$' docker-compose.yml || die "this node already uses an external Postgres (no postgres service in docker-compose.yml)"
+LOCAL_PASSWORD=$(tr -d '[:space:]' < secrets/postgres_password)
+
+# The cluster is reached from a throwaway client container on the node's
+# compose network, so no Postgres client is needed on the host.
+NETWORK=strato_default
+pg() { # pg <host> <password> <db> <psql args...>
+  local host=$1 pw=$2 db=$3; shift 3
+  docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$pw" "$PG_IMAGE" psql -h "$host" -U postgres -d "$db" -v ON_ERROR_STOP=1 -tA "$@"
+}
+
+echo "== starting the node's postgres container"
+docker compose -p strato up -d --wait postgres
+echo "== checking the cluster at $WRITER"
+pg "$WRITER" "$PASSWORD" postgres -c 'select version()' | head -1
+
+mkdir -p pg-migration
+for db in eth cirrus; do
+  echo "== dumping $db"
+  docker run --rm --network "$NETWORK" -e PGPASSWORD="$LOCAL_PASSWORD" "$PG_IMAGE" \
+    pg_dump -h postgres -U postgres --no-owner --no-privileges -Fc "$db" > "pg-migration/$db.dump"
+  ls -lh "pg-migration/$db.dump"
+done
+
+for db in eth cirrus; do
+  echo "== restoring $db into the cluster"
+  if [[ "$(pg "$WRITER" "$PASSWORD" postgres -c "select 1 from pg_database where datname='$db'")" != "1" ]]; then
+    pg "$WRITER" "$PASSWORD" postgres -c "create database \"$db\""
+  fi
+  docker run --rm -i --network "$NETWORK" -e PGPASSWORD="$PASSWORD" "$PG_IMAGE" \
+    pg_restore -h "$WRITER" -U postgres -d "$db" --no-owner --no-privileges -j "$JOBS" --exit-on-error < "pg-migration/$db.dump"
+done
+
+echo "== verifying"
+verify() { # verify <db> <sql>
+  local db=$1 sql=$2
+  local src dst
+  src=$(pg postgres "$LOCAL_PASSWORD" "$db" -c "$sql")
+  dst=$(pg "$WRITER" "$PASSWORD" "$db" -c "$sql")
+  if [[ "$src" != "$dst" ]]; then die "mismatch in $db for [$sql]: container=$src cluster=$dst"; fi
+  echo "  ok  $db: $sql -> $dst"
+}
+verify eth "select coalesce(max(number),0) from block_data_ref"
+verify eth "select coalesce((select block_number from indexer_progress where name='strato-indexer'),0)"
+verify eth "select count(*) from raw_transaction"
+verify cirrus "select coalesce((select block_number from cirrus_progress where name='slipstream'),0)"
+verify cirrus "select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','v')"
+[[ "$READER" == "$WRITER" ]] || pg "$READER" "$PASSWORD" cirrus -c "select count(*) from storage" >/dev/null && echo "  ok  reader endpoint answers"
+
+echo "== stopping the node's postgres container (its data directory is kept)"
+docker compose -p strato stop postgres
+
+echo "== re-pointing the node"
+strato-setup "$(pwd)" --regenerate --pghost="$WRITER" --pgReaderHost="$READER" --password="$PASSWORD" "${SETUP_FLAGS[@]}"
+echo
+echo "Done. Start the node with strato-up; it now writes $WRITER and PostgREST reads $READER."
+echo "Rollback: strato-down, then strato-setup $(pwd) --regenerate --pghost=localhost --password=<old> <original flags>, then strato-up."

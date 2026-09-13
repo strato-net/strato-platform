@@ -16,6 +16,7 @@ library
   exposed-modules:
       Bloc.Database.Queries
       Bloc.Monad
+      Bloc.NonceStore
       Bloc.Server
       Bloc.Server.Contracts
       Bloc.Server.JsonRpc
@@ -62,6 +63,8 @@ library
     , openapi3
     , ordered-containers
     , parsec
+    , persistent
+    , resourcet
     , seqevents
     , servant-client
     , servant-openapi3

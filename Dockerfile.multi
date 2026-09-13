@@ -10,6 +10,7 @@ RUN apt -y update && apt install -y \
       libleveldb-dev \
       libpcre3-dev \
       libpq-dev \
+      librdkafka1 \
       libsodium-dev \
       libsecp256k1-dev \
       libstdc++6 \
@@ -36,6 +37,9 @@ FROM base as strato
 COPY \
   ./usr/local/bin/convoke \
   ./usr/local/bin/ethereum-discover \
+  ./usr/local/bin/ethereum-jsonrpc \
+  ./usr/local/bin/strato-ingest \
+  ./usr/local/bin/vm-query \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/strato-barometer \
@@ -49,10 +53,17 @@ COPY \
   ./usr/local/bin/strato-p2p \
   ./usr/local/bin/strato-sequencer \
   ./usr/local/bin/strato-setup \
+  ./usr/local/bin/strato-vault-import-key \
+  ./usr/local/bin/strato-promote \
+  ./usr/local/bin/blockapps-vault-wrapper-server \
+  ./usr/local/bin/change-vault-password \
   ./usr/local/bin/vm-runner \
   /usr/local/bin/
 COPY ./strato /
-RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
+# yq renders the API tier's config from a node's ethconf.yaml (api-doit.sh).
+RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato \
+  && curl -sSL "https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_$(dpkg --print-architecture)" -o /usr/local/bin/yq \
+  && chmod +x /usr/local/bin/yq
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
 HEALTHCHECK --interval=5s --timeout=1s --start-period=20s \
   CMD pgrep vm-runner && pgrep slipstream || exit 1

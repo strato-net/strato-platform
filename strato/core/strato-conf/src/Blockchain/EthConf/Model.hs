@@ -45,7 +45,28 @@ redisConnection r =
 
 data EthConf = EthConf
   { sqlConfig :: SqlConf,
+    -- | Optional read endpoint for the eth database (a replica); the API
+    -- tier reads it and keeps 'sqlConfig' for writes and the few reads that
+    -- must see the latest commit.
+    sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
+    busConfig :: Maybe BusConf,
+    -- | This core's name among the cores that share one Postgres cluster:
+    -- the writer lease is held by a cell, and cell-local consumer groups
+    -- carry the name. Missing means the hostname.
+    cellId :: Maybe String,
+    -- | Where strato-p2p and ethereum-discover keep peers and sync tasks.
+    -- strato-p2p resets every peer's active state at startup, so cores that
+    -- share a cluster each need their own; missing means the eth database,
+    -- as on a monolith.
+    peerDbConfig :: Maybe SqlConf,
+    -- | Keep the peer store in this SQLite file (relative to the node
+    -- directory) instead of Postgres. Peers and sync tasks are per-node
+    -- operational state, so a core whose Postgres is elsewhere keeps them
+    -- on its own disk and its networking no longer depends on the
+    -- database being reachable. Takes precedence over 'peerDbConfig'.
+    -- Missing means Postgres, as on a monolith.
+    peerSqlitePath :: Maybe FilePath,
     redisBlockDBConfig :: RedisBlockDBConf,
     streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
@@ -69,7 +90,12 @@ kafkaConfig = streamingConfig
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
+    <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
+    <*> v .:? "busConfig"
+    <*> v .:? "cellId"
+    <*> v .:? "peerDbConfig"
+    <*> v .:? "peerSqlitePath"
     <*> v .: "redisBlockDBConfig"
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
@@ -90,12 +116,20 @@ instance ToJSON EthConf where
 data ApiConfig = ApiConfig
   { apiPort :: Int
   , apiListenAddress :: String
+    -- | Bind address of ethereum-jsonrpc, in Warp's notation: an IP, "*"
+    -- (every interface, IPv4 and IPv6), "*4" or "*6". Kept separate from
+    -- 'apiListenAddress' because bloc reaches the JSON-RPC server on
+    -- localhost while nginx reaches strato-api on the docker bridge.
+  , rpcListenAddress :: String
+  , rpcPort :: Int
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
+    <*> v .:? "rpcListenAddress" .!= "*"
+    <*> v .:? "rpcPort" .!= 8545
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -147,6 +181,43 @@ kafkaPort :: StreamingConf -> Int
 kafkaPort = streamingPort
 {-# DEPRECATED kafkaPort "Use streamingPort instead" #-}
 
+-- | The shared message bus (Phase 4 of the tiered deployment): an external
+-- Kafka-compatible cluster carrying transactions inbound to the core
+-- (@ingest_tx@) and results and events outbound (@tx_results@,
+-- @chain_events@). Absent (Nothing) on a node that still submits straight
+-- into its own broker.
+data BusConf = BusConf
+  { busHost :: String,
+    busPort :: Int,
+    -- | "plaintext", "ssl" or "sasl_ssl" (librdkafka's security.protocol)
+    busSecurity :: String,
+    -- | SCRAM-SHA-512 credentials for "sasl_ssl"
+    busSaslUsername :: Maybe String,
+    busSaslPassword :: Maybe String,
+    busIngestTopic :: String,
+    busResultsTopic :: String,
+    busEventsTopic :: String,
+    -- | Where the API tier sends submitted transactions: "core" (the node's
+    -- own broker, as before), "bus", or "shadow" (both, while validating).
+    busSubmitMode :: String
+  }
+  deriving (Show, Eq, Generic, ToJSON)
+
+instance FromJSON BusConf where
+  parseJSON = withObject "BusConf" $ \v -> BusConf
+    <$> v .: "busHost"
+    <*> v .:? "busPort" .!= 9092
+    <*> v .:? "busSecurity" .!= "plaintext"
+    <*> v .:? "busSaslUsername"
+    <*> v .:? "busSaslPassword"
+    <*> v .:? "busIngestTopic" .!= "ingest_tx"
+    <*> v .:? "busResultsTopic" .!= "tx_results"
+    <*> v .:? "busEventsTopic" .!= "chain_events"
+    <*> v .:? "busSubmitMode" .!= "core"
+
+instance Default BusConf where
+  def = BusConf "" 9092 "plaintext" Nothing Nothing "ingest_tx" "tx_results" "chain_events" "core"
+
 data RedisBlockDBConf = RedisBlockDBConf
   { redisHost :: String,
     redisPort :: Int,
@@ -175,6 +246,10 @@ data QuarryConf = QuarryConf
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
   , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
+  , nativeTokenBalancesField :: Maybe String
+    -- ^ Name of the native token's balances mapping in SolidVM storage, so
+    -- eth_getBalance can be answered from the SQL state mirror instead of a
+    -- vm-runner round trip. Missing means "_balances" (OpenZeppelin ERC20).
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -319,6 +394,11 @@ data VmConf = VmConf
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
+  -- | Base URL of a vm-query service (phase 5). Set, ethereum-jsonrpc sends
+  -- latest-state calls, simulations and call traces there, against the SQL
+  -- state mirror, and falls back to the consensus VM only for what it
+  -- declines. Unset, everything goes to vm-runner as before.
+  , vmQueryUrl :: Maybe String
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -330,6 +410,7 @@ instance FromJSON VmConf where
     <*> v .:? "diffPublish" .!= True
     <*> v .:? "vmJsonRpcUrl" .!= "http://localhost:8545"
     <*> v .:? "simMaxConcurrent" .!= 8
+    <*> v .:? "vmQueryUrl"
 
 -- Default instances
 
@@ -393,6 +474,8 @@ instance Default ApiConfig where
   def = ApiConfig
     { apiPort = 3000
     , apiListenAddress = "127.0.0.1"
+    , rpcListenAddress = "*"
+    , rpcPort = 8545
     }
 
 instance Default DebugConfig where
@@ -406,12 +489,14 @@ instance Default VmConf where
     , diffPublish = True
     , vmJsonRpcUrl = "http://localhost:8545"
     , simMaxConcurrent = 8
+    , vmQueryUrl = Nothing
     }
 
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
     , nativeTokenAddress = 0
+    , nativeTokenBalancesField = Nothing
     }
 
 instance Default UrlConfig where
@@ -443,7 +528,12 @@ instance Default NetworkConf where
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
+    , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
+    , busConfig = Nothing
+    , cellId = Nothing
+    , peerDbConfig = Nothing
+    , peerSqlitePath = Nothing
     , redisBlockDBConfig = def
     , streamingConfig = def
     , levelDBConfig = def

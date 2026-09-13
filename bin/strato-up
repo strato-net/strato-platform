@@ -13,6 +13,7 @@ FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
+ROLE="node"
 SETUP_ARGS=()
 for arg in "$@"; do
     case "$arg" in
@@ -37,6 +38,12 @@ for arg in "$@"; do
             NETWORK="${arg#*=}"
             SETUP_ARGS+=("$arg")
             ;;
+        # --role is passed through to strato-setup; remembered here because a
+        # snapshot (chain state) has nothing to restore into an API-only directory.
+        --role=*)
+            ROLE="${arg#*=}"
+            SETUP_ARGS+=("$arg")
+            ;;
         *)
             SETUP_ARGS+=("$arg")
             ;;
@@ -44,6 +51,11 @@ for arg in "$@"; do
 done
 
 NODE_DIR="$1"
+
+if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
+    echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
+    exit 1
+fi
 
 # If the node directory already exists, we are just (re)starting an existing node,
 # not instantiating a new one - so a snapshot restore is neither needed nor safe.

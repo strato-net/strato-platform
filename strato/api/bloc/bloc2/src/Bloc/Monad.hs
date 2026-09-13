@@ -29,12 +29,12 @@ module Bloc.Monad
 where
 
 import BlockApps.Logging
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
 import Control.Monad.Composable.Vault
 import Control.Monad.Reader
-import Data.Cache
+import Data.Map.Strict (Map)
+import Data.Time (UTCTime)
+import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Data.Text (Text)
 import GHC.Stack
 import SQLM
@@ -54,14 +54,20 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce,
+    -- | How long a reserved nonce counter stays valid (see "Bloc.NonceStore";
+    -- the counters live in the eth database's writer).
+    nonceTtlSeconds :: Int,
     -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
     -- transaction simulation (same container). From ethconf.yaml vmConfig.
     vmJsonRpcUrl :: String,
     -- | Count of in-flight simulations and the ceiling above which new ones are
     -- shed (503), so simulations can't starve block processing on the shared VM.
     simInFlight :: TVar Int,
-    simMaxConcurrent :: Int
+    simMaxConcurrent :: Int,
+    -- | Hashes whose results were announced on the message bus recently
+    -- (with the time seen), fed by a subscriber thread; lets resolve=true
+    -- wake as soon as a result lands instead of polling Postgres.
+    resultsFeed :: Maybe (TVar (Map Keccak256 UTCTime))
   }
 
 --------------------------------------------------------------------------------

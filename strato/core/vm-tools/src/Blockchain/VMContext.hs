@@ -370,7 +370,7 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
                 _codeDB = CodeDB cdb,
                 _blockSummaryDB = BlockSummaryDB blksumdb,
                 _redisPool = RBDB.RedisConnection rPool,
-                _sqldb = SQLDB conn
+                _sqldb = sqlDB conn
               }
 
       let cmemDBs =

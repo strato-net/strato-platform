@@ -9,6 +9,7 @@
 module Blockchain.Data.BlockDB
   ( getBlock,
     putBlocks,
+    putBlocksSql,
   )
 where
 
@@ -32,6 +33,7 @@ import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
 import Crypto.Secp256k1.Internal
+import UnliftIO (MonadUnliftIO)
 
 blk2BlkDataRef ::
   Block ->
@@ -92,10 +94,20 @@ putBlocks ::
   [Block] ->
   Bool ->
   m [Key BlockDataRef]
-putBlocks blockList makeHashOne = do
+putBlocks blockList makeHashOne = sqlQuery $ putBlocksSql blockList makeHashOne
+
+-- | The body of 'putBlocks' as one 'SQL.SqlPersistT' action, so a caller can
+-- commit a batch's blocks together with its receipts, state diffs and
+-- progress marker in a single transaction. Idempotent: a block whose hash is
+-- already present is skipped and its existing key returned.
+putBlocksSql ::
+  MonadUnliftIO m =>
+  [Block] ->
+  Bool ->
+  SQL.SqlPersistT m [Key BlockDataRef]
+putBlocksSql blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
-  sqlQuery $
-    forM blocksWithHashes $ \(b, hash') -> do
+  forM blocksWithHashes $ \(b, hash') -> do
       insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (timestamp $ blockBlockData b) (blockReceiptTransactions b)
 
       existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []

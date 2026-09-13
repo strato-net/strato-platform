@@ -2,6 +2,13 @@
 
 set -e
 
+# The OAuth credentials file may arrive as one environment value (how ECS
+# hands over a Secrets Manager secret); make it a file first.
+if [[ -n "${OAUTH_CREDENTIALS_YAML:-}" && ! -f /run/secrets/oauth_credentials.yaml ]]; then
+    mkdir -p /run/secrets
+    printf '%s\n' "$OAUTH_CREDENTIALS_YAML" > /run/secrets/oauth_credentials.yaml
+fi
+
 # Load OAuth from file if env vars not set
 if [[ -f /run/secrets/oauth_credentials.yaml ]]; then
     OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$(grep "discoveryUrl:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)}
@@ -36,17 +43,54 @@ RPC_PORT=${RPC_PORT:-8545}
 # connector signs transactions client-side and submits via eth_sendRawTransaction
 # over /rpc, so deployments that expose the SMD wallet must set JSONRPC_ENABLED=true.
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
+# Whether app-backend and app-ui run next to this nginx (the bundled node) or
+# on their own tier. Unbundled, the app locations are dropped (their upstreams
+# would not resolve and nginx would refuse to start) and "/" redirects to
+# APP_URL, or answers 404 when no APP_URL is known.
+BUNDLED_APP=${BUNDLED_APP:-true}
+APP_URL=${APP_URL:-}
+# Whether the SMD runs next to this nginx or is served from its own deployment
+# (S3 behind CloudFront). Unbundled, the SMD locations are dropped and /smd
+# redirects to SMD_URL (404 when none is known); SMD_HOST then points at a
+# closed port so nginx never has to resolve a missing smd container.
+BUNDLED_SMD=${BUNDLED_SMD:-true}
+SMD_URL=${SMD_URL:-}
+if [[ "$BUNDLED_SMD" != "true" ]]; then SMD_HOST=127.0.0.1:1; fi
+# The scheme browsers use to reach this nginx, for the OpenID redirect and
+# post-logout URIs: https with ssl=true, http otherwise, unless PUBLIC_SCHEME
+# says so. A tier behind a TLS-terminating load balancer or CloudFront sees
+# plain HTTP but is reached over https, and sets PUBLIC_SCHEME=https.
+PUBLIC_SCHEME=${PUBLIC_SCHEME:-}
+# Session cookie secret: from the mounted secret file unless given directly.
+if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
+    SESSION_SECRET=$(tr -d '[:space:]' < /run/secrets/session_secret)
+fi
+SESSION_SECRET=${SESSION_SECRET:-}
+
+# The node config can arrive as a base64 environment value instead of a
+# mounted file (ECS has no bind mounts): ETHCONF_BASE64 is decoded to a
+# private copy and used from there.
+ETHCONF_FILE=${ETHCONF_FILE:-/config/ethconf.yaml}
+if [[ -n "${ETHCONF_BASE64:-}" ]]; then
+  ETHCONF_FILE=/tmp/ethconf.yaml
+  echo "$ETHCONF_BASE64" | base64 -d > "$ETHCONF_FILE"
+fi
 
 # Read config from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
+NODE_URL=$(yq '.urlConfig.nodeUrl' "$ETHCONF_FILE")
 STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
-STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
-HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
-VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | xargs)
+# As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
+# strato-api container next to it, not to the host named by nodeUrl.
+if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
+  STRATO_HOSTNAME=$API_UPSTREAM_HOST
+fi
+STRATO_PORT_API=$(yq '.apiConfig.apiPort' $ETHCONF_FILE)
+HTTP_PORT=$(yq '.networkConfig.httpPort' $ETHCONF_FILE)
+VAULT_URL=$(yq '.urlConfig.vaultUrl' $ETHCONF_FILE | xargs)
 INTERNAL_VAULT_URL=${INTERNAL_VAULT_URL:-http://${STRATO_HOSTNAME}:8093}
 
 if [[ -z "${VAULT_URL}" || "${VAULT_URL}" == "null" ]]; then
-  echo "urlConfig.vaultUrl is required in /config/ethconf.yaml"
+  echo "urlConfig.vaultUrl is required in $ETHCONF_FILE"
   exit 7
 fi
 
@@ -112,6 +156,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
+  # Nameservers for the resolver directive: whatever this container was given.
+  RESOLVER=$(awk '/^nameserver/ && $2 !~ /:/ {printf "%s ", $2}' /etc/resolv.conf)
+  RESOLVER=${RESOLVER:-127.0.0.11}
+  sed -i "s/__RESOLVER__/${RESOLVER% }/g" /tmp/nginx.conf
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
@@ -172,6 +220,36 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's/<BLOC_TIMEOUT>/'"$BLOC_TIMEOUT"'/g' /tmp/nginx.conf
 
   # Replacing HOST NAME PLACEHOLDERS
+  if [[ "$BUNDLED_APP" == "true" ]]; then
+    sed -i '/#TEMPLATE_MARK_EXTERNAL_APP/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_BUNDLED_APP//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_BUNDLED_APP/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EXTERNAL_APP//g' /tmp/nginx.conf
+    if [[ -z "$APP_URL" ]]; then
+      sed -i 's|return 302 __APP_URL__$request_uri;|return 404;|' /tmp/nginx.conf
+    else
+      sed -i "s|__APP_URL__|${APP_URL%/}|g" /tmp/nginx.conf
+    fi
+  fi
+  if [[ "$BUNDLED_SMD" == "true" ]]; then
+    sed -i '/#TEMPLATE_MARK_EXTERNAL_SMD/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_BUNDLED_SMD//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_BUNDLED_SMD/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EXTERNAL_SMD//g' /tmp/nginx.conf
+    if [[ -z "$SMD_URL" ]]; then
+      sed -i 's|return 302 __SMD_URL__$request_uri;|return 404;|' /tmp/nginx.conf
+    else
+      sed -i "s|__SMD_URL__|${SMD_URL%/}|g" /tmp/nginx.conf
+    fi
+  fi
+  if [[ -z "$SESSION_SECRET" ]]; then
+    sed -i '/#TEMPLATE_MARK_SESSION_SECRET/d' /tmp/nginx.conf
+  else
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
+  fi
+  sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
   sed -i "s|__TRACKING_URL__|$TRACKING_URL|g" /tmp/nginx.conf
   sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
@@ -219,11 +297,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-https}/g" /tmp/openid.lua
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/vault-openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-http}/g" /tmp/openid.lua
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/vault-openid.lua
   fi
 
@@ -237,14 +315,21 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   
   mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
   mv /tmp/rpc-guard.lua /usr/local/openresty/nginx/lua/rpc-guard.lua
+  mv /tmp/tracing.lua /usr/local/openresty/nginx/lua/tracing.lua
 fi
 
+# apex is optional in the API tier task (APEX_HOST then points at a closed
+# port); wait for it only when it is deployed.
+if [[ "${APEX_HOST##*:}" == "1" ]]; then
+  echo "apex not deployed (APEX_HOST=${APEX_HOST}); not waiting for it"
+else
 echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
-do
-  sleep 0.5
-done
-echo 'apex is available'
+  until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
+  do
+    sleep 0.5
+  done
+  echo 'apex is available'
+fi
 
 echo  'nginx is now running. See the logs below...'
 exec openresty -g "daemon off;"

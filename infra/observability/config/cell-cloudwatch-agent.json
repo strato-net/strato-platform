@@ -1,0 +1,53 @@
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "omit_hostname": true
+  },
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": {
+      "InstanceId": "${aws:InstanceId}"
+    },
+    "aggregation_dimensions": [["InstanceId"]],
+    "metrics_collected": {
+      "cpu": {
+        "measurement": ["usage_active", "usage_iowait", "usage_steal"],
+        "totalcpu": true
+      },
+      "mem": {
+        "measurement": ["mem_used_percent", "mem_available"]
+      },
+      "disk": {
+        "measurement": ["disk_used_percent", "disk_free"],
+        "resources": ["/", "/opt/strato"],
+        "drop_device": true
+      },
+      "diskio": {
+        "measurement": ["diskio_reads", "diskio_writes", "diskio_read_bytes", "diskio_write_bytes", "diskio_io_time"],
+        "resources": ["*"]
+      },
+      "net": {
+        "measurement": ["net_bytes_recv", "net_bytes_sent", "net_packets_recv", "net_packets_sent"],
+        "resources": ["*"]
+      },
+      "netstat": {
+        "measurement": ["tcp_established", "tcp_time_wait"]
+      }
+    }
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/opt/strato/**/logs/*.log",
+            "log_group_name": "/strato/__ENV__/cell",
+            "log_stream_name": "{instance_id}/{file_basename}",
+            "timestamp_format": "%Y-%m-%d %H:%M:%S",
+            "retention_in_days": 30
+          }
+        ]
+      }
+    }
+  }
+}

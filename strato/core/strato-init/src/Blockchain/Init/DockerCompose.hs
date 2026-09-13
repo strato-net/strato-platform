@@ -8,7 +8,8 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Role
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -17,8 +18,34 @@ import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Process (readProcess)
 
-generateDockerCompose :: IO ()
-generateDockerCompose = do
+-- | Which of the node's containers a role runs. A core keeps the stores the
+-- chain processes write; an API tier keeps what fronts strato-api.
+roleHasService :: Role -> String -> Bool
+roleHasService RoleNode _ = True
+roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+
+generateDockerCompose :: Role -> IO ()
+generateDockerCompose role = do
+  -- app-backend and app-ui ride along only with a full node that has not
+  -- moved its app tier out.
+  let bundledApp = role == RoleNode && flags_bundledApp
+      -- The SMD rides along too, unless it is served from its own deployment.
+      bundledSmd = role == RoleNode && flags_bundledSmd
+      -- PostgREST (Cirrus at /cirrus) too, unless the API tier serves Cirrus.
+      -- An API directory always runs it.
+      bundledPostgrest = role /= RoleNode || flags_bundledPostgrest
+      -- A remote --pghost (a managed cluster) replaces the postgres container:
+      -- containers reach it by that name instead of the service name.
+      externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
+      pgWriterHost = if externalPostgres then flags_pghost else "postgres"
+      pgReaderHost
+        | externalPostgres = if null flags_pgReaderHost then flags_pghost else flags_pgReaderHost
+        | otherwise = "postgres"
+      -- depends_on entries for the local postgres container only
+      withPostgres :: [String] -> [String]
+      withPostgres svcs = [svc | svc <- svcs, externalPostgres `implies` (svc /= "postgres")]
+      implies a b = not a || b
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
   
@@ -41,7 +68,7 @@ generateDockerCompose = do
   let appBackend = def
         { image = "app-backend:" ++ stratoVersionTag ++ "-" ++ hashAppBackend
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres", "postgrest"]
+        , depends_on = Just $ DependsOnList (withPostgres (["postgres"] ++ [ "postgrest" | bundledPostgrest ]))
         , init = Just True
         , extra_hosts = hostGateway
         , volumes = Just
@@ -75,7 +102,7 @@ generateDockerCompose = do
             , ("BA_PASSWORD", "${BA_PASSWORD:-}")
             , ("SAVE_USDST_VAULT", "${SAVE_USDST_VAULT:-}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
-            , ("postgres_host", "postgres")
+            , ("postgres_host", pgReaderHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
@@ -104,7 +131,7 @@ generateDockerCompose = do
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
+        , depends_on = Just $ DependsOnList (["apex"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"])
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -116,14 +143,12 @@ generateDockerCompose = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("postgres_host", "postgres")
+            [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("redis_host", "redis")
-            , ("redis_port", "6379")
             ]
         , volumes = Just
             [ "./logs:/logs"
@@ -166,10 +191,10 @@ generateDockerCompose = do
   let postgrest = def
         { image = "postgrest:" ++ stratoVersionTag ++ "-" ++ hashPostgrest
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["postgres"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , environment = Just $ Map.fromList
             [ ("PG_ENV_POSTGRES_DB", "cirrus")
-            , ("PG_ENV_POSTGRES_HOST", "postgres")
+            , ("PG_ENV_POSTGRES_HOST", pgReaderHost)
             , ("PG_ENV_POSTGRES_USER", "postgres")
             , ("PG_PORT_5432_TCP_PORT", "5432")
             , ("POSTGREST_LOG_LEVEL", "error")
@@ -217,18 +242,18 @@ generateDockerCompose = do
         , extra_hosts = hostGateway
         , depends_on = Just $
             if flags_localAuth
-              then DependsOnMap $ Map.fromList
+              then DependsOnMap $ Map.fromList $
                 [ ("apex", DependsOnCondition "service_started")
                 , ("docs", DependsOnCondition "service_started")
-                , ("postgrest", DependsOnCondition "service_started")
                 , ("prometheus", DependsOnCondition "service_started")
-                , ("smd", DependsOnCondition "service_started")
-                , ("app-backend", DependsOnCondition "service_started")
-                , ("app-ui", DependsOnCondition "service_started")
                 , ("local-auth", DependsOnCondition "service_healthy")
-                ]
-              else DependsOnList
-                ["apex", "docs", "postgrest", "prometheus", "smd", "app-backend", "app-ui"]
+                ] ++ [ ("postgrest", DependsOnCondition "service_started") | bundledPostgrest ]
+                  ++ [ ("smd", DependsOnCondition "service_started") | bundledSmd ]
+                  ++ [ (svc, DependsOnCondition "service_started") | bundledApp, svc <- ["app-backend", "app-ui"] ]
+              else DependsOnList $
+                ["apex", "docs"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"]
+                  ++ [ "smd" | bundledSmd ]
+                  ++ [ svc | bundledApp, svc <- ["app-backend", "app-ui"] ]
         
         , environment = Just $ Map.fromList $
             [ ("STRATO_PORT_API", stratoApiPort)
@@ -238,8 +263,16 @@ generateDockerCompose = do
             , ("RPC_PORT", rpcPort)
             , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")
+            , ("BUNDLED_APP", if bundledApp then "true" else "false")
+            , ("APP_URL", flags_appUrl)
             , ("ssl", if ssl then "true" else "false")
             ]
+            -- An SMD served from its own deployment: nginx drops the SMD
+            -- locations and redirects /smd there. Absent in the bundled default.
+            ++ [ kv | role == RoleNode && not bundledSmd, kv <- [("BUNDLED_SMD", "false"), ("SMD_URL", flags_smdUrl)] ]
+            -- Without PostgREST, /cirrus gets an unreachable upstream (502) so
+            -- nginx never has to resolve the missing postgrest container.
+            ++ [ ("POSTGREST_HOST", "127.0.0.1:1") | not bundledPostgrest ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
                     ]
@@ -249,6 +282,7 @@ generateDockerCompose = do
             [ "./logs:/logs"
             , "./secrets/ssl:/etc/ssl/strato:ro"
             , "./secrets/oauth_credentials.yaml:/run/secrets/oauth_credentials.yaml:ro"
+            , "./secrets/session_secret:/run/secrets/session_secret:ro"
             , "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -291,10 +325,23 @@ generateDockerCompose = do
       applyKafkaRetention env
         | Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaRetentionEnv env
         | otherwise = env
+      -- A second, VPC-facing listener so the API tier can produce to this
+      -- node's broker (transactions, VM calls) until the message bus exists.
+      -- The node's own processes keep using the localhost listener.
+      externalListener = not (null flags_kafkaExternalHost)
+      kafkaExternalEnv = Map.fromList
+        [ ("KAFKA_LISTENERS", "INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093")
+        , ("KAFKA_ADVERTISED_LISTENERS", "INTERNAL://localhost:9092,EXTERNAL://" ++ flags_kafkaExternalHost ++ ":9094")
+        , ("KAFKA_LISTENER_SECURITY_PROTOCOL_MAP", "CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT")
+        , ("KAFKA_INTER_BROKER_LISTENER_NAME", "INTERNAL")
+        ]
+      applyKafkaExternal env
+        | externalListener && Map.member "KAFKA_LOG_DIRS" env = Map.union kafkaExternalEnv env
+        | otherwise = env
       streaming = def
         { image = bcImage bc
         , user = if bcNeedsUserGid bc then Just userGid else Nothing
-        , environment = applyKafkaRetention <$> bcEnvironment bc
+        , environment = applyKafkaExternal . applyKafkaRetention <$> bcEnvironment bc
         , entrypoint = bcEntrypoint bc
         , command = bcCommand bc
         , restart = Just "unless-stopped"
@@ -307,7 +354,8 @@ generateDockerCompose = do
             }
         , volumes = Just (bcVolumes bc)
         , logging = noLogging
-        , ports = Just ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
+        , ports = Just $ ["127.0.0.1:" ++ show (bcPort bc) ++ ":" ++ show (bcPort bc)]
+            ++ ["9094:9094" | externalListener]
         }
 
   let prometheus = def
@@ -327,11 +375,11 @@ generateDockerCompose = do
 
   let localAuth = def
         { image = "local-auth:" ++ stratoVersionTag ++ "-" ++ hashLocalAuth
-        , depends_on = Just $ DependsOnList ["postgres"]
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres"])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList
-            [ ("DSN", "postgres://postgres@postgres:5432/kratos?sslmode=disable")
-            , ("HYDRA_DSN", "postgres://postgres@postgres:5432/hydra?sslmode=disable")
+            [ ("DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/kratos?sslmode=disable")
+            , ("HYDRA_DSN", "postgres://postgres@" ++ pgWriterHost ++ ":5432/hydra?sslmode=disable")
             ]
         , healthcheck = Just Healthcheck
             { test = ["CMD", "curl", "-f", "http://localhost:4444/.well-known/openid-configuration"]
@@ -374,9 +422,29 @@ generateDockerCompose = do
         then ("local-auth", localAuth) : baseServices
         else baseServices
 
+      -- An API-only nginx has no SMD, apex or Prometheus behind it; their
+      -- locations get an unreachable upstream and answer 502.
+      apiOnlyNginx = nginx
+        { depends_on = Just $ DependsOnList ["docs", "postgrest"]
+        , environment = Map.union (Map.fromList
+            [ ("APEX_HOST", "127.0.0.1:1")
+            , ("SMD_HOST", "127.0.0.1:1")
+            , ("PROMETHEUS_HOST", "127.0.0.1:1")
+            ]) <$> environment nginx
+        }
+      roleServices =
+        [ (name, if role == RoleApi && name == "nginx" then apiOnlyNginx else svc)
+        | (name, svc) <- allServices
+        , roleHasService role name
+        , bundledApp || name `notElem` ["app-backend", "app-ui"]
+        , bundledSmd || name /= "smd"
+        , bundledPostgrest || name /= "postgrest"
+        , not (externalPostgres && name == "postgres")
+        ]
+
   let composeFile = ComposeFile
         { namedVolumes = Nothing
-        , services = Map.fromList allServices
+        , services = Map.fromList roleServices
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile

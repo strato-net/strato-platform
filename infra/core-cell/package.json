@@ -1,0 +1,22 @@
+{
+  "name": "strato-core-cell-infra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CDK app for a STRATO core cell: one EC2 host running the consensus, VM and indexer processes under convoke against the shared Aurora cluster, as a follower or the writer",
+  "scripts": {
+    "synth": "cdk synth --strict",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1100.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.220.0",
+    "constructs": "^10.4.0"
+  }
+}

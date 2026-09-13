@@ -1,0 +1,92 @@
+#app-version:<VERSION>
+# STRATO app tier on a VM: the app's nginx (OAuth, CSRF, sessions), backend
+# state; run several copies behind a load balancer with session stickiness.
+# The AWS shape of the same thing is infra/ (CDK).
+#   NODE_URL            public URL of the STRATO API tier or node
+#   postgres_*          the node's cirrus database (read-only pool), until the
+#                       managed cluster exists
+#   OAUTH_*             the app's own OIDC client
+# Put secrets/session_secret and secrets/postgres_password next to this file.
+volumes:
+    driver: local
+services:
+  backend:
+    image: ${APP_BACKEND_IMAGE:-<REPO_URL>app-backend:<VERSION>-<HASH_APP_BACKEND>}
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:?OAUTH_DISCOVERY_URL is required}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:?OAUTH_CLIENT_ID is required}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:?OAUTH_CLIENT_SECRET is required}
+      - NODE_URL=${NODE_URL:?NODE_URL is required}
+      - BASE_URL=${BASE_URL:-}
+      - postgres_host=${postgres_host:?postgres_host is required}
+      - postgres_port=${postgres_port:-5432}
+      - postgres_user=${postgres_user:-postgres}
+      - postgres_password=${postgres_password:-}
+      - RPC_URL_MAINNET=${RPC_URL_MAINNET:-}
+      - RPC_URL_MAINNET_FALLBACK=${RPC_URL_MAINNET_FALLBACK:-}
+      - RPC_URL_SEPOLIA=${RPC_URL_SEPOLIA:-}
+      - RPC_URL_SEPOLIA_FALLBACK=${RPC_URL_SEPOLIA_FALLBACK:-}
+      - RPC_URL_BASE=${RPC_URL_BASE:-}
+      - RPC_URL_BASE_FALLBACK=${RPC_URL_BASE_FALLBACK:-}
+      - RPC_URL_BASE_SEPOLIA=${RPC_URL_BASE_SEPOLIA:-}
+      - RPC_URL_BASE_SEPOLIA_FALLBACK=${RPC_URL_BASE_SEPOLIA_FALLBACK:-}
+      - POOL_FACTORY=${POOL_FACTORY:-}
+      - LENDING_REGISTRY=${LENDING_REGISTRY:-}
+      - TOKEN_FACTORY=${TOKEN_FACTORY:-}
+      - ADMIN_REGISTRY=${ADMIN_REGISTRY:-}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE:-}
+      - STRATO_NATIVE_BRIDGE=${STRATO_NATIVE_BRIDGE:-}
+      - STRATO_NATIVE_CUSTODY_VAULT=${STRATO_NATIVE_CUSTODY_VAULT:-}
+      - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - ONRAMP_HOT_WALLET_ADDRESS=${ONRAMP_HOT_WALLET_ADDRESS:-}
+      - SAVE_USDST_VAULT=${SAVE_USDST_VAULT:-}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+    volumes:
+      - ./secrets/postgres_password:/run/secrets/postgres_password:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  ui:
+    image: ${APP_UI_IMAGE:-<REPO_URL>app-ui:<VERSION>-<HASH_APP_UI>}
+    environment:
+      # No node config is mounted here; the UI takes these from the environment.
+      - CHAIN_ID=${CHAIN_ID:?CHAIN_ID is required}
+      - NETWORK_NAME=${NETWORK_NAME:?NETWORK_NAME is required}
+      - POSTHOG_KEY=${POSTHOG_KEY:-}
+      - POSTHOG_HOST=${POSTHOG_HOST:-}
+      - GOOGLE_ANALYTICS_ID=${GOOGLE_ANALYTICS_ID:-}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    image: ${APP_NGINX_IMAGE:-<REPO_URL>app-nginx:<VERSION>-<HASH_APP_NGINX>}
+    depends_on:
+      - backend
+      - ui
+    environment:
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:?OAUTH_DISCOVERY_URL is required}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:?OAUTH_CLIENT_ID is required}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:?OAUTH_CLIENT_SECRET is required}
+      - NODE_URL=${NODE_URL:?NODE_URL is required}
+      - ssl=${ssl:-false}
+    ports:
+      - ${HTTP_PORT:-80}:80
+      - ${HTTPS_PORT:-443}:443
+    volumes:
+      - ./secrets:/run/secrets:ro
+      - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

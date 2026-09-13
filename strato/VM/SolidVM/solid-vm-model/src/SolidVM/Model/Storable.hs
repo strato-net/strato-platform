@@ -44,6 +44,7 @@ import System.IO.Unsafe
 import Text.Format
 import Text.Read
 import Text.Regex.TDFA
+import qualified Text.Regex.TDFA as TDFA
 import Servant
 
 data BasicValue
@@ -110,28 +111,37 @@ instance JSON.FromJSON BasicValue where
           Just theBasicValue -> theBasicValue
           Nothing -> error $ "in parseJSON for BasicValue, basicParse fails for: " ++ show theString
 
+-- | Parse a value as the SQL mirror renders it ('formatBasicValue'). The
+-- patterns are compiled once: compiling them per call cost about 90 µs per
+-- value, which dominated every mirror read (strato-api's storage endpoint,
+-- vm-query's prefetch). A string of digits is the common case and skips
+-- the patterns entirely; it matches exactly what the integer pattern would.
 basicParse :: String -> Maybe BasicValue
-basicParse input =
-  case readMaybe input of
-    Just val -> return $ BString val
-    Nothing -> foldr tryMatch Nothing patterns
+basicParse input
+  | not (null input) && all isDigit input = Just $ BInteger $ read input
+  | otherwise =
+      case readMaybe input of
+        Just val -> return $ BString val
+        Nothing -> foldr tryMatch Nothing basicPatterns
   where
-    tryMatch :: (String, [String] -> Maybe BasicValue) -> Maybe BasicValue -> Maybe BasicValue
+    tryMatch :: (Regex, [String] -> Maybe BasicValue) -> Maybe BasicValue -> Maybe BasicValue
     tryMatch (regex, constructor) acc =
-                case input =~ regex :: [[String]] of
+                case TDFA.match regex input :: [[String]] of
                           [_:matches] -> constructor matches
                           _ -> acc
-    patterns :: [(String, [String] -> Maybe BasicValue)]
-    patterns =
-      [
-        ("false", \[] -> Just $ BBool False),
-        ("true", \[] -> Just $ BBool True),
-        ("address\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAddress $ read accountString),
-        ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
-        ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
-        ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
-        ("(\"([^\"\\\\]|\\.)*\")", \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
-      ]
+
+{-# NOINLINE basicPatterns #-}
+basicPatterns :: [(Regex, [String] -> Maybe BasicValue)]
+basicPatterns =
+  [
+    (makeRegex ("false" :: String), \[] -> Just $ BBool False),
+    (makeRegex ("true" :: String), \[] -> Just $ BBool True),
+    (makeRegex ("address\\(([a-zA-Z0-9\\:]+)\\)" :: String), \[accountString] -> Just $ BAddress $ read accountString),
+    (makeRegex ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)" :: String), \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
+    (makeRegex ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)" :: String), \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
+    (makeRegex ("([0-9]+)" :: String), \[numString] -> Just $ BInteger $ read numString),
+    (makeRegex ("(\"([^\"\\\\]|\\.)*\")" :: String), \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
+  ]
 
 textToBasicValue :: Text -> BasicValue
 textToBasicValue v =

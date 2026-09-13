@@ -29,6 +29,7 @@ import Data.String
 import qualified Database.Redis as Redis
 import Flags
 import HFlags
+import qualified Strato.Tracing as Tr
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
@@ -38,6 +39,7 @@ main :: IO ()
 main = do
   blockappsInit "seq_main"
   runInstrumentation "strato-sequencer"
+  Tr.initTracing "strato-sequencer"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
 
   conn <- Redis.checkedConnect lookupRedisBlockDBConfig

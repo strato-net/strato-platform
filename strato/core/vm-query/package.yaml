@@ -1,0 +1,92 @@
+name:                vm-query
+version:             0.1.0.0
+license:             Apache-2.0
+synopsis:            "SQL-backed query VM (phase 5 spike), vm-runner JSON-RPC handlers over Postgres state instead of the trie"
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -O2
+  exposed-modules:
+    - Blockchain.VmQuery.SqlContext
+    - Blockchain.VmQuery.Seed
+    - Blockchain.VmQuery.Import
+    - Blockchain.VmQuery.Server
+  dependencies:
+    - base16-bytestring
+    - vector
+    - unordered-containers
+    - http-client-tls
+    - http-client
+    - warp
+    - wai-middleware-prometheus
+    - wai
+    - strato-tracing
+    - seqevents
+    - prometheus-client
+    - http-types
+    - binary
+    - aeson
+    - blockapps-data
+    - blockapps-datadefs
+    - blockapps-mpdbs
+    - blockDB
+    - bytestring
+    - composable-monads-base
+    - containers
+    - data-default
+    - debugger
+    - exceptions
+    - merkle-patricia-db
+    - monad-alter
+    - monad-logger
+    - mtl
+    - nibblestring
+    - persistent
+    - persistent-postgresql
+    - postgresql-simple
+    - solid-vm-model
+    - resource-pool
+    - resourcet
+    - sql-monad
+    - stm
+    - strato-conf
+    - strato-model
+    - text
+    - transformers
+    - time
+    - unliftio
+    - unliftio-core
+    - vm-runner
+    - vm-tools
+
+executables:
+  vm-query:
+    main: Main.hs
+    source-dirs: exec_src
+    ghc-options: -Wall -O2 -threaded -rtsopts
+    dependencies:
+      - base16-bytestring
+      - http-types
+      - http-client
+      - binary
+      - blockapps-data
+      - blockapps-datadefs
+      - blockapps-mpdbs
+      - bytestring
+      - containers
+      - data-default
+      - hflags
+      - monad-alter
+      - monad-logger
+      - persistent
+      - seqevents
+      - solid-vm-model
+      - sql-monad
+      - strato-model
+      - text
+      - vm-query
+      - vm-runner
+      - vm-tools

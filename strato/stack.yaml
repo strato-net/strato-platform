@@ -5,6 +5,7 @@ packages:
 - libs/groth16-snarkjs
 - libs/groth16-rapidsnark
 - libs/strato-auth
+- libs/strato-tracing
 - libs/strato-vault-client
 
 - api/bloc/bloc2
@@ -35,6 +36,8 @@ packages:
 - core/strato-p2p
 - core/strato-redis-blockdb
 - core/strato-sequencer
+- core/strato-ingest
+- core/vm-query
 - core/strato-statediff
 - core/vm-runner/
 - core/vm-tools/

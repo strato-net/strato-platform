@@ -11,9 +11,19 @@ parseBootnodeString s | not $ elem '[' s = [s]
 parseBootnodeString s = read s
 
 defineFlag "u:pguser" ("postgres" :: String) "Postgres user"
-defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname"
+defineFlag "P:pghost" ("localhost" :: String) "Postgres hostname. Anything other than localhost is an external cluster (e.g. the Aurora writer endpoint): no postgres container is generated and --password must carry its password"
+defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the Aurora reader endpoint) for PostgREST; defaults to --pghost"
+defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
+defineFlag "kafkaport" (9092 :: Int) "Streaming broker port (9094 for a core's VPC-facing listener, see --kafkaExternalHost)"
+defineFlag "busHost" ("" :: String) "Shared message bus (Kafka-compatible cluster) bootstrap hostname; empty means no bus. A core runs strato-ingest against it; an API directory submits to it per --busSubmitMode"
+defineFlag "busPort" (9096 :: Int) "Message bus port (9096 is MSK's SASL_SSL port)"
+defineFlag "busSecurity" ("sasl_ssl" :: String) "Message bus security: plaintext, ssl or sasl_ssl"
+defineFlag "busSaslUsername" ("" :: String) "SCRAM username for the message bus"
+defineFlag "busSaslPassword" ("" :: String) "SCRAM password for the message bus (prefer the bus_sasl_password environment variable)"
+defineFlag "busSubmitMode" ("core" :: String) "Where the API sends submitted transactions: core (this node's broker), bus, or shadow (both, while validating)"
+defineFlag "kafkaExternalHost" ("" :: String) "Private hostname or IP at which other hosts (the API tier) reach this node's broker; adds a second, VPC-facing listener on port 9094. Keep it private: the listener is plaintext, so restrict it with a security group"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
@@ -30,7 +40,7 @@ defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 
-defineFlag "apiIPAddress" "" "The address containers use to reach strato-api on the host (auto-detected if empty)"
+defineFlag "apiIPAddress" "" "Address strato-api binds to, which is also how the nginx container reaches it (default: the docker bridge 172.17.0.1 on Linux, 127.0.0.1 elsewhere)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
 defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the node"
@@ -47,11 +57,23 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
+defineFlag "vmQuery" (False :: Bool) "Run vm-query (port 8546) next to ethereum-jsonrpc and route latest-state eth_call, simulations and call traces to it, against the SQL state mirror instead of the consensus VM"
+defineFlag "validatorBehavior" (True :: Bool) "Whether this node votes and proposes when its key is in the validator set. Pass --validatorBehavior=false for a read-only follower core (an RPC cell) that executes blocks and serves reads but never takes part in consensus"
+defineFlag "writer" (True :: Bool) "Whether strato-indexer claims the writer lease at startup (unheld, stale, or its own). false makes a standby core: it follows the chain against the shared Postgres cluster and writes nothing until promoted with strato-promote"
+defineFlag "cellId" ("" :: String) "This core's name among the cores sharing a Postgres cluster (writer lease holder, consumer group suffixes). Default: the hostname"
+defineFlag "peerDatabase" ("" :: String) "Database for this core's peer store (p_peer, sync_task) on the Postgres host. Every core sharing a cluster needs its own, since strato-p2p resets peer state at startup. Default: the eth database, as on a monolith"
+defineFlag "peerStore" ("postgres" :: String) "Where strato-p2p and ethereum-discover keep peers and sync tasks: 'postgres' (the default, the database above) or 'sqlite' (the file peers.sqlite in the node directory, so a core whose Postgres is elsewhere keeps its networking state on its own disk and no longer depends on the database being reachable)"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
+defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (docker-compose.app.yml / the app CDK stack); pass --appUrl so the node's root redirects there"
+defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bundledApp=false"
+defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
+defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"
+defineFlag "bundledPostgrest" (True :: Bool) "Run PostgREST (the Cirrus API at /cirrus) next to this node (default). False when the API tier serves Cirrus; the node's /cirrus then answers 502"
+defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost and --kafkahost at a core and pass its Postgres password with --password)"
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 

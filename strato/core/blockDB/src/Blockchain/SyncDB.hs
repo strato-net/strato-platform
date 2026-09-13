@@ -37,13 +37,14 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
-import           Control.Monad.Composable.SQL
+import           Control.Monad.Reader                  (ask)
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
 import qualified Data.Text                             as T
 import           Data.Time
 import           Database.Esqueleto.Legacy
 import qualified Database.Persist.Sql                  as SQL
+import           Database.Persist.SqlBackend           (getRDBMS)
 import           Database.Redis                        (Redis, RedisCtx)
 import qualified Database.Redis                        as REDIS
 import           System.Random                         (randomIO)
@@ -366,8 +367,10 @@ class HasSyncDB m where
   setSyncTaskFinished :: Host -> m ()
   setSyncTaskNotReady :: Host -> m ()
 
-instance HasSQL m => HasSyncDB m where
-  clearAllSyncTasks host = sqlQuery $ do
+-- Sync tasks live in the peer store, which on a cell is not the eth
+-- database (see "Blockchain.DBM").
+instance HasPeerStore m => HasSyncDB m where
+  clearAllSyncTasks host = peerQuery $ do
     rawExecute
         [r|
             UPDATE "sync_task"
@@ -376,7 +379,7 @@ instance HasSQL m => HasSyncDB m where
         |]
         [toPersistValue host]
 
-  getCurrentSyncTask host = sqlQuery $ do
+  getCurrentSyncTask host = peerQuery $ do
     vals <-
         select $ from $ \syncTask -> do
           where_ (
@@ -396,11 +399,33 @@ instance HasSQL m => HasSyncDB m where
       _ -> error $ CL.red $ "multiple sync tasks found in call to getCurrentSyncTask:\n" ++ unlines (map (format . entityVal) vals)
 
   getNewSyncTask "127.0.0.1" _ = return Nothing -- empirically, I've observed a lot of wasted time trying to sync from the loopback....  Probably should just stop self-connect from even happening, but for now I'll just filter it out here
-  getNewSyncTask host highestBlockNum = sqlQuery $ do
+  getNewSyncTask host highestBlockNum = peerQuery $ do
     now <- liftIO getCurrentTime
     let oneMinuteAgo = addUTCTime (-60) now
+    rdbms <- getRDBMS <$> ask
 
-    result <- rawSql
+    -- The SQLite peer store has no row locks (a writer holds the whole file
+    -- for its transaction, which serialises the two processes as FOR UPDATE
+    -- SKIP LOCKED does on Postgres), no sequences (the insert numbers the
+    -- new chiliad from the highest one present, which is what the chiliad
+    -- sequence yields on a table that only ever grows) and no now().
+    result <- if rdbms == "sqlite"
+      then rawSql
+        [r|
+            UPDATE "sync_task"
+            SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
+            WHERE "id" = (
+                SELECT "id"
+                FROM "sync_task"
+                WHERE "assignment_time" < ?
+                  AND "status" != 'Finished'
+                ORDER BY "assignment_time" ASC
+                LIMIT 1
+            )
+            RETURNING ??
+        |]
+        [toPersistValue host, toPersistValue now, toPersistValue oneMinuteAgo]
+      else rawSql
         [r|
             UPDATE "sync_task"
             SET "host" = ?, "assignment_time" = ?, "status" = 'Assigned'
@@ -421,20 +446,28 @@ instance HasSQL m => HasSyncDB m where
       oneTask:_ -> return $ Just $ entityVal oneTask
       [] -> do
         --No existing task, make a new one
-        results <- SQL.rawSql
-          [r|
-            INSERT INTO sync_task (host)
-            SELECT ?
-            WHERE (select count(*) from "sync_task") < ?
-            RETURNING
-          |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+        results <- if rdbms == "sqlite"
+          then SQL.rawSql
+            [r|
+              INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status")
+              SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned'
+              WHERE (SELECT COUNT(*) FROM "sync_task") < ?
+              RETURNING ??
+            |] [toPersistValue now, toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
+          else SQL.rawSql
+            [r|
+              INSERT INTO sync_task (host)
+              SELECT ?
+              WHERE (select count(*) from "sync_task") < ?
+              RETURNING
+            |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
 
         case results of
           [v] -> return $ Just $ SQL.entityVal v
           []  -> return Nothing
           _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
-  setSyncTaskFinished host = sqlQuery $ do
+  setSyncTaskFinished host = peerQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
       where_ (
@@ -444,7 +477,7 @@ instance HasSQL m => HasSyncDB m where
         )
     return ()
 
-  setSyncTaskNotReady host = sqlQuery $ do
+  setSyncTaskNotReady host = peerQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val NotReady]
       where_ (

@@ -64,25 +64,26 @@ class AuthHandler {
         const isServiceUser = !token && (effectiveAllowAnon || walletAuthenticated);
 
         if (isServiceUser) {
+          // Empty when the backend has no client credentials: the request
+          // goes to the node anonymously (its read APIs are open).
           token = await getServiceToken();
         }
 
-        if (token) {
-          let payload: CustomJwtPayload;
-          try {
-            payload = await verifyAccessTokenSignature(token) as CustomJwtPayload;
-          } catch (err) {
-            res.status(RestStatus.UNAUTHORIZED).json({ error: "Invalid or expired access token" });
-            return next(err);
-          }
-
+        if (token || isServiceUser) {
           if (!isServiceUser) {
+            let payload: CustomJwtPayload;
+            try {
+              payload = await verifyAccessTokenSignature(token!) as CustomJwtPayload;
+            } catch (err) {
+              res.status(RestStatus.UNAUTHORIZED).json({ error: "Invalid or expired access token" });
+              return next(err);
+            }
             let userName: string = payload["preferred_username"];
             if (walletAddress) {
               req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
               req.isNewUser = false;
             } else {
-              const { address, isNew } = await createOrGetKey(token);
+              const { address, isNew } = await createOrGetKey(token!);
               req.address = address;
               req.isNewUser = isNew;
             }
@@ -90,7 +91,7 @@ class AuthHandler {
           } else if (walletAddress) {
             req.address = walletAddress.replace(/^0x/i, "").toLowerCase();
           }
-          req.accessToken = token;
+          req.accessToken = token ?? "";
 
           if (walletAddress) {
             return requestContext.run(

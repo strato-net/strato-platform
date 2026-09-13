@@ -10,8 +10,9 @@
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.EthConf (cirrusConnStr, ethConf, runStreamMConfigured)
+import Blockchain.EthConf (cirrusConnStr, currentCellId, ethConf, runStreamMConfigured)
 import qualified Blockchain.EthConf.Model as EC
+import Blockchain.Slipstream.Bus (newBusPublisher)
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options ()
@@ -38,6 +39,7 @@ main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
+  cell <- T.pack <$> currentCellId
 
   runLoggingT
     . runResourceT
@@ -68,5 +70,9 @@ main = do
       -- 1. `conn` connects slipstream to the cirrus database
       -- 2. The `pool` in the BlocEnv connects slipstream to the eth database
 
+      -- Egress to the shared message bus, when the node has one.
+      mBus <- traverse newBusPublisher (EC.busConfig ethConf)
+
+      $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ ": writing only while this cell holds the writer lease"
       runSQLM $
-        getAndProcessMessages conn
+        getAndProcessMessages cell conn mBus

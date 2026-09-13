@@ -1,0 +1,8 @@
+{
+  "app": "npx tsx bin/app-tier.ts",
+  "context": {
+    "@aws-cdk/core:newStyleStackSynthesis": true,
+    "@aws-cdk/aws-ecs:removeDefaultDeploymentAlarm": true,
+    "@aws-cdk/core:defaultCrossStackReferences": "strong"
+  }
+}

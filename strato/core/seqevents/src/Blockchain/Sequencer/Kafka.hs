@@ -5,9 +5,11 @@
 module Blockchain.Sequencer.Kafka
   ( assertSequencerTopicsCreation,
     unseqEventsTopicName,
+    ingestTxTopicName,
     seqVmTasksTopicName,
     seqP2pEventsTopicName,
     writeUnseqEvents,
+    writeIngestTx,
     writeSeqVmTasks,
     writeSeqP2pEvents,
     writeSeqEvents,
@@ -32,6 +34,13 @@ import Control.Monad.IO.Class (MonadIO)
 unseqEventsTopicName :: TopicName
 unseqEventsTopicName = "unseqevents"
 
+-- | Transactions forwarded from the message bus by strato-ingest. Kept
+-- apart from @unseqevents@ (gossip and consensus traffic, read from the
+-- latest offset) because this one is consumed durably and may be replayed:
+-- replaying transactions is harmless, replaying consensus messages is not.
+ingestTxTopicName :: TopicName
+ingestTxTopicName = "ingest_tx"
+
 seqVmTasksTopicName :: TopicName
 seqVmTasksTopicName = "vm_tasks"
 
@@ -41,12 +50,16 @@ seqP2pEventsTopicName = "seq_p2p_events"
 assertSequencerTopicsCreation :: HasStreaming m => m ()
 assertSequencerTopicsCreation = do
   createTopicAndWait unseqEventsTopicName
+  createTopicAndWait ingestTxTopicName
   createTopicAndWait seqVmTasksTopicName
   createTopicAndWait seqP2pEventsTopicName
 
 writeUnseqEvents :: HasStreaming k => [IngestEvent] -> k [ProduceResponse]
 writeUnseqEvents events = do
   produceItems unseqEventsTopicName events
+
+writeIngestTx :: HasStreaming k => [IngestEvent] -> k [ProduceResponse]
+writeIngestTx = produceItems ingestTxTopicName
 
 writeSeqVmTasks :: HasStreaming k => [VmTask] -> k [ProduceResponse]
 writeSeqVmTasks events = do

@@ -32,6 +32,9 @@ module Core.API
 import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
+import           Blockchain.Data.NodeStatus (CirrusTip)
+import           Blockchain.Model.SyncState (BestBlock, BestSequencedBlock)
+import           Blockchain.SyncDB (SyncStatus)
 import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
@@ -88,6 +91,10 @@ type MonadCoreAPI m =
     MonadLogger m,
     HasPeerDB m,
     Accessible Metadata.UrlMap m,
+    Accessible (Maybe SyncStatus) m,
+    Accessible (Maybe BestBlock) m,
+    Accessible (Maybe BestSequencedBlock) m,
+    Accessible (Maybe CirrusTip) m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
     BlkLast.GetLastBlocks m,

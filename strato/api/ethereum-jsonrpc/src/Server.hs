@@ -7,7 +7,9 @@ where
 
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
-import Blockchain.EthConf (runStreamMConfigured)
+import Blockchain.EthConf (ethConf, runStreamMConfigured)
+import Blockchain.EthConf.Model (ApiConfig (..), apiConfig)
+import Data.String (fromString)
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -15,6 +17,8 @@ import qualified Data.CaseInsensitive as CI
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Strato.Tracing (initTracing)
+import Strato.Tracing.Wai (tracingMiddleware)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
@@ -22,11 +26,14 @@ import RPC
 startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
-  let port = 8545
+  let apiConf = apiConfig ethConf
+      port = rpcPort apiConf
+      bindHost = rpcListenAddress apiConf
   runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
-  putStrLn $ "Listening on port " ++ show port
+  putStrLn $ "Listening on " ++ bindHost ++ ":" ++ show port
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
-  runSettings (setPort port $ setTimeout 150 defaultSettings) app
+  initTracing "ethereum-jsonrpc"
+  runSettings (setHost (fromString bindHost) $ setPort port $ setTimeout 150 defaultSettings) (tracingMiddleware "ethereum-jsonrpc" app)
 
 corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
 corsHeaders =

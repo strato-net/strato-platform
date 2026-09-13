@@ -24,6 +24,7 @@ library:
     - clock
     - common-log
     - conduit
+    - streaming-kafka-hw
     - containers
     - deepseq
     - directory
@@ -49,3 +50,4 @@ library:
     - unliftio
     - unordered-containers
     - strato-redis-blockdb
+    - strato-tracing
