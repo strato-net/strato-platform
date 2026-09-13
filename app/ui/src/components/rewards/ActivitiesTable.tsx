@@ -15,8 +15,7 @@ import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { useEarnContext } from "@/context/EarnContext";
 import { useSaveUsdstContext } from "@/context/SaveUsdstContext";
-import { useYieldVaultContext } from "@/hooks/useYieldVaultContext";
-import { buildActivityRewardsApyInfo, buildNativeRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
+import { buildActivityRewardsApyInfo, EarnApyInfo, findBestEarnApyInfo, findPoolEarnApyInfo } from "@/utils/earnUtils";
 
 interface ActivitiesTableProps {
   activities: Activity[];
@@ -95,54 +94,46 @@ const InfoTooltip = ({ content }: { content: string }) => {
 export const ActivitiesTable = ({ activities, loading }: ActivitiesTableProps) => {
   const { tokenApys } = useEarnContext();
   const { saveUsdstInfo } = useSaveUsdstContext();
-  const { vaults: yieldVaults } = useYieldVaultContext();
   const loginButtonClass = "bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90";
   const visibleActivities = activities.filter(
     (activity) => safeBigInt(activity?.emissionRate || "0") > 0n
   );
-  const saveUsdstVaultAddress = saveUsdstInfo?.vaultAddress?.toLowerCase?.() || "";
-  const usdstAddress = saveUsdstInfo?.assetAddress || "";
-  // Carry-style ERC4626 yield vaults (eth-carry, wbtc-carry). Address-keyed so
-  // we don't depend on activity name. Backend publishes their combined APY
-  // (native strategy yield + CATA rewards) into tokenApys via addCarryVaultApys.
-  const carryVaultAddresses = new Set(
-    Object.values(yieldVaults)
-      .map((vault) => vault?.vaultAddress?.toLowerCase?.() || "")
-      .filter((addr): addr is string => addr.length > 0)
-  );
 
   const getBestAvailableApyInfo = (activity: Activity): EarnApyInfo | null => {
-    const lowerName = activity.name?.toLowerCase?.() || "";
-    const normalizedSource = activity.sourceContract?.toLowerCase?.() || "";
-    const stakeAssetAddress = activity.stakeAssetAddress || null;
+    const routeType = activity.rewardRouteType;
+    const routeId =
+      activity.rewardRouteId ||
+      activity.sourceContract ||
+      activity.stakeAssetAddress ||
+      null;
 
-    if (lowerName.includes("swap lp")) {
-      return (
-        findPoolEarnApyInfo(tokenApys, activity.sourceContract) ||
-        findBestEarnApyInfo(tokenApys, stakeAssetAddress || activity.sourceContract)
-      );
-    }
-
-    if (
-      lowerName.includes("save usdst") ||
-      lowerName.includes("saveusdst") ||
-      (saveUsdstVaultAddress && normalizedSource === saveUsdstVaultAddress)
-    ) {
-      return findBestEarnApyInfo(tokenApys, saveUsdstInfo?.vaultAddress);
-    }
-
-    if (carryVaultAddresses.has(normalizedSource)) {
-      return findBestEarnApyInfo(tokenApys, normalizedSource);
-    }
-
-    if (lowerName.includes("direct mint") || lowerName.includes("bridge")) {
-      return buildActivityRewardsApyInfo(activity.emissionRate, activity.totalStakeUsd);
-    }
+    const routeApyInfo = (() => {
+      switch (routeType) {
+        case "swap_lp":
+          return (
+            findPoolEarnApyInfo(tokenApys, routeId) ||
+            findBestEarnApyInfo(tokenApys, routeId)
+          );
+        case "save_usdst":
+          return findBestEarnApyInfo(tokenApys, routeId || saveUsdstInfo?.vaultAddress);
+        case "carry_vault":
+        case "vault":
+        case "lending":
+          return findBestEarnApyInfo(tokenApys, routeId);
+        // Direct mint / CDP have no token-level earn route: a generic token lookup
+        // would leak an unrelated route's APY (e.g. Swap LP) into the row.
+        case "direct_mint":
+        case "cdp":
+          return null;
+        case "standalone":
+        default:
+          return findBestEarnApyInfo(tokenApys, routeId);
+      }
+    })();
 
     return (
-      findBestEarnApyInfo(tokenApys, stakeAssetAddress) ||
-      findBestEarnApyInfo(tokenApys, activity.sourceContract) ||
-      buildNativeRewardsApyInfo(null, activity.emissionRate, activity.totalStakeUsd, "rewards")
+      routeApyInfo ||
+      buildActivityRewardsApyInfo(activity.emissionRate, activity.totalStakeUsd)
     );
   };
 
