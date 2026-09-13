@@ -17,12 +17,17 @@ export interface HistoryStackProps extends StackProps {
 }
 
 /**
- * The app history service (phase 7): prices, swaps and balances over time
- * in a Postgres cluster of its own, so chart queries never touch the chain
- * data's replicas. One Fargate service runs the two feeds (bus consumer and
- * Cirrus poller) and the chart API, reached through the app ALB under
- * /history-api. Aurora Serverless v2 scales with query load and pauses when
- * idle; the indexer keeps it warm in practice.
+ * The app history service (phase 7): prices, swaps and balances over time.
+ * One Fargate service runs the feeds (the Cirrus poller, and the bus consumer
+ * when a bus is configured) and the chart API, reached through the app ALB
+ * under /history-api.
+ *
+ * Its tables live in a `history` database on an existing cluster when the
+ * config names one (the chain's Aurora cluster: one cluster to run and back
+ * up, and the history writes are small against it), which the service
+ * creates itself at start. Without one, the stack creates an Aurora
+ * Serverless v2 cluster of its own, so chart queries never touch the chain
+ * data's replicas; split to that once chart load shows in their metrics.
  */
 export class HistoryStack extends Stack {
   constructor(scope: Construct, id: string, props: HistoryStackProps) {
@@ -31,24 +36,55 @@ export class HistoryStack extends Stack {
     const history = config.history!;
     const name = `strato-history-${config.envName}`;
 
-    // --- Database: its own cluster, its own generated credentials ---
-    const dbSg = new ec2.SecurityGroup(this, "DbSg", { vpc, description: `${name} postgres`, allowAllOutbound: false });
-    const db = new rds.DatabaseCluster(this, "Db", {
-      engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_16_10 }),
-      clusterIdentifier: name,
-      credentials: rds.Credentials.fromGeneratedSecret("history", { secretName: `${name}/postgres` }),
-      defaultDatabaseName: "history",
-      writer: rds.ClusterInstance.serverlessV2("Writer"),
-      serverlessV2MinCapacity: 0.5,
-      serverlessV2MaxCapacity: 8,
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      securityGroups: [dbSg],
-      storageEncrypted: true,
-      backup: { retention: Duration.days(14) },
-      deletionProtection: true,
-      removalPolicy: RemovalPolicy.RETAIN,
-    });
+    const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
+
+    // --- Database: a database on an existing cluster, or a cluster of its own ---
+    let dbHost: string;
+    let dbPort: string;
+    let dbUser: string;
+    let dbSecret: secretsmanager.ISecret;
+    let dbCreate: string;
+    let dbDescription: string;
+    if (history.database) {
+      const existing = history.database;
+      dbHost = existing.host;
+      dbPort = String(existing.port);
+      dbUser = existing.user;
+      dbSecret = secretsmanager.Secret.fromSecretNameV2(this, "DbSecret", existing.secretName);
+      // The service creates its database through the maintenance database.
+      dbCreate = "true";
+      dbDescription = `history database on ${existing.host}`;
+      if (existing.securityGroupId) {
+        const clusterSg = ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", existing.securityGroupId);
+        clusterSg.addIngressRule(taskSg, ec2.Port.tcp(existing.port), "history service");
+      }
+    } else {
+      const dbSg = new ec2.SecurityGroup(this, "DbSg", { vpc, description: `${name} postgres`, allowAllOutbound: false });
+      const db = new rds.DatabaseCluster(this, "Db", {
+        engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_16_10 }),
+        clusterIdentifier: name,
+        credentials: rds.Credentials.fromGeneratedSecret("history", { secretName: `${name}/postgres` }),
+        defaultDatabaseName: "history",
+        writer: rds.ClusterInstance.serverlessV2("Writer"),
+        serverlessV2MinCapacity: 0.5,
+        serverlessV2MaxCapacity: 8,
+        vpc,
+        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        securityGroups: [dbSg],
+        storageEncrypted: true,
+        backup: { retention: Duration.days(14) },
+        deletionProtection: true,
+        removalPolicy: RemovalPolicy.RETAIN,
+      });
+      dbSg.addIngressRule(taskSg, ec2.Port.tcp(db.clusterEndpoint.port), "history service");
+      dbHost = db.clusterEndpoint.hostname;
+      dbPort = db.clusterEndpoint.port.toString();
+      dbUser = "history";
+      dbSecret = db.secret!;
+      // The cluster created the database; the service's user cannot.
+      dbCreate = "false";
+      dbDescription = db.clusterEndpoint.socketAddress;
+    }
 
     // --- Service ---
     const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/history/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
@@ -70,19 +106,18 @@ export class HistoryStack extends Stack {
       environment: {
         PORT: "3030",
         NODE_URL: config.nodeUrl,
-        postgres_host: db.clusterEndpoint.hostname,
-        postgres_port: db.clusterEndpoint.port.toString(),
-        postgres_user: "history",
+        postgres_host: dbHost,
+        postgres_port: dbPort,
+        postgres_user: dbUser,
         postgres_ssl: "require",
         HISTORY_DB_NAME: "history",
-        // The cluster created the database; the service's user cannot.
-        HISTORY_DB_CREATE: "false",
+        HISTORY_DB_CREATE: dbCreate,
         BUS_HOST: busHost || "",
         BUS_PORT: busPort || "9096",
         BUS_SECURITY: history.busSecurity,
       },
       secrets: {
-        postgres_password: ecs.Secret.fromSecretsManager(db.secret!, "password"),
+        postgres_password: ecs.Secret.fromSecretsManager(dbSecret, "password"),
         ...(busSecret
           ? {
               BUS_SASL_USERNAME: ecs.Secret.fromSecretsManager(busSecret, "username"),
@@ -96,9 +131,6 @@ export class HistoryStack extends Stack {
         startPeriod: Duration.seconds(60),
       },
     });
-
-    const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
-    dbSg.addIngressRule(taskSg, ec2.Port.tcp(db.clusterEndpoint.port), "history service");
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
@@ -122,11 +154,11 @@ export class HistoryStack extends Stack {
       deregistrationDelay: Duration.seconds(15),
     });
 
-    new CfnOutput(this, "DbEndpoint", { value: db.clusterEndpoint.socketAddress });
-    new CfnOutput(this, "DbSecretName", { value: db.secret!.secretName });
+    new CfnOutput(this, "Database", { value: dbDescription });
+    new CfnOutput(this, "DbSecretName", { value: dbSecret.secretName });
     new CfnOutput(this, "TaskSecurityGroupId", {
       value: taskSg.securityGroupId,
-      description: "Allow this group on the message bus (9096) so the live feed can subscribe to chain_events",
+      description: "Allow this group on the database cluster (when not done by the stack) and on the message bus (9096) if the live feed is used",
     });
   }
 }

@@ -24,20 +24,34 @@ export interface AppTierConfig {
   networkName: string;
   /** ACM certificate (in this region) for the ALB; HTTP-only when absent. */
   albCertificateArn?: string;
-  /** ACM certificate in us-east-1 plus the app's hostname, for CloudFront. */
-  cloudfrontCertificateArn?: string;
+  /** The app's public hostname (a CNAME to the CloudFront distribution at the registrar). */
   domainName?: string;
+  /** An existing us-east-1 certificate for it; without one the app creates a DNS-validated certificate (CertificateStack, in us-east-1). */
+  cloudfrontCertificateArn?: string;
+  /** The OpenID discovery URL for the backend, in plain: it only verifies users' tokens with it. Without it the backend reads the URL from the `oauth` secret. */
+  oauthDiscoveryUrl?: string;
   /**
-   * Secrets Manager names. `oauth` is JSON {discoveryUrl, clientId, clientSecret};
+   * Secrets Manager names. `oauth` is JSON {discoveryUrl, clientId, clientSecret} for
+   * nginx's login flow (the backend gets no client credentials: the node's read APIs are open);
    * `backend` is JSON with the backend's optional API keys (STRIPE_SECRET_KEY,
    * SENDGRID_API_KEY, ...); the other two are plain strings.
    */
   secrets: {
     oauth: string;
     postgresPassword: string;
+    /** When set, `postgresPassword` names a JSON secret and this is the key holding the password (the data-plane master secret's "password"). */
+    postgresPasswordJsonKey?: string;
     session: string;
     backend?: string;
   };
+  /** Create the session secret (64 random characters) under `secrets.session` instead of importing one. */
+  createSessionSecret: boolean;
+  /** The Aurora cluster's security group, opened to the tasks on the Postgres port at deploy time. */
+  postgresSecurityGroupId?: string;
+  /** SSM parameter holding a node ethconf.yaml base64-encoded: the nginx sidecar reads the node's ports and URLs from it (the API tier's parameter serves). */
+  ethconfParameterName?: string;
+  /** The port the app's nginx (the app-nginx image) listens on: 80. */
+  httpPort: number;
   /** Plain (non-secret) backend settings passed through as-is. */
   backendEnvironment: Record<string, string>;
   /** Deploy app/ui/dist to the bucket (requires `npm run build` in app/ui first). */
@@ -48,10 +62,14 @@ export interface AppTierConfig {
   otelSidecarPolicyArn?: string;
   /**
    * The app history service (phase 7). Present when `historyImage` is given:
-   * its own Aurora Serverless cluster and a Fargate service under
-   * /history-api on the app ALB. `busBootstrap` is host:port of the message
-   * bus; `busSecretName` a Secrets Manager JSON {username, password} SCRAM
-   * credential (the data-plane bus stack's AmazonMSK_ app secret).
+   * a Fargate service under /history-api on the app ALB, with its tables in
+   * a `history` database on an existing Postgres cluster when
+   * `historyDatabaseHost` is given (the chain's Aurora cluster: one cluster
+   * to run, and the writes are small), else in an Aurora Serverless cluster
+   * of its own. `busBootstrap` is host:port of the message bus (omit it to
+   * feed from the Cirrus poller only); `busSecretName` a Secrets Manager JSON
+   * {username, password} SCRAM credential (the data-plane bus stack's
+   * AmazonMSK_ app secret).
    */
   history?: {
     image: string;
@@ -59,6 +77,15 @@ export interface AppTierConfig {
     busBootstrap?: string;
     busSecurity: string;
     busSecretName?: string;
+    /** An existing cluster to hold the history database; the secret is JSON with a "password" field. */
+    database?: {
+      host: string;
+      port: number;
+      user: string;
+      secretName: string;
+      /** The cluster's security group, to allow the service on its port; omit to do that by hand. */
+      securityGroupId?: string;
+    };
   };
 }
 
@@ -95,12 +122,18 @@ export function loadConfig(app: App): AppTierConfig {
     albCertificateArn: optional(app, "albCertificateArn"),
     cloudfrontCertificateArn: optional(app, "cloudfrontCertificateArn"),
     domainName: optional(app, "domainName"),
+    oauthDiscoveryUrl: optional(app, "oauthDiscoveryUrl"),
     secrets: {
       oauth: ctx(app, "oauthSecretName", "strato/app/oauth"),
       postgresPassword: ctx(app, "postgresPasswordSecretName", "strato/app/postgres-password"),
+      postgresPasswordJsonKey: optional(app, "postgresPasswordJsonKey"),
       session: ctx(app, "sessionSecretName", "strato/app/session-secret"),
       backend: optional(app, "backendSecretName"),
     },
+    createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
+    postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
+    ethconfParameterName: optional(app, "ethconfParameterName"),
+    httpPort: Number(ctx(app, "httpPort", "80")),
     backendEnvironment: ctx<Record<string, string>>(app, "backendEnvironment", {}),
     deployUi: String(ctx(app, "deployUi", "false")) === "true",
     desiredCount: Number(ctx(app, "desiredCount", "2")),
@@ -113,6 +146,15 @@ export function loadConfig(app: App): AppTierConfig {
           busBootstrap: optional(app, "busBootstrap"),
           busSecurity: ctx(app, "busSecurity", "sasl_ssl"),
           busSecretName: optional(app, "busSecretName"),
+          database: optional(app, "historyDatabaseHost")
+            ? {
+                host: ctx(app, "historyDatabaseHost"),
+                port: Number(ctx(app, "historyDatabasePort", "5432")),
+                user: ctx(app, "historyDatabaseUser", "postgres"),
+                secretName: ctx(app, "historyDatabaseSecretName", `strato/${ctx(app, "envName", "testnet")}/postgres`),
+                securityGroupId: optional(app, "historyDatabaseSecurityGroupId"),
+              }
+            : undefined,
         }
       : undefined,
   };

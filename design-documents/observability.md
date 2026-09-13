@@ -67,7 +67,7 @@ sidecar or newer.
 agent to `/strato/<env>/cell`; tasks already log through awslogs.
 
 **The synthetic check**: a CloudWatch Synthetics canary hits the edge every
-minute, reads the latest block over JSON-RPC, records `STRATO/BlockAgeSeconds`
+five minutes (a one-minute cadence costs five times more for the same block-age signal), reads the latest block over JSON-RPC, records `STRATO/BlockAgeSeconds`
 and fails past the configured age. With `-c canaryKeySecretName` it also
 submits a no-op transaction each run: one unit of the native token from the
 canary's address to itself, an Ethereum-legacy transaction with an EIP-155
@@ -76,7 +76,7 @@ signature and gas price zero, exactly what the app's wallet path sends
 decoder). It polls the receipt and records `STRATO/TimeToInclusionSeconds`
 and `STRATO/TxCanarySuccess`. A missing receipt or a failed result fails
 the run, so the existing canary alarm pages; inclusion averaging over 10 s
-for five minutes warns.
+for two consecutive runs warns.
 
 The key lives in Secrets Manager as JSON `{"privateKey": "0x..."}`,
 referenced by name in CDK and read only by the canary's role at run time.

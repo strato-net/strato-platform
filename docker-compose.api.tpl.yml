@@ -4,14 +4,11 @@
 # balancer. Everything it needs is reached over the network:
 #   Postgres (eth + cirrus)   postgres_host / postgres_password
 #   Kafka (tx submission)     kafkaHost / kafkaPort
-#   edge Redis                EDGE_REDIS_HOST (nonces, CSRF tokens, sessions);
-#                             the bundled edge-redis is for a single copy only
 #   vault                     VAULT_URL
 # Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
 # parameters, and the node's secrets/ (postgres_password, session_secret,
 # oauth_credentials.yaml) at ./secrets/.
 volumes:
-  edgeredisdata:
     driver: local
 services:
   strato-api:
@@ -24,8 +21,6 @@ services:
       - postgres_password=${postgres_password:-}
       - kafkaHost=${kafkaHost:?kafkaHost is required}
       - kafkaPort=${kafkaPort:-9092}
-      - EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-edge-redis}
-      - EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
       # Shared message bus (optional): submits go there per BUS_SUBMIT_MODE
       # and resolve=true wakes on its tx_results stream.
       - BUS_HOST=${BUS_HOST:-}
@@ -73,22 +68,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  edge-redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - edgeredisdata:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-      interval: 2s
-      timeout: 2s
-      retries: 10
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   docs:
     image: swaggerapi/swagger-ui:v5.29.2
     environment:
@@ -104,7 +83,6 @@ services:
     depends_on:
       - strato-api
       - postgrest
-      - edge-redis
       - docs
     environment:
       # The sidecar proxies to the strato-api container, not the host in nodeUrl.
@@ -121,8 +99,6 @@ services:
       - APEX_HOST=${APEX_HOST:-127.0.0.1:1}
       - SMD_HOST=${SMD_HOST:-127.0.0.1:1}
       - PROMETHEUS_HOST=${PROMETHEUS_HOST:-127.0.0.1:1}
-      - EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-edge-redis}
-      - EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
       # The app runs on its own tier; "/" redirects there (404 if unset).
       - BUNDLED_APP=false
       - APP_URL=${APP_URL:-}

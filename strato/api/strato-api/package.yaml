@@ -27,7 +27,6 @@ executables:
     - core-api2
     - ethereum-discovery
     - format
-    - hedis
     - streaming-kafka-hw
     - time
     - http-types

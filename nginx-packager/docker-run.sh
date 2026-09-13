@@ -49,11 +49,18 @@ JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
 # APP_URL, or answers 404 when no APP_URL is known.
 BUNDLED_APP=${BUNDLED_APP:-true}
 APP_URL=${APP_URL:-}
-# Edge Redis for CSRF tokens and sessions, shared by every nginx instance in
-# front of the API tier. Empty EDGE_REDIS_HOST keeps both in this instance's
-# memory (fine for a single node, wrong behind a load balancer).
-EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-}
-EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
+# Whether the SMD runs next to this nginx or is served from its own deployment
+# (S3 behind CloudFront). Unbundled, the SMD locations are dropped and /smd
+# redirects to SMD_URL (404 when none is known); SMD_HOST then points at a
+# closed port so nginx never has to resolve a missing smd container.
+BUNDLED_SMD=${BUNDLED_SMD:-true}
+SMD_URL=${SMD_URL:-}
+if [[ "$BUNDLED_SMD" != "true" ]]; then SMD_HOST=127.0.0.1:1; fi
+# The scheme browsers use to reach this nginx, for the OpenID redirect and
+# post-logout URIs: https with ssl=true, http otherwise, unless PUBLIC_SCHEME
+# says so. A tier behind a TLS-terminating load balancer or CloudFront sees
+# plain HTTP but is reached over https, and sets PUBLIC_SCHEME=https.
+PUBLIC_SCHEME=${PUBLIC_SCHEME:-}
 # Session cookie secret: from the mounted secret file unless given directly.
 if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
     SESSION_SECRET=$(tr -d '[:space:]' < /run/secrets/session_secret)
@@ -149,6 +156,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
+  # Nameservers for the resolver directive: whatever this container was given.
+  RESOLVER=$(awk '/^nameserver/ && $2 !~ /:/ {printf "%s ", $2}' /etc/resolv.conf)
+  RESOLVER=${RESOLVER:-127.0.0.11}
+  sed -i "s/__RESOLVER__/${RESOLVER% }/g" /tmp/nginx.conf
 
   # This is used to remove lines from the nginx.conf
   # without having to put the entire replacement string in this file
@@ -221,18 +232,23 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
       sed -i "s|__APP_URL__|${APP_URL%/}|g" /tmp/nginx.conf
     fi
   fi
-  if [[ -z "$EDGE_REDIS_HOST" ]]; then
-    sed -i '/#TEMPLATE_MARK_EDGE_REDIS/d' /tmp/nginx.conf
+  if [[ "$BUNDLED_SMD" == "true" ]]; then
+    sed -i '/#TEMPLATE_MARK_EXTERNAL_SMD/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_BUNDLED_SMD//g' /tmp/nginx.conf
   else
-    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EDGE_REDIS//g' /tmp/nginx.conf
+    sed -i '/#TEMPLATE_MARK_BUNDLED_SMD/d' /tmp/nginx.conf
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EXTERNAL_SMD//g' /tmp/nginx.conf
+    if [[ -z "$SMD_URL" ]]; then
+      sed -i 's|return 302 __SMD_URL__$request_uri;|return 404;|' /tmp/nginx.conf
+    else
+      sed -i "s|__SMD_URL__|${SMD_URL%/}|g" /tmp/nginx.conf
+    fi
   fi
   if [[ -z "$SESSION_SECRET" ]]; then
     sed -i '/#TEMPLATE_MARK_SESSION_SECRET/d' /tmp/nginx.conf
   else
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
   fi
-  sed -i "s/__EDGE_REDIS_HOST__/$EDGE_REDIS_HOST/g" /tmp/nginx.conf
-  sed -i "s/__EDGE_REDIS_PORT__/$EDGE_REDIS_PORT/g" /tmp/nginx.conf
   sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
   sed -i "s|__TRACKING_URL__|$TRACKING_URL|g" /tmp/nginx.conf
@@ -281,11 +297,11 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
 
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-https}/g" /tmp/openid.lua
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/vault-openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-http}/g" /tmp/openid.lua
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/vault-openid.lua
   fi
 
@@ -302,12 +318,18 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/tracing.lua /usr/local/openresty/nginx/lua/tracing.lua
 fi
 
+# apex is optional in the API tier task (APEX_HOST then points at a closed
+# port); wait for it only when it is deployed.
+if [[ "${APEX_HOST##*:}" == "1" ]]; then
+  echo "apex not deployed (APEX_HOST=${APEX_HOST}); not waiting for it"
+else
 echo 'Waiting for apex to be available...'
-until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
-do
-  sleep 0.5
-done
-echo 'apex is available'
+  until curl --silent --output /dev/null --fail --location http://${APEX_HOST}/_ping
+  do
+    sleep 0.5
+  done
+  echo 'apex is available'
+fi
 
 echo  'nginx is now running. See the logs below...'
 exec openresty -g "daemon off;"

@@ -4,7 +4,6 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
@@ -15,6 +14,10 @@ import { Construct } from "constructs";
 import { ApiTierConfig } from "./config";
 
 export interface ApiTierStackProps extends StackProps {
+  /** Certificate for the ALB's HTTPS listener (from CertificateStack); `config.albCertificateArn` otherwise. */
+  albCertificate?: acm.ICertificate;
+  /** More hostnames the HTTPS listener answers for: the SMD's, which CloudFront forwards with the viewer's Host header and so needs a matching certificate here. */
+  extraCertificates?: acm.ICertificate[];
   vpc: ec2.IVpc;
   config: ApiTierConfig;
 }
@@ -23,11 +26,10 @@ export interface ApiTierStackProps extends StackProps {
  * The STRATO API tier: one Fargate task per copy running the node's nginx as
  * a sidecar in front of strato-api + ethereum-jsonrpc (the strato image's
  * api-doit.sh entrypoint), PostgREST for Cirrus, and the SMD and apex
- * containers the SMD needs, behind an ALB. Shared state lives in a small
- * ElastiCache Redis: nonce counters for bloc, CSRF tokens and sessions for
- * nginx. Reads go to the Aurora reader endpoint, writes and the resolve poll
- * to the writer, and transactions and VM calls to the core's VPC-facing
- * Kafka listener until the message bus exists.
+ * containers the SMD needs, behind an ALB. There is no shared edge state:
+ * sessions ride in the encrypted cookie, CSRF tokens stay per instance behind
+ * ALB session stickiness, and nonce counters live in Aurora's writer. Until
+ * the message bus exists, transactions go to the core's Kafka listener.
  */
 export class ApiTierStack extends Stack {
   readonly loadBalancer: elbv2.ApplicationLoadBalancer;
@@ -37,31 +39,16 @@ export class ApiTierStack extends Stack {
     const { vpc, config } = props;
     const name = `strato-api-${config.envName}`;
 
-    // --- Edge Redis ---
-    const redisSg = new ec2.SecurityGroup(this, "RedisSg", { vpc, description: `${name} edge redis`, allowAllOutbound: false });
-    const redisSubnets = new elasticache.CfnSubnetGroup(this, "RedisSubnets", {
-      description: `${name} edge redis subnets`,
-      subnetIds: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
-    });
-    const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
-      replicationGroupDescription: `${name} edge redis (nonces, CSRF tokens, sessions)`,
-      engine: "redis",
-      engineVersion: "7.1",
-      cacheNodeType: "cache.t4g.micro",
-      numCacheClusters: 2,
-      automaticFailoverEnabled: true,
-      multiAzEnabled: true,
-      atRestEncryptionEnabled: true,
-      transitEncryptionEnabled: false,
-      cacheSubnetGroupName: redisSubnets.ref,
-      securityGroupIds: [redisSg.securityGroupId],
-    });
-    redis.addResourceDependency(redisSubnets);
-
     // --- Secrets and the node config ---
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
     const oauthYaml = secretsmanager.Secret.fromSecretNameV2(this, "OauthYamlSecret", config.secrets.oauthCredentialsYaml);
-    const session = secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+    const session: secretsmanager.ISecret = config.createSessionSecret
+      ? new secretsmanager.Secret(this, "SessionSecret", {
+          secretName: config.secrets.session,
+          description: `${name} nginx session secret`,
+          generateSecretString: { passwordLength: 64, excludePunctuation: true },
+        })
+      : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
     // MSK SASL/SCRAM secret: JSON {username, password}, name prefixed AmazonMSK_.
     const busSecret = config.busHost ? secretsmanager.Secret.fromSecretNameV2(this, "BusSecret", config.busSecretName) : undefined;
     const ethconf = ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", {
@@ -97,9 +84,9 @@ export class ApiTierStack extends Stack {
         postgres_user: config.postgresUser,
         kafkaHost: config.kafkaHost,
         kafkaPort: String(config.kafkaPort),
-        EDGE_REDIS_HOST: redis.attrPrimaryEndPointAddress,
-        EDGE_REDIS_PORT: redis.attrPrimaryEndPointPort,
         VM_QUERY: config.vmQuery ? "true" : "false",
+
+        ...(config.vaultUrl ? { VAULT_URL: config.vaultUrl } : {}),
         ...(config.busHost
           ? { BUS_HOST: config.busHost, BUS_PORT: String(config.busPort), BUS_SECURITY: "sasl_ssl", BUS_SUBMIT_MODE: config.busSubmitMode }
           : {}),
@@ -113,7 +100,7 @@ export class ApiTierStack extends Stack {
           : {}),
       },
       healthCheck: {
-        command: ["CMD-SHELL", "pgrep strato-api && pgrep ethereum-jsonrpc || exit 1"],
+        command: ["CMD-SHELL", "pgrep -f '^strato-api' && pgrep -f '^ethereum-jsonrpc' || exit 1"],
         interval: Duration.seconds(15),
         startPeriod: Duration.seconds(90),
       },
@@ -160,6 +147,20 @@ export class ApiTierStack extends Stack {
         })
       : undefined;
 
+    // The API docs: Swagger UI, served at /docs/ by the nginx sidecar, which
+    // also serves the spec and the initializer from its own image. Not
+    // essential, so a docs failure never takes the API down.
+    const docs = config.docsImage
+      ? task.addContainer("docs", {
+          image: image("DocsRepo", config.docsImage),
+          logging: awsLogs("docs"),
+          portMappings: [{ containerPort: 8080 }],
+          environment: { API_URL: "/docs/swagger.yaml" },
+          essential: false,
+          memoryReservationMiB: 64,
+        })
+      : undefined;
+
     const nginx = task.addContainer("nginx", {
       image: image("NginxRepo", config.nginxImage),
       logging: awsLogs("nginx"),
@@ -172,12 +173,12 @@ export class ApiTierStack extends Stack {
         POSTGREST_HOST: "127.0.0.1:3001",
         SMD_HOST: smd ? "127.0.0.1:3002" : "127.0.0.1:1",
         APEX_HOST: apex ? "127.0.0.1:3009" : "127.0.0.1:1",
-        DOCS_HOST: "127.0.0.1:1",
+        DOCS_HOST: docs ? "127.0.0.1:8080" : "127.0.0.1:1",
         PROMETHEUS_HOST: "127.0.0.1:1",
         BUNDLED_APP: "false",
-        EDGE_REDIS_HOST: redis.attrPrimaryEndPointAddress,
-        EDGE_REDIS_PORT: redis.attrPrimaryEndPointPort,
         ssl: "false",
+        // TLS ends at the ALB (or CloudFront): the OpenID redirect goes back over https.
+        ...(props.albCertificate || config.albCertificateArn ? { PUBLIC_SCHEME: "https" } : {}),
       },
       secrets: {
         ...ethconfEnv,
@@ -219,7 +220,16 @@ export class ApiTierStack extends Stack {
     }
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
-    redisSg.addIngressRule(taskSg, ec2.Port.tcp(6379), "nonces, CSRF tokens, sessions");
+    if (config.postgresSecurityGroupId) {
+      ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId).addIngressRule(taskSg, ec2.Port.tcp(config.postgresPort), `${name} tasks`);
+    }
+    if (config.coreSecurityGroupId) {
+      const core = ec2.SecurityGroup.fromSecurityGroupId(this, "CoreSg", config.coreSecurityGroupId);
+      core.addIngressRule(taskSg, ec2.Port.tcp(config.kafkaPort), `${name} tasks: Kafka`);
+      core.addIngressRule(taskSg, ec2.Port.tcp(3000), `${name} tasks: strato-api`);
+      core.addIngressRule(taskSg, ec2.Port.tcp(8545), `${name} tasks: jsonrpc`);
+      core.addIngressRule(taskSg, ec2.Port.tcp(8093), `${name} tasks: vault wrapper`);
+    }
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
@@ -237,23 +247,37 @@ export class ApiTierStack extends Stack {
     // --- ALB ---
     const albSg = new ec2.SecurityGroup(this, "AlbSg", { vpc, description: `${name} alb` });
     this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: name });
-    const listener = config.albCertificateArn
+    const albCertificate =
+      props.albCertificate ?? (config.albCertificateArn ? acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn) : undefined);
+    // The port-80 listener keeps one logical id whether it forwards (no
+    // certificate) or redirects to 443: two listeners on one port cannot
+    // coexist, so switching to HTTPS must update it in place. The service moves
+    // to the HTTPS listener's target group in place too.
+    const http = this.loadBalancer.addListener("Http", {
+      port: 80,
+      ...(albCertificate ? { defaultAction: elbv2.ListenerAction.redirect({ port: "443", protocol: "HTTPS", permanent: true }) } : {}),
+    });
+    const listener = albCertificate
       ? this.loadBalancer.addListener("Https", {
           port: 443,
-          certificates: [acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn)],
+          certificates: [albCertificate],
           sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
         })
-      : this.loadBalancer.addListener("Http", { port: 80 });
+      : http;
+    if (albCertificate && props.extraCertificates?.length) {
+      listener.addCertificates("ExtraCertificates", props.extraCertificates.map((c) => elbv2.ListenerCertificate.fromCertificateManager(c)));
+    }
     listener.addTargets("Nginx", {
       port: config.httpPort,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
       healthCheck: { path: "/_ping", interval: Duration.seconds(15), healthyThresholdCount: 2 },
       deregistrationDelay: Duration.seconds(30),
+      // A browser stays on the instance that issued its CSRF token (kept in
+      // that nginx's shared dict); sessions themselves are in the cookie, so
+      // a re-pin after a deploy only costs one CSRF refresh.
+      stickinessCookieDuration: Duration.days(1),
     });
-    if (config.albCertificateArn) {
-      this.loadBalancer.addListener("HttpRedirect", { port: 80, defaultAction: elbv2.ListenerAction.redirect({ port: "443", protocol: "HTTPS", permanent: true }) });
-    }
 
     // --- Weighted cutover on the node hostname ---
     // Two weighted records with the same name: the node(s) and this tier.
@@ -284,11 +308,16 @@ export class ApiTierStack extends Stack {
     }
 
     new CfnOutput(this, "AlbDnsName", { value: this.loadBalancer.loadBalancerDnsName });
+    if (config.domainName && !config.hostedZoneId) {
+      new CfnOutput(this, "HostnameRecord", {
+        value: `${config.domainName} CNAME ${this.loadBalancer.loadBalancerDnsName}`,
+        description: "The record to create at the registrar for the tier's hostname",
+      });
+    }
     new CfnOutput(this, "TaskSecurityGroupId", {
       value: taskSg.securityGroupId,
       description: "Allow on the Aurora cluster (5432) and the core host's Kafka external listener (9094)",
     });
-    new CfnOutput(this, "RedisEndpoint", { value: `${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}` });
   }
 }
 

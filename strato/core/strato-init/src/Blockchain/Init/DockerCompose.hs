@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -23,13 +23,18 @@ import System.Process (readProcess)
 roleHasService :: Role -> String -> Bool
 roleHasService RoleNode _ = True
 roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
-roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "edge-redis", "docs"]
+roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
   -- app-backend and app-ui ride along only with a full node that has not
   -- moved its app tier out.
   let bundledApp = role == RoleNode && flags_bundledApp
+      -- The SMD rides along too, unless it is served from its own deployment.
+      bundledSmd = role == RoleNode && flags_bundledSmd
+      -- PostgREST (Cirrus at /cirrus) too, unless the API tier serves Cirrus.
+      -- An API directory always runs it.
+      bundledPostgrest = role /= RoleNode || flags_bundledPostgrest
       -- A remote --pghost (a managed cluster) replaces the postgres container:
       -- containers reach it by that name instead of the service name.
       externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
@@ -63,7 +68,7 @@ generateDockerCompose role = do
   let appBackend = def
         { image = "app-backend:" ++ stratoVersionTag ++ "-" ++ hashAppBackend
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "postgrest"])
+        , depends_on = Just $ DependsOnList (withPostgres (["postgres"] ++ [ "postgrest" | bundledPostgrest ]))
         , init = Just True
         , extra_hosts = hostGateway
         , volumes = Just
@@ -126,7 +131,7 @@ generateDockerCompose role = do
   let smd = def
         { image = "smd:" ++ stratoVersionTag ++ "-" ++ hashSmd
         , user = Just userGid
-        , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
+        , depends_on = Just $ DependsOnList (["apex"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"])
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
         , entrypoint = Just ["/bin/sh", "-c"]
@@ -181,27 +186,6 @@ generateDockerCompose role = do
         , logging = noLogging
         , volumes = Just ["./logs:/logs", "./redis:/data"]
         , ports = Just ["127.0.0.1:6379:6379"]
-        }
-
-  -- The edge tier's Redis: nonce counters (strato-api), CSRF tokens and
-  -- sessions (nginx). Separate from the core's block DB so the core's Redis
-  -- stays internal; on a split deployment this is the API tier's ElastiCache.
-  let edgeRedis = def
-        { image = "redis:7-alpine"
-        , user = Just userGid
-        , entrypoint = Just ["/bin/sh", "-c"]
-        , command = Just ["exec docker-entrypoint.sh redis-server --appendonly yes >> /logs/edge-redis.log 2>&1"]
-        , restart = Just "unless-stopped"
-        , healthcheck = Just Healthcheck
-            { test = ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-            , interval = Just "2s"
-            , timeout = Just "2s"
-            , retries = Just 10
-            , start_period = Just "30s"
-            }
-        , logging = noLogging
-        , volumes = Just ["./logs:/logs", "./edge-redis:/data"]
-        , ports = Just ["127.0.0.1:6380:6379"]
         }
 
   let postgrest = def
@@ -261,14 +245,14 @@ generateDockerCompose role = do
               then DependsOnMap $ Map.fromList $
                 [ ("apex", DependsOnCondition "service_started")
                 , ("docs", DependsOnCondition "service_started")
-                , ("postgrest", DependsOnCondition "service_started")
                 , ("prometheus", DependsOnCondition "service_started")
-                , ("smd", DependsOnCondition "service_started")
-                , ("edge-redis", DependsOnCondition "service_healthy")
                 , ("local-auth", DependsOnCondition "service_healthy")
-                ] ++ [ (svc, DependsOnCondition "service_started") | bundledApp, svc <- ["app-backend", "app-ui"] ]
+                ] ++ [ ("postgrest", DependsOnCondition "service_started") | bundledPostgrest ]
+                  ++ [ ("smd", DependsOnCondition "service_started") | bundledSmd ]
+                  ++ [ (svc, DependsOnCondition "service_started") | bundledApp, svc <- ["app-backend", "app-ui"] ]
               else DependsOnList $
-                ["apex", "docs", "postgrest", "prometheus", "smd", "edge-redis"]
+                ["apex", "docs"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"]
+                  ++ [ "smd" | bundledSmd ]
                   ++ [ svc | bundledApp, svc <- ["app-backend", "app-ui"] ]
         
         , environment = Just $ Map.fromList $
@@ -279,12 +263,16 @@ generateDockerCompose role = do
             , ("RPC_PORT", rpcPort)
             , ("TRACKING_ENABLED", "true")
             , ("TRACKING_URL", "https://go.strato.nexus")
-            , ("EDGE_REDIS_HOST", "edge-redis")
-            , ("EDGE_REDIS_PORT", "6379")
             , ("BUNDLED_APP", if bundledApp then "true" else "false")
             , ("APP_URL", flags_appUrl)
             , ("ssl", if ssl then "true" else "false")
             ]
+            -- An SMD served from its own deployment: nginx drops the SMD
+            -- locations and redirects /smd there. Absent in the bundled default.
+            ++ [ kv | role == RoleNode && not bundledSmd, kv <- [("BUNDLED_SMD", "false"), ("SMD_URL", flags_smdUrl)] ]
+            -- Without PostgREST, /cirrus gets an unreachable upstream (502) so
+            -- nginx never has to resolve the missing postgrest container.
+            ++ [ ("POSTGREST_HOST", "127.0.0.1:1") | not bundledPostgrest ]
             ++ if flags_localAuth
                then [ ("OAUTH_DISCOVERY_URL", "http://local-auth:4444/.well-known/openid-configuration")
                     ]
@@ -423,7 +411,6 @@ generateDockerCompose role = do
             , ("smd", smd)
             , ("apex", apex)
             , ("redis", redis)
-            , ("edge-redis", edgeRedis)
             , ("postgrest", postgrest)
             , ("postgres", postgres)
             , ("nginx", nginx)
@@ -438,7 +425,7 @@ generateDockerCompose role = do
       -- An API-only nginx has no SMD, apex or Prometheus behind it; their
       -- locations get an unreachable upstream and answer 502.
       apiOnlyNginx = nginx
-        { depends_on = Just $ DependsOnList ["docs", "postgrest", "edge-redis"]
+        { depends_on = Just $ DependsOnList ["docs", "postgrest"]
         , environment = Map.union (Map.fromList
             [ ("APEX_HOST", "127.0.0.1:1")
             , ("SMD_HOST", "127.0.0.1:1")
@@ -450,6 +437,8 @@ generateDockerCompose role = do
         | (name, svc) <- allServices
         , roleHasService role name
         , bundledApp || name `notElem` ["app-backend", "app-ui"]
+        , bundledSmd || name /= "smd"
+        , bundledPostgrest || name /= "postgrest"
         , not (externalPostgres && name == "postgres")
         ]
 

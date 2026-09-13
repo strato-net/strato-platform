@@ -8,7 +8,6 @@ module Blockchain.EthConf
     connStr,
     readerConnStr,
     lookupRedisBlockDBConfig,
-    edgeRedisConnectInfo,
     cirrusConnStr,
     peerConnStr,
     currentCellId,
@@ -140,7 +139,3 @@ streamEnvPool name = modifyMVar streamEnvPools $ \pools ->
 
 lookupRedisBlockDBConfig :: Redis.ConnectInfo
 lookupRedisBlockDBConfig = redisConnection $ redisBlockDBConfig ethConf
-
--- | The edge tier's Redis (nonces, CSRF tokens, sessions).
-edgeRedisConnectInfo :: Redis.ConnectInfo
-edgeRedisConnectInfo = redisConnection $ edgeRedisConfig ethConf

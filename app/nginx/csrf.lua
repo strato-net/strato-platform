@@ -13,24 +13,15 @@ local CSRF_TOKEN_TTL = 1800
 -- so requests already in flight with pre-rotation cookies still validate
 local ROTATION_GRACE_TTL = 60
 
--- Token store backends. Both expose the same interface:
+-- Token store: this instance's shared dict. Behind a load balancer the
+-- target group's session stickiness keeps a browser on the instance that
+-- issued its token, so no shared store is needed.
 --   get(key) -> value|nil
 --   set(key, value, ttl) -> ok, err
 --   add(key, value, ttl) -> ok, err   (err == "exists" when already present)
 --   ttl(key) -> seconds remaining|nil
 --   delete(key)
 --   expire_at_most(key, ttl)         (shorten a key's life; never extend it)
---
--- The Redis backend is what makes several nginx instances interchangeable:
--- a token issued by one is valid at all of them. The shared-dict backend is
--- the single-instance fallback, used when no edge Redis is configured.
-
-local REDIS_CONNECT_TIMEOUT_MS = 200
-local REDIS_RW_TIMEOUT_MS = 500
-local REDIS_KEEPALIVE_MS = 10000
-local REDIS_POOL_SIZE = 50
-local REDIS_KEY_PREFIX = "csrf:"
-
 local function new_dict_store(dict)
     local store = {}
     function store.get(_, key) return dict:get(key) end
@@ -48,99 +39,9 @@ local function new_dict_store(dict)
     return store
 end
 
-local function new_redis_store(host, port)
-    local store = { host = host, port = tonumber(port) or 6379 }
-
-    local function with_redis(fn)
-        local redis = require "resty.redis"
-        local red = redis:new()
-        red:set_timeouts(REDIS_CONNECT_TIMEOUT_MS, REDIS_RW_TIMEOUT_MS, REDIS_RW_TIMEOUT_MS)
-        local ok, err = red:connect(store.host, store.port)
-        if not ok then
-            ngx.log(ngx.ERR, "CSRF: cannot reach edge redis ", store.host, ":", store.port, ": ", err)
-            return nil, err
-        end
-        local results = { fn(red) }
-        red:set_keepalive(REDIS_KEEPALIVE_MS, REDIS_POOL_SIZE)
-        return unpack(results)
-    end
-
-    -- Cosockets are unavailable in the header_filter and log phases, where
-    -- session rotation runs. Writes issued there are deferred to a zero-delay
-    -- timer, which runs with socket access as soon as the handler yields;
-    -- the response carrying the new cookie has not left the server by then.
-    local function write(fn)
-        local phase = ngx.get_phase()
-        if phase == "header_filter" or phase == "body_filter" or phase == "log" then
-            local ok, err = ngx.timer.at(0, function(premature)
-                if premature then return end
-                with_redis(fn)
-            end)
-            if not ok then
-                ngx.log(ngx.ERR, "CSRF: cannot schedule deferred redis write: ", err)
-                return false, err
-            end
-            return true
-        end
-        local ok, err = with_redis(fn)
-        if ok == nil and err then
-            return false, err
-        end
-        return true
-    end
-
-    function store.get(_, key)
-        local value = with_redis(function(red) return red:get(REDIS_KEY_PREFIX .. key) end)
-        if value == nil or value == ngx.null then
-            return nil
-        end
-        return value
-    end
-
-    function store.set(_, key, value, ttl)
-        return write(function(red) return red:set(REDIS_KEY_PREFIX .. key, value, "EX", ttl) end)
-    end
-
-    function store.add(_, key, value, ttl)
-        local res, err = with_redis(function(red) return red:set(REDIS_KEY_PREFIX .. key, value, "EX", ttl, "NX") end)
-        if res == nil and err then
-            return false, err
-        end
-        if res == ngx.null then
-            return false, "exists"
-        end
-        return true
-    end
-
-    function store.ttl(_, key)
-        local remaining = with_redis(function(red) return red:ttl(REDIS_KEY_PREFIX .. key) end)
-        if remaining == nil or remaining == ngx.null or remaining < 0 then
-            return nil
-        end
-        return remaining
-    end
-
-    function store.delete(_, key)
-        return write(function(red) return red:del(REDIS_KEY_PREFIX .. key) end)
-    end
-
-    function store.expire_at_most(_, key, ttl)
-        -- EXPIRE ... LT only shortens the remaining life (Redis 7+).
-        return write(function(red) return red:expire(REDIS_KEY_PREFIX .. key, ttl, "LT") end)
-    end
-
-    return store
-end
-
--- redis_host empty: keep tokens in the shared dict (single nginx only).
-function _M.init(redis_host, redis_port, csrf_tokens_dict)
-    if redis_host and redis_host ~= "" then
-        _M.csrf_tokens = new_redis_store(redis_host, redis_port)
-        _M.backend = "redis"
-    else
-        _M.csrf_tokens = new_dict_store(csrf_tokens_dict)
-        _M.backend = "dict"
-    end
+function _M.init(csrf_tokens_dict)
+    _M.csrf_tokens = new_dict_store(csrf_tokens_dict)
+    _M.backend = "dict"
 end
 
 function _M.generate_csrf_token()
@@ -245,9 +146,7 @@ function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
         -- a request sent with pre-rotation cookies while another request
         -- rotated the session would otherwise 403 (private issue #88).
         -- Logout still deletes immediately (nginx.tpl.conf /auth/logout).
-        -- Expressed as "shorten to the grace period" so it needs no read:
-        -- this runs in header_filter, where the Redis backend can only
-        -- queue writes.
+        -- Expressed as "shorten to the grace period" so it needs no read.
         _M.csrf_tokens:expire_at_most(old_session_id, ROTATION_GRACE_TTL)
     end
 

@@ -28,7 +28,7 @@ export interface ObservabilityStackProps extends StackProps {
  * - Amazon Managed Grafana reads Prometheus, CloudWatch and X-Ray through a
  *   role defined here; the four boards in dashboards/ are pushed with
  *   scripts/push-dashboards.sh once the workspace exists.
- * - A synthetic check hits the environment's edge every minute and records
+ * - A synthetic check hits the environment's edge every five minutes and records
  *   the best block's age; its failure pages.
  * - IAM for the collectors: an instance profile for core cells (Prometheus
  *   remote write plus the CloudWatch agent) and a policy the ECS task roles
@@ -37,7 +37,8 @@ export interface ObservabilityStackProps extends StackProps {
 export class ObservabilityStack extends Stack {
   readonly pages: sns.Topic;
   readonly warnings: sns.Topic;
-  readonly workspace: aps.CfnWorkspace;
+  /** The Managed Prometheus workspace, absent in traces-only mode. */
+  readonly workspace?: aps.CfnWorkspace;
 
   constructor(scope: Construct, id: string, props: ObservabilityStackProps) {
     super(scope, id, props);
@@ -49,39 +50,42 @@ export class ObservabilityStack extends Stack {
     this.pages = new sns.Topic(this, "Pages", { topicName: `${name}-pages`, displayName: `STRATO ${config.envName} pages` });
     this.warnings = new sns.Topic(this, "Warnings", { topicName: `${name}-warnings`, displayName: `STRATO ${config.envName} warnings` });
 
-    // --- Managed Prometheus: workspace, rules, alertmanager ---
-    const alertmanager = read("rules/alertmanager.yaml")
-      .replaceAll("__PAGES_TOPIC_ARN__", this.pages.topicArn)
-      .replaceAll("__WARNINGS_TOPIC_ARN__", this.warnings.topicArn)
-      .replaceAll("__REGION__", this.region);
-    this.workspace = new aps.CfnWorkspace(this, "Prometheus", {
-      alias: name,
-      alertManagerDefinition: alertmanager,
-    });
-    // Alertmanager publishes to SNS as the workspace's service principal.
-    for (const topic of [this.pages, this.warnings]) {
-      topic.addToResourcePolicy(
-        new iam.PolicyStatement({
-          actions: ["sns:Publish", "sns:GetTopicAttributes"],
-          principals: [new iam.ServicePrincipal("aps.amazonaws.com")],
-          resources: [topic.topicArn],
-          conditions: { ArnEquals: { "aws:SourceArn": this.workspace.attrArn } },
-        })
-      );
+    // --- Managed Prometheus: workspace, rules, alertmanager (unless traces-only) ---
+    if (config.managedPrometheus) {
+      const alertmanager = read("rules/alertmanager.yaml")
+        .replaceAll("__PAGES_TOPIC_ARN__", this.pages.topicArn)
+        .replaceAll("__WARNINGS_TOPIC_ARN__", this.warnings.topicArn)
+        .replaceAll("__REGION__", this.region);
+      this.workspace = new aps.CfnWorkspace(this, "Prometheus", {
+        alias: name,
+        alertManagerDefinition: alertmanager,
+      });
+      // Alertmanager publishes to SNS as the workspace's service principal.
+      for (const topic of [this.pages, this.warnings]) {
+        topic.addToResourcePolicy(
+          new iam.PolicyStatement({
+            actions: ["sns:Publish", "sns:GetTopicAttributes"],
+            principals: [new iam.ServicePrincipal("aps.amazonaws.com")],
+            resources: [topic.topicArn],
+            conditions: { ArnEquals: { "aws:SourceArn": this.workspace.attrArn } },
+          })
+        );
+      }
+      new aps.CfnRuleGroupsNamespace(this, "ChainHealthRules", {
+        workspace: this.workspace.attrArn,
+        name: "chain-health",
+        data: read("rules/chain-health.yaml").replaceAll("__ENV__", config.envName),
+      });
     }
-    new aps.CfnRuleGroupsNamespace(this, "ChainHealthRules", {
-      workspace: this.workspace.attrArn,
-      name: "chain-health",
-      data: read("rules/chain-health.yaml").replaceAll("__ENV__", config.envName),
-    });
 
     // --- Collector configs, published where cells and tasks read them ---
-    const remoteWriteUrl = `${this.workspace.attrPrometheusEndpoint}api/v1/remote_write`;
-    const cellCollector = read("config/cell-otel-collector.yaml")
+    // Traces-only: the *-traces variants carry just the OTLP-to-X-Ray pipeline.
+    const remoteWriteUrl = this.workspace ? `${this.workspace.attrPrometheusEndpoint}api/v1/remote_write` : "";
+    const cellCollector = read(this.workspace ? "config/cell-otel-collector.yaml" : "config/cell-otel-collector-traces.yaml")
       .replaceAll("__REMOTE_WRITE_URL__", remoteWriteUrl)
       .replaceAll("__REGION__", this.region)
       .replaceAll("__ENV__", config.envName);
-    const ecsCollector = read("config/ecs-otel-sidecar.yaml")
+    const ecsCollector = read(this.workspace ? "config/ecs-otel-sidecar.yaml" : "config/ecs-otel-sidecar-traces.yaml")
       .replaceAll("__REMOTE_WRITE_URL__", remoteWriteUrl)
       .replaceAll("__REGION__", this.region)
       .replaceAll("__ENV__", config.envName);
@@ -98,10 +102,12 @@ export class ObservabilityStack extends Stack {
     const cwAgentParam = param("CloudWatchAgentConfig", "cloudwatch-agent", cwAgent, "CloudWatch agent config for core cells: host metrics per machine and the convoke process logs");
 
     // --- IAM for the collectors ---
-    const remoteWrite = new iam.PolicyStatement({
-      actions: ["aps:RemoteWrite", "aps:GetSeries", "aps:GetLabels", "aps:GetMetricMetadata"],
-      resources: [this.workspace.attrArn],
-    });
+    const remoteWrite = this.workspace
+      ? [new iam.PolicyStatement({
+          actions: ["aps:RemoteWrite", "aps:GetSeries", "aps:GetLabels", "aps:GetMetricMetadata"],
+          resources: [this.workspace.attrArn],
+        })]
+      : [];
     const cellRole = new iam.Role(this, "CellRole", {
       roleName: `${name}-cell-observability`,
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
@@ -111,7 +117,7 @@ export class ObservabilityStack extends Stack {
         iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore"),
       ],
     });
-    cellRole.addToPolicy(remoteWrite);
+    for (const st of remoteWrite) cellRole.addToPolicy(st);
     cellRole.addToPolicy(new iam.PolicyStatement({ actions: ["xray:PutTraceSegments", "xray:PutTelemetryRecords"], resources: ["*"] }));
     cellCollectorParam.grantRead(cellRole);
     cwAgentParam.grantRead(cellRole);
@@ -122,41 +128,45 @@ export class ObservabilityStack extends Stack {
       managedPolicyName: `${name}-otel-sidecar`,
       description: `${name} ECS tasks: ADOT sidecar remote write to Managed Prometheus and X-Ray traces`,
       statements: [
-        remoteWrite,
+        ...remoteWrite,
         new iam.PolicyStatement({ actions: ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"], resources: ["*"] }),
       ],
     });
 
-    // --- Managed Grafana ---
-    const grafanaRole = new iam.Role(this, "GrafanaRole", {
-      roleName: `${name}-grafana`,
-      assumedBy: new iam.ServicePrincipal("grafana.amazonaws.com"),
-      description: `${name} Grafana: read Managed Prometheus, CloudWatch and X-Ray, notify through SNS`,
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AmazonGrafanaCloudWatchAccess"),
-        iam.ManagedPolicy.fromAwsManagedPolicyName("AWSXrayReadOnlyAccess"),
-      ],
-    });
-    grafanaRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ["aps:ListWorkspaces", "aps:DescribeWorkspace", "aps:QueryMetrics", "aps:GetLabels", "aps:GetSeries", "aps:GetMetricMetadata", "aps:ListRules", "aps:ListAlerts", "aps:ListAlertManagerAlerts", "aps:GetAlertManagerStatus"],
-        resources: ["*"],
-      })
-    );
-    this.pages.grantPublish(grafanaRole);
-    this.warnings.grantPublish(grafanaRole);
-    const grafanaWorkspace = new grafana.CfnWorkspace(this, "Grafana", {
-      name,
-      description: `STRATO ${config.envName}: infrastructure map, per-tier, per-machine and chain-health boards`,
-      accountAccessType: "CURRENT_ACCOUNT",
-      authenticationProviders: [config.grafanaAuth],
-      permissionType: "CUSTOMER_MANAGED",
-      roleArn: grafanaRole.roleArn,
-      dataSources: ["PROMETHEUS", "CLOUDWATCH", "XRAY"],
-      notificationDestinations: ["SNS"],
-      grafanaVersion: config.grafanaVersion,
-      pluginAdminEnabled: true,
-    });
+    // --- Managed Grafana (unless managedGrafana=false) ---
+    let grafanaWorkspace: grafana.CfnWorkspace | undefined;
+    if (config.managedGrafana) {
+      // --- Managed Grafana ---
+      const grafanaRole = new iam.Role(this, "GrafanaRole", {
+        roleName: `${name}-grafana`,
+        assumedBy: new iam.ServicePrincipal("grafana.amazonaws.com"),
+        description: `${name} Grafana: read Managed Prometheus, CloudWatch and X-Ray, notify through SNS`,
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName("service-role/AmazonGrafanaCloudWatchAccess"),
+          iam.ManagedPolicy.fromAwsManagedPolicyName("AWSXrayReadOnlyAccess"),
+        ],
+      });
+      grafanaRole.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ["aps:ListWorkspaces", "aps:DescribeWorkspace", "aps:QueryMetrics", "aps:GetLabels", "aps:GetSeries", "aps:GetMetricMetadata", "aps:ListRules", "aps:ListAlerts", "aps:ListAlertManagerAlerts", "aps:GetAlertManagerStatus"],
+          resources: ["*"],
+        })
+      );
+      this.pages.grantPublish(grafanaRole);
+      this.warnings.grantPublish(grafanaRole);
+      grafanaWorkspace = new grafana.CfnWorkspace(this, "Grafana", {
+        name,
+        description: `STRATO ${config.envName}: infrastructure map, per-tier, per-machine and chain-health boards`,
+        accountAccessType: "CURRENT_ACCOUNT",
+        authenticationProviders: [config.grafanaAuth],
+        permissionType: "CUSTOMER_MANAGED",
+        roleArn: grafanaRole.roleArn,
+        dataSources: ["PROMETHEUS", "CLOUDWATCH", "XRAY"],
+        notificationDestinations: ["SNS"],
+        grafanaVersion: config.grafanaVersion,
+        pluginAdminEnabled: true,
+      });
+    }
 
     // --- Synthetic end-to-end check ---
     if (config.edgeUrl) {
@@ -175,7 +185,9 @@ export class ObservabilityStack extends Stack {
         : undefined;
       const canary = new synthetics.Canary(this, "EdgeHealth", {
         canaryName: `${name}-edge`.slice(0, 21),
-        schedule: synthetics.Schedule.rate(Duration.minutes(1)),
+        // Five minutes: block age tolerates it, and a one-minute cadence costs
+        // about five times more for the same signal.
+        schedule: synthetics.Schedule.rate(Duration.minutes(5)),
         runtime: synthetics.Runtime.SYNTHETICS_NODEJS_PUPPETEER_13_0,
         test: synthetics.Test.custom({
           code: synthetics.Code.fromAsset(path.join(__dirname, "..", "canary")),
@@ -225,20 +237,22 @@ export class ObservabilityStack extends Stack {
       const failing = new cloudwatch.Alarm(this, "EdgeHealthFailing", {
         alarmName: `${name}-edge-health`,
         alarmDescription: "The synthetic end-to-end check against the edge failed: the edge is down, the chain is not producing, or the block age exceeded the limit",
-        metric: canary.metricSuccessPercent({ period: Duration.minutes(1), statistic: "Average" }),
+        metric: canary.metricSuccessPercent({ period: Duration.minutes(5), statistic: "Average" }),
         comparisonOperator: cloudwatch.ComparisonOperator.LESS_THAN_THRESHOLD,
         threshold: 100,
-        evaluationPeriods: 3,
-        datapointsToAlarm: 3,
+        evaluationPeriods: 2,
+        datapointsToAlarm: 2,
         treatMissingData: cloudwatch.TreatMissingData.BREACHING,
       });
       failing.addAlarmAction(new cwactions.SnsAction(this.pages));
       failing.addOkAction(new cwactions.SnsAction(this.pages));
     }
 
-    new CfnOutput(this, "PrometheusWorkspaceId", { value: this.workspace.attrWorkspaceId });
-    new CfnOutput(this, "PrometheusEndpoint", { value: this.workspace.attrPrometheusEndpoint });
-    new CfnOutput(this, "GrafanaUrl", { value: `https://${grafanaWorkspace.attrEndpoint}` });
+    if (this.workspace) {
+      new CfnOutput(this, "PrometheusWorkspaceId", { value: this.workspace.attrWorkspaceId });
+      new CfnOutput(this, "PrometheusEndpoint", { value: this.workspace.attrPrometheusEndpoint });
+    }
+    if (grafanaWorkspace) new CfnOutput(this, "GrafanaUrl", { value: `https://${grafanaWorkspace.attrEndpoint}` });
     new CfnOutput(this, "PagesTopicArn", { value: this.pages.topicArn, description: "Subscribe PagerDuty here" });
     new CfnOutput(this, "WarningsTopicArn", { value: this.warnings.topicArn, description: "Subscribe Slack here" });
     new CfnOutput(this, "CellInstanceProfileName", { value: `${name}-cell-observability`, description: "Instance profile for core cell hosts" });

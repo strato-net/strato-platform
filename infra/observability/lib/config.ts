@@ -22,6 +22,10 @@ export interface ObservabilityConfig {
   /** Seconds the canary waits for its transaction's receipt before failing. */
   maxInclusionSeconds: number;
   canaryGasLimit: number;
+  /** Managed Prometheus (workspace, rules, alertmanager, metrics pipelines in the collectors). Off = traces only: the collectors ship spans to X-Ray and nothing else. */
+  managedPrometheus: boolean;
+  /** Managed Grafana workspace (needs IAM Identity Center or SAML). Off = read X-Ray and CloudWatch from another Grafana, e.g. the cell's. */
+  managedGrafana: boolean;
   /** Grafana authentication: AWS_SSO (IAM Identity Center) or SAML. */
   grafanaAuth: "AWS_SSO" | "SAML";
   grafanaVersion: string;
@@ -64,6 +68,8 @@ export function loadConfig(app: App): ObservabilityConfig {
     canaryKeySecretName: optional(app, "canaryKeySecretName"),
     maxInclusionSeconds: Number(ctx(app, "maxInclusionSeconds", "30")),
     canaryGasLimit: Number(ctx(app, "canaryGasLimit", "1000000")),
+    managedPrometheus: ctx(app, "managedPrometheus", "true") === "true",
+    managedGrafana: ctx(app, "managedGrafana", "true") === "true",
     grafanaAuth: ctx(app, "grafanaAuth", "AWS_SSO") as "AWS_SSO" | "SAML",
     grafanaVersion: ctx(app, "grafanaVersion", "10.4"),
     auroraClusterIdentifier: optional(app, "auroraClusterIdentifier"),

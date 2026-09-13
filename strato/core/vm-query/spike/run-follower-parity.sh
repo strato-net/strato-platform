@@ -11,8 +11,8 @@
 #   STRATO_CONF=~/follower/.ethereumH/ethconf.yaml \
 #   NODE=https://app.testnet.strato.nexus ./run-follower-parity.sh
 set -euo pipefail
-cd "$(dirname "$0")/../../.."
-BIN=$(stack path --local-install-root)/bin/vm-query
+cd "$(dirname "$0")/../../.." 2>/dev/null || true
+BIN=${VMQ_BIN:-$(stack path --local-install-root)/bin/vm-query}
 NODE=${NODE:-https://app.testnet.strato.nexus}
 : "${STRATO_CONF:?set STRATO_CONF to an ethconf reaching the follower mirror}"
 PORT=${VMQ_PORT:-58550}

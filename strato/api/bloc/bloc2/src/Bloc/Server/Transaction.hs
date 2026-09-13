@@ -240,7 +240,7 @@ walletWrapCall target method innerArgs =
 
 postBlocTransactionBody ::
   (HasCodeDB m,
-    MonadIO m,
+    HasSQLDB m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
@@ -379,7 +379,7 @@ postBlocTransactionBody token (PostBlocTransactionRequest mAddr txList txParams 
 -- | postBlocTransactionUnsigned
 postBlocTransactionUnsigned ::
   (HasCodeDB m,
-    MonadIO m,
+    HasSQLDB m,
     MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
@@ -1255,9 +1255,9 @@ constructArgValuesAndSource mTypeDefs args argNamesTypes = do
     Just argsMap -> concatMap valueToTexts <$> getArgValues mTypeDefs argsMap argNamesTypes
 
 getAccountTxParams ::
-  ( MonadIO m
-  , MonadLogger m
+  ( MonadLogger m
   , HasBlocEnv m
+  , HasSQLDB m
   , A.Selectable AccountsFilterParams [AddressStateRef] m
   ) =>
   Should CacheNonce ->
@@ -1268,7 +1268,7 @@ getAccountTxParams cacheNonce addr mTxParams = do
   let params = fromMaybe emptyTxParams mTxParams
   sqlNonce <- getAccountNonce addr
   env <- getBlocEnv
-  let reserve = reserveNonces (nonceStore env) (nonceTtlSeconds env) addr (useStoredNonce cacheNonce) sqlNonce
+  let reserve = reserveNonces (nonceTtlSeconds env) addr (useStoredNonce cacheNonce) sqlNonce
   theNonce <- case txparamsNonce params of
     -- An explicit nonce is used as given and becomes the floor for the next
     -- reservation, exactly as the in-process cache used to record it.
@@ -1285,9 +1285,9 @@ useStoredNonce (Do CacheNonce) = True
 useStoredNonce (Don't CacheNonce) = False
 
 genNonces :: forall a m.
-  ( MonadIO m
-  , MonadLogger m
+  ( MonadLogger m
   , HasBlocEnv m
+  , HasSQLDB m
   , A.Selectable AccountsFilterParams [AddressStateRef] m
   , Show a
   ) =>
@@ -1306,7 +1306,7 @@ genNonces cacheNonce fromAddr l items = do
   -- One atomic reservation for the whole batch: items with an explicit nonce
   -- keep it, the rest receive the next free nonces in order, and the shared
   -- counter ends one past the highest nonce in the batch.
-  assigned <- reserveNonces (nonceStore env) (nonceTtlSeconds env) fromAddr (useStoredNonce cacheNonce) sqlNonce inUse missing
+  assigned <- reserveNonces (nonceTtlSeconds env) fromAddr (useStoredNonce cacheNonce) sqlNonce inUse missing
   let setNonce a n =
         let params' = fromMaybe emptyTxParams (a ^. l)
          in (l .~ Just params' {txparamsNonce = Just n}) a

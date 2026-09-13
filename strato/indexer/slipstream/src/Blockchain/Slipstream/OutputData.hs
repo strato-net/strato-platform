@@ -1325,6 +1325,14 @@ genericBaseTableIndexesSQL = T.unlines
   [ "CREATE INDEX IF NOT EXISTS history_mapping_lookup_idx"
   , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_from, valid_to);"
   , ""
+    -- Value-at-date lookups (valid_from <= d AND valid_to >= d) need valid_to
+    -- first: with valid_from leading, the scan visits every version of the key
+    -- up to d (tens of thousands for an oracle price) before valid_to filters
+    -- them to one. With valid_to leading only the versions still valid at d
+    -- are visited, which is one plus the future ones.
+  , "CREATE INDEX IF NOT EXISTS history_mapping_valid_to_idx"
+  , "  ON \"history@mapping\" (address, collection_name, ((key->>'key')), valid_to, valid_from);"
+  , ""
   , "CREATE INDEX IF NOT EXISTS mapping_collection_key_address_idx"
   , "  ON mapping (collection_name, ((key->>'key')), address);"
   , ""

@@ -16,7 +16,6 @@
 #   BUS_SUBMIT_MODE (core|bus|shadow)             the shared message bus
 #   postgres_password | /run/secrets/postgres_password
 #   kafkaHost, kafkaPort                          broker for tx submission
-#   EDGE_REDIS_HOST, EDGE_REDIS_PORT              nonce counters
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
@@ -58,10 +57,12 @@ fi
 override() {
   local path=$1 value=$2
   [[ -n "$value" ]] && yq -i "$path = \"$value\"" "$CONF"
+  return 0
 }
 override_num() {
   local path=$1 value=$2
   [[ -n "$value" ]] && yq -i "$path = $value" "$CONF"
+  return 0
 }
 override     '.sqlConfig.host'                 "${postgres_host:-}"
 override     '.cirrusConfig.host'              "${postgres_reader_host:-${postgres_host:-}}"
@@ -73,8 +74,6 @@ override     '.sqlConfig.password'             "${postgres_password:-}"
 override     '.cirrusConfig.password'          "${postgres_password:-}"
 override     '.streamingConfig.streamingHost'  "${kafkaHost:-}"
 override_num '.streamingConfig.streamingPort'  "${kafkaPort:-}"
-override     '.edgeRedisConfig.redisHost'      "${EDGE_REDIS_HOST:-}"
-override_num '.edgeRedisConfig.redisPort'      "${EDGE_REDIS_PORT:-}"
 override     '.urlConfig.vaultUrl'             "${VAULT_URL:-}"
 # The shared message bus (Phase 4). BUS_HOST empty means no bus: the API
 # submits to the core's broker (kafkaHost) as before.

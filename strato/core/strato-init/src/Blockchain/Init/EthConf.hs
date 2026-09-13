@@ -64,10 +64,6 @@ runtimeConfig = def
       , redisPort = flags_redisPort
       , redisDBNumber = flags_redisDBNumber
       }
-  , edgeRedisConfig = def
-      { redisHost = preferIPv4Loopback flags_edgeRedisHost
-      , redisPort = flags_edgeRedisPort
-      }
   , streamingConfig = def
       { streamingHost = bcHost brokerConfig
       , streamingPort = bcPort brokerConfig
@@ -197,6 +193,10 @@ genEthConf role = do
     , vmConfig = roleVmConfig { vmQueryUrl = if flags_vmQuery then Just "http://127.0.0.1:8546" else Nothing }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
+    , peerSqlitePath = case flags_peerStore of
+        "postgres" -> Nothing
+        "sqlite" -> Just "peers.sqlite"
+        other -> error $ "--peerStore must be 'postgres' or 'sqlite', not '" ++ other ++ "'"
     , sqlConfig = writerSql
     , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)

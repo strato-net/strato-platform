@@ -68,11 +68,35 @@ getAndProcessMessages cell conn mBus = do
     if holds
       then processBatch conn mBus messages
       else case cirrusTip messages of
-        -- No block in the batch (code collections, results): the writer
-        -- applies those; returning commits the offset past them.
-        Nothing -> return ()
+        -- No block in the batch (code collections, results). Returning
+        -- would commit the offset past them, which is only right when some
+        -- other writer applies them. A lone core (a monolith, or a single
+        -- cell) starts slipstream before strato-indexer has claimed the
+        -- lease, and dropping here would lose those results for good. So
+        -- wait: either this cell gets the lease (the lone core, within
+        -- seconds) or the writer's progress moves, which proves a writer
+        -- consumed this batch before the block it just committed.
+        Nothing -> do
+          seen <- liftIO $ getCirrusProgress conn
+          awaitWriter messages seen False
         Just tip -> follow messages tip False
   where
+    awaitWriter messages seen logged = do
+      holds <- holdsWriterLease cell
+      if holds
+        then do
+          $logInfoS "slipstream" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now; applying a batch without blocks"
+          processBatch conn mBus messages
+        else do
+          progress <- liftIO $ getCirrusProgress conn
+          if progress > seen
+            then return ()
+            else do
+              unless logged $
+                $logInfoS "slipstream" . T.pack $
+                  "no writer lease yet: holding a batch without blocks until this cell holds the lease or cirrus_progress moves past " ++ maybe "unset" show seen
+              liftIO $ threadDelay 1000000
+              awaitWriter messages seen True
     follow messages tip logged = do
       progress <- liftIO $ getCirrusProgress conn
       if maybe False (>= tip) progress
@@ -121,12 +145,22 @@ processBatch conn mBus allMessages = timeSlipstreamPhase "batch" $ do
       $logInfoS "slipstream" . T.pack $
         "skipping " ++ show skipped ++ " actions at or below cirrus_progress " ++ maybe "unset" show progress
     let mTip = cirrusTip messages
+        -- The genesis import is many NewActions for block 0 (one per
+        -- account, see Bootstrap.populateStorageDBs) and can span several
+        -- batches. Recording block 0 as committed after the first of them
+        -- made the skip filter above drop the rest of the genesis accounts
+        -- as "already applied": Cirrus came up missing hundreds of contracts
+        -- and the genesis fields of others. Block 0 is therefore never
+        -- recorded; the marker first moves once block 1 is applied, and a
+        -- replayed genesis (vm-runner re-bootstraps on some restarts) is
+        -- skipped from then on.
+        mProgressTip = mTip >>= \tip -> if tip > 0 then Just tip else Nothing
     -- The progress upsert is appended as the batch's final query, so it
     -- lands in the last chunk and commits in the same transaction as the
     -- batch's final Cirrus writes: the marker never claims a block whose
     -- rows are still uncommitted.
     (emittedEvents, ()) <- runConduit $
-      ((processTheMessages messages <* for_ mTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
+      ((processTheMessages messages <* for_ mProgressTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
         sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk conn mBus)
     recordProcessedKafkaMessages messages
     -- Egress: the batch's events go out after everything above committed.

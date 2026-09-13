@@ -2,9 +2,11 @@
 
 CDK app for Phase 3 of the tiered deployment: strato-api, ethereum-jsonrpc,
 PostgREST, and the SMD with apex, behind the node's nginx as a sidecar, all
-in one Fargate task per copy behind an ALB. State that must be shared by the
-copies (bloc's nonce counters, nginx's CSRF tokens and sessions) lives in an
-ElastiCache Redis.
+in one Fargate task per copy behind an ALB. The copies share no edge state:
+nginx sessions ride in the encrypted session cookie (one `session_secret` for
+every copy), CSRF tokens stay in each copy's shared dict behind the ALB's
+session stickiness, and bloc's nonce counters are rows in the eth database's
+writer (`nonce_counter`), which every copy already shares.
 
 Data paths: eth reads go to the Aurora reader endpoint, writes and the
 resolve poll to the writer, Cirrus to the reader, and transactions and VM
@@ -53,3 +55,53 @@ stay clean, and finish at 100:
 Rolling back is the same weight going down. The node keeps serving until
 the weight is 100 and has been for a while; then re-set-up the node with
 `--role=core` at the next window.
+
+Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and `-c coreSecurityGroupId=<core cell SG>` and the stack opens them to its task security group at deploy time; otherwise allow the output `TaskSecurityGroupId` by hand.
+
+## Hostname and certificate
+
+Outside Route 53, `-c domainName=<host>` (with no `hostedZoneId`) names the
+tier's public hostname. Without `-c albCertificateArn`, the app adds
+`StratoApi-<env>-Certificate` holding a DNS-validated ACM certificate; that
+stack stays in `CREATE_IN_PROGRESS` until the validation CNAME ACM asks for
+exists at the registrar (the record is in the stack's events and in `aws acm
+describe-certificate`). The Tier stack then serves HTTPS on 443 with it and
+redirects port 80, and its `HostnameRecord` output is the CNAME to create
+for the hostname itself (the ALB has no fixed IPs). Anything that reached
+the tier over plain HTTP (the app tier's `nodeUrl`) must move to
+`https://<host>` at the same time.
+
+## SMD on CloudFront
+
+`-c smdDomainName=smd.example.com` adds two stacks. `<prefix>-SmdCertificate`
+is a DNS-validated certificate for that hostname (the validation CNAME goes to
+the registrar; the stack waits for it). `<prefix>-Smd` serves the SMD bundle
+from a private S3 bucket behind CloudFront at `/smd/`, and sends the node API,
+apex, RPC and login paths (`/strato/*`, `/strato-api*`, `/bloc/*`, `/cirrus/*`,
+`/apex-api*`, `/apex-ws/*`, `/rpc*`, `/login*`, `/auth/*`) to this tier over
+https, so the browser keeps one origin and its session and CSRF cookies. A
+viewer-request function redirects `/` to `/smd/` and serves `index.html` for
+the SMD's client-side routes.
+
+CloudFront forwards the viewer's Host header, so login returns to the SMD's
+hostname; CloudFront then checks the origin certificate against that Host, so
+the same certificate is also attached to this tier's HTTPS listener.
+
+- Build first: `npm ci && npm run build` in `smd-ui` (base path `/smd/`).
+- Context: `-c deploySmdUi=true -c chainId=<id> -c networkName=<name>`
+  (`-c wagmiProjectId=` optional) for the SMD's `config.js`.
+- The SMD needs apex: pass `-c apexImage=...` so the task runs it.
+- The OAuth client needs `https://<smdDomainName>/*` among its redirect and
+  post-logout URIs.
+- Outputs: `HostnameRecord` (the CNAME to create) and `DistributionId` (name
+  it in the tier map's `frontend_labels`, `<id>=SMD`).
+
+## API docs
+
+The task runs Swagger UI (`swaggerapi/swagger-ui`) as the `docs` container on
+port 8080, and the nginx sidecar serves it at `/docs/`, as on a node: the
+spec (`/docs/swagger.yaml`) and the initializer come from the nginx image
+itself. The container is not essential, so a docs failure never takes the
+API down. `-c docsImage=<uri>` points at a mirror (an ECR URI is pulled with
+the task's ECR permissions); `-c docs=false` leaves it out, and `/docs/` then
+answers 502.

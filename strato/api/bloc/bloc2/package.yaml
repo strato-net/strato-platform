@@ -34,7 +34,6 @@ library:
     - extra
     - format
     - hashable
-    - hedis
     - insert-ordered-containers
     - labeled-error
     - lens
@@ -60,6 +59,8 @@ library:
     - time
     - transformers
     - unliftio
+    - resourcet
+    - persistent
     - strato-auth
     - vault-monad
     - vector

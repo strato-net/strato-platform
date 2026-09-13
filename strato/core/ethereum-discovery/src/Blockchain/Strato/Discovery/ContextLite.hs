@@ -63,6 +63,8 @@ import           System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB    :: SQLDB,
+    -- | Peers; the eth pool itself on a monolith.
+    litePeerDB   :: SQLDB,
     redisBlockDB :: RBDB.RedisConnection,
     sock         :: Socket,
     myUdpPort    :: UDPPort,
@@ -76,6 +78,9 @@ instance {-# OVERLAPPING #-} Monad m => Accessible SQLDB (ReaderT ContextLite m)
 
 instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT ContextLite m) where
   accessEnv = asks liteSQLDB
+
+instance {-# OVERLAPPING #-} Monad m => AccessibleEnv PeerStore (ReaderT ContextLite m) where
+  accessEnv = asks (PeerStore . litePeerDB)
 
 instance {-# OVERLAPPING #-} Monad m => Accessible Socket (ReaderT ContextLite m) where
   access _ = asks sock
@@ -97,7 +102,7 @@ instance {-# OVERLAPPING #-} MonadIO m => Accessible [Validator] (ReaderT Contex
 instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
   replace _ host peer = do
     maybePeer <- getPeerByIP host
-    void . sqlQuery $ actions maybePeer
+    void . peerQuery $ actions maybePeer
     where
       actions mp = case mp of
         Nothing -> SQL.insert peer
@@ -108,7 +113,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Replaceable Host PPeer (Reader
             ]
           return (SQL.entityKey peer')
       getPeerByIP :: Host -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
-      getPeerByIP host' = listToMaybe <$> sqlQuery actions'
+      getPeerByIP host' = listToMaybe <$> peerQuery actions'
         where
           actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
@@ -117,7 +122,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable IP PPeer (ReaderT C
     where
       getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
       getPeerByIP ip' =
-        sqlQuery actions >>= \case
+        peerQuery actions >>= \case
           [] -> return Nothing
           --If multiple Hosts map to the same IP address, choose one arbitrarily, but prefer ones with domain names
           lst -> case sortOn (isIP . pPeerHost . SQL.entityVal) lst of
@@ -206,6 +211,7 @@ initContextLite udpPort tcpPort = do
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
+        litePeerDB = peerDB' dbs,
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,

@@ -30,12 +30,12 @@ import Blockchain.Sequencer.Event (JsonRpcCommand (..), JsonRpcResponse (..))
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (keccak256ToHex)
 import Blockchain.VmQuery.SqlContext
-import Control.Concurrent (runInBoundThread)
+import Control.Concurrent (forkIO, runInBoundThread, threadDelay)
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Concurrent.STM
 import Control.Exception (IOException, SomeException, bracket, bracket_, displayException, fromException, throwIO, try)
-import Control.Monad (void, when)
+import Control.Monad (forever, void, when)
 import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Data.Pool (destroyResource, putResource, takeResource)
@@ -260,6 +260,17 @@ serve db cfg = do
   pool <- ContextPool <$> newTVarIO []
   putStrLn $ "vm-query serving on port " ++ show (scPort cfg) ++ ", reading the mirror through the " ++ sqlEndpoint ++ " endpoint"
   when (sqlEndpoint == "writer") $ putStrLn "vm-query: no sqlReaderConfig, so reads go to the writer; point sqlReaderConfig at the reader before scaling this out"
+  -- Epochs are otherwise refreshed only by requests, so an idle server
+  -- would hold its first epoch's repeatable-read transaction open for as
+  -- long as it lives. A snapshot that old is more than stale: an Aurora
+  -- reader reports its oldest snapshot to the writer, which then cannot
+  -- vacuum anything newer, so one idle vm-query froze the writer's dead
+  -- rows in place for 18 hours and slowed the indexer to a crawl. The
+  -- timer keeps every epoch's transaction within snapshotMaxAge.
+  void . forkIO . forever $ do
+    threadDelay (max 1000000 (round (scSnapshotMaxAgeSeconds cfg * 1000000)))
+    r <- try (refreshSnapshot db cfg rotateLock lastCheck snapRef) :: IO (Either SomeException Snapshot)
+    either (\e -> putStrLn ("vm-query: timed epoch refresh failed: " ++ displayException e)) (const (pure ())) r
   run (scPort cfg) . prometheus def . tracingMiddleware "vm-query" $ app db cfg (rotateLock, lastCheck, snapRef) sem waiting pool
 
 app :: SQLDB -> ServerConfig -> (MVar (), IORef UTCTime, IORef Snapshot) -> QSem -> IORef Int -> ContextPool -> Application

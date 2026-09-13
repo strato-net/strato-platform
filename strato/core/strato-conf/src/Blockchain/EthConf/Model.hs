@@ -60,10 +60,14 @@ data EthConf = EthConf
     -- share a cluster each need their own; missing means the eth database,
     -- as on a monolith.
     peerDbConfig :: Maybe SqlConf,
+    -- | Keep the peer store in this SQLite file (relative to the node
+    -- directory) instead of Postgres. Peers and sync tasks are per-node
+    -- operational state, so a core whose Postgres is elsewhere keeps them
+    -- on its own disk and its networking no longer depends on the
+    -- database being reachable. Takes precedence over 'peerDbConfig'.
+    -- Missing means Postgres, as on a monolith.
+    peerSqlitePath :: Maybe FilePath,
     redisBlockDBConfig :: RedisBlockDBConf,
-    -- | The edge tier's Redis (nonce counters, CSRF tokens, sessions),
-    -- shared by every API instance and separate from the core's block DB.
-    edgeRedisConfig :: RedisBlockDBConf,
     streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
@@ -91,8 +95,8 @@ instance FromJSON EthConf where
     <*> v .:? "busConfig"
     <*> v .:? "cellId"
     <*> v .:? "peerDbConfig"
+    <*> v .:? "peerSqlitePath"
     <*> v .: "redisBlockDBConfig"
-    <*> v .:? "edgeRedisConfig" .!= defaultEdgeRedisConf
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
     <*> v .:? "quarryConfig" .!= def
@@ -521,14 +525,6 @@ instance Default NetworkConf where
     , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"
     }
 
--- | Used when ethconf.yaml has no @edgeRedisConfig@ key, i.e. a node
--- directory set up before the edge Redis existed. Such a node has no
--- edge-redis container, so fall back to the core's Redis on a separate
--- database number: functionally what the old in-process cache gave a single
--- instance. strato-setup writes an explicit @edgeRedisConfig@ for new nodes.
-defaultEdgeRedisConf :: RedisBlockDBConf
-defaultEdgeRedisConf = def { redisDBNumber = 1 }
-
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
@@ -537,8 +533,8 @@ instance Default EthConf where
     , busConfig = Nothing
     , cellId = Nothing
     , peerDbConfig = Nothing
+    , peerSqlitePath = Nothing
     , redisBlockDBConfig = def
-    , edgeRedisConfig = defaultEdgeRedisConf
     , streamingConfig = def
     , levelDBConfig = def
     , quarryConfig = def

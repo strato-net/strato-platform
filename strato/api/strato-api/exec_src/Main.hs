@@ -17,6 +17,7 @@ module Main where
 import Bloc.API
 -- hiding (handleRuntimeError)
 import Bloc.Monad
+import Bloc.NonceStore (ensureNonceCounterTable)
 import Bloc.Server
 import BlockApps.Init
 import BlockApps.Logging
@@ -47,7 +48,6 @@ import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.HashMap.Strict.InsOrd as H
-import qualified Database.Redis as Redis
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Monad (forever)
 import Control.Monad.Composable.Streaming.Bus (BusSettings (..), createBusEnv)
@@ -207,14 +207,10 @@ main = do
   runInstrumentation "strato-api"
 
   let stateFetchLimit' = 100
-      -- Seconds a reserved nonce counter stays valid in the edge Redis; long
-      -- enough to cover a transaction's trip to the indexer under load.
+      -- Seconds a reserved nonce counter stays valid; long enough to cover a
+      -- transaction's trip to the indexer under load.
       nonceCounterTimeout = 10
 
-  -- The edge Redis (nonces here; CSRF tokens and sessions in nginx) is
-  -- shared by every API instance. hedis opens sockets lazily, so an
-  -- unreachable Redis surfaces on the first signed transaction, not here.
-  nonceStore' <- Redis.connect edgeRedisConnectInfo
   simCounter <- newTVarIO 0
 
   -- The message bus, when configured: submits may go to it, and its results
@@ -227,13 +223,15 @@ main = do
     pure tv
   sqlDb <- runLoggingT $ createSQLDB sqlPoolSize
   cirrusDb <- runLoggingT $ createCirrusDB sqlPoolSize
+  -- Per-address nonce counters shared by every API instance live in the
+  -- writer (Bloc.NonceStore); make sure the table exists.
+  ensureNonceCounterTable sqlDb
 
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
-            Bloc.Monad.nonceStore = nonceStore',
             Bloc.Monad.nonceTtlSeconds = nonceCounterTimeout,
             Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
             Bloc.Monad.simInFlight = simCounter,

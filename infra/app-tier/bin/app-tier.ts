@@ -5,6 +5,7 @@ import { NetworkStack } from "../lib/network-stack";
 import { AppTierStack } from "../lib/app-tier-stack";
 import { AppUiStack } from "../lib/app-ui-stack";
 import { HistoryStack } from "../lib/history-stack";
+import { CertificateStack } from "../lib/certificate-stack";
 
 const app = new App();
 const config = loadConfig(app);
@@ -13,7 +14,13 @@ const prefix = `StratoApp-${config.envName}`;
 
 const network = new NetworkStack(app, `${prefix}-Network`, { env, vpcId: config.vpcId });
 const tier = new AppTierStack(app, `${prefix}-Tier`, { env, vpc: network.vpc, config });
-new AppUiStack(app, `${prefix}-Ui`, { env, config, loadBalancer: tier.loadBalancer, albUsesHttps: tier.albUsesHttps });
+// CloudFront certificates live in us-east-1: a hostname without an existing
+// certificate gets a DNS-validated one there (the validation CNAME goes to the
+// registrar), referenced across regions when the app is deployed elsewhere.
+const certificate = config.domainName && !config.cloudfrontCertificateArn
+  ? new CertificateStack(app, `${prefix}-Certificate`, { env: { ...env, region: "us-east-1" }, domainName: config.domainName, crossRegionReferences: true })
+  : undefined;
+new AppUiStack(app, `${prefix}-Ui`, { env, config, loadBalancer: tier.loadBalancer, albUsesHttps: tier.albUsesHttps, certificate: certificate?.certificate, crossRegionReferences: true });
 // The history service (phase 7) deploys once its image exists: -c historyImage=...
 if (config.history) {
   new HistoryStack(app, `${prefix}-History`, { env, vpc: network.vpc, config, cluster: tier.cluster, listener: tier.listener });

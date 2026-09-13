@@ -10,6 +10,8 @@ export interface ApiTierConfig {
   postgrestImage: string;
   smdImage?: string;
   apexImage?: string;
+  /** Swagger UI for the API docs at /docs/ (the spec and initializer come from the nginx image). Default swaggerapi/swagger-ui:v5.29.2, as on a node; `-c docs=false` leaves it out. */
+  docsImage?: string;
   /** Aurora endpoints (infra/data-plane outputs) and the core's VPC-facing Kafka listener. */
   postgresWriterHost: string;
   postgresReaderHost: string;
@@ -29,18 +31,33 @@ export interface ApiTierConfig {
    * parameter holding the node's ethconf.yaml base64-encoded. */
   secrets: { postgres: string; oauthCredentialsYaml: string; session: string };
   ethconfParameterName: string;
+  /** Create the session secret (64 random characters) under `secrets.session` instead of importing an existing one. */
+  createSessionSecret: boolean;
+  /** An existing regional certificate for the ALB. Without it, and with `domainName` set, the app creates a DNS-validated one (see CertificateStack). */
   albCertificateArn?: string;
-  /** Weighted cutover: the node hostname's zone and the current node addresses. */
-  hostedZoneId?: string;
+  /** Security groups this stack opens to its tasks at deploy time: the Aurora cluster's (5432) and the core cell's (9094 Kafka, 3000 strato-api, 8545 jsonrpc). Without them, allow the output TaskSecurityGroupId by hand. */
+  postgresSecurityGroupId?: string;
+  coreSecurityGroupId?: string;
+  /** The tier's public hostname. With `hostedZoneId` it is the node hostname being cut over (weighted records below); without one it is a CNAME to the ALB kept at the registrar. */
   domainName?: string;
+  /** Weighted cutover: the node hostname's Route 53 zone and the current node addresses. */
+  hostedZoneId?: string;
   nodeIpAddresses: string[];
   apiTierWeight: number;
   desiredCount: number;
+  /** The core's vault wrapper (http://<core private host>:8093): strato-api signs through it. Empty leaves the ethconf's value. */
+  vaultUrl?: string;
   /** Run vm-query in the task and serve latest-state calls from the mirror (phase 5). */
   vmQuery: boolean;
   /** Observability (optional): SSM parameter holding the ADOT sidecar config and the IAM policy it needs, both outputs of the observability app. */
   otelConfigParameterName?: string;
   otelSidecarPolicyArn?: string;
+  /** The SMD from S3 behind CloudFront (SmdUiStack): its hostname (a DNS-validated certificate is created for it and also attached to this ALB, because CloudFront forwards the viewer's Host header and checks the origin certificate against it), whether to upload the bundle built in smd-ui/dist, and the chain values its config.js carries. */
+  smdDomainName?: string;
+  deploySmdUi: boolean;
+  chainId?: string;
+  networkName?: string;
+  wagmiProjectId?: string;
 }
 
 function present(v: unknown): boolean {
@@ -67,6 +84,7 @@ export function loadConfig(app: App): ApiTierConfig {
     postgrestImage: ctx(app, "postgrestImage"),
     smdImage: optional(app, "smdImage"),
     apexImage: optional(app, "apexImage"),
+    docsImage: String(ctx(app, "docs", "true")) === "true" ? ctx(app, "docsImage", "swaggerapi/swagger-ui:v5.29.2") : undefined,
     postgresWriterHost: ctx(app, "postgresWriterHost"),
     postgresReaderHost: ctx(app, "postgresReaderHost"),
     postgresPort: Number(ctx(app, "postgresPort", "5432")),
@@ -84,6 +102,9 @@ export function loadConfig(app: App): ApiTierConfig {
       session: ctx(app, "sessionSecretName", `strato/${envName}/api/session-secret`),
     },
     ethconfParameterName: ctx(app, "ethconfParameterName", `/strato/${envName}/api/ethconf-base64`),
+    createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
+    postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
+    coreSecurityGroupId: optional(app, "coreSecurityGroupId"),
     albCertificateArn: optional(app, "albCertificateArn"),
     hostedZoneId: optional(app, "hostedZoneId"),
     domainName: optional(app, "domainName"),
@@ -91,7 +112,13 @@ export function loadConfig(app: App): ApiTierConfig {
     apiTierWeight: Number(ctx(app, "apiTierWeight", "0")),
     desiredCount: Number(ctx(app, "desiredCount", "2")),
     vmQuery: String(ctx(app, "vmQuery", "false")) === "true",
+    vaultUrl: optional(app, "vaultUrl"),
     otelConfigParameterName: optional(app, "otelConfigParameterName"),
     otelSidecarPolicyArn: optional(app, "otelSidecarPolicyArn"),
+    smdDomainName: optional(app, "smdDomainName"),
+    deploySmdUi: String(ctx(app, "deploySmdUi", "false")) === "true",
+    chainId: optional(app, "chainId"),
+    networkName: optional(app, "networkName"),
+    wagmiProjectId: optional(app, "wagmiProjectId"),
   };
 }

@@ -219,11 +219,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     -- Create node directories first (needed before genEthConf reads postgres_password)
     let coreDirs = ["postgres", "redis", "prometheus"] ++ brokerVolumeDirs
-        apiDirs = ["edge-redis"]
     liftIO $ mapM_ (createDirectoryIfMissing True) $
       ["logs", "secrets", ".ethereumH"]
         ++ (if roleRunsCore role then coreDirs else [])
-        ++ (if roleRunsApi role then apiDirs else [])
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)

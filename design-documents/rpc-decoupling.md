@@ -394,22 +394,37 @@ an array of offers pays one query instead of one per element
 trips with promotion after 32 slots and 67 without, and the next call
 none.
 
-**Live follower mirror (in progress, 2026-09-10).** `spike/run-follower-parity.sh`
-runs the same 16 calls with no import: `STRATO_CONF` points at an ethconf
-reaching a follower's eth database (an SSH tunnel to the node's loopback
-Postgres does), the service runs on it, each call goes over the wire twice
-(cold, then warm) and is compared with the node's JSON-RPC, and the report
-ends with the mirror's health and prefetch counters. Verified end to end
-against a locally imported mirror (16 of 16). The testnet app nodes
-(`testnet-node-app-a`/`-b`) are non-validator followers with their own
-indexer and a loopback-bound Postgres: their `block_data_ref`,
-`address_state_ref`, `storage` and `code_ref` columns match this branch's
-entities, the mirror was at block 543494 with 2.23M storage rows, and the
-storage table carries seven copies of the `key` index
-(`storage_key_idx`, `storage_key_idx1` to `6`, from repeated migrations)
-and no index on `address_state_ref_id`, so until the indexer restarts
-with the new `indexAll` every whole-contract prefetch there scans the
-table. The run itself needs database credentials for the node, which
-this session does not handle; see the runbook line in the README.
+**Live follower mirror (2026-09-11).** The run happened on a core cell
+deployed with `infra/core-cell` into a personal AWS account against an
+Aurora cluster from `infra/data-plane`: a full node (`--role=node`) that
+synced Mercata **mainnet** from genesis (194.8k blocks in about eight hours,
+bound by the p2p block fetch) and then followed the live tip, its indexer
+holding the writer lease and building the SQL mirror in Aurora as it went.
+`spike/run-follower-parity.sh` ran on the host itself (`VMQ_BIN` pointing at
+the image's vm-query, `STRATO_CONF` at the node's own ethconf), so no
+database credential left the machine. At block 194837 all 16 calls matched
+byte for byte twice over: against the same node's JSON-RPC (the trie-backed
+consensus VM reading the same LevelDB) and against the public mainnet RPC
+at app.strato.nexus. The oracle, the lendUSDST token and the native token
+on mainnet hold 250, 103 and 1223 rows; the funded balances and total
+supplies compared were non-zero.
 
-**Still open.** The live-follower run above.
+Costs seen on that host (an m6i.xlarge with Aurora db.t4g.medium in the
+same VPC): the first call on a contract in an epoch is 400 to 860 ms, which
+is the SolidVM code-collection compile of the contract's source plus the
+whole-contract prefetch over the network, and every call after that is 0.8
+to 1 ms end to end over the wire, matching the local harness. The 16 calls
+prefetched 1576 rows. The cell was given the composite storage index by the
+indexer's own bootstrap, so the prefetches were index reads from the start.
+
+Two things the run surfaced that were not visible locally: the per-cell
+peer store cannot be used yet (strato-p2p reads block data through the same
+pool it uses for peers, so a separate peer database stops the sync), and
+the compile cost of the first call per contract per epoch is the largest
+remaining latency term for the query VM; caching compiled code collections
+across epochs (the source does not change with the block) is the obvious
+next step.
+
+`spike/run-follower-parity.sh` compares against whichever RPC `NODE` names
+and takes the contract and holder addresses from the environment, so the
+same run works on testnet (`--network=helium`) once a cell follows it.

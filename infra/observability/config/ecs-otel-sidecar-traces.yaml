@@ -1,0 +1,31 @@
+# ADOT sidecar on an API, app or history task, traces-only variant (no
+# Managed Prometheus deployed): OTLP spans from the instrumented processes,
+# which reach the sidecar over the task's shared network namespace, go to
+# X-Ray. Installed from SSM /strato/__ENV__/observability/otel-collector-ecs.
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+
+processors:
+  batch:
+    timeout: 10s
+  resourcedetection:
+    detectors: [env, ecs]
+  resource:
+    attributes:
+      - key: env
+        value: __ENV__
+        action: upsert
+
+exporters:
+  awsxray:
+    region: __REGION__
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource, batch]
+      exporters: [awsxray]

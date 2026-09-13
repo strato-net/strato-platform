@@ -14,6 +14,8 @@ export interface AppUiStackProps extends StackProps {
   config: AppTierConfig;
   loadBalancer: elbv2.IApplicationLoadBalancer;
   albUsesHttps: boolean;
+  /** The us-east-1 certificate for `config.domainName` (from CertificateStack); `config.cloudfrontCertificateArn` otherwise. */
+  certificate?: acm.ICertificate;
 }
 
 /** Paths CloudFront sends to the app tier's nginx rather than the bucket. */
@@ -59,6 +61,8 @@ export class AppUiStack extends Stack {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     };
 
+    const certificate =
+      props.certificate ?? (config.cloudfrontCertificateArn ? acm.Certificate.fromCertificateArn(this, "CfCert", config.cloudfrontCertificateArn) : undefined);
     const distribution = new cloudfront.Distribution(this, "Distribution", {
       comment: `strato app ${config.envName}`,
       defaultRootObject: "index.html",
@@ -76,10 +80,10 @@ export class AppUiStack extends Stack {
         { httpStatus: 403, responseHttpStatus: 200, responsePagePath: "/index.html", ttl: Duration.seconds(0) },
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: "/index.html", ttl: Duration.seconds(0) },
       ],
-      ...(config.domainName && config.cloudfrontCertificateArn
+      ...(config.domainName && certificate
         ? {
             domainNames: [config.domainName],
-            certificate: acm.Certificate.fromCertificateArn(this, "CfCert", config.cloudfrontCertificateArn),
+            certificate,
             minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
           }
         : {}),
@@ -112,6 +116,12 @@ export class AppUiStack extends Stack {
     }
 
     new CfnOutput(this, "DistributionDomainName", { value: distribution.distributionDomainName });
+    if (config.domainName) {
+      new CfnOutput(this, "HostnameRecord", {
+        value: `${config.domainName} CNAME ${distribution.distributionDomainName}`,
+        description: "The record to create at the registrar for the app's hostname",
+      });
+    }
     new CfnOutput(this, "UiBucketName", { value: bucket.bucketName });
   }
 }

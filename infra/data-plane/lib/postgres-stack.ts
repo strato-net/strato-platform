@@ -63,6 +63,13 @@ export class PostgresStack extends Stack {
         // slipstream relies on NOTIFY on the writer; replicas use the
         // PostgREST schema watcher instead.
         "rds.force_ssl": "0",
+        // A transaction left open on the reader pins the writer's vacuum
+        // horizon (Aurora readers report their oldest snapshot to the
+        // writer), and Cirrus rewrites the same rows every block, so one
+        // leaked session bloats the churned tables and slows slipstream to
+        // a crawl within hours. Ten minutes is far past any legitimate
+        // idle gap (vm-query re-pins its epoch every 30 s).
+        idle_in_transaction_session_timeout: "600000",
       },
     });
 

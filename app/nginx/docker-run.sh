@@ -8,11 +8,6 @@ OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 NODE_URL=${NODE_URL:-NULL}
 HOST_IP=${HOST_IP:-host.docker.internal}
 DOCKERIZED_APP=${DOCKERIZED_APP:-true}
-# Edge Redis for CSRF tokens and sessions, shared by every nginx instance in
-# front of the app tier. Empty EDGE_REDIS_HOST keeps both in this instance's
-# memory (fine for a single copy, wrong behind a load balancer).
-EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-}
-EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
 # Session cookie secret: from the mounted secret file unless given directly.
 if [[ -z "${SESSION_SECRET:-}" && -f /run/secrets/session_secret ]]; then
     SESSION_SECRET=$(tr -d '[:space:]' < /run/secrets/session_secret)
@@ -37,25 +32,22 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ### Generate nginx.conf from template according to configuration provided
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
+  # Nameservers for the resolver directive: whatever this container was given.
+  RESOLVER=$(awk '/^nameserver/ && $2 !~ /:/ {printf "%s ", $2}' /etc/resolv.conf)
+  RESOLVER=${RESOLVER:-127.0.0.11}
+  sed -i "s/__RESOLVER__/${RESOLVER% }/g" /tmp/nginx.conf
 
   # Remove SSL lines if deployment is not SSL-enabled
   if [ "$ssl" != true ]; then
     sed -i '/#TEMPLATE_MARK_SSL/d' /tmp/nginx.conf
   fi
   
-  if [[ -z "$EDGE_REDIS_HOST" ]]; then
-    sed -i '/#TEMPLATE_MARK_EDGE_REDIS/d' /tmp/nginx.conf
-  else
-    sed -i 's/[[:space:]]*#TEMPLATE_MARK_EDGE_REDIS//g' /tmp/nginx.conf
-  fi
   if [[ -z "$SESSION_SECRET" ]]; then
     sed -i '/#TEMPLATE_MARK_SESSION_SECRET/d' /tmp/nginx.conf
   else
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
   fi
   sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
-  sed -i "s/__EDGE_REDIS_HOST__/$EDGE_REDIS_HOST/g" /tmp/nginx.conf
-  sed -i "s/__EDGE_REDIS_PORT__/$EDGE_REDIS_PORT/g" /tmp/nginx.conf
   sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
 
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
@@ -82,12 +74,14 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   sed -i 's*<CLIENT_SECRET_PLACEHOLDER>*'"$OAUTH_CLIENT_SECRET"'*g' /tmp/openid.lua
   sed -i 's*<OAUTH_SCOPE_PLACEHOLDER>*openid profile*g' /tmp/openid.lua
 
+  # PUBLIC_SCHEME: the scheme browsers use to reach this nginx (https behind
+  # CloudFront or a TLS-terminating load balancer); defaults follow ssl.
   if [ "$ssl" = true ] ; then
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/yes/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/https/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-https}/g" /tmp/openid.lua
   else
     sed -i 's/<IS_SSL_PLACEHOLDER_YES_NO>/no/g' /tmp/openid.lua
-    sed -i 's/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/http/g' /tmp/openid.lua
+    sed -i "s/<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>/${PUBLIC_SCHEME:-http}/g" /tmp/openid.lua
   fi
 
   ########

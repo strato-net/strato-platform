@@ -3,7 +3,6 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as elasticache from "aws-cdk-lib/aws-elasticache";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as logs from "aws-cdk-lib/aws-logs";
@@ -20,7 +19,8 @@ export interface AppTierStackProps extends StackProps {
 /**
  * The stateless app tier: one Fargate task per copy running the app's nginx
  * (OAuth, CSRF, sessions) next to the backend, behind an ALB. The only state
- * is nginx's, kept in a small ElastiCache Redis that every copy shares.
+ * is nginx's: sessions in the encrypted cookie, CSRF tokens per copy behind
+ * ALB session stickiness. No shared store.
  */
 export class AppTierStack extends Stack {
   readonly loadBalancer: elbv2.ApplicationLoadBalancer;
@@ -34,33 +34,16 @@ export class AppTierStack extends Stack {
     const { vpc, config } = props;
     const name = `strato-app-${config.envName}`;
 
-    // --- Edge Redis: nginx sessions and CSRF tokens, shared by every copy ---
-    const redisSg = new ec2.SecurityGroup(this, "RedisSg", { vpc, description: `${name} edge redis`, allowAllOutbound: false });
-    const redisSubnets = new elasticache.CfnSubnetGroup(this, "RedisSubnets", {
-      description: `${name} edge redis subnets`,
-      subnetIds: vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds,
-    });
-    const redis = new elasticache.CfnReplicationGroup(this, "Redis", {
-      replicationGroupDescription: `${name} edge redis (nginx sessions, CSRF tokens)`,
-      engine: "redis",
-      engineVersion: "7.1",
-      cacheNodeType: "cache.t4g.micro",
-      numCacheClusters: 2,
-      automaticFailoverEnabled: true,
-      multiAzEnabled: true,
-      atRestEncryptionEnabled: true,
-      // In-transit TLS would need lua-resty-session's redis SSL settings; the
-      // group is reachable only from the tasks' security group.
-      transitEncryptionEnabled: false,
-      cacheSubnetGroupName: redisSubnets.ref,
-      securityGroupIds: [redisSg.securityGroupId],
-    });
-    redis.addResourceDependency(redisSubnets);
-
     // --- Secrets: named here, resolved by ECS at task start ---
     const oauth = secretsmanager.Secret.fromSecretNameV2(this, "OauthSecret", config.secrets.oauth);
     const postgresPassword = secretsmanager.Secret.fromSecretNameV2(this, "PostgresPasswordSecret", config.secrets.postgresPassword);
-    const session = secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+    const session: secretsmanager.ISecret = config.createSessionSecret
+      ? new secretsmanager.Secret(this, "SessionSecret", {
+          secretName: config.secrets.session,
+          description: `${name} session secret`,
+          generateSecretString: { passwordLength: 64, excludePunctuation: true },
+        })
+      : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
     const backendSecret = config.secrets.backend
       ? secretsmanager.Secret.fromSecretNameV2(this, "BackendSecret", config.secrets.backend)
       : undefined;
@@ -76,11 +59,17 @@ export class AppTierStack extends Stack {
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
     });
 
+    // nginx runs the login flow (the OIDC relying party) and needs the client
+    // credentials; the backend only verifies users' tokens against the
+    // provider's JWKS, so it gets the discovery URL alone.
     const oauthEnv = {
       OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(oauth, "discoveryUrl"),
       OAUTH_CLIENT_ID: ecs.Secret.fromSecretsManager(oauth, "clientId"),
       OAUTH_CLIENT_SECRET: ecs.Secret.fromSecretsManager(oauth, "clientSecret"),
     };
+    const backendDiscovery: { environment: Record<string, string>; secrets: Record<string, ecs.Secret> } = config.oauthDiscoveryUrl
+      ? { environment: { OAUTH_DISCOVERY_URL: config.oauthDiscoveryUrl }, secrets: {} }
+      : { environment: {}, secrets: { OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(oauth, "discoveryUrl") } };
 
     const backend = task.addContainer("backend", {
       image: containerImage(this, "BackendRepo", config.backendImage),
@@ -92,15 +81,17 @@ export class AppTierStack extends Stack {
         postgres_host: config.postgresHost,
         postgres_port: String(config.postgresPort),
         postgres_user: config.postgresUser,
+        ...backendDiscovery.environment,
         ...config.backendEnvironment,
       },
       secrets: {
-        ...oauthEnv,
-        postgres_password: ecs.Secret.fromSecretsManager(postgresPassword),
+        ...backendDiscovery.secrets,
+        postgres_password: ecs.Secret.fromSecretsManager(postgresPassword, config.secrets.postgresPasswordJsonKey),
         ...(backendSecret ? backendSecretFields(backendSecret) : {}),
       },
       healthCheck: {
-        command: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/v1/metrics > /dev/null || exit 1"],
+        // /api/health is the backend's health route (/api/v1/metrics has no index route and answered 404).
+        command: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"],
         interval: Duration.seconds(15),
         startPeriod: Duration.seconds(60),
       },
@@ -111,22 +102,31 @@ export class AppTierStack extends Stack {
     const nginx = task.addContainer("nginx", {
       image: containerImage(this, "NginxRepo", config.nginxImage),
       logging: ecs.LogDrivers.awsLogs({ logGroup, streamPrefix: "nginx" }),
-      portMappings: [{ containerPort: 80 }],
+      portMappings: [{ containerPort: config.httpPort }],
       environment: {
         NODE_URL: config.nodeUrl,
         DOCKERIZED_APP: "false",
         HOST_IP: "127.0.0.1",
-        EDGE_REDIS_HOST: redis.attrPrimaryEndPointAddress,
-        EDGE_REDIS_PORT: redis.attrPrimaryEndPointPort,
+        // Services that are not in this task: a closed port, which the sidecar's startup treats as "not deployed".
+        APEX_HOST: "127.0.0.1:1",
+        SMD_HOST: "127.0.0.1:1",
+        DOCS_HOST: "127.0.0.1:1",
+        PROMETHEUS_HOST: "127.0.0.1:1",
+        POSTGREST_HOST: "127.0.0.1:1",
         // TLS terminates at CloudFront / the ALB; nginx itself speaks HTTP.
         ssl: "false",
+        // Browsers reach this nginx over https through CloudFront: the OpenID redirect goes back the same way.
+        ...(config.domainName || this.node.tryGetContext("publicScheme") === "https" ? { PUBLIC_SCHEME: "https" } : {}),
       },
       secrets: {
+        ...(config.ethconfParameterName
+          ? { ETHCONF_BASE64: ecs.Secret.fromSsmParameter(ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", { parameterName: config.ethconfParameterName, forceDynamicReference: true })) }
+          : {}),
         ...oauthEnv,
         SESSION_SECRET: ecs.Secret.fromSecretsManager(session),
       },
       healthCheck: {
-        command: ["CMD-SHELL", "curl -sf http://127.0.0.1/_ping || exit 1"],
+        command: ["CMD-SHELL", `curl -sf http://127.0.0.1:${config.httpPort}/_ping || exit 1`],
         interval: Duration.seconds(10),
         startPeriod: Duration.seconds(30),
       },
@@ -160,7 +160,9 @@ export class AppTierStack extends Stack {
     }
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
-    redisSg.addIngressRule(taskSg, ec2.Port.tcp(6379), "nginx sessions and CSRF tokens");
+    if (config.postgresSecurityGroupId) {
+      ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId).addIngressRule(taskSg, ec2.Port.tcp(config.postgresPort), `${name} tasks`);
+    }
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
@@ -180,21 +182,32 @@ export class AppTierStack extends Stack {
     this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: name });
     this.albUsesHttps = Boolean(config.albCertificateArn);
 
+    // The port-80 listener keeps one logical id whether it forwards (no
+    // certificate) or redirects to 443: two listeners on one port cannot
+    // coexist, so switching to HTTPS must update it in place.
+    const http = this.loadBalancer.addListener("Http", {
+      port: 80,
+      ...(this.albUsesHttps ? { defaultAction: elbv2.ListenerAction.redirect({ port: "443", protocol: "HTTPS", permanent: true }) } : {}),
+    });
     const listener = this.albUsesHttps
       ? this.loadBalancer.addListener("Https", {
           port: 443,
           certificates: [acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn!)],
           sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
         })
-      : this.loadBalancer.addListener("Http", { port: 80 });
+      : http;
     this.listener = listener;
 
     listener.addTargets("Nginx", {
-      port: 80,
+      port: config.httpPort,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: 80 })],
+      targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
       healthCheck: { path: "/_ping", interval: Duration.seconds(15), healthyThresholdCount: 2 },
       deregistrationDelay: Duration.seconds(15),
+      // A browser stays on the copy that issued its CSRF token (per-instance
+      // shared dict); sessions are in the cookie, so a re-pin only costs one
+      // CSRF refresh.
+      stickinessCookieDuration: Duration.days(1),
     });
 
     new CfnOutput(this, "AlbDnsName", { value: this.loadBalancer.loadBalancerDnsName });
@@ -202,7 +215,6 @@ export class AppTierStack extends Stack {
       value: taskSg.securityGroupId,
       description: "Allow this group on the node's Postgres (5432) so the backend's cirrus pool can connect",
     });
-    new CfnOutput(this, "RedisEndpoint", { value: `${redis.attrPrimaryEndPointAddress}:${redis.attrPrimaryEndPointPort}` });
   }
 }
 

@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.DB.SQLDB
   ( HasSQLDB,
@@ -20,12 +21,21 @@ module Blockchain.DB.SQLDB
     runPostgresConn,
     createPostgresqlPool,
     withGlobalSQLPool,
+    peerStoreIsSqlite,
+    createPeerStorePool,
+    withPeerStoreConn,
+    runPeerStoreMigration,
+    PeerStore (..),
+    HasPeerStore,
+    peerQuery,
   )
 where
 
 import BlockApps.Logging (runNoLoggingT)
-import Blockchain.EthConf (peerConnStr)
+import Blockchain.EthConf (ethConf, peerConnStr, peerSqlitePath)
 import Control.DeepSeq
+import Control.Lens ((&), (.~))
+import Control.Monad (forM_, when)
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
@@ -33,8 +43,11 @@ import Control.Monad.Logger (MonadLoggerIO)
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import Data.IORef
+import qualified Data.Text as T
 import qualified Database.Persist.Postgresql as PSQL
 import qualified Database.Persist.Sql as SQL
+import Database.Persist.SqlBackend (getRDBMS)
+import qualified Database.Persist.Sqlite as SQLITE
 import System.IO.Unsafe (unsafePerformIO)
 
 -- | The eth database. Reads go to 'sqlReaderPool' and writes (and the few
@@ -103,9 +116,72 @@ createPostgresqlPool cString n = sqlDB <$> PSQL.createPostgresqlPool cString n
 -- node shares a Postgres cluster with other cores).
 globalSQLPool :: IORef SQLDB
 globalSQLPool = unsafePerformIO $ do
-  pool <- runNoLoggingT $ createPostgresqlPool peerConnStr 5
+  pool <- runNoLoggingT $ createPeerStorePool 5
   newIORef pool
 {-# NOINLINE globalSQLPool #-}
+
+-- | The peer store (p_peer, sync_task) as a process environment, distinct
+-- from the eth database ('SQLDB') that strato-p2p also reads block data
+-- from. On a monolith both are the same Postgres pool; a cell keeps the
+-- peer store in its own file or database.
+newtype PeerStore = PeerStore {unPeerStore :: SQLDB}
+
+type HasPeerStore m = (MonadIO m, MonadUnliftIO m, AccessibleEnv PeerStore m)
+
+-- | Run against the peer store.
+peerQuery :: HasPeerStore m => SQL.SqlPersistT (ResourceT m) a -> m a
+peerQuery q = runResourceT . SQL.runSqlPool q . sqlWriterPool . unPeerStore =<< accessEnv
+
+-- | Whether the peer store (p_peer, sync_task) is the SQLite file named by
+-- 'peerSqlitePath' rather than Postgres at 'peerConnStr'.
+peerStoreIsSqlite :: Bool
+peerStoreIsSqlite = maybe False (const True) (peerSqlitePath ethConf)
+
+-- | Connection settings for the SQLite peer store. WAL mode (persistent's
+-- default) lets ethereum-discover and strato-p2p, two processes on the
+-- same host, read and write the file concurrently; the busy timeout makes
+-- a writer wait for the other process's transaction instead of failing.
+peerSqliteInfo :: FilePath -> SQLITE.SqliteConnectionInfo
+peerSqliteInfo path =
+  SQLITE.mkSqliteConnectionInfo (T.pack path)
+    & SQLITE.extraPragmas .~ ["PRAGMA busy_timeout = 10000"]
+
+-- | Opens the peer store: the SQLite file when 'peerSqlitePath' is set,
+-- else Postgres at 'peerConnStr' exactly as before.
+createPeerStorePool :: (MonadUnliftIO m, MonadLoggerIO m) => Int -> m SQLDB
+createPeerStorePool n = case peerSqlitePath ethConf of
+  Just path -> sqlDB <$> SQLITE.createSqlitePoolFromInfo (peerSqliteInfo path) n
+  Nothing -> createPostgresqlPool peerConnStr n
+
+-- | One connection to the peer store, for setup steps.
+withPeerStoreConn :: (MonadUnliftIO m, MonadLoggerIO m) => (SQL.SqlBackend -> m a) -> m a
+withPeerStoreConn act = case peerSqlitePath ethConf of
+  Just path -> SQLITE.withSqliteConnInfo (peerSqliteInfo path) act
+  Nothing -> PSQL.withPostgresqlConn peerConnStr act
+
+-- | Runs a peer-store migration. On Postgres this is persistent's
+-- 'runMigration', unchanged. On SQLite only the CREATE TABLE statements
+-- are taken from the migration, made idempotent, and given SQLite-legal
+-- defaults where the models carry Postgres ones (sync_task's
+-- @nextval('chiliad')@ and @now()@; inserts always supply those columns,
+-- see "Blockchain.SyncDB"). Nothing else is applied: persistent's SQLite
+-- migration rebuilds a table whose stored DDL differs from its own, and
+-- it would do so on every start once the defaults differ.
+runPeerStoreMigration :: MonadUnliftIO m => SQL.Migration -> SQL.SqlPersistT m ()
+runPeerStoreMigration migration = do
+  rdbms <- getRDBMS <$> ask
+  if rdbms /= "sqlite"
+    then SQL.runMigration migration
+    else do
+      statements <- SQL.getMigration migration
+      forM_ statements $ \statement ->
+        when ("CREATE TABLE" `T.isPrefixOf` statement) $
+          SQL.rawExecute (sqliteCompatible statement) []
+  where
+    sqliteCompatible =
+      T.replace "CREATE TABLE " "CREATE TABLE IF NOT EXISTS "
+        . T.replace "DEFAULT nextval('chiliad')" "DEFAULT 0"
+        . T.replace "DEFAULT now()" "DEFAULT CURRENT_TIMESTAMP"
 
 withGlobalSQLPool :: (MonadIO m) => (SQLDB -> m a) -> m a
 withGlobalSQLPool m = liftIO (readIORef globalSQLPool) >>= m

@@ -79,6 +79,8 @@ library
     , openapi3
     , persistent
     , persistent-postgresql
+    , persistent-sqlite
+    , postgresql-simple
     , quickcheck-instances
     , regex-compat
     , resourcet

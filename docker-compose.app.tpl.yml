@@ -1,15 +1,13 @@
 #app-version:<VERSION>
 # STRATO app tier on a VM: the app's nginx (OAuth, CSRF, sessions), backend
-# and UI, with an edge Redis for the nginx state. Stateless apart from that
-# Redis; run several copies behind a load balancer sharing one external Redis
-# (EDGE_REDIS_HOST). The AWS shape of the same thing is infra/ (CDK).
+# state; run several copies behind a load balancer with session stickiness.
+# The AWS shape of the same thing is infra/ (CDK).
 #   NODE_URL            public URL of the STRATO API tier or node
 #   postgres_*          the node's cirrus database (read-only pool), until the
 #                       managed cluster exists
 #   OAUTH_*             the app's own OIDC client
 # Put secrets/session_secret and secrets/postgres_password next to this file.
 volumes:
-  edgeredisdata:
     driver: local
 services:
   backend:
@@ -69,35 +67,16 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  edge-redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - edgeredisdata:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
-      interval: 2s
-      timeout: 2s
-      retries: 10
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
   nginx:
     image: ${APP_NGINX_IMAGE:-<REPO_URL>app-nginx:<VERSION>-<HASH_APP_NGINX>}
     depends_on:
       - backend
       - ui
-      - edge-redis
     environment:
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:?OAUTH_DISCOVERY_URL is required}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:?OAUTH_CLIENT_ID is required}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:?OAUTH_CLIENT_SECRET is required}
       - NODE_URL=${NODE_URL:?NODE_URL is required}
-      - EDGE_REDIS_HOST=${EDGE_REDIS_HOST:-edge-redis}
-      - EDGE_REDIS_PORT=${EDGE_REDIS_PORT:-6379}
       - ssl=${ssl:-false}
     ports:
       - ${HTTP_PORT:-80}:80

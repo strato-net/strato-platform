@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -6,27 +7,31 @@
 -- bloc assigns nonces to the transactions it signs on a user's behalf. The
 -- account's nonce in Postgres lags reality by the transactions still in
 -- flight, so bloc keeps a short-lived counter per address: the next nonce to
--- hand out, expiring after a few seconds. That counter used to be an
--- in-process cache, which is correct only while exactly one strato-api
--- serves a user. It now lives in the edge Redis, reserved with one atomic
--- Lua script, so any number of API instances hand out disjoint nonces.
+-- hand out, expiring after a few seconds. The counter is a row in the eth
+-- database's @nonce_counter@ table on the writer, reserved under a row lock,
+-- so any number of API instances hand out disjoint nonces without any state
+-- of their own: the writer is the one thing every instance already shares.
 --
--- The script reproduces the old cache's rules exactly: the starting point is
--- the greater of the stored counter (when the caller opts in) and the nonce
--- read from Postgres; explicit nonces supplied by the caller are honored
--- and skipped over; the counter is left at one past the highest nonce used.
+-- The rules are those of the original in-process cache: the starting point
+-- is the greater of the stored counter (when the caller opts in and it has
+-- not expired) and the nonce read from Postgres; explicit nonces supplied by
+-- the caller are honored and skipped over; the counter is left at one past
+-- the highest nonce used.
 module Bloc.NonceStore
   ( reserveNonces,
+    ensureNonceCounterTable,
   )
 where
 
+import Blockchain.DB.SQLDB (HasSQLDB, SQLDB (..), sqlQueryWriter)
 import Blockchain.Strato.Model.Address (Address, formatAddressWithoutColor)
 import Blockchain.Strato.Model.Nonce (Nonce (..))
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import qualified Data.ByteString.Char8 as BC
-import qualified Database.Redis as Redis
-import SQLM (ApiError (..))
-import UnliftIO (throwIO)
+import Control.Monad (when)
+import Control.Monad.IO.Class (MonadIO)
+import Control.Monad.Trans.Resource (runResourceT)
+import qualified Data.Set as Set
+import qualified Data.Text as T
+import Database.Persist.Sql (PersistValue (..), Single (..), SqlPersistT, rawExecute, rawSql, runSqlPool)
 
 -- | Reserve @count@ fresh nonces for @addr@.
 --
@@ -38,8 +43,7 @@ import UnliftIO (throwIO)
 --
 -- Returns exactly @count@ nonces in ascending order.
 reserveNonces ::
-  MonadIO m =>
-  Redis.Connection ->
+  HasSQLDB m =>
   -- | seconds the counter stays valid after a reservation
   Int ->
   Address ->
@@ -48,55 +52,44 @@ reserveNonces ::
   [Nonce] ->
   Int ->
   m [Nonce]
-reserveNonces conn ttlSeconds addr useStored (Nonce floorNonce) inUse count = do
-  let key = BC.pack $ "nonce:" ++ formatAddressWithoutColor addr
-      args =
-        [ BC.pack (show (toInteger floorNonce)),
-          if useStored then "1" else "0",
-          BC.pack (show ttlSeconds),
-          BC.pack (show count)
-        ]
-          ++ [BC.pack (show (toInteger n)) | Nonce n <- inUse]
-  result <- liftIO . Redis.runRedis conn $ Redis.eval reserveScript [key] args
-  case result of
-    Left err -> throwIO . ServerError $ "nonce store unavailable: " ++ show err
-    Right (assigned :: [BC.ByteString]) -> do
-      let nonces = map (Nonce . fromInteger . read . BC.unpack) assigned
-      if length nonces /= count
-        then throwIO . ServerError $ "nonce store returned " ++ show (length nonces) ++ " nonces, expected " ++ show count
-        else pure nonces
+reserveNonces ttlSeconds addr useStored (Nonce floorNonce) inUse count = sqlQueryWriter $ do
+  let key = PersistText . T.pack $ formatAddressWithoutColor addr
+  -- One row per address; the FOR UPDATE below serializes concurrent
+  -- reservations for the same address across every API instance.
+  rawExecute
+    "INSERT INTO nonce_counter (address, next_nonce, expires_at) VALUES (?, 0, now()) ON CONFLICT (address) DO NOTHING"
+    [key]
+  rows <- selectCounter key
+  let stored = case rows of
+        [(Single n, Single live)] | live -> Just (read (T.unpack n) :: Integer)
+        _ -> Nothing
+      base0 = toInteger floorNonce
+      base = if useStored then maybe base0 (max base0) stored else base0
+      used = Set.fromList [toInteger n | Nonce n <- inUse]
+      pick _ 0 acc = reverse acc
+      pick n k acc
+        | Set.member n used = pick (n + 1) k acc
+        | otherwise = pick (n + 1) (k - 1 :: Int) (n : acc)
+      assigned = pick base count []
+      maxSeen = maximum ((-1) : Set.toList used ++ assigned)
+  when (maxSeen >= 0) $
+    rawExecute
+      "UPDATE nonce_counter SET next_nonce = ?, expires_at = now() + make_interval(secs => ?) WHERE address = ?"
+      [PersistText (T.pack (show (maxSeen + 1))), PersistInt64 (fromIntegral ttlSeconds), key]
+  pure $ map (Nonce . fromInteger) assigned
 
--- KEYS[1] counter key; ARGV: floor, use_stored, ttl, count, in-use nonces...
-reserveScript :: BC.ByteString
-reserveScript =
-  BC.unlines
-    [ "local key = KEYS[1]",
-      "local base = tonumber(ARGV[1])",
-      "local use_stored = ARGV[2] == '1'",
-      "local ttl = tonumber(ARGV[3])",
-      "local count = tonumber(ARGV[4])",
-      "local in_use = {}",
-      "local max_seen = -1",
-      "for i = 5, #ARGV do",
-      "  local n = tonumber(ARGV[i])",
-      "  in_use[n] = true",
-      "  if n > max_seen then max_seen = n end",
-      "end",
-      "if use_stored then",
-      "  local cur = redis.call('GET', key)",
-      "  if cur then",
-      "    cur = tonumber(cur)",
-      "    if cur > base then base = cur end",
-      "  end",
-      "end",
-      "local assigned = {}",
-      "local n = base",
-      "for i = 1, count do",
-      "  while in_use[n] do n = n + 1 end",
-      "  assigned[#assigned + 1] = tostring(n)",
-      "  if n > max_seen then max_seen = n end",
-      "  n = n + 1",
-      "end",
-      "if max_seen >= 0 then redis.call('SET', key, tostring(max_seen + 1), 'EX', ttl) end",
-      "return assigned"
-    ]
+-- | The counter row, locked for the rest of the transaction: (next nonce, still valid).
+selectCounter :: MonadIO n => PersistValue -> SqlPersistT n [(Single T.Text, Single Bool)]
+selectCounter key =
+  rawSql
+    "SELECT next_nonce::text, (expires_at > now()) FROM nonce_counter WHERE address = ? FOR UPDATE"
+    [key]
+
+-- | Create the counter table on the writer if it is missing (API startup).
+ensureNonceCounterTable :: SQLDB -> IO ()
+ensureNonceCounterTable db =
+  runResourceT $
+    flip runSqlPool (sqlWriterPool db) $
+      rawExecute
+        "CREATE TABLE IF NOT EXISTS nonce_counter (address text PRIMARY KEY, next_nonce numeric NOT NULL, expires_at timestamptz NOT NULL)"
+        []

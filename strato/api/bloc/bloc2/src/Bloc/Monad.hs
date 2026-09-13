@@ -32,7 +32,6 @@ import BlockApps.Logging
 import Control.Monad.Change.Modify hiding (modify)
 import Control.Monad.Composable.Vault
 import Control.Monad.Reader
-import qualified Database.Redis as Redis
 import Data.Map.Strict (Map)
 import Data.Time (UTCTime)
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
@@ -55,9 +54,8 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    -- | Edge Redis holding the per-address nonce counters shared by every
-    -- API instance (see "Bloc.NonceStore"), and how long a counter lives.
-    nonceStore :: Redis.Connection,
+    -- | How long a reserved nonce counter stays valid (see "Bloc.NonceStore";
+    -- the counters live in the eth database's writer).
     nonceTtlSeconds :: Int,
     -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
     -- transaction simulation (same container). From ethconf.yaml vmConfig.

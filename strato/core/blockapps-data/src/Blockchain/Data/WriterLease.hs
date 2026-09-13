@@ -38,7 +38,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import qualified Database.Persist.Postgresql as SQL
-import UnliftIO (SomeException, try)
+import Database.PostgreSQL.Simple (SqlError (..))
+import UnliftIO (SomeException, fromException, throwIO, try)
 
 -- | One lease per cluster: the core writer role.
 coreWriterLease :: Text
@@ -97,10 +98,17 @@ fenceWriterLeaseSql cell now = do
   return (n == 1)
 
 -- | Whether @cell@ holds the lease right now, read from the writer endpoint.
+-- On a brand-new node the table may not exist yet (strato-indexer creates
+-- it, and slipstream can ask first); that reads as "not held", so the
+-- caller waits for the claim instead of crashing.
 holdsWriterLease :: HasSQLDB m => Text -> m Bool
 holdsWriterLease cell = do
-  lease <- sqlQueryWriter getWriterLeaseSql
-  return $ maybe False ((== cell) . writerLeaseHolder) lease
+  r <- try $ sqlQueryWriter getWriterLeaseSql
+  case r of
+    Right lease -> return $ maybe False ((== cell) . writerLeaseHolder) lease
+    Left (e :: SomeException)
+      | Just SqlError {sqlState = "42P01"} <- fromException e -> return False
+      | otherwise -> throwIO e
 
 -- | Runs forever: keeps this cell's heartbeat fresh while it holds the
 -- lease (a no-op otherwise). The write path also heartbeats with every

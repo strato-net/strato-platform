@@ -2,7 +2,8 @@
 # Runs under "sh" (see the Dockerfile CMD), so keep this POSIX.
 
 set -e
-set -x
+# No "set -x": the trace echoes PGPASSWORD and the rendered db-uri, which
+# put the Postgres password into the container log.
 
 # Read postgres password from mounted secrets file
 if [ -f /run/secrets/postgres_password ]; then

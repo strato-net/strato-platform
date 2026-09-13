@@ -97,19 +97,50 @@ if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "local-aut
   exit 1
 fi
 
-for _ in $(seq 1 90); do
-  if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
-    break
+# Postgres is either the node's own container (a monolith) or an external
+# cluster named in ethconf's sqlConfig (--pghost at setup); psql goes through
+# the container in the first case and runs on the host in the second.
+pg_password="$(tr -d '\n' < secrets/postgres_password)"
+read -r PG_HOST PG_PORT < <(python3 - <<'PY'
+import re
+text = open(".ethereumH/ethconf.yaml").read()
+m = re.search(r"^sqlConfig:(.*?)(?=^\S|\Z)", text, re.S | re.M)
+block = m.group(1) if m else ""
+host = re.search(r"host:\s*['\"]?([^'\",}\s]+)", block)
+port = re.search(r"port:\s*['\"]?([0-9]+)", block)
+print((host.group(1) if host else ""), (port.group(1) if port else ""))
+PY
+)
+PG_HOST="${PG_HOST:-localhost}"; PG_PORT="${PG_PORT:-5432}"
+if "${COMPOSE[@]}" config --services 2>/dev/null | grep -qx "postgres"; then
+  PG_MODE=container
+  for _ in $(seq 1 90); do
+    if "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+      break
+    fi
+    sleep 2
+  done
+  if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
+    echo "Error: postgres service did not start" >&2
+    exit 1
   fi
-  sleep 2
-done
-
-if ! "${COMPOSE[@]}" ps --services --filter status=running | grep -qx "postgres"; then
-  echo "Error: postgres service did not start" >&2
-  exit 1
+else
+  PG_MODE=external
+  if ! command -v psql >/dev/null 2>&1; then
+    echo "Error: psql is required to reach the external Postgres at $PG_HOST" >&2
+    exit 1
+  fi
 fi
+pg_psql() {
+  if [[ "$PG_MODE" == container ]]; then
+    "${COMPOSE[@]}" exec -T postgres psql -U postgres "$@"
+  else
+    PGPASSWORD="$pg_password" psql -h "$PG_HOST" -p "$PG_PORT" -U postgres "$@"
+  fi
+}
 
-for _ in $(seq 1 60); do
+# The first start migrates the identity databases, minutes on a remote cluster.
+for _ in $(seq 1 450); do
   if "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/identities" >/dev/null 2>&1; then
     break
   fi
@@ -122,13 +153,13 @@ if ! "${COMPOSE[@]}" exec -T local-auth curl -fsS "http://localhost:4434/admin/i
 fi
 
 for _ in $(seq 1 60); do
-  if "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+  if pg_psql -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 
-if ! "${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
+if ! pg_psql -d oauth -Atc "select count(*) from message;" >/dev/null 2>&1; then
   echo "Error: vault database did not become ready" >&2
   exit 1
 fi
@@ -165,7 +196,7 @@ vault_key_exists() {
   local username_sql provider_sql count
   username_sql="$(sql_escape "$username")"
   provider_sql="$(sql_escape "$provider")"
-  count="$("${COMPOSE[@]}" exec -T postgres psql -U postgres -d oauth -Atc \
+  count="$(pg_psql -d oauth -Atc \
     "select count(*) from users where x_user_unique_name = '$username_sql' and x_identity_provider_id = '$provider_sql';" | tr -d '[:space:]')"
   [[ "$count" != "0" ]]
 }
@@ -175,8 +206,15 @@ if IDENTITY_JSON="$identities" python3 -c 'import json, os, sys; username = sys.
   echo "Local auth user already exists: $USERNAME"
 else
   echo "Creating local auth user: $USERNAME"
-  password="$(prompt_hidden "Create password: ")"
-  confirm="$(prompt_hidden "Confirm password: ")"
+  if [[ -n "${LOCAL_AUTH_ADMIN_PASSWORD:-}" ]]; then
+    # Unattended setup (a host bootstrapping itself): the password comes from
+    # the environment instead of a terminal prompt.
+    password="$LOCAL_AUTH_ADMIN_PASSWORD"
+    confirm="$password"
+  else
+    password="$(prompt_hidden "Create password: ")"
+    confirm="$(prompt_hidden "Confirm password: ")"
+  fi
 
   if [[ "$password" != "$confirm" ]]; then
     echo "Error: passwords do not match" >&2
@@ -218,8 +256,18 @@ if [[ "$WITH_NODEKEY" == true ]]; then
 fi
 echo "  1. Generate a new recovery phrase"
 echo "  2. Restore from an existing recovery phrase"
-printf "Choose [1/2]: " >&2
-IFS= read -r choice
+# Unattended (a host bootstrapping itself: password from the environment, no
+# terminal): generate the phrase and keep it in the node's secrets directory,
+# readable by the node's user only, instead of prompting.
+UNATTENDED=false
+if [[ -n "${LOCAL_AUTH_ADMIN_PASSWORD:-}" && ! -t 0 ]]; then
+  UNATTENDED=true
+  choice=1
+  echo "Unattended setup: generating a recovery phrase into secrets/admin_recovery_phrase"
+else
+  printf "Choose [1/2]: " >&2
+  IFS= read -r choice
+fi
 
 case "$choice" in
   1)
@@ -261,17 +309,22 @@ bits = bin(int.from_bytes(entropy, "big"))[2:].zfill(128) + bin(checksum)[2:].zf
 print(" ".join(words[int(bits[i:i+11], 2)] for i in range(0, 132, 11)))
 PY
 )"
-  echo ""
-  echo "Generated recovery phrase. Write it down now; it will not be saved."
-  echo ""
-  echo "  $mnemonic"
-  echo ""
-  confirm_phrase="$(prompt_hidden "Type YES after you have saved it: ")"
-  if [[ "$confirm_phrase" != "YES" ]]; then
-    echo "Error: recovery phrase was not confirmed" >&2
-    exit 1
+  if [[ "$UNATTENDED" == true ]]; then
+    (umask 077; printf '%s\n' "$mnemonic" > secrets/admin_recovery_phrase)
+    echo "Recovery phrase saved to secrets/admin_recovery_phrase (owner-readable only); move it somewhere safe."
+  else
+    echo ""
+    echo "Generated recovery phrase. Write it down now; it will not be saved."
+    echo ""
+    echo "  $mnemonic"
+    echo ""
+    confirm_phrase="$(prompt_hidden "Type YES after you have saved it: ")"
+    if [[ "$confirm_phrase" != "YES" ]]; then
+      echo "Error: recovery phrase was not confirmed" >&2
+      exit 1
+    fi
+    unset confirm_phrase
   fi
-  unset confirm_phrase
 else
   echo "Enter your BIP39 recovery phrase. It will not be saved."
   mnemonic="$(prompt_hidden "Recovery phrase: ")"
@@ -383,14 +436,12 @@ sys.stdout.write(f"{key:064x}")
 PY
 }
 
-pg_password="$(tr -d '\n' < secrets/postgres_password)"
-
 import_key() {
   local private_key="$1"
   local username="$2"
   local provider="$3"
   printf "%s" "$private_key" | strato-vault-import-key \
-    --pghost localhost \
+    --pghost "$PG_HOST" --pgport "$PG_PORT" \
     --password "$pg_password" \
     --database oauth \
     --vaultPasswordFile secrets/vault_password \

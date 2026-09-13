@@ -40,6 +40,15 @@ _bloc.interceptors.request.use(unsignedTxInterceptor);
 _cirrus.interceptors.request.use(unsignedTxInterceptor);
 _eth.interceptors.request.use(unsignedTxInterceptor);
 
+// An empty token is an anonymous call: no Authorization header at all (the
+// node's nginx rejects a present-but-empty bearer token).
+function authHeaders(token: string, config?: AxiosRequestConfig) {
+  return {
+    ...(config?.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 function makeTokenClient(client: AxiosInstance) {
   return {
     get: async <T = any>(
@@ -49,10 +58,7 @@ function makeTokenClient(client: AxiosInstance) {
     ): Promise<AxiosResponse<T>> => {
       return client.get<T>(url, {
         ...config,
-        headers: {
-          ...(config?.headers || {}),
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token, config),
       });
     },
 
@@ -64,10 +70,7 @@ function makeTokenClient(client: AxiosInstance) {
     ): Promise<AxiosResponse<T>> => {
       return client.post<T>(url, data, {
         ...config,
-        headers: {
-          ...(config?.headers || {}),
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token, config),
       });
     },
   };

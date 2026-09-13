@@ -54,7 +54,6 @@ library
     , extra
     , format
     , hashable
-    , hedis
     , http-client
     , insert-ordered-containers
     , labeled-error
@@ -64,6 +63,8 @@ library
     , openapi3
     , ordered-containers
     , parsec
+    , persistent
+    , resourcet
     , seqevents
     , servant-client
     , servant-openapi3

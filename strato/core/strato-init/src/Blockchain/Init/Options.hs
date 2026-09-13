@@ -37,8 +37,6 @@ defineCustomFlag
 defineFlag "R:redisHost" ("localhost" :: String) "Redis BlockDB hostname"
 defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
-defineFlag "edgeRedisHost" ("localhost" :: String) "Edge Redis hostname (nonce counters, CSRF tokens, sessions; shared by API instances)"
-defineFlag "edgeRedisPort" (6380 :: Int) "Edge Redis port"
 
 defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
 
@@ -64,6 +62,7 @@ defineFlag "validatorBehavior" (True :: Bool) "Whether this node votes and propo
 defineFlag "writer" (True :: Bool) "Whether strato-indexer claims the writer lease at startup (unheld, stale, or its own). false makes a standby core: it follows the chain against the shared Postgres cluster and writes nothing until promoted with strato-promote"
 defineFlag "cellId" ("" :: String) "This core's name among the cores sharing a Postgres cluster (writer lease holder, consumer group suffixes). Default: the hostname"
 defineFlag "peerDatabase" ("" :: String) "Database for this core's peer store (p_peer, sync_task) on the Postgres host. Every core sharing a cluster needs its own, since strato-p2p resets peer state at startup. Default: the eth database, as on a monolith"
+defineFlag "peerStore" ("postgres" :: String) "Where strato-p2p and ethereum-discover keep peers and sync tasks: 'postgres' (the default, the database above) or 'sqlite' (the file peers.sqlite in the node directory, so a core whose Postgres is elsewhere keeps its networking state on its own disk and no longer depends on the database being reachable)"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"
@@ -71,6 +70,9 @@ defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and 
 defineFlag "dockerMode" ("local" :: String) "Docker compose mode: 'local' for local dev, 'allDocker' for full containerized deployment"
 defineFlag "bundledApp" (True :: Bool) "Run app-backend and app-ui next to this node (default). False when the app runs on its own tier (docker-compose.app.yml / the app CDK stack); pass --appUrl so the node's root redirects there"
 defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bundledApp=false"
+defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
+defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"
+defineFlag "bundledPostgrest" (True :: Bool) "Run PostgREST (the Cirrus API at /cirrus) next to this node (default). False when the API tier serves Cirrus; the node's /cirrus then answers 502"
 defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost and --kafkahost at a core and pass its Postgres password with --password)"
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"

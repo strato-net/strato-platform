@@ -121,11 +121,33 @@ indexAPIGated cell idxEvents = do
   if holds
     then indexAPI cell idxEvents
     else case batchTip idxEvents of
-      -- Nothing block-bound in this batch (transactions, balance updates):
-      -- the writer applies those; returning commits the offset past them.
-      Nothing -> return ()
+      -- Nothing block-bound in this batch (transactions, balance updates).
+      -- Returning would commit the offset past them, which is only right
+      -- when another writer applies them. A lone core can reach here before
+      -- its own strato-indexer claims the lease, so wait until this cell
+      -- holds it or the writer's progress moves (proof a writer consumed
+      -- this batch before the block it just committed).
+      Nothing -> do
+        seen <- getIndexerProgress
+        awaitWriter seen False
       Just tip -> follow tip False
   where
+    awaitWriter seen logged = do
+      holds <- holdsWriterLease cell
+      if holds
+        then do
+          $logInfoS "apiIndexer" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now; applying a batch without blocks"
+          indexAPI cell idxEvents
+        else do
+          progress <- getIndexerProgress
+          if progress > seen
+            then return ()
+            else do
+              unless logged $
+                $logInfoS "apiIndexer" . T.pack $
+                  "no writer lease yet: holding a batch without blocks until this cell holds the lease or indexer_progress moves past " ++ maybe "unset" show seen
+              liftIO $ threadDelay 1000000
+              awaitWriter seen True
     follow tip logged = do
       progress <- getIndexerProgress
       if maybe False (>= tip) progress
