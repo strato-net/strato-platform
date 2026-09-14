@@ -40,6 +40,8 @@ export interface CoreCellConfig {
   oauthSecretName?: string;
   /** A Grafana container on the host (port 3001, anonymous viewer) reading the node's own Prometheus, with the repo's dashboards. */
   grafana: boolean;
+  /** Publish the node's Prometheus on the cell's private address, port 9090, for the API tier's apex (its prometheusHost). The API tier app opens the security group to its tasks. */
+  exposePrometheus: boolean;
   /** Public hostname of the node: a Let's Encrypt certificate is obtained for it on the host (HTTP-01 on port 80), the machine hostname is set to it (the node URL derives from the hostname), and the node serves https. */
   tlsHostname?: string;
   letsEncryptEmail?: string;
@@ -145,6 +147,7 @@ export function loadConfig(app: App): CoreCellConfig {
     localAuth: bool(app, "localAuth", "false"),
     oauthSecretName: optional(app, "oauthSecretName"),
     grafana: bool(app, "grafana", "false"),
+    exposePrometheus: bool(app, "exposePrometheus", "false"),
     tlsHostname: optional(app, "tlsHostname"),
     letsEncryptEmail: optional(app, "letsEncryptEmail"),
     webCidrs: list(app, "webCidrs", "0.0.0.0/0"),

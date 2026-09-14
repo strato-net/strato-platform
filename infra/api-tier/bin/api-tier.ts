@@ -5,6 +5,7 @@ import { NetworkStack } from "../lib/network-stack";
 import { ApiTierStack } from "../lib/api-tier-stack";
 import { CertificateStack } from "../lib/certificate-stack";
 import { SmdUiStack } from "../lib/smd-ui-stack";
+import { FrontDoorStack } from "../lib/front-door-stack";
 
 const app = new App();
 const config = loadConfig(app);
@@ -23,13 +24,23 @@ const certificate = config.domainName && !config.albCertificateArn
 const smdCertificate = config.smdDomainName
   ? new CertificateStack(app, `${prefix}-SmdCertificate`, { env, domainName: config.smdDomainName })
   : undefined;
+// The front door's hostname: the same arrangement, for the distribution that
+// serves every UI. The app tier's ALB needs this certificate too
+// (-c extraCertificateArns=... there, from this stack's CertificateArn output).
+const frontDoorCertificate = config.frontDoorDomainName
+  ? new CertificateStack(app, `${prefix}-FrontDoorCertificate`, { env, domainName: config.frontDoorDomainName })
+  : undefined;
+const extraCertificates = [smdCertificate, frontDoorCertificate].flatMap((c) => (c ? [c.certificate] : []));
 new ApiTierStack(app, `${prefix}-Tier`, {
   env,
   vpc: network.vpc,
   config,
   albCertificate: certificate?.certificate,
-  extraCertificates: smdCertificate ? [smdCertificate.certificate] : undefined,
+  extraCertificates: extraCertificates.length ? extraCertificates : undefined,
 });
 if (config.smdDomainName) {
   new SmdUiStack(app, `${prefix}-Smd`, { env, config, certificate: smdCertificate?.certificate });
+}
+if (frontDoorCertificate) {
+  new FrontDoorStack(app, `${prefix}-FrontDoor`, { env, config, certificate: frontDoorCertificate.certificate });
 }

@@ -96,6 +96,7 @@ submits transactions to this cell.
 | `localAuth` | `false` | with role node: local OpenID provider instead of Keycloak; admin `admin`, password in `/etc/strato/local-auth-admin-password` on the host |
 | `oauthSecretName` | none | without localAuth: Secrets Manager secret, JSON `{discoveryUrl, clientId, clientSecret}`, holding the node's Keycloak client (confidential, service accounts enabled, the node's URL among its redirect URIs). The host writes it as strato-login would; strato-setup then creates the node key in the shared vault (`--vaultUrl`, default vault.blockapps.net) under that client |
 | `frontendLabels` | none | with `grafana`: names for the tier map's CloudFront distributions (`E123ABC=SMD,E456DEF=App UI`) |
+| `exposePrometheus` | `false` | publish the node's Prometheus on the cell's private IP, port 9090 (a socat container), for the API tier's apex: pass `-c prometheusHost=<PrivateDnsName>:9090` there |
 | `grafana` | `false` | Grafana container on port 3001 (anonymous viewer; admin password in `/etc/strato/grafana-admin-password`) over the node's Prometheus, with the repo's dashboards |
 | `tlsHostname` / `letsEncryptEmail` | none | public hostname (an A record to the cell's Elastic IP): the host obtains a Let's Encrypt certificate for it over port 80, sets its hostname to it, and the node serves `https://<hostname>/` (the app URL, the OAuth issuer) |
 | `webCidrs` | `0.0.0.0/0` | who may reach the app (`httpPort`, 443) and Grafana (3001) |

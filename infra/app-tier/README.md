@@ -78,3 +78,20 @@ unsigned-transaction endpoints are open, so it calls them on behalf of
 anonymous users without a token. The client id and secret go to nginx,
 which runs the login flow. That flow needs the app hostname's callback
 (`https://<host>/auth/openidc/return`) registered on the OAuth client.
+
+## Behind the API tier's front door
+
+When the API tier app's front door serves every UI on one hostname (see its
+README), this tier is the origin for `/api/*`, `/api-docs*` and
+`/history-api/*`, and the `Ui` stack is no longer needed:
+
+- `-c albCertificateArn=<this tier's hostname certificate>` so the ALB serves
+  https, and `-c extraCertificateArns=<the front door's CertificateArn>` because
+  CloudFront forwards the front door's Host header.
+- `-c csrfStateless=true` (nginx image 18.10-onehost or later), and the same
+  session secret and OAuth client as the API tier's nginx.
+- This tier's hostname can then point straight at the ALB (`AlbDnsName`).
+- `-c ui=false` leaves the `Ui` stack out of the app; destroy a deployed one
+  with `cdk destroy <prefix>-Ui` (its bucket is retained; empty and delete it
+  by hand).
+

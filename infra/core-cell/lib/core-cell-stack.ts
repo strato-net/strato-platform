@@ -172,6 +172,7 @@ export class CoreCellStack extends Stack {
       LOCAL_AUTH: String(config.localAuth),
       OAUTH_SECRET_ID: config.oauthSecretName ?? "",
       GRAFANA: String(config.grafana),
+      PROMETHEUS_EXPOSE: String(config.exposePrometheus),
       DASHBOARDS_S3: dashboards.s3ObjectUrl,
       PEER_DATABASE: config.peerDatabase ?? "",
       PEER_STORE: config.peerStore,

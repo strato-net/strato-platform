@@ -24,6 +24,10 @@ export interface AppTierConfig {
   networkName: string;
   /** ACM certificate (in this region) for the ALB; HTTP-only when absent. */
   albCertificateArn?: string;
+  /** More certificates for the ALB's HTTPS listener: the front door's hostname, which CloudFront forwards as Host (the API tier app's FrontDoorCertificate output). */
+  extraCertificateArns: string[];
+  /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. Required behind a front door shared with the API tier. */
+  csrfStateless: boolean;
   /** The app's public hostname (a CNAME to the CloudFront distribution at the registrar). */
   domainName?: string;
   /** An existing us-east-1 certificate for it; without one the app creates a DNS-validated certificate (CertificateStack, in us-east-1). */
@@ -56,6 +60,8 @@ export interface AppTierConfig {
   backendEnvironment: Record<string, string>;
   /** Deploy app/ui/dist to the bucket (requires `npm run build` in app/ui first). */
   deployUi: boolean;
+  /** The Ui stack (S3 + CloudFront). `-c ui=false` leaves it out when the API tier app's front door serves the app UI. */
+  uiStack: boolean;
   desiredCount: number;
   /** Observability (optional): SSM parameter holding the ADOT sidecar config and the IAM policy it needs, both outputs of the observability app. */
   otelConfigParameterName?: string;
@@ -120,6 +126,8 @@ export function loadConfig(app: App): AppTierConfig {
     chainId: Number(ctx(app, "chainId")),
     networkName: ctx(app, "networkName"),
     albCertificateArn: optional(app, "albCertificateArn"),
+    extraCertificateArns: String(ctx(app, "extraCertificateArns", "")).split(",").map((s) => s.trim()).filter(Boolean),
+    csrfStateless: String(ctx(app, "csrfStateless", "false")) === "true",
     cloudfrontCertificateArn: optional(app, "cloudfrontCertificateArn"),
     domainName: optional(app, "domainName"),
     oauthDiscoveryUrl: optional(app, "oauthDiscoveryUrl"),
@@ -136,6 +144,7 @@ export function loadConfig(app: App): AppTierConfig {
     httpPort: Number(ctx(app, "httpPort", "80")),
     backendEnvironment: ctx<Record<string, string>>(app, "backendEnvironment", {}),
     deployUi: String(ctx(app, "deployUi", "false")) === "true",
+    uiStack: String(ctx(app, "ui", "true")) === "true",
     desiredCount: Number(ctx(app, "desiredCount", "2")),
     otelConfigParameterName: optional(app, "otelConfigParameterName"),
     otelSidecarPolicyArn: optional(app, "otelSidecarPolicyArn"),

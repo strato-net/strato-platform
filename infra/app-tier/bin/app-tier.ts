@@ -17,10 +17,13 @@ const tier = new AppTierStack(app, `${prefix}-Tier`, { env, vpc: network.vpc, co
 // CloudFront certificates live in us-east-1: a hostname without an existing
 // certificate gets a DNS-validated one there (the validation CNAME goes to the
 // registrar), referenced across regions when the app is deployed elsewhere.
+// The certificate also serves the ALB (-c albCertificateArn), so it stays when the Ui stack is left out.
 const certificate = config.domainName && !config.cloudfrontCertificateArn
   ? new CertificateStack(app, `${prefix}-Certificate`, { env: { ...env, region: "us-east-1" }, domainName: config.domainName, crossRegionReferences: true })
   : undefined;
-new AppUiStack(app, `${prefix}-Ui`, { env, config, loadBalancer: tier.loadBalancer, albUsesHttps: tier.albUsesHttps, certificate: certificate?.certificate, crossRegionReferences: true });
+if (config.uiStack) {
+  new AppUiStack(app, `${prefix}-Ui`, { env, config, loadBalancer: tier.loadBalancer, albUsesHttps: tier.albUsesHttps, certificate: certificate?.certificate, crossRegionReferences: true });
+}
 // The history service (phase 7) deploys once its image exists: -c historyImage=...
 if (config.history) {
   new HistoryStack(app, `${prefix}-History`, { env, vpc: network.vpc, config, cluster: tier.cluster, listener: tier.listener });

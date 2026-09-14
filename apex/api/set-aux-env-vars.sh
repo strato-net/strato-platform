@@ -19,6 +19,14 @@ if [ -n "$STRATO_IPV4" ]; then
   STRATO_HOSTNAME="$STRATO_IPV4"
 fi
 
+# Opt-in: where strato-api runs next to apex rather than at the node URL's host
+# (an API tier task: APEX_STRATO_API_HOST=127.0.0.1). Unset everywhere else, so
+# the node URL stays the source as above.
+if [ -n "${APEX_STRATO_API_HOST:-}" ]; then
+  STRATO_HOSTNAME="$APEX_STRATO_API_HOST"
+  STRATO_PORT_API="${APEX_STRATO_API_PORT:-$STRATO_PORT_API}"
+fi
+
 export STRATO_HOSTNAME
 export STRATO_PORT_API
 export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}

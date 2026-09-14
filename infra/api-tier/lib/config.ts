@@ -58,6 +58,41 @@ export interface ApiTierConfig {
   chainId?: string;
   networkName?: string;
   wagmiProjectId?: string;
+  /**
+   * The front door (FrontDoorStack): one hostname for every UI. CloudFront serves the app UI
+   * (app/ui/dist) at / and the SMD at /smd/ from their own buckets, sends the app backend's
+   * paths to `appOriginDomainName` (the app tier's ALB, which must carry a certificate for
+   * the front door's hostname) and the node API, apex, RPC, docs and login paths to this
+   * tier. A DNS-validated certificate is created for the hostname and attached to this ALB.
+   */
+  frontDoorDomainName?: string;
+  appOriginDomainName?: string;
+  deployAppUi: boolean;
+  /** Values for the app UI's config.js (as app/ui/render-config.sh writes them). */
+  appUiPosthogKey?: string;
+  appUiPosthogHost?: string;
+  appUiGoogleAnalyticsId?: string;
+  /**
+   * A Secrets Manager JSON {discoveryUrl, clientId, clientSecret} for nginx's login flow,
+   * overriding the client in the node's OAuth credentials file (strato-api keeps that file).
+   * Behind a front door both tiers' nginx must use the same client and session secret, so
+   * that a session started by either tier is readable, and refreshable, by the other.
+   */
+  nginxOauthSecretName?: string;
+  /**
+   * The session secret nginx uses, when it differs from `secrets.session` (which this stack may own).
+   * Behind a front door both tiers' nginx must share one secret: name the app tier's here, as its
+   * complete ARN when the name ends in "-" and six characters (strato/app/session-secret does).
+   */
+  nginxSessionSecretName?: string;
+  /**
+   * A core cell's Prometheus as host:port (the core-cell app's exposePrometheus). apex reads the node's
+   * health and consensus data there, instead of reporting it unknown; the cell's security group
+   * (coreSecurityGroupId) is opened to the tasks on that port.
+   */
+  prometheusHost?: string;
+  /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. */
+  csrfStateless: boolean;
 }
 
 function present(v: unknown): boolean {
@@ -120,5 +155,15 @@ export function loadConfig(app: App): ApiTierConfig {
     chainId: optional(app, "chainId"),
     networkName: optional(app, "networkName"),
     wagmiProjectId: optional(app, "wagmiProjectId"),
+    frontDoorDomainName: optional(app, "frontDoorDomainName"),
+    appOriginDomainName: optional(app, "appOriginDomainName"),
+    deployAppUi: String(ctx(app, "deployAppUi", "false")) === "true",
+    appUiPosthogKey: optional(app, "appUiPosthogKey"),
+    appUiPosthogHost: optional(app, "appUiPosthogHost"),
+    appUiGoogleAnalyticsId: optional(app, "appUiGoogleAnalyticsId"),
+    nginxOauthSecretName: optional(app, "nginxOauthSecretName"),
+    nginxSessionSecretName: optional(app, "nginxSessionSecretName"),
+    csrfStateless: String(ctx(app, "csrfStateless", "false")) === "true",
+    prometheusHost: optional(app, "prometheusHost"),
   };
 }

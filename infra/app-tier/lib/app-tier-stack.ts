@@ -117,6 +117,7 @@ export class AppTierStack extends Stack {
         ssl: "false",
         // Browsers reach this nginx over https through CloudFront: the OpenID redirect goes back the same way.
         ...(config.domainName || this.node.tryGetContext("publicScheme") === "https" ? { PUBLIC_SCHEME: "https" } : {}),
+        ...(config.csrfStateless ? { CSRF_STATELESS: "true" } : {}),
       },
       secrets: {
         ...(config.ethconfParameterName
@@ -197,6 +198,9 @@ export class AppTierStack extends Stack {
         })
       : http;
     this.listener = listener;
+    if (this.albUsesHttps && config.extraCertificateArns.length) {
+      listener.addCertificates("ExtraCertificates", config.extraCertificateArns.map((arn) => elbv2.ListenerCertificate.fromArn(arn)));
+    }
 
     listener.addTargets("Nginx", {
       port: config.httpPort,

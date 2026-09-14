@@ -96,6 +96,67 @@ the same certificate is also attached to this tier's HTTPS listener.
 - Outputs: `HostnameRecord` (the CNAME to create) and `DistributionId` (name
   it in the tier map's `frontend_labels`, `<id>=SMD`).
 
+## Front door: every UI on one hostname
+
+`-c frontDoorDomainName=node.example.com -c appOriginDomainName=<app ALB DNS name>`
+adds `<prefix>-FrontDoorCertificate` (DNS-validated, also attached to this
+tier's HTTPS listener) and `<prefix>-FrontDoor`: one CloudFront distribution
+serving the app UI at `/` and the SMD at `/smd/` from their own private
+buckets, as a single node does. It routes:
+
+| Paths | Origin |
+|---|---|
+| everything else | app UI bucket (client-side routes get `index.html`) |
+| `/smd`, `/smd/*` | SMD bucket (`/smd` redirects to `/smd/`) |
+| `/api/*`, `/api-docs*`, `/history-api/*` | the app tier's ALB |
+| `/strato/*`, `/strato-api*`, `/bloc/*`, `/cirrus/*`, `/apex-api*`, `/apex-ws/*`, `/rpc*`, `/docs*`, `/login*`, `/auth/*`, `/csrf-init`, `/health`, `/_ping` | this tier's ALB |
+
+CloudFront forwards the viewer's Host header to both ALBs, so each carries the
+front door's certificate: here through the stack reference, on the app tier
+with `-c extraCertificateArns=<FrontDoorCertificate's CertificateArn>` (the app
+ALB must serve https: `-c albCertificateArn=...` there).
+
+Two nginx tiers then answer one hostname, so they must agree on sessions:
+
+- **One session secret.** `-c nginxSessionSecretName=<the app tier's session
+  secret>` makes this tier's nginx read it. Pass the complete ARN when the name
+  ends in a hyphen and six characters, like `strato/app/session-secret`: a
+  name-only reference is misread as name plus random suffix and ECS fails with
+  AccessDenied (a secret this stack created under
+  `sessionSecretName` stays in place, unused; renaming it would collide).
+- **One OAuth client.** `-c nginxOauthSecretName=<JSON {discoveryUrl, clientId,
+  clientSecret}>` gives this tier's nginx the app tier's client (strato-api
+  keeps the node's credentials file). Login and logout for both UIs run here;
+  a token refresh needs the client that issued the session. The client needs
+  `https://<frontDoorDomainName>/*` among its redirect and post-logout URIs.
+- **Stateless CSRF.** `-c csrfStateless=true` on both tiers sets
+  `CSRF_STATELESS=true`: the token becomes an HMAC of the session under the
+  session secret, so any copy of either tier validates it. The default
+  per-instance token store would reset the shared `CSRF-TOKEN` cookie between
+  tiers, and the two ALBs' `AWSALB` stickiness cookies overwrite each other on
+  one hostname. Requires nginx images with the stateless mode (18.10-onehost
+  or later); single-node deployments leave it off and are unchanged.
+
+Other context: `-c deployAppUi=true` uploads `app/ui/dist` (run `npm run build`
+in `app/ui` first) with a `config.js` from `chainId`, `networkName` and the
+optional `appUiPosthogKey`, `appUiPosthogHost`, `appUiGoogleAnalyticsId`;
+`-c deploySmdUi=true` uploads the SMD as in the section above.
+
+Cut over by pointing the hostname at the `HostnameRecord` output's CloudFront
+name. If the hostname was a node's A record, give the node another name first
+(its Grafana, and the core-cell context's `tlsHostname`). Name the
+`DistributionId` in the tier map's `frontend_labels`.
+
+## Node health from a core cell
+
+apex answers `/health` and `/apex-api/status` from Prometheus metrics of the
+core's processes, which run in a core cell, not in this tier. Expose the cell's
+Prometheus on its private address (the core-cell app's `-c exposePrometheus=true`)
+and pass `-c prometheusHost=<cell private DNS name>:9090`: apex reads it, the
+cell's security group (`coreSecurityGroupId`) opens that port to the tasks, and
+the required health jobs leave out core-api (strato-api runs in this task).
+Without it apex reports health, consensus data and the node address as unknown.
+
 ## API docs
 
 The task runs Swagger UI (`swaggerapi/swagger-ui`) as the `docs` container on

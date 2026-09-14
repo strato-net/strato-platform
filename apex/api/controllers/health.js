@@ -98,7 +98,7 @@ module.exports = {
 
       const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData, nodeAddress] = await Promise.all([
         utils.getLatestHealth(),
-        getPbftData(),
+        getPbftDataOrNull(),
         getNodeAddress(),
       ]);
 
@@ -165,7 +165,7 @@ module.exports = {
           winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
           return null;
         }),
-        getPbftData(),
+        getPbftDataOrNull(),
         getNodeAddress(),
         // Peers the node is currently connected to: active (active_state=1)
         // and bonded (bond_state=2). Falls back to null so /health remains usable.
@@ -257,6 +257,19 @@ function findNodeAddress(obj) {
     return null;
   }
   return `0x${elem.metric.address}`;
+}
+
+// The status and health endpoints keep answering without consensus data: when
+// Prometheus is unreachable (an API tier runs apex without one), pbftData is
+// empty rather than the whole response failing with a 500. The health daemon
+// still calls getPbftData directly and handles its errors itself.
+async function getPbftDataOrNull() {
+  try {
+    return await getPbftData();
+  } catch (err) {
+    winston.warn(`Unable to fetch pbft data: ${err.message}`);
+    return null;
+  }
 }
 
 function getPbftData() {

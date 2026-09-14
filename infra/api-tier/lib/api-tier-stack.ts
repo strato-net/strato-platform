@@ -49,6 +49,18 @@ export class ApiTierStack extends Stack {
           generateSecretString: { passwordLength: 64, excludePunctuation: true },
         })
       : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+    // nginx's session secret, when it is not this stack's own (front door: the app tier's).
+    // A complete ARN is required when the name ends in "-" and six characters (as
+    // strato/app/session-secret does): Secrets Manager reads that ending of a
+    // name-only reference as the random suffix, finds no such secret, and ECS's
+    // fetch fails as AccessDenied.
+    const nginxSession = !config.nginxSessionSecretName
+      ? session
+      : config.nginxSessionSecretName.startsWith("arn:")
+        ? secretsmanager.Secret.fromSecretCompleteArn(this, "NginxSessionSecret", config.nginxSessionSecretName)
+        : secretsmanager.Secret.fromSecretNameV2(this, "NginxSessionSecret", config.nginxSessionSecretName);
+    // nginx's login client, when it differs from the node's (front door: shared with the app tier).
+    const nginxOauth = config.nginxOauthSecretName ? secretsmanager.Secret.fromSecretNameV2(this, "NginxOauthSecret", config.nginxOauthSecretName) : undefined;
     // MSK SASL/SCRAM secret: JSON {username, password}, name prefixed AmazonMSK_.
     const busSecret = config.busHost ? secretsmanager.Secret.fromSecretNameV2(this, "BusSecret", config.busSecretName) : undefined;
     const ethconf = ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", {
@@ -141,7 +153,16 @@ export class ApiTierStack extends Stack {
             postgres_host: config.postgresWriterHost,
             postgres_port: String(config.postgresPort),
             postgres_user: config.postgresUser,
-            PROMETHEUS_HOST: "127.0.0.1:1",
+            // The node's metrics live in a core cell's Prometheus (-c prometheusHost). strato-api
+            // runs in this task, so apex calls it locally and its health_check is not among the
+            // cell's jobs: the required jobs leave core-api out.
+            PROMETHEUS_HOST: config.prometheusHost ?? "127.0.0.1:1",
+            // apex would otherwise call strato-api at the node URL's host (the front door).
+            APEX_STRATO_API_HOST: "127.0.0.1",
+            APEX_STRATO_API_PORT: "3000",
+            ...(config.prometheusHost
+              ? { HEALTH_CHECK_JOBS: "slipstream_main=slipstream,strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer" }
+              : {}),
           },
           secrets: { ...ethconfEnv, postgres_password: ecs.Secret.fromSecretsManager(postgres, "password") },
         })
@@ -179,11 +200,20 @@ export class ApiTierStack extends Stack {
         ssl: "false",
         // TLS ends at the ALB (or CloudFront): the OpenID redirect goes back over https.
         ...(props.albCertificate || config.albCertificateArn ? { PUBLIC_SCHEME: "https" } : {}),
+        ...(config.csrfStateless ? { CSRF_STATELESS: "true" } : {}),
       },
       secrets: {
         ...ethconfEnv,
-        SESSION_SECRET: ecs.Secret.fromSecretsManager(session),
+        SESSION_SECRET: ecs.Secret.fromSecretsManager(nginxSession),
         OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml),
+        // docker-run.sh prefers these over the credentials file's client.
+        ...(nginxOauth
+          ? {
+              OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(nginxOauth, "discoveryUrl"),
+              OAUTH_CLIENT_ID: ecs.Secret.fromSecretsManager(nginxOauth, "clientId"),
+              OAUTH_CLIENT_SECRET: ecs.Secret.fromSecretsManager(nginxOauth, "clientSecret"),
+            }
+          : {}),
       },
       healthCheck: {
         command: ["CMD-SHELL", `curl -sf http://127.0.0.1:${config.httpPort}/_ping || exit 1`],
@@ -229,6 +259,10 @@ export class ApiTierStack extends Stack {
       core.addIngressRule(taskSg, ec2.Port.tcp(3000), `${name} tasks: strato-api`);
       core.addIngressRule(taskSg, ec2.Port.tcp(8545), `${name} tasks: jsonrpc`);
       core.addIngressRule(taskSg, ec2.Port.tcp(8093), `${name} tasks: vault wrapper`);
+      if (config.prometheusHost) {
+        const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
+        core.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
+      }
     }
 
     const service = new ecs.FargateService(this, "Service", {

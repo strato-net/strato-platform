@@ -345,6 +345,19 @@ PY
     grafana/grafana-oss:11.2.0 >/dev/null
 fi
 
+# --- 7a. The node's Prometheus on the private address (for the API tier's apex) ---
+# Prometheus listens only on the compose network; a socat container publishes it
+# on the cell's private IP, where the security group admits the API tier's tasks.
+if [[ "${PROMETHEUS_EXPOSE:-false}" == "true" ]]; then
+  log "prometheus on the private address"
+  for i in $(seq 1 60); do docker network inspect strato_default >/dev/null 2>&1 && break; sleep 10; done
+  token=$(curl -s -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' http://169.254.169.254/latest/api/token)
+  private_ip=$(curl -s -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/local-ipv4)
+  docker rm -f strato-prometheus-expose >/dev/null 2>&1 || true
+  docker run -d --name strato-prometheus-expose --restart unless-stopped --network strato_default -p "$private_ip:9090:9090" \
+    alpine/socat:1.8.1.1 tcp-listen:9090,fork,reuseaddr tcp-connect:prometheus:9090 >/dev/null
+fi
+
 # --- 7b. Container states to CloudWatch (for the tier map) ---
 # The node's Prometheus scrapes its processes but not its containers (redis,
 # the broker, nginx, postgrest, apex, the app). Once a minute each container
