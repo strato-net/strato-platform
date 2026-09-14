@@ -1,6 +1,5 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const os = require("node:os");
 const { randomUUID } = require("node:crypto");
 const dotenv = require("dotenv");
 dotenv.config({ quiet: true });
@@ -19,22 +18,16 @@ const { verifyFromManifest } = require("./scanTokenConfig");
 const { buildDepositRouterControl } = require("./lib/externalBridgeArtifacts");
 
 const TIMEOUT_MS = 30_000;
-const DEFAULT_ADMIN_CONFIG = path.join(os.homedir(), ".config", "strato", "eab-admin.json");
-const DEFAULT_TECHNICIAN_CONFIG = path.join(os.homedir(), ".config", "strato", "eab-technician.json");
-const inferAdminNumber = (...values) => {
-  const match = values.filter(Boolean).map(String).join(" ").match(/admin[-_ ]?([12])/i);
-  return match?.[1];
-};
+const ROLES = ["coordinator", "admin-1", "admin-2", "infra"];
 function parseArgs(argv) {
   const command = argv[0]?.startsWith("--") ? "plan" : argv.shift() || "plan";
-  if (!["init", "bundle", "technician-setup", "admin-setup", "plan", "resume", "status", "next", "verify", "vote", "activate"].includes(command)) {
-    throw new Error("Use init|bundle|technician-setup|admin-setup|plan|status|next|resume|verify|vote|activate");
+  if (!["init", "bundle", "setup", "plan", "resume", "status", "next", "verify", "vote", "activate"].includes(command)) {
+    throw new Error("Use init|bundle|setup|plan|status|next|resume|verify|vote|activate");
   }
   const args = { command };
   const allowed = command === "init" ? ["manifest", "settings", "policy"]
     : command === "bundle" ? ["manifest", "bundle"]
-      : command === "technician-setup" ? ["config", "manifest", "output-dir", "stage", "env-file"]
-      : command === "admin-setup" ? ["admin", "config", "manifest", "output-dir", "stage", "env-file"]
+      : command === "setup" ? ["role", "config", "manifest", "output-dir", "stage", "env-file"]
         : ["config", "manifest", "output-dir", "stage", "env-file",
           ...(["vote", "activate"].includes(command) ? ["approve"] : [])];
   for (let index = 0; index < argv.length; index += 2) {
@@ -42,31 +35,27 @@ function parseArgs(argv) {
     if (!argv[index].startsWith("--") || !allowed.includes(name) || !argv[index + 1] || argv[index + 1].startsWith("--") || args[name]) throw new Error(`Invalid or duplicate option ${argv[index]}`);
     args[name] = argv[index + 1];
   }
-  if (command === "technician-setup") args.config ||= DEFAULT_TECHNICIAN_CONFIG;
-  if (command === "admin-setup") args.config ||= DEFAULT_ADMIN_CONFIG;
   if (!args.config && !args.manifest && process.env.EAB_ROLLOUT_CONFIG) {
     args.config = process.env.EAB_ROLLOUT_CONFIG;
   }
-  if (!args.config && !args.manifest && fs.existsSync(DEFAULT_ADMIN_CONFIG)) {
-    args.config = DEFAULT_ADMIN_CONFIG;
-  }
-  if (args.config && !["technician-setup", "admin-setup"].includes(command)) {
+  if (args.config && command !== "setup") {
     const config = readJson(path.resolve(args.config));
     if (config.manifestSha256 && digest(fs.readFileSync(config.manifest, "utf8")) !== config.manifestSha256) {
-      throw new Error("Configured deployment bundle changed; stop and repeat admin-setup with the technician");
+      throw new Error("Configured deployment bundle changed; stop and repeat setup with the coordinator");
     }
     args.manifest ||= config.manifest;
     args["output-dir"] ||= config.outputDir;
     args.stage ||= config.stage;
     args["env-file"] ||= config.environmentFile;
+    args.role ||= config.role;
     if (config.admin) args.admin ||= config.admin;
+    if (config.role === "admin-1") args.admin = "1";
+    if (config.role === "admin-2") args.admin = "2";
   }
-  const inferredAdmin = inferAdminNumber(args.config, args["env-file"]);
-  if (!args.admin && inferredAdmin) args.admin = inferredAdmin;
-  if (args.admin && !["1", "2"].includes(String(args.admin))) throw new Error("--admin must be 1 or 2");
-  if (["technician-setup", "admin-setup"].includes(command)) {
-    for (const required of ["manifest", "output-dir"]) {
-      if (!args[required]) throw new Error(`admin-setup requires --${required}`);
+  if (command === "setup") {
+    if (!ROLES.includes(args.role)) throw new Error(`setup requires --role ${ROLES.join("|")}`);
+    for (const required of ["config", "manifest", "output-dir"]) {
+      if (!args[required]) throw new Error(`setup requires --${required}`);
     }
     return args;
   }
@@ -207,17 +196,76 @@ function recordedIssueIds(calls, artifacts) {
     .filter(([, value]) => value.issueId).map(([id, value]) => [id, value.issueId]));
 }
 
+function comparableGovernanceValue(value) {
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (value && typeof value === "object" && "value" in value) return comparableGovernanceValue(value.value);
+  const text = String(value ?? "").trim();
+  if (/^(true|false)$/i.test(text)) return text.toLowerCase();
+  if (/^0x[0-9a-fA-F]{40}$/.test(text) || /^[0-9a-fA-F]{40}$/.test(text)) return address(text);
+  if (/^-?\d+$/.test(text)) return BigInt(text).toString();
+  return text;
+}
+
+function parseGovernanceEventArgs(raw) {
+  if (raw == null || raw === "") return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [raw];
+    }
+  }
+  return [raw];
+}
+
+function sameGovernanceArgs(call, eventArgs) {
+  const expected = (call.args?._args || []).map(({ value }) => comparableGovernanceValue(value));
+  const actual = parseGovernanceEventArgs(eventArgs).map(comparableGovernanceValue);
+  return expected.length === actual.length && expected.every((value, index) => value === actual[index]);
+}
+
 async function fetchLiveAdminVoteCounts(settings, nodeUrl, token, calls, artifacts, fetchImpl = fetch) {
   const metadata = recordedVoteMetadata(calls, artifacts);
-  if (metadata.size === 0) return new Map();
+  const registry = address(settings.adminRegistry);
+  const createdUrl = `${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry-IssueCreated`;
+  const votedUrl = `${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry-IssueVoted`;
+  const unmatched = calls.filter(({ id, call }) => !metadata.get(id)?.issueId && call?.args?._target && call?.args?._func);
+  if (unmatched.length) {
+    const pairs = [...new Map(unmatched.flatMap(({ call }) => {
+      const target = address(call.args._target);
+      const func = call.args._func;
+      return [
+        [`${target}:${func}`, `and(target.eq.${target},func.eq.${func})`],
+        [`0x${target}:${func}`, `and(target.eq.0x${target},func.eq.${func})`],
+      ];
+    })).values()];
+    const created = await jsonFetch(`${createdUrl}?${new URLSearchParams({
+      address: `eq.${registry}`,
+      or: `(${pairs.join(",")})`,
+      select: "issueId,target,func,args",
+      limit: 10000,
+    })}`, token, fetchImpl);
+    for (const item of unmatched) {
+      const match = created.find((row) =>
+        address(row.target) === address(item.call.args._target) &&
+        String(row.func || "") === item.call.args._func &&
+        sameGovernanceArgs(item.call, row.args));
+      if (!match?.issueId) continue;
+      const current = metadata.get(item.id) || { hashes: new Set() };
+      current.issueId = String(match.issueId).toLowerCase();
+      metadata.set(item.id, current);
+    }
+  }
   const transactionToCall = new Map([...metadata].flatMap(([id, value]) =>
     [...value.hashes].map((hash) => [hash, id])));
   const missingIssueHashes = [...transactionToCall.keys()]
     .filter((hash) => !metadata.get(transactionToCall.get(hash)).issueId);
-  const baseUrl = `${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry-IssueVoted`;
   if (missingIssueHashes.length) {
-    const rows = await jsonFetch(`${baseUrl}?${new URLSearchParams({
-      address: `eq.${address(settings.adminRegistry)}`,
+    const rows = await jsonFetch(`${votedUrl}?${new URLSearchParams({
+      address: `eq.${registry}`,
       transaction_hash: `in.(${missingIssueHashes.join(",")})`,
       select: "issueId,transaction_hash",
       limit: 10000,
@@ -232,8 +280,8 @@ async function fetchLiveAdminVoteCounts(settings, nodeUrl, token, calls, artifac
   if (issues.size === 0) return new Map();
   const issueIds = [...new Set(issues.values())];
   const rows = await jsonFetch(
-    `${baseUrl}?${new URLSearchParams({
-      address: `eq.${address(settings.adminRegistry)}`,
+    `${votedUrl}?${new URLSearchParams({
+      address: `eq.${registry}`,
       issueId: `in.(${issueIds.join(",")})`,
       select: "issueId,voter",
       limit: 10000,
@@ -281,13 +329,15 @@ async function sourceState(context, artifacts, fetchImpl = fetch) {
   const activationErrors = [...prerequisiteErrors, ...verification.compareActions(beforeEnable, actions)];
   const calls = governanceProgress(settings, state, { stage: context.stage, activationErrors });
   calls.forEach((item) => { item.requiredAdminVotes = requiredAdminVotes(votingPolicy, item.call); });
-  const liveVoteCounts = await fetchLiveAdminVoteCounts(
+  const liveVoteCountsResult = await fetchLiveAdminVoteCounts(
     settings, nodeUrl, token, calls.filter(({ status }) => status === "READY"),
-    artifacts, boundedFetch).catch(() => new Map());
-  calls.forEach((item) => { item.recordedAdminVotes = liveVoteCounts.get(item.id); });
+    artifacts, boundedFetch).then((counts) => ({ counts })).catch((error) => ({ error: error.message }));
+  if (liveVoteCountsResult.counts) {
+    calls.forEach((item) => { item.recordedAdminVotes = liveVoteCountsResult.counts.get(item.id); });
+  }
   return { settings, state, inactiveTokens, votingPolicy: votingPolicy && {
     adminCount: votingPolicy.adminCount, defaultThresholdBps: votingPolicy.defaultThresholdBps,
-  }, votingPolicyError: votingPolicyResult.error, calls, errors: [
+  }, votingPolicyError: votingPolicyResult.error, liveVoteCountsError: liveVoteCountsResult.error, calls, errors: [
     ...prerequisiteErrors, ...verification.compareActions(settings, actions),
     ...(initialization.bridge.depositsPaused === false || initialization.bridge.depositsPaused === "false" ? [] : ["STRATO deposit settlement is paused or its pause state is unavailable"]),
   ] };
@@ -408,16 +458,14 @@ async function inspect(context, artifacts, options = {}) {
     if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) throw new Error("Approve services.confirmations as a positive integer");
     if (services.verifiers.length !== 3 || context.manifest.authorizationSigners.length !== 3) throw new Error("Configure three verifier endpoints and KMS addresses in the manifest");
     const urls = new Set();
-    const tokens = new Set();
     for (const verifier of services.verifiers) {
       const url = new URL(verifier.url);
       if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("Verifier base URLs must be HTTPS without embedded credentials or query strings");
-      const token = process.env[verifier.tokenEnv];
-      if (!token || tokens.has(token) || urls.has(url.href)) throw new Error("Verifier tokens and URLs must be present and distinct");
-      urls.add(url.href); tokens.add(token);
+      if (urls.has(url.href)) throw new Error("Verifier URLs must be distinct");
+      urls.add(url.href);
     }
     const metadata = await Promise.all(services.verifiers.map(async (verifier, index) => {
-      const data = await jsonFetch(`${verifier.url.replace(/\/$/, "")}/health`, process.env[verifier.tokenEnv], options.fetchImpl);
+      const data = await jsonFetch(`${verifier.url.replace(/\/$/, "")}/health`, undefined, options.fetchImpl);
       const policy = context.rollout.verifierPolicies[index];
       const expectedConfirmations = verifier.confirmations ?? services.confirmations;
       const confirmationMismatch = verifier.confirmations === undefined
@@ -435,8 +483,11 @@ async function inspect(context, artifacts, options = {}) {
     return metadata;
   };
   const checkBridgeHealth = async () => {
-    const url = context.manifest.services.bridgeHealthUrl;
-    if (!url || !/^https:\/\//.test(url)) throw new Error("Configure services.bridgeHealthUrl after Runtime deployment");
+    const { bridgeHealthUrl, bridgeHealthUrlEnv = "BRIDGE_HEALTH_URL" } = context.manifest.services;
+    const url = process.env[bridgeHealthUrlEnv] || bridgeHealthUrl;
+    if (!url || !/^https:\/\/[^<>\s]+$/.test(url)) {
+      throw new Error(`Set ${bridgeHealthUrlEnv} to the deployed Runtime HTTPS health URL`);
+    }
     const data = await jsonFetch(url, undefined, options.fetchImpl);
     if (data.status !== true) throw new Error("Bridge health is not ready");
     return data;
@@ -467,19 +518,35 @@ async function inspect(context, artifacts, options = {}) {
       ? [{ step: "configure-vault", path: artifacts.vaultConfigurePath, status: passed("vault-configuration") ? "DONE" : "PENDING" }]
       : []),
   ];
+  const pendingSafeConfiguration = safeExecutionOrder.some(({ status }) => status === "PENDING");
   const report = {
     revision: context.revision, observedAt: new Date().toISOString(), checks, calls, activationChecksRequired,
     governance: source?.votingPolicy
       ? { status: "LIVE", ...source.votingPolicy }
       : { status: "UNAVAILABLE", error: source?.votingPolicyError },
+    liveVoteCounts: source?.liveVoteCountsError
+      ? { status: "UNAVAILABLE", error: redactFor(context, source.liveVoteCountsError) }
+      : source ? { status: "LIVE" } : undefined,
     status: ready ? (router.paused ? "READY_FOR_ACTIVATION_REVIEW" : "DEPOSITS_ACTIVE_CANARY_REQUIRED") : "PENDING",
     approvalHash: digest({ revision: context.revision, calls: calls.map(({ id, status }) => ({ id, status })), ready, routerPaused: router?.paused }),
     safe: { executionOrder: safeExecutionOrder, vaultPause: artifacts.vaultPausePath,
       vaultConfigure: artifacts.vaultConfigurePath, routerPause: artifacts.depositRouterPausePath,
       routerTokens: artifacts.depositRouterBatchPaths },
-    next: !source ? "Resolve STRATO read access before voting" : calls.some(({ status }) => status === "READY") ? "Review READY governance calls and run vote with approvalHash" : !ready ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun resume" : router.paused ? "Review activation, then generate the Safe unpause file with activate --approve" : "Reconcile canary custody and issuance before declaring launch complete",
+    next: !source ? "Resolve STRATO read access before voting" : source.liveVoteCountsError
+      ? "Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun status"
+      : calls.some(({ status }) => status === "READY") ? "Review READY governance calls and run vote with approvalHash" : !ready
+      ? pendingSafeConfiguration
+        ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun status"
+        : "Resolve failed readiness checks; no Safe configuration remains; rerun status"
+      : router.paused ? "Review activation, then generate the Safe unpause file with activate --approve" : "Reconcile canary custody and issuance before declaring launch complete",
   };
   return { report, source, externalReady, router };
+}
+
+function requireLiveAdminVoteCounts(source, report) {
+  if (source?.liveVoteCountsError || report?.liveVoteCounts?.status === "UNAVAILABLE") {
+    throw new Error("Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun status");
+  }
 }
 
 async function vote(context, artifacts, inspection, approval, options = {}) {
@@ -488,6 +555,7 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
   if (inspection.source.inactiveTokens?.length || inspection.report.calls.some(({ status, call }) => status === "BLOCKED" && call.args._func === "initialize")) {
     throw new Error("Resolve inactive tokens or conflicting initialization before voting");
   }
+  requireLiveAdminVoteCounts(inspection.source, inspection.report);
   const token = await resolveSourceToken(context);
   const nodeUrl = context.manifest.services.nodeUrl.replace(/\/$/, "");
   const identity = await jsonFetch(`${nodeUrl.replace(/\/$/, "")}/strato/v2.3/key`, token, options.fetchImpl);
@@ -507,6 +575,7 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
     const fresh = refreshed?.source || await (options.sourceState || sourceState)(context, artifacts);
     if (fresh.inactiveTokens?.length) throw new Error("Token status changed; stop and review before voting");
     if (fresh.calls.find(({ id }) => id === item.id)?.status !== "READY") continue;
+    requireLiveAdminVoteCounts(fresh, refreshed?.report);
     if (journal[item.id]) {
       const previous = journal[item.id];
       if (!previous.hashes?.length) throw new Error(`Uncertain prior submission for ${item.id}; reconcile chain evidence before retrying`);
@@ -598,7 +667,6 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
       !process.env[rpcUrl] && rpcUrl,
       !oauthReady && oauthRequirement,
     ].filter(Boolean),
-    requiredAtActivation: context.manifest.services.verifiers.map(({ tokenEnv }) => tokenEnv),
     runtimeServiceVariables: "Not rollout inputs; fill the generated bridge/verifier env templates only when deploying services.",
   };
   if (report.operationError) {
@@ -606,6 +674,17 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
   }
   const ready = report.calls?.filter(({ status }) => status === "READY") || [];
   if (ready.length) {
+    if (report.liveVoteCounts?.status === "UNAVAILABLE") {
+      return {
+        currentStage: `${ready[0].deploymentStage}/12: ${ready[0].deploymentStageName}`,
+        readyCallCount: ready.length,
+        voteState: "LIVE_ADMIN_VOTES_UNAVAILABLE",
+        action: "Live AdminRegistry vote counts are unavailable. Do not infer zero votes. Restore the STRATO vote query and rerun status.",
+        safeChecklist,
+        environment,
+        resumeCommand,
+      };
+    }
     const voteCounts = recordedVoteCounts(ready, artifacts)
       .map((count, index) => Math.max(count, ready[index].recordedAdminVotes || 0));
     const requirementsKnown = ready.every(({ requiredAdminVotes }) =>
@@ -660,7 +739,7 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
       action: "All governance and verification gates pass. Review and generate the Safe unpause transaction.",
       safeChecklist,
       environment,
-      activateCommand: `npm run external:rollout -- activate ${common.join(" ")} --approve ${report.approvalHash}`,
+      activateCommand: `npm run external:rollout -- activate --approve ${report.approvalHash}`,
     };
   }
   return {
@@ -688,18 +767,18 @@ function terminalSummary(report, reportFile) {
     if (report.voteOutcome === "STAGE_EXECUTED") {
       return {
         status: "STAGE_EXECUTED",
-        action: "TECHNICIAN_RUN_STATUS",
+        action: "COORDINATOR_RUN_STATUS",
         run: "npm run external:rollout -- status",
-        then: "The technician runs status with their own technician profile.",
+        then: "The coordinator runs status with their own coordinator profile.",
         details,
       };
     }
     if (report.voterAdmin === "2" || report.voteInputState === "WAITING_ON_SECOND_ADMIN") {
       return {
         status: "VOTE_SUBMITTED",
-        action: "TECHNICIAN_RUN_STATUS",
+        action: "COORDINATOR_RUN_STATUS",
         run: "npm run external:rollout -- status",
-        then: "The technician runs status with their own profile. If still pending, wait for indexing; do not vote again.",
+        then: "The coordinator runs status with their own profile. If still pending, wait for indexing; do not vote again.",
         details,
       };
     }
@@ -707,7 +786,7 @@ function terminalSummary(report, reportFile) {
       status: "HANDOFF_REQUIRED",
       action: "ADMIN_2_VOTE",
       run: operator.adminHandoffCommand,
-      then: "The technician runs status after Admin 2 votes.",
+      then: "The coordinator runs status after Admin 2 votes.",
       details,
     };
   }
@@ -715,6 +794,17 @@ function terminalSummary(report, reportFile) {
   const progress = requirements.length === 1
     ? `${requirements[0].recorded}/${requirements[0].required} admin votes recorded`
     : undefined;
+  if (operator.voteState === "LIVE_ADMIN_VOTES_UNAVAILABLE" ||
+      operator.voteState === "GOVERNANCE_THRESHOLD_UNAVAILABLE") {
+    return {
+      status: "WAITING",
+      step: operator.currentStage,
+      action: operator.voteState,
+      then: operator.action,
+      run: operator.resumeCommand,
+      details,
+    };
+  }
   if (operator.voteState === "FIRST_ADMIN_VOTE_REQUIRED") {
     return {
       status: "ACTION_REQUIRED",
@@ -760,8 +850,9 @@ function terminalSummary(report, reportFile) {
   if (operator.activateCommand) {
     return {
       status: "ACTION_REQUIRED",
-      action: "GENERATE_ACTIVATION_TRANSACTION",
+      action: "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION",
       run: operator.activateCommand,
+      then: "The coordinator proposes the generated transaction; the required Safe owners approve and execute it; then the coordinator reruns status.",
       details,
     };
   }
@@ -777,13 +868,12 @@ function terminalSummary(report, reportFile) {
 async function main(argv = process.argv.slice(2)) {
   const args = parseArgs([...argv]);
   const manifestPath = path.resolve(args.manifest);
-  if (["technician-setup", "admin-setup"].includes(args.command)) {
+  if (args.command === "setup") {
     const configPath = path.resolve(args.config);
     const stage = args.stage || "activation";
     loadManifest(manifestPath, stage);
     const profile = {
-      role: args.command === "technician-setup" ? "technician" : "administrator",
-      ...(args.admin ? { admin: String(args.admin) } : {}),
+      role: args.role,
       manifest: manifestPath,
       manifestSha256: digest(fs.readFileSync(manifestPath, "utf8")),
       outputDir: path.resolve(args["output-dir"]),
@@ -794,7 +884,7 @@ async function main(argv = process.argv.slice(2)) {
     writeJson(configPath, profile);
     fs.chmodSync(configPath, 0o600);
     console.log(JSON.stringify({
-      status: args.command === "technician-setup" ? "TECHNICIAN_CONFIGURED" : "ADMIN_CONFIGURED",
+      status: `${args.role.toUpperCase().replace("-", "_")}_CONFIGURED`,
       config: configPath,
       action: `Run this once in this persona's terminal: export EAB_ROLLOUT_CONFIG=${JSON.stringify(configPath)}`,
     }, null, 2));
@@ -807,7 +897,7 @@ async function main(argv = process.argv.slice(2)) {
       status: "BUNDLE_CREATED",
       bundle: bundlePath,
       sha256: digest(fs.readFileSync(bundlePath, "utf8")),
-      action: "Give this non-secret file and its SHA-256 checksum to both administrators.",
+      action: "Give this non-secret file and its SHA-256 checksum to the coordinator, both administrators, and infra deployer.",
     }, null, 2));
     return;
   }
@@ -837,7 +927,8 @@ async function main(argv = process.argv.slice(2)) {
   fs.writeFileSync(handle, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
   try {
     const context = loadManifest(manifestPath, args.stage);
-    const artifacts = generate(context, output);
+    const adminProfile = ["administrator", "admin-1", "admin-2"].includes(args.role);
+    const artifacts = generate(context, output, { includeServiceTemplates: !adminProfile });
     let report;
     if (args.command === "plan") {
       const settings = loadConfig(artifacts.bridgeConfigPath);

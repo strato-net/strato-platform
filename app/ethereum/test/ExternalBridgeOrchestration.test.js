@@ -97,6 +97,11 @@ test("init imports existing settings without overwriting and plan never emits ac
   assert.equal(f.artifacts.vaultConfigurePath, undefined);
   const repeat = generate(f.context, path.join(f.directory, "output"));
   assert.deepEqual(repeat.hashes, f.artifacts.hashes);
+  const adminArtifacts = generate(f.context, path.join(f.directory, "admin-output"),
+    { includeServiceTemplates: false });
+  assert.deepEqual(adminArtifacts.serviceTemplates, []);
+  assert.equal(fs.existsSync(path.join(adminArtifacts.directory, "bridge.env.template")), false);
+  assert.equal(fs.existsSync(adminArtifacts.bridgeConfigPath), true);
 });
 
 test("init can expand a draft manifest in place without settings.json", (t) => {
@@ -150,8 +155,24 @@ test("embedded deployment inputs make the manifest portable and revision-bound",
   assert.notEqual(loadManifest(f.manifestPath).revision, policyRevision);
 });
 
-test("technician bundle loads without the original deployment files", (t) => {
+test("bundle creation rejects incomplete service ownership inputs", (t) => {
   const f = fixture(t);
+  assert.throws(() => createPortableBundle(f.manifestPath,
+    path.join(f.directory, "deployment-bundle.json")), /Bundle requires three verifiers/);
+});
+
+test("coordinator bundle loads without the original deployment files", (t) => {
+  const f = fixture(t);
+  f.manifest.authorizationSigners = [addr("d"), addr("e"), addr("f")];
+  f.manifest.services.confirmations = 12;
+  f.manifest.services.safeProposerAddress = addr("b");
+  f.manifest.services.executorAddress = addr("c");
+  f.manifest.services.verifiers = [1, 2, 3].map((index) => ({
+    url: `https://verifier-${index}.example`,
+    tokenEnv: `VERIFIER_${index}_API_TOKEN`,
+    confirmations: 12,
+  }));
+  writeJson(f.manifestPath, f.manifest);
   const bundlePath = path.join(f.directory, "handoff", "deployment-bundle.json");
   fs.mkdirSync(path.dirname(bundlePath));
   createPortableBundle(f.manifestPath, bundlePath);
@@ -160,10 +181,15 @@ test("technician bundle loads without the original deployment files", (t) => {
   fs.copyFileSync(bundlePath, copiedBundle);
   fs.rmSync(path.join(f.directory, "deployment.json"));
   fs.rmSync(path.join(f.directory, "discovery.json"));
-  const technician = loadManifest(bundlePath);
+  const coordinator = loadManifest(bundlePath);
   const admin2 = loadManifest(copiedBundle);
-  assert.equal(technician.rollout.chainId, f.context.rollout.chainId);
-  assert.equal(admin2.revision, technician.revision);
+  assert.equal(coordinator.rollout.chainId, f.context.rollout.chainId);
+  assert.equal(admin2.revision, coordinator.revision);
+  const bundle = readJson(bundlePath);
+  assert.match(bundle.toolingRevision, /^[a-f0-9]{64}$/);
+  bundle.toolingRevision = "0".repeat(64);
+  writeJson(bundlePath, bundle);
+  assert.throws(() => loadManifest(bundlePath), /different reviewed rollout code revision/);
 });
 
 test("editing generated files or their hash index cannot bypass integrity checking", (t) => {
@@ -280,7 +306,7 @@ test("operator guidance identifies first and second administrator vote state", (
     status: "HANDOFF_REQUIRED",
     action: "ADMIN_2_VOTE",
     run: guidance.adminHandoffCommand,
-    then: "The technician runs status after Admin 2 votes.",
+    then: "The coordinator runs status after Admin 2 votes.",
     details: "/secure/report.json",
   });
   const secondAdminSummary = terminalSummary({
@@ -289,7 +315,7 @@ test("operator guidance identifies first and second administrator vote state", (
     voterAdmin: "2",
     voteOutcome: "AWAITING_ANOTHER_ADMIN",
   }, "/secure/report.json");
-  assert.equal(secondAdminSummary.action, "TECHNICIAN_RUN_STATUS");
+  assert.equal(secondAdminSummary.action, "COORDINATOR_RUN_STATUS");
   assert.equal(secondAdminSummary.run, "npm run external:rollout -- status");
   writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`),
     { "call-id": { status: "VOTED" } });
@@ -301,6 +327,16 @@ test("operator guidance identifies first and second administrator vote state", (
   guidance = operatorGuidance(report, args, artifacts);
   assert.equal(guidance.voteState, "WAITING_FOR_EXECUTION");
   assert.equal(guidance.voteCommand, undefined);
+  guidance = operatorGuidance({
+    status: "READY_FOR_ACTIVATION_REVIEW",
+    approvalHash: "b".repeat(64),
+    calls: [],
+    safe: { executionOrder: [] },
+  }, args, artifacts);
+  assert.equal(guidance.activateCommand,
+    `npm run external:rollout -- activate --approve ${"b".repeat(64)}`);
+  assert.equal(terminalSummary({ operator: guidance }, "/secure/report.json").action,
+    "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION");
 });
 
 test("rollout automatically loads deployment.env beside the manifest", (t) => {
@@ -347,6 +383,7 @@ test("one-time admin config supplies portable rollout arguments", (t) => {
   const manifest = path.join(directory, "deployment-bundle.json");
   fs.writeFileSync(manifest, "{}\n");
   writeJson(config, {
+    role: "admin-1",
     manifest,
     manifestSha256: digest("{}\n"),
     outputDir: path.join(directory, "generated"),
@@ -360,6 +397,8 @@ test("one-time admin config supplies portable rollout arguments", (t) => {
     "output-dir": path.join(directory, "generated"),
     stage: "activation",
     "env-file": path.join(directory, "admin.env"),
+    role: "admin-1",
+    admin: "1",
   });
   const previous = process.env.EAB_ROLLOUT_CONFIG;
   process.env.EAB_ROLLOUT_CONFIG = config;
@@ -370,12 +409,19 @@ test("one-time admin config supplies portable rollout arguments", (t) => {
   assert.throws(() => parseArgs(["status", "--config", config]), /bundle changed/);
 });
 
-test("technician setup uses a separate read-only profile", () => {
-  const args = parseArgs(["technician-setup", "--config", "/secure/technician.json",
+test("setup supports each deployment persona", () => {
+  const args = parseArgs(["setup", "--role", "coordinator", "--config", "/secure/coordinator.json",
     "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]);
-  assert.equal(args.command, "technician-setup");
-  assert.equal(args.config, "/secure/technician.json");
+  assert.equal(args.command, "setup");
+  assert.equal(args.role, "coordinator");
+  assert.equal(args.config, "/secure/coordinator.json");
   assert.equal(args.admin, undefined);
+  for (const role of ["admin-1", "admin-2", "infra"]) {
+    assert.equal(parseArgs(["setup", "--role", role, "--config", `/secure/${role}.json`,
+      "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]).role, role);
+  }
+  assert.throws(() => parseArgs(["setup", "--role", "unknown", "--config", "/secure/config.json",
+    "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]), /setup requires --role/);
 });
 
 test("Safe proposer remains a delegate while testnet may retain threshold one", () => {
@@ -462,6 +508,71 @@ test("live AdminRegistry events include votes cast outside this rollout director
   assert.equal(counts.get("call-id"), 2);
 });
 
+test("coordinator status counts live votes without a local journal", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-live-votes-remote-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const issueId = "c".repeat(64);
+  const target = addr("2");
+  const stratoToken = addr("3");
+  const calls = [{
+    id: "call-id",
+    call: { args: { _target: target, _func: "setRoute", _args: [
+      { type: "address", value: stratoToken },
+      { type: "bool", value: true },
+    ] } },
+  }];
+  const counts = await fetchLiveAdminVoteCounts(
+    { adminRegistry: addr("9") }, "https://node.example", "token",
+    calls, { directory: path.join(root, "revision") },
+    async (url) => ({ ok: true, json: async () => {
+      if (url.includes("IssueCreated")) {
+        return [{
+          issueId, target: target.slice(2), func: "setRoute",
+          args: [stratoToken, true],
+        }];
+      }
+      if (url.includes("issueId=")) {
+        return [
+          { issueId, voter: addr("1") },
+          { issueId, voter: addr("4") },
+        ];
+      }
+      return [];
+    } }),
+  );
+  assert.equal(counts.get("call-id"), 2);
+});
+
+test("unavailable live vote counts do not produce first-admin vote guidance", () => {
+  const args = { manifest: "/secure/manifest.json", "output-dir": "/secure/output", stage: "activation" };
+  const report = {
+    liveVoteCounts: { status: "UNAVAILABLE", error: "HTTP 500" },
+    approvalHash: "a".repeat(64),
+    calls: [{
+      id: "call-id",
+      status: "READY",
+      requiredAdminVotes: 2,
+      recordedAdminVotes: 0,
+      deploymentStage: 6,
+      deploymentStageName: "settlement verifier threshold",
+      call: { args: { _func: "setSettlementVerifierThreshold" } },
+    }],
+  };
+  const guidance = operatorGuidance(report, args, { directory: "/secure/missing" });
+  assert.equal(guidance.voteState, "LIVE_ADMIN_VOTES_UNAVAILABLE");
+  assert.equal(guidance.voteCommand, undefined);
+  assert.equal(guidance.adminHandoffCommand, undefined);
+  assert.match(guidance.action, /Do not infer zero votes/);
+  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
+    status: "WAITING",
+    step: "6/12: settlement verifier threshold",
+    action: "LIVE_ADMIN_VOTES_UNAVAILABLE",
+    then: guidance.action,
+    run: guidance.resumeCommand,
+    details: "/secure/report.json",
+  });
+});
+
 test("missing state is uninitialized only for a verified fresh proxy", () => {
   const settings = { adminRegistry: addr("1") };
   const proxyRows = [{ address: addr("2"), _owner: addr("1"), logicContract: addr("3") }];
@@ -491,6 +602,28 @@ test("votes require a fresh approval and safe pause gates", async (t) => {
   const f = fixture(t);
   await assert.rejects(vote(f.context, f.artifacts, { report: { approvalHash: "new" } }, "old"), /stale/);
   await assert.rejects(vote(f.context, f.artifacts, { report: { approvalHash: "new" } }, "new"), /Voting requires/);
+});
+
+test("votes refuse unavailable live vote counts before and after the fresh state check", async (t) => {
+  const f = fixture(t);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY").slice(0, 1);
+  let submitted = false;
+  const options = {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ address: addr("8") }) }),
+    submit: async () => { submitted = true; },
+  };
+  await assert.rejects(vote(f.context, f.artifacts, {
+    report: { approvalHash: "reviewed", calls, liveVoteCounts: { status: "UNAVAILABLE" } },
+    source: { liveVoteCountsError: "HTTP 500" }, externalReady: true, router: { paused: true },
+  }, "reviewed", { ...options, sourceState: async () => ({ calls }) }), /vote counts are unavailable/);
+  assert.equal(submitted, false);
+  await assert.rejects(vote(f.context, f.artifacts, {
+    report: { approvalHash: "reviewed", calls }, source: {}, externalReady: true, router: { paused: true },
+  }, "reviewed", {
+    ...options,
+    sourceState: async () => ({ calls, liveVoteCountsError: "HTTP 503" }),
+  }), /vote counts are unavailable/);
+  assert.equal(submitted, false);
 });
 
 test("receipt-backed retry waits for quorum after a crash rather than submitting twice", async (t) => {
@@ -688,6 +821,10 @@ test("service URL line injection and secret literals in tokenEnv are rejected", 
   f.manifest.services.verifiers[0] = { url: "https://verifier.invalid\nINJECTED=value", tokenEnv: "TOKEN_1", confirmations: 12 };
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /control characters/);
+  f.manifest.services.verifiers[0].url = "https://verifier.invalid";
+  f.manifest.services.bridgeHealthUrlEnv = "https://runtime.invalid/health";
+  writeJson(f.manifestPath, f.manifest);
+  assert.throws(() => loadManifest(f.manifestPath), /bridgeHealthUrlEnv/);
 });
 
 test("router scanner supports active-state reconciliation without changing its paused default", async (t) => {

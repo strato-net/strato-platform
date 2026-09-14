@@ -91,6 +91,10 @@ This configuration is for new vault deployments. Replace old `windowLimit`/`wind
 
 ### Resumable deployment command
 
+Operators follow [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md): one
+`deployment-bundle.json`, persona `setup`, and printed commands. The rest of
+this section describes helper semantics, not a second procedure.
+
 Use `external:rollout` to coordinate the existing configuration tools from one
 manifest. It starts from deployed contracts and the existing legacy-route discovery
 JSON; AWS provisioning, contract deployment, and Safe execution remain separate.
@@ -244,7 +248,7 @@ KMS, then three addresses), and these service bindings:
   "confirmations": 64,
   "safeProposerAddress": "<KMS_PROPOSER_ADDRESS>",
   "executorAddress": "<KMS_EXECUTOR_ADDRESS>",
-  "bridgeHealthUrl": "https://<BRIDGE_HOST>/health",
+  "bridgeHealthUrlEnv": "BRIDGE_HEALTH_URL",
   "verifiers": [
     { "url": "https://<VERIFIER_1_HOST>", "tokenEnv": "VERIFIER_1_API_TOKEN", "confirmations": 64 },
     { "url": "https://<VERIFIER_2_HOST>", "tokenEnv": "VERIFIER_2_API_TOKEN", "confirmations": 72 },
@@ -265,8 +269,10 @@ signer addresses, and STRATO settlement verifiers must match. `sourceChainId`
 remains a decimal string. Importing an old window-based policy does not convert its
 risk limits: replace those fields with reviewed bucket capacity/refill values first.
 
-Set the named RPC and verifier-token environment variables through your secret
-manager. Only variable **names**, never secret values, go in the manifest. If the
+Set the named RPC environment variable in each rollout persona's local environment.
+Verifier tokens remain only in verifier and Runtime service secret stores.
+The coordinator sets `BRIDGE_HEALTH_URL` locally after Runtime deployment.
+Only variable **names**, never secret values, go in the manifest. If the
 named source-token variable is unset, the rollout loads OAuth credentials from
 `app/contracts/.env` and obtains a transient access token without printing or
 persisting it. The credentials used for `vote` must belong to the administrator

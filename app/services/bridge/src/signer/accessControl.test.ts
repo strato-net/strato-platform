@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
 import { verifierAccessControl } from "./accessControl";
 
@@ -25,4 +27,12 @@ test("verifier rejects bearer mismatches and bounds authenticated and failed req
 
 test("rejects weak bearer tokens", () => {
   assert.throws(() => verifierAccessControl("short"), /at least 32/);
+});
+
+test("health is public while verifier operations require bearer authentication", () => {
+  const source = readFileSync(resolve(__dirname, "../../src/signer/index.ts"), "utf8");
+  const health = source.indexOf('app.get("/health"');
+  const accessControl = source.indexOf("app.use(verifierAccessControl");
+  const signing = source.indexOf('app.post("/v1/sign-withdrawal"');
+  assert.ok(health >= 0 && health < accessControl && accessControl < signing);
 });

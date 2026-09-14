@@ -17,6 +17,16 @@ const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const address = (value) => String(value || "").replace(/^0x/i, "").toLowerCase();
 const bool = (value) => value === true || value === "true";
 const key = (token, chain, stratoToken) => `${address(token)}:${chain}:${address(stratoToken)}`;
+const rolloutCodeFiles = () => [
+  __filename, path.join(__dirname, "externalBridgeRolloutPlan.js"),
+  path.join(__dirname, "externalBridgeVaultPlan.js"), path.join(__dirname, "depositRouterSafeOps.js"),
+  path.join(__dirname, "externalBridgeArtifacts.js"), path.join(__dirname, "externalBridgeNetworks.js"),
+  path.join(__dirname, "../externalBridgeRollout.js"),
+  path.join(__dirname, "../scanTokenConfig.js"), path.join(__dirname, "../externalBridgeVaultOps.js"),
+  path.join(CONTRACTS, "configure-external-bridge.js"), path.join(CONTRACTS, "external-bridge-verification.js"),
+];
+const rolloutToolingRevision = () =>
+  digest(rolloutCodeFiles().map((name) => digest(fs.readFileSync(name, "utf8"))));
 
 function writeJson(file, value) {
   fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
@@ -97,7 +107,7 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
       sourceTokenEnv: "ACCESS_TOKEN",
       confirmations: "REVIEW_REQUIRED",
       verifiers: [],
-      bridgeHealthUrl: "REVIEW_REQUIRED",
+      bridgeHealthUrlEnv: "BRIDGE_HEALTH_URL",
       safeProposerAddress: "REVIEW_REQUIRED",
       executorAddress: "REVIEW_REQUIRED",
     },
@@ -108,8 +118,20 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
 
 function createPortableBundle(manifestPath, bundlePath) {
   if (fs.existsSync(bundlePath)) throw new Error("Bundle already exists; it was not overwritten");
-  const manifest = readJson(manifestPath);
-  if (manifest.schemaVersion !== 1) throw new Error("Only initialized manifests can be bundled");
+  const context = loadManifest(manifestPath, "activation");
+  const manifest = context.manifest;
+  const services = manifest.services;
+  const identities = [
+    services.safeProposerAddress,
+    services.executorAddress,
+    ...manifest.authorizationSigners,
+  ];
+  if (services.verifiers.length !== 3 || manifest.authorizationSigners.length !== 3 ||
+      identities.some((value) => !ethers.isAddress(value)) ||
+      new Set(identities.map(address)).size !== identities.length ||
+      !services.bridgeHealthUrlEnv) {
+    throw new Error("Bundle requires three verifiers, five distinct KMS identities, and bridgeHealthUrlEnv");
+  }
   const directory = path.dirname(manifestPath);
   const externalDeployment = manifest.inputs?.externalDeployment ||
     readJson(path.resolve(directory, manifest.settings.externalDeployment));
@@ -117,6 +139,7 @@ function createPortableBundle(manifestPath, bundlePath) {
     readJson(path.resolve(directory, manifest.settings.depositPlan));
   const bundle = {
     ...manifest,
+    toolingRevision: rolloutToolingRevision(),
     settings: {
       ...manifest.settings,
       externalDeployment: "embedded:externalDeployment",
@@ -133,10 +156,17 @@ function loadManifest(file, stage = "initial") {
   if (!["initial", "activation"].includes(stage)) throw new Error("--stage must be initial|activation");
   const manifest = readJson(file);
   if (manifest.schemaVersion !== 1) throw new Error("Unsupported manifest schemaVersion");
+  if (manifest.toolingRevision && manifest.toolingRevision !== rolloutToolingRevision()) {
+    throw new Error("Deployment bundle requires a different reviewed rollout code revision");
+  }
   const services = manifest.services;
   if (!services || !/^https:\/\//.test(services.nodeUrl || "")) throw new Error("services.nodeUrl must use HTTPS");
   for (const name of ["rpcUrlEnv", "sourceTokenEnv"]) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(services[name] || "")) throw new Error(`${name} must name an environment variable, not a secret value`);
+  }
+  if (services.bridgeHealthUrlEnv &&
+      !/^[A-Z][A-Z0-9_]*$/.test(services.bridgeHealthUrlEnv)) {
+    throw new Error("bridgeHealthUrlEnv must name an environment variable");
   }
   if (!Array.isArray(services.verifiers) || !Array.isArray(manifest.authorizationSigners)) throw new Error("verifiers and authorizationSigners must be arrays");
   for (const value of [services.nodeUrl, ...services.verifiers.map(({ url }) => url)]) {
@@ -176,18 +206,13 @@ function loadManifest(file, stage = "initial") {
   const operator = address(settings.bridgeOperator);
   if (settings.settlementVerifiers.some((verifier) => address(verifier) === operator)) throw new Error("Operator cannot be a settlement verifier");
   // Code changes invalidate approval and cached generation just like input changes.
-  const codeFiles = [__filename, path.join(__dirname, "externalBridgeRolloutPlan.js"),
-    path.join(__dirname, "externalBridgeVaultPlan.js"), path.join(__dirname, "depositRouterSafeOps.js"),
-    path.join(__dirname, "externalBridgeArtifacts.js"), path.join(__dirname, "externalBridgeNetworks.js"),
-    path.join(__dirname, "../externalBridgeRollout.js"),
-    path.join(__dirname, "../scanTokenConfig.js"), path.join(__dirname, "../externalBridgeVaultOps.js"),
-    path.join(CONTRACTS, "configure-external-bridge.js"), path.join(CONTRACTS, "external-bridge-verification.js")];
+  const codeFiles = rolloutCodeFiles();
   const revision = digest({ stage, manifest, settings, deployment, depositPlan, defaults,
     code: codeFiles.map((name) => digest(fs.readFileSync(name, "utf8"))) });
   return { stage, manifest, rollout, revision, settings, deployment };
 }
 
-function generate(context, outputDirectory) {
+function generate(context, outputDirectory, options = {}) {
   const directory = path.resolve(outputDirectory, context.revision);
   const indexFile = path.join(directory, "artifacts.json");
   const { rollout } = context;
@@ -240,40 +265,42 @@ function generate(context, outputDirectory) {
   const saveEnv = (name, values) => serviceTemplates.push(saveText(name,
     "# Generated bindings; resolve environment references through the deployment secret renderer.\n" +
     Object.entries(values).map(([key, value]) => `${key}=${value}`).join("\n") + "\n"));
-  const services = context.manifest.services;
-  const bridgeEnvironment = {
-    NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: context.settings.externalAssetBridge,
-    TOKEN_ROUTER: context.settings.tokenRouter, USDST_ADDRESS: rollout.bridgeConfig.externalAssetBridge.usdst, PRICE_ORACLE_ADDRESS: rollout.bridgeConfig.externalAssetBridge.priceOracle,
-    SAFE_ADDRESS: chain.safeAddress,
-    [`CHAIN_${rollout.chainId}_RPC_URL`]: reference(services.rpcUrlEnv),
-    [`CHAIN_${rollout.chainId}_DEPOSIT_CONFIRMATIONS`]: services.confirmations,
-    [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`]: services.verifiers.map(({ url }) => url).join(","),
-    [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`]: services.verifiers.map(({ tokenEnv }) => reference(tokenEnv)).join(","),
-  };
-  for (const name of ["BRIDGE_IMAGE", "BRIDGENGINX_IMAGE", "BRIDGE_ADDRESS", "STRATO_APP_API_URL", "BA_USERNAME", "BA_PASSWORD", "CLIENT_ID", "CLIENT_SECRET", "OPENID_DISCOVERY_URL",
-    "RELAYER_BA_USERNAME", "RELAYER_BA_PASSWORD", "RELAYER_CLIENT_ID", "RELAYER_CLIENT_SECRET", "RELAYER_OPENID_DISCOVERY_URL",
-    "SAFE_PROPOSER_ADDRESS", "SAFE_PROPOSER_KMS_KEY_ID", "SAFE_PROPOSER_KMS_REGION", "SAFE_API_KEY", "DEPOSIT_WEBHOOK_TOKEN", "DEPOSIT_OPERATIONS_TOKEN",
-    ...["WS_RPC_URL", "VERIFICATION_RPC_URLS", "EXTERNAL_BRIDGE_EXECUTOR_ADDRESS", "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID", "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION"].map((suffix) => `CHAIN_${rollout.chainId}_${suffix}`)]) bridgeEnvironment[name] = reference(name);
-  bridgeEnvironment.SAFE_PROPOSER_ADDRESS = services.safeProposerAddress || "REVIEW_REQUIRED";
-  bridgeEnvironment[`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS`] = services.executorAddress || "REVIEW_REQUIRED";
-  saveEnv("bridge.env.template", bridgeEnvironment);
-  rollout.verifierPolicies.forEach((policy, index) => {
-    const prefix = `VERIFIER_${index + 1}`;
-    const verifier = services.verifiers[index];
-    saveEnv(`verifier-${index + 1}.env.template`, {
-      BRIDGE_IMAGE: reference("BRIDGE_IMAGE"), PORT: 3004, SOURCE_CHAIN_ID: policy.sourceChainId,
-      STRATO_NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: policy.sourceBridge,
-      DESTINATION_CHAIN_ID: policy.destinationChainId, DESTINATION_VAULT_ADDRESS: policy.destinationVault,
-      VAULT_AUTHORIZATION_SIGNER_ADDRESS: context.manifest.authorizationSigners[index] || "REVIEW_REQUIRED",
-      KMS_KEY_ID: reference(`${prefix}_KMS_KEY_ID`), KMS_REGION: reference(`${prefix}_KMS_REGION`),
-      VERIFIER_RPC_URL: reference(`${prefix}_RPC_URL`), VERIFIER_INDEPENDENT_RPC_URLS: reference(`${prefix}_INDEPENDENT_RPC_URLS`), VERIFIER_CONFIRMATIONS: verifier?.confirmations ?? services.confirmations,
-      VERIFIER_POLICY_PATH: "/run/secrets/eab-verifier-policy.json", VERIFIER_POLICY_PATH_HOST: reference("VERIFIER_POLICY_PATH_HOST"),
-      SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL: reference(`${prefix}_OPENID_DISCOVERY_URL`),
-      SETTLEMENT_ATTESTOR_CLIENT_ID: reference(`${prefix}_CLIENT_ID`), SETTLEMENT_ATTESTOR_CLIENT_SECRET: reference(`${prefix}_CLIENT_SECRET`),
-      SETTLEMENT_ATTESTOR_BA_USERNAME: reference(`${prefix}_BA_USERNAME`), SETTLEMENT_ATTESTOR_BA_PASSWORD: reference(`${prefix}_BA_PASSWORD`),
-      EXTERNAL_BRIDGE_VERIFIER_API_TOKEN: reference(services.verifiers[index]?.tokenEnv || `${prefix}_API_TOKEN`),
+  if (options.includeServiceTemplates !== false) {
+    const services = context.manifest.services;
+    const bridgeEnvironment = {
+      NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: context.settings.externalAssetBridge,
+      TOKEN_ROUTER: context.settings.tokenRouter, USDST_ADDRESS: rollout.bridgeConfig.externalAssetBridge.usdst, PRICE_ORACLE_ADDRESS: rollout.bridgeConfig.externalAssetBridge.priceOracle,
+      SAFE_ADDRESS: chain.safeAddress,
+      [`CHAIN_${rollout.chainId}_RPC_URL`]: reference(services.rpcUrlEnv),
+      [`CHAIN_${rollout.chainId}_DEPOSIT_CONFIRMATIONS`]: services.confirmations,
+      [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`]: services.verifiers.map(({ url }) => url).join(","),
+      [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`]: services.verifiers.map(({ tokenEnv }) => reference(tokenEnv)).join(","),
+    };
+    for (const name of ["BRIDGE_IMAGE", "BRIDGENGINX_IMAGE", "BRIDGE_ADDRESS", "STRATO_APP_API_URL", "BA_USERNAME", "BA_PASSWORD", "CLIENT_ID", "CLIENT_SECRET", "OPENID_DISCOVERY_URL",
+      "RELAYER_BA_USERNAME", "RELAYER_BA_PASSWORD", "RELAYER_CLIENT_ID", "RELAYER_CLIENT_SECRET", "RELAYER_OPENID_DISCOVERY_URL",
+      "SAFE_PROPOSER_ADDRESS", "SAFE_PROPOSER_KMS_KEY_ID", "SAFE_PROPOSER_KMS_REGION", "SAFE_API_KEY", "DEPOSIT_WEBHOOK_TOKEN", "DEPOSIT_OPERATIONS_TOKEN",
+      ...["WS_RPC_URL", "VERIFICATION_RPC_URLS", "EXTERNAL_BRIDGE_EXECUTOR_ADDRESS", "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID", "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION"].map((suffix) => `CHAIN_${rollout.chainId}_${suffix}`)]) bridgeEnvironment[name] = reference(name);
+    bridgeEnvironment.SAFE_PROPOSER_ADDRESS = services.safeProposerAddress || "REVIEW_REQUIRED";
+    bridgeEnvironment[`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS`] = services.executorAddress || "REVIEW_REQUIRED";
+    saveEnv("bridge.env.template", bridgeEnvironment);
+    rollout.verifierPolicies.forEach((policy, index) => {
+      const prefix = `VERIFIER_${index + 1}`;
+      const verifier = services.verifiers[index];
+      saveEnv(`verifier-${index + 1}.env.template`, {
+        BRIDGE_IMAGE: reference("BRIDGE_IMAGE"), PORT: 3004, SOURCE_CHAIN_ID: policy.sourceChainId,
+        STRATO_NODE_URL: services.nodeUrl, EXTERNAL_ASSET_BRIDGE_ADDRESS: policy.sourceBridge,
+        DESTINATION_CHAIN_ID: policy.destinationChainId, DESTINATION_VAULT_ADDRESS: policy.destinationVault,
+        VAULT_AUTHORIZATION_SIGNER_ADDRESS: context.manifest.authorizationSigners[index] || "REVIEW_REQUIRED",
+        KMS_KEY_ID: reference(`${prefix}_KMS_KEY_ID`), KMS_REGION: reference(`${prefix}_KMS_REGION`),
+        VERIFIER_RPC_URL: reference(`${prefix}_RPC_URL`), VERIFIER_INDEPENDENT_RPC_URLS: reference(`${prefix}_INDEPENDENT_RPC_URLS`), VERIFIER_CONFIRMATIONS: verifier?.confirmations ?? services.confirmations,
+        VERIFIER_POLICY_PATH: "/run/secrets/eab-verifier-policy.json", VERIFIER_POLICY_PATH_HOST: reference("VERIFIER_POLICY_PATH_HOST"),
+        SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL: reference(`${prefix}_OPENID_DISCOVERY_URL`),
+        SETTLEMENT_ATTESTOR_CLIENT_ID: reference(`${prefix}_CLIENT_ID`), SETTLEMENT_ATTESTOR_CLIENT_SECRET: reference(`${prefix}_CLIENT_SECRET`),
+        SETTLEMENT_ATTESTOR_BA_USERNAME: reference(`${prefix}_BA_USERNAME`), SETTLEMENT_ATTESTOR_BA_PASSWORD: reference(`${prefix}_BA_PASSWORD`),
+        EXTERNAL_BRIDGE_VERIFIER_API_TOKEN: reference(services.verifiers[index]?.tokenEnv || `${prefix}_API_TOKEN`),
+      });
     });
-  });
+  }
   const index = { serviceTemplates, revision: context.revision, hashes, bridgeConfigPath, vaultConfigPath, verifierPolicyPaths,
     depositRouterBatchPaths, depositRouterPausePath, vaultPausePath, vaultConfigurePath, manifestPath };
   writeJson(indexFile, index);

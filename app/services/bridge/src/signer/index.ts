@@ -619,8 +619,6 @@ const auditDecision = (
 
 const app = express();
 app.set("env", "production");
-app.use(verifierAccessControl(verifierApiToken));
-app.use(express.json({ limit: "32kb" }));
 
 app.get("/health", (_, res) => {
   res.json({
@@ -637,6 +635,9 @@ app.get("/health", (_, res) => {
     verifierIndex: verifierPolicy.verifierIndex,
   });
 });
+
+app.use(verifierAccessControl(verifierApiToken));
+app.use(express.json({ limit: "32kb" }));
 
 app.post("/v1/sign-withdrawal", async (req, res) => {
   try {
