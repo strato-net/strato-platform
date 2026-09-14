@@ -34,6 +34,18 @@ module.exports = {
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
+    bsc: {
+      url: process.env.BSC_RPC_URL || "https://bsc-dataseed.bnbchain.org",
+      chainId: 56,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
+    xLayer: {
+      url: process.env.XLAYER_RPC_URL || "https://rpc.xlayer.tech",
+      chainId: 196,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
     linea: {
       url: process.env.LINEA_RPC_URL || "https://rpc.linea.build",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
