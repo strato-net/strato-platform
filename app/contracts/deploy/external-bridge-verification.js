@@ -152,6 +152,20 @@ function compareInitialization(settings, state) {
   return errors;
 }
 
+function verifyUninitializedProxy(settings, name, targetAddress, proxyRows, logicRows) {
+  const proxy = proxyRows.find((row) =>
+    normalizeAddress(row.address) === normalizeAddress(targetAddress));
+  if (!proxy || normalizeAddress(proxy._owner) !== normalizeAddress(settings.adminRegistry)) {
+    throw new Error(`${name} state is unavailable and its AdminRegistry-owned proxy was not found`);
+  }
+  const logic = logicRows.find((row) =>
+    normalizeAddress(row.address) === normalizeAddress(proxy.logicContract));
+  if (!logic || (logic.initialized !== false && logic.initialized !== "false")) {
+    throw new Error(`${name} proxy implementation state cannot prove a fresh uninitialized deployment`);
+  }
+  return { initialized: false };
+}
+
 function compareRoutes(settings, state) {
   const errors = [];
   for (const policy of settings.mintPolicies || []) {
@@ -365,7 +379,7 @@ async function validateActiveRouteTokens(
 async function fetchInitializationState(settings, nodeUrl, token, fetchImpl) {
   const bridgeAddress = normalizeAddress(settings.bridge.address);
   const routerAddress = normalizeAddress(settings.tokenRouter.address);
-  const [bridgeRows, routerRows, verifierRows, yieldVaultRows] =
+  const [bridgeRows, routerRows, verifierRows, yieldVaultRows, proxyRows] =
     await Promise.all([
       cirrusSearch(
         nodeUrl,
@@ -415,9 +429,34 @@ async function fetchInitializationState(settings, nodeUrl, token, fetchImpl) {
         },
         fetchImpl,
       ),
+      cirrusSearch(
+        nodeUrl,
+        token,
+        "BlockApps-Proxy",
+        {
+          address: `in.(${bridgeAddress},${routerAddress})`,
+          select: "address,_owner,logicContract",
+          limit: 2,
+        },
+        fetchImpl,
+      ),
     ]);
-  if (!bridgeRows[0] || !routerRows[0]) {
-    throw new Error("Initialized bridge or TokenRouter state is unavailable");
+  const missing = [
+    ["ExternalAssetBridge", bridgeAddress, bridgeRows],
+    ["TokenRouter", routerAddress, routerRows],
+  ].filter(([, , rows]) => !rows[0]);
+  const logicStates = await Promise.all(missing.map(([name, targetAddress]) => {
+    const proxy = proxyRows.find((row) =>
+      normalizeAddress(row.address) === normalizeAddress(targetAddress));
+    return proxy ? cirrusSearch(nodeUrl, token, `BlockApps-${name}`, {
+      address: `eq.${normalizeAddress(proxy.logicContract)}`,
+      select: "address,initialized",
+      limit: 1,
+    }, fetchImpl) : [];
+  }));
+  for (let index = 0; index < missing.length; index += 1) {
+    const [name, targetAddress, rows] = missing[index];
+    rows.push(verifyUninitializedProxy(settings, name, targetAddress, proxyRows, logicStates[index]));
   }
   return {
     bridge: bridgeRows[0],
@@ -559,6 +598,7 @@ async function validateDeploymentDependencies(settings, nodeUrl, token, fetchImp
 }
 
 module.exports = {
+  verifyUninitializedProxy,
   validateDeploymentDependencies,
   fetchInitializationState,
   fetchRouteState,

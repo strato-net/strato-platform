@@ -67,7 +67,7 @@ Use reviewed addresses and chain IDs for the target environment. Deploy new Toke
 
 Run legacy route discovery without `--apply` and retain the resulting audit JSON as inventory only. Do not execute its discovery-time Safe batches: minimum deposits must come from the reviewed rollout policy. Keep the new DepositRouter paused until configuration, KMS/verifiers, live verification and activation gates pass. Existing legacy custody remains independent; every migration amount stays zero.
 
-Run the contract, backend, bridge and rollout test suites before generating production artifacts. Use the resumable command below for the initial deposit-only activation. Withdrawal enablement and AUTO_ROUTE enablement require separate reviewed configuration and governance after their canaries pass.
+Run the contract, backend, bridge and rollout test suites before generating production artifacts. The generic runbook uses activation mode to configure reviewed deposit and withdrawal routes while keeping AUTO_ROUTE disabled for the first launch.
 
 Legacy MercataBridge incident operations remain available independently: owner-governed `cancelAndSweepWithdrawal` and its batch variant move INITIATED/PENDING_REVIEW escrow to a triage wallet and mark it SWEPT. Never whitelist these operations for the relayer; reject any associated external Safe proposal before sweeping pending-review escrow. These operations do not apply to ExternalAssetBridge.
 
@@ -89,12 +89,31 @@ Safe policy changes and emergency pause remain immediate; no timelock is added. 
 
 This configuration is for new vault deployments. Replace old `windowLimit`/`windowSeconds` settings with reviewed bucket values; the refill rate is not a duration. The example rate is illustrative, and generated rollout policies require explicit review. No live limits or deployments are changed by updating these files.
 
-### Resumable deposit-only deployment command
+### Resumable deployment command
 
 Use `external:rollout` to coordinate the existing configuration tools from one
 manifest. It starts from deployed contracts and the existing legacy-route discovery
 JSON; AWS provisioning, contract deployment, and Safe execution remain separate.
 No command provisions cloud resources, migrates liquidity, or submits a deposit.
+
+#### Files and environment by phase
+
+The operator maintains only `deployment-manifest.json` and, when local secret
+injection is needed, `deployment.env` beside it. The rollout automatically loads
+that environment file. Keep it outside the repository with mode `0600`; each
+administrator uses their own copy containing their own OAuth credentials.
+
+During governance, `deployment.env` needs the external RPC variable named by
+`services.rpcUrlEnv` and either the token named by `services.sourceTokenEnv` or
+`GLOBAL_ADMIN_NAME` plus `GLOBAL_ADMIN_PASSWORD`. Verifier API-token variables are
+not required until pre-activation verification. Bridge Runtime, executor, proposer,
+KMS and workload variables are not rollout inputs; fill them from the generated
+service templates only when deploying those services.
+
+Do not manually manage revision directories under the output directory. They are
+immutable audit artifacts. Use `latest.json` to locate the current report, and use
+only the exact artifact path printed when the next action requires Safe or service
+deployment.
 
 #### Approval requirements by deployment step
 
@@ -117,14 +136,14 @@ vote receipt substitutes for either governance threshold.
 | A10: pause/configure DepositRouter | **Safe approvals** for the pause transaction and each token/route configuration batch. | Each batch executes successfully; paused-state verification passes. |
 | A11: initialize STRATO contracts | **Admin votes for every call:** TokenRouter `initialize`, each `setYieldVault`, ExternalAssetBridge `initialize`, `setPriceOracle`, `setTokenRouter`, each `setSettlementVerifier`, and `setSettlementVerifierThreshold`. | Respect dependencies and wait for each issue to execute; initialization verification passes. |
 | A11: grant token permissions | **Admin votes for every generated AdminRegistry `addWhitelist` call**, including required mint/burn permissions. | Live permission verification passes before route configuration. |
-| A11: configure STRATO chains/routes | **Admin votes for each `setMintPolicy`, each `setChain`, each `setRoute`, and each `setRouteRebaseRequired`**, including an explicit `false`. | Route verification passes; withdrawals remain disabled. |
+| A11: configure STRATO chains/routes | **Admin votes for each `setMintPolicy`, each `setChain`, each `setRoute`, and each `setRouteRebaseRequired`**, including an explicit `false`. | Route verification matches the reviewed manifest. |
 | A11: deposit actions, if a setter is needed | **Admin votes for every `setDepositAction` submitted.** Verification alone needs no vote; already-disabled actions are skipped. | Action verification passes; actions remain disabled for this rollout. |
 | A12: pre-KMS verification | No votes. | All required reports pass. |
 | B: AWS/KMS, secrets and workload provisioning | AWS/IAM deployment authorization; no on-chain votes for provisioning alone. | Infrastructure and workload checks pass. |
-| B/C: add the proposer as a Safe owner or change Safe threshold, if needed | **Safe approvals.** | Live Safe owners and threshold match the reviewed configuration. |
-| C: pause/configure external vault after KMS binding | **Safe approvals** for the generated vault pause/configuration transactions: source bridge, signer registrations, threshold, authorization validity and token policies. | Transactions execute; live vault verification passes. Keep the vault paused in this deposit-only rollout. |
+| B/C: register the proposer as a Safe Transaction Service delegate | An existing Safe owner signs the off-chain delegate registration; this does not change on-chain owners or threshold. | The proposer is registered as a delegate and is not a Safe owner. |
+| C: pause/configure external vault after KMS binding | **Safe approvals** for the generated vault pause/configuration transactions: source bridge, signer registrations, threshold, authorization validity and token policies. | Transactions execute; live vault verification passes. Keep the vault paused until activation. |
 | C: deploy service configuration; `resume` / `verify` | Workload deployment authorization; no on-chain votes for configuration files or read-only checks. Any changed STRATO setter still requires **admin votes**; changed Safe-controlled settings require **Safe approvals**. | Services and consolidated live checks pass. |
-| C: `activate` and execute DepositRouter unpause | `activate --approve` only generates the file. **Safe approvals and execution are required to unpause.** | Unpause receipt succeeds, then live verification observes the expected active router. |
+| C: `activate` and execute the reviewed unpause batch | `activate --approve` only generates the file. **Safe approvals and execution are required to unpause.** Withdrawal-enabled manifests unpause the vault before DepositRouter; deposit-only manifests unpause only DepositRouter. | Unpause receipt succeeds, then live verification observes the expected active state. |
 | C: canary deposit and reconciliation | Depositor transaction authorization; no admin votes for the normal deposit. | Custody and STRATO issuance reconcile before declaring launch complete. |
 
 For A3/A4, creation itself may wait for governance before the script can proceed.
@@ -204,16 +223,13 @@ Complete `policy.mintPolicies` for every STRATO representation token:
 
 **AdminRegistry votes required:** the route plan includes `setMintPolicy` calls. Complete these votes before deposit activation; `verify-routes` checks the live policies. Use the same policy for a STRATO token shared by multiple external chains.
 
-All generator modes enforce rollout validation. The default `--stage initial` keeps withdrawals and AUTO_ROUTE disabled. For the fresh guide’s withdrawal-enabled configuration, explicitly use `--stage activation`; this permits explicitly enabled withdrawal and AUTO_ROUTE routes while retaining the zero-migration check. Keep AUTO_ROUTE disabled in the fresh deployment policy; later enablement requires the activation gates below. Generate configuration before activation and retain the pause/canary sequence. Regenerate artifacts after these contract/configuration changes.
+All generator modes enforce rollout validation. The default `--stage initial` keeps withdrawals and AUTO_ROUTE disabled. The generic deployment guide uses `--stage activation`; this permits explicitly reviewed withdrawal settings while retaining the zero-migration check. Keep AUTO_ROUTE disabled for the first launch; later enablement requires the activation gates below. Generate configuration before activation and retain the pause/canary sequence. Regenerate artifacts after these contract/configuration changes.
 
-Run each command from the repository root. Import your existing settings and
-reviewed policy once; omit `--policy` to create policy placeholders for review:
+Run each command from the repository root. The first command creates a draft.
+Fill its deployment inputs, then rerun the same command to initialize it:
 
 ```bash
-(cd app/ethereum && npm run external:rollout -- init \
-  --settings /secure/eab-settings.json \
-  --policy /secure/external-bridge-rollout-policy-11155111.json \
-  --manifest /secure/eab-deployment.json)
+(cd app/ethereum && npm run external:rollout -- init --manifest /secure/eab-deployment.json)
 ```
 
 Edit **only the deployment manifest**, not generated artifacts. It contains the
@@ -237,6 +253,10 @@ KMS, then three addresses), and these service bindings:
 }
 ```
 
+Keep `nodeUrl` at the canonical STRATO host; the rollout adds the `/strato-api`
+prefix for Ethereum API requests while leaving Cirrus and STRATO routes at the
+host root.
+
 The example confirmation counts are illustrative. `services.confirmations` is the
 Runtime deposit threshold. Each verifier has its own independently approved
 confirmation count and must be at least as strict as Runtime. These values are
@@ -245,18 +265,21 @@ signer addresses, and STRATO settlement verifiers must match. `sourceChainId`
 remains a decimal string. Importing an old window-based policy does not convert its
 risk limits: replace those fields with reviewed bucket capacity/refill values first.
 
-Set the named access-token/RPC/verifier-token environment variables through your
-secret manager. Only variable **names**, never secret values, go in the manifest.
-The source token used for `vote` must belong to the administrator casting that
-vote; each administrator authenticates independently. An empty verifier list is
-allowed for pre-KMS planning, but cannot pass activation verification.
+Set the named RPC and verifier-token environment variables through your secret
+manager. Only variable **names**, never secret values, go in the manifest. If the
+named source-token variable is unset, the rollout loads OAuth credentials from
+`app/contracts/.env` and obtains a transient access token without printing or
+persisting it. The credentials used for `vote` must belong to the administrator
+casting that vote; each administrator authenticates independently. An empty
+verifier list is allowed for pre-KMS planning, but cannot pass activation
+verification.
 
 ```bash
 # Offline generation is the default; no chain/RPC calls or votes.
 (cd app/ethereum && npm run external:rollout -- plan --manifest /secure/eab-deployment.json)
 
 # Fresh live reconciliation: completed, ready, blocked, and failed checks.
-(cd app/ethereum && npm run external:rollout -- resume --manifest /secure/eab-deployment.json)
+(cd app/ethereum && npm run external:rollout -- status --manifest /secure/eab-deployment.json)
 
 # ADMIN VOTES REQUIRED: each participating administrator uses their own token.
 # Submit only READY calls; wait for quorum execution, then rerun resume.
@@ -267,7 +290,7 @@ allowed for pre-KMS planning, but cannot pass activation verification.
 (cd app/ethereum && npm run external:rollout -- verify --manifest /secure/eab-deployment.json)
 
 # SAFE APPROVALS REQUIRED after export; this command does not unpause.
-# Recheck gates, then export the Safe unpause transaction.
+# Recheck gates, then export the Safe activation/unpause batch.
 (cd app/ethereum && npm run external:rollout -- activate \
   --manifest /secure/eab-deployment.json --approve <APPROVAL_HASH>)
 ```
@@ -278,6 +301,12 @@ Rerun `resume` after each administrator/Safe approval round; only the live state
 marks calls complete. Initialization conflicts and changed existing chain bindings
 require explicit corrective governance rather than replay. An advanced polling
 cursor is accepted and preserved; it is never reset by resumption.
+
+Terminal output identifies the current numbered deployment stage, groups the READY
+methods and counts, identifies whether the first vote is required, the second
+administrator is required, or execution is pending, and prints the exact next
+`vote`, `resume`, or `activate` command. Detailed reconciliation mismatches remain
+in the retained report file.
 
 The command generates:
 
@@ -294,7 +323,7 @@ The command generates:
   `--output-dir` selects another directory. Keep it outside the repository and
   retain it across operator sessions.
 
-For later AUTO_ROUTE enablement, update the reviewed manifest policy and pass `--stage activation` to each helper command (`plan`, `resume`, `vote`, `verify`, and `activate`). This regenerates bridge and verifier policies under a new approval revision; deploy those verifier policies before voting. Keep the external router and vault paused during configuration. Enable votes require matching initialization/routes/permissions, a fresh pre-enable action check (remaining actions disabled), and verified external configuration and service policies. After quorum, `verify-actions` checks the desired enabled state before the helper can export the router unpause transaction. The standalone policy generator also requires `--stage activation`. Migration amounts must remain zero.
+For later AUTO_ROUTE enablement, update the reviewed manifest policy and pass `--stage activation` to each helper command (`plan`, `resume`, `vote`, `verify`, and `activate`). This regenerates bridge and verifier policies under a new approval revision; deploy those verifier policies before voting. Keep the external router and vault paused during configuration. Enable votes require matching initialization/routes/permissions, a fresh pre-enable action check (remaining actions disabled), and verified external configuration and service policies. After quorum, `verify-actions` checks the desired enabled state before the helper can export the activation batch. The standalone policy generator also requires `--stage activation`. Migration amounts must remain zero.
 
 Changing inputs, discovery/deployment files, or orchestration code produces a new
 revision and invalidates approvals. Editing generated files is rejected even if
@@ -313,7 +342,8 @@ coordinate operators rather than assuming it is a distributed deployment lock.
 
 Verification checks STRATO chain identity, initialization, ACTIVE tokens, mint/burn
 permissions, routes/actions and cursors; current external implementation bytecode
-against local Hardhat artifacts; vault pause/configuration/roles; Safe proposer and
+against local Hardhat artifacts; vault pause/configuration/roles; that the Safe
+excludes the proposer delegate and executor; the environment-appropriate Safe
 threshold; router configuration; verifier identity/file digests/baseline/finality;
 and bridge health. Compile the approved external contracts before a live check.
 Reconciliation understands an already-unpaused DepositRouter without weakening the
@@ -323,8 +353,9 @@ Health metadata does not independently prove AWS account separation, IAM control
 KMS availability, source-code provenance on STRATO, or ongoing dependency health.
 Retain those infrastructure/startup checks and the canary balance reconciliation.
 `DEPOSITS_ACTIVE_CANARY_REQUIRED` deliberately does not mean launch complete.
-`activate` never executes Safe or submits the canary, and withdrawals/actions remain
-disabled. Unpausing opens every permitted route in the reviewed policy.
+`activate` never executes Safe or submits the canary, and it does not change the
+reviewed withdrawal or action flags. Unpausing opens every permitted route in the
+reviewed policy.
 
 Tests:
 
@@ -360,4 +391,8 @@ Run commands from the repository root. Load app/ethereum/.env inside each deploy
 
 Runtime hosts use app/services/bridge/.env; each verifier host uses its own verifier.env at the repository root. Pass those files directly through Compose --env-file in a fresh shell. Never source the deployment env into a service shell: inherited values override Compose settings. No deployment env or administrator credentials are needed on the service hosts.
 
-The guide supplies app/services/bridge/compose.override.yml binding BRIDGE_DATA_DIRECTORY from Runtime .env to /app/data with create_host_path=false. Mount the persistent disk first and include the override with every Runtime Compose command. TLS requires ssl=true, sslCertFileType=pem, ssl/certs/server.pem and ssl/private/server.key under the repository root. Verifier policies must be readable by UID 1000; host env files remain mode 600.
+The current `docker-compose.bridge.tpl.yml` mounts the `bridgedata` Docker volume
+at `/app/data`; preserve and back up that volume across Runtime replacement. TLS
+requires `ssl=true`, `sslCertFileType=pem`, `ssl/certs/server.pem` and
+`ssl/private/server.key` under the repository root. Verifier policies must be
+readable by UID 1000; host env files remain mode 600.

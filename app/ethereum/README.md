@@ -113,6 +113,12 @@ assigns default administration, upgrades, policy, pause, unpause, attestation
 administration, and large-withdrawal approval explicitly. The existing
 `DepositRouter` remains owned by the Safe.
 
+For new deployments, follow the canonical operator runbook at
+[`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md) and use
+`external:rollout init|plan|resume|vote|verify|activate`. The standalone
+`external:rollout:prepare|finalize|generate` flow below is retained for legacy
+artifacts and is not the new-deployment workflow.
+
 ### Pair deployment
 
 The pair deployer creates one `ExternalBridgeVault` proxy and one
@@ -167,44 +173,12 @@ npm run external:rollout:test
 
 ### All-token configuration generator
 
-First run `router:ops:testnet -- --step setters` as a dry run. Its audit JSON
-contains every enabled legacy route and the external token metadata needed by
-the generator. Discovery fails if any enabled legacy route references a STRATO
-token that is not currently `ACTIVE`; activate that token or disable the stale
-legacy route before continuing. Create a settings file containing `sourceChainId`,
-`externalDeployment`, `depositPlan`, `tokenRouter`, `externalAssetBridge`,
-`bridgeOperator`, `guardian`, and exactly three `settlementVerifiers`.
+Use the manifest-first workflow in `EAB_DEPLOYMENT.md`. Deployment and route
+discovery can write their stable artifacts directly into the rollout directory;
+`external:rollout init` then expands the draft manifest in place.
 
-Prepare the derived bridge/vault templates, inventory, and fail-closed policy:
-
-```bash
-npm run external:rollout:prepare -- --settings /secure/path/eab-settings.json --output-dir /secure/path/eab-rollout
-```
-
-The external deployment artifact supplies the chain ID, Safe, vault,
-DepositRouter, guardian, and initial block. For deployments created before
-`depositRouterDeploymentBlock` was recorded, set that field in the settings
-file. Preparation never overwrites an existing policy.
-
-Replace every `REVIEW_REQUIRED` value. This includes each route's
-`maxAutoDepositAmount` and each token's `maxAutoWithdrawalAmount`; both use raw
-external-token units. Set `rebaseRequired` to an explicitly reviewed boolean.
-Then finalize:
-
-```bash
-npm run external:rollout:finalize -- --settings /secure/path/eab-settings.json --policy /secure/path/eab-rollout/external-bridge-rollout-policy-11155111.json --output-dir /secure/path/eab-rollout
-```
-
-Finalization fails if token metadata, risk policy, deployment addresses, or
-chain IDs are missing or inconsistent. It also requires withdrawals and
-AUTO_ROUTE to remain disabled and every `migrateAmount` to remain zero. It
-emits three `external-bridge-verifier-policy-<chainId>-<index>.json` files,
-each bound to one configured STRATO settlement attestor and one shared baseline
-hash. Each verifier organization may lower its local limits, but must not raise
-them above contract policy. It
-never copies legacy withdrawal limits or submits transactions. The existing
-`external:rollout:generate` command remains available for manually supplied
-bridge and vault templates.
+`external:rollout:prepare`, `external:rollout:finalize`, and
+`external:rollout:generate` are deprecated compatibility commands.
 
 After Safe configuration, verify DepositRouter against the generated manifest:
 

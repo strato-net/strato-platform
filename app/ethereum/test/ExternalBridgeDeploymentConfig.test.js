@@ -7,11 +7,20 @@ const {
   getDeploymentProfile,
   parseDeployArgs,
 } = require("../scripts/lib/externalBridgeDeploymentConfig");
+const { NETWORKS, getExternalBridgeNetwork } = require("../scripts/lib/externalBridgeNetworks");
 
 test("defaults to preflight and accepts only execute", () => {
   assert.deepEqual(parseDeployArgs([]), { execute: false });
   assert.deepEqual(parseDeployArgs(["--execute"]), { execute: true });
+  assert.deepEqual(parseDeployArgs(["--rollout-dir", "/secure/eab", "--execute"]),
+    { execute: true, rolloutDir: "/secure/eab" });
   assert.throws(() => parseDeployArgs(["--unknown"]), /Unsupported option/);
+});
+
+test("uses one network registry for names, aliases and chain IDs", () => {
+  assert.equal(getExternalBridgeNetwork("base-sepolia").chainId, 84532);
+  assert.equal(getExternalBridgeNetwork(59141).name, "lineaSepolia");
+  assert.equal(NETWORKS.length, 6);
 });
 
 test("builds chain-prefixed deployment variable names", () => {

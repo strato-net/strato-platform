@@ -377,6 +377,7 @@ test("loads verification state from Cirrus", async () => {
           : [],
       );
     }
+    if (url.includes("BlockApps-Proxy?")) return response([]);
     if (url.includes("BlockApps-ExternalAssetBridge?")) {
       return response([{
         initialized: true,

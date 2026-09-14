@@ -6,7 +6,7 @@ const {
   collectInventory, buildPolicyTemplate, buildRolloutTemplates,
   buildSynchronizedRollout, validateInitialRollout,
 } = require("./externalBridgeRolloutPlan");
-const { buildDepositRouterBatches, buildDepositRouterControl } = require("../generateExternalBridgeRollout");
+const { buildDepositRouterBatches, buildDepositRouterControl } = require("./externalBridgeArtifacts");
 const { normalizeConfig, buildOperations } = require("./externalBridgeVaultPlan");
 const { buildTransactionBuilderBatch } = require("./depositRouterSafeOps");
 const { loadConfig, buildPlan } = require("../../../contracts/deploy/configure-external-bridge");
@@ -72,19 +72,23 @@ function loadBridgeDefaults(settings, directory) {
 }
 
 function initializeManifest(settingsPath, policyPath, manifestPath) {
-  if (fs.existsSync(manifestPath)) throw new Error("Manifest already exists; it was not overwritten");
+  const inPlace = path.resolve(settingsPath) === path.resolve(manifestPath);
+  if (fs.existsSync(manifestPath) && !inPlace) throw new Error("Manifest already exists; it was not overwritten");
   const settings = readJson(settingsPath);
+  if (inPlace && settings.schemaVersion !== undefined) throw new Error("Manifest is already initialized");
   for (const name of ["externalDeployment", "depositPlan"]) {
     if (!settings[name]) throw new Error(`settings.${name} is required`);
     settings[name] = path.resolve(path.dirname(settingsPath), settings[name]);
   }
   const bridgeDefaults = loadBridgeDefaults(settings, path.dirname(settingsPath));
   const deployment = readJson(settings.externalDeployment);
+  const depositPlan = readJson(settings.depositPlan);
   const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults });
-  const inventory = collectInventory(readJson(settings.depositPlan), templates.chainId);
+  const inventory = collectInventory(depositPlan, templates.chainId);
   const manifest = {
     schemaVersion: 1,
     settings,
+    inputs: { externalDeployment: deployment, depositPlan },
     policy: policyPath ? readJson(policyPath) : buildPolicyTemplate(inventory, templates.chainId, templates.lastProcessedBlock),
     authorizationSigners: [],
     services: {
@@ -100,6 +104,29 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
   };
   writeJson(manifestPath, manifest);
   return manifest;
+}
+
+function createPortableBundle(manifestPath, bundlePath) {
+  if (fs.existsSync(bundlePath)) throw new Error("Bundle already exists; it was not overwritten");
+  const manifest = readJson(manifestPath);
+  if (manifest.schemaVersion !== 1) throw new Error("Only initialized manifests can be bundled");
+  const directory = path.dirname(manifestPath);
+  const externalDeployment = manifest.inputs?.externalDeployment ||
+    readJson(path.resolve(directory, manifest.settings.externalDeployment));
+  const depositPlan = manifest.inputs?.depositPlan ||
+    readJson(path.resolve(directory, manifest.settings.depositPlan));
+  const bundle = {
+    ...manifest,
+    settings: {
+      ...manifest.settings,
+      externalDeployment: "embedded:externalDeployment",
+      depositPlan: "embedded:depositPlan",
+    },
+    inputs: { externalDeployment, depositPlan },
+  };
+  fs.mkdirSync(path.dirname(bundlePath), { recursive: true, mode: 0o700 });
+  writeJson(bundlePath, bundle);
+  return bundle;
 }
 
 function loadManifest(file, stage = "initial") {
@@ -132,9 +159,10 @@ function loadManifest(file, stage = "initial") {
   }
   if (typeof manifest.settings?.sourceChainId !== "string") throw new Error("settings.sourceChainId must be a decimal string");
   const settings = { ...manifest.settings };
-  for (const name of ["externalDeployment", "depositPlan"]) settings[name] = path.resolve(path.dirname(file), settings[name]);
-  const deployment = readJson(settings.externalDeployment);
-  const depositPlan = readJson(settings.depositPlan);
+  const deployment = manifest.inputs?.externalDeployment ||
+    readJson(path.resolve(path.dirname(file), settings.externalDeployment));
+  const depositPlan = manifest.inputs?.depositPlan ||
+    readJson(path.resolve(path.dirname(file), settings.depositPlan));
   const defaults = loadBridgeDefaults(settings, path.dirname(file));
   const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults: defaults });
   const signers = manifest.authorizationSigners || [];
@@ -150,7 +178,8 @@ function loadManifest(file, stage = "initial") {
   // Code changes invalidate approval and cached generation just like input changes.
   const codeFiles = [__filename, path.join(__dirname, "externalBridgeRolloutPlan.js"),
     path.join(__dirname, "externalBridgeVaultPlan.js"), path.join(__dirname, "depositRouterSafeOps.js"),
-    path.join(__dirname, "../externalBridgeRollout.js"), path.join(__dirname, "../generateExternalBridgeRollout.js"),
+    path.join(__dirname, "externalBridgeArtifacts.js"), path.join(__dirname, "externalBridgeNetworks.js"),
+    path.join(__dirname, "../externalBridgeRollout.js"),
     path.join(__dirname, "../scanTokenConfig.js"), path.join(__dirname, "../externalBridgeVaultOps.js"),
     path.join(CONTRACTS, "configure-external-bridge.js"), path.join(CONTRACTS, "external-bridge-verification.js")];
   const revision = digest({ stage, manifest, settings, deployment, depositPlan, defaults,
@@ -255,6 +284,39 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
   const { initialization: init, routes, actions, permissionErrors } = state;
   const calls = [];
   const initialized = bool(init.tokenRouter.initialized) && bool(init.bridge.initialized);
+  const order = (call) => {
+    const method = call.call.args._func;
+    if (method === "initialize") {
+      return address(call.call.args._target) === address(settings.tokenRouter.address) ? 1 : 3;
+    }
+    return {
+      setYieldVault: 2,
+      setPriceOracle: 4,
+      setTokenRouter: 4,
+      setSettlementVerifier: 5,
+      setSettlementVerifierThreshold: 6,
+      addWhitelist: 7,
+      setMintPolicy: 8,
+      setChain: 9,
+      setRoute: 10,
+      setRouteRebaseRequired: 11,
+      setDepositAction: 12,
+    }[method] || Number.MAX_SAFE_INTEGER;
+  };
+  const stageNames = {
+    1: "TokenRouter initialization",
+    2: "yield vault approval",
+    3: "ExternalAssetBridge initialization",
+    4: "PriceOracle and TokenRouter connection",
+    5: "settlement verifier registration",
+    6: "settlement verifier threshold",
+    7: "token whitelist",
+    8: "mint policy",
+    9: "external chain configuration",
+    10: "route configuration",
+    11: "route rebase configuration",
+    12: "deposit action configuration",
+  };
   for (const step of ["initialize", "routes", "actions"]) {
     buildPlan(settings, step).forEach((call, index) => {
       const method = call.args._func;
@@ -318,6 +380,17 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
         status: complete ? "COMPLETE" : blocked ? "BLOCKED" : "READY", reason: complete ? undefined : blocked });
     });
   }
+  for (const item of calls) {
+    item.deploymentStage = order(item);
+    item.deploymentStageName = stageNames[item.deploymentStage];
+  }
+  const earliestIncompleteStage = Math.min(...calls.filter(({ status }) => status !== "COMPLETE").map(order));
+  for (const item of calls) {
+    if (item.status === "READY" && order(item) > earliestIncompleteStage) {
+      item.status = "BLOCKED";
+      item.reason = `Wait for ${stageNames[earliestIncompleteStage]} quorum`;
+    }
+  }
   return calls;
 }
 
@@ -329,5 +402,5 @@ function currentCursorSettings(settings, routes) {
   }) };
 }
 
-module.exports = { CONTRACTS, digest, readJson, writeJson, address, bool, initializeManifest, loadManifest,
+module.exports = { CONTRACTS, digest, readJson, writeJson, address, bool, initializeManifest, createPortableBundle, loadManifest,
   generate, governanceProgress, currentCursorSettings, loadConfig };

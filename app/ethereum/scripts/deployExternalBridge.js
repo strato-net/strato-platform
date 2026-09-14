@@ -19,7 +19,7 @@ function requiredChainAddress(chainId, name, fallback) {
   return ethers.getAddress(value);
 }
 
-function writeOutput(payload, artifactPrefix) {
+function writeOutput(payload, artifactPrefix, rolloutDir) {
   const directory = path.resolve(__dirname, "../deployments");
   fs.mkdirSync(directory, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -34,11 +34,19 @@ function writeOutput(payload, artifactPrefix) {
     fs.writeFileSync(temporaryPath, serialized);
     fs.renameSync(temporaryPath, file);
   }
-  return { outputPath, latestPath };
+  let rolloutPath;
+  if (rolloutDir) {
+    fs.mkdirSync(path.resolve(rolloutDir), { recursive: true, mode: 0o700 });
+    rolloutPath = path.resolve(rolloutDir, "external-deployment.json");
+    const temporaryPath = `${rolloutPath}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, serialized, { mode: 0o600 });
+    fs.renameSync(temporaryPath, rolloutPath);
+  }
+  return { outputPath, latestPath, rolloutPath };
 }
 
 async function main() {
-  const { execute } = parseDeployArgs(process.argv.slice(2));
+  const { execute, rolloutDir } = parseDeployArgs(process.argv.slice(2));
   const network = await ethers.provider.getNetwork();
   const profile = getDeploymentProfile(network.chainId, process.env, {
     execute,
@@ -256,10 +264,11 @@ async function main() {
     },
     verification,
   };
-  const paths = writeOutput(payload, profile.artifactPrefix);
+  const paths = writeOutput(payload, profile.artifactPrefix, rolloutDir);
   console.log(JSON.stringify(payload, null, 2));
   console.log(`Output: ${paths.outputPath}`);
   console.log(`Latest: ${paths.latestPath}`);
+  if (paths.rolloutPath) console.log(`Rollout: ${paths.rolloutPath}`);
 }
 
 if (require.main === module) {

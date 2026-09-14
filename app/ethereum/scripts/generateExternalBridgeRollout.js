@@ -1,11 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { ethers } = require("ethers");
-const {
-  encodeCall,
-  chunkArray,
-  buildTransactionBuilderBatch,
-} = require("./lib/depositRouterSafeOps");
+const { buildDepositRouterBatches, buildDepositRouterControl } = require("./lib/externalBridgeArtifacts");
 const {
   collectInventory,
   buildPolicyTemplate,
@@ -114,59 +109,9 @@ function loadSettingsInputs(settingsPath) {
   };
 }
 
-function buildDepositRouterBatches(rollout) {
-  return chunkArray(rollout.depositRouter.updates, 20).map((updates, index) => {
-    const transaction = {
-      to: rollout.depositRouter.address,
-      value: "0",
-      data: encodeCall("batchUpdateTokens", [
-        updates.map(({ token }) => ethers.getAddress(token)),
-        updates.map(({ minDepositAmount }) => minDepositAmount),
-        updates.map(({ permitted }) => permitted),
-        updates.map(({ targetStratoToken }) =>
-          ethers.getAddress(targetStratoToken),
-        ),
-      ]),
-      operation: 0,
-    };
-    return {
-      index: index + 1,
-      updates,
-      transactionBuilder: buildTransactionBuilderBatch(
-        rollout.chainId,
-        rollout.depositRouter.safeAddress,
-        [transaction],
-        {
-          name: `EAB all-token DepositRouter batch ${index + 1}`,
-          description: `${updates.length} synchronized token route updates`,
-        },
-      ),
-    };
-  });
-}
-
-function buildDepositRouterControl(rollout, action) {
-  if (!["pause", "unpause"].includes(action)) {
-    throw new Error(`Unsupported DepositRouter control action: ${action}`);
-  }
-  return buildTransactionBuilderBatch(
-    rollout.chainId,
-    rollout.depositRouter.safeAddress,
-    [{
-      to: rollout.depositRouter.address,
-      value: "0",
-      data: encodeCall(action, []),
-      operation: 0,
-    }],
-    {
-      name: `EAB DepositRouter ${action} (${rollout.chainId})`,
-      description: `${action} the new DepositRouter through Safe`,
-    },
-  );
-}
-
 function main() {
   const args = parseArgs();
+  console.warn("DEPRECATED: use external:rollout init|plan|status|vote|verify|activate for new deployments.");
   const outputDirectory = path.resolve(args["output-dir"]);
   fs.mkdirSync(outputDirectory, { recursive: true });
 

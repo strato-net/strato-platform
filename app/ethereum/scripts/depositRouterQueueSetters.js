@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
 require("dotenv").config({
   path: path.resolve(__dirname, "../../services/bridge/.env"),
@@ -8,6 +9,7 @@ const {
   getProfileFromArgv,
   applyEnvProfile,
 } = require("./lib/envProfile");
+const { getExternalBridgeNetwork } = require("./lib/externalBridgeNetworks");
 const envProfile = applyEnvProfile(getProfileFromArgv(process.argv.slice(2)));
 const { bootstrapAuthEnv } = require("./lib/bootstrapAuthEnv");
 bootstrapAuthEnv();
@@ -43,6 +45,8 @@ function parseArgs() {
     "chains",
     "router-address",
     "safe-address",
+    "output-plan",
+    "rollout-dir",
   ]);
 
   for (let i = 0; i < argv.length; i++) {
@@ -67,24 +71,6 @@ function parseArgs() {
   return args;
 }
 
-const CHAIN_NAME_TO_ID = {
-  mainnet: 1,
-  ethereum: 1,
-  eth: 1,
-  sepolia: 11155111,
-  base: 8453,
-  base_mainnet: 8453,
-  base_main: 8453,
-  base_sepolia: 84532,
-  "base-sepolia": 84532,
-  basesepolia: 84532,
-  linea: 59144,
-  linea_mainnet: 59144,
-  "linea-mainnet": 59144,
-  linea_sepolia: 59141,
-  "linea-sepolia": 59141,
-};
-
 function parseChains(args) {
   const value = args.chains || envProfile.defaultChainsCsv;
   if (!value) return [];
@@ -93,8 +79,7 @@ function parseChains(args) {
     .map((v) => {
       const raw = String(v || "").trim().toLowerCase();
       if (!raw) return NaN;
-      if (/^\d+$/.test(raw)) return Number(raw);
-      return CHAIN_NAME_TO_ID[raw] || NaN;
+      try { return getExternalBridgeNetwork(raw).chainId; } catch { return NaN; }
     })
     .filter((v) => Number.isInteger(v) && CHAIN_CONFIG[v]);
   if (!chainIds.length) {
@@ -725,6 +710,16 @@ async function main() {
   }
 
   const outputPath = writeOutput("deposit-router-setters", summary);
+  const rolloutPlanPath = args["output-plan"] ||
+    (args["rollout-dir"] && path.join(args["rollout-dir"], "deposit-plan.json"));
+  if (rolloutPlanPath) {
+    const planPath = path.resolve(rolloutPlanPath);
+    fs.mkdirSync(path.dirname(planPath), { recursive: true, mode: 0o700 });
+    const temporaryPath = `${planPath}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, `${JSON.stringify(summary, null, 2)}\n`, { mode: 0o600 });
+    fs.renameSync(temporaryPath, planPath);
+    console.log(`Rollout: ${planPath}`);
+  }
   console.log("=== DepositRouter Setter Queue Plan ===");
   console.log(JSON.stringify(summary, null, 2));
   console.log(`Output: ${outputPath}`);

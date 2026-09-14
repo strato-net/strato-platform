@@ -1,18 +1,22 @@
-const DEPLOYMENT_PROFILES = {
-  1: { network: "mainnet", production: true },
-  8453: { network: "base", production: true },
-  59144: { network: "linea", production: true },
-  84532: { network: "baseSepolia", production: false },
-  59141: { network: "lineaSepolia", production: false },
-  11155111: { network: "sepolia", production: false },
-};
+const { NETWORKS, getExternalBridgeNetwork } = require("./externalBridgeNetworks");
+
+const DEPLOYMENT_PROFILES = Object.fromEntries(NETWORKS.map(({ chainId, name, production }) =>
+  [chainId, { network: name, production }]));
 
 function parseDeployArgs(argv) {
-  const unsupported = argv.filter((arg) => arg !== "--execute");
-  if (unsupported.length > 0) {
-    throw new Error(`Unsupported option ${unsupported[0]}`);
+  const parsed = { execute: false };
+  for (let index = 0; index < argv.length; index++) {
+    if (argv[index] === "--execute") {
+      parsed.execute = true;
+      continue;
+    }
+    if (argv[index] === "--rollout-dir" && argv[index + 1] && !argv[index + 1].startsWith("--")) {
+      parsed.rolloutDir = argv[++index];
+      continue;
+    }
+    throw new Error(`Unsupported option ${argv[index]}`);
   }
-  return { execute: argv.includes("--execute") };
+  return parsed;
 }
 
 function getChainEnvName(chainId, name) {
@@ -34,10 +38,11 @@ function getDeploymentProfile(
   { execute = false } = {},
 ) {
   const normalizedChainId = Number(chainId);
-  const profile = DEPLOYMENT_PROFILES[normalizedChainId];
-  if (!profile) {
+  let network;
+  try { network = getExternalBridgeNetwork(normalizedChainId); } catch {
     throw new Error(`Unsupported External Bridge deployment chain ${chainId}`);
   }
+  const profile = { network: network.name, production: network.production };
   if (
     profile.production &&
     execute &&

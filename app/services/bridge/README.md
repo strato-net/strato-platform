@@ -79,6 +79,10 @@ The service automatically validates that RPC URLs are configured for all enabled
 
 The bridge workload calls AWS KMS directly with its IAM role. No AWS access key, bearer-authenticated signing adapter, or Safe proposer private key is loaded by the service. The KMS public key and every returned signature are checked against `SAFE_PROPOSER_ADDRESS`.
 
+The same proposer is used for native-bridge and ExternalAssetBridge Safe proposals
+on a combined Runtime. Register it as a Safe Transaction Service delegate; it must
+not be an on-chain Safe owner. Safe owners still review, sign, and execute proposals.
+
 The separately run Ethereum `depositRouterSafeOps.js` deployment and upgrade tooling still accepts `SAFE_PROPOSER_PRIVATE_KEY`. This is an offline operational exception and must not share the bridge-service runtime or environment.
 
 #### Native Bridge Minting

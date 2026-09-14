@@ -1,6 +1,6 @@
 {
   "sourceChainId": "REVIEW_REQUIRED",
-  "externalDeployment": "./external-bridge-deployment.json",
+  "externalDeployment": "./external-deployment.json",
   "depositPlan": "./deposit-plan.json",
   "tokenRouter": "REVIEW_REQUIRED",
   "externalAssetBridge": "REVIEW_REQUIRED",

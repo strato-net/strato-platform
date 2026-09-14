@@ -8,6 +8,7 @@ const {
   getProfileFromArgv,
   applyEnvProfile,
 } = require("./lib/envProfile");
+const { getExternalBridgeNetwork } = require("./lib/externalBridgeNetworks");
 
 const envProfile = applyEnvProfile(getProfileFromArgv(process.argv.slice(2)));
 const { bootstrapAuthEnv } = require("./lib/bootstrapAuthEnv");
@@ -62,25 +63,6 @@ function parseArgs() {
   return args;
 }
 
-const CHAIN_NAME_TO_ID = {
-  mainnet: 1,
-  ethereum: 1,
-  eth: 1,
-  sepolia: 11155111,
-  base: 8453,
-  base_mainnet: 8453,
-  base_main: 8453,
-  base_sepolia: 84532,
-  "base-sepolia": 84532,
-  basesepolia: 84532,
-  linea: 59144,
-  linea_mainnet: 59144,
-  "linea-mainnet": 59144,
-  linea_sepolia: 59141,
-  "linea-sepolia": 59141,
-  lineasepolia: 59141,
-};
-
 function parseChains(args) {
   const value = args.chains || envProfile.defaultChainsCsv;
   if (!value) return [];
@@ -89,8 +71,7 @@ function parseChains(args) {
     .map((v) => {
       const raw = String(v || "").trim().toLowerCase();
       if (!raw) return NaN;
-      if (/^\d+$/.test(raw)) return Number(raw);
-      return CHAIN_NAME_TO_ID[raw] || NaN;
+      try { return getExternalBridgeNetwork(raw).chainId; } catch { return NaN; }
     })
     .filter((v) => Number.isInteger(v) && CHAIN_CONFIG[v]);
   if (!chainIds.length) {
@@ -100,20 +81,12 @@ function parseChains(args) {
 }
 
 function getImplementationForChain(chainId) {
-  const implEth = normalizeAddress(process.env.ROUTER_IMPL_ETH);
-  const implBase = normalizeAddress(process.env.ROUTER_IMPL_BASE);
-  const implLinea = normalizeAddress(process.env.ROUTER_IMPL_LINEA);
-  if (chainId === 1 || chainId === 11155111) return implEth;
-  if (chainId === 8453 || chainId === 84532) return implBase;
-  if (chainId === 59144 || chainId === 59141) return implLinea;
-  return "";
+  const family = getExternalBridgeNetwork(chainId).family.toUpperCase();
+  return normalizeAddress(process.env[`ROUTER_IMPL_${family}`]);
 }
 
 function getImplementationEnvForChain(chainId) {
-  if (chainId === 1 || chainId === 11155111) return "ROUTER_IMPL_ETH";
-  if (chainId === 8453 || chainId === 84532) return "ROUTER_IMPL_BASE";
-  if (chainId === 59144 || chainId === 59141) return "ROUTER_IMPL_LINEA";
-  return "";
+  return `ROUTER_IMPL_${getExternalBridgeNetwork(chainId).family.toUpperCase()}`;
 }
 
 function normalizeHexAddress(value, { zeroIfEmpty = false } = {}) {
@@ -127,13 +100,7 @@ function normalizeHexAddress(value, { zeroIfEmpty = false } = {}) {
 }
 
 function getHardhatNetwork(chainId) {
-  if (chainId === 1) return "mainnet";
-  if (chainId === 8453) return "base";
-  if (chainId === 11155111) return "sepolia";
-  if (chainId === 84532) return "baseSepolia";
-  if (chainId === 59144) return "linea";
-  if (chainId === 59141) return "lineaSepolia";
-  return "";
+  return getExternalBridgeNetwork(chainId).name;
 }
 
 function verifyImplementation(chainId, implementationAddress) {

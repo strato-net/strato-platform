@@ -416,7 +416,14 @@ async function submit(tokenObj, call, onSubmitted = () => {}) {
   if (!final || final.status !== "Success") {
     throw new Error(`Governance vote failed: ${JSON.stringify(final || results)}`);
   }
-  return { transactionHash: final.hash, status: final.status };
+  const resultValues = final.txResult?.response?.v;
+  const issueId = [resultValues].flat(Infinity)
+    .find((value) => typeof value === "string" && /^[a-f0-9]{64}$/i.test(value));
+  return {
+    transactionHash: final.hash,
+    status: final.status,
+    ...(issueId ? { issueId } : {}),
+  };
 }
 
 function writeOutput(payload, outputDirectory) {

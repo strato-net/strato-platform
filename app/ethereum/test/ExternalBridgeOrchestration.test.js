@@ -5,15 +5,23 @@ const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const {
-  initializeManifest, loadManifest, generate, writeJson, readJson, digest,
+  initializeManifest, createPortableBundle, loadManifest, generate, writeJson, readJson, digest,
   governanceProgress, currentCursorSettings, loadConfig,
 } = require("../scripts/lib/externalBridgeOrchestration");
-const { parseArgs, redact, vote, activate, inspect } = require("../scripts/externalBridgeRollout");
+const {
+  parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl,
+  normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, fetchLiveAdminVoteCounts,
+  vote, activate, inspect, operatorGuidance, terminalSummary,
+} = require("../scripts/externalBridgeRollout");
+const { verifyUninitializedProxy } = require("../../contracts/deploy/external-bridge-verification");
 
 const addr = (digit) => `0x${digit.repeat(40)}`;
 function fixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-orchestration-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const accessToken = process.env.ACCESS_TOKEN;
+  process.env.ACCESS_TOKEN = "test-access-token";
+  t.after(() => accessToken === undefined ? delete process.env.ACCESS_TOKEN : process.env.ACCESS_TOKEN = accessToken);
   const deployment = { chainId: "11155111", network: "sepolia", safeAddress: addr("1"),
     depositRouterDeploymentBlock: "1234", externalBridgeVault: { proxy: addr("2"), implementation: addr("a") },
     depositRouter: { proxy: addr("3"), implementation: addr("b") } };
@@ -62,6 +70,25 @@ function initialized(f) {
   f.state.initialization.approvedYieldVaults = new Set(f.config.tokenRouter.yieldVaults);
 }
 
+function configured(f) {
+  initialized(f);
+  f.state.permissionErrors = [];
+  for (const policy of f.config.mintPolicies) {
+    f.state.routes.mintPolicies.set(policy.token, {
+      capacity: policy.capacity,
+      refillRate: policy.refillRate,
+    });
+  }
+  for (const chain of f.config.chains) {
+    f.state.routes.chains.set(String(chain.externalChainId), { ...chain });
+    for (const route of chain.routes) {
+      const routeKey = `${route.externalToken}:${chain.externalChainId}:${route.stratoToken}`;
+      f.state.routes.routes.set(routeKey, { ...route });
+      if (route.rebaseRequired) f.state.routes.rebaseRequired.add(routeKey);
+    }
+  }
+}
+
 test("init imports existing settings without overwriting and plan never emits activation", (t) => {
   const f = fixture(t);
   assert.throws(() => initializeManifest(path.join(f.directory, "settings.json"), undefined, f.manifestPath), /already exists/);
@@ -70,6 +97,30 @@ test("init imports existing settings without overwriting and plan never emits ac
   assert.equal(f.artifacts.vaultConfigurePath, undefined);
   const repeat = generate(f.context, path.join(f.directory, "output"));
   assert.deepEqual(repeat.hashes, f.artifacts.hashes);
+});
+
+test("init can expand a draft manifest in place without settings.json", (t) => {
+  const f = fixture(t);
+  const draft = path.join(f.directory, "draft-manifest.json");
+  writeJson(draft, readJson(path.join(f.directory, "settings.json")));
+  initializeManifest(draft, undefined, draft);
+  assert.equal(readJson(draft).schemaVersion, 1);
+  assert.throws(() => initializeManifest(draft, undefined, draft), /already initialized/);
+  assert.equal(parseArgs(["status", "--manifest", draft]).command, "status");
+  assert.equal(parseArgs(["next", "--manifest", draft]).command, "next");
+});
+
+test("init creates the only operator-managed manifest when it is missing", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-draft-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const manifest = path.join(directory, "deployment-manifest.json");
+  const result = spawnSync(process.execPath, [
+    path.resolve(__dirname, "../scripts/externalBridgeRollout.js"),
+    "init", "--manifest", manifest,
+  ], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /DRAFT_CREATED/);
+  assert.equal(readJson(manifest).schemaVersion, undefined);
 });
 
 test("KMS addresses are generated from the manifest and survive repeated generation", (t) => {
@@ -84,7 +135,7 @@ test("KMS addresses are generated from the manifest and survive repeated generat
   assert.deepEqual(generate(next, path.join(f.directory, "output")).hashes, output.hashes);
 });
 
-test("changed policy, deployment or discovery invalidates approval revisions", (t) => {
+test("embedded deployment inputs make the manifest portable and revision-bound", (t) => {
   const f = fixture(t);
   f.manifest.policy.tokens[addr("b")].bucketCapacity = "2000";
   writeJson(f.manifestPath, f.manifest);
@@ -92,7 +143,27 @@ test("changed policy, deployment or discovery invalidates approval revisions", (
   assert.notEqual(policyRevision, f.context.revision);
   const deploymentPath = path.join(f.directory, "deployment.json");
   writeJson(deploymentPath, { ...readJson(deploymentPath), deployedAt: "2026-09-10" });
+  assert.equal(loadManifest(f.manifestPath).revision, policyRevision);
+  f.manifest = readJson(f.manifestPath);
+  f.manifest.inputs.externalDeployment.deployedAt = "2026-09-10";
+  writeJson(f.manifestPath, f.manifest);
   assert.notEqual(loadManifest(f.manifestPath).revision, policyRevision);
+});
+
+test("technician bundle loads without the original deployment files", (t) => {
+  const f = fixture(t);
+  const bundlePath = path.join(f.directory, "handoff", "deployment-bundle.json");
+  fs.mkdirSync(path.dirname(bundlePath));
+  createPortableBundle(f.manifestPath, bundlePath);
+  const copiedBundle = path.join(f.directory, "admin-2", "deployment-bundle.json");
+  fs.mkdirSync(path.dirname(copiedBundle));
+  fs.copyFileSync(bundlePath, copiedBundle);
+  fs.rmSync(path.join(f.directory, "deployment.json"));
+  fs.rmSync(path.join(f.directory, "discovery.json"));
+  const technician = loadManifest(bundlePath);
+  const admin2 = loadManifest(copiedBundle);
+  assert.equal(technician.rollout.chainId, f.context.rollout.chainId);
+  assert.equal(admin2.revision, technician.revision);
 });
 
 test("editing generated files or their hash index cannot bypass integrity checking", (t) => {
@@ -136,7 +207,111 @@ test("permissions must reach quorum before route calls become ready", (t) => {
   assert.equal(calls.find(({ call }) => call.args._func === "addWhitelist").status, "READY");
   assert.equal(calls.find(({ call }) => call.args._func === "setChain").status, "BLOCKED");
   f.state.permissionErrors = [];
+  assert.equal(governanceProgress(f.config, f.state).find(({ call }) => call.args._func === "setMintPolicy").status, "READY");
+  assert.equal(governanceProgress(f.config, f.state).find(({ call }) => call.args._func === "setChain").status, "BLOCKED");
+  for (const policy of f.config.mintPolicies) {
+    f.state.routes.mintPolicies.set(policy.token, { capacity: policy.capacity, refillRate: policy.refillRate });
+  }
   assert.equal(governanceProgress(f.config, f.state).find(({ call }) => call.args._func === "setChain").status, "READY");
+});
+
+test("governance exposes only the earliest incomplete deployment stage", (t) => {
+  const f = fixture(t);
+  let calls = governanceProgress(f.config, f.state);
+  assert.deepEqual(calls.filter(({ status }) => status === "READY").map(({ call }) => call.args._func),
+    ["initialize"]);
+  assert.equal(calls.find(({ status }) => status === "READY").deploymentStageName,
+    "TokenRouter initialization");
+  assert.equal(calls.find(({ call }) =>
+    call.args._func === "initialize" && call.args._target === f.config.bridge.address).status, "BLOCKED");
+
+  f.state.initialization.tokenRouter = { ...f.config.tokenRouter, initialized: true };
+  calls = governanceProgress(f.config, f.state);
+  assert(calls.filter(({ status }) => status === "READY").every(({ call }) =>
+    call.args._func === "setYieldVault"));
+
+  f.state.initialization.approvedYieldVaults = new Set(f.config.tokenRouter.yieldVaults);
+  calls = governanceProgress(f.config, f.state);
+  assert.deepEqual(calls.filter(({ status }) => status === "READY").map(({ call }) => call.args._func),
+    ["initialize"]);
+  assert.equal(calls.find(({ status }) => status === "READY").call.args._target, f.config.bridge.address);
+});
+
+test("operator guidance identifies first and second administrator vote state", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-guidance-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const directory = path.join(root, "revision");
+  fs.mkdirSync(directory);
+  const artifacts = { directory };
+  const args = { manifest: "/secure/manifest.json", "output-dir": "/secure/output", stage: "activation" };
+  const report = {
+    approvalHash: "a".repeat(64),
+    safe: { executionOrder: [{ step: "pause-router", path: "/secure/router-pause.json", status: "PENDING" }] },
+    calls: [{
+      id: "call-id",
+      status: "READY",
+      requiredAdminVotes: 2,
+      deploymentStage: 6,
+      deploymentStageName: "settlement verifier threshold",
+      call: { args: { _func: "setSettlementVerifierThreshold" } },
+    }],
+  };
+  let guidance = operatorGuidance(report, args, artifacts);
+  assert.equal(guidance.currentStage, "6/12: settlement verifier threshold");
+  assert.deepEqual(guidance.readyMethods, [{ method: "setSettlementVerifierThreshold", count: 1 }]);
+  assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED");
+  assert.equal(guidance.safeChecklist[0].step, "pause-router");
+  assert.match(guidance.voteCommand, /external:rollout -- vote/);
+  assert.match(guidance.voteCommand, new RegExp(report.approvalHash));
+  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
+    status: "ACTION_REQUIRED",
+    step: "6/12: settlement verifier threshold",
+    action: "ADMIN_1_VOTE",
+    progress: "0/2 admin votes recorded",
+    run: guidance.adminHandoffCommand,
+    then: "Run status again. It will tell Admin 2 to vote.",
+    details: "/secure/report.json",
+  });
+  assert.deepEqual(terminalSummary({
+    operator: guidance,
+    submittedVotes: [{ id: "call-id" }],
+    voteOutcome: "AWAITING_ANOTHER_ADMIN",
+  }, "/secure/report.json"), {
+    status: "HANDOFF_REQUIRED",
+    action: "ADMIN_2_VOTE",
+    run: guidance.adminHandoffCommand,
+    then: "The technician runs status after Admin 2 votes.",
+    details: "/secure/report.json",
+  });
+  const secondAdminSummary = terminalSummary({
+    operator: guidance,
+    submittedVotes: [{ id: "call-id" }],
+    voterAdmin: "2",
+    voteOutcome: "AWAITING_ANOTHER_ADMIN",
+  }, "/secure/report.json");
+  assert.equal(secondAdminSummary.action, "TECHNICIAN_RUN_STATUS");
+  assert.equal(secondAdminSummary.run, "npm run external:rollout -- status");
+  writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`),
+    { "call-id": { status: "VOTED" } });
+  guidance = operatorGuidance(report, args, artifacts);
+  assert.equal(guidance.voteState, "WAITING_ON_SECOND_ADMIN");
+  assert.match(guidance.action, /waiting on the second administrator/);
+  writeJson(path.join(directory, `votes-${"2".repeat(40)}.json`),
+    { "call-id": { status: "VOTED" } });
+  guidance = operatorGuidance(report, args, artifacts);
+  assert.equal(guidance.voteState, "WAITING_FOR_EXECUTION");
+  assert.equal(guidance.voteCommand, undefined);
+});
+
+test("rollout automatically loads deployment.env beside the manifest", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-environment-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  t.after(() => delete process.env.EAB_AUTO_ENV_TEST);
+  process.env.EAB_AUTO_ENV_TEST = "old";
+  fs.writeFileSync(path.join(directory, "deployment.env"), "EAB_AUTO_ENV_TEST=loaded\n");
+  assert.equal(loadRolloutEnvironment(path.join(directory, "deployment-manifest.json")),
+    path.join(directory, "deployment.env"));
+  assert.equal(process.env.EAB_AUTO_ENV_TEST, "loaded");
 });
 
 test("advanced cursors are preserved and changed existing chains are never replayed", (t) => {
@@ -163,6 +338,142 @@ test("commands reject implicit mutations, invalid options and missing approval",
   assert.throws(() => parseArgs(["vote", "--manifest", "file"]), /Explicit/);
   assert.throws(() => parseArgs(["plan", "--manifest", "file", "--execute", "yes"]), /Invalid/);
   assert.throws(() => parseArgs(["liquidity", "--manifest", "file"]), /Use/);
+});
+
+test("one-time admin config supplies portable rollout arguments", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-admin-config-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const config = path.join(directory, "admin.json");
+  const manifest = path.join(directory, "deployment-bundle.json");
+  fs.writeFileSync(manifest, "{}\n");
+  writeJson(config, {
+    manifest,
+    manifestSha256: digest("{}\n"),
+    outputDir: path.join(directory, "generated"),
+    stage: "activation",
+    environmentFile: path.join(directory, "admin.env"),
+  });
+  assert.deepEqual(parseArgs(["status", "--config", config]), {
+    command: "status",
+    config,
+    manifest: path.join(directory, "deployment-bundle.json"),
+    "output-dir": path.join(directory, "generated"),
+    stage: "activation",
+    "env-file": path.join(directory, "admin.env"),
+  });
+  const previous = process.env.EAB_ROLLOUT_CONFIG;
+  process.env.EAB_ROLLOUT_CONFIG = config;
+  t.after(() => previous === undefined
+    ? delete process.env.EAB_ROLLOUT_CONFIG : process.env.EAB_ROLLOUT_CONFIG = previous);
+  assert.equal(parseArgs(["status"]).config, config);
+  fs.writeFileSync(manifest, '{"changed":true}\n');
+  assert.throws(() => parseArgs(["status", "--config", config]), /bundle changed/);
+});
+
+test("technician setup uses a separate read-only profile", () => {
+  const args = parseArgs(["technician-setup", "--config", "/secure/technician.json",
+    "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]);
+  assert.equal(args.command, "technician-setup");
+  assert.equal(args.config, "/secure/technician.json");
+  assert.equal(args.admin, undefined);
+});
+
+test("Safe proposer remains a delegate while testnet may retain threshold one", () => {
+  const context = {
+    deployment: { production: false },
+    manifest: {
+      authorizationSigners: [addr("3"), addr("4"), addr("5")],
+      services: { safeProposerAddress: addr("1"), executorAddress: addr("2") },
+    },
+  };
+  assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 1n).threshold, "1");
+  assert.throws(() => validateSafeRuntimeIdentities(context, [addr("1")], 1n), /exclude the proposer/);
+  context.deployment.production = true;
+  assert.throws(() => validateSafeRuntimeIdentities(context, [addr("6")], 1n), /at least 2/);
+  assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 2n).threshold, "2");
+});
+
+test("STRATO OAuth credentials resolve a transient access token", async (t) => {
+  const names = ["ACCESS_TOKEN", "GLOBAL_ADMIN_NAME", "GLOBAL_ADMIN_PASSWORD"];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  t.after(() => names.forEach((name) => previous[name] === undefined
+    ? delete process.env[name] : process.env[name] = previous[name]));
+  delete process.env.ACCESS_TOKEN;
+  process.env.GLOBAL_ADMIN_NAME = "admin";
+  process.env.GLOBAL_ADMIN_PASSWORD = "password";
+  const context = { manifest: { services: { sourceTokenEnv: "ACCESS_TOKEN" } } };
+  const token = await resolveSourceToken(context, {
+    getUserToken: async (username, password) => {
+      assert.deepEqual([username, password], ["admin", "password"]);
+      return "short-lived-token";
+    },
+  });
+  assert.equal(token, "short-lived-token");
+  assert.equal(process.env.ACCESS_TOKEN, "short-lived-token");
+});
+
+test("raw STRATO requests normalize the API prefix", () => {
+  assert.equal(stratoApiUrl("https://node.example"), "https://node.example/strato-api");
+  assert.equal(stratoApiUrl("https://node.example/"), "https://node.example/strato-api");
+  assert.equal(stratoApiUrl("https://node.example/strato-api"), "https://node.example/strato-api");
+  assert.equal(stratoApiUrl("https://node.example/strato-api/"), "https://node.example/strato-api");
+  assert.equal(normalizeStratoRequestUrl("https://node.example", "https://node.example/eth/v1.2/metadata"),
+    "https://node.example/strato-api/eth/v1.2/metadata");
+  assert.equal(normalizeStratoRequestUrl("https://node.example", "https://node.example/strato/v2.3/key"),
+    "https://node.example/strato/v2.3/key");
+  assert.equal(normalizeStratoRequestUrl("https://node.example", "https://node.example/cirrus/search/Table"),
+    "https://node.example/cirrus/search/Table");
+});
+
+test("live AdminRegistry policy determines required vote count", async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => [{ admins: [addr("a"), addr("b"), addr("c"), addr("d")]
+      .map((address) => ({ address })),
+    thresholds: [{ target: addr("2"), func: "setRoute", threshold: "7500" }],
+    defaultVotingThresholdBps: "6000" }],
+  });
+  const policy = await fetchAdminVotingPolicy({ adminRegistry: addr("1") },
+    "https://node.example", "token", fetchImpl);
+  assert.equal(requiredAdminVotes(policy, { args: { _target: addr("3"), _func: "initialize" } }), 3);
+  assert.equal(requiredAdminVotes(policy, { args: { _target: addr("2"), _func: "setRoute" } }), 3);
+});
+
+test("live AdminRegistry events include votes cast outside this rollout directory", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-live-votes-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const directory = path.join(root, "revision");
+  fs.mkdirSync(directory);
+  const issueId = "a".repeat(64);
+  const transactionHash = "b".repeat(64);
+  writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`), {
+    "call-id": { status: "VOTED", hashes: [transactionHash] },
+  });
+  const counts = await fetchLiveAdminVoteCounts(
+    { adminRegistry: addr("9") }, "https://node.example", "token",
+    [{ id: "call-id" }], { directory },
+    async (url) => ({ ok: true, json: async () => url.includes("transaction_hash")
+      ? [{ issueId, transaction_hash: transactionHash }]
+      : [
+        { issueId, voter: addr("1") },
+        { issueId, voter: addr("2") },
+      ] }),
+  );
+  assert.equal(counts.get("call-id"), 2);
+});
+
+test("missing state is uninitialized only for a verified fresh proxy", () => {
+  const settings = { adminRegistry: addr("1") };
+  const proxyRows = [{ address: addr("2"), _owner: addr("1"), logicContract: addr("3") }];
+  const logicRows = [{ address: addr("3"), initialized: false }];
+  assert.deepEqual(verifyUninitializedProxy(settings, "TokenRouter", addr("2"), proxyRows, logicRows),
+    { initialized: false });
+  assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("4"), proxyRows, logicRows),
+    /proxy was not found/);
+  assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("2"),
+    [{ ...proxyRows[0], _owner: addr("4") }], logicRows), /proxy was not found/);
+  assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("2"), proxyRows,
+    [{ ...logicRows[0], initialized: true }]), /cannot prove/);
 });
 
 test("process CLI offline plan works and refuses a concurrent run", (t) => {
@@ -231,6 +542,18 @@ test("activation exports only unpause after fresh readiness and approval", (t) =
   assert.throws(() => activate(f.context, f.artifacts, { report }, "approved"), /already active/);
 });
 
+test("withdrawal activation unpauses the vault before the DepositRouter", (t) => {
+  const f = fixture(t);
+  f.context.rollout.summary.withdrawalsEnabledCount = 1;
+  const report = { status: "READY_FOR_ACTIVATION_REVIEW", approvalHash: "approved" };
+  const batch = readJson(activate(f.context, f.artifacts, { report }, "approved"));
+  assert.equal(batch.transactions.length, 2);
+  assert.equal(batch.transactions[0].to.toLowerCase(), addr("2"));
+  assert.equal(batch.transactions[0].data, "0x3f4ba83a");
+  assert.equal(batch.transactions[1].to.toLowerCase(), addr("3"));
+  assert.equal(batch.transactions[1].data, "0x3f4ba83a");
+});
+
 test("missing external access and verifier setup produce a pending consolidated report", async (t) => {
   const f = fixture(t);
   f.context.manifest.services.rpcUrlEnv = "EAB_ORCHESTRATION_TEST_MISSING_RPC";
@@ -238,14 +561,16 @@ test("missing external access and verifier setup produce a pending consolidated 
     settings: f.config, state: f.state, errors: ["TokenRouter is not initialized"], calls: governanceProgress(f.config, f.state),
   }) });
   assert.equal(inspection.report.status, "PENDING");
-  assert(inspection.report.checks.find(({ name }) => name === "strato").data.errors.length);
+  const strato = inspection.report.checks.find(({ name }) => name === "strato");
+  assert.equal(strato.status, "PENDING");
+  assert(strato.data.errors.length);
   assert.equal(inspection.report.checks.find(({ name }) => name === "external").status, "FAILED");
-  assert.equal(inspection.report.checks.find(({ name }) => name === "verifiers").status, "FAILED");
-  assert.equal(inspection.report.checks.find(({ name }) => name === "bridge-health").status, "FAILED");
+  assert.equal(inspection.report.checks.find(({ name }) => name === "verifiers").status, "DEFERRED");
+  assert.equal(inspection.report.checks.find(({ name }) => name === "bridge-health").status, "DEFERRED");
 });
 
 test("action reconciliation uses the stored autoRoute flag", (t) => {
-  const f = fixture(t); initialized(f);
+  const f = fixture(t); configured(f);
   f.state.actions.actionConfigs.set(`${"b".repeat(40)}:11155111:${"c".repeat(40)}`, { autoRoute: true });
   const action = governanceProgress(f.config, f.state).find(({ call }) => call.args._func === "setDepositAction");
   assert.equal(action.status, "READY");
@@ -253,7 +578,7 @@ test("action reconciliation uses the stored autoRoute flag", (t) => {
 });
 
 test("activation regenerates artifacts and reconciles the enable transition", (t) => {
-  const f = fixture(t); initialized(f);
+  const f = fixture(t); configured(f);
   Object.values(f.manifest.policy.routes)[0].autoRouteEnabled = true;
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /AUTO_ROUTE/);
@@ -278,7 +603,7 @@ test("activation regenerates artifacts and reconciles the enable transition", (t
 });
 
 test("activation enablement remains blocked when service and external gates fail", async (t) => {
-  const f = fixture(t); initialized(f);
+  const f = fixture(t); configured(f);
   f.config.chains[0].routes[0].autoRouteEnabled = true;
   const calls = governanceProgress(f.config, f.state, { stage: "activation", activationErrors: [] });
   assert.equal(calls.find(({ call }) => call.args._func === "setDepositAction").status, "READY");
@@ -293,7 +618,7 @@ test("activation enablement remains blocked when service and external gates fail
 });
 
 test("activation cannot vote after fresh gates fail", async (t) => {
-  const f = fixture(t); initialized(f);
+  const f = fixture(t); configured(f);
   f.config.chains[0].routes[0].autoRouteEnabled = true;
   const item = governanceProgress(f.config, f.state, { stage: "activation", activationErrors: [] })
     .find(({ call }) => call.args._func === "setDepositAction");
