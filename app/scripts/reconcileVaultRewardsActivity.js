@@ -112,7 +112,7 @@ const optionValue = (name) => {
 
 const NETWORK_PROFILES = {
   testnet: {
-    nodeUrl: "https://node1.testnet.strato.nexus",
+    nodeUrl: "https://app.testnet.strato.nexus",
     rewards: "170147f58738c9f46112a874030420b823901f3b",
     vaults: {
       eth: {

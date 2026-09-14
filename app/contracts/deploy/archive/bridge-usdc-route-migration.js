@@ -43,7 +43,7 @@ function applyEnvProfile(profile) {
   process.env.NODE_URL =
     normalized === "prod"
       ? "https://app.strato.nexus"
-      : "https://node1.testnet.strato.nexus";
+      : "https://app.testnet.strato.nexus";
 
   return normalized;
 }

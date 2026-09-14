@@ -65,7 +65,7 @@ const dotenv = require('dotenv');
 
 const PROFILES = {
   testnet: {
-    nodeUrl: 'https://node1.testnet.strato.nexus',
+    nodeUrl: 'https://app.testnet.strato.nexus',
     cirrusUrl: 'https://app.testnet.strato.nexus',
   },
   prod: {

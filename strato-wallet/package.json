@@ -2,7 +2,7 @@
   "name": "strato-wallet",
   "description": "STRATO Wallet — a self-custody browser extension wallet for STRATO, discoverable and interoperable with web3 dApps.",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "engines": {
     "node": ">=22.12 <23.0"

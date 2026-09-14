@@ -53,7 +53,7 @@ const dotenv = require('dotenv');
 const { keccak256, toUtf8Bytes } = require('ethers');
 
 const PROFILES = {
-  testnet: { nodeUrl: 'https://node1.testnet.strato.nexus', cirrusUrl: 'https://app.testnet.strato.nexus' },
+  testnet: { nodeUrl: 'https://app.testnet.strato.nexus', cirrusUrl: 'https://app.testnet.strato.nexus' },
   prod: { nodeUrl: 'https://app.strato.nexus', cirrusUrl: 'https://app.strato.nexus' },
 };
 const DEFAULT_BRIDGE = '0000000000000000000000000000000000001008';

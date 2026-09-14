@@ -21,7 +21,7 @@ Oracle config is keyed by network in `assets.json` (`networks[ORACLE_NETWORK_ID]
 
 ```env
 # STRATO Configuration
-STRATO_NODE_URL=https://node1.testnet.strato.nexus/
+STRATO_NODE_URL=https://app.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
 ORACLE_NETWORK_ID=114784819836269  # helium testnet; production: 33056204878082667 (upquark)
 

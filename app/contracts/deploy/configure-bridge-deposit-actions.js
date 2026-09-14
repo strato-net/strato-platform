@@ -18,7 +18,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const PROFILE_CONFIG = {
   testnet: {
-    nodeUrl: "https://node1.testnet.strato.nexus",
+    nodeUrl: "https://app.testnet.strato.nexus",
     routes: [
       {
         symbol: "USDC",

@@ -103,15 +103,15 @@ export const DEFAULT_NETWORK: StratoNetwork = {
   id: "strato",
   name: "STRATO",
   kind: "strato",
-  rpcUrl: "https://dnorwood.stratomercata.com/rpc",
+  rpcUrl: "https://app.strato.nexus/rpc",
   chainId: "123354377739506",
-  blocUrl: "https://dnorwood.stratomercata.com/bloc/v2.2",
-  stratoApiUrl: "https://dnorwood.stratomercata.com/strato-api/eth/v1.2",
+  blocUrl: "https://app.strato.nexus/bloc/v2.2",
+  stratoApiUrl: "https://app.strato.nexus/strato-api/eth/v1.2",
   vaultUrl: "https://vault.blockapps.net:8093/strato/v2.3",
   explorerUrl: STRATO_EXPLORER,
   nativeSymbol: "USDST",
   oauthIssuer: "https://keycloak.blockapps.net/auth/realms/mercata",
-  oauthClientId: "strato-wallet-extension-test",
+  oauthClientId: "strato-wallet-extension",
 };
 
 // Generic EVM networks (mainly for bridging to/from STRATO). Balances + activity
@@ -285,6 +285,24 @@ export function isTestnet(n: StratoNetwork): boolean {
   return n.testnet === true;
 }
 
+/**
+ * Values earlier releases shipped for built-in STRATO networks, by network id.
+ * Installs that ever saved a network in Settings have the whole list persisted,
+ * so they would keep these forever; getNetworks upgrades any field still equal
+ * to one of them to the current shipped default.
+ */
+const RETIRED_STRATO_DEFAULTS: Record<
+  string,
+  Partial<Record<keyof StratoNetwork, string[]>>
+> = {
+  [DEFAULT_NETWORK.id]: {
+    rpcUrl: ["https://dnorwood.stratomercata.com/rpc"],
+    blocUrl: ["https://dnorwood.stratomercata.com/bloc/v2.2"],
+    stratoApiUrl: ["https://dnorwood.stratomercata.com/strato-api/eth/v1.2"],
+    oauthClientId: ["strato-wallet-extension-test"],
+  },
+};
+
 export async function getNetworks(): Promise<StratoNetwork[]> {
   const stored = await networksStore.getValue();
   // Ensure built-in networks are present (adds newly-shipped ones to existing
@@ -296,7 +314,27 @@ export async function getNetworks(): Promise<StratoNetwork[]> {
     if (!existing) {
       byId.set(b.id, b);
       changed = true;
-    } else if (b.kind === "evm") {
+    } else if (b.kind !== "evm") {
+      // STRATO networks are user-editable, so only replace fields that still
+      // hold a value an earlier release shipped (the user never changed them).
+      const retired = RETIRED_STRATO_DEFAULTS[b.id];
+      if (retired) {
+        const updated = { ...existing };
+        for (const [field, oldValues] of Object.entries(retired) as [
+          keyof StratoNetwork,
+          string[],
+        ][]) {
+          const current = existing[field];
+          if (typeof current === "string" && oldValues.includes(current)) {
+            (updated as Record<string, unknown>)[field] = b[field];
+          }
+        }
+        if (JSON.stringify(updated) !== JSON.stringify(existing)) {
+          byId.set(b.id, updated);
+          changed = true;
+        }
+      }
+    } else {
       // Keep built-in EVM networks in sync with shipped defaults (e.g. a fixed
       // RPC URL); users customize the STRATO network, not these.
       const synced = { ...existing, ...b };
