@@ -130,9 +130,11 @@ pipeline {
                     docker compose -f docker-compose.highway.push.yml push 2>&1
                     docker compose -f docker-compose.bridge.push.yml push 2>&1
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                    docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-                    docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
-                    docker compose -f docker-compose.bridge.push.ecr.yml push 2>&1
+                    # ECR repositories have immutable tags: skip tags that already exist instead of failing the build
+                    ./scripts/docker-push-ecr.sh \
+                      -f docker-compose.vault.push.ecr.yml \
+                      -f docker-compose.highway.push.ecr.yml \
+                      -f docker-compose.bridge.push.ecr.yml 2>&1
                   '''
                 }
                 

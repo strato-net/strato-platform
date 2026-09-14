@@ -7,7 +7,7 @@ license:             Apache-2.0
 
 dependencies:
 - base >= 4.7 && < 5
-- kafka-monad
+- streaming-jlog
 
 library:
   source-dirs: src

@@ -93,6 +93,11 @@ contract record MercataBridge is Ownable {
     /// @param withdrawalId The unique withdrawal identifier
     event WithdrawalRequested(address dest, uint256 destChainId, uint256 externalTokenAmount, uint256 stratoTokenAmount, address token, address user, uint256 withdrawalId, bool useHotWallet);
 
+    /// @notice Emitted when governance cancels a withdrawal and moves its escrow to a triage wallet
+    /// @dev custodyTxHash is non-empty when the withdrawal was already PENDING_REVIEW: that custody
+    ///      transaction must also be rejected on the external chain, or the recipient is paid there too
+    event WithdrawalSwept(uint256 withdrawalId, address stratoSender, address stratoToken, uint256 stratoTokenAmount, address triageWallet, string custodyTxHash);
+
     // ───────────── Registry related events ─────────────
     /// @notice Emitted when chain configuration is updated
     event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router, address hotWallet);
@@ -250,6 +255,10 @@ contract record MercataBridge is Ownable {
     /// @notice Auto-incrementing counter for withdrawal IDs
     /// @dev Ensures unique withdrawal identifiers for each request
     uint256 public withdrawalCounter;
+
+    /// @notice Triage wallet that received the escrow of a SWEPT withdrawal
+    /// @dev Key: withdrawalId -> triage wallet. Set only by cancelAndSweepWithdrawal.
+    mapping(uint256 => address) public record withdrawalSweptTo;
 
     // ───────────── Registry related state variables ─────────────
     /// @notice Registry of external chains and their configuration
@@ -1367,6 +1376,64 @@ contract record MercataBridge is Ownable {
 
         for (uint256 i = 0; i < n; i++) {
             abortWithdrawal(ids[i]);
+        }
+    }
+
+    // ───────────── Incident response ─────────────
+    /**
+     * @dev Cancels a withdrawal request and moves its escrow to a triage wallet
+     * @notice Incident-response tool: stops a theft from bridging out and captures the
+     *         escrowed tokens so they can be returned to the victims. Governed by the
+     *         AdminRegistry (the owner): every admin's vote must name the same id and
+     *         the same triage wallet, which is the safeguard against a mistyped address.
+     * @notice Allowed from INITIATED or PENDING_REVIEW. From PENDING_REVIEW a custody
+     *         transaction has already been proposed on the external chain and MUST be
+     *         rejected there as well, or the recipient is paid on both sides. The
+     *         WithdrawalSwept event carries the custody tx hash for that purpose.
+     * @notice Deliberately not gated by the withdrawal circuit breaker: an incident is
+     *         when this runs, and withdrawals will usually be paused already.
+     * @notice Moves the tokens with a plain transfer, exactly like abortWithdrawal. If
+     *         the token itself has been paused, unpause it or whitelist the bridge for
+     *         transfer on it first.
+     * @notice Do NOT whitelist the relayer for this function: a relayer key compromise
+     *         could then redirect every escrow in flight.
+     * @param id The unique withdrawal identifier
+     * @param triageWallet The address that receives the escrowed tokens
+     */
+    function cancelAndSweepWithdrawal(
+        uint256 id, address triageWallet
+    ) public onlyOwner {
+        require(id > 0, "MB: invalid withdrawal id");
+        require(triageWallet != address(0) && triageWallet != address(this), "MB: invalid triage wallet");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not sweepable");
+
+        w.bridgeStatus = BridgeStatus.SWEPT;
+        w.timestamp = block.timestamp;
+        withdrawalSweptTo[id] = triageWallet;
+
+        uint256 actualSweptAmount = _refundFunds(w.stratoToken, triageWallet, w.stratoTokenAmount);
+        require(actualSweptAmount > 0, "MB: no tokens swept");
+
+        emit WithdrawalSwept(id, w.stratoSender, w.stratoToken, w.stratoTokenAmount, triageWallet, w.custodyTxHash);
+    }
+
+    /**
+     * @dev Cancels multiple withdrawals and moves their escrow to one triage wallet
+     * @notice Batch version of cancelAndSweepWithdrawal; each id follows the same rules,
+     *         and one bad id makes the whole batch revert
+     * @param ids Array of unique withdrawal identifiers
+     * @param triageWallet The address that receives all of the escrowed tokens
+     */
+    function cancelAndSweepWithdrawalBatch(
+        uint256[] ids, address triageWallet
+    ) external onlyOwner {
+        uint256 n = ids.length;
+        require(n > 0, "MB: len");
+
+        for (uint256 i = 0; i < n; i++) {
+            cancelAndSweepWithdrawal(ids[i], triageWallet);
         }
     }
 }

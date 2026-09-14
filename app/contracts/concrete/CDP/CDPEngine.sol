@@ -610,6 +610,7 @@ contract record CDPEngine is Ownable {
         config.isPaused = pause;
 
         if (!isSupportedAsset[asset]) { isSupportedAsset[asset] = true; }
+        _enumerateAsset(asset);
 
         emit CollateralConfigured(
             asset,
@@ -990,6 +991,95 @@ contract record CDPEngine is Ownable {
 
         // --- Interaction (after state updates) ---
         CDPReserve(address(registry.cdpReserve())).transferTo(msg.sender, payAmount);
+    }
+
+
+
+
+    // ═══════════════════════════════════════════════════════════════════════════════════════════════════
+    // ═══════════════════════ COLLATERAL ENUMERATION & AGGREGATE DEBT VIEWS ══════════════════════════════
+    // ═══════════════════════════════════════════════════════════════════════════════════════════════════
+    // Read-only surface for off-chain consumers (DefiLlama TVL/borrows adapters, dashboards).
+
+    address[] public record collateralAssets;  // every asset ever configured (never removed)
+
+    event CollateralAssetEnumerated(address indexed asset, uint256 index);
+
+    function _isEnumerated(address asset) internal view returns (bool) {
+        uint len = collateralAssets.length;
+        for (uint i = 0; i < len; i++) {
+            if (collateralAssets[i] == asset) return true;
+        }
+        return false;
+    }
+
+    function _enumerateAsset(address asset) internal {
+        if (!_isEnumerated(asset)) {
+            collateralAssets.push(asset);
+            emit CollateralAssetEnumerated(asset, collateralAssets.length - 1);
+        }
+    }
+
+    /// @notice One-time backfill of collateralAssets for assets configured before this upgrade.
+    /// @dev Accepts only assets that already have a config (unitScale is validated > 0 on set),
+    ///      so a typo'd address cannot enter the enumeration. Duplicates are skipped, not reverted.
+    function registerCollateralAssets(address[] calldata assets) external onlyOwner {
+        for (uint i = 0; i < assets.length; i++) {
+            require(collateralConfigs[assets[i]].unitScale > 0, "CDPEngine: not configured");
+            _enumerateAsset(assets[i]);
+        }
+    }
+
+    /// @notice Live USDST debt for one collateral asset, WAD (1e18).
+    /// @dev Uses the stored rateAccumulator — no accrual side effects, so safe from eth_call.
+    ///      Slightly understates true debt between accruals.
+    function totalDebt(address asset) public view returns (uint256) {
+        CollateralGlobalState storage s = collateralGlobalStates[asset];
+        uint rate = s.rateAccumulator;
+        if (rate == 0) rate = RAY; // configured but never accrued: index defaults to 1.0
+        return (s.totalScaledDebt * rate) / RAY;
+    }
+
+    /// @notice Sum of totalDebt over every enumerated collateral asset, WAD (1e18).
+    /// @dev Includes assets whose support was later toggled off — their debt is still outstanding.
+    function totalDebtAll() external view returns (uint256 total) {
+        uint len = collateralAssets.length;
+        for (uint i = 0; i < len; i++) {
+            total += totalDebt(collateralAssets[i]);
+        }
+        return total;
+    }
+
+    /// @notice Number of enumerated collateral assets.
+    function collateralAssetCount() external view returns (uint256) {
+        return collateralAssets.length;
+    }
+
+    /// @notice Enumerated collateral asset at index i.
+    function collateralAssetAt(uint256 i) external view returns (address) {
+        require(i < collateralAssets.length, "CDPEngine: index out of range");
+        return collateralAssets[i];
+    }
+
+    /// @notice Per-asset risk params for off-chain borrow-market adapters.
+    /// @return paused true when the asset itself OR the whole engine is paused
+    function collateralParams(address asset) external view returns (
+        uint256 liquidationRatio,
+        uint256 minCR,
+        uint256 stabilityFeeRate,
+        uint256 debtFloor,
+        uint256 debtCeiling,
+        bool paused
+    ) {
+        CollateralConfig storage c = collateralConfigs[asset];
+        return (
+            c.liquidationRatio,
+            c.minCR,
+            c.stabilityFeeRate,
+            c.debtFloor,
+            c.debtCeiling,
+            c.isPaused || globalPaused
+        );
     }
 
 }

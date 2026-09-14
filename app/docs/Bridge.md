@@ -35,6 +35,11 @@ Flows and events:
      - Relayer may abort while `INITIATED|PENDING_REVIEW`
      - User may abort only while `INITIATED` and after `requestedAt + WITHDRAWAL_ABORT_DELAY (172800s)`
      - Refunds escrowed tokens and emits `WithdrawalAborted`
+  5) Incident path: `cancelAndSweepWithdrawal(id, triageWallet)` / `cancelAndSweepWithdrawalBatch(ids, triageWallet)`
+     - Owner (AdminRegistry governance) only; never whitelist the relayer for it
+     - Allowed while `INITIATED|PENDING_REVIEW`; not blocked by the withdrawal pause
+     - Moves the escrow to `triageWallet` (not back to the sender), sets status `SWEPT`, records `withdrawalSweptTo[id]`, emits `WithdrawalSwept`
+     - From `PENDING_REVIEW` the proposed custody (Safe) transaction must be rejected on the external chain too; the event carries its hash
 
 Permissions & registries:
 - Assets are registered per `(stratoToken, externalChainId)` with:
@@ -47,6 +52,7 @@ Replay protection:
 
 Pause & admin controls:
 - `setPause(depositsPaused, withdrawalsPaused)`; `setRelayer`; `setTokenFactory`; `setUSDSTAddress`.
+- Incident response: `cancelAndSweepWithdrawal(Batch)` captures in-flight withdrawal escrow to a triage wallet for redistribution to victims (see Withdrawal step 5).
 
 USDST vs wrapped tokens:
 - `mintUSDST=true`: USDST minted/burned; otherwise the configured `stratoToken`.

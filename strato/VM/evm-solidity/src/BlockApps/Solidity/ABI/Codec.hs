@@ -169,9 +169,20 @@ decodeValue TString bs offset =
       len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs)))
    in SString (BC.unpack (B.take len (B.drop (dataOffset + 32) bs)))
 decodeValue (TArrayOf elemType) bs offset =
-  let dataOffset = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop offset bs)))
-      len = fromIntegral (bytesToIntegerBE (B.take 32 (B.drop dataOffset bs))) :: Int
+  let total = B.length bs
+      dataOffsetI = bytesToIntegerBE (B.take 32 (B.drop offset bs))
+      dataOffset = fromIntegral dataOffsetI :: Int
+      -- A length word that points outside the calldata is malformed.
+      rawLen
+        | dataOffsetI < 0 || dataOffsetI > fromIntegral total = 0
+        | otherwise = bytesToIntegerBE (B.take 32 (B.drop dataOffset bs))
       elemsStart = dataOffset + 32
+      -- Clamp the declared length to the number of 32-byte element slots that
+      -- actually remain. Without this, a crafted length (e.g. a misaligned
+      -- offset yielding ~2^34) makes V.fromList allocate an enormous vector and
+      -- crashes the node, since eth_call ABI decoding runs before gas metering.
+      maxElems = max 0 ((total - elemsStart) `div` 32)
+      len = fromIntegral (min rawLen (fromIntegral maxElems)) :: Int
       elems = [decodeValue elemType bs (elemsStart + i * 32) | i <- [0 .. len - 1]]
    in SArray (V.fromList $ map Constant elems)
 

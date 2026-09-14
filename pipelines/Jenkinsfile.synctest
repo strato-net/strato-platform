@@ -151,26 +151,20 @@ def deployAndSync(String network, String metricNamespacePrefix) {
     // public vault and file server, so no local vault/highway deployment is
     // needed.
     //
-    // NOTE: do NOT lower kafka retention (--kafkaLogRetention*) on this node.
-    // During a from-genesis sync the sequencer runs far ahead of the VM, so
-    // vm-runner's unconsumed vm_tasks backlog is essentially the whole topic;
-    // any retention cap the topic outgrows deletes unconsumed segments and
-    // vm-runner dies with OffsetOutOfRange mid-sync. Shrinking the kafka
-    // payload happens at snapshot time instead: strato-snapshot create prunes
-    // the consumed history behind the committed consumer offsets.
-    //
-    // The smaller segment size below is safe (it deletes nothing): it only
-    // makes the broker roll log files more often, so the snapshot-time prune
-    // can reclaim consumed history at fine granularity -- whole segments are
-    // the deletion unit, and the default 1GiB segments never roll on these
-    // topics.
+    // NOTE: nothing here tunes streaming retention, and nothing should. The
+    // node runs the embedded jlog backend, which unlinks a topic's segments
+    // only once every registered subscriber has checkpointed past them -- so
+    // the jlog/ dir stays bounded on its own and never drops data a consumer
+    // still needs. That matters most during a from-genesis sync, where the
+    // sequencer runs far ahead of the VM and vm-runner's unconsumed backlog is
+    // essentially the whole topic. (The --kafkaLog* flags still parse, but the
+    // jlog backend ignores them: there is no broker container to configure.)
     writeFile file: "run.sh", text: """#!/bin/bash
       export PATH
       strato-up mynode \\
         --network=${network} \\
         --nodeHost=\$(</host) \\
-        --sslDir='/home/ubuntu/letsencrypt-ssl' \\
-        --kafkaLogSegmentBytes=67108864
+        --sslDir='/home/ubuntu/letsencrypt-ssl'
     """
     sh 'chmod +x run.sh'
     withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {

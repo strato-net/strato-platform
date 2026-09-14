@@ -18,6 +18,7 @@
         "upgrade:stablepools": "node deploy/upgrade-stablepools.js",
         "upgrade:stablepools:testnet": "node deploy/upgrade-stablepools.js --env testnet",
         "upgrade:stablepools:prod": "node deploy/upgrade-stablepools.js --env prod",
+        "bridge:sweep-withdrawal": "node deploy/sweep-withdrawal.js",
         "bridge:ops": "node deploy/bridge-usdc-route-migration.js",
         "bridge:ops:testnet": "node deploy/bridge-usdc-route-migration.js --env testnet",
         "bridge:ops:prod": "node deploy/bridge-usdc-route-migration.js --env prod",

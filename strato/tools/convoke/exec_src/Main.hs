@@ -13,6 +13,7 @@ import System.Posix.Types (ProcessID)
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Posix.Signals (signalProcess, sigTERM, sigKILL, Signal)
 import System.Posix.Process (getProcessStatus, ProcessStatus)
+import System.Posix.Resource (Resource(ResourceOpenFiles), ResourceLimit(..), ResourceLimits(..), getResourceLimit, setResourceLimit)
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async
 import Control.Exception
@@ -182,6 +183,23 @@ dockerComposeDown = do
   _ <- waitForProcess ph
   say "Docker containers stopped."
 
+-- | Children inherit convoke's open-file limit, and the usual soft default of
+-- 1024 is too low: ethereum-jsonrpc opens a fresh Kafka connection per callVM
+-- request and only closes it ~10s after use, so a load test exhausts
+-- descriptors ("Too many open files"). Raise the soft limit to 8192, or to the
+-- hard limit if that is lower; no privilege is needed for that. Never lower it.
+raiseOpenFileLimit :: IO ()
+raiseOpenFileLimit = do
+  limits <- getResourceLimit ResourceOpenFiles
+  let wanted = case hardLimit limits of
+        ResourceLimit h -> min 8192 h
+        _ -> 8192
+  case softLimit limits of
+    ResourceLimit s | s < wanted -> do
+      setResourceLimit ResourceOpenFiles limits { softLimit = ResourceLimit wanted }
+      say $ "Raised open-file soft limit from " ++ show s ++ " to " ++ show wanted
+    _ -> return ()
+
 main :: IO ()
 main = do
   setupLogging
@@ -203,6 +221,7 @@ main = do
   -- Start docker compose first (unless --no-docker)
   unless noDocker dockerComposeUp
 
+  raiseOpenFileLimit
   say $ "Launching " ++ show (length commandList) ++ " processes..."
   asyncs <- sequence $ map launchCommand commandList
 
