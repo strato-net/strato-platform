@@ -47,7 +47,6 @@ export const lendingPool = process.env.LENDING_POOL || "000000000000000000000000
 export const poolConfigurator = process.env.POOL_CONFIGURATOR || "0000000000000000000000000000000000001006";
 export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000000000000000000000001007";
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
-export const externalAssetBridge = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS || "";
 export const poolFactory = process.env.POOL_FACTORY || "000000000000000000000000000000000000100a";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
@@ -102,6 +101,15 @@ export const compositeYieldMap: Record<string, string> = {
 export const defaultBridgeServiceFor: Record<string, string> = {
   "114784819836269":"https://bridge.testnet.strato.nexus", // Helium testnet
   "33056204878082667":"https://bridge.strato.nexus",       // Upquark mainnet
+};
+// Populate with verified proxy addresses after deployment, before releasing the backend.
+export const defaultExternalAssetBridgeFor: Record<string, string> = {
+  "114784819836269": "394d276e3b6109d6c58444653c26996bf3ae3eda", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+export const defaultTokenRouterFor: Record<string, string> = {
+  "114784819836269": "ed37a83d3b1f7b49e44f0ca9ea342fe0e11cc1d6", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
 };
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
@@ -244,6 +252,7 @@ export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
 export let tokenRouter: string = '';
+export let externalAssetBridge: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -381,8 +390,12 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
-export function setTokenRouterConfig() {
-  tokenRouter = process.env.TOKEN_ROUTER || "";
+export function setTokenRouterConfig(networkId: string) {
+  tokenRouter = process.env.TOKEN_ROUTER || defaultTokenRouterFor[networkId] || "";
+}
+
+export function setExternalAssetBridgeConfig(networkId: string) {
+  externalAssetBridge = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS || defaultExternalAssetBridgeFor[networkId] || "";
 }
 
 export function setVaultConfig(networkId: string) {
@@ -438,9 +451,13 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
-  setTokenRouterConfig();
+  setTokenRouterConfig(networkId);
+  setExternalAssetBridgeConfig(networkId);
+  if (!externalAssetBridge) {
+    throw new Error("ExternalAssetBridge is not configured for this network; populate defaultExternalAssetBridgeFor or set EXTERNAL_ASSET_BRIDGE_ADDRESS");
+  }
   if (!tokenRouter) {
-    throw new Error("TOKEN_ROUTER is required for unified routing");
+    throw new Error("TokenRouter is not configured for this network; populate defaultTokenRouterFor or set TOKEN_ROUTER");
   }
   const normalizedTokenRouter = tokenRouter.toLowerCase().replace(/^0x/, "");
   const [{ data: bridgeRows }, { data: routerRows }] = await Promise.all([

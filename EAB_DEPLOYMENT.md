@@ -395,6 +395,22 @@ policy.
 
 ## 8. Activate and canary
 
+### Backend configuration gate
+
+After STRATO governance completes, verify in Cirrus that the TokenRouter proxy
+is initialized and `ExternalAssetBridge.tokenRouter` matches that proxy. Record
+both verified **proxy** addresses under the target STRATO network ID in
+`app/backend/src/config/config.ts`: `defaultExternalAssetBridgeFor` and
+`defaultTokenRouterFor` (Helium `114784819836269`, Upquark `33056204878082667`).
+Do not copy addresses between networks or release with empty target entries.
+
+Build and deploy the backend image containing these defaults before the canary.
+`EXTERNAL_ASSET_BRIDGE_ADDRESS` and `TOKEN_ROUTER` remain optional backend
+overrides; if used, pass them into the backend container explicitly. A Compose
+`.env` entry alone does not inject them. Bridge-service env configuration is
+still required separately. Verify `/api/config` returns HTTP 200 on the app
+hostname; `/health` alone checks node health and does not prove backend readiness.
+
 Owners: Coordinator and required Safe owners
 
 ```bash
