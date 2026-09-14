@@ -11,5 +11,6 @@ library:
   - blockapps-vault-wrapper-api
   - blockapps-vault-wrapper-client
   - bytestring
+  - containers
   - mtl
   - strato-auth

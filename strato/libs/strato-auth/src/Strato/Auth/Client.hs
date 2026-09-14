@@ -4,6 +4,7 @@
 
 module Strato.Auth.Client
   ( AuthEnv
+  , authEnvCacheKey
   , newAuthEnv
   , newAuthEnvWith
   , runWithAuth
@@ -103,25 +104,34 @@ newAuthEnvWith timeoutSec url = do
     , aeManager = mgr
     }
 
--- | Retry on 'ConnectionError' (i.e. anything thrown as a transport-level
--- error: TCP timeouts, TLS handshake failures, premature socket close, etc).
+-- | Identifies the vault identity an 'AuthEnv' authenticates as, for callers
+-- that cache per-identity vault data (e.g. the node's public key). The OAuth
+-- client credentials are process-wide, so the base URL alone determines it.
+authEnvCacheKey :: AuthEnv -> String
+authEnvCacheKey = showBaseUrl . aeBaseUrl
+
+-- | Retry transient failures: 'ConnectionError' (anything thrown as a
+-- transport-level error: TCP timeouts, TLS handshake failures, premature socket
+-- close, etc) and the 502/503/504 responses a proxy in front of the vault
+-- (vault-nginx) returns when the vault-wrapper is slow or restarting.
 -- 4 attempts total; sleeps 1s, 2s, 4s between attempts. The cap of 8s exists
 -- so a future bump in 'maxAttempts' doesn't accidentally produce very long
 -- waits — at the current 4 attempts the cap is non-binding.
-withConnectionRetry :: String -> IO (Either ClientError a) -> IO (Either ClientError a)
-withConnectionRetry label go = loop (1 :: Int)
+withTransientRetry :: String -> IO (Either ClientError a) -> IO (Either ClientError a)
+withTransientRetry label go = loop (1 :: Int)
   where
     maxAttempts = 4 :: Int
 
     loop attempt = do
       result <- try go
       case joinResult result of
-        Left (ConnectionError e)
-          | attempt < maxAttempts -> do
+        Left err
+          | Just reason <- transientReason err
+          , attempt < maxAttempts -> do
               let delaySec = min 8 (2 ^ (attempt - 1) :: Int)
               hPutStrLn stderr $
                 label ++ ": attempt " ++ show attempt ++ "/" ++ show maxAttempts ++
-                " failed (" ++ show e ++ "), retrying in " ++ show delaySec ++ "s"
+                " failed (" ++ reason ++ "), retrying in " ++ show delaySec ++ "s"
               threadDelay (delaySec * 1000000)
               loop (attempt + 1)
         r -> return r
@@ -130,12 +140,26 @@ withConnectionRetry label go = loop (1 :: Int)
     joinResult (Left e)  = Left (ConnectionError e)
     joinResult (Right r) = r
 
+-- | Why a failed request is worth retrying, or 'Nothing' if it isn't. Other
+-- error responses come from the vault-wrapper itself (bad request, unknown
+-- user, ...) and would fail the same way again.
+transientReason :: ClientError -> Maybe String
+transientReason (ConnectionError e) = Just (show e)
+transientReason (FailureResponse _ resp)
+  | code `elem` [502, 503, 504] = Just ("HTTP " ++ show code)
+  where
+    code = statusCode (responseStatusCode resp)
+transientReason _ = Nothing
+
 -- | Run a Servant client action with OAuth authentication.
 --
--- Retries on 401 (with token refresh) and on connection errors
--- (up to 4 attempts with exponential backoff: 1s, 2s, 4s).
+-- Retries on 401 (with token refresh), and on connection errors and
+-- 502/503/504 responses (up to 4 attempts with exponential backoff: 1s, 2s,
+-- 4s). A retried request may already have reached the vault, so the action
+-- should be idempotent (key lookup, signing); a retried 'postKey' can fail
+-- with "already exists".
 runWithAuth :: AuthEnv -> ClientM a -> IO (Either ClientError a)
-runWithAuth ae action = withConnectionRetry "Vault request" doRequestWith401Retry
+runWithAuth ae action = withTransientRetry "Vault request" doRequestWith401Retry
   where
     doRequestWith401Retry = do
       result <- runOnce ae
@@ -156,13 +180,13 @@ status401 :: Status
 status401 = Status 401 "Unauthorized"
 
 -- | Run a Servant client action with a user-provided token (no node
--- credentials). Retries on connection errors with the same policy as
--- 'runWithAuth' (4 attempts, 1s/2s/4s backoff). The bearer token lives only
--- inside this call's 'ClientEnv' closure — never on the shared 'Manager' —
--- so the per-URL pool can be reused across concurrent users safely.
+-- credentials). Retries on connection errors and 502/503/504 responses with
+-- the same policy as 'runWithAuth' (4 attempts, 1s/2s/4s backoff). The bearer
+-- token lives only inside this call's 'ClientEnv' closure — never on the shared
+-- 'Manager' — so the per-URL pool can be reused across concurrent users safely.
 runWithUserToken :: AuthEnv -> Text -> ClientM a -> IO (Either ClientError a)
 runWithUserToken AuthEnv{..} token action =
-  withConnectionRetry "Vault user-token request" $ do
+  withTransientRetry "Vault user-token request" $ do
     let addAuth :: Request -> Request
         addAuth = addHeader "Authorization" ("Bearer " <> token)
         env = (mkClientEnv aeManager aeBaseUrl) { makeClientRequest = \url req -> defaultMakeClientRequest url (addAuth req) }
