@@ -11,6 +11,8 @@ import {
   externalTxLink,
   formatCount,
   formatUsd,
+  METRICS_PERIOD_SUFFIX,
+  MetricsPeriod,
   OpenRow,
   WalletRow,
 } from '../api';
@@ -23,7 +25,7 @@ import {
   thClass,
 } from './primitives';
 
-// The rows behind each Daily Snapshot tile. Same UTC-today window as the
+// The rows behind each snapshot tile. Same window (same `period`) as the
 // tiles, so a table and the number above it always agree; the server caps each
 // list and says so via `truncated`.
 
@@ -36,11 +38,23 @@ export const BREAKDOWN_LABELS: Record<BreakdownKey, string> = {
   actions: 'On-chain actions',
 };
 
-// Every row is timestamped today, so the clock alone is enough; the title
-// carries the full instant.
-const Time = ({ at }: { at: string }) => (
-  <span title={new Date(at).toLocaleString()}>{format(new Date(at), 'HH:mm')}</span>
+// A single-day window makes the clock enough; a longer one needs the date
+// too. The title always carries the full instant.
+const Time = ({ at, withDate }: { at: string; withDate: boolean }) => (
+  <span title={new Date(at).toLocaleString()}>
+    {format(new Date(at), withDate ? 'MMM d, HH:mm' : 'HH:mm')}
+  </span>
 );
+
+const Dash = () => <span className="text-muted-foreground">—</span>;
+
+// How long a visit took to convert (open -> wallet connection)
+const duration = (seconds: number): string => {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const hours = Math.floor(seconds / 3600);
+  return `${hours}h ${Math.round((seconds % 3600) / 60)}m`;
+};
 
 const LinkCell = ({ link }: { link: BreakdownLink | null }) => {
   if (!link) return <span className="text-muted-foreground">—</span>;
@@ -95,14 +109,24 @@ const Empty = ({ children }: { children: ReactNode }) => (
   </p>
 );
 
-const OpensTable = ({ section }: { section: BreakdownSection<OpenRow> }) => {
-  if (section.rows.length === 0) return <Empty>No opens yet today.</Empty>;
+// A window longer than a day needs dates on every timestamp
+const spansDays = (period: MetricsPeriod): boolean => period === '7d' || period === '30d';
+
+const OpensTable = ({
+  section,
+  period,
+}: {
+  section: BreakdownSection<OpenRow>;
+  period: MetricsPeriod;
+}) => {
+  if (section.rows.length === 0) return <Empty>No opens {METRICS_PERIOD_SUFFIX[period]}.</Empty>;
+  const withDate = spansDays(period);
   return (
     <Table headers={['Time', 'Link', 'Location', 'Referrer', 'Engaged', 'Wallet']}>
       {section.rows.map((row, i) => (
         <tr key={`${row.at}-${i}`}>
           <td className={`${tdClass} whitespace-nowrap`}>
-            <Time at={row.at} />
+            <Time at={row.at} withDate={withDate} />
           </td>
           <td className={`${tdClass} max-w-[200px]`}>
             <LinkCell link={row.link} />
@@ -125,7 +149,8 @@ const OpensTable = ({ section }: { section: BreakdownSection<OpenRow> }) => {
   );
 };
 
-// The categories a wallet acted in today, so "3 actions" says which three
+// The categories a wallet acted in inside the window, so "3 actions" says
+// which three
 const ActionBadges = ({ summary }: { summary: WalletRow['actionSummary'] }) => {
   const entries = Object.entries(summary) as [keyof typeof ACTIVITY_CATEGORY_LABELS, number][];
   if (entries.length === 0) return <span className="text-muted-foreground">—</span>;
@@ -140,20 +165,34 @@ const ActionBadges = ({ summary }: { summary: WalletRow['actionSummary'] }) => {
   );
 };
 
-const WalletsTable = ({ section }: { section: BreakdownSection<WalletRow> }) => {
-  if (section.rows.length === 0) return <Empty>No wallets connected yet today.</Empty>;
+// The wallet table is the behavioural one: who the visitor is (new to us or
+// returning), how they got here, how long the visit took to convert, how much
+// they moved and what they did with it.
+const WalletsTable = ({
+  section,
+  period,
+}: {
+  section: BreakdownSection<WalletRow>;
+  period: MetricsPeriod;
+}) => {
+  if (section.rows.length === 0)
+    return <Empty>No wallets connected {METRICS_PERIOD_SUFFIX[period]}.</Empty>;
+  const withDate = spansDays(period);
   return (
     <Table
       headers={[
         'Wallet',
+        'Visitor',
         'First open',
         'Connected',
+        { label: 'Visits', align: 'right' },
         'Link',
+        'Referrer',
         'Location',
         'Connector',
         { label: 'Bridged in', align: 'right' },
         'Assets',
-        'Actions today',
+        'Actions',
       ]}
     >
       {section.rows.map((row) => (
@@ -161,22 +200,49 @@ const WalletsTable = ({ section }: { section: BreakdownSection<WalletRow> }) => 
           <td className={tdClass}>
             <AddressCell address={row.address} />
           </td>
-          <td className={`${tdClass} whitespace-nowrap`}>
-            {row.firstOpenAt ? <Time at={row.firstOpenAt} /> : <span className="text-muted-foreground">—</span>}
+          <td className={tdClass}>
+            <Badge variant={row.returning ? 'outline' : 'secondary'}>
+              <span title={`First seen ${new Date(row.firstSeenAt).toLocaleString()}`}>
+                {row.returning ? 'returning' : 'new'}
+              </span>
+            </Badge>
           </td>
           <td className={`${tdClass} whitespace-nowrap`}>
-            <Time at={row.connectedAt} />
+            {row.firstOpenAt ? <Time at={row.firstOpenAt} withDate={withDate} /> : <Dash />}
+          </td>
+          <td className={`${tdClass} whitespace-nowrap`}>
+            <Time at={row.connectedAt} withDate={withDate} />
+            {row.secondsToConnect != null && (
+              <span
+                className="block text-[11px] text-muted-foreground"
+                title="Time from the open to the wallet connection"
+              >
+                +{duration(row.secondsToConnect)}
+              </span>
+            )}
+          </td>
+          <td className={`${tdClass} whitespace-nowrap text-right`}>
+            {formatCount(row.visits)}
+            <span className="block text-[11px] text-muted-foreground">
+              {formatCount(row.engagedVisits)} engaged
+            </span>
           </td>
           <td className={`${tdClass} max-w-[200px]`}>
             <LinkCell link={row.link} />
           </td>
+          <td
+            className={`${tdClass} max-w-[160px] truncate text-muted-foreground`}
+            title={row.referrer ?? ''}
+          >
+            {row.referrer || '—'}
+          </td>
           <td className={tdClass}>
             <Place city={row.city} country={row.country} />
           </td>
-          <td className={tdClass}>{row.connector || <span className="text-muted-foreground">—</span>}</td>
+          <td className={tdClass}>{row.connector || <Dash />}</td>
           <td className={`${tdClass} whitespace-nowrap text-right`}>
             {row.bridgeIns === 0 ? (
-              <span className="text-muted-foreground">—</span>
+              <Dash />
             ) : (
               <>
                 <Usd value={row.bridgeValueUsd} partial={row.bridgeValuePartial} />
@@ -187,7 +253,7 @@ const WalletsTable = ({ section }: { section: BreakdownSection<WalletRow> }) => 
             )}
           </td>
           <td className={`${tdClass} max-w-[140px] truncate`} title={row.assets.join(', ')}>
-            {row.assets.join(', ') || <span className="text-muted-foreground">—</span>}
+            {row.assets.join(', ') || <Dash />}
           </td>
           <td className={tdClass}>
             <ActionBadges summary={row.actionSummary} />
@@ -198,8 +264,16 @@ const WalletsTable = ({ section }: { section: BreakdownSection<WalletRow> }) => 
   );
 };
 
-const BridgeInsTable = ({ section }: { section: BreakdownSection<BridgeRow> }) => {
-  if (section.rows.length === 0) return <Empty>No bridge-ins attributed today.</Empty>;
+const BridgeInsTable = ({
+  section,
+  period,
+}: {
+  section: BreakdownSection<BridgeRow>;
+  period: MetricsPeriod;
+}) => {
+  if (section.rows.length === 0)
+    return <Empty>No bridge-ins attributed {METRICS_PERIOD_SUFFIX[period]}.</Empty>;
+  const withDate = spansDays(period);
   return (
     <Table
       headers={[
@@ -218,7 +292,7 @@ const BridgeInsTable = ({ section }: { section: BreakdownSection<BridgeRow> }) =
         return (
           <tr key={`${row.txHash ?? row.at}-${i}`}>
             <td className={`${tdClass} whitespace-nowrap`}>
-              <Time at={row.at} />
+              <Time at={row.at} withDate={withDate} />
             </td>
             <td className={tdClass}>
               <AddressCell address={row.address} />
@@ -259,13 +333,17 @@ const BridgeInsTable = ({ section }: { section: BreakdownSection<BridgeRow> }) =
 
 const ActionsTable = ({
   section,
+  period,
 }: {
   section: BreakdownSection<ActionRow> & { byCategory: DailyBreakdown['actions']['byCategory'] };
+  period: MetricsPeriod;
 }) => {
-  if (section.rows.length === 0) return <Empty>No on-chain actions attributed today.</Empty>;
+  if (section.rows.length === 0)
+    return <Empty>No on-chain actions attributed {METRICS_PERIOD_SUFFIX[period]}.</Empty>;
+  const withDate = spansDays(period);
   return (
     <div className="space-y-3">
-      {/* Grouped by action type first — the shape of the day at a glance */}
+      {/* Grouped by action type first — the shape of the window at a glance */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {section.byCategory.map((group) => (
           <div key={group.category} className="rounded-lg border border-border p-3">
@@ -284,7 +362,7 @@ const ActionsTable = ({
         {section.rows.map((row, i) => (
           <tr key={`${row.at}-${i}`}>
             <td className={`${tdClass} whitespace-nowrap`}>
-              <Time at={row.at} />
+              <Time at={row.at} withDate={withDate} />
             </td>
             <td className={tdClass}>{ACTIVITY_CATEGORY_LABELS[row.category]}</td>
             <td className={`${tdClass} max-w-[200px] truncate text-muted-foreground`} title={row.description}>
@@ -303,7 +381,8 @@ const ActionsTable = ({
   );
 };
 
-// Sub-line under the panel heading: how much of the metric the table shows
+// Sub-line under the panel heading: how much of the metric the table shows,
+// over which window
 export const breakdownCaption = (
   key: BreakdownKey,
   breakdown: DailyBreakdown
@@ -311,13 +390,16 @@ export const breakdownCaption = (
   const section = breakdown[key];
   const noun =
     key === 'opens' ? 'opens' : key === 'wallets' ? 'wallets' : key === 'bridgeIns' ? 'transfers' : 'actions';
-  if (section.total === 0) return `no ${noun} today`;
+  const when = METRICS_PERIOD_SUFFIX[breakdown.period];
+  if (section.total === 0) return `no ${noun} ${when}`;
   if (section.truncated) {
-    return `newest ${formatCount(section.shown)} of ${formatCount(section.total)} ${noun} today`;
+    return `newest ${formatCount(section.shown)} of ${formatCount(section.total)} ${noun} ${when}`;
   }
-  return `${formatCount(section.total)} ${noun} today`;
+  return `${formatCount(section.total)} ${noun} ${when}`;
 };
 
+// The window comes from the payload, not from the caller's state: the table
+// must describe the data it was given, even mid-refetch after a period switch.
 const SnapshotBreakdown = ({
   metric,
   breakdown,
@@ -325,15 +407,16 @@ const SnapshotBreakdown = ({
   metric: BreakdownKey;
   breakdown: DailyBreakdown;
 }) => {
+  const period = breakdown.period;
   switch (metric) {
     case 'opens':
-      return <OpensTable section={breakdown.opens} />;
+      return <OpensTable section={breakdown.opens} period={period} />;
     case 'wallets':
-      return <WalletsTable section={breakdown.wallets} />;
+      return <WalletsTable section={breakdown.wallets} period={period} />;
     case 'bridgeIns':
-      return <BridgeInsTable section={breakdown.bridgeIns} />;
+      return <BridgeInsTable section={breakdown.bridgeIns} period={period} />;
     case 'actions':
-      return <ActionsTable section={breakdown.actions} />;
+      return <ActionsTable section={breakdown.actions} period={period} />;
   }
 };
 
