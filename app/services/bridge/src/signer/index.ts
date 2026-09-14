@@ -100,7 +100,9 @@ const kmsConfig = {
 const kmsSigner = new DigestKmsSigner(kmsConfig, provider);
 const stratoNodeUrl = required("STRATO_NODE_URL").replace(/\/$/, "");
 const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
-const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "");
+// Cirrus stores contract addresses as bare lowercase hex and its eq. filters are case-sensitive,
+// so accept 0x-prefixed and checksummed input but always query with the lowercase form.
+const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "").toLowerCase();
 const verifierApiToken = required("EXTERNAL_BRIDGE_VERIFIER_API_TOKEN");
 const { policy: verifierPolicy, digest: verifierPolicyDigest } =
   loadVerifierPolicy(required("VERIFIER_POLICY_PATH"));

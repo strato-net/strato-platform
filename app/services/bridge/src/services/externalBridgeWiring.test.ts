@@ -986,3 +986,30 @@ test("app quote client never forwards operator credentials", async (t) => {
   });
   assert.deepEqual(await app.get("/api/trade/route/quote"), { quote: true });
 });
+
+test("prefixes bare-hex cirrus addresses so ethers never treats them as ENS names", async () => {
+  const { cirrus } = await import("../utils/api");
+  const { getEnabledChains } = await import("./cirrusService");
+  const originalGet = cirrus.get;
+  const vault = "bb2af432802602ced9369e219a7b7329eac4e273";
+  const router = "48e52ebbf02a144c31bdce5ff29bb10547cca7d4";
+  const extraRouter = "411b8d466da0af8e79140a4d42efc647fea7e6fc";
+  (cirrus as any).get = async (url: string) => {
+    if (url.endsWith("-chains")) {
+      return [{ key: "11155111", value: { enabled: true, vault, depositRouter: router, chainName: "sepolia", lastProcessedBlock: "11685462" } }];
+    }
+    if (url.endsWith("-depositRouters")) return [{ key: "11155111", key2: extraRouter, value: true }];
+    throw new Error(`unexpected cirrus call ${url}`);
+  };
+  try {
+    const chain = (await getEnabledChains()).get(11155111)!;
+    assert.equal(chain.vault, `0x${vault}`);
+    assert.equal(chain.depositRouter, `0x${router}`);
+    assert.deepEqual(chain.depositRouters, [`0x${router}`, `0x${extraRouter}`]);
+    assert.equal(chain.chainName, "sepolia");
+    assert.equal(chain.lastProcessedBlock, 11685462);
+    assert.equal(chain.custody, undefined);
+  } finally {
+    (cirrus as any).get = originalGet;
+  }
+});
