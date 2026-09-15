@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useBalance, useReadContract } from "wagmi";
+import { ERC20_ABI } from "@/lib/bridge/constants";
 import { ArrowDownUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBridgeContext } from "@/context/BridgeContext";
@@ -15,6 +17,7 @@ import {
   formatAmount,
   formatUnits,
   safeParseUnits,
+  ensureHexPrefix,
 } from "@/utils/numberUtils";
 import RoutePreview from "./RoutePreview";
 import { useTokenContext } from "@/context/TokenContext";
@@ -35,7 +38,7 @@ const RouterWidget = ({
   userRewards?: UserRewardsData | null;
 }) => {
   const { toast } = useToast();
-  const { isLoggedIn, isAppAuthenticated } = useUser();
+  const { isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
   const { usdstBalance, voucherBalance, loadingUsdstBalance } =
     useTokenContext();
   const {
@@ -112,6 +115,31 @@ const RouterWidget = ({
     sourceMode === "external"
       ? Number(externalRoute?.externalDecimals ?? 18)
       : tokenIn?.customDecimals ?? 18;
+  const externalChainId = Number(network?.chainId);
+  const balanceChainId = Number.isSafeInteger(externalChainId) && externalChainId > 0
+    ? externalChainId
+    : undefined;
+  const externalAddress = ensureHexPrefix(externalEvmWalletAddress);
+  const isNativeInput = !!externalRoute && BigInt(externalRoute.externalToken) === 0n;
+  const balanceEnabled = sourceMode === "external" && isExternalEvmWalletConnected &&
+    !!externalAddress && !!balanceChainId && !!externalRoute;
+  const nativeBalance = useBalance({
+    address: externalAddress,
+    chainId: balanceChainId,
+    query: { enabled: balanceEnabled && isNativeInput, refetchInterval: 15000 },
+  });
+  const tokenBalance = useReadContract({
+    address: ensureHexPrefix(externalRoute?.externalToken),
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: externalAddress ? [externalAddress] : undefined,
+    chainId: balanceChainId,
+    query: { enabled: balanceEnabled && !isNativeInput, refetchInterval: 15000 },
+  });
+  const externalBalance = balanceEnabled
+    ? isNativeInput ? nativeBalance.data?.value : tokenBalance.data as bigint | undefined
+    : undefined;
+  const externalBalanceQuery = isNativeInput ? nativeBalance : tokenBalance;
   const amountWei = useMemo(() => {
     if (!amount) return "0";
     try {
@@ -121,6 +149,8 @@ const RouterWidget = ({
     }
   }, [amount, inputDecimals]);
   const routeFeeWei = safeParseUnits(SWAP_FEE);
+  const externalBalanceError = sourceMode === "external" && externalBalance !== undefined &&
+    BigInt(amountWei) > externalBalance ? "Insufficient external token balance" : "";
   const availableFees = BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0");
   const feeError =
     sourceMode === "strato" &&
@@ -201,12 +231,9 @@ const RouterWidget = ({
   }, [sourceMode, quote, userRewards, tokens]);
 
   const handleTrade = async () => {
-    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0") return;
+    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0" || externalBalanceError) return;
     try {
       if (sourceMode === "external") {
-        if (!isAppAuthenticated) {
-          throw new Error("Sign in to STRATO before bridging assets");
-        }
         if (!externalRoute || !network || !compositeQuote.data) return;
         await autoRouteDeposit.execute({
           route: externalRoute,
@@ -242,6 +269,7 @@ const RouterWidget = ({
         });
       }
       onTransactionSubmitted?.();
+      if (balanceEnabled) void externalBalanceQuery.refetch();
       setAmount("");
     } catch (error) {
       toast({
@@ -293,6 +321,8 @@ const RouterWidget = ({
             value={network?.chainName ?? ""}
             onChange={(event) => {
               setExternalRouteId("");
+              setAmount("");
+              setAmountError("");
               void setSelectedNetwork(event.target.value);
             }}
           >
@@ -373,6 +403,17 @@ const RouterWidget = ({
             >
               Max
             </button>
+          </div>
+        )}
+        {sourceMode === "external" && externalRoute && (
+          <div className="mt-2 text-xs text-muted-foreground">
+            {!isExternalEvmWalletConnected
+              ? "Connect an external wallet to see your balance"
+              : externalBalanceQuery.isError
+                ? "Balance unavailable"
+                : externalBalance === undefined
+                  ? "Loading balance..."
+                  : `Available: ${formatAmount(formatUnits(externalBalance.toString(), inputDecimals))} ${externalRoute.externalSymbol}`}
           </div>
         )}
       </div>
@@ -463,8 +504,8 @@ const RouterWidget = ({
           {(quoteError as Error).message}
         </p>
       )}
-      {(amountError || feeError) && (
-        <p className="text-sm text-destructive">{amountError || feeError}</p>
+      {(amountError || feeError || externalBalanceError) && (
+        <p className="text-sm text-destructive">{amountError || feeError || externalBalanceError}</p>
       )}
 
       <Button
@@ -476,7 +517,8 @@ const RouterWidget = ({
           !quote ||
           !!amountError ||
           !!feeError ||
-          (sourceMode === "external" && !isAppAuthenticated) ||
+          !!externalBalanceError ||
+          (sourceMode === "external" && !isExternalEvmWalletConnected) ||
           amountWei === "0"
         }
         onClick={handleTrade}
@@ -485,8 +527,8 @@ const RouterWidget = ({
           ? "Sign in to trade"
           : pending
             ? "Submitting..."
-            : sourceMode === "external" && !isAppAuthenticated
-              ? "Sign in to STRATO"
+            : sourceMode === "external" && !isExternalEvmWalletConnected
+              ? "Connect external wallet"
             : sourceMode === "external"
               ? "Deposit & Trade"
               : "Trade"}

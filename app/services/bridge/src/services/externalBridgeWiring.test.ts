@@ -31,6 +31,29 @@ process.env.SENDGRID_API_KEY = "SG.test.test";
 
 const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
 
+test("legacy withdrawal polling can be disabled without disabling EAB polling", async (t) => {
+  const { config } = await import("../config");
+  const cirrus = await import("./cirrusService");
+  const polling = await import("../polling/stratoPolling");
+  const original = config.bridge.withdrawalPollingEnabled;
+  t.after(() => { config.bridge.withdrawalPollingEnabled = original; });
+  config.bridge.withdrawalPollingEnabled = false;
+  const legacyQueries = t.mock.method(cirrus, "getWithdrawalsByStatus", async () => []);
+  const externalQueries = t.mock.method(cirrus, "getExternalWithdrawalsByStatus", async () => []);
+  const timers = t.mock.method(globalThis, "setTimeout", (() => 0) as any);
+
+  polling.startWithdrawalRequestPolling();
+  polling.startWithdrawalTxPolling();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(legacyQueries.mock.callCount(), 0);
+  assert.equal(timers.mock.callCount(), 0);
+
+  polling.startExternalWithdrawalPolling();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(externalQueries.mock.callCount(), 3);
+  assert.equal(timers.mock.callCount(), 1);
+});
+
 test.before(async () => {
   const vaultService = await import("./externalWithdrawalService");
   (vaultService as any).getWithdrawalCapacity = async () => ({ available: 1000000000000000000n, retryAfterSeconds: 0n });

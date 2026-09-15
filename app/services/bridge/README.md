@@ -86,6 +86,8 @@ not be an on-chain Safe owner. Safe owners still review, sign, and execute propo
 The separately run Ethereum `depositRouterSafeOps.js` deployment and upgrade tooling still accepts `SAFE_PROPOSER_PRIVATE_KEY`. This is an offline operational exception and must not share the bridge-service runtime or environment.
 
 #### Native Bridge Minting
+Set `LEGACY_WITHDRAWAL_POLLING_ENABLED=false` to disable MercataBridge withdrawal requests and Safe transaction monitoring when another service handles them. The default is `true`. This does not disable EAB withdrawals or native bridge processing. Apply the setting to the runtime environment and restart with an image that includes this switch.
+
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
 - `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
 - `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY` - Destination-chain key used to pay gas and sign native mint attestations

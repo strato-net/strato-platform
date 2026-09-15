@@ -50,6 +50,7 @@ const config = {
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+    withdrawalPollingEnabled: process.env.LEGACY_WITHDRAWAL_POLLING_ENABLED !== "false",
   },
   externalAssetBridge: {
     address: process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS,

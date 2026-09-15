@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import {
   useAccount,
   useSignTypedData,
@@ -34,6 +35,8 @@ import { ensureHexPrefix, safeParseUnits } from "@/utils/numberUtils";
 
 export function useAutoRouteDeposit() {
   const [isPending, setIsPending] = useState(false);
+  const submitting = useRef(false);
+  const { toast } = useToast();
   const account = useAccount();
   const { signTypedDataAsync } = useSignTypedData();
   const { switchChainAsync } = useSwitchChain();
@@ -63,43 +66,45 @@ export function useAutoRouteDeposit() {
     outputAddress: string;
     slippageBps: number;
   }) => {
-    quote = structuredClone(quote);
-    const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
-    const assertCurrentQuote = () => assertAutoRouteQuote(quote, {
-      externalChainId: network.chainId, externalToken: route.externalToken,
-      targetStratoToken: route.stratoToken, externalAmount: amountWei,
-      externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
-    });
-    assertCurrentQuote();
-    if (
-      !isExternalEvmWalletConnected ||
-      !externalEvmWalletAddress ||
-      !account.address
-    ) {
-      throw new Error("Connect an external wallet to bridge and trade");
-    }
-    if (
-      account.address.toLowerCase() !== externalEvmWalletAddress.toLowerCase()
-    ) {
-      throw new Error("Connected external wallet address does not match");
-    }
-    if (!isAppAuthenticated || !stratoAddress) {
-      throw new Error("Sign in to STRATO before bridging assets");
-    }
-    const recipient = stratoAddress;
-    if (!network.depositRouter) {
-      throw new Error("Deposit router is unavailable");
-    }
-    const expectedChainId = Number(network.chainId);
-    if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0) {
-      throw new Error("External network chain ID is not wallet-compatible");
-    }
-    if (account.chainId !== expectedChainId) {
-      await switchChainAsync({ chainId: expectedChainId });
-    }
-
+    if (submitting.current) throw new Error("A deposit is already being submitted");
+    submitting.current = true;
     setIsPending(true);
     try {
+      quote = structuredClone(quote);
+      const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
+      const assertCurrentQuote = () => assertAutoRouteQuote(quote, {
+        externalChainId: network.chainId, externalToken: route.externalToken,
+        targetStratoToken: route.stratoToken, externalAmount: amountWei,
+        externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
+      });
+      assertCurrentQuote();
+      if (
+        !isExternalEvmWalletConnected ||
+        !externalEvmWalletAddress ||
+        !account.address
+      ) {
+        throw new Error("Connect an external wallet to bridge and trade");
+      }
+      if (
+        account.address.toLowerCase() !== externalEvmWalletAddress.toLowerCase()
+      ) {
+        throw new Error("Connected external wallet address does not match");
+      }
+      const recipient = isAppAuthenticated ? stratoAddress : externalEvmWalletAddress;
+      if (!recipient) {
+        throw new Error("STRATO recipient is unavailable");
+      }
+      if (!network.depositRouter) {
+        throw new Error("Deposit router is unavailable");
+      }
+      const expectedChainId = Number(network.chainId);
+      if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0) {
+        throw new Error("External network chain ID is not wallet-compatible");
+      }
+      if (account.chainId !== expectedChainId) {
+        await switchChainAsync({ chainId: expectedChainId });
+      }
+
       const isNative = BigInt(route.externalToken || "0") === 0n;
       const validation = await validateRouterContract({
         depositRouterAddress: network.depositRouter,
@@ -258,32 +263,40 @@ export function useAutoRouteDeposit() {
         throw new Error("External bridge transaction reverted");
       }
 
-      const pending = JSON.parse(
-        localStorage.getItem("pendingDeposits") || "[]"
-      );
-      pending.push({
-        externalChainId: Number(network.chainId),
-        externalTxHash: txHash,
-        depositRouter: network.depositRouter,
-        type: actionIntent ? "route" : "bridge",
-        finalTokenSymbol: outputSymbol,
-        finalAmount: quote.amountOut,
-        DepositInfo: {
-          externalSender: externalEvmWalletAddress,
-          stratoRecipient: recipient,
-          stratoToken: route.stratoToken,
-          stratoTokenAmount: quote.bridge.bridgedAmount,
-          bridgeStatus: "1",
-        },
-        block_timestamp: new Date().toISOString(),
-        stratoTokenSymbol: route.stratoTokenSymbol,
-        externalName: route.externalName,
-        externalSymbol: route.externalSymbol,
-      });
-      localStorage.setItem("pendingDeposits", JSON.stringify(pending));
+      try {
+        const pending = JSON.parse(
+          localStorage.getItem("pendingDeposits") || "[]"
+        );
+        pending.push({
+          externalChainId: Number(network.chainId),
+          externalTxHash: txHash,
+          depositRouter: network.depositRouter,
+          type: actionIntent ? "route" : "bridge",
+          finalTokenSymbol: outputSymbol,
+          finalAmount: quote.amountOut,
+          DepositInfo: {
+            externalSender: externalEvmWalletAddress,
+            stratoRecipient: recipient,
+            stratoToken: route.stratoToken,
+            stratoTokenAmount: quote.bridge.bridgedAmount,
+            bridgeStatus: "1",
+          },
+          block_timestamp: new Date().toISOString(),
+          stratoTokenSymbol: route.stratoTokenSymbol,
+          externalName: route.externalName,
+          externalSymbol: route.externalSymbol,
+        });
+        localStorage.setItem("pendingDeposits", JSON.stringify(pending));
+      } catch {
+        toast({
+          title: "Deposit submitted; local history unavailable",
+          description: `Your transaction succeeded: ${txHash}. Do not submit it again.`,
+        });
+      }
       triggerDepositRefresh();
       return txHash;
     } finally {
+      submitting.current = false;
       setIsPending(false);
     }
   };

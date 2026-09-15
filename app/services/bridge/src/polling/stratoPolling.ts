@@ -54,6 +54,7 @@ const startNonOverlappingPolling = (
 };
 
 export const startWithdrawalRequestPolling = (): void => {
+  if (!config.bridge.withdrawalPollingEnabled) return;
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
 
   const poll = async () => {
@@ -220,6 +221,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
 };
 
 export const startWithdrawalTxPolling = (): void => {
+  if (!config.bridge.withdrawalPollingEnabled) return;
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
   type Withdrawal = { id: Number, safeTxHash: string };
   const poll = async () => {
@@ -373,6 +375,9 @@ export const startNativeWithdrawalTxPolling = (): void => {
 
 export const initializeStratoPolling = async () => {
   logInfo("StratoPolling", "Initializing STRATO polling...");
+  if (!config.bridge.withdrawalPollingEnabled) {
+    logInfo("StratoPolling", "Legacy withdrawal polling disabled");
+  }
 
   startNativeDepositInitiatedPolling();
   startWithdrawalRequestPolling();
