@@ -309,7 +309,7 @@ test("loads verification state from Cirrus", async () => {
   });
   let actionsEnabled = false;
   const fetchImpl = async (url) => {
-    if (url.includes("/eth/v1.2/metadata")) return response({ networkID: settings.sourceChainId });
+    if (url === "https://strato.example/strato-api/eth/v1.2/metadata") return response({ networkID: settings.sourceChainId });
     if (/BlockApps-(TokenFactory|PriceOracle|Token)\?/.test(url)) return response([{ address: ADDRESS, status: 2, _symbol: "USDST", tokenFactory: ADDRESS }]);
     if (url.includes("ExternalAssetBridge-mintPolicies")) return response(settings.mintPolicies.map((policy) => ({ key: policy.token, value: policy })));
     if (url.includes("AdminRegistry-whitelist")) {

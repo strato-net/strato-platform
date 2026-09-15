@@ -109,7 +109,8 @@ test('rechecks quote expiry after the Permit2 signing prompt and before deposit 
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useAutoRouteDeposit.ts'), 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText, { exports, structuredClone, Date: { now: () => now * 1000 }, require: (id) => {
-    if (id === 'react') return { useState: () => [false, () => {}] };
+    if (id === 'react') return { useState: () => [false, () => {}], useRef: (value) => ({ current: value }) };
+    if (id === '@/hooks/use-toast') return { useToast: () => ({ toast: () => {} }) };
     if (id === 'wagmi') return { useAccount: () => ({ address: account, chainId: 1 }),
       useSwitchChain: () => ({}), useWriteContract: () => ({ writeContractAsync: async () => { writes++; } }),
       useSignTypedData: () => ({ signTypedDataAsync: async () => { now = 2001; return '0xsignature'; } }) };

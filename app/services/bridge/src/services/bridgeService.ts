@@ -251,7 +251,7 @@ export const settleDeposit = async (
         action: actionDeposit.action || "0",
         actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
         minFinalOut: actionDeposit.minFinalOut || "0",
-        attestationProof: "0x",
+        attestationProof: "",
       },
     });
     logInfo(
@@ -304,7 +304,7 @@ export const settleRoutedDeposit = async (
         expectedTokenOut: deposit.actionToken,
         minFinalOut: deposit.minFinalOut,
         steps: deposit.steps,
-        attestationProof: "0x",
+        attestationProof: "",
       },
     });
     logInfo(
@@ -422,7 +422,7 @@ export const confirmReviewedDeposit = async (
     externalChainId,
     depositRouter,
     depositId,
-    attestationProof: "0x",
+    attestationProof: "",
   };
   if (actionDeposit.action === "4") {
     const settlementInfo = await getDepositSettlementInfoByIdentity(
@@ -477,7 +477,7 @@ export const confirmReviewedDeposit = async (
         externalChainId,
         depositRouter,
         depositId,
-        attestationProof: "0x",
+        attestationProof: "",
       },
     });
     return result.hash;
@@ -775,7 +775,7 @@ export const processExternalWithdrawal = async (
       withdrawalId: withdrawal.withdrawalId,
       reservationId,
       externalTxHash: releaseTxHash,
-      attestationProof: "0x",
+      attestationProof: "",
     },
   });
   if (finalizeResult.status !== "Success") {

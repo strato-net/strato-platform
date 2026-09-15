@@ -133,6 +133,10 @@ Infra provisions five `ECC_SECG_P256K1` / `SIGN_VERIFY` keys (proposer,
 executor, three verifiers) per eab-infra. Runtime uses workload identity.
 Each verifier has its own role, key, RPCs, and STRATO attestor.
 
+Before submitting STRATO deployment or governance transactions, fund each
+administrator's STRATO address with vouchers or USDST for transaction fees.
+External deployment gas is funded separately on the external chain.
+
 Infra returns only:
 
 ```text
@@ -362,6 +366,48 @@ files. Coordinator reruns `status` until every Safe configuration item is
 
 Owner: Infra
 
+### Fund STRATO transaction senders before starting services
+
+Owners: Infra supplies the addresses; the STRATO funding-account owner sends
+vouchers or USDST; Coordinator records the balance checks.
+
+1. Resolve the STRATO address of each configured OAuth identity. Check these
+   against the operator, relayer, and settlement-attestor addresses in the
+   deployment configuration. Do not use their external KMS signer addresses.
+2. Transfer vouchers or USDST on the **target STRATO network** to every address
+   below. Each account needs its own fee reserve; the operator does not pay fees
+   for the relayer or verifiers.
+
+| STRATO account | Runtime credentials | Transactions requiring fees |
+| --- | --- | --- |
+| Operator | Bridge `BA_USERNAME` | Cursor updates and operator bridge operations |
+| Relayer | Bridge `RELAYER_BA_USERNAME` | Settlement and other relayed contract calls |
+| Verifier 1 attestor | Verifier 1 STRATO/OAuth identity | On-chain settlement attestations |
+| Verifier 2 attestor | Verifier 2 STRATO/OAuth identity | On-chain settlement attestations |
+| Verifier 3 attestor | Verifier 3 STRATO/OAuth identity | On-chain settlement attestations |
+
+3. Verify the credited balances in Cirrus on the target network. For each bare
+   STRATO address, query `BlockApps-Voucher-_balances` using the configured
+   `VOUCHER_CONTRACT_ADDRESS`, and `BlockApps-Token-_balances` using the configured
+   `USDST_ADDRESS`: filter `address=eq.<TOKEN_CONTRACT>` and
+   `key=eq.<STRATO_ACCOUNT>`, with `select=balance:value::text`. Confirm funding
+   is indexed before proceeding. Record each account, funding transaction,
+   balances, and the agreed refill threshold in the deployment evidence.
+4. Budget for repeated attestations, retries, and cursor updates, not just one
+   canary. Confirm the network's current fee schedule; at 0.01 USDST per contract
+   call, 1 USDST covers 100 calls. Check voucher coverage using the network's
+   voucher fee rate separately.
+5. Assign an owner to monitor and replenish **all five** STRATO accounts. Fund
+   the external executor with external-chain native gas separately. KMS keys
+   and AWS permissions do not provide STRATO transaction fees.
+
+This is a **manual activation gate**. Current health checks do not prove all
+five accounts are funded. The existing operator balance check does not cover
+the relayer or attestors and runs with legacy withdrawal polling; do not rely
+on it when that polling is disabled.
+
+### Start services
+
 ```bash
 npm run external:rollout -- plan
 ```
@@ -397,6 +443,10 @@ This path does not call `EAB.setPause`. Route flags come from the reviewed
 policy.
 
 ## 8. Activate and canary
+
+Confirm the five STRATO fee-balance checks from step 6 are recorded and still
+sufficient before executing activation. Do not activate with an unfunded
+relayer or verifier attestor, even if every `/health` response passes.
 
 ### Backend configuration gate
 
@@ -471,6 +521,11 @@ Pause on any mismatch.
 - Bundle checksum or tooling revision mismatch: stop; take the coordinator
   bundle / reviewed commit.
 - Safe configuration `DONE` and services fail: fix services only.
+- Verifier attestation or relayer submission fails with HTTP 422: inspect the
+  downstream STRATO error and the submitting account's voucher/USDST balance.
+  Fund that specific account if insufficient and verify the existing operation
+  retries successfully. A generic 422 alone does not prove a funding failure;
+  do not submit a second deposit or bypass attestations.
 - Verifier token leak: rotate that verifier and Runtime secret; pause if more
   than one token or unexpected signatures appear.
 - Identity mismatch: stop; do not override.
@@ -482,6 +537,9 @@ Pause on any mismatch.
 - Status shows governance complete and activation executed.
 - STRATO and external state match the bundle.
 - Verifier and Runtime health pass.
+- Operator, relayer, and all three STRATO attestors have verified fee reserves
+  and an assigned refill owner; successful canaries include on-chain attestation
+  and relayer transaction hashes.
 - Required canaries reconcile (deposit always; withdrawal only if enabled).
 - Temporary credentials and allowlists removed.
 - Retain bundle hash, tooling revision, addresses, policy hashes, issue IDs,

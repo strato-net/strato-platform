@@ -581,7 +581,7 @@ async function verifyConfiguration(settings, step, options) {
 }
 
 async function validateDeploymentDependencies(settings, nodeUrl, token, fetchImpl = fetch) {
-  const response = await fetchImpl(`${nodeUrl.replace(/\/$/, "")}/eth/v1.2/metadata`, {
+  const response = await fetchImpl(`${nodeUrl.replace(/\/$/, "")}/strato-api/eth/v1.2/metadata`, {
     headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000),
   });
   if (!response.ok) throw new Error("STRATO metadata unavailable");

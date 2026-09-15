@@ -119,7 +119,7 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
       action: "0",
       actionToken: "0000000000000000000000000000000000000000",
       minFinalOut: "0",
-      attestationProof: "0x",
+      attestationProof: "",
     },
   });
 });
@@ -225,7 +225,7 @@ test("confirms reviewed deposits through the bridge operator", async () => {
       externalChainId: 1,
       depositRouter: "router",
       depositId: "7",
-      attestationProof: "0x",
+      attestationProof: "",
     },
   });
   let recovered = false;
