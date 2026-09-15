@@ -6,6 +6,9 @@ vault.
 
 ExternalBridgeVault `1.0.0`. DepositRouter `3.2.0`.
 
+For an existing MercataBridge network, also follow [EAB_CUTOVER.md](EAB_CUTOVER.md)
+for intake cutoff, pending transactions, custody, application rollout, and rollback.
+
 Wait for each AdminRegistry issue or Safe transaction to execute. Stop on
 failure. Run the command `status` prints; do not invent flags.
 

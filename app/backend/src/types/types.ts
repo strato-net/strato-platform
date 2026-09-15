@@ -59,6 +59,10 @@ export type EdgeKind =
   | "SAVE"
   | "YIELD_VAULT_DEPOSIT";
 
+export type StratoRouteStep = Omit<import("@strato/shared-types").RouteStep, "action"> & {
+  action: string;
+};
+
 export interface RouteEdge {
   kind: EdgeKind;
   tokenIn: string;

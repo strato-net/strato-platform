@@ -2,7 +2,6 @@ import {
   RouteAction,
   RouteExecuteParams,
   RouteQuoteResponse,
-  RouteStep,
   RouteStepQuote,
   SwapToken,
   TransactionResponse,
@@ -10,7 +9,7 @@ import {
 } from "@strato/shared-types";
 import { constants, ROUTE_TOPOLOGY_TTL_MS, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
-import { FunctionInput, RouteEdge, RouteTopologyCache } from "../../types/types";
+import { FunctionInput, RouteEdge, RouteTopologyCache, StratoRouteStep } from "../../types/types";
 import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
@@ -790,8 +789,8 @@ export const toExecutableRouteStep = ({
   parameter2,
   direction,
   factoryPoolIndex,
-}: RouteStepQuote): RouteStep => ({
-  action,
+}: RouteStepQuote): StratoRouteStep => ({
+  action: RouteAction[action],
   target,
   tokenIn,
   tokenOut,

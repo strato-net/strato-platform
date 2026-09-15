@@ -62,7 +62,7 @@ test("removes quote-only fields from executable route steps", () => {
     label: "Stable",
   };
   assert.deepEqual(toExecutableRouteStep(quotedStep), {
-    action: RouteAction.SWAP_STABLE,
+    action: "SWAP_STABLE",
     target: "pool",
     tokenIn: "a",
     tokenOut: "b",
@@ -72,6 +72,17 @@ test("removes quote-only fields from executable route steps", () => {
     direction: false,
     factoryPoolIndex: "7",
   });
+  for (const [action, name] of [
+    [RouteAction.SWAP_V2, "SWAP_V2"],
+    [RouteAction.SWAP_STABLE, "SWAP_STABLE"],
+    [RouteAction.SWAP_V3, "SWAP_V3"],
+    [RouteAction.PSM_MINT, "PSM_MINT"],
+    [RouteAction.FORGE, "FORGE"],
+    [RouteAction.SAVE, "SAVE"],
+    [RouteAction.YIELD_VAULT_DEPOSIT, "YIELD_VAULT_DEPOSIT"],
+  ] as const) {
+    assert.equal(toExecutableRouteStep({ ...quotedStep, action }).action, name);
+  }
 });
 
 test("reuses swap topology and request-local quotes without reusing live outputs", async (t) => {

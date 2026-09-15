@@ -15,9 +15,10 @@ const UnifiedTrade = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
-      <DashboardHeader title="Unified Trade" />
-      <div className="flex">
-        <DashboardSidebar />
+      <DashboardSidebar />
+
+      <div className="transition-all duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
+        <DashboardHeader title="Unified Trade" />
         <main className="flex-1 p-4 md:p-6">
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to test unified trading and bridge routes" />

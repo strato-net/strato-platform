@@ -10,6 +10,7 @@ import {
   buildDepositActionCatalog,
   getBridgeTransferContractName,
   getDepositRouterMajor,
+  getNetworkConfigs,
   getWithdrawalSummary,
   validateNativeWithdrawalRoute,
 } from "./bridge.service";
@@ -23,6 +24,37 @@ import {
   QUERY_CONFIGS,
 } from "../helpers/bridge.helper";
 import type { BridgeToken } from "@strato/shared-types";
+
+test("network queries read the EAB address initialized after service imports", async (t) => {
+  const originalEnv = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS;
+  const originalAddress = config.externalAssetBridge;
+  t.after(() => {
+    if (originalEnv === undefined) delete process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS;
+    else process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS = originalEnv;
+    (config as any).externalAssetBridge = originalAddress;
+  });
+  const chainInfo = {
+    enabled: true,
+    chainName: "sepolia",
+    depositRouter: "1".repeat(40),
+    vault: "2".repeat(40),
+  };
+  t.mock.method(cirrus, "get", async (_token: string, table: string, options: any) => {
+    assert.equal(table, "/BlockApps-ExternalAssetBridge-chains");
+    assert.equal(options.params.address, `eq.${config.externalAssetBridge}`);
+    assert.equal(options.params["value->>enabled"], "eq.true");
+    return { data: [{ externalChainId: "11155111", ChainInfo: { ...chainInfo } }] };
+  });
+  for (const address of ["3".repeat(40), "4".repeat(40)]) {
+    process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS = address;
+    config.setExternalAssetBridgeConfig("114784819836269");
+    assert.equal(constants.externalAssetBridge, address);
+    const networks = await getNetworkConfigs("test-token");
+    assert.equal(networks.length, 1);
+    assert.equal(networks[0].chainInfo.chainName, "sepolia");
+    assert.equal(networks[0].chainInfo.depositRouter, `0x${chainInfo.depositRouter}`);
+  }
+});
 
 const route = (
   id: string,

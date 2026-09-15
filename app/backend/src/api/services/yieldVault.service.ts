@@ -30,7 +30,6 @@ const {
   CDPRegistry,
   cdpRegistry,
   priceOracle,
-  externalAssetBridge,
 } = constants;
 
 const WAD = 10n ** 18n;
@@ -1204,7 +1203,7 @@ const getStrategyOffChainCapital = async (
   priceMap: Map<string, string>
 ): Promise<{ offChainUsdWad: string; recentOutflows: RecentBridgeOutflow[] }> => {
   const empty = { offChainUsdWad: "0", recentOutflows: [] as RecentBridgeOutflow[] };
-  if (!externalAssetBridge || !strategyAddress) return empty;
+  if (!constants.externalAssetBridge || !strategyAddress) return empty;
 
   const cutoffMs = Date.now() - OFF_CHAIN_EVENT_WINDOW_DAYS * DAY_MS;
   const cutoffStr = toUTCTime(new Date(cutoffMs));
@@ -1220,7 +1219,7 @@ const getStrategyOffChainCapital = async (
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${externalAssetBridge}`,
+          address: `eq.${constants.externalAssetBridge}`,
           event_name: "eq.WithdrawalRequested",
           "attributes->>stratoSender": `eq.${strategyAddress}`,
           block_timestamp: `gte.${cutoffStr}`,
@@ -1232,7 +1231,7 @@ const getStrategyOffChainCapital = async (
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${externalAssetBridge}`,
+          address: `eq.${constants.externalAssetBridge}`,
           event_name: "eq.DepositCompleted",
           "attributes->>stratoRecipient": `eq.${strategyAddress}`,
           block_timestamp: `gte.${cutoffStr}`,
@@ -1243,7 +1242,7 @@ const getStrategyOffChainCapital = async (
     cirrus
       .get(serviceToken, "/event", {
         params: {
-          address: `eq.${externalAssetBridge}`,
+          address: `eq.${constants.externalAssetBridge}`,
           event_name: "in.(WithdrawalAborted,WithdrawalRefunded,WithdrawalReviewRejected)",
           block_timestamp: `gte.${cutoffStr}`,
           select: "attributes",

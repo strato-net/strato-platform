@@ -17,7 +17,7 @@ import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPair
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/vaultPerformance.helper";
 
-const { Token, CollateralVault, CDPEngine, ExternalAssetBridge, externalAssetBridge, DECIMALS, priceOracle } = constants;
+const { Token, CollateralVault, CDPEngine, ExternalAssetBridge, DECIMALS, priceOracle } = constants;
 
 // Queries ExternalAssetBridge routes for the unanimous externalSymbol for each STRATO token.
 // Returns a map of stratoToken -> externalSymbol.
@@ -27,10 +27,10 @@ const getRebasingExternalSymbols = async (
   accessToken: string,
   stratoTokenAddresses: string[]
 ): Promise<Map<string, string>> => {
-  if (!stratoTokenAddresses.length || !externalAssetBridge) return new Map();
+  if (!stratoTokenAddresses.length || !constants.externalAssetBridge) return new Map();
   const { data } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-routes`, {
     params: {
-      address: `eq.${externalAssetBridge}`,
+      address: `eq.${constants.externalAssetBridge}`,
       "value->>stratoToken": `in.(${stratoTokenAddresses.join(",")})`,
       select: "value->>stratoToken,value->>externalSymbol",
     },

@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, externalAssetBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataGovernance, mercataBridge, cdpRegistry, voucher, safetyModule, sToken, priceOracle, liquidityPool, lendingPool } from "./config";
 import * as config from "./config";
 import {
   SWAP_CONTRACTS,
@@ -195,7 +195,7 @@ export const constants = (() => {
     safetyModule,
     sToken,
     mercataBridge,
-    externalAssetBridge,
+    get externalAssetBridge() { return config.externalAssetBridge; },
     get stratoNativeBridge() { return config.stratoNativeBridge; },
     get stratoNativeCustodyVault() { return config.stratoNativeCustodyVault; },
     get stratoToken() { return config.stratoToken; },

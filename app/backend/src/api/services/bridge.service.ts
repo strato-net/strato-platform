@@ -34,7 +34,6 @@ const {
   StratoNativeCustodyVault,
   SaveUSDSTVault,
   Token,
-  externalAssetBridge,
   DECIMALS,
   USDST,
 } = constants;
@@ -426,7 +425,7 @@ export const getBridgeTransactions = async (
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
   const standardParams: Record<string, string> = {
     select: "externalToken:key,externalChainId:key2,targetStratoToken:key3,mappingValue:value",
-    address: `eq.${externalAssetBridge}`
+    address: `eq.${constants.externalAssetBridge}`
   };
   if (chainId) standardParams.key2 = `eq.${chainId}`;
 
@@ -478,7 +477,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
       `/${ExternalAssetBridge}-routeRebaseRequired`,
       {
         params: {
-          address: `eq.${externalAssetBridge}`,
+          address: `eq.${constants.externalAssetBridge}`,
           select: "key,key2,key3,value",
         },
       }
@@ -554,7 +553,7 @@ export const getNetworkConfigs = async (accessToken: string): Promise<NetworkCon
     params: {
       select: "externalChainId:key,ChainInfo:value",
       "value->>enabled": "eq.true",
-      address: `eq.${externalAssetBridge}`
+      address: `eq.${constants.externalAssetBridge}`
     }
   });
   return data.map((c: any) => {
@@ -608,7 +607,7 @@ export const getWithdrawalSummary = async (
     cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
-        address: `eq.${externalAssetBridge}`,
+        address: `eq.${constants.externalAssetBridge}`,
         "value->>stratoSender": `eq.${userAddress}`,
         "value->>status": "in.(1,2,3)"
       }
@@ -633,7 +632,7 @@ export const getWithdrawalSummary = async (
     cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
-        address: `eq.${externalAssetBridge}`,
+        address: `eq.${constants.externalAssetBridge}`,
         "value->>stratoSender": `eq.${userAddress}`,
         "value->>status": "eq.4",
         block_timestamp: `gte.${thirtyDaysAgoUTC}`
@@ -749,7 +748,7 @@ export const isAutoRouteEnabled = async (
     `/${ExternalAssetBridge}-depositActionConfigs`,
     {
       params: {
-        address: `eq.${externalAssetBridge}`,
+        address: `eq.${constants.externalAssetBridge}`,
         key: `eq.${normalizeCatalogAddress(externalToken)}`,
         key2: `eq.${externalChainId}`,
         key3: `eq.${normalizeCatalogAddress(targetStratoToken)}`,
@@ -949,14 +948,14 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     constants.metalForge ? getMetalForgeConfigs(accessToken) : Promise.resolve({ metals: [], payTokens: [] }),
     cirrus.get(accessToken, "/storage", {
       params: {
-        address: `eq.${externalAssetBridge}`,
+        address: `eq.${constants.externalAssetBridge}`,
         select: "data->>directMintPsm,data->>saveUsdstVault",
         limit: "1",
       },
     }).then(({ data }) => data?.[0] || {}),
     cirrus.get(accessToken, `/${ExternalAssetBridge}-depositActionConfigs`, {
       params: {
-        address: `eq.${externalAssetBridge}`,
+        address: `eq.${constants.externalAssetBridge}`,
         select: "externalToken:key,externalChainId:key2,targetStratoToken:key3,value",
       },
     }).then(({ data }) => data || []),
