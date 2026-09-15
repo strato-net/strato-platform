@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dynamic-collateral-optimization" class="md-skip">
+        <a href="#collateral-optimization" class="md-skip">
           Skip to content
         </a>
       
@@ -1077,10 +1077,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
+  <a href="#the-parameters-that-matter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Strategy
+        The Parameters That Matter
       
     </span>
   </a>
@@ -1088,10 +1088,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-optimize-10-ethst-position" class="md-nav__link">
+  <a href="#the-trade-offs-as-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Optimize 10 ETHST Position
+        The Trade-offs, as Formulas
       
     </span>
   </a>
@@ -1099,22 +1099,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#understanding-collateral-types" class="md-nav__link">
+  <a href="#why-vault-isolation-matters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Understanding Collateral Types
+        Why Vault Isolation Matters
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Understanding Collateral Types">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-app-helps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the App Helps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-moves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Moves
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Moves">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#collateral-parameters-on-strato" class="md-nav__link">
+  <a href="#move-debt-to-a-cheaper-vault" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Collateral Parameters on STRATO
+        Move debt to a cheaper vault
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-headroom-where-its-thinnest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add headroom where it's thinnest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-the-collateral-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change the collateral mix
       
     </span>
   </a>
@@ -1127,394 +1171,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#optimization-framework" class="md-nav__link">
+  <a href="#when-to-revisit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optimization Framework
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optimization Framework">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-calculate-current-efficiency" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Calculate Current Efficiency
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-identify-optimal-mix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Identify Optimal Mix
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-execute-rebalancing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Execute Rebalancing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dynamic-optimization-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dynamic Optimization Rules
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Dynamic Optimization Rules">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rule-1-volatility-targeting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 1: Volatility Targeting
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rule-2-ltv-maximization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 2: LTV Maximization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rule-3-correlation-reduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 3: Correlation Reduction
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#market-condition-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Market Condition Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Market Condition Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#bull-market-prices-rising" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bull Market (Prices Rising)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bear-market-prices-falling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bear Market (Prices Falling)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sideways-market-ranging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sideways Market (Ranging)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-automated-rebalancing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced: Automated Rebalancing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced: Automated Rebalancing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#set-rebalancing-triggers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Set Rebalancing Triggers
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-benefit-analysis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost-Benefit Analysis
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rebalancing-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rebalancing Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-rebalancing-pays-off" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Rebalancing Pays Off
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#real-example-portfolio-over-1-year" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Real Example: Portfolio Over 1 Year
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optimization-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Checklist
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optimization Checklist">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#monthly-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Review
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#quarterly-deep-dive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quarterly Deep Dive
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tools-resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tools &amp; Resources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tools &amp; Resources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#portfolio-tracking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Portfolio Tracking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#volatility-calculation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Volatility Calculation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#when-not-to-optimize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When NOT to Optimize
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="When NOT to Optimize">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#skip-rebalancing-if" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skip Rebalancing If:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Mistakes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Mistakes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rebalancing-too-often" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Rebalancing Too Often
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chasing-past-performance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Chasing Past Performance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ignoring-correlations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Ignoring Correlations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
+        When to Revisit
       
     </span>
   </a>
@@ -1532,28 +1192,6 @@
   
     <nav class="md-nav" aria-label="Next Steps">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#related-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Strategies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Learn More
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#need-help" class="md-nav__link">
@@ -1653,6 +1291,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1676,7 +1320,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1694,8 +1528,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1826,10 +1660,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1847,8 +1681,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1885,10 +1719,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1906,8 +1740,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2034,10 +1868,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -2055,8 +1889,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2155,10 +1989,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2176,8 +2010,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2273,6 +2107,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2288,10 +2126,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2309,8 +2147,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2404,6 +2242,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2465,6 +2768,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2492,10 +2822,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
+  <a href="#the-parameters-that-matter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Strategy
+        The Parameters That Matter
       
     </span>
   </a>
@@ -2503,10 +2833,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-optimize-10-ethst-position" class="md-nav__link">
+  <a href="#the-trade-offs-as-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Optimize 10 ETHST Position
+        The Trade-offs, as Formulas
       
     </span>
   </a>
@@ -2514,22 +2844,66 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#understanding-collateral-types" class="md-nav__link">
+  <a href="#why-vault-isolation-matters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Understanding Collateral Types
+        Why Vault Isolation Matters
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Understanding Collateral Types">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-app-helps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the App Helps
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#optimization-moves" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optimization Moves
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Optimization Moves">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#collateral-parameters-on-strato" class="md-nav__link">
+  <a href="#move-debt-to-a-cheaper-vault" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Collateral Parameters on STRATO
+        Move debt to a cheaper vault
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-headroom-where-its-thinnest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add headroom where it's thinnest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#change-the-collateral-mix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Change the collateral mix
       
     </span>
   </a>
@@ -2542,394 +2916,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#optimization-framework" class="md-nav__link">
+  <a href="#when-to-revisit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Optimization Framework
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optimization Framework">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-calculate-current-efficiency" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Calculate Current Efficiency
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-identify-optimal-mix" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Identify Optimal Mix
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-execute-rebalancing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Execute Rebalancing
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dynamic-optimization-rules" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Dynamic Optimization Rules
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Dynamic Optimization Rules">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rule-1-volatility-targeting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 1: Volatility Targeting
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rule-2-ltv-maximization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 2: LTV Maximization
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rule-3-correlation-reduction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rule 3: Correlation Reduction
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#market-condition-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Market Condition Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Market Condition Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#bull-market-prices-rising" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bull Market (Prices Rising)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bear-market-prices-falling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Bear Market (Prices Falling)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#sideways-market-ranging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Sideways Market (Ranging)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-automated-rebalancing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced: Automated Rebalancing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced: Automated Rebalancing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#set-rebalancing-triggers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Set Rebalancing Triggers
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-benefit-analysis" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost-Benefit Analysis
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost-Benefit Analysis">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rebalancing-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rebalancing Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-rebalancing-pays-off" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Rebalancing Pays Off
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#real-example-portfolio-over-1-year" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Real Example: Portfolio Over 1 Year
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optimization-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimization Checklist
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optimization Checklist">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#monthly-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Review
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#quarterly-deep-dive" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quarterly Deep Dive
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tools-resources" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tools &amp; Resources
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Tools &amp; Resources">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#portfolio-tracking" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Portfolio Tracking
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#volatility-calculation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Volatility Calculation
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#when-not-to-optimize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When NOT to Optimize
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="When NOT to Optimize">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#skip-rebalancing-if" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skip Rebalancing If:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Mistakes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Mistakes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#rebalancing-too-often" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Rebalancing Too Often
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#chasing-past-performance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Chasing Past Performance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ignoring-correlations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        ❌ Ignoring Correlations
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#summary" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Summary
+        When to Revisit
       
     </span>
   </a>
@@ -2947,28 +2937,6 @@
   
     <nav class="md-nav" aria-label="Next Steps">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#related-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Related Strategies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Learn More
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#need-help" class="md-nav__link">
@@ -3003,571 +2971,125 @@
 
 
 
-<h1 id="dynamic-collateral-optimization">Dynamic Collateral Optimization<a class="headerlink" href="#dynamic-collateral-optimization" title="Permanent link">&para;</a></h1>
-<p>Continuously optimize your collateral mix based on market conditions for best risk/reward.</p>
+<h1 id="collateral-optimization">Collateral Optimization<a class="headerlink" href="#collateral-optimization" title="Permanent link">&para;</a></h1>
+<p>Decide which collateral carries your USDST debt, balancing borrowing capacity, liquidation distance and cost.</p>
 <hr />
-<h2 id="the-strategy">The Strategy<a class="headerlink" href="#the-strategy" title="Permanent link">&para;</a></h2>
-<p>Actively manage collateral composition to:</p>
-<ul>
-<li>Maximize borrowing capacity</li>
-<li>Minimize liquidation risk</li>
-<li>Optimize for fee generation</li>
-<li>Adapt to market conditions</li>
-</ul>
-<p><strong>Key insight:</strong> Not all collateral is created equal - different LTVs, volatilities, and correlations.</p>
-<hr />
-<h2 id="complete-example-optimize-10-ethst-position">Complete Example: Optimize 10 ETHST Position<a class="headerlink" href="#complete-example-optimize-10-ethst-position" title="Permanent link">&para;</a></h2>
-<p><strong>Your starting position:</strong></p>
-<ul>
-<li>Collateral: 10 ETHST ($30,000)</li>
-<li>Borrowed: 15,000 USDST</li>
-<li>LTV: 50%</li>
-<li>Health Factor: 1.6</li>
-<li>Risk: High (single asset)</li>
-</ul>
-<p><strong>After optimization:</strong></p>
-<ul>
-<li>Collateral: 3 ETHST + 0.18 WBTCST + 12,000 USDST ($30,000)</li>
-<li>Borrowed: 18,000 USDST</li>
-<li>LTV: 60%</li>
-<li>Health Factor: 1.37</li>
-<li>Risk: Medium (diversified)</li>
-</ul>
-<p><strong>Improvement:</strong> </p>
-<ul>
-<li>✅ Borrow $3k more (trade-off: slightly lower HF)</li>
-<li>✅ Lower volatility portfolio (70% → 45%)</li>
-<li>✅ Better risk-adjusted returns</li>
-</ul>
-<hr />
-<h2 id="understanding-collateral-types">Understanding Collateral Types<a class="headerlink" href="#understanding-collateral-types" title="Permanent link">&para;</a></h2>
-<h3 id="collateral-parameters-on-strato">Collateral Parameters on STRATO<a class="headerlink" href="#collateral-parameters-on-strato" title="Permanent link">&para;</a></h3>
+<h2 id="the-parameters-that-matter">The Parameters That Matter<a class="headerlink" href="#the-parameters-that-matter" title="Permanent link">&para;</a></h2>
+<p>Each collateral asset in <code>CDPEngine</code> has its own settings. They differ by asset and can change, so this page doesn't list values. Read them in the app, or with <code>CDPEngine.collateralParams(asset)</code> if you're a developer.</p>
 <table>
 <thead>
 <tr>
-<th>Asset</th>
-<th>LTV</th>
-<th>Liq. Threshold</th>
-<th>Volatility</th>
-<th>Correlation to ETHST</th>
+<th>Parameter</th>
+<th>Effect</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>ETHST</strong></td>
-<td>75%</td>
-<td>80%</td>
-<td>High (70%)</td>
-<td>1.0 (perfect)</td>
+<td><strong>Minimum CR</strong></td>
+<td>Mints and withdrawals (while in debt) must keep CR at or above this. Sets your maximum borrowing.</td>
 </tr>
 <tr>
-<td><strong>WBTCST</strong></td>
-<td>75%</td>
-<td>80%</td>
-<td>High (65%)</td>
-<td>0.85 (high)</td>
+<td><strong>Liquidation ratio</strong></td>
+<td>The vault can be liquidated when CR falls below it. The app's Health Factor = CR ÷ liquidation ratio.</td>
 </tr>
 <tr>
-<td><strong>USDST</strong></td>
-<td>80%</td>
-<td>85%</td>
-<td>None (0%)</td>
-<td>0.0 (none)</td>
+<td><strong>Stability fee</strong></td>
+<td>Per-second compounding rate added to the vault's debt</td>
 </tr>
 <tr>
-<td><strong>USDST</strong></td>
-<td>80%</td>
-<td>85%</td>
-<td>None (0%)</td>
-<td>0.0 (none)</td>
+<td><strong>Liquidation penalty</strong></td>
+<td>Extra collateral, on top of the repaid debt, that a liquidator receives</td>
 </tr>
 <tr>
-<td><strong>GOLDST</strong></td>
-<td>70%</td>
-<td>75%</td>
-<td>Moderate (40%)</td>
-<td>0.3 (low)</td>
+<td><strong>Close factor</strong></td>
+<td>Maximum share of a vault's debt one liquidation can repay</td>
+</tr>
+<tr>
+<td><strong>Debt floor</strong></td>
+<td>Vault debt must be zero or at least this amount</td>
+</tr>
+<tr>
+<td><strong>Debt ceiling</strong></td>
+<td>System-wide cap on USDST minted against the asset</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Key insights:</strong></p>
-<ol>
-<li>Stablecoins have higher LTV (can borrow more)</li>
-<li>But provide no price appreciation</li>
-<li>Volatile assets have upside but more risk</li>
-<li>Correlation matters for diversification</li>
-</ol>
+<p>On <strong>Borrow</strong>, each vault shows its collateral, debt, Health Factor and stability fee.</p>
 <hr />
-<h2 id="optimization-framework">Optimization Framework<a class="headerlink" href="#optimization-framework" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-calculate-current-efficiency">Step 1: Calculate Current Efficiency<a class="headerlink" href="#step-1-calculate-current-efficiency" title="Permanent link">&para;</a></h3>
-<p><strong>Metric: Risk-Adjusted Borrowing Capacity</strong></p>
-<div class="highlight"><pre><span></span><code>Current position:
-
-- Collateral: 10 ETHST ($30k)
-- Max borrow: $22,500 (75% LTV)
-- Volatility: 70% (high)
-- Sharpe-like ratio: $22,500 / 70% = 321
-
-Target: Increase this ratio
+<h2 id="the-trade-offs-as-formulas">The Trade-offs, as Formulas<a class="headerlink" href="#the-trade-offs-as-formulas" title="Permanent link">&para;</a></h2>
+<p>For one vault, with collateral value <code>V</code> at the oracle price:</p>
+<div class="highlight"><pre><span></span><code>Maximum debt              &lt; V / minimum CR
+Health Factor             = (V / debt) / liquidation ratio
+Price drop to liquidation = 1 − 1 / Health Factor        (debt held constant)
+Yearly cost               ≈ debt × stability fee rate     (compounding adds a little)
 </code></pre></div>
-<hr />
-<h3 id="step-2-identify-optimal-mix">Step 2: Identify Optimal Mix<a class="headerlink" href="#step-2-identify-optimal-mix" title="Permanent link">&para;</a></h3>
-<p><strong>Goal:</strong> Maximize borrowing capacity per unit of risk</p>
-<p><strong>Theory:</strong> </p>
+<p>So for each asset you're choosing between:</p>
 <ul>
-<li>More stables = higher LTV, lower vol</li>
-<li>Some volatile assets = upside exposure</li>
-<li>Uncorrelated assets = better diversification</li>
-</ul>
-<p><strong>Optimal mix (depends on goals):</strong></p>
-<p><strong>Conservative:</strong></p>
-<ul>
-<li>40% volatile (ETHST+WBTCST)</li>
-<li>60% stables</li>
-<li>Lower risk, less upside</li>
-</ul>
-<p><strong>Moderate (recommended):</strong></p>
-<ul>
-<li>60% volatile</li>
-<li>40% stables</li>
-<li>Balanced risk/reward</li>
-</ul>
-<p><strong>Aggressive:</strong></p>
-<ul>
-<li>80% volatile</li>
-<li>20% stables</li>
-<li>Higher upside, more risk</li>
+<li><strong>Capacity:</strong> a lower minimum CR lets you mint more per dollar of collateral.</li>
+<li><strong>Distance to liquidation:</strong> set by the Health Factor you keep, not by the maximum you could mint.</li>
+<li><strong>Cost:</strong> the stability fee on the debt you place in that vault.</li>
+<li><strong>Price behavior:</strong> a volatile asset reaches a given price drop sooner than a stable one.</li>
 </ul>
 <hr />
-<h3 id="step-3-execute-rebalancing">Step 3: Execute Rebalancing<a class="headerlink" href="#step-3-execute-rebalancing" title="Permanent link">&para;</a></h3>
-<p><strong>For moderate allocation on $30k portfolio:</strong></p>
-<p><strong>Target:</strong></p>
+<h2 id="why-vault-isolation-matters">Why Vault Isolation Matters<a class="headerlink" href="#why-vault-isolation-matters" title="Permanent link">&para;</a></h2>
+<p>Each asset's vault stands alone:</p>
 <ul>
-<li>$18k volatile (60%)</li>
-<li>$9k ETHST (3 ETHST)</li>
-<li>$9k WBTCST (0.18 BTC)</li>
-<li>$12k stables (40%)</li>
-<li>$12k USDST</li>
+<li>Collateral in one vault never backs debt in another.</li>
+<li>A price drop in asset A can only liquidate vault A.</li>
+<li>Assets that tend to move together will still fall together, so isolation doesn't create diversification by itself.</li>
+<li>More vaults means more debt floors to meet and more positions to watch.</li>
 </ul>
-<p><strong>From current (10 ETHST):</strong></p>
+<div class="admonition info">
+<p class="admonition-title">Lending pool: pooled collateral</p>
+<p>The <code>LendingPool</code> contract uses a different, pooled model where all collateral backs one loan:</p>
+<div class="highlight"><pre><span></span><code>Health factor = Σ(collateral_i × price_i × liquidation threshold_i) / debt value
+Borrow limit  = Σ(collateral_i × price_i × LTV_i) / USDST price
+</code></pre></div>
+<p>A loan there is liquidatable below health factor 1.0. A liquidator may repay up to 50% of the debt while the health factor is at least 0.95, and up to 100% below that. The liquidator receives collateral worth the repaid debt times the asset's liquidation bonus (a configured value between 100% and 125%). <strong>The lending pool's borrow screens are hidden in the current app</strong>; the <strong>Borrow</strong> page uses CDP vaults.</p>
+</div>
+<hr />
+<h2 id="how-the-app-helps">How the App Helps<a class="headerlink" href="#how-the-app-helps" title="Permanent link">&para;</a></h2>
+<p>The <strong>Mint</strong> form on <strong>Borrow</strong> already optimizes for cost when you mint a target amount with auto-allocation on:</p>
 <ol>
-<li><strong>Remove 7 ETHST from collateral</strong></li>
-<li>Temporarily reduces HF</li>
-<li>
-<p>Will fix by adding others</p>
-</li>
-<li>
-<p><strong>Swap 4 ETHST → $12k USDST</strong></p>
-</li>
-<li>
-<p>Keep as stables</p>
-</li>
-<li>
-<p><strong>Swap 3 ETHST → 0.18 WBTCST</strong></p>
-</li>
-<li>
-<p>Diversify volatile holdings</p>
-</li>
-<li>
-<p><strong>Supply new collateral:</strong></p>
-</li>
-<li>
-<p>3 ETHST</p>
-</li>
-<li>0.18 WBTCST</li>
-<li>12,000 USDST</li>
+<li>It sorts vaults by <strong>stability fee</strong> (lowest first), then by existing collateral, then by available headroom.</li>
+<li>It fills them in that order while keeping the <strong>target Health Factor</strong> you set with the slider.</li>
+<li>It skips allocations that would break a debt floor or debt ceiling.</li>
 </ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>New collateral: 3 ETHST + 0.18 WBTCST + 12k USDST
-Value: $30,000 (unchanged)
-Max borrow: $23,100 (vs $22,500)
-Volatility: ~45% (vs 70%)
-Sharpe ratio: 513 (vs 321) ✅
-</code></pre></div></p>
-<p><strong>Can now borrow $600 more with lower risk!</strong></p>
+<p>Switch off auto-allocation to override this, for example to keep debt off an asset you expect to be volatile even if its fee is lower.</p>
 <hr />
-<h2 id="dynamic-optimization-rules">Dynamic Optimization Rules<a class="headerlink" href="#dynamic-optimization-rules" title="Permanent link">&para;</a></h2>
-<h3 id="rule-1-volatility-targeting">Rule 1: Volatility Targeting<a class="headerlink" href="#rule-1-volatility-targeting" title="Permanent link">&para;</a></h3>
-<p><strong>Set target portfolio volatility (e.g., 50%):</strong></p>
-<p><strong>If volatility exceeds target:</strong></p>
+<h2 id="optimization-moves">Optimization Moves<a class="headerlink" href="#optimization-moves" title="Permanent link">&para;</a></h2>
+<h3 id="move-debt-to-a-cheaper-vault">Move debt to a cheaper vault<a class="headerlink" href="#move-debt-to-a-cheaper-vault" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Measure current vol (use price history)</li>
-<li>Calculate over-exposure to volatile assets</li>
-<li>Swap excess to stablecoins</li>
-<li>Rebalance to hit target</li>
+<li><strong>Mint USDST</strong> from vault B (lower stability fee), keeping its Health Factor at your target.</li>
+<li><strong>Repay</strong> the same amount in vault A.</li>
+<li>Optionally <strong>Withdraw</strong> the collateral freed in vault A.</li>
 </ol>
-<p><strong>When to use:</strong></p>
-<ul>
-<li>During high market volatility</li>
-<li>When nervous about positions</li>
-<li>Before major events (Fed meetings, etc.)</li>
-</ul>
+<p>Cost: a few transactions at 0.01 USDST (or one voucher) each. Worth it only if the fee difference on the moved debt exceeds that over your holding period.</p>
+<h3 id="add-headroom-where-its-thinnest">Add headroom where it's thinnest<a class="headerlink" href="#add-headroom-where-its-thinnest" title="Permanent link">&para;</a></h3>
+<p>If one vault's Health Factor is much lower than the others, <strong>Deposit</strong> more of that asset or repay that vault first. The aggregate figure won't warn you.</p>
+<h3 id="change-the-collateral-mix">Change the collateral mix<a class="headerlink" href="#change-the-collateral-mix" title="Permanent link">&para;</a></h3>
+<p>Swap part of one collateral asset into another and move it between vaults. Follow the step order in <a href="../portfolio-rebalancing/">Portfolio Rebalancing</a> so no vault drops below its minimum CR.</p>
 <hr />
-<h3 id="rule-2-ltv-maximization">Rule 2: LTV Maximization<a class="headerlink" href="#rule-2-ltv-maximization" title="Permanent link">&para;</a></h3>
-<p><strong>Goal: Borrow maximum while staying safe</strong></p>
-<p><strong>Calculate weighted LTV:</strong>
-<div class="highlight"><pre><span></span><code>Weighted LTV = Σ(Asset_Value × Asset_LTV) / Total_Value
-
-Example:
-
-- 3 ETHST ($9k) × 75% = $6,750
-- 0.18 WBTCST ($9k) × 75% = $6,750
-- 12k USDST × 80% = $9,600
-Total: $23,100 / $30k = 77% effective LTV
-
-vs pure ETHST: 75% LTV
-</code></pre></div></p>
-<p><strong>Improvement: +2% borrowing capacity</strong></p>
-<hr />
-<h3 id="rule-3-correlation-reduction">Rule 3: Correlation Reduction<a class="headerlink" href="#rule-3-correlation-reduction" title="Permanent link">&para;</a></h3>
-<p><strong>Minimize correlated assets:</strong></p>
-<p><strong>Bad diversification:</strong></p>
+<h2 id="when-to-revisit">When to Revisit<a class="headerlink" href="#when-to-revisit" title="Permanent link">&para;</a></h2>
 <ul>
-<li>50% ETHST</li>
-<li>50% WBTCST</li>
-<li>Correlation: 0.85 (move together)</li>
-<li>Crash together in bear market</li>
+<li>A vault's Health Factor drops below your own threshold (the app highlights values below 1.5)</li>
+<li>Stability fees or other parameters change</li>
+<li>An asset's debt ceiling is reached and new mints fail</li>
+<li>Your view of an asset's risk changes</li>
 </ul>
-<p><strong>Good diversification:</strong></p>
-<ul>
-<li>30% ETHST</li>
-<li>30% GOLDST</li>
-<li>40% USDST</li>
-<li>Correlations: 0.85, 0.0</li>
-<li>Better protected in crashes</li>
-</ul>
-<p><strong>Formula:</strong>
-<div class="highlight"><pre><span></span><code>Portfolio_Variance = Σ(w_i² × σ_i²) + Σ(w_i × w_j × ρ_ij × σ_i × σ_j)
-
-Minimize this by choosing low-correlation assets
-</code></pre></div></p>
-<hr />
-<h2 id="market-condition-strategies">Market Condition Strategies<a class="headerlink" href="#market-condition-strategies" title="Permanent link">&para;</a></h2>
-<h3 id="bull-market-prices-rising">Bull Market (Prices Rising)<a class="headerlink" href="#bull-market-prices-rising" title="Permanent link">&para;</a></h3>
-<p><strong>Optimize for:</strong></p>
-<ul>
-<li>Maximum upside exposure</li>
-<li>Higher volatile allocation</li>
-<li>Leverage if confident</li>
-</ul>
-<p><strong>Target mix:</strong></p>
-<ul>
-<li>80% ETHST + WBTCST - 20% stables (for stability)</li>
-</ul>
-<p><strong>Why:</strong></p>
-<ul>
-<li>Capitalize on appreciation</li>
-<li>Stables provide safety net</li>
-<li>Can borrow more as collateral grows</li>
-</ul>
-<hr />
-<h3 id="bear-market-prices-falling">Bear Market (Prices Falling)<a class="headerlink" href="#bear-market-prices-falling" title="Permanent link">&para;</a></h3>
-<p><strong>Optimize for:</strong></p>
-<ul>
-<li>Capital preservation</li>
-<li>Reduce liquidation risk</li>
-<li>Increase stable allocation</li>
-</ul>
-<p><strong>Target mix:</strong></p>
-<ul>
-<li>40% ETHST + WBTCST (minimum exposure)</li>
-<li>60% stables (protection)</li>
-</ul>
-<p><strong>Why:</strong></p>
-<ul>
-<li>Reduce downside</li>
-<li>Higher LTV on stables lets you maintain debt</li>
-<li>Less chance of liquidation</li>
-</ul>
-<hr />
-<h3 id="sideways-market-ranging">Sideways Market (Ranging)<a class="headerlink" href="#sideways-market-ranging" title="Permanent link">&para;</a></h3>
-<p><strong>Optimize for:</strong></p>
-<ul>
-<li>Yield generation</li>
-<li>Balanced risk</li>
-<li>Fee optimization</li>
-</ul>
-<p><strong>Target mix:</strong></p>
-<ul>
-<li>60% volatile (some upside exposure)</li>
-<li>40% stables (stability + higher LTV)</li>
-</ul>
-<p><strong>Why:</strong></p>
-<ul>
-<li>Balanced position</li>
-<li>Can add leverage safely</li>
-<li>Focus on yield vs price action</li>
-</ul>
-<hr />
-<h2 id="advanced-automated-rebalancing">Advanced: Automated Rebalancing<a class="headerlink" href="#advanced-automated-rebalancing" title="Permanent link">&para;</a></h2>
-<h3 id="set-rebalancing-triggers">Set Rebalancing Triggers<a class="headerlink" href="#set-rebalancing-triggers" title="Permanent link">&para;</a></h3>
-<p><strong>Volatility trigger:</strong>
-<div class="highlight"><pre><span></span><code>If portfolio_volatility &gt; 60%:
-    Sell 10% of volatile assets
-    Buy stablecoins
-    Rebalance monthly
-</code></pre></div></p>
-<p><strong>Drift trigger:</strong>
-<div class="highlight"><pre><span></span><code>If any asset &gt; 50% of portfolio:
-    Rebalance to target
-    Max 5% drift tolerance
-</code></pre></div></p>
-<p><strong>Price trigger:</strong>
-<div class="highlight"><pre><span></span><code>If ETHST drops &gt; 15%:
-    Sell some ETHST
-    Add stablecoins
-    Protect from further drops
-</code></pre></div></p>
-<p><strong>Implementation:</strong></p>
-<ul>
-<li>Manual: Check weekly, rebalance monthly</li>
-<li>Semi-auto: Price alerts + manual action</li>
-<li>Fully auto: Smart contract + keeper bot (advanced)</li>
-</ul>
-<hr />
-<h2 id="cost-benefit-analysis">Cost-Benefit Analysis<a class="headerlink" href="#cost-benefit-analysis" title="Permanent link">&para;</a></h2>
-<h3 id="rebalancing-costs">Rebalancing Costs<a class="headerlink" href="#rebalancing-costs" title="Permanent link">&para;</a></h3>
-<p><strong>Per rebalancing event:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Action</th>
-<th>Cost</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Withdraw collateral</td>
-<td>$0.10</td>
-</tr>
-<tr>
-<td>Swap fees (0.3% × amount)</td>
-<td>$30-90</td>
-</tr>
-<tr>
-<td>Re-supply collateral</td>
-<td>$0.30</td>
-</tr>
-<tr>
-<td><strong>Total</strong></td>
-<td><strong>$30-100</strong></td>
-</tr>
-</tbody>
-</table>
-<p><strong>Frequency recommendations:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Portfolio Size</th>
-<th>Rebalance Frequency</th>
-<th>Annual Cost</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&lt; $20k</td>
-<td>Quarterly</td>
-<td>$120-400</td>
-</tr>
-<tr>
-<td>$20k-$100k</td>
-<td>Monthly</td>
-<td>$360-1,200</td>
-</tr>
-<tr>
-<td>&gt; $100k</td>
-<td>Bi-weekly</td>
-<td>$780-2,600</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Benefits must exceed costs!</strong></p>
-<hr />
-<h3 id="when-rebalancing-pays-off">When Rebalancing Pays Off<a class="headerlink" href="#when-rebalancing-pays-off" title="Permanent link">&para;</a></h3>
-<p><strong>Example:</strong></p>
-<p><strong>Without rebalancing:</strong></p>
-<ul>
-<li>10 ETHST position</li>
-<li>ETHST drops 30%</li>
-<li>Liquidated, lose 10% = $900</li>
-</ul>
-<p><strong>With rebalancing (added stables):</strong></p>
-<ul>
-<li>Mixed collateral</li>
-<li>ETHST drops 30%</li>
-<li>Not liquidated</li>
-<li>Cost to rebalance: $50</li>
-</ul>
-<p><strong>Net benefit: $850</strong> ✅</p>
-<p><strong>Rebalancing is insurance</strong></p>
-<hr />
-<h2 id="real-example-portfolio-over-1-year">Real Example: Portfolio Over 1 Year<a class="headerlink" href="#real-example-portfolio-over-1-year" title="Permanent link">&para;</a></h2>
-<p><strong>Starting (January):</strong></p>
-<ul>
-<li>10 ETHST ($30k)</li>
-<li>50% LTV</li>
-<li>Volatility: 70%</li>
-</ul>
-<p><strong>Q1 (Bull market):</strong></p>
-<ul>
-<li>Optimized to 80% volatile, 20% stable</li>
-<li>Captured upside</li>
-<li>Grew to $38k</li>
-</ul>
-<p><strong>Q2 (Volatility spike):</strong></p>
-<ul>
-<li>Rebalanced to 50% volatile, 50% stable</li>
-<li>Reduced risk</li>
-<li>Avoided liquidation in June crash</li>
-</ul>
-<p><strong>Q3 (Bear market):</strong></p>
-<ul>
-<li>Further reduced to 30% volatile, 70% stable</li>
-<li>Preserved capital</li>
-<li>Value: $30k (vs $20k if stayed 100% ETHST)</li>
-</ul>
-<p><strong>Q4 (Recovery):</strong></p>
-<ul>
-<li>Increased back to 60% volatile, 40% stable</li>
-<li>Positioned for recovery</li>
-<li>End value: $36k</li>
-</ul>
-<p><strong>Result:</strong></p>
-<ul>
-<li>Started: $30k</li>
-<li>Ended: $36k (+20%)</li>
-<li>Without optimization: $25k (-17%)</li>
-<li><strong>Optimization added 37% relative gain</strong></li>
-</ul>
-<hr />
-<h2 id="optimization-checklist">Optimization Checklist<a class="headerlink" href="#optimization-checklist" title="Permanent link">&para;</a></h2>
-<h3 id="monthly-review">Monthly Review<a class="headerlink" href="#monthly-review" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Calculate current allocation percentages</li>
-<li>[ ] Measure portfolio volatility</li>
-<li>[ ] Check asset correlations</li>
-<li>[ ] Compare to target allocation</li>
-<li>[ ] If drift &gt; 10%, plan rebalance</li>
-<li>[ ] Check market conditions</li>
-<li>[ ] Adjust target if needed</li>
-<li>[ ] Execute rebalancing if warranted</li>
-</ul>
-<h3 id="quarterly-deep-dive">Quarterly Deep Dive<a class="headerlink" href="#quarterly-deep-dive" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Review all asset parameters (LTVs, etc.)</li>
-<li>[ ] Analyze 3-month performance</li>
-<li>[ ] Update target allocation</li>
-<li>[ ] Consider new assets</li>
-<li>[ ] Optimize debt structure</li>
-<li>[ ] Calculate rebalancing ROI</li>
-<li>[ ] Update strategy for next quarter</li>
-</ul>
-<hr />
-<h2 id="tools-resources">Tools &amp; Resources<a class="headerlink" href="#tools-resources" title="Permanent link">&para;</a></h2>
-<h3 id="portfolio-tracking">Portfolio Tracking<a class="headerlink" href="#portfolio-tracking" title="Permanent link">&para;</a></h3>
-<p><strong>Spreadsheet template:</strong>
-<div class="highlight"><pre><span></span><code>Columns:
-
-- Asset
-- Amount
-- Price
-- Value
-- % of Portfolio
-- Target %
-- Drift
-- Action Needed
-</code></pre></div></p>
-<p><strong>DeFi dashboards:</strong></p>
-<ul>
-<li>Zapper.fi</li>
-<li>DeBank</li>
-<li>Zerion</li>
-<li>Custom scripts</li>
-</ul>
-<h3 id="volatility-calculation">Volatility Calculation<a class="headerlink" href="#volatility-calculation" title="Permanent link">&para;</a></h3>
-<p><strong>Simple method:</strong></p>
-<ol>
-<li>Download 30-day price history</li>
-<li>Calculate daily returns</li>
-<li>Standard deviation × √365</li>
-<li>= Annual volatility</li>
-</ol>
-<p><strong>Or use:</strong></p>
-<ul>
-<li>TradingView indicators</li>
-<li>Crypto volatility indexes</li>
-<li>Risk management tools</li>
-</ul>
-<hr />
-<h2 id="when-not-to-optimize">When NOT to Optimize<a class="headerlink" href="#when-not-to-optimize" title="Permanent link">&para;</a></h2>
-<h3 id="skip-rebalancing-if">Skip Rebalancing If:<a class="headerlink" href="#skip-rebalancing-if" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Drift &lt; 5% from target</li>
-<li>[ ] Rebalancing cost &gt; expected benefit</li>
-<li>[ ] Major market event imminent (wait)</li>
-<li>[ ] Portfolio &lt; $10k (not worth complexity)</li>
-<li>[ ] Already rebalanced this month</li>
-<li>[ ] Gas fees unusually high</li>
-</ul>
-<p><strong>Don't over-optimize</strong></p>
-<hr />
-<h2 id="common-mistakes">Common Mistakes<a class="headerlink" href="#common-mistakes" title="Permanent link">&para;</a></h2>
-<h3 id="rebalancing-too-often">❌ Rebalancing Too Often<a class="headerlink" href="#rebalancing-too-often" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Death by a thousand fees</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Set minimum drift threshold (10%)</li>
-<li>Maximum frequency (monthly)</li>
-<li>Calculate if cost &lt; benefit</li>
-</ul>
-<h3 id="chasing-past-performance">❌ Chasing Past Performance<a class="headerlink" href="#chasing-past-performance" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> "BTC just pumped, let me add more"</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Stick to target allocation</li>
-<li>Rebalance means selling winners</li>
-<li>Buy low, sell high</li>
-</ul>
-<h3 id="ignoring-correlations">❌ Ignoring Correlations<a class="headerlink" href="#ignoring-correlations" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> "Diversified" into 5 correlated assets</p>
-<p><strong>Fix:</strong></p>
-<ul>
-<li>Check correlation matrix</li>
-<li>True diversification = low correlation</li>
-<li>Include stables or negative correlation</li>
-</ul>
-<hr />
-<h2 id="summary">Summary<a class="headerlink" href="#summary" title="Permanent link">&para;</a></h2>
-<p><strong>Collateral optimization offers:</strong></p>
-<ul>
-<li>✅ Higher borrowing capacity</li>
-<li>✅ Lower portfolio volatility</li>
-<li>✅ Better risk-adjusted returns</li>
-<li>✅ Adaptive to market conditions</li>
-<li>❌ Requires active management</li>
-<li>❌ Ongoing rebalancing costs</li>
-</ul>
-<p><strong>Best for:</strong> Users with $20k+ portfolios willing to actively manage</p>
-<p><strong>Key metric:</strong> Risk-adjusted borrowing capacity</p>
-<p><strong>Golden rule:</strong> Rebalance when benefit &gt; cost</p>
+<p>Every move costs transaction fees, swap fees and price impact, so don't rebalance for tiny improvements.</p>
 <hr />
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<h3 id="related-strategies">Related Strategies<a class="headerlink" href="#related-strategies" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></strong> - Execution guide</li>
-<li><strong><a href="../multi-asset-strategy/">Multi-Asset Strategy</a></strong> - Use multiple assets</li>
-<li><strong><a href="../risk-hedging/">Risk Management</a></strong> - Hedge your portfolio</li>
-</ul>
-<h3 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../../safety/">Safety Guide</a></strong> - Risk management</li>
-<li><strong><a href="../../guides/borrow/">Lending Guide</a></strong> - Collateral basics</li>
+<li><strong><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></strong> - Step order for moving collateral</li>
+<li><strong><a href="../multi-asset-strategy/">Multi-Asset Strategy</a></strong> - Combine vaults with pools and Earn</li>
+<li><strong><a href="../risk-hedging/">Risk Management</a></strong> - Buffers and monitoring</li>
+<li><strong><a href="../../guides/mint-cdp/">Mint USDST via CDP</a></strong> · <strong><a href="../../safety/">Safety Guide</a></strong></li>
 </ul>
 <h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
 <li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
 </ul>
 
 
@@ -3591,7 +3113,7 @@ Minimize this by choosing low-correlation assets
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:53:05 UTC"><span class="timeago" datetime="2026-05-28T04:53:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:53:05 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 19:31:45 UTC"><span class="timeago" datetime="2026-09-15T19:31:45+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 19:31:45 UTC">2026-09-15</span>
   </span>
 
     
@@ -3692,7 +3214,7 @@ Minimize this by choosing low-correlation assets
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       

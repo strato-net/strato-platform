@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -684,22 +684,55 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
+  <a href="#where-liquidity-lives-in-the-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Provide $6,000 ETHST-USDST Liquidity
+        Where Liquidity Lives in the App
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#classic-and-stable-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classic and Stable Pools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Classic and Stable Pools">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#quick-walkthrough" class="md-nav__link">
+  <a href="#how-they-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Walkthrough
+        How They Work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remove-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Liquidity
       
     </span>
   </a>
@@ -712,44 +745,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#concentrated-liquidity-v3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Concentrated Liquidity (V3)
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-liquidity-pools-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Liquidity Pools Work
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How Liquidity Pools Work">
+    <nav class="md-nav" aria-label="Concentrated Liquidity (V3)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automated-market-maker-amm" class="md-nav__link">
+  <a href="#open-a-position" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated Market Maker (AMM)
+        Open a Position
       
     </span>
   </a>
@@ -757,21 +768,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pool-math" class="md-nav__link">
+  <a href="#manage-positions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pool Math
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Share
+        Manage Positions
       
     </span>
   </a>
@@ -784,385 +784,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-by-step-add-liquidity" class="md-nav__link">
+  <a href="#impermanent-loss" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step-by-Step: Add Liquidity
+        Impermanent Loss
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-choose-a-pool" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Choose a Pool
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-enter-amounts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Enter Amounts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-review-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Review Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Add Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#earning-from-liquidity" class="md-nav__link">
+  <a href="#rewards-for-liquidity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Earning from Liquidity
+        Rewards for Liquidity
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Earning from Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#trading-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trading Fees
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reward Points
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tracking-earnings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracking Earnings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#removing-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Removing Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Removing Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-go-to-your-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Go to Your Positions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-choose-amount" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Choose Amount
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Confirm Withdrawal
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#understanding-impermanent-loss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Understanding Impermanent Loss
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-is-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Is It?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-is-it-a-problem" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Is It a Problem?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mitigating-il" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mitigating IL
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#choosing-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choosing Pools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#managing-il-risk" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Managing IL Risk
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#position-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Position Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pool-stats-explained" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pool Stats Explained
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pool Stats Explained">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tvl-total-value-locked" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TVL (Total Value Locked)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#volume-24h" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Volume 24h
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#apr-annual-percentage-rate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        APR (Annual Percentage Rate)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-pool-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Pool Share
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#liquidity-farming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Liquidity Farming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Range Orders (Concentrated Liquidity)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arbitrage-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arbitrage Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1175,152 +814,13 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient Balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#price-updated-warning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Price Updated" Warning
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Slippage Tolerance Exceeded"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#diversification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diversification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-small" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start Small
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitor-regularly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Regularly
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emergency-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What&#39;s Next?">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-your-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Your Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-portfolio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your Portfolio
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
+        Next Steps
       
     </span>
   </a>
@@ -1802,6 +1302,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1825,7 +1331,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1843,8 +1539,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1975,10 +1671,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1996,8 +1692,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2034,10 +1730,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -2055,8 +1751,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2183,10 +1879,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -2204,8 +1900,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2304,10 +2000,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2325,8 +2021,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2422,6 +2118,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2437,10 +2137,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2458,8 +2158,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2553,6 +2253,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2614,6 +2779,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2641,22 +2833,55 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#complete-example-provide-6000-ethst-usdst-liquidity" class="md-nav__link">
+  <a href="#where-liquidity-lives-in-the-app" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Provide $6,000 ETHST-USDST Liquidity
+        Where Liquidity Lives in the App
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Complete Example: Provide $6,000 ETHST-USDST Liquidity">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#classic-and-stable-pools" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Classic and Stable Pools
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Classic and Stable Pools">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#quick-walkthrough" class="md-nav__link">
+  <a href="#how-they-work" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Quick Walkthrough
+        How They Work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#add-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Add Liquidity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#remove-liquidity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remove Liquidity
       
     </span>
   </a>
@@ -2669,44 +2894,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#concentrated-liquidity-v3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Concentrated Liquidity (V3)
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-liquidity-pools-work" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How Liquidity Pools Work
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How Liquidity Pools Work">
+    <nav class="md-nav" aria-label="Concentrated Liquidity (V3)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#automated-market-maker-amm" class="md-nav__link">
+  <a href="#open-a-position" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Automated Market Maker (AMM)
+        Open a Position
       
     </span>
   </a>
@@ -2714,21 +2917,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#pool-math" class="md-nav__link">
+  <a href="#manage-positions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Pool Math
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Share
+        Manage Positions
       
     </span>
   </a>
@@ -2741,385 +2933,24 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#step-by-step-add-liquidity" class="md-nav__link">
+  <a href="#impermanent-loss" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Step-by-Step: Add Liquidity
+        Impermanent Loss
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Step-by-Step: Add Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-choose-a-pool" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Choose a Pool
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-enter-amounts" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Enter Amounts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-review-details" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Review Details
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Add Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#earning-from-liquidity" class="md-nav__link">
+  <a href="#rewards-for-liquidity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Earning from Liquidity
+        Rewards for Liquidity
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Earning from Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#trading-fees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Trading Fees
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Reward Points
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tracking-earnings" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tracking Earnings
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#removing-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Removing Liquidity
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Removing Liquidity">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-go-to-your-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Go to Your Positions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-choose-amount" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Choose Amount
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-confirm-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Confirm Withdrawal
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#understanding-impermanent-loss" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Understanding Impermanent Loss
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Understanding Impermanent Loss">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-is-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What Is It?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-is-it-a-problem" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When Is It a Problem?
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mitigating-il" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mitigating IL
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#choosing-pools" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Choosing Pools
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#managing-il-risk" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Managing IL Risk
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#position-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Position Management
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pool-stats-explained" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pool Stats Explained
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Pool Stats Explained">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#tvl-total-value-locked" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        TVL (Total Value Locked)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#volume-24h" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Volume 24h
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#apr-annual-percentage-rate" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        APR (Annual Percentage Rate)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#your-pool-share" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Your Pool Share
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Advanced Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#liquidity-farming" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Liquidity Farming
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#range-orders-concentrated-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Range Orders (Concentrated Liquidity)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#arbitrage-protection" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Arbitrage Protection
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -3132,152 +2963,13 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient Balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#price-updated-warning" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Price Updated" Warning
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#slippage-tolerance-exceeded" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Slippage Tolerance Exceeded"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#diversification" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Diversification
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-small" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start Small
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monitor-regularly" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitor Regularly
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#emergency-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Emergency Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's Next?
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="What&#39;s Next?">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-your-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Your Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-portfolio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your Portfolio
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#need-help" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need Help?
+        Next Steps
       
     </span>
   </a>
@@ -3302,394 +2994,137 @@
 
 
 <h1 id="provide-liquidity">Provide Liquidity<a class="headerlink" href="#provide-liquidity" title="Permanent link">&para;</a></h1>
-<p>Earn fees by providing liquidity to STRATO's decentralized exchange pools.</p>
-<div class="admonition note">
-<p class="admonition-title">Variable Returns &amp; Risks</p>
-<p>APR estimates, gas costs, and trading fees shown are based on historical data and typical conditions. Actual returns may vary significantly based on trading volume, pool size, and market conditions. You may also experience impermanent loss. Always research pool performance before providing liquidity.</p>
-</div>
-<hr />
-<h2 id="complete-example-provide-6000-ethst-usdst-liquidity">Complete Example: Provide $6,000 ETHST-USDST Liquidity<a class="headerlink" href="#complete-example-provide-6000-ethst-usdst-liquidity" title="Permanent link">&para;</a></h2>
-<p><strong>Your situation:</strong></p>
-<ul>
-<li>You have: 1 ETHST ($3,000) + 3,000 USDST</li>
-<li>You want: Earn trading fees passively</li>
-</ul>
-<p><strong>What you'll do:</strong></p>
-<ol>
-<li>Choose ETHST-USDST pool</li>
-<li>Add liquidity</li>
-<li>Earn fees automatically</li>
-<li>Remove liquidity (anytime)</li>
-</ol>
-<p><strong>Time needed:</strong> 5 minutes<br />
-<strong>Potential earnings:</strong> ~8-15% APR (fees + Reward Points)<br />
-<strong>Total gas cost:</strong> ~$0.30</p>
-<hr />
-<h3 id="quick-walkthrough">Quick Walkthrough<a class="headerlink" href="#quick-walkthrough" title="Permanent link">&para;</a></h3>
-<p><strong>Step 1: Choose Pool</strong>
-- Go to <strong>Pools</strong> page
-- Select <strong>ETHST-USDST pool</strong>
-- Check: 24h volume $500k, APR 12%</p>
-<p><strong>Step 2: Enter Amounts</strong>
-- Enter: <strong>1 ETHST</strong>
-- Auto-fills: <strong>3,000 USDST</strong> (to match ratio)
-- Your share: 0.5% of pool</p>
-<p><strong>Step 3: Add Liquidity</strong>
-- Click <strong>"Add Liquidity"</strong> (~$0.10 gas)
-- Confirm in wallet
-  - Approvals + add liquidity happen automatically in one transaction
-- Wait 1-2 seconds</p>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>✅ Added: 1 ETHST + 3,000 USDST to pool
-✅ Received: LP tokens (representing your 0.5% share)
-✅ Earning: ~$2/day in fees (12% APR)
-✅ Plus: Reward Points
-</code></pre></div></p>
-<p><strong>Your position:</strong></p>
-<ul>
-<li>Pool share: 0.5%</li>
-<li>Value: $6,000</li>
-<li>Daily earnings: ~$2 in fees</li>
-<li>Monthly: ~$60 (if volume stays constant)</li>
-</ul>
-<hr />
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><strong>What is liquidity providing?</strong>
-- Deposit token pairs into liquidity pools (e.g., ETHST + USDC)
-- Earn trading fees from every swap that uses your pool
-- Receive LP (Liquidity Provider) tokens representing your share
-- Plus earn Reward Points</p>
-<p><strong>Why provide liquidity?</strong>
-- <strong>Passive income</strong>: Earn from trading fees (typically 0.3% per trade)
-- <strong>Reward Points</strong>: Bonus rewards for liquidity providers
-- <strong>Support ecosystem</strong>: Enable trading for others
-- <strong>Capital efficiency</strong>: Put idle assets to work</p>
-<hr />
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<p>Before providing liquidity:</p>
-<ul>
-<li>[ ] STRATO account set up (<a href="../../quick-start/">Quick Start Guide</a>)</li>
-<li>[ ] Wallet connected to STRATO network</li>
-<li>[ ] Both tokens of a pair in your wallet (e.g., ETHST + USDC)</li>
-<li>[ ] Small amount of USDST for gas fees</li>
-<li>[ ] Understanding of impermanent loss (<a href="../../concepts/#impermanent-loss-liquidity-provision">Core Concepts</a>)</li>
-</ul>
-<hr />
-<h2 id="how-liquidity-pools-work">How Liquidity Pools Work<a class="headerlink" href="#how-liquidity-pools-work" title="Permanent link">&para;</a></h2>
-<h3 id="automated-market-maker-amm">Automated Market Maker (AMM)<a class="headerlink" href="#automated-market-maker-amm" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>You deposit</strong> equal value of two tokens (e.g., $1,000 ETHST + $1,000 USDC)</li>
-<li><strong>Traders swap</strong> between these tokens, paying fees</li>
-<li><strong>You earn</strong> a share of fees proportional to your pool share</li>
-<li><strong>You can withdraw</strong> anytime (subject to available liquidity)</li>
-</ol>
-<h3 id="pool-math">Pool Math<a class="headerlink" href="#pool-math" title="Permanent link">&para;</a></h3>
-<p>Pools maintain a constant product:</p>
-<div class="highlight"><pre><span></span><code>x × y = k (constant)
-
-Where:
-x = Token A reserves
-y = Token B reserves  
-k = constant product
-</code></pre></div>
-<p>This formula automatically sets prices based on supply and demand.</p>
-<h3 id="your-share">Your Share<a class="headerlink" href="#your-share" title="Permanent link">&para;</a></h3>
-<p>You receive <strong>LP tokens</strong> representing your ownership:</p>
-<div class="highlight"><pre><span></span><code>Your LP tokens / Total LP tokens = Your % of pool
-</code></pre></div>
-<p><strong>Example</strong>: You own 1,000 LP tokens, total is 100,000 LP tokens
-- Your share: 1%
-- You earn: 1% of all trading fees</p>
-<hr />
-<h2 id="step-by-step-add-liquidity">Step-by-Step: Add Liquidity<a class="headerlink" href="#step-by-step-add-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-choose-a-pool">Step 1: Choose a Pool<a class="headerlink" href="#step-1-choose-a-pool" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Navigate to <strong>Pools</strong> section in STRATO app</li>
-<li>Browse available pools or search for specific pair</li>
-<li>
-<p>Check pool stats:</p>
-</li>
-<li>
-<p><strong>TVL (Total Value Locked)</strong>: Pool size</p>
-</li>
-<li><strong>Volume 24h</strong>: Trading activity</li>
-<li><strong>APR</strong>: Estimated annual returns (fees + rewards)</li>
-</ol>
-<p><strong>Popular pools</strong>:</p>
-<ul>
-<li>ETHST / USDST - High volume, stable</li>
-<li>WBTC / ETHST - Dual crypto exposure</li>
-<li>USDST / USDST - Minimal impermanent loss</li>
-</ul>
-<h3 id="step-2-enter-amounts">Step 2: Enter Amounts<a class="headerlink" href="#step-2-enter-amounts" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Click <strong>Add Liquidity</strong> on chosen pool</li>
-<li>Enter amount for one token</li>
-<li>Second token amount auto-fills to maintain pool ratio</li>
-</ol>
-<p><strong>Example</strong>:</p>
-<ul>
-<li>Pool is 50% ETHST, 50% USDST</li>
-<li>You enter: 1 ETHST ($3,000)</li>
-<li>Auto-fills: 3,000 USDST (to match value)</li>
-</ul>
-<div class="admonition tip">
-<p class="admonition-title">Start Small</p>
-<p>Test with ~$100-500 first to understand the process before committing large amounts.</p>
-</div>
-<h3 id="step-3-review-details">Step 3: Review Details<a class="headerlink" href="#step-3-review-details" title="Permanent link">&para;</a></h3>
-<p>Check:</p>
-<ul>
-<li><strong>Token amounts</strong>: Both tokens and their USD values</li>
-<li><strong>Pool share</strong>: Your % of total pool</li>
-<li><strong>Exchange rate</strong>: Current price in pool</li>
-<li><strong>Estimated APR</strong>: Expected annual returns</li>
-<li><strong>Fees</strong>: Gas cost (&lt; $0.10 in USDST)</li>
-</ul>
-<h3 id="step-4-add-liquidity">Step 4: Add Liquidity<a class="headerlink" href="#step-4-add-liquidity" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Click <strong>Add Liquidity</strong></li>
-<li>Review transaction in wallet popup</li>
-<li>Confirm transaction</li>
-<li>Wait for confirmation (~1-2 seconds)</li>
-</ol>
-<p>✅ <strong>Done!</strong> You now have LP tokens in your wallet.</p>
-<hr />
-<h2 id="earning-from-liquidity">Earning from Liquidity<a class="headerlink" href="#earning-from-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="trading-fees">Trading Fees<a class="headerlink" href="#trading-fees" title="Permanent link">&para;</a></h3>
-<p><strong>How you earn</strong>:</p>
-<ul>
-<li>Every swap pays 0.3% fee (typical)</li>
-<li>Fees distributed proportionally to all LP holders</li>
-<li>Automatically added to pool (compounds)</li>
-</ul>
-<p><strong>Example</strong>:</p>
-<ul>
-<li>You own 1% of ETH-USDC pool</li>
-<li>Pool does $1,000,000 daily volume</li>
-<li>Daily fees: $1,000,000 × 0.3% = $3,000</li>
-<li>Your share: $3,000 × 1% = $30/day</li>
-</ul>
-<h3 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h3>
-<p>Additional rewards in Reward Points:</p>
-<ul>
-<li>Distributed to select pools</li>
-<li>Varies by pool and season</li>
-<li>Claim anytime in Rewards section</li>
-</ul>
-<h3 id="tracking-earnings">Tracking Earnings<a class="headerlink" href="#tracking-earnings" title="Permanent link">&para;</a></h3>
-<p>Monitor your position:</p>
-<ol>
-<li>Go to <strong>Advanced</strong> (in sidebar) → <strong>Swap Pools</strong> tab</li>
-<li>See your LP positions</li>
-<li>View accumulated fees</li>
-<li>Check current value vs. initial deposit</li>
-</ol>
-<hr />
-<h2 id="removing-liquidity">Removing Liquidity<a class="headerlink" href="#removing-liquidity" title="Permanent link">&para;</a></h2>
-<h3 id="step-1-go-to-your-positions">Step 1: Go to Your Positions<a class="headerlink" href="#step-1-go-to-your-positions" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Navigate to <strong>Portfolio</strong> → <strong>Liquidity</strong></li>
-<li>Select pool to withdraw from</li>
-</ol>
-<h3 id="step-2-choose-amount">Step 2: Choose Amount<a class="headerlink" href="#step-2-choose-amount" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Remove All</strong>: Withdraw 100% of position</li>
-<li><strong>Partial</strong>: Enter % or amount to withdraw</li>
-<li>Receive both tokens proportionally</li>
-</ul>
-<h3 id="step-3-confirm-withdrawal">Step 3: Confirm Withdrawal<a class="headerlink" href="#step-3-confirm-withdrawal" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Click <strong>Remove Liquidity</strong></li>
-<li>Review amounts you'll receive</li>
-<li>Confirm transaction in wallet</li>
-<li>Wait for confirmation</li>
-</ol>
-<p>Tokens (including earned fees) return to your wallet.</p>
-<hr />
-<h2 id="understanding-impermanent-loss">Understanding Impermanent Loss<a class="headerlink" href="#understanding-impermanent-loss" title="Permanent link">&para;</a></h2>
-<h3 id="what-is-it">What Is It?<a class="headerlink" href="#what-is-it" title="Permanent link">&para;</a></h3>
-<p><strong>Impermanent Loss (IL)</strong>: Loss vs. simply holding the tokens when prices diverge.</p>
-<h3 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h3>
-<p><strong>Initial deposit</strong>:</p>
-<ul>
-<li>1 ETHST ($3,000) + 3,000 USDST = $6,000 total</li>
-</ul>
-<p><strong>ETH doubles to $6,000</strong>:</p>
-<ul>
-<li>Pool rebalances: 0.707 ETHST + 4,242 USDST - Pool value: $8,485</li>
-<li>If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000</li>
-<li><strong>Impermanent loss: $515 (5.7%)</strong></li>
-</ul>
-<h3 id="when-is-it-a-problem">When Is It a Problem?<a class="headerlink" href="#when-is-it-a-problem" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>High IL</strong>: When token prices diverge significantly</li>
-<li><strong>Low IL</strong>: Stablecoin pairs (USDC-USDST) or correlated assets</li>
-</ul>
-<h3 id="mitigating-il">Mitigating IL<a class="headerlink" href="#mitigating-il" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Choose stable pairs</strong>: USDC-USDST has minimal IL</li>
-<li><strong>Earn fees to offset</strong>: High-volume pools compensate with fees</li>
-<li><strong>Long-term provide</strong>: Price often reverts, making loss "impermanent"</li>
-<li><strong>Reward Points</strong>: Additional rewards can exceed IL</li>
-</ol>
-<div class="admonition note">
-<p class="admonition-title">IL is Impermanent</p>
-<p>Loss only realizes if you withdraw. If prices revert, the "loss" disappears. Plus trading fees and rewards often exceed IL.</p>
-</div>
-<hr />
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
-<h3 id="choosing-pools">Choosing Pools<a class="headerlink" href="#choosing-pools" title="Permanent link">&para;</a></h3>
-<p><strong>Good pools have</strong>:</p>
-<ul>
-<li>✅ High trading volume (more fees earned)</li>
-<li>✅ Deep liquidity (lower IL from your deposits)</li>
-<li>✅ Verified tokens (avoid scams)</li>
-<li>✅ Reward Points incentives</li>
-</ul>
-<p><strong>Avoid pools with</strong>:</p>
-<ul>
-<li>❌ Unknown/unverified tokens</li>
-<li>❌ Extremely low liquidity</li>
-<li>❌ Suspicious APR (too good to be true)</li>
-</ul>
-<h3 id="managing-il-risk">Managing IL Risk<a class="headerlink" href="#managing-il-risk" title="Permanent link">&para;</a></h3>
-<p><strong>Low IL strategies</strong>:</p>
-<ul>
-<li>Stablecoin pairs (USDC-USDST, USDC-DAI)</li>
-<li>Correlated assets (WBTC-ETH move together)</li>
-<li>Short time horizons in stable markets</li>
-</ul>
-<p><strong>Higher IL but profitable</strong>:</p>
-<ul>
-<li>High-volume pairs (fees offset IL)</li>
-<li>Pools with Reward Points</li>
-<li>Long-term positions (price reverts)</li>
-</ul>
-<h3 id="position-management">Position Management<a class="headerlink" href="#position-management" title="Permanent link">&para;</a></h3>
-<ul>
-<li>[ ] Monitor positions weekly</li>
-<li>[ ] Check if fees exceed IL</li>
-<li>[ ] Rebalance between pools based on APR</li>
-<li>[ ] Claim Reward Points regularly</li>
-<li>[ ] Withdraw if IL becomes too large</li>
-</ul>
-<hr />
-<h2 id="pool-stats-explained">Pool Stats Explained<a class="headerlink" href="#pool-stats-explained" title="Permanent link">&para;</a></h2>
-<h3 id="tvl-total-value-locked">TVL (Total Value Locked)<a class="headerlink" href="#tvl-total-value-locked" title="Permanent link">&para;</a></h3>
-<p>Total $ value in the pool. Higher = more stable prices, lower price impact.</p>
-<h3 id="volume-24h">Volume 24h<a class="headerlink" href="#volume-24h" title="Permanent link">&para;</a></h3>
-<p>Total trading volume in last 24 hours. Higher = more fees earned.</p>
-<h3 id="apr-annual-percentage-rate">APR (Annual Percentage Rate)<a class="headerlink" href="#apr-annual-percentage-rate" title="Permanent link">&para;</a></h3>
-<p>Estimated yearly returns from:</p>
-<ul>
-<li>Trading fees</li>
-<li>Reward Points</li>
-</ul>
-<p><strong>Example</strong>: 25% APR on $10,000 = ~$2,500/year</p>
+<p>Deposit tokens into STRATO swap pools and earn a share of trading fees.</p>
 <div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>APR is estimated based on recent activity. Actual returns vary with volume and prices.</p>
+<p class="admonition-title">Returns are not guaranteed</p>
+<p>What you earn depends on trading volume, the pool's fee and your share of the pool. Liquidity positions can lose value compared with just holding the tokens (impermanent loss). Any APY the app shows comes from recent data, not a promise.</p>
 </div>
-<h3 id="your-pool-share">Your Pool Share<a class="headerlink" href="#your-pool-share" title="Permanent link">&para;</a></h3>
-<p>Your % of total pool. Determines your fee earnings:</p>
-<div class="highlight"><pre><span></span><code>Your fees = Total pool fees × Your share %
-</code></pre></div>
 <hr />
-<h2 id="advanced-strategies">Advanced Strategies<a class="headerlink" href="#advanced-strategies" title="Permanent link">&para;</a></h2>
-<h3 id="liquidity-farming">Liquidity Farming<a class="headerlink" href="#liquidity-farming" title="Permanent link">&para;</a></h3>
-<p>Maximize returns by:</p>
+<h2 id="where-liquidity-lives-in-the-app">Where Liquidity Lives in the App<a class="headerlink" href="#where-liquidity-lives-in-the-app" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Pool type</th>
+<th>Where</th>
+<th>What you receive</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Classic</strong> and <strong>Stable</strong> pools</td>
+<td><strong>Advanced &gt; Swap Pools</strong> (sidebar, under <strong>PRO</strong>)</td>
+<td>LP tokens</td>
+</tr>
+<tr>
+<td><strong>Concentrated liquidity</strong> (V3)</td>
+<td><strong>V3 Liquidity</strong> (sidebar, under <strong>PRO</strong>)</td>
+<td>A position NFT</td>
+</tr>
+</tbody>
+</table>
+<p>A pool also has its own detail page with <strong>Deposit</strong>, <strong>Withdraw</strong> and <strong>Pool Stats</strong>. The Rewards page's <strong>Earn Now</strong> buttons and APY links open these pages.</p>
+<p>Every STRATO transaction costs <strong>0.01 USDST, or one voucher if you hold one</strong>. Depositing usually takes approvals plus the deposit, and each dialog shows the total <strong>Transaction fee</strong>.</p>
+<hr />
+<h2 id="classic-and-stable-pools">Classic and Stable Pools<a class="headerlink" href="#classic-and-stable-pools" title="Permanent link">&para;</a></h2>
+<h3 id="how-they-work">How They Work<a class="headerlink" href="#how-they-work" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Classic pools</strong> (<code>Pool</code>) hold two tokens and price trades with <code>x × y = k</code>. Depositing mints LP tokens in proportion to your share of the reserves. Swap fees stay in the reserves (70% of the fee by default; the rest goes to the protocol), so each LP token redeems for more over time.</li>
+<li><strong>Stable pools</strong> (<code>StablePool</code>) use a StableSwap curve for assets that should trade near par. They can hold two or more tokens. LP tokens work the same way.</li>
+</ul>
+<div class="highlight"><pre><span></span><code>Your share of the pool = your LP tokens / total LP token supply
+</code></pre></div>
+<h3 id="add-liquidity">Add Liquidity<a class="headerlink" href="#add-liquidity" title="Permanent link">&para;</a></h3>
 <ol>
-<li>Choose highest APR pools</li>
-<li>Reinvest earned fees (compound)</li>
-<li>Claim and reinvest Reward Points</li>
-<li>Rotate to best-performing pools</li>
+<li>Go to <strong>Advanced &gt; Swap Pools</strong> and find the pool.</li>
+<li>Click <strong>Deposit</strong>. The <strong>Deposit Liquidity</strong> dialog opens.</li>
+<li>Choose to deposit <strong>both tokens</strong> or <strong>a single token</strong>:<ul>
+<li><strong>Both tokens:</strong> enter one amount. The other is calculated from the <strong>Current pool ratio</strong>.</li>
+<li><strong>Single token:</strong> the pool swaps part of your deposit into the other token internally, then adds both. That internal swap may or may not charge the swap fee, depending on the pool's setting.</li>
+</ul>
+</li>
+<li>Review the amounts and <strong>Transaction fee</strong>, then click <strong>Confirm Deposit</strong>.</li>
 </ol>
-<h3 id="range-orders-concentrated-liquidity">Range Orders (Concentrated Liquidity)<a class="headerlink" href="#range-orders-concentrated-liquidity" title="Permanent link">&para;</a></h3>
-<p>Some pools support concentrated liquidity:</p>
+<p>If you're the first depositor in an empty pool, the amounts you enter set the starting price.</p>
+<h3 id="remove-liquidity">Remove Liquidity<a class="headerlink" href="#remove-liquidity" title="Permanent link">&para;</a></h3>
+<ol>
+<li>In <strong>Advanced &gt; Swap Pools</strong>, click <strong>Withdraw</strong> on the pool. It's disabled if you hold no LP tokens.</li>
+<li>In <strong>Withdraw Liquidity</strong>, choose the <strong>Percent</strong> of your LP tokens to redeem.</li>
+<li>Click <strong>Confirm Withdraw</strong>. You receive the pool's tokens in proportion to your share, including accumulated fees.</li>
+</ol>
+<hr />
+<h2 id="concentrated-liquidity-v3">Concentrated Liquidity (V3)<a class="headerlink" href="#concentrated-liquidity-v3" title="Permanent link">&para;</a></h2>
+<p>V3 pools (<code>PoolV3</code>) let you provide liquidity within a price range. Inside that range your capital earns more fees than it would spread across all prices. Outside it, your position earns nothing and holds only one of the two tokens.</p>
+<p>Each V3 pool has a fee tier: <strong>0.05%</strong>, <strong>0.30%</strong> or <strong>1.00%</strong>.</p>
+<h3 id="open-a-position">Open a Position<a class="headerlink" href="#open-a-position" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Open <strong>V3 Liquidity</strong> and select a pool on the <strong>Pools</strong> tab (it shows the <strong>Fee tier</strong>).</li>
+<li>In <strong>New position</strong>, set <strong>Min price</strong> and <strong>Max price</strong>. Min must be below max.</li>
+<li>Enter a <strong>Deposit amount</strong>. The app works out the amount of the other token for your range.</li>
+<li>Click <strong>Add Liquidity</strong> and confirm.</li>
+</ol>
+<p>Each position is an NFT in your wallet. It also appears on the NFTs page.</p>
+<h3 id="manage-positions">Manage Positions<a class="headerlink" href="#manage-positions" title="Permanent link">&para;</a></h3>
+<p>The <strong>My Positions</strong> tab lists each position, whether it is <strong>In range</strong> or <strong>Out of range</strong>, its <strong>Position value</strong> and <strong>Uncollected (incl. pending fees)</strong>. From there you can:</p>
 <ul>
-<li>Provide liquidity in specific price ranges</li>
-<li>Earn more fees per capital</li>
-<li>Higher risk if price exits range</li>
+<li><strong>Add liquidity</strong> to an existing position</li>
+<li><strong>Collect fees</strong>: V3 fees are not reinvested automatically, so you collect them yourself</li>
+<li><strong>Remove liquidity</strong></li>
 </ul>
-<p><strong>Not yet available on all STRATO pools</strong> - check pool type.</p>
-<h3 id="arbitrage-protection">Arbitrage Protection<a class="headerlink" href="#arbitrage-protection" title="Permanent link">&para;</a></h3>
-<p>Be aware of:</p>
+<hr />
+<h2 id="impermanent-loss">Impermanent Loss<a class="headerlink" href="#impermanent-loss" title="Permanent link">&para;</a></h2>
+<p>When the prices of a pool's tokens move apart, the pool rebalances and you end up with more of the token that fell and less of the one that rose. Compared with just holding, that shows up as a loss.</p>
+<p><strong>Illustration only</strong> (classic pool, fees ignored):</p>
 <ul>
-<li>Price discrepancies between exchanges</li>
-<li>Arbitrageurs quickly correct, earning fees from your pool</li>
-<li>You still earn fees, but IL can occur rapidly</li>
+<li>You deposit 1 token A at $3,000 plus 3,000 USDST, for $6,000 total.</li>
+<li>Token A's price doubles to $6,000.</li>
+<li>The pool now gives you about 0.707 A plus 4,243 USDST, worth about <strong>$8,485</strong>.</li>
+<li>Holding would have been worth <strong>$9,000</strong>.</li>
+<li>Impermanent loss: about <strong>$515 (5.7%)</strong>.</li>
 </ul>
+<p>The loss only becomes permanent if you withdraw while prices are apart. Fees you earn offset it. Pairs that move together (such as two stablecoins in a stable pool) have much less of it.</p>
+<p>Concentrated positions magnify both effects: fees are higher in range, and the rebalancing is sharper.</p>
+<hr />
+<h2 id="rewards-for-liquidity">Rewards for Liquidity<a class="headerlink" href="#rewards-for-liquidity" title="Permanent link">&para;</a></h2>
+<p>Some pools are <strong>reward activities</strong>. While you hold a position you earn Reward Points on top of fees. The <strong>Activities</strong> tab on the Rewards page lists which pools qualify and their emission rates. See <a href="../rewards/">Manage Rewards</a>.</p>
 <hr />
 <h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
-<h3 id="insufficient-balance">"Insufficient Balance"<a class="headerlink" href="#insufficient-balance" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Not enough of one or both tokens</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Check you have both tokens</li>
-<li>Verify balances cover amounts + gas</li>
-<li>Swap to get missing token</li>
-</ul>
-<h3 id="price-updated-warning">"Price Updated" Warning<a class="headerlink" href="#price-updated-warning" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Pool ratio changed since you started</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Accept new price</li>
-<li>Or cancel and try again with updated amounts</li>
-</ul>
-<h3 id="slippage-tolerance-exceeded">"Slippage Tolerance Exceeded"<a class="headerlink" href="#slippage-tolerance-exceeded" title="Permanent link">&para;</a></h3>
-<p><strong>Cause</strong>: Pool price moved beyond tolerance</p>
-<p><strong>Fix</strong>:</p>
-<ul>
-<li>Increase slippage in settings</li>
-<li>Try again with updated amounts</li>
-</ul>
+<table>
+<thead>
+<tr>
+<th>Message</th>
+<th>Meaning</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Insufficient balance</td>
+<td>You don't hold enough of a token</td>
+<td>Lower the amount or swap for the missing token</td>
+</tr>
+<tr>
+<td>Pool is paused by admin at this time</td>
+<td>Deposits and swaps are stopped</td>
+<td>Wait. Some withdrawals may still be available.</td>
+</tr>
+<tr>
+<td>Enter a price range / Min price must be below max price</td>
+<td>V3 range is missing or invalid</td>
+<td>Fix the range</td>
+</tr>
+<tr>
+<td>Amount too small</td>
+<td>The deposit rounds to zero liquidity</td>
+<td>Deposit more</td>
+</tr>
+</tbody>
+</table>
 <hr />
-<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
-<h3 id="diversification">Diversification<a class="headerlink" href="#diversification" title="Permanent link">&para;</a></h3>
+<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Don't put all capital in one pool</li>
-<li>Split across 3-5 pools</li>
-<li>Mix stable and volatile pairs</li>
-</ul>
-<h3 id="start-small">Start Small<a class="headerlink" href="#start-small" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Test with $100-500 first</li>
-<li>Learn the mechanics</li>
-<li>Scale up gradually</li>
-</ul>
-<h3 id="monitor-regularly">Monitor Regularly<a class="headerlink" href="#monitor-regularly" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Check positions weekly</li>
-<li>Compare returns vs. holding</li>
-<li>Exit if IL exceeds comfort level</li>
-</ul>
-<h3 id="emergency-exit">Emergency Exit<a class="headerlink" href="#emergency-exit" title="Permanent link">&para;</a></h3>
-<p>If you need to exit quickly:</p>
-<ul>
-<li>Remove liquidity anytime</li>
-<li>Receive both tokens back</li>
-<li>May realize impermanent loss</li>
-<li>But you keep all earned fees</li>
-</ul>
-<hr />
-<h2 id="whats-next">What's Next?<a class="headerlink" href="#whats-next" title="Permanent link">&para;</a></h2>
-<h3 id="claim-your-rewards">Claim Your Rewards<a class="headerlink" href="#claim-your-rewards" title="Permanent link">&para;</a></h3>
-<p>Maximize earnings:</p>
-<p>→ <strong><a href="../rewards/">Rewards Guide</a></strong> - Learn to claim Reward Points</p>
-<h3 id="optimize-your-portfolio">Optimize Your Portfolio<a class="headerlink" href="#optimize-your-portfolio" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../swap/">Swap Guide</a></strong> - Rebalance between pools</li>
-<li><strong><a href="../borrow/">Borrow USDST</a></strong> - Leverage your LP positions</li>
-<li><strong><a href="../../concepts/">Core Concepts</a></strong> - Deepen your understanding</li>
-</ul>
-<hr />
-<h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>FAQ</strong>: <a href="../../faq/#swaps-liquidity">Common Questions</a></li>
-<li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
-<li><strong>API Reference</strong>: <a href="../../reference/interactive-api/">Interactive API (Swagger)</a></li>
-<li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
+<li><strong><a href="../swap/">Swap Tokens</a>:</strong> how traders use these pools</li>
+<li><strong><a href="../rewards/">Manage Rewards</a>:</strong> claim Reward Points</li>
+<li><strong><a href="../../concepts/#impermanent-loss-liquidity-provision">Core Concepts</a>:</strong> impermanent loss in more depth</li>
 </ul>
 
 
@@ -3713,7 +3148,7 @@ k = constant product
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:53:05 UTC"><span class="timeago" datetime="2026-05-28T04:53:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:53:05 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 19:31:45 UTC"><span class="timeago" datetime="2026-09-15T19:31:45+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 19:31:45 UTC">2026-09-15</span>
   </span>
 
     
@@ -3814,7 +3249,7 @@ k = constant product
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       
