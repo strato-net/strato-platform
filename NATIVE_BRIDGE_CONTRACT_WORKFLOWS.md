@@ -64,6 +64,7 @@ Main privileged roles:
 - `MAPPING_ADMIN_ROLE`: route registration, disable, enable, freeze, and migration.
 - `PAUSER_ROLE` / `UNPAUSER_ROLE`: emergency controls.
 - `ATTESTATION_ADMIN_ROLE`: signer set and threshold configuration.
+- `MINT_EXECUTOR_ROLE`: required to call `mintRepresentationWithAttestation`. Grant only to the custody Safe, so a mint needs both valid attestation signatures and Safe execution.
 
 Initialization note:
 
