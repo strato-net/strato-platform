@@ -124,6 +124,8 @@ import SolidVM.Model.Value
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Statement
 import SolidVM.Solidity.Parse.UnParser hiding (sortWith)
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Colors as C
 import Text.Format
 import Text.Parsec (runParser)
@@ -2564,6 +2566,25 @@ callBuiltin name [arg]
             _ -> invalidArguments ("Could not convert to " ++ name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
+callBuiltin "__solidvm_b16encode" [SBytes input] =
+  pure . SBytes $ B16.encode input
+callBuiltin "__solidvm_b16encode" args = typeError "b16encode" $ show args
+callBuiltin "__solidvm_b16decode" [SBytes input] =
+  let padded = if odd (B.length input) then B.cons 48 input else input
+   in case B16.decode padded of
+        Right decoded -> pure $ SBytes decoded
+        Left _ -> invalidArguments "b16decode: invalid hex string" input
+callBuiltin "__solidvm_b16decode" args = typeError "b16decode" $ show args
+callBuiltin "__solidvm_normalizeHex" [SString input] =
+  let hexPart = case input of
+        '0' : 'x' : rest -> rest
+        _ -> input
+      encoded = DT.encodeUtf8 $ T.pack hexPart
+      padded = if odd (B.length encoded) then B.cons 48 encoded else encoded
+   in case B16.decode padded of
+        Right decoded -> pure . SString $ "0x" ++ BC.unpack (B16.encode decoded)
+        Left _ -> invalidArguments "normalizeHex: invalid hex string" input
+callBuiltin "__solidvm_normalizeHex" args = typeError "normalizeHex" $ show args
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
@@ -3093,6 +3114,51 @@ validatedCallMode original vals
     isReference SReference{} = True
     isReference _ = False
 
+{-# NOINLINE astIntrinsicsEnabled #-}
+astIntrinsicsEnabled :: Bool
+astIntrinsicsEnabled = unsafePerformIO $ (== Just "1") <$> lookupEnv "SOLIDVM_AST_INTRINSICS"
+
+-- Mirrors FastUIntIR's compileCanonicalNormalizeHex / compileCanonicalBytesHex:
+-- contract name, function name, signature and statement shape must all match.
+canonicalHostBuiltin :: CC.Contract -> SolidString -> CC.Func -> Maybe SolidString
+canonicalHostBuiltin contract' funcName theFunction
+  | not (null (CC._funcModifiers theFunction)) = Nothing
+  | otherwise = case (labelToString (contract' ^. CC.contractName), labelToString funcName) of
+      ("StringUtils", "normalizeHex") ->
+        case (CC._funcArgs theFunction, CC._funcVals theFunction, CC._funcContents theFunction) of
+          ( [(Just "s", CC.IndexedType _ SVMType.String {} _)],
+            [(Nothing, CC.IndexedType _ SVMType.String {} _)],
+            Just
+              [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "hexPart" _] (Just _)) _,
+                CC.Return (Just _) _
+                ]
+            ) -> Just "__solidvm_normalizeHex"
+          _ -> Nothing
+      ("BytesUtils", "b16encode") -> bytesBody $ \case
+        [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "dst" _] (Just _)) _,
+          CC.ForStatement {},
+          CC.Return (Just (CC.Variable _ "dst")) _
+          ] -> Just "__solidvm_b16encode"
+        _ -> Nothing
+      ("BytesUtils", "b16decode") -> bytesBody $ \case
+        [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "isEven" _] (Just _)) _,
+          CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "offset" _] (Just _)) _,
+          CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "dst" _] (Just _)) _,
+          CC.IfStatement {},
+          CC.ForStatement {},
+          CC.Return (Just (CC.Variable _ "dst")) _
+          ] -> Just "__solidvm_b16decode"
+        _ -> Nothing
+      _ -> Nothing
+  where
+    bytesBody match =
+      case (CC._funcArgs theFunction, CC._funcVals theFunction, CC._funcContents theFunction) of
+        ( [(Just "b", CC.IndexedType _ SVMType.Bytes {} _)],
+          [(Nothing, CC.IndexedType _ SVMType.Bytes {} _)],
+          Just body
+          ) -> match body
+        _ -> Nothing
+
 -- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
 -- For memory arrays/structs, if a Variable is provided, it's used directly instead
 -- of creating a new IORef wrapper. This allows modifications to propagate to caller.
@@ -3111,6 +3177,14 @@ runTheCallWithVars ::
   Bool ->
   Bool ->
   m (Maybe Value)
+-- EXPERIMENT (SOLIDVM_AST_INTRINSICS=1): the same canonical hex-helper
+-- substitution FastUIntIR performs, applied on the interpreted path.
+runTheCallWithVars _ _ contract' funcName _ _ theFunction argVals' _ _ _ _
+  | astIntrinsicsEnabled,
+    not (Conf.svmTrace (Conf.debugConfig ethConf)),
+    Just builtin <- canonicalHostBuiltin contract' funcName theFunction = do
+      decrementGas 5
+      Just <$> callBuiltin builtin argVals'
 runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff = do
   decrementGas 5
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
