@@ -37,7 +37,6 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP (rlpEncode, rlpSerialize)
 import Blockchain.Stream.VMEvent (VMEvent(..), produceVMEvents)
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
@@ -49,16 +48,15 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
 import Control.Lens hiding (Context (..))
-import Control.Monad (join, void, when)
+import Control.Monad (join, void)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.Streaming (HasStreaming)
 import Control.Monad.IO.Class
-import Control.Monad.Reader (ReaderT, ask)
+import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
 import Data.Default
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
@@ -161,16 +159,11 @@ vmBlockHashRootKey = "block_hash_root"
 
 instance HasContext m => Mod.Modifiable BlockHashRoot m where
   get _ = do
-    pendingRef <- view mpPendingBlockHashRoot <$> accessEnv
-    pending <- liftIO $ readIORef pendingRef
-    case pending of
-      Just sr -> pure . BlockHashRoot $ MP.StateRoot sr
-      Nothing -> do
-        db <- getStateDB
-        BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
+    db <- getStateDB
+    BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get db def vmBlockHashRootKey
   put _ (BlockHashRoot (MP.StateRoot sr)) = do
-    pendingRef <- view mpPendingBlockHashRoot <$> accessEnv
-    liftIO $ writeIORef pendingRef (Just sr)
+    db <- getStateDB
+    DB.put db def vmBlockHashRootKey sr
 
 instance HasContext m => Mod.Modifiable CurrentBlockHash m where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
@@ -183,57 +176,9 @@ instance HasContext m => HasMemAddressStateDB m where
   putAddressStateBlockDBMap theMap = modify $ memDBs . stateBlockMap .~ theMap
 
 instance MonadUnliftIO m => (MP.StateRoot `A.Alters` MP.NodeData) (ReaderT Context m) where
-  lookup _ sr@(MP.StateRoot key) = do
-    pendingRef <- view mpPendingNodes <$> ask
-    pending <- liftIO $ readIORef pendingRef
-    case HM.lookup key pending of
-      Just nd -> pure (Just nd)
-      Nothing -> MP.genericLookupDB getStateDB sr
-  insert _ (MP.StateRoot key) nd = do
-    pendingRef <- view mpPendingNodes <$> ask
-    pending <- liftIO $ readIORef pendingRef
-    case HM.lookup key pending of
-      Just staged
-        | staged == nd -> pure ()
-        | otherwise -> error "MP node hash collision: pending node differs"
-      Nothing -> liftIO $ modifyIORef' pendingRef (HM.insert key nd)
-  delete _ sr@(MP.StateRoot key) = do
-    pendingRef <- view mpPendingNodes <$> ask
-    liftIO $ modifyIORef' pendingRef (HM.delete key)
-    MP.genericDeleteDB getStateDB sr
-
-instance HasContext m => HasPendingMPNodes m where
-  flushPendingMPNodes = do
-    ctx <- accessEnv
-    count <- liftIO $ atomicModifyIORef' (ctx ^. mpFlushCount) $ \n -> let n' = n + 1 in (n', n')
-    when (count >= ctx ^. mpFlushInterval) flushPendingMPNodesNow
-  finalizePendingMPNodes = flushPendingMPNodesNow
-  clearPendingMPNodes = do
-    ctx <- accessEnv
-    liftIO $ do
-      writeIORef (ctx ^. mpPendingNodes) HM.empty
-      writeIORef (ctx ^. mpPendingBlockHashRoot) Nothing
-      writeIORef (ctx ^. mpFlushCount) 0
-
-flushPendingMPNodesNow :: HasContext m => m ()
-flushPendingMPNodesNow = do
-    pendingRef <- view mpPendingNodes <$> accessEnv
-    pending <- liftIO $ readIORef pendingRef
-    rootRef <- view mpPendingBlockHashRoot <$> accessEnv
-    pendingRoot <- liftIO $ readIORef rootRef
-    db <- getStateDB
-    DB.write db def
-      ( [ DB.Put key (rlpSerialize $ rlpEncode node)
-        | (key, node) <- HM.toList pending
-        ]
-          ++ maybe [] (pure . DB.Put vmBlockHashRootKey) pendingRoot
-      )
-    liftIO $ do
-      writeIORef pendingRef HM.empty
-      writeIORef rootRef Nothing
-    countRef <- view mpFlushCount <$> accessEnv
-    liftIO $ writeIORef countRef 0
-
+  lookup _ = MP.genericLookupDB $ getStateDB
+  insert _ = MP.genericInsertDB $ getStateDB
+  delete _ = MP.genericDeleteDB $ getStateDB
 
 instance (MonadUnliftIO m, MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe

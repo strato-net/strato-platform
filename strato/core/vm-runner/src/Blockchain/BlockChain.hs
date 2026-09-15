@@ -251,7 +251,6 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
         case verifyBlockResult of
           failures@(_:_) -> do
-            lift clearPendingMPNodes
             lift $ P.incCounter vmBlocksInvalid
             -- Identify the block that failed, not its parent. 'bSum' summarizes
             -- the *parent* (setParentStateRoot looks it up by parentHash), so
@@ -262,7 +261,6 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             pure $ map (BlockVerificationFailure (number bd) obh) failures
           _ -> do
             forM_ postRewardSR $ putChainStateRoot Nothing obh
-            lift flushPendingMPNodes
             lift $ P.incCounter vmBlocksValid
             lift $ P.incCounter vmBlocksMined
             lift $ P.incCounter vmBlocksProcessed

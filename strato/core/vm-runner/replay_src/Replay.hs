@@ -23,7 +23,7 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()
-import Blockchain.VMContext (evalContextM', finalizePendingMPNodes, initReplayContext)
+import Blockchain.VMContext (evalContextM', initReplayContext)
 import Blockchain.VMOptions ()
 import Conduit
 import Control.Monad (forM, unless, when)
@@ -136,9 +136,7 @@ applyBlocksPreloaded inPath mRange = do
       gi <- getGenesisInfo
       seedDatabases (genesisInfoToBlock gi)
       initializeBestBlock
-      result <- runConduit $ processBlocks blocks .| collectFailures
-      finalizePendingMPNodes
-      pure result
+      runConduit $ processBlocks blocks .| collectFailures
   t1 <- getCurrentTime
   let dt = realToFrac (diffUTCTime t1 t0) :: Double
       rate = fromIntegral (length blocks) / max dt 1e-9
@@ -366,9 +364,7 @@ applyBlocksStreamed chunkSize inPath mRange = do
                             else pure (chunkFailures, Just stats', source')
                         else
                           go Nothing source' reversedBlocks' chunkLength' (Just stats')
-        result <- go firstSelected source1 [] 0 Nothing
-        finalizePendingMPNodes
-        pure result
+        go firstSelected source1 [] 0 Nothing
     when (null failures && mRange == Nothing) $
       ensureLegacyEnd finalSource
     t1 <- getCurrentTime

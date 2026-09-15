@@ -56,7 +56,6 @@ import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
   ( ContextState (..),
     VMBase,
-    HasPendingMPNodes (..),
     CurrentBlockHash (..),
     GasCap (..),
     MemDBs (..),
@@ -136,11 +135,6 @@ instance Default (MemContext t) where
   def = MemContext def def
 
 type MemContextM (t :: VMType) m = ReaderT (IORef (MemContext t)) m
-
-instance Monad m => HasPendingMPNodes (MemContextM t m) where
-  flushPendingMPNodes = pure ()
-  finalizePendingMPNodes = pure ()
-  clearPendingMPNodes = pure ()
 
 getMemContext :: MonadIO m => MemContextM t m (MemContext t)
 getMemContext = ask >>= readIORef

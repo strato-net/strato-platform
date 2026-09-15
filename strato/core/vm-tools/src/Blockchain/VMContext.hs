@@ -46,11 +46,6 @@ module Blockchain.VMContext
     dbs,
     state,
     stateDiffQueue,
-    mpPendingNodes,
-    mpPendingBlockHashRoot,
-    mpFlushInterval,
-    mpFlushCount,
-    HasPendingMPNodes (..),
     runTestContextM,
     initContext,
     initContextWithLevelDBTuning,
@@ -113,9 +108,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Binary
-import qualified Data.ByteString as B
 import Data.Default
-import qualified Data.HashMap.Strict as HM
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
@@ -232,12 +225,7 @@ data QueueEvent
 data Context = Context
   { _dbs :: ContextDBs,
     _state :: IORef ContextState,
-    _stateDiffQueue :: (TQueue QueueEvent),
-    -- Merkle Patricia nodes written this block, not yet in LevelDB; flushed as one batch.
-    _mpPendingNodes :: IORef (HM.HashMap B.ByteString MP.NodeData),
-    _mpPendingBlockHashRoot :: IORef (Maybe B.ByteString),
-    _mpFlushInterval :: !Int,
-    _mpFlushCount :: IORef Int
+    _stateDiffQueue :: (TQueue QueueEvent)
   }
   deriving (Generic)
 
@@ -245,17 +233,11 @@ makeLenses ''Context
 
 type ContextM = ReaderT Context (ResourceT (LoggingT IO))
 
-class Monad m => HasPendingMPNodes m where
-  flushPendingMPNodes :: m ()
-  finalizePendingMPNodes :: m ()
-  clearPendingMPNodes :: m ()
-
 type VMBase m =
   ( MonadIO m,
     MonadCatch m,
     MonadUnliftIO m,
     MonadLogger m,
-    HasPendingMPNodes m,
     Mod.Modifiable (Maybe DebugSettings) m,
     Mod.Modifiable (Maybe VmTracer) m,
     Mod.Modifiable ContextState m,
@@ -391,18 +373,11 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _selfAddress = Address 0
             }
       que <- newTQueueIO
-      pendingNodes <- newIORef HM.empty
-      pendingBlockHashRoot <- newIORef Nothing
-      flushCount <- newIORef 0
       let ctx =
             Context
               { _dbs = cdbs,
                 _state = cstate,
-                _stateDiffQueue = que,
-                _mpPendingNodes = pendingNodes,
-                _mpPendingBlockHashRoot = pendingBlockHashRoot,
-                _mpFlushInterval = 1,
-                _mpFlushCount = flushCount
+                _stateDiffQueue = que
               }
       a <- flip runReaderT ctx $ do
         MP.initializeBlank
@@ -424,7 +399,7 @@ initContextWithLevelDBTuning ::
   Int ->
   m Context
 initContextWithLevelDBTuning cacheBytes writeBufferBytes = do
-  initContextWithOptions cacheBytes writeBufferBytes 1
+  initContextWithOptions cacheBytes writeBufferBytes
 
 initReplayContext ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
@@ -432,12 +407,11 @@ initReplayContext ::
 initReplayContext = initContextWithOptions
   (Conf.cacheSize $ levelDBConfig ethConf)
   (DB.writeBufferSize DB.defaultOptions)
-  256
 
 initContextWithOptions ::
   (MonadUnliftIO m, MonadLoggerIO m, MonadResource m) =>
-  Int -> Int -> Int -> m Context
-initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
+  Int -> Int -> m Context
+initContextWithOptions cacheBytes writeBufferBytes = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
   conn <- createPostgresqlPool connStr 20
   let ldbOptions =
@@ -469,18 +443,11 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
       def
         & txRunResultsCache .~ cache
   que <- newTQueueIO
-  pendingNodes <- newIORef HM.empty
-  pendingBlockHashRoot <- newIORef Nothing
-  flushCount <- newIORef 0
   pure
     Context
       { _dbs = cdbs,
         _state = cstate,
-        _stateDiffQueue = que,
-        _mpPendingNodes = pendingNodes,
-        _mpPendingBlockHashRoot = pendingBlockHashRoot,
-        _mpFlushInterval = flushInterval,
-        _mpFlushCount = flushCount
+        _stateDiffQueue = que
       }
 
 runContextM ::
