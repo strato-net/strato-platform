@@ -9,7 +9,12 @@ import {
   invalidateSnapshot,
 } from "../services/attributionService";
 import { getUserTimeline } from "../services/timelineService";
-import { getDailyBreakdown, getDailySnapshot } from "../services/metricsService";
+import {
+  getDailyBreakdown,
+  getDailySnapshot,
+  METRICS_PERIODS,
+  parsePeriod,
+} from "../services/metricsService";
 import { isValidDestination } from "../utils/destinations";
 import { normalizeAddress } from "../utils/addresses";
 
@@ -24,15 +29,28 @@ export const list = async (_req: AuthorizedRequest, res: Response): Promise<void
   res.json(await getLinkSummaries());
 };
 
-// GET /tracking-api/metrics/daily — today's cross-link snapshot
-export const dailyMetrics = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
-  res.json(await getDailySnapshot());
+const PERIOD_ERROR = `period must be one of ${METRICS_PERIODS.join(", ")}`;
+
+// GET /tracking-api/metrics/daily?period= — the cross-link snapshot over the
+// requested window (`today` when omitted)
+export const dailyMetrics = async (req: AuthorizedRequest, res: Response): Promise<void> => {
+  const period = parsePeriod(req.query.period);
+  if (!period) {
+    res.status(400).json({ error: PERIOD_ERROR });
+    return;
+  }
+  res.json(await getDailySnapshot(period));
 };
 
-// GET /tracking-api/metrics/daily/breakdown — the rows behind the snapshot
-// tiles, over the same UTC-today window
-export const dailyBreakdown = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
-  res.json(await getDailyBreakdown());
+// GET /tracking-api/metrics/daily/breakdown?period= — the rows behind the
+// snapshot tiles, over exactly the same window as the tiles
+export const dailyBreakdown = async (req: AuthorizedRequest, res: Response): Promise<void> => {
+  const period = parsePeriod(req.query.period);
+  if (!period) {
+    res.status(400).json({ error: PERIOD_ERROR });
+    return;
+  }
+  res.json(await getDailyBreakdown(period));
 };
 
 // GET /tracking-api/links/:id

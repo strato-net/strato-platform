@@ -1,7 +1,7 @@
 import { query } from "../db/pool";
 import { toCirrusAddress } from "../utils/addresses";
 import { externalChainName } from "../utils/chains";
-import { ActivityCategory } from "./cirrusService";
+import { ActivityCategory, ActivityEvent, BridgeInEvent } from "./cirrusService";
 import {
   ActivitySummary,
   AttributionSnapshot,
@@ -13,18 +13,80 @@ import {
   walletKeyOf,
 } from "./attributionService";
 
-// "Today" is the UTC day, like every other rollup in this service (the
+// Windows are whole UTC days, like every other rollup in this service (the
 // per-day history, the daily session buckets). Deltas compare against the
-// SAME ELAPSED WINDOW yesterday — comparing a half-finished day against a
-// whole one would make every morning look like a collapse.
+// window of the SAME LENGTH immediately before it — and, while that window is
+// still running, only against its SAME ELAPSED SLICE: comparing a
+// half-finished day against a whole one would make every morning look like a
+// collapse.
 
 const HOURS_PER_DAY = 24;
 const DAY_MS = HOURS_PER_DAY * 60 * 60 * 1000;
 const TOP_LINKS = 6;
 
+// The periods the dashboard panel can look at. `today` is the default so the
+// endpoints stay backwards compatible with callers that send no `period`.
+export const METRICS_PERIODS = ["today", "yesterday", "7d", "30d"] as const;
+
+export type MetricsPeriod = (typeof METRICS_PERIODS)[number];
+
+// null = the caller sent something that is not a period (the controller
+// answers 400); missing/empty means "today".
+export const parsePeriod = (raw: unknown): MetricsPeriod | null => {
+  if (raw == null || raw === "") return "today";
+  if (typeof raw !== "string") return null;
+  return (METRICS_PERIODS as readonly string[]).includes(raw)
+    ? (raw as MetricsPeriod)
+    : null;
+};
+
+// One window definition drives the tiles AND the breakdown rows, so a table
+// can never disagree with the number above it.
+interface PeriodWindow {
+  period: MetricsPeriod;
+  days: number; // UTC days covered
+  startMs: number; // inclusive
+  // Exclusive end of the last UTC day in the window. For a window that
+  // includes today this sits in the future on purpose: chain timestamps come
+  // from block time and can sit slightly ahead of this server's clock.
+  endMs: number;
+  prevStartMs: number;
+  prevEndMs: number;
+  startDate: string; // YYYY-MM-DD (UTC)
+  endDate: string; // YYYY-MM-DD (UTC), the window's last day
+}
+
+const dayString = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+const periodWindow = (period: MetricsPeriod, now: Date): PeriodWindow => {
+  const todayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const days = period === "7d" ? 7 : period === "30d" ? 30 : 1;
+  const includesToday = period !== "yesterday";
+  const endMs = includesToday ? todayStartMs + DAY_MS : todayStartMs;
+  const startMs = endMs - days * DAY_MS;
+  const spanMs = days * DAY_MS;
+  // A still-running window is only compared against the same elapsed slice of
+  // the preceding one; a finished window against the whole of it.
+  const elapsedMs = includesToday
+    ? Math.max(0, Math.min(now.getTime() - startMs, spanMs))
+    : spanMs;
+  const prevStartMs = startMs - spanMs;
+  return {
+    period,
+    days,
+    startMs,
+    endMs,
+    prevStartMs,
+    prevEndMs: prevStartMs + elapsedMs,
+    startDate: dayString(startMs),
+    endDate: dayString(endMs - DAY_MS),
+  };
+};
+
 export interface MetricDelta {
   value: number;
-  // Same-elapsed-window value from yesterday
+  // Value of the preceding window of the same length (its same elapsed slice
+  // while the current window is still running)
   previous: number;
   // Percent change vs `previous`, one decimal; null when there is no
   // baseline (previous = 0) so the UI can say "new" instead of "+∞%"
@@ -40,7 +102,11 @@ export interface DailySnapshotLink {
 }
 
 export interface DailySnapshot {
-  date: string; // YYYY-MM-DD (UTC)
+  period: MetricsPeriod;
+  days: number; // UTC days the window covers (1, 7 or 30)
+  date: string; // YYYY-MM-DD (UTC): the window's last day
+  startDate: string; // YYYY-MM-DD (UTC)
+  endDate: string; // YYYY-MM-DD (UTC), same as `date`
   generatedAt: string;
   hour: number; // current UTC hour: the last (partial) opensByHour bucket
   linksTotal: number;
@@ -56,7 +122,9 @@ export interface DailySnapshot {
   bridgeIns: number;
   actions: MetricDelta;
   actionLinks: number;
-  opensByHour: number[]; // 24 UTC buckets
+  // 24 UTC hour-of-day buckets; over a multi-day window every day's opens
+  // land in the same 24 buckets
+  opensByHour: number[];
   topLinks: DailySnapshotLink[];
 }
 
@@ -139,50 +207,47 @@ const chainMetrics = (snapshot: AttributionSnapshot, startMs: number, endMs: num
   };
 };
 
-// Today's headline numbers for every link at once: session rollups from SQL,
-// wallet/chain rollups from the attribution snapshot, each against the same
-// elapsed window yesterday.
-export const getDailySnapshot = async (): Promise<DailySnapshot> => {
+// The window's headline numbers for every link at once: session rollups from
+// SQL, wallet/chain rollups from the attribution snapshot, each against the
+// preceding window of the same length.
+export const getDailySnapshot = async (
+  period: MetricsPeriod = "today"
+): Promise<DailySnapshot> => {
   const now = new Date();
-  const dayStartMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate()
-  );
-  const prevStartMs = dayStartMs - DAY_MS;
-  const prevEndMs = prevStartMs + (now.getTime() - dayStartMs); // same elapsed slice
-  const dayStart = new Date(dayStartMs);
-  const prevStart = new Date(prevStartMs);
-  const prevEnd = new Date(prevEndMs);
+  const window = periodWindow(period, now);
+  const start = new Date(window.startMs);
+  const end = new Date(window.endMs);
+  const prevStart = new Date(window.prevStartMs);
+  const prevEnd = new Date(window.prevEndMs);
 
   const snapshot = await getSnapshot();
 
   const [totalsResult, hoursResult, topLinksResult] = await Promise.all([
     query<SessionTotalsRow>(
-      `SELECT COUNT(*) FILTER (WHERE opened_at >= $1)::int AS opens,
-              COUNT(*) FILTER (WHERE opened_at >= $1 AND engaged_at IS NOT NULL)::int AS engaged,
-              COUNT(DISTINCT link_id) FILTER (WHERE opened_at >= $1)::int AS links_with_opens,
-              COUNT(*) FILTER (WHERE opened_at >= $2 AND opened_at < $3)::int AS prev_opens
+      `SELECT COUNT(*) FILTER (WHERE opened_at >= $1 AND opened_at < $2)::int AS opens,
+              COUNT(*) FILTER (WHERE opened_at >= $1 AND opened_at < $2 AND engaged_at IS NOT NULL)::int AS engaged,
+              COUNT(DISTINCT link_id) FILTER (WHERE opened_at >= $1 AND opened_at < $2)::int AS links_with_opens,
+              COUNT(*) FILTER (WHERE opened_at >= $3 AND opened_at < $4)::int AS prev_opens
        FROM tracking_sessions
-       WHERE NOT is_bot_or_preview AND opened_at >= $2`,
-      [dayStart, prevStart, prevEnd]
+       WHERE NOT is_bot_or_preview AND opened_at >= $3 AND opened_at < $2`,
+      [start, end, prevStart, prevEnd]
     ),
     query<HourRow>(
       `SELECT EXTRACT(HOUR FROM opened_at AT TIME ZONE 'UTC')::int AS hour,
               COUNT(*)::int AS opens
        FROM tracking_sessions
-       WHERE NOT is_bot_or_preview AND opened_at >= $1
+       WHERE NOT is_bot_or_preview AND opened_at >= $1 AND opened_at < $2
        GROUP BY hour`,
-      [dayStart]
+      [start, end]
     ),
     query<LinkOpensRow>(
       `SELECT link_id, COUNT(*)::int AS opens
        FROM tracking_sessions
-       WHERE NOT is_bot_or_preview AND opened_at >= $1
+       WHERE NOT is_bot_or_preview AND opened_at >= $1 AND opened_at < $2
        GROUP BY link_id
        ORDER BY opens DESC, link_id ASC
-       LIMIT $2`,
-      [dayStart, TOP_LINKS]
+       LIMIT $3`,
+      [start, end, TOP_LINKS]
     ),
   ]);
 
@@ -209,26 +274,31 @@ export const getDailySnapshot = async (): Promise<DailySnapshot> => {
       : [];
   });
 
-  // Today runs to the end of the UTC day, not to `now`: chain timestamps come
-  // from block time and can sit slightly ahead of this server's clock.
-  const today = chainMetrics(snapshot, dayStartMs, dayStartMs + DAY_MS);
-  const yesterday = chainMetrics(snapshot, prevStartMs, prevEndMs);
+  // A window that includes today runs to the end of the UTC day, not to
+  // `now`: chain timestamps come from block time and can sit slightly ahead of
+  // this server's clock.
+  const current = chainMetrics(snapshot, window.startMs, window.endMs);
+  const previous = chainMetrics(snapshot, window.prevStartMs, window.prevEndMs);
 
   return {
-    date: new Date(dayStartMs).toISOString().slice(0, 10),
+    period: window.period,
+    days: window.days,
+    date: window.endDate,
+    startDate: window.startDate,
+    endDate: window.endDate,
     generatedAt: now.toISOString(),
     hour: now.getUTCHours(),
     linksTotal: snapshot.links.length,
     linksWithOpens: Number(totals?.links_with_opens ?? 0),
     opens: delta(Number(totals?.opens ?? 0), Number(totals?.prev_opens ?? 0)),
     engagedOpens: Number(totals?.engaged ?? 0),
-    wallets: delta(today.wallets, yesterday.wallets),
-    bridgedWallets: today.bridgedWallets,
-    bridgeValueUsd: delta(today.bridgeValueUsd, yesterday.bridgeValueUsd),
-    bridgeValuePartial: today.bridgeValuePartial,
-    bridgeIns: today.bridgeIns,
-    actions: delta(today.actions, yesterday.actions),
-    actionLinks: today.actionLinks,
+    wallets: delta(current.wallets, previous.wallets),
+    bridgedWallets: current.bridgedWallets,
+    bridgeValueUsd: delta(current.bridgeValueUsd, previous.bridgeValueUsd),
+    bridgeValuePartial: current.bridgeValuePartial,
+    bridgeIns: current.bridgeIns,
+    actions: delta(current.actions, previous.actions),
+    actionLinks: current.actionLinks,
     opensByHour,
     topLinks,
   };
@@ -237,10 +307,10 @@ export const getDailySnapshot = async (): Promise<DailySnapshot> => {
 // ---------------------------------------------------------------------------
 // Breakdowns behind the snapshot tiles
 // ---------------------------------------------------------------------------
-// Each tile on the Daily Snapshot is a single number; these are the rows that
-// number is made of, over the SAME UTC-today window, so a tile and its table
-// can never disagree. Lists are newest-first and capped (`truncated` says the
-// tail was cut) — this is a drill-down, not an export.
+// Each tile on the snapshot panel is a single number; these are the rows that
+// number is made of, over the SAME window (same `period`), so a tile and its
+// table can never disagree. Lists are newest-first and capped (`truncated`
+// says the tail was cut) — this is a drill-down, not an export.
 
 const MAX_ROWS = 500;
 
@@ -263,18 +333,31 @@ export interface OpenRow {
   address: string | null;
 }
 
-// One wallet identity that connected today. The bridge/action figures cover
-// today's attributed events for that wallet — the same window as the tiles, so
-// a wallet that connects today and bridges tomorrow reads 0 here today.
+// One wallet identity that connected inside the window. The bridge/action
+// figures cover that wallet's attributed events in the SAME window as the
+// tiles, so a wallet that connects today and bridges tomorrow reads 0 today.
 export interface WalletRow {
   address: string;
   externalWalletAddress: string | null;
   stratoAddress: string | null;
   connector: string | null;
+  // Earliest connection inside the window
   connectedAt: string;
-  // Open that started the session the wallet connected in
+  // Open that started the session that connection happened in
   firstOpenAt: string | null;
+  // firstOpenAt -> connectedAt: how long the visit took to convert
+  secondsToConnect: number | null;
+  // This identity's very first tracked connection, ever (not window-bound)
+  firstSeenAt: string;
+  // First seen before the window started: not a first-touch visitor
+  returning: boolean;
+  // Visits inside the window in which this wallet connected, and how many of
+  // them reached the app (engagement ping)
+  visits: number;
+  engagedVisits: number;
   link: BreakdownLink | null;
+  // Referrer of the visit that first connected this wallet in the window
+  referrer: string | null;
   city: string | null;
   country: string | null;
   bridgeIns: number;
@@ -315,7 +398,11 @@ export interface BreakdownSection<Row> {
 }
 
 export interface DailyBreakdown {
-  date: string; // YYYY-MM-DD (UTC), same window as the snapshot
+  period: MetricsPeriod;
+  days: number;
+  date: string; // YYYY-MM-DD (UTC): the window's last day, as in the snapshot
+  startDate: string;
+  endDate: string;
   generatedAt: string;
   opens: BreakdownSection<OpenRow>;
   wallets: BreakdownSection<WalletRow>;
@@ -336,9 +423,13 @@ interface OpenDetailRow {
   address: string | null;
 }
 
-interface SessionGeoRow {
+// The visits a wallet connected in: enough to tell first open, engagement,
+// first-touch referrer and location apart per visit
+interface SessionDetailRow {
   id: string;
   opened_at: Date;
+  engaged: boolean;
+  referrer: string | null;
   geo_city: string | null;
   geo_country: string | null;
 }
@@ -350,25 +441,41 @@ const section = <Row>(total: number, rows: Row[]): BreakdownSection<Row> => ({
   rows,
 });
 
-// Today's wallet identities, keyed like the wallets tile counts them
+// The window's wallet identities, keyed like the wallets tile counts them
 // (walletKeyOf): the connection rows of one visitor collapse into one row.
-interface TodayIdentity {
+interface WindowIdentity {
   key: string;
   addresses: Set<string>;
   externalWalletAddress: string | null;
   stratoAddress: string | null;
   connector: string | null;
   connectedAt: Date;
+  // First tracked connection ever, so a wallet can be told apart from a
+  // returning one even when the window only holds its latest visit
+  firstSeenAt: Date;
   linkId: string;
   sessionId: string;
+  // Every visit inside the window this wallet connected in
+  sessionIds: Set<string>;
 }
 
-const todayIdentities = (
+const windowIdentities = (
   snapshot: AttributionSnapshot,
   startMs: number,
   endMs: number
-): TodayIdentity[] => {
-  const identities = new Map<string, TodayIdentity>();
+): WindowIdentity[] => {
+  // Lifetime first-touch per identity, from the full (unwindowed) connection
+  // list the snapshot already carries, ordered ascending by connected_at.
+  const firstSeen = new Map<string, Date>();
+  for (const conn of snapshot.connections) {
+    if (conn.is_bot_or_preview) continue;
+    const key = walletKeyOf(conn);
+    if (!key) continue;
+    const seen = firstSeen.get(key);
+    if (!seen || conn.connected_at < seen) firstSeen.set(key, conn.connected_at);
+  }
+
+  const identities = new Map<string, WindowIdentity>();
   for (const conn of snapshot.connections) {
     if (conn.is_bot_or_preview) continue;
     if (!inWindow(conn.connected_at.getTime(), startMs, endMs)) continue;
@@ -383,8 +490,10 @@ const todayIdentities = (
         stratoAddress: null,
         connector: null,
         connectedAt: conn.connected_at,
+        firstSeenAt: firstSeen.get(key) ?? conn.connected_at,
         linkId: String(conn.link_id),
         sessionId: String(conn.session_id),
+        sessionIds: new Set(),
       };
       identities.set(key, identity);
     }
@@ -397,7 +506,8 @@ const todayIdentities = (
       identity.addresses.add(toCirrusAddress(conn.strato_address));
     }
     identity.connector = identity.connector ?? conn.connector;
-    // Earliest connection of the day owns the "link used" and the session
+    identity.sessionIds.add(String(conn.session_id));
+    // Earliest connection in the window owns the "link used" and the session
     if (conn.connected_at < identity.connectedAt) {
       identity.connectedAt = conn.connected_at;
       identity.linkId = String(conn.link_id);
@@ -407,12 +517,45 @@ const todayIdentities = (
   return [...identities.values()];
 };
 
-// Rows behind all four tiles for today's UTC window.
-export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
+// Chain events of the window, indexed by every address that identifies them,
+// so a wallet row doesn't rescan the whole event list. Keyed by eventKey on
+// the way out: a bridge-in matching both of a wallet's addresses counts once.
+const indexByAddress = <Event extends { eventKey: string }>(
+  events: Event[],
+  addressesOf: (event: Event) => (string | null | undefined)[]
+): Map<string, Event[]> => {
+  const index = new Map<string, Event[]>();
+  for (const event of events) {
+    for (const address of addressesOf(event)) {
+      if (!address) continue;
+      const list = index.get(address);
+      if (list) list.push(event);
+      else index.set(address, [event]);
+    }
+  }
+  return index;
+};
+
+const eventsFor = <Event extends { eventKey: string }>(
+  index: Map<string, Event[]>,
+  addresses: Set<string>
+): Event[] => {
+  const found = new Map<string, Event>();
+  for (const address of addresses) {
+    for (const event of index.get(address) ?? []) found.set(event.eventKey, event);
+  }
+  return [...found.values()];
+};
+
+// Rows behind all four tiles, over the same window as the snapshot.
+export const getDailyBreakdown = async (
+  period: MetricsPeriod = "today"
+): Promise<DailyBreakdown> => {
   const now = new Date();
-  const dayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const dayEndMs = dayStartMs + DAY_MS;
-  const dayStart = new Date(dayStartMs);
+  const window = periodWindow(period, now);
+  const { startMs, endMs } = window;
+  const start = new Date(startMs);
+  const end = new Date(endMs);
 
   const snapshot = await getSnapshot();
   const linkRefs = new Map<string, BreakdownLink>(
@@ -429,8 +572,8 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
     query<{ opens: number }>(
       `SELECT COUNT(*)::int AS opens
        FROM tracking_sessions
-       WHERE NOT is_bot_or_preview AND opened_at >= $1`,
-      [dayStart]
+       WHERE NOT is_bot_or_preview AND opened_at >= $1 AND opened_at < $2`,
+      [start, end]
     ),
     query<OpenDetailRow>(
       `SELECT s.link_id, s.opened_at, s.engaged_at IS NOT NULL AS engaged,
@@ -444,10 +587,10 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
          ORDER BY connected_at ASC, id ASC
          LIMIT 1
        ) wc ON TRUE
-       WHERE NOT s.is_bot_or_preview AND s.opened_at >= $1
+       WHERE NOT s.is_bot_or_preview AND s.opened_at >= $1 AND s.opened_at < $2
        ORDER BY s.opened_at DESC
-       LIMIT $2`,
-      [dayStart, MAX_ROWS]
+       LIMIT $3`,
+      [start, end, MAX_ROWS]
     ),
   ]);
   const openRows: OpenRow[] = opensResult.rows.map((row) => ({
@@ -460,36 +603,40 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
     address: row.address || null,
   }));
 
+  // ---- the window's attributed chain events, shared by three sections ----
+  const windowBridges: BridgeInEvent[] = snapshot.bridgeIns
+    .filter((b) => snapshot.assignments.has(b.eventKey) && inWindow(b.timestampMs, startMs, endMs))
+    .sort((a, b) => b.timestampMs - a.timestampMs);
+  const windowActions: ActivityEvent[] = snapshot.activityEvents
+    .filter((e) => snapshot.assignments.has(e.eventKey) && inWindow(e.timestampMs, startMs, endMs))
+    .sort((a, b) => b.timestampMs - a.timestampMs);
+
   // ---- wallets ----------------------------------------------------------
-  const identities = todayIdentities(snapshot, dayStartMs, dayEndMs);
-  // The opens that started today's wallet sessions, for "first open" and geo
-  const sessionIds = [...new Set(identities.map((i) => i.sessionId))];
+  const identities = windowIdentities(snapshot, startMs, endMs);
+  // Every visit those wallets connected in, for first open, engagement,
+  // first-touch referrer and geo
+  const sessionIds = [...new Set(identities.flatMap((i) => [...i.sessionIds]))];
   const sessionsResult = sessionIds.length
-    ? await query<SessionGeoRow>(
-        `SELECT id, opened_at, geo_city, geo_country
+    ? await query<SessionDetailRow>(
+        `SELECT id, opened_at, engaged_at IS NOT NULL AS engaged, referrer, geo_city, geo_country
          FROM tracking_sessions
          WHERE id = ANY($1::uuid[])`,
         [sessionIds]
       )
-    : { rows: [] as SessionGeoRow[] };
+    : { rows: [] as SessionDetailRow[] };
   const sessions = new Map(sessionsResult.rows.map((row) => [String(row.id), row]));
+  const bridgesByAddress = indexByAddress(windowBridges, (b) => [
+    b.stratoRecipient,
+    b.externalSender,
+  ]);
+  const actionsByAddress = indexByAddress(windowActions, (e) => [e.userAddress]);
 
   const walletRows: WalletRow[] = identities
     .sort((a, b) => b.connectedAt.getTime() - a.connectedAt.getTime())
     .slice(0, MAX_ROWS)
     .map((identity) => {
-      const bridges = snapshot.bridgeIns.filter(
-        (b) =>
-          snapshot.assignments.has(b.eventKey) &&
-          inWindow(b.timestampMs, dayStartMs, dayEndMs) &&
-          (identity.addresses.has(b.stratoRecipient) || identity.addresses.has(b.externalSender))
-      );
-      const events = snapshot.activityEvents.filter(
-        (e) =>
-          snapshot.assignments.has(e.eventKey) &&
-          inWindow(e.timestampMs, dayStartMs, dayEndMs) &&
-          identity.addresses.has(e.userAddress)
-      );
+      const bridges = eventsFor(bridgesByAddress, identity.addresses);
+      const events = eventsFor(actionsByAddress, identity.addresses);
       let bridgeValueUsd = 0;
       let bridgeValuePartial = false;
       const assets = new Set<string>();
@@ -501,6 +648,10 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
       }
       const timestamps = [...bridges.map((b) => b.timestampMs), ...events.map((e) => e.timestampMs)];
       const session = sessions.get(identity.sessionId);
+      const visits = [...identity.sessionIds].flatMap((id) => {
+        const visit = sessions.get(id);
+        return visit ? [visit] : [];
+      });
       return {
         address: identity.key,
         externalWalletAddress: identity.externalWalletAddress,
@@ -508,7 +659,18 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
         connector: identity.connector,
         connectedAt: identity.connectedAt.toISOString(),
         firstOpenAt: session ? session.opened_at.toISOString() : null,
+        secondsToConnect: session
+          ? Math.max(
+              0,
+              Math.round((identity.connectedAt.getTime() - session.opened_at.getTime()) / 1000)
+            )
+          : null,
+        firstSeenAt: identity.firstSeenAt.toISOString(),
+        returning: identity.firstSeenAt.getTime() < startMs,
+        visits: identity.sessionIds.size,
+        engagedVisits: visits.filter((visit) => visit.engaged).length,
         link: linkRef(identity.linkId),
+        referrer: session?.referrer ?? null,
         city: session?.geo_city ?? null,
         country: session?.geo_country ?? null,
         bridgeIns: bridges.length,
@@ -522,28 +684,22 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
     });
 
   // ---- bridged in -------------------------------------------------------
-  const todayBridges = snapshot.bridgeIns
-    .filter((b) => snapshot.assignments.has(b.eventKey) && inWindow(b.timestampMs, dayStartMs, dayEndMs))
-    .sort((a, b) => b.timestampMs - a.timestampMs);
   let bridgeValueUsd = 0;
   let bridgeValuePartial = false;
-  for (const bridge of todayBridges) {
+  for (const bridge of windowBridges) {
     const price = snapshot.oraclePrices.get(bridge.stratoToken);
     if (price == null) bridgeValuePartial = true;
     else bridgeValueUsd += tokenAmount(bridge.stratoTokenAmount) * price;
   }
-  const bridgeRows: BridgeRow[] = todayBridges.slice(0, MAX_ROWS).map((bridge) => ({
+  const bridgeRows: BridgeRow[] = windowBridges.slice(0, MAX_ROWS).map((bridge) => ({
     ...toBridgeInItem(snapshot, bridge),
     link: linkRef(snapshot.assignments.get(bridge.eventKey)?.linkId),
     chainName: externalChainName(bridge.externalChainId),
   }));
 
   // ---- on-chain actions -------------------------------------------------
-  const todayActions = snapshot.activityEvents
-    .filter((e) => snapshot.assignments.has(e.eventKey) && inWindow(e.timestampMs, dayStartMs, dayEndMs))
-    .sort((a, b) => b.timestampMs - a.timestampMs);
   const groups = new Map<ActivityCategory, { count: number; wallets: Set<string>; links: Set<string> }>();
-  for (const event of todayActions) {
+  for (const event of windowActions) {
     let group = groups.get(event.category);
     if (!group) {
       group = { count: 0, wallets: new Set(), links: new Set() };
@@ -562,7 +718,7 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
       links: group.links.size,
     }))
     .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
-  const actionRows: ActionRow[] = todayActions.slice(0, MAX_ROWS).map((event) => ({
+  const actionRows: ActionRow[] = windowActions.slice(0, MAX_ROWS).map((event) => ({
     at: new Date(event.timestampMs).toISOString(),
     category: event.category,
     description: `${event.contractName}: ${event.eventName}`,
@@ -571,11 +727,15 @@ export const getDailyBreakdown = async (): Promise<DailyBreakdown> => {
   }));
 
   return {
-    date: new Date(dayStartMs).toISOString().slice(0, 10),
+    period: window.period,
+    days: window.days,
+    date: window.endDate,
+    startDate: window.startDate,
+    endDate: window.endDate,
     generatedAt: now.toISOString(),
     opens: section(Number(opensCountResult.rows[0]?.opens ?? 0), openRows),
     wallets: section(identities.length, walletRows),
-    bridgeIns: { ...section(todayBridges.length, bridgeRows), valueUsd: bridgeValueUsd, valuePartial: bridgeValuePartial },
-    actions: { ...section(todayActions.length, actionRows), byCategory },
+    bridgeIns: { ...section(windowBridges.length, bridgeRows), valueUsd: bridgeValueUsd, valuePartial: bridgeValuePartial },
+    actions: { ...section(windowActions.length, actionRows), byCategory },
   };
 };
