@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import Navbar from "@/components/Navbar";
 import SiteFooter from "@/components/SiteFooter";
 import LandingAssurances from "@/components/landing/LandingAssurances";
@@ -21,9 +22,11 @@ import NotFound from "./NotFound";
 const ProductLanding = ({ slug }: { slug: string }) => {
   const config = LANDING_CONFIGS[slug];
 
+  // `config` is missing for an unknown slug, where this route renders <NotFound />.
+  usePageTitle(config ? config.documentTitle : "Page Not Found");
+
   useEffect(() => {
     if (!config) return;
-    document.title = config.documentTitle;
     // Autocapture already records the URL, but a named event carrying the slug
     // is what makes the acquisition funnel buildable without regex filters.
     capture("landing_page_viewed", { slug });

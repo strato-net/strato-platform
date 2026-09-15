@@ -11,6 +11,8 @@ import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { getEarningAssetSymbolRank } from "@/lib/tokenPriority";
 import { getStratoTokenAddress } from "@/lib/constants";
+import AssetIcon from "@/components/ui/AssetIcon";
+import { SAVE_USDST_VAULT_KEY, getVaultKeyForSymbol } from "@/config/vaultIcons";
 
 const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | undefined): boolean => {
   const symbol = asset?._symbol?.toLowerCase?.() || "";
@@ -18,18 +20,12 @@ const isSaveUsdstAsset = (asset: { _symbol?: string; _name?: string } | null | u
   return symbol === "saveusdst" || name.includes("save usdst") || name.includes("saveusdst");
 };
 
-const CARRY_VAULT_SHARE_MAP: Record<string, string> = {
-  carryeth: "eth-carry",
-  carrywbtc: "wbtc-carry",
-  yieldusdc: "usdc-yield",
-  yieldgoldst: "goldst-yield",
-  yieldsilvst: "silvst-yield",
-};
+const getCarryVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null =>
+  getVaultKeyForSymbol(asset?._symbol);
 
-const getCarryVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null => {
-  const symbol = asset?._symbol?.toLowerCase?.() || "";
-  return CARRY_VAULT_SHARE_MAP[symbol] ?? null;
-};
+/** Vault an asset represents, if any — used to pick vault artwork over token image metadata. */
+const getAssetVaultKey = (asset: { _symbol?: string; _name?: string } | null | undefined): string | null =>
+  isSaveUsdstAsset(asset) ? SAVE_USDST_VAULT_KEY : getCarryVaultKey(asset);
 
 const getAssetDetailHref = (asset: { address?: string; _symbol?: string; _name?: string } | null | undefined): string => {
   if (isSaveUsdstAsset(asset)) {
@@ -243,20 +239,20 @@ const AssetsList = ({
                     >
                       <td className="py-3 md:py-4 px-3 md:px-4">
                         <div className="flex items-center">
-                          {asset?.images?.[0] ? (
-                            <img
-                              src={asset.images[0].value}
-                              alt={asset._name}
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
-                            />
-                          ) : (
-                            <div
-                              className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
-                              style={{ backgroundColor: "red" }}
-                            >
-                              {asset?._symbol?.slice(0, 2) || "??"}
-                            </div>
-                          )}
+                          <AssetIcon
+                            vaultKey={getAssetVaultKey(asset)}
+                            src={asset?.images?.[0]?.value}
+                            alt={asset._name}
+                            className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover shrink-0"
+                            fallback={
+                              <div
+                                className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium shrink-0"
+                                style={{ backgroundColor: "red" }}
+                              >
+                                {asset?._symbol?.slice(0, 2) || "??"}
+                              </div>
+                            }
+                          />
                           <div className="ml-2 md:ml-3 min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <TooltipProvider>
@@ -463,20 +459,20 @@ const AssetsList = ({
                       >
                         <td className="py-3 md:py-4 px-3 md:px-4">
                           <div className="flex items-center">
-                            {asset?.images?.[0] ? (
-                              <img
-                                src={asset.images[0].value}
-                                alt={asset._name}
-                                className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div
-                                className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                                style={{ backgroundColor: "red" }}
-                              >
-                                {asset?._symbol?.slice(0, 2) || "??"}
-                              </div>
-                            )}
+                            <AssetIcon
+                              vaultKey={getAssetVaultKey(asset)}
+                              src={asset?.images?.[0]?.value}
+                              alt={asset._name}
+                              className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover"
+                              fallback={
+                                <div
+                                  className="w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                                  style={{ backgroundColor: "red" }}
+                                >
+                                  {asset?._symbol?.slice(0, 2) || "??"}
+                                </div>
+                              }
+                            />
                             <div className="ml-2 md:ml-3 min-w-0 flex-1">
                               <Link
                                 to={getAssetDetailHref(asset)}

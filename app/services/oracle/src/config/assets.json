@@ -323,7 +323,9 @@
             "USDT",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "NVDA",
+            "SPY"
           ]
         },
         "Metals.dev": {
@@ -414,10 +416,13 @@
             "TSLAX",
             "SPY",
             "SPYX",
-            "NVDA",
             "WEETH",
+            "WHYPE",
             "KHYPE"
-          ]
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
+          }
         },
         "DefiLlama": {
           "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
@@ -856,7 +861,9 @@
             "USDT",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "NVDA",
+            "SPY"
           ]
         },
         "Metals.dev": {
@@ -947,10 +954,13 @@
             "TSLAX",
             "SPY",
             "SPYX",
-            "NVDA",
             "WEETH",
+            "WHYPE",
             "KHYPE"
-          ]
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
+          }
         },
         "DefiLlama": {
           "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",

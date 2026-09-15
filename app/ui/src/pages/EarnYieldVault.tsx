@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { formatDistanceToNow } from "date-fns";
@@ -43,6 +44,7 @@ import { findBestEarnApyInfo } from "@/utils/earnUtils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
 import { YieldVaultHistoryCharts } from "@/components/earn/YieldVaultHistoryCharts";
+import AssetIcon from "@/components/ui/AssetIcon";
 import type { YieldVaultHistoryPoint } from "@/context/YieldVaultContext";
 
 const VAULT_META: Record<string, {
@@ -231,9 +233,10 @@ const EarnYieldVault = () => {
     await fetchHistory();
   }, [fetchHistory, isFundedVault]);
 
+  usePageTitle(meta?.title);
+
   useEffect(() => {
     if (meta) {
-      document.title = `${meta.title} | STRATO`;
       window.scrollTo(0, 0);
     }
   }, [meta]);
@@ -654,11 +657,18 @@ const EarnYieldVault = () => {
                         <div className="space-y-3">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-3">
-                              <div
-                                className={`w-9 h-9 rounded-full ${meta.iconBg} flex items-center justify-center`}
-                              >
-                                <TrendingUp className={`h-4 w-4 ${meta.iconColor}`} />
-                              </div>
+                              <AssetIcon
+                                vaultKey={vaultKey}
+                                alt={meta.title}
+                                className="w-9 h-9 rounded-full object-cover shrink-0"
+                                fallback={
+                                  <div
+                                    className={`w-9 h-9 rounded-full ${meta.iconBg} flex items-center justify-center`}
+                                  >
+                                    <TrendingUp className={`h-4 w-4 ${meta.iconColor}`} />
+                                  </div>
+                                }
+                              />
                               <div>
                                 <h1 className="text-xl md:text-2xl font-semibold tracking-tight">
                                   {meta.title}
@@ -781,11 +791,18 @@ const EarnYieldVault = () => {
                         <>
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
-                              <div
-                                className={`w-12 h-12 rounded-full ${meta.iconBg} flex items-center justify-center`}
-                              >
-                                <TrendingUp className={`h-6 w-6 ${meta.iconColor}`} />
-                              </div>
+                              <AssetIcon
+                                vaultKey={vaultKey}
+                                alt={meta.title}
+                                className="w-12 h-12 rounded-full object-cover shrink-0"
+                                fallback={
+                                  <div
+                                    className={`w-12 h-12 rounded-full ${meta.iconBg} flex items-center justify-center`}
+                                  >
+                                    <TrendingUp className={`h-6 w-6 ${meta.iconColor}`} />
+                                  </div>
+                                }
+                              />
                               <div>
                                 <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">
                                   {meta.title}

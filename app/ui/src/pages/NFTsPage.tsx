@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -10,6 +11,8 @@ import NFTThumbnail from "@/components/nft/NFTThumbnail";
 
 /** All NFTs the signed-in user owns, across every registered NFT source. */
 const NFTsPage = () => {
+  usePageTitle("NFTs");
+
   const { isLoggedIn } = useUser();
   const { ownedNFTs, loadingOwned, getOwnedNFTs } = useNFTContext();
   const navigate = useNavigate();

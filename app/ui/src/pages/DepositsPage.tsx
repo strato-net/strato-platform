@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
@@ -11,6 +12,8 @@ import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import { normBridgeAddr } from '@/lib/bridgeLinks';
 
 const DepositsPage = () => {
+  usePageTitle("Fund");
+
   const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { loadNetworksAndTokens, selectTokenByStratoAddress } = useBridgeContext();
   const [searchParams] = useSearchParams();

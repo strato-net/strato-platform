@@ -62,6 +62,8 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import qualified Blockchain.Strato.RedisBlockDB as RBDB
+import Blockchain.SyncDB (updateVmBestBlockNumber)
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (SAddress))
@@ -147,7 +149,7 @@ instance (HasMemRawStorageDB m) => HasMemRawStorageDB (ConduitT i o m) where
 
 -- todo: lovely!
 
-addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
+addBlocks :: (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m) => [OutputBlock] -> ConduitT a VmOutEvent m ()
 addBlocks unfiltered = do
   let filtered = filter ((/= 0) . number . obBlockData) unfiltered
       genesisOnly = filter ((== 0) . number . obBlockData) unfiltered
@@ -178,6 +180,7 @@ addBlocks unfiltered = do
             timeit (printf "Block #%d (%d TXs insertion)" blockNo txCount) timerToUse $ do
               failures <- lift $ addBlock block
               when (null failures) $ do
+                lift . lift . RBDB.withRedisBlockDB $ updateVmBestBlockNumber blockNo
                 (didReplaceThisTime, replacedBits@(hsh, num)) <- lift . lift $ replaceBestIfBetter block
                 when didReplaceThisTime $ do
                   writeIORef didReplaceBest True

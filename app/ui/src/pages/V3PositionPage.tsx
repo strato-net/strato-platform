@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
@@ -16,6 +17,7 @@ import { NFTItem } from "@strato/shared-types";
  */
 const V3PositionPage = () => {
   const { tokenId } = useParams<{ tokenId: string }>();
+  usePageTitle(tokenId ? `Position #${tokenId}` : "Position");
   const { getPositionNFTItem } = useNFTContext();
   const navigate = useNavigate();
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef, memo } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useTokenContext } from '@/context/TokenContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { api } from '@/lib/axios';
@@ -119,6 +120,8 @@ const convertToOHLC = (
 const WIDGET_STORAGE_KEY = 'price-tracking-widgets';
 
 const PriceTracking = () => {
+  usePageTitle("Trading Desk");
+
   const { earningAssets, usdstBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const { setFromAsset, setToAsset, swappableTokens, refetchSwappableTokens, fetchPairableTokens, getPoolByTokenPair, getPoolByAddress } = useSwapContext();

@@ -32,11 +32,26 @@ pipeline {
           }
         }
         sh '''#!/bin/bash -le
+          # Find the previous deployment's node directory before bringing it down.
+          # strato-ps prints either "######## STRATO Status: <dir>" (running)
+          # or "STRATO is not running (<network> node at <dir>)" (stopped).
+          PREV_NODE_DIR=$(strato-ps 2>/dev/null | sed -n \
+            -e 's|^######## STRATO Status: ||p' \
+            -e 's|^STRATO is not running (.* node at \\(.*\\))$|\\1|p' \
+            | head -1) || true
+          echo "Previous node directory: ${PREV_NODE_DIR:-<none>}"
+
           strato-down || true
           pkill convoke || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
+          # Wipe the previous node directory, keeping logs/ and the generated configs, for debugging/reference
+          if [ -n "$PREV_NODE_DIR" ] && [ -d "$PREV_NODE_DIR" ]; then
+            sudo find "$PREV_NODE_DIR" -mindepth 1 -maxdepth 1 \
+              ! -name logs ! -name docker-compose.yml ! -name commands.txt \
+              -exec rm -rf {} + || true
+          fi
           # Clean up node data from previous builds
           sudo rm -rf mynode || true
         '''

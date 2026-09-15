@@ -33,16 +33,15 @@ assert_no_appledouble() {
   fi
 }
 
-# The kafka broker container runs as its baked-in appuser (uid 1000), not the
-# host user, so the restored kafka tree must be readable and writable by any
-# uid: files o+rw, dirs o+rwx (KRaft *.checkpoint files are written 0600 on the
-# source node and older archives carry that mode).
-assert_kafka_modes_relaxed() {
-  local kafka_dir="$1"
+# jlog writes its segments 0640 and topic dirs 0750 owned by whoever ran the
+# node, so the restored jlog tree must be relaxed to be readable and writable by
+# any uid: files o+rw, dirs o+rwx.
+assert_jlog_modes_relaxed() {
+  local jlog_dir="$1"
   local bad
-  bad="$({ find "$kafka_dir" -type f ! -perm -0006; find "$kafka_dir" -type d ! -perm -0007; })"
+  bad="$({ find "$jlog_dir" -type f ! -perm -0006; find "$jlog_dir" -type d ! -perm -0007; })"
   if [[ -n "$bad" ]]; then
-    echo "kafka payload entries not world-read/writable after restore:" >&2
+    echo "jlog payload entries not world-read/writable after restore:" >&2
     echo "$bad" >&2
     exit 1
   fi
@@ -53,17 +52,18 @@ make_fixture_snapshot() {
   mkdir -p "$staging/payload/ethereumH/state"
   mkdir -p "$staging/payload/postgres-dumps"
   mkdir -p "$staging/payload/redis"
-  mkdir -p "$staging/payload/kafka/kafka-logs/__cluster_metadata-0"
+  mkdir -p "$staging/payload/jlog/vmevents"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
   echo "eth dump fixture" > "$staging/payload/postgres-dumps/eth.dump"
   echo "cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.dump"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
-  echo "kafka-from-snapshot" > "$staging/payload/kafka/log"
-  # KRaft metadata snapshots are written 0600 (Java createTempFile) on the
-  # source node; archives published before create normalized modes carry that.
-  echo "kraft-metadata-snapshot" > "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-  chmod 600 "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
+  echo "jlog-from-snapshot" > "$staging/payload/jlog/vmevents/00000000"
+  echo "jlog-metastore" > "$staging/payload/jlog/vmevents/metastore"
+  # jlog writes subscriber checkpoints tight on the source node; archives
+  # published before create normalized modes carry that.
+  echo "jlog-checkpoint" > "$staging/payload/jlog/vmevents/cp.73747261746f"
+  chmod 600 "$staging/payload/jlog/vmevents/cp.73747261746f"
 
   cat > "$staging/SNAPSHOT.json" <<'JSON'
 {
@@ -89,7 +89,7 @@ make_fixture_snapshot() {
     "postgres-dumps/eth.dump",
     "postgres-dumps/cirrus.dump",
     "redis",
-    "kafka"
+    "jlog"
   ],
   "checksums": {
     "payloadSha256": "fixture"
@@ -160,9 +160,9 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.t
 assert_file "$NODE/.ethereumH/ethconf.yaml"
 assert_file "$NODE/.ethereumH/state/value"
 assert_file "$NODE/redis/appendonly.aof"
-assert_file "$NODE/kafka/log"
-assert_file "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-assert_kafka_modes_relaxed "$NODE/kafka"
+assert_file "$NODE/jlog/vmevents/00000000"
+assert_file "$NODE/jlog/vmevents/cp.73747261746f"
+assert_jlog_modes_relaxed "$NODE/jlog"
 assert_file "$NODE/secrets/oauth_credentials.yaml"
 assert_file "$NODE/secrets/ssl/server.key"
 assert_file "$NODE/secrets/postgres_password"
@@ -223,14 +223,10 @@ JSON
 
 CREATED="$TMP/created.tar.gz"
 echo "appledouble" > "$NODE/.ethereumH/state/._value"
-echo "appledouble" > "$NODE/kafka/._log"
-# Re-tighten the checkpoint to how the broker leaves it on a live node, so the
-# create below has to normalize it (the restore above already relaxed it).
-chmod 600 "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-# Half-deleted segments (renamed '*.deleted' by the broker after the history
-# prune, awaiting the delete timer) must not ship in the payload.
-mkdir -p "$NODE/kafka/kafka-logs/vmevents-0"
-echo "pruned segment" > "$NODE/kafka/kafka-logs/vmevents-0/00000000000000000000.log.deleted"
+echo "appledouble" > "$NODE/jlog/vmevents/._00000000"
+# Re-tighten the checkpoint to how jlog leaves it on a live node, so the create
+# below has to normalize it (the restore above already relaxed it).
+chmod 600 "$NODE/jlog/vmevents/cp.73747261746f"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$CREATED" \
@@ -248,16 +244,11 @@ if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; th
   cat "$TMP/created-appledouble.out" >&2
   exit 1
 fi
-# The archive itself must record relaxed kafka modes, so even a manual
-# tar -xp restore yields files the broker's appuser (uid 1000) can use on
-# hosts whose uid differs.
-if tar -tvzf "$CREATED" | grep "__cluster_metadata-0/00000000000000007271-0000000001.checkpoint" | grep -qv "^-rw-rw-rw-"; then
-  echo "created archive should carry relaxed (0666) kafka checkpoint modes" >&2
-  tar -tvzf "$CREATED" | grep "checkpoint" >&2
-  exit 1
-fi
-if tar -tzf "$CREATED" | grep -q '\.deleted$'; then
-  echo "created archive should not contain half-deleted ('*.deleted') kafka segments" >&2
+# The archive itself must record relaxed jlog modes, so even a manual tar -xp
+# restore yields state the node's processes can use on hosts whose uid differs.
+if tar -tvzf "$CREATED" | grep "vmevents/cp.73747261746f" | grep -qv "^-rw-rw-rw-"; then
+  echo "created archive should carry relaxed (0666) jlog checkpoint modes" >&2
+  tar -tvzf "$CREATED" | grep "vmevents" >&2
   exit 1
 fi
 
@@ -400,6 +391,21 @@ if grep -q "Traceback" "$TMP/unreachable.err"; then
   exit 1
 fi
 
+# A v1 (kafka-era) payload has kafka/ where this build expects jlog/. Restore
+# must refuse it instead of leaving a node with empty streaming state.
+mkdir -p "$TMP/staging-v1"
+(cd "$TMP/staging" && tar -cf - .) | (cd "$TMP/staging-v1" && tar -xf -)
+rm -rf "$TMP/staging-v1/payload/jlog"
+mkdir -p "$TMP/staging-v1/payload/kafka/kafka-logs"
+echo "kafka-from-v1-snapshot" > "$TMP/staging-v1/payload/kafka/log"
+(cd "$TMP/staging-v1" && tar -czf "$TMP/snapshot-v1.tar.gz" .)
+if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot-v1.tar.gz" --network helium --force \
+    > "$TMP/restore-v1.out" 2>&1; then
+  echo "restore should reject a kafka-era payload with no jlog/ state" >&2
+  exit 1
+fi
+assert_contains "$TMP/restore-v1.out" "payload has no jlog/ streaming state"
+
 PUBLISH="$TMP/published"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" publish "$TMP/snapshot.tar.gz" --destination "$PUBLISH" --alias latest
 assert_file "$PUBLISH/snapshot.tar.gz"
@@ -409,13 +415,17 @@ assert_file "$PUBLISH/latest.tar.gz.sha256"
 assert_contains "$PUBLISH/latest.tar.gz.sha256" "latest.tar.gz"
 
 # Snapshot source resolution (offline): exercise the helpers that map
-# --snapshot[=ts] + --network + --bucket into S3 URIs.
+# --snapshot[=ts] + --network + --bucket into S3 URIs under the tool's own
+# snapshot version.
+TOOL_VERSION="$(sed -n 's/^SNAPSHOT_VERSION="\(.*\)"$/\1/p' "$TOOL" | head -1)"
+[[ -n "$TOOL_VERSION" ]] || { echo "could not read SNAPSHOT_VERSION from $TOOL" >&2; exit 1; }
 RESOLVE_HELPERS="$(sed -n '/^snapshot_bucket()/,/^fetch_source()/p' "$TOOL" | sed '$d')"
 resolve_uri() {
   STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" bash -c '
     set -euo pipefail
     DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
     SNAPSHOT_ARCHIVE_EXT="tar.zst"
+    SNAPSHOT_VERSION="'"$TOOL_VERSION"'"
     die(){ echo "Error: $*" >&2; exit 1; }
     warn(){ :; }
     info(){ :; }
@@ -427,13 +437,13 @@ resolve_uri() {
   ' _ "$@"
 }
 
-[[ "$(resolve_uri "" true "" upquark "")" == "s3://strato-snapshots/upquark/latest.tar.zst" ]] \
+[[ "$(resolve_uri "" true "" upquark "")" == "s3://strato-snapshots/upquark/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "latest resolution wrong" >&2; exit 1; }
-[[ "$(resolve_uri "" true "20260601-13:05:00Z" helium "")" == "s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst" ]] \
+[[ "$(resolve_uri "" true "20260601-13:05:00Z" helium "")" == "s3://strato-snapshots/helium/$TOOL_VERSION/helium-20260601-130500Z.tar.zst" ]] \
   || { echo "timestamp resolution wrong" >&2; exit 1; }
-[[ "$(resolve_uri "" true "" helium "custom-bucket")" == "s3://custom-bucket/helium/latest.tar.zst" ]] \
+[[ "$(resolve_uri "" true "" helium "custom-bucket")" == "s3://custom-bucket/helium/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "bucket override resolution wrong" >&2; exit 1; }
-[[ "$(STRATO_SNAPSHOT_BUCKET=env-bucket resolve_uri "" true "" helium "")" == "s3://env-bucket/helium/latest.tar.zst" ]] \
+[[ "$(STRATO_SNAPSHOT_BUCKET=env-bucket resolve_uri "" true "" helium "")" == "s3://env-bucket/helium/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "env bucket resolution wrong" >&2; exit 1; }
 [[ "$(resolve_uri "/tmp/explicit.tar" false "" helium "")" == "/tmp/explicit.tar" ]] \
   || { echo "explicit source passthrough wrong" >&2; exit 1; }

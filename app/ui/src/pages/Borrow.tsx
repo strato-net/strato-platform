@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useUser } from "@/context/UserContext";
 import { useCDP } from '@/context/CDPContext';
 import { useRewardsUserInfo } from '@/hooks/useRewardsUserInfo';
@@ -27,9 +28,7 @@ const Borrow = () => {
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
   const [mintPlannerRefreshTrigger, setMintPlannerRefreshTrigger] = useState(0);
 
-  useEffect(() => {
-    document.title = "Borrow | STRATO";
-  }, []);
+  usePageTitle("Borrow");
 
   /* Hidden state and route handling - temporarily disabled 
   const [searchParams] = useSearchParams();

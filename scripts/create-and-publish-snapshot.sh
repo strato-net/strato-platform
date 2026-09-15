@@ -7,9 +7,12 @@
 # node at --node-dir is up and reachable; create waits for sync, stops writers,
 # archives state, and runs a restore smoke test before publishing.
 #
-# Layout produced in the bucket:
-#   s3://<bucket>/<network>/<network>-<YYYYMMDD-HHmmssZ>.tar.zst (+ .sha256)
-#   s3://<bucket>/<network>/latest.tar.zst                       (+ .sha256)
+# Layout produced in the bucket, under the snapshot version this build of
+# strato-snapshot reads and writes (SNAPSHOT_VERSION in bin/strato-snapshot;
+# currently v2). The unversioned <network>/ root holds the frozen v1 (kafka)
+# snapshots and is never published to again.
+#   s3://<bucket>/<network>/<version>/<network>-<YYYYMMDD-HHmmssZ>.tar.zst (+ .sha256)
+#   s3://<bucket>/<network>/<version>/latest.tar.zst                       (+ .sha256)
 
 set -euo pipefail
 
@@ -54,9 +57,6 @@ Options:
   --layer-lag <blocks>    Allowed API-indexer/Cirrus tip lag. Default: 5.
   --strict-layers         Require API-indexer and Cirrus tip verification.
   --include-prometheus    Include prometheus/ in the payload.
-  --skip-kafka-prune      Keep full kafka topic history in the payload (by
-                          default create prunes consumed history behind the
-                          committed consumer offsets before archiving).
   --run-smoke-test        Run create's post-create restore smoke test. Off by
                           default in this orchestration (the source node is
                           already verified synced and the artifact is checksummed).
@@ -85,7 +85,6 @@ WAIT_TIMEOUT="3600"
 LAYER_LAG="5"
 STRICT_LAYERS="false"
 INCLUDE_PROMETHEUS="false"
-SKIP_KAFKA_PRUNE="false"
 RUN_SMOKE_TEST="false"
 KEEP_ARCHIVE="false"
 NO_PUBLISH="false"
@@ -104,7 +103,6 @@ while [[ $# -gt 0 ]]; do
     --layer-lag) LAYER_LAG="$2"; shift 2 ;;
     --strict-layers) STRICT_LAYERS="true"; shift ;;
     --include-prometheus) INCLUDE_PROMETHEUS="true"; shift ;;
-    --skip-kafka-prune) SKIP_KAFKA_PRUNE="true"; shift ;;
     --run-smoke-test) RUN_SMOKE_TEST="true"; shift ;;
     --no-publish) NO_PUBLISH="true"; shift ;;
     --publish-only) PUBLISH_ONLY="$2"; shift 2 ;;
@@ -120,7 +118,11 @@ done
 [[ -x "$SNAPSHOT_TOOL" ]] || die "strato-snapshot not found at $SNAPSHOT_TOOL"
 command -v aws >/dev/null 2>&1 || die "aws CLI is required to publish snapshots"
 
-DESTINATION="s3://${BUCKET}/${NETWORK}/"
+# Publish under the same snapshot version the tool resolves --snapshot from, so
+# publish and restore can never disagree about which line a node uses.
+SNAPSHOT_VERSION="$(sed -n 's/^SNAPSHOT_VERSION="\(.*\)"$/\1/p' "$SNAPSHOT_TOOL" | head -1)"
+[[ -n "$SNAPSHOT_VERSION" ]] || die "could not read SNAPSHOT_VERSION from $SNAPSHOT_TOOL"
+DESTINATION="s3://${BUCKET}/${NETWORK}/${SNAPSHOT_VERSION}/"
 
 # --publish-only: upload a previously-created (and validated) archive, then exit.
 if [[ -n "$PUBLISH_ONLY" ]]; then
@@ -169,7 +171,6 @@ CREATE_ARGS=(
 # skip the smoke restore in this orchestration unless explicitly enabled.
 [[ "$RUN_SMOKE_TEST" == "true" ]] || CREATE_ARGS+=(--skip-smoke-test)
 [[ "$INCLUDE_PROMETHEUS" == "true" ]] && CREATE_ARGS+=(--include-prometheus)
-[[ "$SKIP_KAFKA_PRUNE" == "true" ]] && CREATE_ARGS+=(--skip-kafka-prune)
 
 # Run the node metadata/tip curls from inside this container, since the node
 # API is not published to the host. Empty means curl directly from the host.

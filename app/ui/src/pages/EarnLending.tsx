@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { formatUnits } from "ethers";
 import { ArrowLeft, CircleArrowDown, CircleArrowUp, Gauge, HelpCircle, Landmark, PauseCircle, Wallet } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -62,8 +63,9 @@ const EarnLending = () => {
     return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
   };
 
+  usePageTitle("Earn Lending");
+
   useEffect(() => {
-    document.title = "STRATO Earn Lending | STRATO";
     window.scrollTo(0, 0);
   }, []);
 

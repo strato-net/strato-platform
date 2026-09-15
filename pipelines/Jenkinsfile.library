@@ -259,7 +259,7 @@ def replaceServerPortsDocker() {
  * burns its full ~5h timeout before reporting a generic "failed to sync".
  *
  * isSynced=true only covers the p2p/VM pipeline (node best block vs world best
- * block in Redis). Cirrus is populated by slipstream from a separate Kafka
+ * block in Redis). Cirrus is populated by slipstream from a separate streaming
  * topic (vmevents) and can still be tens of thousands of blocks behind at the
  * moment isSynced flips true, so a second wait covers that layer. That check
  * mirrors the one strato-snapshot create runs for

@@ -206,8 +206,6 @@ export class Monitor {
           severity: "warn",
           line: `pool price is ${fmt(dislocationPct, 2)}% off the oracle (threshold ±${fmt(cfg.dislocationPct, 2)}%) — arbitrage opportunity`,
         });
-      } else {
-        state.clear(pairKey, "dislocation");
       }
     }
 
@@ -231,7 +229,9 @@ export class Monitor {
 
     // gate per finding-kind by the hysteresis state; due findings become one section
     // of the cycle's combined notification (sent once by runCycle)
-    const due = findings.filter((f) => state.shouldAlert(pairKey, f.kind, { mu, driftPct }));
+    const due = findings.filter((f) =>
+      state.shouldAlert(f.kind === "dislocation" ? pool : pairKey, f.kind, { mu, driftPct })
+    );
     if (due.length === 0) return null;
 
     const primary = due.find((f) => f.severity === "alert") ?? due[0];
@@ -259,7 +259,7 @@ export class Monitor {
         `  cd app/scripts && node positionV3Liquidity.js --pool ${pool} --widths ${configuredWidths ?? widths.join(",")} --execute`
       );
     }
-    for (const f of due) state.record(pairKey, f.kind, { mu, driftPct });
+    for (const f of due) state.record(f.kind === "dislocation" ? pool : pairKey, f.kind, { mu, driftPct });
     return { short, headline, body: lines.join("\n") };
   }
 }

@@ -19,6 +19,16 @@ export class AlertState {
   constructor(private file: string, private cooldownHours: number) {
     try {
       this.state = JSON.parse(fs.readFileSync(file, "utf8"));
+      // Preserve the latest dislocation cooldown from older account/watch keys.
+      for (const [key, records] of Object.entries(this.state)) {
+        if (!key.includes(":") || !records.dislocation) continue;
+        const pool = key.split(":")[1];
+        const current = this.state[pool]?.dislocation;
+        if (!current || Date.parse(records.dislocation.lastAlertAt) > Date.parse(current.lastAlertAt)) {
+          this.state[pool] = { ...this.state[pool], dislocation: records.dislocation };
+        }
+        delete records.dislocation;
+      }
     } catch (_) {
       this.state = {};
     }

@@ -5,7 +5,7 @@ import type { ProductLandingConfig } from "./types";
 
 export const goldVault: ProductLandingConfig = {
   slug: "gold-vault",
-  documentTitle: "GOLDST Yield Vault | Get Your Gold Onchain | STRATO",
+  documentTitle: "STRATO | GOLDST Yield Vault | Get Your Gold Onchain",
   accent: "gold",
   appPath: "/dashboard/earn-yield-vault?vault=goldst-yield",
 

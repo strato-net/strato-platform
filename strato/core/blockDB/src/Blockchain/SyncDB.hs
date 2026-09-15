@@ -21,7 +21,9 @@ module Blockchain.SyncDB
     getSyncStatus,
     getSyncStatusNow,
     getCirrusBestBlockNumber,
-    updateCirrusBestBlockNumber
+    updateCirrusBestBlockNumber,
+    getVmBestBlockNumber,
+    updateVmBestBlockNumber
   )
 where
 
@@ -325,6 +327,27 @@ updateCirrusBestBlockNumber :: Integer -> Redis ()
 updateCirrusBestBlockNumber n = do
   current <- getCirrusBestBlockNumber
   when (maybe True (< n) current) . void $ REDIS.set cirrusBestBlockNumberKey (toValue n)
+
+vmBestBlockNumberKey :: S8.ByteString
+vmBestBlockNumberKey = "<vm_best>"
+{-# INLINE vmBestBlockNumberKey #-}
+
+-- | Highest block number the vm-runner has finished executing. Written by the
+-- vm-runner after each block, so it moves in real time; the indexer-written
+-- @<best>@ only advances once per vm-runner batch after the indexer has
+-- committed that batch to SQL.
+getVmBestBlockNumber :: Redis (Maybe Integer)
+getVmBestBlockNumber = fmap fromValue . eitherToMaybe <$> REDIS.get vmBestBlockNumberKey
+  where
+    eitherToMaybe :: Either a (Maybe b) -> Maybe b
+    eitherToMaybe (Left _)  = Nothing
+    eitherToMaybe (Right a) = a
+
+-- | Monotonic, like 'updateCirrusBestBlockNumber'.
+updateVmBestBlockNumber :: Integer -> Redis ()
+updateVmBestBlockNumber n = do
+  current <- getVmBestBlockNumber
+  when (maybe True (< n) current) . void $ REDIS.set vmBestBlockNumberKey (toValue n)
 
 getSyncStatus :: Redis (Maybe Bool)
 getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey

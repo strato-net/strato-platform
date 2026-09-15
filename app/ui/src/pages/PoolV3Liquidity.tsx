@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Link, useSearchParams } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -12,6 +13,8 @@ import { useUser } from "@/context/UserContext";
 import { PoolV3, PoolV3Position } from "@/interface";
 
 const PoolV3Liquidity = () => {
+  usePageTitle("V3 Liquidity");
+
   const { isLoggedIn } = useUser();
   const { fetchV3Pools, fetchV3Positions } = useSwapContext();
   const [searchParams, setSearchParams] = useSearchParams();
