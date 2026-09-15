@@ -24,16 +24,16 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>DCA Strategy - STRATO Technical Docs</title>
+        <title>DCA Strategy - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dollar-cost-averaging-dca-strategy" class="md-skip">
+        <a href="#dollar-cost-averaging-dca" class="md-skip">
           Skip to content
         </a>
       
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -909,10 +907,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
+  <a href="#why-dca" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Strategy
+        Why DCA
       
     </span>
   </a>
@@ -920,33 +918,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-monthly-1000-dca" class="md-nav__link">
+  <a href="#each-cycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Monthly $1,000 DCA
+        Each Cycle
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#month-by-month-plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Month-by-Month Plan
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Month-by-Month Plan">
+    <nav class="md-nav" aria-label="Each Cycle">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#month-1-initial-setup" class="md-nav__link">
+  <a href="#1-fund-your-account" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Month 1: Initial Setup
+        1. Fund Your Account
       
     </span>
   </a>
@@ -954,10 +941,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#month-2-12-repeat-process" class="md-nav__link">
+  <a href="#2-buy-the-asset" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Month 2-12: Repeat Process
+        2. Buy the Asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-put-holdings-to-work-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Put Holdings to Work (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-record-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Record It
       
     </span>
   </a>
@@ -970,427 +979,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#12-month-simulation" class="md-nav__link">
+  <a href="#cost-per-cycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        12-Month Simulation
+        Cost per Cycle
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="12-Month Simulation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Related">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#scenario-a-bull-market" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario A: Bull Market
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scenario-b-bear-market" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario B: Bear Market
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scenario-c-volatilesideways" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario C: Volatile/Sideways
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-dca-leverage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced: DCA + Leverage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#automation-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Automation Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Automation Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#semi-automated-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Semi-Automated (Recommended)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fully-automated-advanced" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fully Automated (Advanced)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dca-variations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DCA Variations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DCA Variations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#variation-1-value-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 1: Value DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variation-2-yield-focused-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 2: Yield-Focused DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variation-3-accelerating-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 3: Accelerating DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#avoid-these-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Avoid These Mistakes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monthly-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-breakdown" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost Breakdown
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost Breakdown">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#monthly-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#annual-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Annual Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#real-example-sarahs-dca-journey" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Real Example: Sarah's DCA Journey
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tax-implications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tax Implications
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#when-dca-works-best" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When DCA Works Best
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="When DCA Works Best">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#good-market-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Good Market Conditions ✅
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#less-ideal-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Less Ideal Conditions ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#exit-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exit Strategy
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Exit Strategy">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-continue-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: Continue DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-switch-to-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: Switch to Maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-3-gradual-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 3: Gradual Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dca-calculator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DCA Calculator
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#do" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DO ✅
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dont" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DON'T ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Learn More
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#need-help" class="md-nav__link">
@@ -1658,6 +1278,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1681,7 +1307,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1699,8 +1515,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1831,10 +1647,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1852,8 +1668,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1890,10 +1706,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1911,8 +1727,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2039,10 +1855,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -2060,8 +1876,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2160,10 +1976,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2181,8 +1997,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2278,6 +2094,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2293,10 +2113,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2314,8 +2134,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2409,6 +2229,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2470,6 +2755,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2497,10 +2809,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-strategy" class="md-nav__link">
+  <a href="#why-dca" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Strategy
+        Why DCA
       
     </span>
   </a>
@@ -2508,33 +2820,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#complete-example-monthly-1000-dca" class="md-nav__link">
+  <a href="#each-cycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Complete Example: Monthly $1,000 DCA
+        Each Cycle
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#month-by-month-plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Month-by-Month Plan
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Month-by-Month Plan">
+    <nav class="md-nav" aria-label="Each Cycle">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#month-1-initial-setup" class="md-nav__link">
+  <a href="#1-fund-your-account" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Month 1: Initial Setup
+        1. Fund Your Account
       
     </span>
   </a>
@@ -2542,10 +2843,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#month-2-12-repeat-process" class="md-nav__link">
+  <a href="#2-buy-the-asset" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Month 2-12: Repeat Process
+        2. Buy the Asset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-put-holdings-to-work-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Put Holdings to Work (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-record-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Record It
       
     </span>
   </a>
@@ -2558,427 +2881,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#12-month-simulation" class="md-nav__link">
+  <a href="#cost-per-cycle" class="md-nav__link">
     <span class="md-ellipsis">
       
-        12-Month Simulation
+        Cost per Cycle
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="12-Month Simulation">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Variations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#related" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Related
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Related">
       <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#scenario-a-bull-market" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario A: Bull Market
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scenario-b-bear-market" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario B: Bear Market
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scenario-c-volatilesideways" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Scenario C: Volatile/Sideways
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#advanced-dca-leverage" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Advanced: DCA + Leverage
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#automation-strategies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Automation Strategies
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Automation Strategies">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#semi-automated-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Semi-Automated (Recommended)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#fully-automated-advanced" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Fully Automated (Advanced)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dca-variations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DCA Variations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="DCA Variations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#variation-1-value-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 1: Value DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variation-2-yield-focused-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 2: Yield-Focused DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#variation-3-accelerating-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Variation 3: Accelerating DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#risk-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Risk Management
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Risk Management">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#avoid-these-mistakes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Avoid These Mistakes
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#monthly-checklist" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Checklist
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cost-breakdown" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cost Breakdown
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Cost Breakdown">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#monthly-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monthly Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#annual-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Annual Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#real-example-sarahs-dca-journey" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Real Example: Sarah's DCA Journey
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#tax-implications" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Tax Implications
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#when-dca-works-best" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When DCA Works Best
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="When DCA Works Best">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#good-market-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Good Market Conditions ✅
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#less-ideal-conditions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Less Ideal Conditions ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#exit-strategy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Exit Strategy
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Exit Strategy">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#option-1-continue-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 1: Continue DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-2-switch-to-maintenance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 2: Switch to Maintenance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#option-3-gradual-exit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Option 3: Gradual Exit
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dca-calculator" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DCA Calculator
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Best Practices">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#do" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DO ✅
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#dont" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        DON'T ❌
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#optimize-your-dca" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optimize Your DCA
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#learn-more" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Learn More
-      
-    </span>
-  </a>
-  
-</li>
         
           <li class="md-nav__item">
   <a href="#need-help" class="md-nav__link">
@@ -3013,689 +2947,127 @@
 
 
 
-<h1 id="dollar-cost-averaging-dca-strategy">Dollar-Cost Averaging (DCA) Strategy<a class="headerlink" href="#dollar-cost-averaging-dca-strategy" title="Permanent link">&para;</a></h1>
-<p>Build DeFi positions systematically over time while minimizing timing risk.</p>
+<h1 id="dollar-cost-averaging-dca">Dollar-Cost Averaging (DCA)<a class="headerlink" href="#dollar-cost-averaging-dca" title="Permanent link">&para;</a></h1>
+<p>Build a position gradually by buying a fixed dollar amount on a regular schedule, whatever the price.</p>
+<div class="admonition note">
+<p class="admonition-title">DCA on STRATO is manual</p>
+<p>The STRATO app has no recurring buys, scheduled orders or limit orders. You repeat the steps below yourself at whatever interval you choose.</p>
+</div>
 <hr />
-<h2 id="the-strategy">The Strategy<a class="headerlink" href="#the-strategy" title="Permanent link">&para;</a></h2>
-<p>Regularly deposit and invest fixed amounts into STRATO, regardless of price.</p>
-<p><strong>Benefits:</strong></p>
+<h2 id="why-dca">Why DCA<a class="headerlink" href="#why-dca" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Reduce timing risk (don't need to predict tops/bottoms)</li>
-<li>Build position gradually</li>
-<li>Lower emotional stress</li>
-<li>Automate your DeFi strategy</li>
+<li>You don't need to time the market.</li>
+<li>You buy more units when prices are low and fewer when they are high.</li>
+<li>Your average cost per unit ends up below the simple average of the prices you paid.</li>
 </ul>
-<p><strong>Result:</strong> Consistent, disciplined position building</p>
-<hr />
-<h2 id="complete-example-monthly-1000-dca">Complete Example: Monthly $1,000 DCA<a class="headerlink" href="#complete-example-monthly-1000-dca" title="Permanent link">&para;</a></h2>
-<p><strong>Your situation:</strong></p>
-<ul>
-<li>Income: Steady job, $1,000/month to invest</li>
-<li>Goal: Build ETHST position + earn DeFi yields</li>
-<li>Timeline: 12 months</li>
-<li>Risk tolerance: Moderate</li>
-</ul>
-<p><strong>The play:</strong></p>
-<ol>
-<li>Every month: Bridge $1,000 to STRATO</li>
-<li>Buy 50% ETHST, keep 50% USDST</li>
-<li>Supply ETHST as collateral</li>
-<li>Provide USDST liquidity</li>
-<li>Compound rewards</li>
-</ol>
-<p><strong>Expected outcome after 12 months:</strong></p>
-<ul>
-<li>Total invested: $12,000</li>
-<li>ETHST accumulated: ~4-5 ETHST (depending on prices)</li>
-<li>Liquidity provided: $6,000 in USDST pools</li>
-<li>Rewards earned: ~$500-800 in Reward Points + fees</li>
-</ul>
-<hr />
-<h2 id="month-by-month-plan">Month-by-Month Plan<a class="headerlink" href="#month-by-month-plan" title="Permanent link">&para;</a></h2>
-<h3 id="month-1-initial-setup">Month 1: Initial Setup<a class="headerlink" href="#month-1-initial-setup" title="Permanent link">&para;</a></h3>
-<p><strong>Deposit:</strong> $1,000</p>
-<p><strong>Actions:</strong></p>
-<ol>
-<li>Bridge $1,000 USDC to STRATO ($20-30 Ethereum L1 gas, one-time per bridge)</li>
-<li>Swap $500 USDST → ETHST (~0.167 ETHST @ $3,000)</li>
-<li>Supply 0.167 ETHST as collateral</li>
-<li>Swap $500 USDST → USDST</li>
-<li>Provide $500 USDST liquidity in USDST-USDST pool</li>
-</ol>
-<p><strong>Result:</strong>
-<div class="highlight"><pre><span></span><code>Collateral: 0.167 ETHST ($500)
-Liquidity: $500 USDST-USDST
-Total value: $1,000
-Earning: LP fees + Reward Points
-</code></pre></div></p>
-<hr />
-<h3 id="month-2-12-repeat-process">Month 2-12: Repeat Process<a class="headerlink" href="#month-2-12-repeat-process" title="Permanent link">&para;</a></h3>
-<p><strong>Each month:</strong></p>
-<p><strong>1. Bridge assets</strong> ($1,000)
-- Bridge $1,000 USDC
-- Cost: ~$20 Ethereum L1 gas (paid on Ethereum network)</p>
-<p><strong>2. Split allocation</strong> (50/50)
-- $500 → ETHST (buy on STRATO DEX)
-- $500 → USDST liquidity</p>
-<p><strong>3. Supply ETHST collateral</strong>
-- Add new ETHST to collateral
-- Increase collateral base</p>
-<p><strong>4. Add to liquidity</strong>
-- Increase USDST-USDST LP position
-- Compound previous rewards</p>
-<hr />
-<h2 id="12-month-simulation">12-Month Simulation<a class="headerlink" href="#12-month-simulation" title="Permanent link">&para;</a></h2>
-<h3 id="scenario-a-bull-market">Scenario A: Bull Market<a class="headerlink" href="#scenario-a-bull-market" title="Permanent link">&para;</a></h3>
-<p><strong>ETHST price:</strong> $3,000 → $5,000 over 12 months</p>
+<div class="admonition example">
+<p class="admonition-title">Illustrative example (hypothetical prices)</p>
 <table>
 <thead>
 <tr>
-<th>Month</th>
-<th>ETHST Price</th>
-<th>ETHST Bought</th>
-<th>Total ETHST</th>
-<th>LP Value</th>
-<th>Total Value</th>
+<th>Purchase</th>
+<th>Price</th>
+<th>Amount</th>
+<th>Units bought</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
 <td>$3,000</td>
-<td>0.167</td>
-<td>0.167</td>
 <td>$500</td>
-<td>$1,000</td>
+<td>0.1667</td>
 </tr>
 <tr>
-<td>3</td>
-<td>$3,500</td>
-<td>0.143</td>
-<td>0.593</td>
-<td>$1,500</td>
-<td>$3,575</td>
-</tr>
-<tr>
-<td>6</td>
-<td>$4,000</td>
-<td>0.125</td>
-<td>1.303</td>
-<td>$3,000</td>
-<td>$8,212</td>
-</tr>
-<tr>
-<td>9</td>
-<td>$4,500</td>
-<td>0.111</td>
-<td>2.091</td>
-<td>$4,500</td>
-<td>$13,910</td>
-</tr>
-<tr>
-<td>12</td>
-<td>$5,000</td>
-<td>0.100</td>
-<td>3.000</td>
-<td>$6,000</td>
-<td>$21,000</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Results:</strong></p>
-<ul>
-<li>Invested: $12,000</li>
-<li>Value: $21,000</li>
-<li>Profit: $9,000 (75% gain!)</li>
-<li>ETHST accumulated: 3 ETHST @ average $2,000</li>
-</ul>
-<p><strong>vs Lump Sum at Month 1:</strong></p>
-<ul>
-<li>Invest $12k at $3,000 = 4 ETHST - Value at $5,000 = $20,000</li>
-<li>Profit: $8,000 (67% gain)</li>
-</ul>
-<p><strong>DCA wins in bull market (slightly)</strong> ✅</p>
-<hr />
-<h3 id="scenario-b-bear-market">Scenario B: Bear Market<a class="headerlink" href="#scenario-b-bear-market" title="Permanent link">&para;</a></h3>
-<p><strong>ETHST price:</strong> $3,000 → $1,500 over 12 months</p>
-<table>
-<thead>
-<tr>
-<th>Month</th>
-<th>ETHST Price</th>
-<th>ETHST Bought</th>
-<th>Total ETHST</th>
-<th>LP Value</th>
-<th>Total Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>$3,000</td>
-<td>0.167</td>
-<td>0.167</td>
-<td>$500</td>
-<td>$1,000</td>
-</tr>
-<tr>
-<td>3</td>
+<td>2</td>
 <td>$2,500</td>
-<td>0.200</td>
-<td>0.733</td>
-<td>$1,500</td>
-<td>$3,333</td>
-</tr>
-<tr>
-<td>6</td>
-<td>$2,000</td>
-<td>0.250</td>
-<td>1.683</td>
-<td>$3,000</td>
-<td>$6,366</td>
-</tr>
-<tr>
-<td>9</td>
-<td>$1,750</td>
-<td>0.286</td>
-<td>3.041</td>
-<td>$4,500</td>
-<td>$9,822</td>
-</tr>
-<tr>
-<td>12</td>
-<td>$1,500</td>
-<td>0.333</td>
-<td>5.000</td>
-<td>$6,000</td>
-<td>$13,500</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Results:</strong></p>
-<ul>
-<li>Invested: $12,000</li>
-<li>Value: $13,500</li>
-<li>Profit: $1,500 (12.5% gain!)</li>
-<li>ETHST accumulated: 5 ETHST @ average $1,200</li>
-</ul>
-<p><strong>vs Lump Sum at Month 1:</strong></p>
-<ul>
-<li>Invest $12k at $3,000 = 4 ETHST - Value at $1,500 = $6,000</li>
-<li>Loss: -$6,000 (-50%)</li>
-</ul>
-<p><strong>DCA wins MASSIVELY in bear market</strong> ✅✅✅</p>
-<hr />
-<h3 id="scenario-c-volatilesideways">Scenario C: Volatile/Sideways<a class="headerlink" href="#scenario-c-volatilesideways" title="Permanent link">&para;</a></h3>
-<p><strong>ETHST price:</strong> Ranges $2,500-$3,500, ends at $3,000</p>
-<table>
-<thead>
-<tr>
-<th>Month</th>
-<th>ETHST Price</th>
-<th>ETHST Bought</th>
-<th>Total ETHST</th>
-<th>LP Value</th>
-<th>Total Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>1</td>
-<td>$3,000</td>
-<td>0.167</td>
-<td>0.167</td>
 <td>$500</td>
-<td>$1,000</td>
+<td>0.2000</td>
 </tr>
 <tr>
 <td>3</td>
-<td>$2,500</td>
-<td>0.200</td>
-<td>0.567</td>
-<td>$1,500</td>
-<td>$2,918</td>
-</tr>
-<tr>
-<td>6</td>
-<td>$3,500</td>
-<td>0.143</td>
-<td>1.110</td>
-<td>$3,000</td>
-<td>$6,330</td>
-</tr>
-<tr>
-<td>9</td>
-<td>$2,700</td>
-<td>0.185</td>
-<td>1.795</td>
-<td>$4,500</td>
-<td>$9,347</td>
-</tr>
-<tr>
-<td>12</td>
-<td>$3,000</td>
-<td>0.167</td>
-<td>2.362</td>
-<td>$6,000</td>
-<td>$13,086</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Results:</strong></p>
-<ul>
-<li>Invested: $12,000</li>
-<li>Value: $13,086</li>
-<li>Profit: $1,086 (9% gain)</li>
-<li>Average ETHST price: $2,543 (better than ending price!)</li>
-</ul>
-<p><strong>DCA smooths volatility</strong> ✅</p>
-<hr />
-<h2 id="advanced-dca-leverage">Advanced: DCA + Leverage<a class="headerlink" href="#advanced-dca-leverage" title="Permanent link">&para;</a></h2>
-<p><strong>For aggressive investors:</strong></p>
-<p><strong>Each month:</strong></p>
-<ol>
-<li>Bridge $1,000</li>
-<li>Buy $500 ETHST + keep $500 USDST</li>
-<li>Supply ETHST as collateral</li>
-<li>Borrow additional $250 USDST (conservative leverage)</li>
-<li>Swap $250 USDST to more ETHST</li>
-<li>Use remaining $500 + $250 borrowed = $750 for liquidity</li>
-</ol>
-<p><strong>Result:</strong></p>
-<ul>
-<li>More ETHST exposure via leverage</li>
-<li>More liquidity (higher yields)</li>
-<li>Higher risk (interest costs, liquidation)</li>
-</ul>
-<p><strong>Only for experienced users</strong></p>
-<hr />
-<h2 id="automation-strategies">Automation Strategies<a class="headerlink" href="#automation-strategies" title="Permanent link">&para;</a></h2>
-<h3 id="semi-automated-recommended">Semi-Automated (Recommended)<a class="headerlink" href="#semi-automated-recommended" title="Permanent link">&para;</a></h3>
-<p><strong>What you automate:</strong></p>
-<ul>
-<li>Monthly calendar reminder</li>
-<li>Auto-buy on CEX (e.g., Coinbase recurring buy)</li>
-<li>Manual bridge to STRATO</li>
-<li>Manual allocation</li>
-</ul>
-<p><strong>Pros:</strong></p>
-<ul>
-<li>Simple to set up</li>
-<li>Keep control</li>
-<li>Flexibility to adjust</li>
-</ul>
-<p><strong>Cons:</strong></p>
-<ul>
-<li>Still requires monthly action</li>
-<li>Miss some deposits if busy</li>
-</ul>
-<hr />
-<h3 id="fully-automated-advanced">Fully Automated (Advanced)<a class="headerlink" href="#fully-automated-advanced" title="Permanent link">&para;</a></h3>
-<p><strong>Using smart contracts:</strong></p>
-<ol>
-<li>Bridge assets once to STRATO</li>
-<li>
-<p>Schedule weekly/monthly buys via:</p>
-</li>
-<li>
-<p>Gelato Network (automation platform)</p>
-</li>
-<li>Custom keeper bot</li>
-<li>STRATO's built-in automation (if available)</li>
-</ol>
-<p><strong>Pros:</strong></p>
-<ul>
-<li>True set-and-forget</li>
-<li>Never miss a deposit</li>
-<li>Optimal timing</li>
-</ul>
-<p><strong>Cons:</strong></p>
-<ul>
-<li>Complex setup</li>
-<li>Smart contract risk</li>
-<li>Gas costs for automation</li>
-</ul>
-<hr />
-<h2 id="dca-variations">DCA Variations<a class="headerlink" href="#dca-variations" title="Permanent link">&para;</a></h2>
-<h3 id="variation-1-value-dca">Variation 1: Value DCA<a class="headerlink" href="#variation-1-value-dca" title="Permanent link">&para;</a></h3>
-<p><strong>Adjust amount based on price:</strong></p>
-<table>
-<thead>
-<tr>
-<th>ETHST Price</th>
-<th>Monthly Deposit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>&gt; $3,500</td>
-<td>$750 (buy less)</td>
-</tr>
-<tr>
-<td>$2,500-$3,500</td>
-<td>$1,000 (normal)</td>
-</tr>
-<tr>
-<td>&lt; $2,500</td>
-<td>$1,250 (buy more)</td>
-</tr>
-</tbody>
-</table>
-<p><strong>Pros:</strong> Buy more when cheap<br />
-<strong>Cons:</strong> Not true DCA (timing involved)</p>
-<hr />
-<h3 id="variation-2-yield-focused-dca">Variation 2: Yield-Focused DCA<a class="headerlink" href="#variation-2-yield-focused-dca" title="Permanent link">&para;</a></h3>
-<p><strong>Prioritize yield generation:</strong></p>
-<p><strong>Each month:</strong></p>
-<ul>
-<li>30% → ETHST collateral</li>
-<li>70% → Stablecoin liquidity (higher income)</li>
-</ul>
-<p><strong>Pros:</strong> Maximize current income<br />
-<strong>Cons:</strong> Less ETHST upside exposure</p>
-<hr />
-<h3 id="variation-3-accelerating-dca">Variation 3: Accelerating DCA<a class="headerlink" href="#variation-3-accelerating-dca" title="Permanent link">&para;</a></h3>
-<p><strong>Increase deposits over time:</strong></p>
-<table>
-<thead>
-<tr>
-<th>Quarter</th>
-<th>Monthly Deposit</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Q1</td>
-<td>$1,000</td>
-</tr>
-<tr>
-<td>Q2</td>
-<td>$1,200</td>
-</tr>
-<tr>
-<td>Q3</td>
-<td>$1,500</td>
-</tr>
-<tr>
-<td>Q4</td>
 <td>$2,000</td>
+<td>$500</td>
+<td>0.2500</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>$1,500</strong></td>
+<td><strong>0.6167</strong></td>
 </tr>
 </tbody>
 </table>
-<p><strong>Good for:</strong> Rising income, increasing conviction</p>
+<p>Average cost = $1,500 / 0.6167 ≈ <strong>$2,432</strong>, below the $2,500 average price.</p>
+</div>
+<p>DCA does not prevent losses: if the price keeps falling, the position is still worth less than you paid.</p>
 <hr />
-<h2 id="risk-management">Risk Management<a class="headerlink" href="#risk-management" title="Permanent link">&para;</a></h2>
-<h3 id="avoid-these-mistakes">Avoid These Mistakes<a class="headerlink" href="#avoid-these-mistakes" title="Permanent link">&para;</a></h3>
-<p><strong>❌ Skipping months:</strong></p>
+<h2 id="each-cycle">Each Cycle<a class="headerlink" href="#each-cycle" title="Permanent link">&para;</a></h2>
+<h3 id="1-fund-your-account">1. Fund Your Account<a class="headerlink" href="#1-fund-your-account" title="Permanent link">&para;</a></h3>
 <ul>
-<li>DCA works through consistency</li>
-<li>Missing months defeats the purpose</li>
-<li>Set up automatic reminders</li>
+<li><strong>Bridge in:</strong> Open <strong>Fund → Bridge In</strong>, choose your network and a stablecoin, and under <strong>You Receive On STRATO</strong> choose <strong>USDST</strong>. Each confirmed deposit also mints vouchers to your account for transaction fees. See the <a href="../../guides/bridge/">Bridge Guide</a>.</li>
+<li><strong>Or buy with a card or bank:</strong> Use the Buy Crypto page (<code>/dashboard/onramp</code> on app.strato.nexus).</li>
 </ul>
-<p><strong>❌ Panic selling:</strong></p>
+<p>Every bridge deposit pays gas on the source network, so fewer, larger deposits cost less in gas than many small ones.</p>
+<h3 id="2-buy-the-asset">2. Buy the Asset<a class="headerlink" href="#2-buy-the-asset" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Don't sell during crashes</li>
-<li>DCA is long-term strategy</li>
-<li>Crashes = buying opportunities</li>
+<li><strong>Tokens:</strong> Open <strong>Trade</strong> and swap a fixed amount of USDST for your target asset (for example ETH or WBTC). Check <strong>Price Impact</strong> and <strong>Minimum received</strong>. See the <a href="../../guides/swap/">Swap Guide</a>.</li>
+<li><strong>Gold or silver:</strong> Open <strong>Fund → Buy Metals</strong> to buy GOLDST or SILVST directly. The fee is shown before you confirm.</li>
 </ul>
-<p><strong>❌ Over-leveraging:</strong></p>
+<h3 id="3-put-holdings-to-work-optional">3. Put Holdings to Work (Optional)<a class="headerlink" href="#3-put-holdings-to-work-optional" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Keep leverage conservative</li>
-<li>Don't compound too aggressively</li>
-<li>Remember interest costs</li>
+<li>Deposit spare USDST in <strong>Earn → USDST Savings Vault</strong>.</li>
+<li>Or use accumulated assets as collateral on <strong>Borrow</strong>. Depositing collateral without minting carries no liquidation risk.</li>
 </ul>
-<p><strong>❌ Ignoring fees:</strong></p>
-<ul>
-<li>Bridge costs add up ($20-30/month)</li>
-<li>Consider batching (bridge quarterly)</li>
-<li>Or keep buffer on STRATO</li>
-</ul>
+<h3 id="4-record-it">4. Record It<a class="headerlink" href="#4-record-it" title="Permanent link">&para;</a></h3>
+<p>Note the date, amount and price. The <strong>Activity Feed</strong> page lists your past transactions.</p>
 <hr />
-<h3 id="monthly-checklist">Monthly Checklist<a class="headerlink" href="#monthly-checklist" title="Permanent link">&para;</a></h3>
-<p><strong>Every month:</strong></p>
-<ul>
-<li>[ ] Bridge $1,000 (or batch quarterly)</li>
-<li>[ ] Buy ETHST allocation</li>
-<li>[ ] Supply to collateral</li>
-<li>[ ] Add to liquidity</li>
-<li>[ ] Claim and compound rewards</li>
-<li>[ ] Check Health Factor (if borrowing)</li>
-<li>[ ] Track total position value</li>
-<li>[ ] Update spreadsheet</li>
-</ul>
-<p><strong>Time required:</strong> 15-20 minutes/month</p>
-<hr />
-<h2 id="cost-breakdown">Cost Breakdown<a class="headerlink" href="#cost-breakdown" title="Permanent link">&para;</a></h2>
-<h3 id="monthly-costs">Monthly Costs<a class="headerlink" href="#monthly-costs" title="Permanent link">&para;</a></h3>
+<h2 id="cost-per-cycle">Cost per Cycle<a class="headerlink" href="#cost-per-cycle" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>Item</th>
 <th>Cost</th>
+<th>Paid in</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Bridge from Ethereum</td>
-<td>~$20-30</td>
+<td>Bridge deposit gas</td>
+<td>Source network's gas token; varies with congestion</td>
 </tr>
 <tr>
-<td>STRATO gas (4-5 transactions)</td>
-<td>~$0.50</td>
+<td>STRATO transaction fees</td>
+<td>0.01 USDST or one voucher per call</td>
 </tr>
 <tr>
-<td>Swap fees (0.3%)</td>
-<td>~$3</td>
+<td>Swap fee</td>
+<td>Deducted from the trade (0.3% default on standard pools; varies by pool)</td>
 </tr>
 <tr>
-<td><strong>Total per month</strong></td>
-<td><strong>~$23.50</strong></td>
+<td>Price impact</td>
+<td>Larger trades in thinner pools get worse prices</td>
 </tr>
 </tbody>
 </table>
-<h3 id="annual-costs">Annual Costs<a class="headerlink" href="#annual-costs" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Item</th>
-<th>Cost</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Bridge costs (12 months)</td>
-<td>~$300</td>
-</tr>
-<tr>
-<td>STRATO gas</td>
-<td>~$6</td>
-</tr>
-<tr>
-<td>Swap fees</td>
-<td>~$36</td>
-</tr>
-<tr>
-<td><strong>Total annually</strong></td>
-<td><strong>~$342</strong></td>
-</tr>
-</tbody>
-</table>
-<p><strong>As % of investment:</strong> 2.85% of $12k</p>
-<p><strong>Optimization:</strong> Bridge quarterly to reduce to ~$100/year</p>
+<p>Fixed per-deposit costs matter more for small amounts. Size your cycles so fees stay a small fraction of each purchase.</p>
 <hr />
-<h2 id="real-example-sarahs-dca-journey">Real Example: Sarah's DCA Journey<a class="headerlink" href="#real-example-sarahs-dca-journey" title="Permanent link">&para;</a></h2>
-<p><strong>Background:</strong></p>
+<h2 id="variations">Variations<a class="headerlink" href="#variations" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Software engineer</li>
-<li>$1,500/month to invest</li>
-<li>Started: January 2023</li>
-<li>Strategy: 50/50 ETH/USDST liquidity</li>
-</ul>
-<p><strong>Her Results (12 months):</strong></p>
-<table>
-<thead>
-<tr>
-<th>Metric</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Total invested</td>
-<td>$18,000</td>
-</tr>
-<tr>
-<td>ETHST accumulated</td>
-<td>6.8 ETHST</td>
-</tr>
-<tr>
-<td>LP value</td>
-<td>$9,000</td>
-</tr>
-<tr>
-<td>Reward Points</td>
-<td>$800</td>
-</tr>
-<tr>
-<td>LP fees earned</td>
-<td>$1,200</td>
-</tr>
-<tr>
-<td><strong>Total value</strong></td>
-<td>$28,400</td>
-</tr>
-<tr>
-<td><strong>Profit</strong></td>
-<td><strong>$10,400 (58%)</strong></td>
-</tr>
-</tbody>
-</table>
-<p><strong>What worked:</strong></p>
-<ul>
-<li>Consistent monthly deposits</li>
-<li>Didn't panic during summer dip</li>
-<li>Compounded all rewards</li>
-<li>Bought more during crashes</li>
-</ul>
-<p><strong>Sarah's takeaway:</strong> "DCA removed all stress from investing"</p>
-<hr />
-<h2 id="tax-implications">Tax Implications<a class="headerlink" href="#tax-implications" title="Permanent link">&para;</a></h2>
-<p><strong>DCA creates many taxable events:</strong></p>
-<p><strong>Each month:</strong></p>
-<ul>
-<li>Bridge: No tax</li>
-<li>Buy ETHST: Tax event (swap)</li>
-<li>Supply collateral: No tax</li>
-<li>Add liquidity: No tax</li>
-<li>Claim rewards: Taxable income</li>
-</ul>
-<p><strong>Record keeping:</strong></p>
-<ul>
-<li>Track each purchase price</li>
-<li>Calculate cost basis</li>
-<li>Document all transactions</li>
-<li>Use crypto tax software (Koinly, CoinTracker)</li>
-</ul>
-<p><strong>Annual tax prep:</strong></p>
-<ul>
-<li>12+ taxable events</li>
-<li>Need detailed records</li>
-<li>Consider tax-loss harvesting</li>
+<li><strong>Yield-focused:</strong> Put part of each cycle into the USDST Savings Vault or a stablecoin pool. See <a href="../maximize-yield/">Maximize Yield</a>.</li>
+<li><strong>Leveraged:</strong> Mint USDST against accumulated collateral to buy more. This adds liquidation risk. See <a href="../grow-position/">Grow Your Position</a>.</li>
+<li><strong>Gradual exit:</strong> Reverse the process. Periodically trade a fixed amount back to USDST and bridge out. See <a href="../withdrawals/">Withdrawals</a>.</li>
 </ul>
 <hr />
-<h2 id="when-dca-works-best">When DCA Works Best<a class="headerlink" href="#when-dca-works-best" title="Permanent link">&para;</a></h2>
-<h3 id="good-market-conditions">Good Market Conditions ✅<a class="headerlink" href="#good-market-conditions" title="Permanent link">&para;</a></h3>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Volatile markets (smooths entry)</li>
-<li>Bear markets (accumulate cheap)</li>
-<li>Sideways markets (consistent building)</li>
-<li>High uncertainty (removes timing pressure)</li>
-</ul>
-<h3 id="less-ideal-conditions">Less Ideal Conditions ❌<a class="headerlink" href="#less-ideal-conditions" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Straight-up bull run (lump sum would be better)</li>
-<li>When you have strong conviction on timing</li>
-<li>Very short time horizons (&lt; 6 months)</li>
-</ul>
-<p><strong>Overall:</strong> DCA is good in 80% of market conditions</p>
-<hr />
-<h2 id="exit-strategy">Exit Strategy<a class="headerlink" href="#exit-strategy" title="Permanent link">&para;</a></h2>
-<p><strong>After 12 months, what next?</strong></p>
-<h3 id="option-1-continue-dca">Option 1: Continue DCA<a class="headerlink" href="#option-1-continue-dca" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Keep building position</li>
-<li>Compound gains</li>
-<li>Long-term wealth building</li>
-</ul>
-<h3 id="option-2-switch-to-maintenance">Option 2: Switch to Maintenance<a class="headerlink" href="#option-2-switch-to-maintenance" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Stop new deposits</li>
-<li>Maintain existing positions</li>
-<li>Live off yields</li>
-</ul>
-<h3 id="option-3-gradual-exit">Option 3: Gradual Exit<a class="headerlink" href="#option-3-gradual-exit" title="Permanent link">&para;</a></h3>
-<ul>
-<li>DCA out (reverse process)</li>
-<li>Sell fixed amounts monthly</li>
-<li>Smooth exit, minimize timing risk</li>
-</ul>
-<hr />
-<h2 id="dca-calculator">DCA Calculator<a class="headerlink" href="#dca-calculator" title="Permanent link">&para;</a></h2>
-<p><strong>Quick formula to estimate results:</strong></p>
-<div class="highlight"><pre><span></span><code>Average price = Sum(prices) / Number of months
-ETHST accumulated = Total invested × 0.5 / Average price
-LP value = Total invested × 0.5 × (1 + Annual LP APR ÷ 12 × Months)
-Estimated value = (ETH × Current price) + LP value
-</code></pre></div>
-<p><strong>Example (your numbers):</strong></p>
-<ul>
-<li>Monthly investment: $1,000</li>
-<li>Duration: 12 months</li>
-<li>ETHST average price: $2,800</li>
-<li>LP APR: 10%</li>
-</ul>
-<div class="highlight"><pre><span></span><code>ETHST accumulated = ($12,000 × 0.5) / $2,800 = 2.14 ETHST LP value = $6,000 × 1.10 = $6,600
-Total value = (2.14 × current_price) + $6,600
-</code></pre></div>
-<hr />
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
-<h3 id="do">DO ✅<a class="headerlink" href="#do" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Set calendar reminders</li>
-<li>Track all purchases</li>
-<li>Compound rewards</li>
-<li>Stay consistent</li>
-<li>Use bear markets to accumulate</li>
-<li>Keep emergency fund separate</li>
-</ul>
-<h3 id="dont">DON'T ❌<a class="headerlink" href="#dont" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Skip months</li>
-<li>Panic sell</li>
-<li>Over-leverage</li>
-<li>Forget about taxes</li>
-<li>Ignore risk management</li>
-<li>Stop during crashes</li>
-</ul>
-<hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<h3 id="optimize-your-dca">Optimize Your DCA<a class="headerlink" href="#optimize-your-dca" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../maximize-yield/">Maximize Yield</a></strong> - Combine with yield strategies</li>
-<li><strong><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></strong> - Rebalance accumulated assets</li>
-<li><strong><a href="../risk-hedging/">Risk Management</a></strong> - Protect your growing position</li>
-</ul>
-<h3 id="learn-more">Learn More<a class="headerlink" href="#learn-more" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong><a href="../../quick-start/">Quick Start</a></strong> - Initial setup</li>
-<li><strong><a href="../../guides/liquidity/">Liquidity Guide</a></strong> - LP strategies</li>
-<li><strong><a href="../../safety/">Safety Guide</a></strong> - Risk management</li>
+<li><a href="../portfolio-rebalancing/">Portfolio Rebalancing</a></li>
+<li><a href="../risk-hedging/">Risk Hedging</a></li>
+<li><a href="../../safety/">Safety Guide</a></li>
 </ul>
 <h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
 <li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
 </ul>
 
 
@@ -3719,7 +3091,7 @@ Total value = (2.14 × current_price) + $6,600
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -3820,7 +3192,7 @@ Total value = (2.14 × current_price) + $6,600
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       

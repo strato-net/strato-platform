@@ -24,16 +24,16 @@
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Core Concepts - STRATO Technical Docs</title>
+        <title>Core Concepts - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#core-concepts-for-end-users" class="md-skip">
+        <a href="#core-concepts" class="md-skip">
           Skip to content
         </a>
       
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href=".." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href=".." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href=".." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href=".." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -358,6 +356,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#platform-basics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Basics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Platform Basics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Networks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accounts-and-wallets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accounts and Wallets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transaction-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#transaction-vouchers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -367,52 +410,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#wrapped-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wrapped Tokens
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collateral
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#health-factor-lending" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health Factor (Lending)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#collateralization-ratio-cdp" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collateralization Ratio (CDP)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#usdst" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -422,19 +421,102 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#consensus-and-finality" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reward Points
+        Consensus and Finality
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#solidvm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SolidVM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cirrus-indexed-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cirrus (Indexed Data)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#defi-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeFi Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DeFi Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bridged-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bridged Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collateralization-ratio-cr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateralization Ratio (CR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Factor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#liquidation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -444,8 +526,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#impermanent-loss-liquidity-provision" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -455,8 +537,19 @@
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#swap-fees" class="md-nav__link">
+    <span class="md-ellipsis">
       
-        <li class="md-nav__item">
+        Swap Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#slippage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -466,35 +559,12 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Reference">
-      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#key-metrics-to-remember" class="md-nav__link">
+  <a href="#reward-points" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Metrics to Remember
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#transaction-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Flow
+        Reward Points
       
     </span>
   </a>
@@ -514,56 +584,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Available Tokens">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#native-wrapped-assets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native &amp; Wrapped Assets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#stablecoins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stablecoins
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#commodity-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Commodity Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#governance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Governance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1379,6 +1399,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1402,7 +1428,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1420,8 +1636,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1552,10 +1768,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1573,8 +1789,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1611,10 +1827,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1632,8 +1848,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1760,10 +1976,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -1781,8 +1997,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1881,10 +2097,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -1902,8 +2118,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1999,6 +2215,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2014,10 +2234,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2035,8 +2255,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2130,6 +2350,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2191,6 +2876,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2218,6 +2930,51 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#platform-basics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Platform Basics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Platform Basics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#networks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Networks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#accounts-and-wallets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Accounts and Wallets
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#transaction-fees" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transaction Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#transaction-vouchers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2227,52 +2984,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#wrapped-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wrapped Tokens
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collateral
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#health-factor-lending" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Health Factor (Lending)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#collateralization-ratio-cdp" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Collateralization Ratio (CDP)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#usdst" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2282,19 +2995,102 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#reward-points" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#consensus-and-finality" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reward Points
+        Consensus and Finality
       
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#solidvm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SolidVM
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cirrus-indexed-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cirrus (Indexed Data)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
+  <a href="#defi-concepts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DeFi Concepts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="DeFi Concepts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#bridged-tokens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bridged Tokens
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collateral" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateral
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collateralization-ratio-cr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Collateralization Ratio (CR)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#health-factor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health Factor
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#liquidation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2304,8 +3100,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#impermanent-loss-liquidity-provision" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2315,8 +3111,19 @@
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#swap-fees" class="md-nav__link">
+    <span class="md-ellipsis">
       
-        <li class="md-nav__item">
+        Swap Fees
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#slippage" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2326,35 +3133,12 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#quick-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Quick Reference
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Quick Reference">
-      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#key-metrics-to-remember" class="md-nav__link">
+  <a href="#reward-points" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Metrics to Remember
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#transaction-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Flow
+        Reward Points
       
     </span>
   </a>
@@ -2374,56 +3158,6 @@
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Available Tokens">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#native-wrapped-assets" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Native &amp; Wrapped Assets
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#stablecoins" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Stablecoins
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#commodity-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Commodity Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#governance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Governance
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2455,361 +3189,228 @@
 
 
 
-<h1 id="core-concepts-for-end-users">Core Concepts for End Users<a class="headerlink" href="#core-concepts-for-end-users" title="Permanent link">&para;</a></h1>
-<p>Essential concepts you must understand before using STRATO DeFi.</p>
-<h2 id="transaction-vouchers">Transaction Vouchers<a class="headerlink" href="#transaction-vouchers" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Free transaction fee credits automatically given when you bridge assets to STRATO.</p>
-<p><strong>Key points:</strong></p>
-<ul>
-<li><strong>10 vouchers</strong> per bridge-in (every time you bridge)</li>
-<li>Each voucher covers <strong>1 transaction fee</strong></li>
-<li>Used automatically before USDST</li>
-<li>After vouchers run out, fees are 0.01 USDST (~$0.01) per transaction</li>
-</ul>
-<p><strong>How it works:</strong>
-<div class="highlight"><pre><span></span><code>1. Bridge assets to STRATO
-2. Receive 10 free vouchers automatically
-3. First 10 transactions: FREE (voucher used)
-4. After 10 transactions: 0.01 USDST per transaction
-</code></pre></div></p>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Bridge 0.5 ETH to STRATO
-→ Receive 10 vouchers
-→ Do 10 transactions for free
-→ Bridge more assets later
-→ Receive 10 more vouchers
-</code></pre></div></p>
-<p><strong>Getting more vouchers:</strong>
-- Bridge assets again (any amount, any time)
-- Each bridge-in gives you 10 more vouchers</p>
+<h1 id="core-concepts">Core Concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h1>
+<p>Essential concepts to understand before using or building on STRATO. The first part covers the platform. The second covers the DeFi features.</p>
 <hr />
-<h2 id="wrapped-tokens">Wrapped Tokens<a class="headerlink" href="#wrapped-tokens" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> STRATO versions of Ethereum assets that you can use for DeFi operations on STRATO.</p>
-<p><strong>Why wrapped tokens?</strong></p>
-<p>When you bridge assets from Ethereum to STRATO, they become "wrapped" to work on the STRATO blockchain:</p>
-<ul>
-<li><strong>On Ethereum</strong>: You have ETH, WBTC, Gold, Silver</li>
-<li><strong>On STRATO</strong>: You have ETHST, WBTCST, GOLDST, SILVST (wrapped versions)</li>
-<li><strong>1:1 Peg</strong>: Always exchangeable 1:1 with the original</li>
-</ul>
-<p><strong>How it works:</strong></p>
-<div class="highlight"><pre><span></span><code>Bridge ETH from Ethereum → Receive ETHST on STRATO
-Use ETHST on STRATO → Bridge back → Receive ETH on Ethereum
-</code></pre></div>
-<p><strong>Common wrapped tokens:</strong></p>
+<h2 id="platform-basics">Platform Basics<a class="headerlink" href="#platform-basics" title="Permanent link">&para;</a></h2>
+<h3 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
 <tr>
-<th>Original (Ethereum)</th>
-<th>Wrapped (STRATO)</th>
-<th>Type</th>
+<th>Network</th>
+<th>Name</th>
+<th>App</th>
+<th>Chain ID (<code>eth_chainId</code>)</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ETH</td>
-<td>ETHST</td>
-<td>Wrapped ETH</td>
+<td>Mainnet</td>
+<td>upquark</td>
+<td><a href="https://app.strato.nexus">app.strato.nexus</a></td>
+<td>123354377739506 (<code>0x7030addddcf2</code>)</td>
 </tr>
 <tr>
-<td>WBTC</td>
-<td>WBTCST</td>
-<td>Wrapped BTC</td>
-</tr>
-<tr>
-<td>Gold tokens</td>
-<td>GOLDST</td>
-<td>Tokenized Gold</td>
-</tr>
-<tr>
-<td>Silver tokens</td>
-<td>SILVST</td>
-<td>Tokenized Silver</td>
+<td>Testnet</td>
+<td>helium</td>
+<td><a href="https://app.testnet.strato.nexus">app.testnet.strato.nexus</a></td>
+<td>195049586845898 (<code>0xb165855668ca</code>)</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Key points:</strong></p>
+<p>Tokens and balances on testnet have no value. See <a href="../platform/networks/">Networks</a>.</p>
+<h3 id="accounts-and-wallets">Accounts and Wallets<a class="headerlink" href="#accounts-and-wallets" title="Permanent link">&para;</a></h3>
+<p>You can use STRATO with either kind of account:</p>
 <ul>
-<li>✅ <strong>All STRATO operations</strong> use wrapped tokens (swaps, lending, collateral, pools)</li>
-<li>✅ <strong>Bridge operations</strong> convert automatically (ETH → ETHST when bridging in)</li>
-<li>✅ <strong>Always 1:1</strong> - No slippage or conversion fees between original and wrapped</li>
-<li>✅ <strong>Secure</strong> - Backed by locked original assets on Ethereum</li>
+<li><strong>STRATO account (custodial).</strong> You sign in with OpenID Connect (the <strong>STRATO Wallet</strong> option in the app). Your private key is generated and held by the STRATO <strong>Vault</strong> on your first authenticated request, and transactions are signed server-side for you. No seed phrase.</li>
+<li><strong>Self-custody wallet.</strong> You connect MetaMask, Coinbase Wallet, or a WalletConnect wallet. The app builds each transaction, and you sign it in your wallet.</li>
 </ul>
-<p><strong>Example:</strong></p>
-<div class="highlight"><pre><span></span><code>1. You bridge 2 ETH from Ethereum to STRATO
-2. You receive 2 ETHST on STRATO
-3. You use ETHST to:
-   - Supply as collateral
-   - Swap for USDST
-   - Provide liquidity in ETHST-USDST pool
-4. Later, bridge 2 ETHST back to Ethereum
-5. You receive 2 ETH on Ethereum
-</code></pre></div>
-<p><strong>Why this matters:</strong></p>
-<p>Throughout the documentation, you'll see:
-- "Supply ETHST" (not "Supply ETH")
-- "USDST-ETHST pool" (not "USDST-ETH pool")
-- "Swap WBTCST → ETHST" (not "Swap WBTC → ETH")</p>
-<p>This is because on STRATO, you're working with the wrapped versions!</p>
+<p>On-chain, usernames are registered in the <code>UserRegistry</code> system contract. See <a href="../platform/identity-and-vault/">Identity &amp; Vault</a>.</p>
+<h3 id="transaction-fees">Transaction Fees<a class="headerlink" href="#transaction-fees" title="Permanent link">&para;</a></h3>
+<p>Every transaction pays a flat fee through the <strong>Decider</strong> system contract (<code>0xDEC1DE</code>), before the transaction runs:</p>
+<ul>
+<li><strong>1 voucher</strong>, if you hold one, otherwise</li>
+<li><strong>0.01 USDST</strong></li>
+</ul>
+<p>There is no gas price or fee market. If neither a voucher nor 0.01 USDST is available, the transaction is rejected. A transaction that reverts still pays its fee. App actions that send several transactions (for example approve plus supply) pay the fee once per transaction.</p>
+<p>With Staking V2, part of each USDST fee is credited to the block proposer's validator and its delegators. The rest goes to the protocol fee collector. See <a href="../platform/transactions-and-fees/">Transactions &amp; Fees</a>.</p>
+<h3 id="transaction-vouchers">Transaction Vouchers<a class="headerlink" href="#transaction-vouchers" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> Prepaid fee credits.</p>
+<ul>
+<li>One voucher pays one transaction fee in place of 0.01 USDST</li>
+<li>Used automatically before USDST</li>
+<li>The bridge service credits <strong>25 vouchers</strong> for each confirmed bridge deposit</li>
+<li>Vouchers cannot be transferred</li>
+</ul>
+<h3 id="usdst">USDST<a class="headerlink" href="#usdst" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> STRATO's USD-pegged stablecoin, and the token used to pay transaction fees.</p>
+<ul>
+<li>Minted against collateral in a <strong>CDP vault</strong>, from the app's <strong>Borrow</strong> page (a separate <code>LendingPool</code> contract exists, but the app does not currently offer lending-pool borrowing)</li>
+<li>Overcollateralized: CDP positions below their liquidation ratio can be liquidated</li>
+<li>Used for fees, trading, pools, savings, and as a stable unit of account</li>
+</ul>
+<h3 id="consensus-and-finality">Consensus and Finality<a class="headerlink" href="#consensus-and-finality" title="Permanent link">&para;</a></h3>
+<p>STRATO uses <strong>PBFT-style consensus</strong> (blockstanbul). A block is final once the validators commit it. Validators are tracked by the <code>MercataGovernance</code> system contract.</p>
+<p>With <strong>Staking V2</strong> (active on testnet; on mainnet it activates at block 1,000,000):</p>
+<ul>
+<li>Operators register, stake $STRATO (self-bond plus delegations), and activate to join the validator set</li>
+<li>The block proposer is chosen in proportion to stake</li>
+<li>The proposer can earn a flat block reward, when the fee contract is funded</li>
+</ul>
+<p>See <a href="../platform/consensus/">Consensus &amp; Staking</a>.</p>
+<h3 id="solidvm">SolidVM<a class="headerlink" href="#solidvm" title="Permanent link">&para;</a></h3>
+<p>STRATO executes smart contracts with <strong>SolidVM</strong>, which runs a Solidity dialect. There is <strong>no EVM bytecode execution</strong>.</p>
+<p>The node still accepts Ethereum-format signed transactions (for example via <code>eth_sendRawTransaction</code>) and serves Ethereum-style JSON-RPC, so standard wallets can sign for STRATO. See <a href="../solidvm/">SolidVM</a>.</p>
+<h3 id="cirrus-indexed-data">Cirrus (Indexed Data)<a class="headerlink" href="#cirrus-indexed-data" title="Permanent link">&para;</a></h3>
+<p><strong>Cirrus</strong> indexes contract state and events into Postgres and serves them read-only over a REST interface at <code>/cirrus/search</code>. Apps use it to query balances, positions, and history without scanning blocks. See <a href="../reference/cirrus/">Cirrus</a>.</p>
 <hr />
-<h2 id="collateral">Collateral<a class="headerlink" href="#collateral" title="Permanent link">&para;</a></h2>
+<h2 id="defi-concepts">DeFi Concepts<a class="headerlink" href="#defi-concepts" title="Permanent link">&para;</a></h2>
+<h3 id="bridged-tokens">Bridged Tokens<a class="headerlink" href="#bridged-tokens" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> STRATO-side tokens that represent assets deposited from another chain.</p>
+<p>When you bridge a supported asset in, the bridge contract credits the matching STRATO token to your address. When you bridge out, the STRATO token is taken and the original asset is released on the destination chain.</p>
+<ul>
+<li>STRATO tokens are named after their source asset, for example "STRATO ETH" (symbol <code>ETH</code>) or "STRATO USDC" (symbol <code>USDC</code>)</li>
+<li>One STRATO token can be fed from several chains (for example, ETH from Ethereum and from Base)</li>
+<li>Supported chains and assets are configured on-chain, and the app's <strong>Fund</strong> page shows the current list</li>
+<li>Bridge-outs are not instant and depend on available bridge liquidity</li>
+</ul>
+<p><strong>GOLDST</strong> and <strong>SILVST</strong> are tokenized gold and silver. You can buy them in the app (Fund → Metals), and some bridged gold tokens (such as XAUt) can be routed into GOLDST.</p>
+<h3 id="collateral">Collateral<a class="headerlink" href="#collateral" title="Permanent link">&para;</a></h3>
 <p><strong>Definition:</strong> Assets you deposit to back your borrowing or minting.</p>
-<p><strong>Key points:</strong></p>
 <ul>
 <li>Locked while you have debt outstanding</li>
-<li>Value determines how much you can borrow/mint</li>
-<li>Can be liquidated if value drops too much</li>
-<li>Each asset has different parameters (LTV, liquidation threshold)</li>
+<li>Its value determines how much you can borrow or mint</li>
+<li>Can be liquidated if its value falls too far</li>
+<li>Each asset has its own on-chain CDP parameters: liquidation ratio, minimum CR, liquidation penalty, stability fee, debt floor and debt ceiling</li>
 </ul>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Deposit: 1 ETHST ($3,000)
-Can borrow: Up to ~$2,100 (70% LTV)
-If ETHST drops to $2,000: Position at risk
-</code></pre></div></p>
-<h2 id="health-factor-lending">Health Factor (Lending)<a class="headerlink" href="#health-factor-lending" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Ratio showing how safe your lending position is.</p>
-<p><strong>Formula:</strong>
-<div class="highlight"><pre><span></span><code>Health Factor = (Collateral Value × Liquidation Threshold) / Borrowed Amount
-</code></pre></div></p>
-<p><strong>Rules:</strong></p>
-<ul>
-<li><strong>&gt; 2.0</strong>: Very safe (recommended)</li>
-<li><strong>1.5 - 2.0</strong>: Safe with buffer</li>
-<li><strong>1.0 - 1.5</strong>: Moderate risk</li>
-<li><strong>&lt; 1.0</strong>: LIQUIDATION occurs</li>
-</ul>
-<p><strong>Visual Guide:</strong></p>
-<pre class="mermaid"><code>stateDiagram-v2
-    [*] --&gt; VeryHealthy: HF &gt; 2.0
-    VeryHealthy --&gt; Healthy: Price drops
-    Healthy --&gt; AtRisk: Price drops
-    AtRisk --&gt; Liquidated: HF &lt; 1.0
-
-    Liquidated --&gt; [*]: Position closed
-
-    AtRisk --&gt; Healthy: Add collateral / Repay debt
-    Healthy --&gt; VeryHealthy: Add collateral / Repay debt
-
-    note right of VeryHealthy: Safe zone&lt;br/&gt;Recommended
-    note right of Healthy: Safe with buffer&lt;br/&gt;HF 1.5-2.0
-    note right of AtRisk: Moderate risk&lt;br/&gt;HF 1.0-1.5
-    note right of Liquidated: Position liquidated&lt;br/&gt;HF &lt; 1.0</code></pre>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Collateral: 10 ETHST @ $3,000 = $30,000
-Liquidation threshold: 80%
-Borrowed: 15,000 USDST
-
-Health Factor = ($30,000 × 0.8) / $15,000 = 1.6
-Status: Safe, but watch ETHST price
-</code></pre></div></p>
-<h2 id="collateralization-ratio-cdp">Collateralization Ratio (CDP)<a class="headerlink" href="#collateralization-ratio-cdp" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Ratio of collateral value to minted USDST (CDP version of health factor).</p>
-<p><strong>Formula:</strong>
+<p>CDP vaults are <strong>per asset</strong>. Collateral in your ETH vault does not back debt in your WBTC vault, and each vault is liquidated on its own. The lending pool keeps its collateral in a separate <code>CollateralVault</code>.</p>
+<h3 id="collateralization-ratio-cr">Collateralization Ratio (CR)<a class="headerlink" href="#collateralization-ratio-cr" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> A vault's collateral value divided by the USDST minted against it.</p>
 <div class="highlight"><pre><span></span><code>CR = (Collateral Value / Minted USDST) × 100%
+</code></pre></div>
+<p>Each collateral asset has two thresholds:</p>
+<ul>
+<li><strong>Liquidation ratio</strong>: below this CR, the vault can be liquidated</li>
+<li><strong>Minimum CR</strong>: at or above the liquidation ratio. Minting and withdrawing collateral must keep your CR at or above it</li>
+</ul>
+<p>Stability fees accrue continuously on minted USDST, at a rate set per asset.</p>
+<h3 id="health-factor">Health Factor<a class="headerlink" href="#health-factor" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> How close a vault is to liquidation, as shown on the app's <strong>Borrow</strong> page.</p>
+<div class="highlight"><pre><span></span><code>Health Factor = CR / Liquidation Ratio
+</code></pre></div>
+<ul>
+<li><strong>≥ 1.5</strong>: shown normally in the vault list</li>
+<li><strong>1.0 - 1.5</strong>: highlighted as a warning</li>
+<li><strong>&lt; 1.0</strong>: can be liquidated</li>
+</ul>
+<p>The mint planner's slider labels a target health factor from <strong>Low Risk</strong> (2.5 or higher) to <strong>High Risk</strong> (below 1.5).</p>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; Healthy: HF ≥ 1.5
+    Healthy --&gt; Warning: Price drops
+    Warning --&gt; Liquidatable: HF &lt; 1.0
+
+    Warning --&gt; Healthy: Add collateral / Repay debt</code></pre>
+<p><strong>Example</strong> (illustrative prices and parameters):
+<div class="highlight"><pre><span></span><code>Collateral: 1 ETH @ $3,000
+Minted: 1,500 USDST
+Liquidation ratio: 150%
+
+CR = $3,000 / 1,500 = 200%
+Health Factor = 200% / 150% ≈ 1.33
 </code></pre></div></p>
-<p><strong>Rules:</strong></p>
-<ul>
-<li><strong>200%+</strong>: Very safe</li>
-<li><strong>150-200%</strong>: Moderate risk</li>
-<li><strong>&lt; 150%</strong>: Often liquidated (varies by asset)</li>
-</ul>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Collateral: 5 ETHST @ $3,000 = $15,000
-Minted: 10,000 USDST
+<h3 id="liquidation">Liquidation<a class="headerlink" href="#liquidation" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> Forced repayment of your debt from your collateral when a vault becomes unsafe.</p>
+<p>When a vault's CR falls below its asset's liquidation ratio (health factor below 1), any user can repay part of the vault's debt, up to the asset's close factor. In return they receive collateral worth the repaid USDST plus the asset's <strong>liquidation penalty</strong>, valued at the oracle price. You keep the USDST you minted.</p>
+<p><strong>Example</strong> (illustrative: 150% liquidation ratio, 50% close factor, 10% penalty):
+<div class="highlight"><pre><span></span><code>Collateral: 1 ETH, Minted: 1,500 USDST
+ETH drops to $2,200 → CR ≈ 146.7%, HF ≈ 0.98 → liquidatable
 
-CR = ($15,000 / $10,000) × 100% = 150%
-Status: At minimum - risky!
+Liquidator repays 750 USDST
+Collateral seized: 750 × 1.10 / 2,200 = 0.375 ETH
+Left in your vault: 0.625 ETH and 750 USDST of debt
 </code></pre></div></p>
-<h2 id="usdst">USDST<a class="headerlink" href="#usdst" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> STRATO's USD-pegged stablecoin.</p>
-<p><strong>Key points:</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Lending pool</p>
+<p>The <code>LendingPool</code> contract uses its own health factor, <code>(collateral value × liquidation threshold) / debt</code>, and a liquidation bonus instead of a penalty. The app does not currently show lending-pool borrowing.</p>
+</div>
+<p><strong>How to avoid it:</strong></p>
 <ul>
-<li>Pegged to $1 USD</li>
-<li>Can be obtained by borrowing (Lending) or minting (CDP)</li>
-<li>Used for fees, trading, and as stable value storage</li>
-<li>Must be repaid/burned to unlock collateral</li>
+<li>Keep a buffer above HF 1.0 or the liquidation ratio</li>
+<li>Add collateral or repay debt when prices fall</li>
+<li>Watch the app's liquidation alerts</li>
 </ul>
-<p><strong>Uses:</strong></p>
-<ul>
-<li>Pay transaction fees on STRATO</li>
-<li>Stable asset for trading</li>
-<li>Collateral for other DeFi operations</li>
-<li>Bridge out for USD on other chains</li>
-</ul>
-<h2 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> STRATO's governance and rewards token.</p>
-<p><strong>Key points:</strong></p>
-<ul>
-<li>Earned by participating in DeFi activities</li>
-<li>Used for governance voting (future)</li>
-<li>Can be traded or held for value</li>
-<li>Rewards distributed seasonally</li>
-</ul>
-<p><strong>How to earn:</strong></p>
-<ul>
-<li>Supply collateral to lending pool</li>
-<li>Borrow USDST</li>
-<li>Provide liquidity to swap pools</li>
-<li>Mint USDST via CDP</li>
-<li>Complete swaps</li>
-</ul>
-<h2 id="liquidation">Liquidation<a class="headerlink" href="#liquidation" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Forced closure of your position when collateral value falls too low.</p>
-<p><strong>What happens:</strong></p>
-<ol>
-<li>Your position health factor &lt; 1.0 (or CR &lt; minimum)</li>
-<li>A liquidator repays your debt</li>
-<li>Liquidator takes your collateral + bonus (5-10%)</li>
-<li>You lose collateral value beyond your debt</li>
-</ol>
-<p><strong>Example liquidation:</strong>
-<div class="highlight"><pre><span></span><code>Before:
-
-- Collateral: 1 ETHST @ $3,000
-- Borrowed: 2,400 USDST
-- Health factor: 1.0
-
-ETHST drops to $2,800:
-
-- Health factor: 0.93
-- LIQUIDATION TRIGGERED
-
-After:
-
-- Lost: 1 ETHST ($2,800)
-- Kept: 2,400 USDST
-- Net loss: $400 + liquidation penalty (~$140)
-- Total loss: ~$540
-</code></pre></div></p>
-<p><strong>How to avoid:</strong></p>
-<ul>
-<li>Maintain high health factor (2.0+) or CR (200%+)</li>
-<li>Add collateral when prices drop</li>
-<li>Repay debt to improve ratio</li>
-<li>Set price alerts</li>
-</ul>
-<h2 id="impermanent-loss-liquidity-provision">Impermanent Loss (Liquidity Provision)<a class="headerlink" href="#impermanent-loss-liquidity-provision" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Loss from providing liquidity to swap pools when token prices diverge.</p>
-<p><strong>When it happens:</strong></p>
-<ul>
-<li>You provide liquidity to a pool (e.g., ETH-USDC)</li>
-<li>Token prices change significantly</li>
-<li>Pool auto-rebalances</li>
-<li>You end up with different amounts than if you just held</li>
-</ul>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Initial deposit:
-
-- 1 ETHST ($3,000) + 3,000 USDST = $6,000 total
+<h3 id="impermanent-loss-liquidity-provision">Impermanent Loss (Liquidity Provision)<a class="headerlink" href="#impermanent-loss-liquidity-provision" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> The shortfall versus simply holding, caused by price divergence while your tokens are in a pool.</p>
+<p><strong>Example</strong> (standard constant-product pool, illustrative):
+<div class="highlight"><pre><span></span><code>Deposit: 1 ETH ($3,000) + 3,000 USDST = $6,000
 
 ETH doubles to $6,000:
-
-- Pool rebalances to: 0.707 ETHST + 4,242 USDST
-- Pool value: $8,485
-- If you just held: 1 ETHST ($6,000) + 3,000 USDST = $9,000
-- Impermanent loss: $515 (5.7%)
-
-BUT: Swap fees earned may offset this loss
+- Pool position: ≈0.707 ETH + ≈4,243 USDST ≈ $8,485
+- If held: $9,000
+- Impermanent loss ≈ $515 (5.7%)
 </code></pre></div></p>
-<p><strong>When it's worth it:</strong></p>
+<p>Swap fees earned can offset this. Stable pairs see little divergence.</p>
+<h3 id="swap-fees">Swap Fees<a class="headerlink" href="#swap-fees" title="Permanent link">&para;</a></h3>
+<p>Standard pools charge a swap fee on the input amount. The default is <strong>0.3%</strong>, of which <strong>70%</strong> stays in the pool for liquidity providers and the rest goes to the protocol fee collector. Individual pools can use different parameters, and stable pools and concentrated-liquidity (V3) pools have their own fee settings.</p>
+<h3 id="slippage">Slippage<a class="headerlink" href="#slippage" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> The difference between the quoted and executed trade price.</p>
 <ul>
-<li>High trading volume pools (lots of fees)</li>
-<li>Stablecoin-stablecoin pairs (minimal price divergence)</li>
-<li>Short-term price movements (loss is "impermanent")</li>
+<li>Larger trades relative to pool size move the price more</li>
+<li>The price can move between quote and execution</li>
+<li>Your slippage tolerance sets the minimum output. If execution would fall below it, the transaction reverts (and still pays its fee)</li>
 </ul>
-<h2 id="slippage">Slippage<a class="headerlink" href="#slippage" title="Permanent link">&para;</a></h2>
-<p><strong>Definition:</strong> Difference between expected and actual trade price.</p>
-<p><strong>Causes:</strong></p>
+<h3 id="reward-points">Reward Points<a class="headerlink" href="#reward-points" title="Permanent link">&para;</a></h3>
+<p><strong>Definition:</strong> Rewards earned for eligible on-chain activity, paid in the <code>CATA</code> token.</p>
 <ul>
-<li>Pool size too small for your trade</li>
-<li>Price moves between preview and execution</li>
-<li>Network congestion delays</li>
+<li>Activities (for example providing liquidity, lending, or one-time actions such as swaps) and their emission rates are configured in the Rewards contract</li>
+<li>Rewards accrue continuously and can be claimed at any time</li>
+<li>See the <a href="../guides/rewards/">Rewards guide</a></li>
 </ul>
-<p><strong>Example:</strong>
-<div class="highlight"><pre><span></span><code>Expected: Swap 1 ETH for 3,000 USDC
-Slippage: 0.5%
-Minimum received: 2,985 USDC
-
-If price moves more than 0.5%, transaction reverts
-</code></pre></div></p>
-<p><strong>Settings:</strong></p>
-<ul>
-<li>Low slippage (0.1-0.5%): Safer, may fail in volatile markets</li>
-<li>High slippage (1-5%): More tolerant, risk of worse price</li>
-</ul>
-<h2 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h2>
-<h3 id="key-metrics-to-remember">Key Metrics to Remember<a class="headerlink" href="#key-metrics-to-remember" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>Health Factor &gt; 2.0</strong> (lending) or <strong>CR &gt; 200%</strong> (CDP) = Safe</li>
-<li><strong>Always keep reserve USDST</strong> for transaction fees</li>
-<li><strong>Monitor prices daily</strong> when you have active positions</li>
-<li><strong>Set alerts</strong> at liquidation prices</li>
-</ul>
-<h3 id="transaction-flow">Transaction Flow<a class="headerlink" href="#transaction-flow" title="Permanent link">&para;</a></h3>
-<p>Typically:</p>
-<ol>
-<li>Approve token spending (one-time per token)</li>
-<li>Execute main action (supply, borrow, swap, etc.)</li>
-<li>Wait for confirmation (~5-10 seconds)</li>
-<li>Check transaction success</li>
-</ol>
 <hr />
 <h2 id="available-tokens">Available Tokens<a class="headerlink" href="#available-tokens" title="Permanent link">&para;</a></h2>
-<p>STRATO supports various tokens for trading, lending, and collateral.</p>
-<div class="admonition info">
-<p class="admonition-title">Understanding Wrapped Tokens</p>
-<p>All tokens bridged from Ethereum are automatically wrapped to work on STRATO. See <a href="#wrapped-tokens">Wrapped Tokens</a> section above for details.</p>
-</div>
-<h3 id="native-wrapped-assets">Native &amp; Wrapped Assets<a class="headerlink" href="#native-wrapped-assets" title="Permanent link">&para;</a></h3>
-<p><strong>ETHST</strong> (Wrapped ETH):</p>
-<ul>
-<li>Bridged from Ethereum mainnet</li>
-<li>1:1 peg with ETH</li>
-<li>Primary trading and collateral asset</li>
-</ul>
-<p><strong>WBTCST</strong> (Wrapped BTC):</p>
-<ul>
-<li>Bridged from Ethereum (WBTC)</li>
-<li>Represents Bitcoin value</li>
-<li>High-value collateral</li>
-</ul>
-<h3 id="stablecoins">Stablecoins<a class="headerlink" href="#stablecoins" title="Permanent link">&para;</a></h3>
-<p><strong>USDST</strong> (STRATO USD):</p>
-<ul>
-<li>Protocol stablecoin (described above)</li>
-<li>Minted via CDP or borrowed from lending pool</li>
-<li>Pegged to 1 USD</li>
-<li>Used for fees and trading</li>
-</ul>
-<h3 id="commodity-tokens">Commodity Tokens<a class="headerlink" href="#commodity-tokens" title="Permanent link">&para;</a></h3>
-<p><strong>GOLDST</strong> (Gold):</p>
-<ul>
-<li>Represents gold value</li>
-<li>Commodity-backed</li>
-<li>Trading and collateral</li>
-</ul>
-<p><strong>SILVST</strong> (Silver):</p>
-<ul>
-<li>Represents silver value</li>
-<li>Commodity-backed</li>
-<li>Trading pair with GOLDST</li>
-</ul>
-<h3 id="governance">Governance<a class="headerlink" href="#governance" title="Permanent link">&para;</a></h3>
-<p><strong>Reward Points</strong>:</p>
-<ul>
-<li>STRATO governance token (described above)</li>
-<li>Earned through DeFi activities</li>
-<li>Used for voting and governance</li>
-</ul>
+<p>The token list is on-chain and changes over time. Common tokens:</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>USDST</strong></td>
+<td>STRATO's USD stablecoin; pays transaction fees</td>
+</tr>
+<tr>
+<td><strong>ETH, WBTC, wstETH, rETH, USDC, USDT, PAXG, XAUt, …</strong></td>
+<td>Bridged tokens (see <a href="#bridged-tokens">Bridged Tokens</a>)</td>
+</tr>
+<tr>
+<td><strong>GOLDST / SILVST</strong></td>
+<td>Tokenized gold and silver</td>
+</tr>
+<tr>
+<td><strong>STRATO</strong></td>
+<td>The network token, used for staking (<a href="../tokenomics/">Tokenomics</a>)</td>
+</tr>
+<tr>
+<td><strong>CATA</strong></td>
+<td>Reward Points token</td>
+</tr>
+<tr>
+<td><strong>Voucher</strong></td>
+<td>Non-transferable fee credits</td>
+</tr>
+</tbody>
+</table>
 <div class="admonition tip">
 <p class="admonition-title">Getting Tokens</p>
-<p>Most tokens are obtained by <strong><a href="../guides/bridge/">bridging from Ethereum</a></strong>. USDST and Reward Points are earned/minted on STRATO directly.</p>
+<p>Most tokens are obtained by <strong><a href="../guides/bridge/">bridging in</a></strong>. USDST is minted or borrowed on STRATO, GOLDST/SILVST can be bought in the app, and Reward Points are earned.</p>
 </div>
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>Now that you understand the core concepts:</p>
 <ul>
-<li><strong><a href="../quick-start/">Quick Start Guide</a></strong> - Get set up in 10 minutes</li>
-<li><strong><a href="../safety/">Review Safety Practices</a></strong> - Security and risk management</li>
+<li><strong><a href="../quick-start/">Quick Start Guide</a></strong> - Get set up</li>
+<li><strong><a href="../safety/">Safety Practices</a></strong> - Security and risk management</li>
 <li><strong><a href="../guides/borrow/">Borrow USDST Guide</a></strong> - Put concepts into practice</li>
 <li><strong><a href="../guides/mint-cdp/">Mint USDST via CDP Guide</a></strong> - Alternative approach</li>
 </ul>
@@ -2835,7 +3436,7 @@ If price moves more than 0.5%, transaction reverts
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -2936,7 +3537,7 @@ If price moves more than 0.5%, transaction reverts
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../js/timeago.min.js"></script>
       

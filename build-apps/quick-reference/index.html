@@ -24,16 +24,16 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>API Cheat Sheet - STRATO Technical Docs</title>
+        <title>API Cheat Sheet - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-cheat-sheet" class="md-skip">
+        <a href="#quick-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -1111,6 +1109,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1134,7 +1138,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1152,8 +1346,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1284,10 +1478,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" checked>
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1305,8 +1499,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1343,10 +1537,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1364,8 +1558,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1492,10 +1686,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -1513,8 +1707,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1613,10 +1807,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -1634,8 +1828,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1740,10 +1934,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
+  <a href="#networks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Setup
+        Networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API paths
       
     </span>
   </a>
@@ -1759,467 +1964,93 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Authentication">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get-oauth-token" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fees" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Get OAuth Token
+        Fees
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#transaction-builder" class="md-nav__link">
+  <a href="#key-addresses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transaction Builder
+        Key addresses
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Transaction Builder">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-function-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Function Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#submit-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submit Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#token-operations" class="md-nav__link">
+  <a href="#cirrus" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Token Operations
+        Cirrus
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Token Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#transfer-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transfer Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#approve-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Approve Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-token-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Token Balance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-all-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Get All Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#lending-operations" class="md-nav__link">
+  <a href="#json-rpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lending Operations
+        JSON-RPC
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Lending Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#supply-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supply Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#borrow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Borrow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-user-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query User Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#cdp-operations" class="md-nav__link">
+  <a href="#bloc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CDP Operations
+        Bloc
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="CDP Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#deposit-collateral-to-cdp" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deposit Collateral to CDP
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mint-usdst" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mint USDST
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay-cdp-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay CDP Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#swap-operations" class="md-nav__link">
+  <a href="#common-contract-calls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Swap Operations
+        Common contract calls
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Swap Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#swap-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Swap Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-pool-reserves" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Pool Reserves
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#liquidity-operations" class="md-nav__link">
+  <a href="#app-api-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Liquidity Operations
+        App API endpoints
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Liquidity Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Add Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#remove-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Remove Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#bridge-operations" class="md-nav__link">
+  <a href="#errors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bridge Operations
+        Errors
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Bridge Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#request-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Withdrawal
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-bridge-transactions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Bridge Transactions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rewards-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rewards Operations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rewards Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-user-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query User Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#utility-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Utility Functions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Utility Functions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#wait-for-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wait for Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#batch-queries" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Batch Queries
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Error Handling">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#retry-with-backoff" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Retry with Backoff
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#handle-common-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Handle Common Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2227,18 +2058,7 @@
   <a href="#reference-implementation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference Implementation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        Reference implementation
       
     </span>
   </a>
@@ -2284,6 +2104,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2299,10 +2123,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2320,8 +2144,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2415,6 +2239,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2476,6 +2765,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2503,10 +2819,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#setup" class="md-nav__link">
+  <a href="#networks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Setup
+        Networks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API paths
       
     </span>
   </a>
@@ -2522,467 +2849,93 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Authentication">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#get-oauth-token" class="md-nav__link">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fees" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Get OAuth Token
+        Fees
       
     </span>
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#transaction-builder" class="md-nav__link">
+  <a href="#key-addresses" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transaction Builder
+        Key addresses
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Transaction Builder">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-function-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Function Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#submit-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Submit Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#token-operations" class="md-nav__link">
+  <a href="#cirrus" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Token Operations
+        Cirrus
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Token Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#transfer-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transfer Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#approve-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Approve Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-token-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Token Balance
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#get-all-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Get All Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#lending-operations" class="md-nav__link">
+  <a href="#json-rpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Lending Operations
+        JSON-RPC
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Lending Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#supply-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supply Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#borrow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Borrow
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-user-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query User Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#cdp-operations" class="md-nav__link">
+  <a href="#bloc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        CDP Operations
+        Bloc
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="CDP Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#deposit-collateral-to-cdp" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Deposit Collateral to CDP
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mint-usdst" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Mint USDST
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay-cdp-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay CDP Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#swap-operations" class="md-nav__link">
+  <a href="#common-contract-calls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Swap Operations
+        Common contract calls
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Swap Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#swap-tokens" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Swap Tokens
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-pool-reserves" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Pool Reserves
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#liquidity-operations" class="md-nav__link">
+  <a href="#app-api-endpoints" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Liquidity Operations
+        App API endpoints
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Liquidity Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#add-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Add Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#remove-liquidity" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Remove Liquidity
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#bridge-operations" class="md-nav__link">
+  <a href="#errors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bridge Operations
+        Errors
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Bridge Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#request-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Request Withdrawal
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-bridge-transactions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query Bridge Transactions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#rewards-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rewards Operations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Rewards Operations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#claim-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claim Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#query-user-rewards" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Query User Rewards
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#utility-functions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Utility Functions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Utility Functions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#wait-for-transaction" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Wait for Transaction
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#batch-queries" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Batch Queries
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#error-handling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Error Handling
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Error Handling">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#retry-with-backoff" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Retry with Backoff
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#handle-common-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Handle Common Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2990,18 +2943,7 @@
   <a href="#reference-implementation" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Reference Implementation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        Reference implementation
       
     </span>
   </a>
@@ -3025,638 +2967,457 @@
 
 
 
-<h1 id="api-cheat-sheet">API Cheat Sheet<a class="headerlink" href="#api-cheat-sheet" title="Permanent link">&para;</a></h1>
-<p>Quick reference for common STRATO operations using REST APIs.</p>
-<div class="admonition danger">
-<p class="admonition-title">Important: ethers.js Does NOT Work</p>
-<p><strong>You CANNOT use ethers.js or web3.js with STRATO.</strong></p>
-<p>Use STRATO REST APIs: <code>/strato/v2.3</code>, <code>/cirrus/search</code>, <code>/bloc/v2.2</code></p>
-</div>
-<div class="admonition note">
-<p class="admonition-title">About Endpoints</p>
-<p>All examples use <code>localhost</code> for local development.</p>
-<p><strong>For production, use public endpoints:</strong>
-- Mainnet: <code>https://app.strato.nexus</code>
-- Testnet: <code>https://app.testnet.strato.nexus</code></p>
-<p><strong>Optional:</strong> <a href="../../contribute/setup/">Local setup guide</a></p>
-</div>
-<hr />
-<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><span class="k">import</span><span class="w"> </span><span class="nx">axios</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">AxiosInstance</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;axios&#39;</span><span class="p">;</span>
-
-<span class="c1">// For local dev:</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">NODE_URL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;http://localhost:8080&#39;</span><span class="p">;</span>
-
-<span class="c1">// For production (replace with):</span>
-<span class="c1">// const NODE_URL = &#39;https://app.strato.nexus&#39;;  // mainnet</span>
-<span class="c1">// const NODE_URL = &#39;https://app.testnet.strato.nexus&#39;;  // testnet</span>
-
-<span class="kd">function</span><span class="w"> </span><span class="nx">createApiClient</span><span class="p">(</span><span class="nx">baseURL</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nx">AxiosInstance</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">create</span><span class="p">({</span>
-<span class="w">    </span><span class="nx">baseURL</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/json&#39;</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">timeout</span><span class="o">:</span><span class="w"> </span><span class="kt">60_000</span><span class="p">,</span>
-<span class="w">  </span><span class="p">});</span>
-<span class="p">}</span>
-
-<span class="c1">// API clients</span>
-<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">strato</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createApiClient</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">NODE_URL</span><span class="si">}</span><span class="sb">/strato/v2.3`</span><span class="p">);</span>
-<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">cirrus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createApiClient</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">NODE_URL</span><span class="si">}</span><span class="sb">/cirrus/search`</span><span class="p">);</span>
-<span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">bloc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">createApiClient</span><span class="p">(</span><span class="sb">`</span><span class="si">${</span><span class="nx">NODE_URL</span><span class="si">}</span><span class="sb">/bloc/v2.2`</span><span class="p">);</span>
-</code></pre></div>
-<hr />
+<h1 id="quick-reference">Quick Reference<a class="headerlink" href="#quick-reference" title="Permanent link">&para;</a></h1>
+<p>A cheat sheet for building on STRATO. For the full references, see <a href="../../reference/strato-node-api/">Core Platform API</a>, <a href="../../reference/cirrus/">Cirrus</a>, <a href="../../reference/json-rpc/">JSON-RPC</a> and <a href="../../platform/transactions-and-fees/">Transactions and Fees</a>.</p>
+<h2 id="networks">Networks<a class="headerlink" href="#networks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Mainnet (upquark)</th>
+<th>Testnet (helium)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Host</td>
+<td><code>https://app.strato.nexus</code></td>
+<td><code>https://app.testnet.strato.nexus</code></td>
+</tr>
+<tr>
+<td>JSON-RPC</td>
+<td><code>https://app.strato.nexus/rpc</code>, <code>https://noderpc.strato.nexus/rpc</code></td>
+<td><code>https://app.testnet.strato.nexus/rpc</code></td>
+</tr>
+<tr>
+<td><code>eth_chainId</code></td>
+<td><code>0x7030addddcf2</code> (<code>123354377739506</code>)</td>
+<td><code>0xb165855668ca</code> (<code>195049586845898</code>)</td>
+</tr>
+<tr>
+<td><code>net_version</code></td>
+<td><code>33056204878082667</code></td>
+<td><code>114784819836269</code></td>
+</tr>
+<tr>
+<td>Explorer</td>
+<td><a href="https://stratoscan.strato.nexus">stratoscan.strato.nexus</a></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="api-paths">API paths<a class="headerlink" href="#api-paths" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Purpose</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rpc</code></td>
+<td>Ethereum JSON-RPC</td>
+<td>None. <code>strato_*</code> methods are blocked on public endpoints.</td>
+</tr>
+<tr>
+<td><code>/cirrus/search/&lt;table&gt;</code></td>
+<td>Indexed state and events (PostgREST, <code>GET</code> only)</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/strato-api/eth/v1.2/*</code></td>
+<td>Core API: <code>account</code>, <code>block</code>, <code>block/last</code>, <code>transaction</code>, <code>transactionResult</code>, <code>metadata</code>, and more</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/bloc/v2.2/transaction[/parallel]</code></td>
+<td>Sign with your Vault key and submit</td>
+<td>Bearer token</td>
+</tr>
+<tr>
+<td><code>/bloc/v2.2/transactions/results</code></td>
+<td>Transaction results by hash</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/bloc/v2.2/transaction/simulate</code></td>
+<td>Dry run (rate-limited)</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/bloc/v2.2/transaction/unsigned</code></td>
+<td>Build unsigned transactions</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/api/*</code></td>
+<td>App backend (DeFi operations)</td>
+<td>Token for user data and writes</td>
+</tr>
+<tr>
+<td><code>/api/public/api-docs.json</code></td>
+<td>App API OpenAPI spec</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>/api/docs</code></td>
+<td>App API Swagger UI</td>
+<td>Browser login</td>
+</tr>
+</tbody>
+</table>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
-<h3 id="get-oauth-token">Get OAuth Token<a class="headerlink" href="#get-oauth-token" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">import</span><span class="w"> </span><span class="nx">axios</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s1">&#39;axios&#39;</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><span class="c1"># Discovery document (the token_endpoint is inside)</span>
+curl<span class="w"> </span>-s<span class="w"> </span>https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
 
-<span class="kd">const</span><span class="w"> </span><span class="nx">OAUTH_DISCOVERY_URL</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">OAUTH_DISCOVERY_URL</span><span class="o">!</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">CLIENT_ID</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">OAUTH_CLIENT_ID</span><span class="o">!</span><span class="p">;</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">CLIENT_SECRET</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">process</span><span class="p">.</span><span class="nx">env</span><span class="p">.</span><span class="nx">OAUTH_CLIENT_SECRET</span><span class="o">!</span><span class="p">;</span>
+<span class="c1"># Client-credentials token (credentials from support.blockapps.net)</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-u<span class="w"> </span><span class="s2">"</span><span class="nv">$OAUTH_CLIENT_ID</span><span class="s2">:</span><span class="nv">$OAUTH_CLIENT_SECRET</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="nv">grant_type</span><span class="o">=</span>client_credentials<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="s2">"&lt;token_endpoint&gt;"</span>
 
-<span class="kd">let</span><span class="w"> </span><span class="nx">tokenEndpoint</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
-
-<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">initAuth</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span>
-<span class="w">    </span><span class="sb">`</span><span class="si">${</span><span class="nx">OAUTH_DISCOVERY_URL</span><span class="si">}</span><span class="sb">/.well-known/openid-configuration`</span>
-<span class="w">  </span><span class="p">);</span>
-<span class="w">  </span><span class="nx">tokenEndpoint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">data</span><span class="p">.</span><span class="nx">token_endpoint</span><span class="p">;</span>
-<span class="p">}</span>
-
-<span class="k">export</span><span class="w"> </span><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getAccessToken</span><span class="p">()</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="kt">string</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span>
-<span class="w">    </span><span class="nx">tokenEndpoint</span><span class="p">,</span>
-<span class="w">    </span><span class="ow">new</span><span class="w"> </span><span class="nx">URLSearchParams</span><span class="p">({</span>
-<span class="w">      </span><span class="nx">grant_type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;client_credentials&#39;</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">client_id</span><span class="o">:</span><span class="w"> </span><span class="kt">CLIENT_ID</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">client_secret</span><span class="o">:</span><span class="w"> </span><span class="kt">CLIENT_SECRET</span><span class="p">,</span>
-<span class="w">    </span><span class="p">}),</span>
-<span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="s1">&#39;Content-Type&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;application/x-www-form-urlencoded&#39;</span><span class="w"> </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">);</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">.</span><span class="nx">access_token</span><span class="p">;</span>
-<span class="p">}</span>
+<span class="c1"># Use it</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>https://app.testnet.strato.nexus/api/user/me
 </code></pre></div>
-<hr />
-<h2 id="transaction-builder">Transaction Builder<a class="headerlink" href="#transaction-builder" title="Permanent link">&para;</a></h2>
-<h3 id="build-function-transaction">Build Function Transaction<a class="headerlink" href="#build-function-transaction" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">interface</span><span class="w"> </span><span class="nx">FunctionInput</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="kt">Record</span><span class="o">&lt;</span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">any</span><span class="o">&gt;</span><span class="p">;</span>
-<span class="p">}</span>
-
-<span class="kd">function</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">(</span><span class="nx">inputs</span><span class="o">:</span><span class="w"> </span><span class="kt">FunctionInput</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nx">FunctionInput</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">inputArray</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Array</span><span class="p">.</span><span class="nx">isArray</span><span class="p">(</span><span class="nx">inputs</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">inputs</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="nx">inputs</span><span class="p">];</span>
-
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">txs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">inputArray</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">input</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">({</span>
-<span class="w">    </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;FUNCTION&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">payload</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="kt">input.contractName</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">input.contractAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="kt">input.method</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="kt">input.args</span><span class="p">,</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">  </span><span class="p">}));</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">txs</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">txParams</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">gasLimit</span><span class="o">:</span><span class="w"> </span><span class="kt">32_100_000_000</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">gasPrice</span><span class="o">:</span><span class="w"> </span><span class="kt">1</span><span class="p">,</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">  </span><span class="p">};</span>
-<span class="p">}</span>
-</code></pre></div>
-<h3 id="submit-transaction">Submit Transaction<a class="headerlink" href="#submit-transaction" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">strato</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span>
-<span class="w">    </span><span class="s1">&#39;/transaction/parallel?resolve=true&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">tx</span><span class="p">,</span>
-<span class="w">    </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">}</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">);</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="token-operations">Token Operations<a class="headerlink" href="#token-operations" title="Permanent link">&para;</a></h2>
-<h3 id="transfer-tokens">Transfer Tokens<a class="headerlink" href="#transfer-tokens" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">({</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;0x...&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;transfer&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;0x...&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;1000000000000000000&#39;</span><span class="w"> </span><span class="c1">// 1 token (18 decimals)</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">});</span>
-
-<span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="approve-tokens">Approve Tokens<a class="headerlink" href="#approve-tokens" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">({</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_ADDRESS</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">SPENDER_ADDRESS</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;1000000000000000000&#39;</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">});</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="query-token-balance">Query Token Balance<a class="headerlink" href="#query-token-balance" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getTokenBalance</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">tokenAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">userAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/Token-_balances&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">address</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">tokenAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">userAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;value::text&#39;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nb">BigInt</span><span class="p">(</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">[</span><span class="mf">0</span><span class="p">]</span><span class="o">?</span><span class="p">.</span><span class="nx">value</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s1">&#39;0&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-</code></pre></div>
-<h3 id="get-all-tokens">Get All Tokens<a class="headerlink" href="#get-all-tokens" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getAllTokens</span><span class="p">(</span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/Token&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;address,_name,_symbol,_totalSupply::text&#39;</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">limit</span><span class="o">:</span><span class="w"> </span><span class="kt">100</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="lending-operations">Lending Operations<a class="headerlink" href="#lending-operations" title="Permanent link">&para;</a></h2>
-<h3 id="supply-collateral">Supply Collateral<a class="headerlink" href="#supply-collateral" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1">// Multi-step: Approve + Supply</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">LENDING_POOL</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;LendingPool&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">LENDING_POOL</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;supplyCollateral&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">asset</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="borrow">Borrow<a class="headerlink" href="#borrow" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">({</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;LendingPool&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">LENDING_POOL</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;borrow&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">asset</span><span class="o">:</span><span class="w"> </span><span class="kt">USDST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;1000000000000000000000&#39;</span><span class="w"> </span><span class="c1">// 1000 USDST</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">});</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="repay">Repay<a class="headerlink" href="#repay" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">USDST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">LENDING_POOL</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;LendingPool&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">LENDING_POOL</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;repay&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">asset</span><span class="o">:</span><span class="w"> </span><span class="kt">USDST_TOKEN</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="query-user-collateral">Query User Collateral<a class="headerlink" href="#query-user-collateral" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getUserCollateral</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">collateralVaultAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">userAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/CollateralVault-userCollaterals&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">address</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">collateralVaultAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">userAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;key2,value::text&#39;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="cdp-operations">CDP Operations<a class="headerlink" href="#cdp-operations" title="Permanent link">&para;</a></h2>
-<h3 id="deposit-collateral-to-cdp">Deposit Collateral to CDP<a class="headerlink" href="#deposit-collateral-to-cdp" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">CDP_ENGINE</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;CDPEngine&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">CDP_ENGINE</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;deposit&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">collateralType</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="mint-usdst">Mint USDST<a class="headerlink" href="#mint-usdst" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">({</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;CDPEngine&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">CDP_ENGINE</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;mint&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">collateralType</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;1000000000000000000000&#39;</span><span class="w"> </span><span class="c1">// 1000 USDST</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">});</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="repay-cdp-debt">Repay CDP Debt<a class="headerlink" href="#repay-cdp-debt" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">USDST_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">CDP_ENGINE</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;CDPEngine&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">CDP_ENGINE</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;repay&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">collateralType</span><span class="o">:</span><span class="w"> </span><span class="kt">ETHST_TOKEN</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amount</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<hr />
-<h2 id="swap-operations">Swap Operations<a class="headerlink" href="#swap-operations" title="Permanent link">&para;</a></h2>
-<h3 id="swap-tokens">Swap Tokens<a class="headerlink" href="#swap-tokens" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_IN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amountIn</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Router&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;swapExactTokensForTokens&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">amountIn</span><span class="o">:</span><span class="w"> </span><span class="kt">amountIn</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountOutMin</span><span class="o">:</span><span class="w"> </span><span class="kt">amountOutMin</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="nx">TOKEN_IN</span><span class="p">,</span><span class="w"> </span><span class="nx">TOKEN_OUT</span><span class="p">],</span>
-<span class="w">      </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">userAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">deadline</span><span class="o">:</span><span class="w"> </span><span class="kt">Math.floor</span><span class="p">(</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1000</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">1200</span><span class="w"> </span><span class="c1">// 20 minutes</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="query-pool-reserves">Query Pool Reserves<a class="headerlink" href="#query-pool-reserves" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getPoolReserves</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">poolAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/Pool&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">address</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">poolAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;_token0,_token1,_reserve0::text,_reserve1::text&#39;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">[</span><span class="mf">0</span><span class="p">];</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="liquidity-operations">Liquidity Operations<a class="headerlink" href="#liquidity-operations" title="Permanent link">&para;</a></h2>
-<h3 id="add-liquidity">Add Liquidity<a class="headerlink" href="#add-liquidity" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_A</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amountA</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_B</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amountB</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Router&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;addLiquidity&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">tokenA</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_A</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">tokenB</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_B</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountADesired</span><span class="o">:</span><span class="w"> </span><span class="kt">amountA</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountBDesired</span><span class="o">:</span><span class="w"> </span><span class="kt">amountB</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountAMin</span><span class="o">:</span><span class="w"> </span><span class="kt">amountAMin</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountBMin</span><span class="o">:</span><span class="w"> </span><span class="kt">amountBMin</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">userAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">deadline</span><span class="o">:</span><span class="w"> </span><span class="kt">Math.floor</span><span class="p">(</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1000</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">1200</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="remove-liquidity">Remove Liquidity<a class="headerlink" href="#remove-liquidity" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Pool&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">POOL_ADDRESS</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">lpTokenAmount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Router&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">ROUTER</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;removeLiquidity&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">tokenA</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_A</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">tokenB</span><span class="o">:</span><span class="w"> </span><span class="kt">TOKEN_B</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">liquidity</span><span class="o">:</span><span class="w"> </span><span class="kt">lpTokenAmount</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountAMin</span><span class="o">:</span><span class="w"> </span><span class="kt">amountAMin</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">amountBMin</span><span class="o">:</span><span class="w"> </span><span class="kt">amountBMin</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">to</span><span class="o">:</span><span class="w"> </span><span class="kt">userAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">deadline</span><span class="o">:</span><span class="w"> </span><span class="kt">Math.floor</span><span class="p">(</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1000</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mf">1200</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<hr />
-<h2 id="bridge-operations">Bridge Operations<a class="headerlink" href="#bridge-operations" title="Permanent link">&para;</a></h2>
-<h3 id="request-withdrawal">Request Withdrawal<a class="headerlink" href="#request-withdrawal" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">([</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">STRATO_TOKEN</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;approve&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">spender</span><span class="o">:</span><span class="w"> </span><span class="kt">BRIDGE</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;MercataBridge&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">BRIDGE</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;requestWithdrawal&#39;</span><span class="p">,</span>
-<span class="w">    </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">externalChainId</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;1&#39;</span><span class="p">,</span><span class="w"> </span><span class="c1">// Ethereum mainnet</span>
-<span class="w">      </span><span class="nx">externalRecipient</span><span class="o">:</span><span class="w"> </span><span class="kt">ethereumAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">externalToken</span><span class="o">:</span><span class="w"> </span><span class="kt">externalTokenAddress</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">stratoTokenAmount</span><span class="o">:</span><span class="w"> </span><span class="kt">amount</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">]);</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="query-bridge-transactions">Query Bridge Transactions<a class="headerlink" href="#query-bridge-transactions" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getBridgeTransactions</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">userAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/MercataBridge-Deposit&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">recipient</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">userAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;*&#39;</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">order</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;timestamp.desc&#39;</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">limit</span><span class="o">:</span><span class="w"> </span><span class="kt">50</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="rewards-operations">Rewards Operations<a class="headerlink" href="#rewards-operations" title="Permanent link">&para;</a></h2>
-<h3 id="claim-rewards">Claim Rewards<a class="headerlink" href="#claim-rewards" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">tx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">buildFunctionTx</span><span class="p">({</span>
-<span class="w">  </span><span class="nx">contractName</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Rewards&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">contractAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">REWARDS_ADDRESS</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">method</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;claimRewards&#39;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">args</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">activityIdsToSettle</span><span class="o">:</span><span class="w"> </span><span class="p">[</span><span class="mf">1</span><span class="p">,</span><span class="w"> </span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="mf">3</span><span class="p">]</span><span class="w"> </span><span class="c1">// Activity IDs</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">});</span>
-
-<span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-</code></pre></div>
-<h3 id="query-user-rewards">Query User Rewards<a class="headerlink" href="#query-user-rewards" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getUserRewards</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">rewardsAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">userAddress</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;/Rewards-userInfo&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">    </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">address</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">rewardsAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">userAddress</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span>
-<span class="w">      </span><span class="nx">select</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;*&#39;</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">});</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">;</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="utility-functions">Utility Functions<a class="headerlink" href="#utility-functions" title="Permanent link">&para;</a></h2>
-<h3 id="wait-for-transaction">Wait for Transaction<a class="headerlink" href="#wait-for-transaction" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">waitForTransaction</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">txHash</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">timeout</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">60000</span>
-<span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">any</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">();</span>
-
-<span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="kc">true</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">bloc</span><span class="p">.</span><span class="nx">post</span><span class="p">(</span>
-<span class="w">      </span><span class="s1">&#39;/transactions/results&#39;</span><span class="p">,</span>
-<span class="w">      </span><span class="p">[</span><span class="nx">txHash</span><span class="p">],</span>
-<span class="w">      </span><span class="p">{</span>
-<span class="w">        </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">}</span>
-<span class="w">      </span><span class="p">}</span>
-<span class="w">    </span><span class="p">);</span>
-
-<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">[</span><span class="mf">0</span><span class="p">];</span>
-
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;Failure&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="sb">`Transaction failed: </span><span class="si">${</span><span class="nx">result</span><span class="p">.</span><span class="nx">message</span><span class="si">}</span><span class="sb">`</span><span class="p">);</span>
-<span class="w">    </span><span class="p">}</span>
-
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">result</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="s1">&#39;Pending&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nx">result</span><span class="p">;</span>
-<span class="w">    </span><span class="p">}</span>
-
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nb">Date</span><span class="p">.</span><span class="nx">now</span><span class="p">()</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nx">start</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="nx">timeout</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;Transaction timeout&#39;</span><span class="p">);</span>
-<span class="w">    </span><span class="p">}</span>
-
-<span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Promise</span><span class="p">(</span><span class="nx">resolve</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">setTimeout</span><span class="p">(</span><span class="nx">resolve</span><span class="p">,</span><span class="w"> </span><span class="mf">2000</span><span class="p">));</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div>
-<h3 id="batch-queries">Batch Queries<a class="headerlink" href="#batch-queries" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">batchQuery</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">accessToken</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">queries</span><span class="o">:</span><span class="w"> </span><span class="kt">Array</span><span class="o">&lt;</span><span class="p">{</span><span class="w"> </span><span class="nx">table</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span><span class="w"> </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="w"> </span><span class="p">}</span><span class="o">&gt;</span>
-<span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">promises</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">queries</span><span class="p">.</span><span class="nx">map</span><span class="p">(({</span><span class="w"> </span><span class="nx">table</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span>
-<span class="w">    </span><span class="nx">cirrus</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="sb">`/</span><span class="si">${</span><span class="nx">table</span><span class="si">}</span><span class="sb">`</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nx">headers</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Authorization</span><span class="o">:</span><span class="w"> </span><span class="sb">`Bearer </span><span class="si">${</span><span class="nx">accessToken</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">},</span>
-<span class="w">      </span><span class="nx">params</span>
-<span class="w">    </span><span class="p">})</span>
-<span class="w">  </span><span class="p">);</span>
-
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nb">Promise</span><span class="p">.</span><span class="nx">all</span><span class="p">(</span><span class="nx">promises</span><span class="p">);</span>
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="nx">results</span><span class="p">.</span><span class="nx">map</span><span class="p">(</span><span class="nx">r</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">r</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="c1">// Usage</span>
-<span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">tokens</span><span class="p">,</span><span class="w"> </span><span class="nx">pools</span><span class="p">,</span><span class="w"> </span><span class="nx">balances</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">batchQuery</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="p">[</span>
-<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">table</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">limit</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">table</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Pool&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">limit</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">},</span>
-<span class="w">  </span><span class="p">{</span><span class="w"> </span><span class="nx">table</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;Token-_balances&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">params</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">key</span><span class="o">:</span><span class="w"> </span><span class="sb">`eq.</span><span class="si">${</span><span class="nx">userAddress</span><span class="si">}</span><span class="sb">`</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
-<span class="p">]);</span>
-</code></pre></div>
-<hr />
-<h2 id="error-handling">Error Handling<a class="headerlink" href="#error-handling" title="Permanent link">&para;</a></h2>
-<h3 id="retry-with-backoff">Retry with Backoff<a class="headerlink" href="#retry-with-backoff" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">retryWithBackoff</span><span class="o">&lt;</span><span class="nx">T</span><span class="o">&gt;</span><span class="p">(</span>
-<span class="w">  </span><span class="nx">fn</span><span class="o">:</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">T</span><span class="o">&gt;</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">maxRetries</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3</span><span class="p">,</span>
-<span class="w">  </span><span class="nx">baseDelay</span><span class="o">:</span><span class="w"> </span><span class="kt">number</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1000</span>
-<span class="p">)</span><span class="o">:</span><span class="w"> </span><span class="nb">Promise</span><span class="o">&lt;</span><span class="nx">T</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">let</span><span class="w"> </span><span class="nx">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0</span><span class="p">;</span><span class="w"> </span><span class="nx">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="nx">maxRetries</span><span class="p">;</span><span class="w"> </span><span class="nx">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fn</span><span class="p">();</span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">i</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="nx">maxRetries</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mf">1</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="nx">error</span><span class="p">;</span>
-
-<span class="w">      </span><span class="kd">const</span><span class="w"> </span><span class="nx">delay</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">baseDelay</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nb">Math</span><span class="p">.</span><span class="nx">pow</span><span class="p">(</span><span class="mf">2</span><span class="p">,</span><span class="w"> </span><span class="nx">i</span><span class="p">);</span>
-<span class="w">      </span><span class="k">await</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nb">Promise</span><span class="p">(</span><span class="nx">resolve</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">setTimeout</span><span class="p">(</span><span class="nx">resolve</span><span class="p">,</span><span class="w"> </span><span class="nx">delay</span><span class="p">));</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="w">  </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s1">&#39;Max retries exceeded&#39;</span><span class="p">);</span>
-<span class="p">}</span>
-
-<span class="c1">// Usage</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">retryWithBackoff</span><span class="p">(()</span><span class="w"> </span><span class="p">=&gt;</span>
-<span class="w">  </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">)</span>
-<span class="p">);</span>
-</code></pre></div>
-<h3 id="handle-common-errors">Handle Common Errors<a class="headerlink" href="#handle-common-errors" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">submitTransaction</span><span class="p">(</span><span class="nx">accessToken</span><span class="p">,</span><span class="w"> </span><span class="nx">tx</span><span class="p">);</span>
-<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="o">:</span><span class="w"> </span><span class="kt">any</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">401</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// Token expired - refresh</span>
-<span class="w">    </span><span class="nx">accessToken</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">getAccessToken</span><span class="p">();</span>
-<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="o">?</span><span class="p">.</span><span class="nx">status</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="mf">400</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// Transaction failed</span>
-<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;Transaction error:&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">error</span><span class="p">.</span><span class="nx">response</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
-<span class="w">  </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">.</span><span class="nx">code</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s1">&#39;ECONNREFUSED&#39;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="c1">// STRATO node not reachable</span>
-<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s1">&#39;Cannot connect to STRATO&#39;</span><span class="p">);</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div>
-<hr />
-<h2 id="reference-implementation">Reference Implementation<a class="headerlink" href="#reference-implementation" title="Permanent link">&para;</a></h2>
-<p>The <strong>mercata backend</strong> provides complete examples:</p>
+<p>For server-side <code>POST</code>s, use an HTTP client whose <code>User-Agent</code> nginx recognizes (curl, axios, python-requests, …). Node's built-in <code>fetch</code> fails the CSRF check.</p>
+<h2 id="fees">Fees<a class="headerlink" href="#fees" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Transaction Builder</strong> - <code>mercata/backend/src/utils/txBuilder.ts</code></li>
-<li><strong>Transaction Helper</strong> - <code>mercata/backend/src/utils/txHelper.ts</code></li>
-<li><strong>API Clients</strong> - <code>mercata/backend/src/utils/mercataApiHelper.ts</code></li>
-<li><strong>Services</strong> - <code>mercata/backend/src/api/services/</code></li>
+<li><strong>0.01 USDST</strong> per transaction, or <strong>1 voucher</strong> if the sender holds one (paid through the Decider contract <code>…dec1de</code> to FeeCollector <code>…100d</code>)</li>
+<li>Charged before execution, so reverted transactions still pay</li>
+<li>No gas price to tune. Submitting N transactions costs N fees (approve plus an action = 0.02 USDST).</li>
 </ul>
-<hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h2 id="key-addresses">Key addresses<a class="headerlink" href="#key-addresses" title="Permanent link">&para;</a></h2>
+<p>The same on both networks (genesis). Full list: <a href="../contract-addresses/">Contract Addresses</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Contract</th>
+<th>Address</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>USDST</td>
+<td><code>937efa7e3a77e20bbdbd7c0d32b6514f368c1010</code></td>
+</tr>
+<tr>
+<td>Voucher</td>
+<td><code>000000000000000000000000000000000000100e</code></td>
+</tr>
+<tr>
+<td>MercataGovernance</td>
+<td><code>0000000000000000000000000000000000000100</code></td>
+</tr>
+<tr>
+<td>Decider</td>
+<td><code>0000000000000000000000000000000000dec1de</code></td>
+</tr>
+<tr>
+<td>UserRegistry</td>
+<td><code>0000000000000000000000000000000000000720</code></td>
+</tr>
+<tr>
+<td>PriceOracle</td>
+<td><code>0000000000000000000000000000000000001002</code></td>
+</tr>
+<tr>
+<td>LendingPool</td>
+<td><code>0000000000000000000000000000000000001005</code></td>
+</tr>
+<tr>
+<td>LendingRegistry</td>
+<td><code>0000000000000000000000000000000000001007</code></td>
+</tr>
+<tr>
+<td>MercataBridge</td>
+<td><code>0000000000000000000000000000000000001008</code></td>
+</tr>
+<tr>
+<td>PoolFactory</td>
+<td><code>000000000000000000000000000000000000100a</code></td>
+</tr>
+<tr>
+<td>TokenFactory</td>
+<td><code>000000000000000000000000000000000000100b</code></td>
+</tr>
+<tr>
+<td>AdminRegistry</td>
+<td><code>000000000000000000000000000000000000100c</code></td>
+</tr>
+<tr>
+<td>FeeCollector</td>
+<td><code>000000000000000000000000000000000000100d</code></td>
+</tr>
+<tr>
+<td>CDPEngine</td>
+<td><code>0000000000000000000000000000000000001011</code></td>
+</tr>
+<tr>
+<td>CDPRegistry</td>
+<td><code>0000000000000000000000000000000000001012</code></td>
+</tr>
+<tr>
+<td>CDPVault</td>
+<td><code>0000000000000000000000000000000000001013</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="cirrus">Cirrus<a class="headerlink" href="#cirrus" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Table</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Contract state</td>
+<td><code>BlockApps-&lt;Contract&gt;</code></td>
+</tr>
+<tr>
+<td>Mapping</td>
+<td><code>BlockApps-&lt;Contract&gt;-&lt;mapping&gt;</code> (<code>address</code>, <code>key</code>, <code>key2</code>, <code>value</code>)</td>
+</tr>
+<tr>
+<td>Event</td>
+<td><code>BlockApps-&lt;Contract&gt;-&lt;Event&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="nv">H</span><span class="o">=</span>https://app.testnet.strato.nexus/cirrus/search
+
+<span class="c1"># Token by address</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-Token?address=eq.937efa7e3a77e20bbdbd7c0d32b6514f368c1010&amp;select=address,_name,_symbol,customDecimals"</span>
+
+<span class="c1"># Token balance</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-Token-_balances?address=eq.&lt;token&gt;&amp;key=eq.&lt;user&gt;&amp;select=value::text"</span>
+
+<span class="c1"># All balances for a user, with token metadata</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-Token-_balances?key=eq.&lt;user&gt;&amp;select=address,balance:value::text,token:BlockApps-Token(_symbol,customDecimals)"</span>
+
+<span class="c1"># Voucher balance</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-Voucher-_balances?address=eq.000000000000000000000000000000000000100e&amp;key=eq.&lt;user&gt;&amp;select=value::text"</span>
+
+<span class="c1"># Swap pools</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-Pool?select=address,tokenA,tokenB,tokenABalance::text,tokenBBalance::text,lpToken,isStable&amp;limit=20"</span>
+
+<span class="c1"># Oracle prices</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-PriceOracle-prices?address=eq.0000000000000000000000000000000000001002&amp;select=asset:key,price:value::text"</span>
+
+<span class="c1"># CDP vaults for a user</span>
+curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">"</span><span class="nv">$H</span><span class="s2">/BlockApps-CDPEngine-vaults?address=eq.0000000000000000000000000000000000001011&amp;key=eq.&lt;user&gt;&amp;select=asset:key2,Vault:value"</span>
+</code></pre></div>
+<p>Operators: <code>eq.</code>, <code>in.(a,b)</code>, <code>gt.</code>, <code>order=col.desc</code>, <code>limit</code>, <code>offset</code>, <code>alias:col</code>, <code>::text</code>, and embedding <code>rel:fkey_name(cols)</code>.</p>
+<h2 id="json-rpc">JSON-RPC<a class="headerlink" href="#json-rpc" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nv">R</span><span class="o">=</span>https://app.testnet.strato.nexus/rpc
+rpc<span class="o">()</span><span class="w"> </span><span class="o">{</span><span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$R</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s2">"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"</span><span class="nv">$1</span><span class="s2">\",\"params\":</span><span class="nv">$2</span><span class="s2">}"</span><span class="p">;</span><span class="w"> </span><span class="o">}</span>
+
+rpc<span class="w"> </span>eth_chainId<span class="w"> </span><span class="s1">'[]'</span>
+rpc<span class="w"> </span>eth_blockNumber<span class="w"> </span><span class="s1">'[]'</span>
+rpc<span class="w"> </span>eth_call<span class="w"> </span><span class="s1">'[{"to":"0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010","data":"0x95d89b41"},"latest"]'</span><span class="w">   </span><span class="c1"># symbol()</span>
+rpc<span class="w"> </span>eth_getTransactionCount<span class="w"> </span><span class="s1">'["0x&lt;address&gt;","latest"]'</span>
+rpc<span class="w"> </span>eth_getTransactionReceipt<span class="w"> </span><span class="s1">'["0x&lt;hash&gt;"]'</span>
+</code></pre></div>
+<p>Transaction rules:</p>
 <ul>
-<li><strong><a href="../quickstart/">Quick Start</a></strong> - Build your first app</li>
-<li><strong><a href="../integration/">API Integration</a></strong> - Complete integration guide</li>
-<li><strong><a href="../e2e/">E2E Examples</a></strong> - Full example flows</li>
+<li>Legacy EIP-155 transactions only</li>
+<li><code>gasPrice</code> 0 and an explicit gas limit (the app uses <code>1000000</code>)</li>
+<li>Submit with <code>eth_sendRawTransaction</code>; <code>eth_sendTransaction</code> isn't supported</li>
+</ul>
+<p>viem write:</p>
+<div class="highlight"><pre><span></span><code><span class="k">await</span><span class="w"> </span><span class="nx">walletClient</span><span class="p">.</span><span class="nx">writeContract</span><span class="p">({</span><span class="w"> </span><span class="nx">address</span><span class="p">,</span><span class="w"> </span><span class="nx">abi</span><span class="p">,</span><span class="w"> </span><span class="nx">functionName</span><span class="p">,</span><span class="w"> </span><span class="nx">args</span><span class="p">,</span><span class="w"> </span><span class="kr">type</span><span class="o">:</span><span class="w"> </span><span class="s2">"legacy"</span><span class="p">,</span><span class="w"> </span><span class="nx">gasPrice</span><span class="o">:</span><span class="w"> </span><span class="kt">0n</span><span class="p">,</span><span class="w"> </span><span class="nx">gas</span><span class="o">:</span><span class="w"> </span><span class="kt">1_000_000n</span><span class="w"> </span><span class="p">});</span>
+</code></pre></div>
+<h2 id="bloc">Bloc<a class="headerlink" href="#bloc" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="c1"># Submit (Vault signs for the token's account)</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">"https://app.testnet.strato.nexus/bloc/v2.2/transaction/parallel?resolve=true"</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer </span><span class="nv">$TOKEN</span><span class="s2">"</span><span class="w"> </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-d<span class="w"> </span><span class="s1">'{"txs":[{"type":"FUNCTION","payload":{"contractAddress":"&lt;address&gt;","method":"&lt;method&gt;","args":{}}}],"txParams":{"gasLimit":32100000000,"gasPrice":1}}'</span>
+
+<span class="c1"># Results: [{ status: Success|Failure|Pending, hash, txResult, data }]</span>
+curl<span class="w"> </span>-s<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>https://app.testnet.strato.nexus/bloc/v2.2/transactions/results<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-H<span class="w"> </span><span class="s1">'Content-Type: application/json'</span><span class="w"> </span>-d<span class="w"> </span><span class="s1">'["&lt;hash&gt;"]'</span>
+</code></pre></div>
+<p>Swap <code>/transaction/parallel</code> for <code>/transaction/simulate</code> to dry-run the same body.</p>
+<h2 id="common-contract-calls">Common contract calls<a class="headerlink" href="#common-contract-calls" title="Permanent link">&para;</a></h2>
+<p>These are the calls the app backend makes (<code>app/backend/src/api/services</code>). Amounts are base-unit integers (18 decimals for USDST and the genesis tokens). Each row is one transaction and one fee; "Approve first" is an extra transaction.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>Approve first (token → spender)</th>
+<th>Call</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transfer</td>
+<td>none</td>
+<td><code>Token.transfer(to, value)</code></td>
+</tr>
+<tr>
+<td>CDP deposit</td>
+<td>collateral → CDPVault <code>…1013</code></td>
+<td><code>CDPEngine(…1011).deposit(asset, amount)</code></td>
+</tr>
+<tr>
+<td>CDP mint</td>
+<td>none</td>
+<td><code>CDPEngine.mint(asset, amountUSD)</code></td>
+</tr>
+<tr>
+<td>CDP repay</td>
+<td>USDST → CDPEngine <code>…1011</code></td>
+<td><code>CDPEngine.repay(asset, amountUSD)</code></td>
+</tr>
+<tr>
+<td>Swap</td>
+<td>input token → pool</td>
+<td><code>Pool.swap(isAToB, amountIn, minAmountOut, deadline)</code></td>
+</tr>
+<tr>
+<td>Bridge out</td>
+<td>token → MercataBridge <code>…1008</code></td>
+<td><code>MercataBridge.requestWithdrawal(externalChainId, externalRecipient, externalToken, stratoToken, stratoTokenAmount)</code></td>
+</tr>
+<tr>
+<td>Lending: supply collateral</td>
+<td>collateral → CollateralVault <code>…1003</code></td>
+<td><code>LendingPool(…1005).supplyCollateral(asset, amount)</code></td>
+</tr>
+<tr>
+<td>Lending: borrow</td>
+<td>none</td>
+<td><code>LendingPool.borrow(amount)</code></td>
+</tr>
+<tr>
+<td>Lending: repay</td>
+<td>USDST → LiquidityPool <code>…1004</code></td>
+<td><code>LendingPool.repay(amount)</code></td>
+</tr>
+<tr>
+<td>Rewards</td>
+<td>none</td>
+<td><code>Rewards.claimAllRewards()</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>Pool.swap</code> requires <code>minAmountOut &gt; 0</code> and <code>block.timestamp &lt;= deadline</code>, with <code>deadline</code> in Unix seconds. The Rewards contract address differs per network; see <a href="../contract-addresses/#per-network-contracts">Contract Addresses</a>.</p>
+<h2 id="app-api-endpoints">App API endpoints<a class="headerlink" href="#app-api-endpoints" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Method and path</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /api/user/me</code></td>
+<td>Returns <code>{ userAddress, isAdmin, userName, isNewUser }</code></td>
+</tr>
+<tr>
+<td><code>GET /api/tokens/balance</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>GET /api/vouchers/balance</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POST /api/tokens/transfer</code></td>
+<td><code>{ address, to, value }</code>, returns <code>{ status, hash }</code></td>
+</tr>
+<tr>
+<td><code>GET /api/trade/quote</code></td>
+<td><code>?tokenIn&amp;tokenOut&amp;amount&amp;type</code></td>
+</tr>
+<tr>
+<td><code>POST /api/swap</code></td>
+<td><code>{ poolAddress, isAToB, amountIn, minAmountOut }</code></td>
+</tr>
+<tr>
+<td><code>POST /api/cdp/deposit</code></td>
+<td><code>{ asset, amount }</code></td>
+</tr>
+<tr>
+<td><code>POST /api/cdp/mint</code></td>
+<td><code>{ asset, amount }</code></td>
+</tr>
+<tr>
+<td><code>POST /api/bridge/requestWithdrawal</code></td>
+<td><code>{ externalChainId, externalToken, stratoToken, stratoTokenAmount, externalRecipient }</code></td>
+</tr>
+<tr>
+<td><code>POST /api/rewards/claim-all</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>More: <a href="../integration/#common-endpoints">Integration Guide</a> and <code>/api/public/api-docs.json</code>.</p>
+<h2 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Message or status</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>403 Authorization header is provided but the bearer token is invalid or expired</code></td>
+<td>nginx rejected the JWT</td>
+<td>Get a new token</td>
+</tr>
+<tr>
+<td><code>403 {"error": "Authentication required. Please log in and try again."}</code></td>
+<td>A <code>POST</code> was treated as a browser request (CSRF)</td>
+<td>Use curl, axios or another API client User-Agent</td>
+</tr>
+<tr>
+<td><code>401</code></td>
+<td>The endpoint needs a token and none was sent</td>
+<td>Add <code>Authorization: Bearer</code></td>
+</tr>
+<tr>
+<td><code>Insufficient gas fee coverage</code></td>
+<td>App backend: USDST + vouchers can't cover 0.01 × transactions</td>
+<td>Fund the account</td>
+</tr>
+<tr>
+<td><code>low tx nonce (expected: N, actual: M)</code></td>
+<td>Nonce reused</td>
+<td>Resubmit with nonce N</td>
+</tr>
+<tr>
+<td><code>403 method not available on the public RPC endpoint</code></td>
+<td>A <code>strato_*</code> method on public <code>/rpc</code></td>
+<td>Use <code>/bloc/v2.2/transaction/simulate</code> or your own node</td>
+</tr>
+<tr>
+<td><code>eth_sendTransaction not supported, use eth_sendRawTransaction</code></td>
+<td>Unsigned send to <code>/rpc</code></td>
+<td>Sign locally or in a wallet</td>
+</tr>
+<tr>
+<td><code>Method not found: eth_feeHistory</code> (or <code>eth_maxPriorityFeePerGas</code>)</td>
+<td>EIP-1559 fee lookup</td>
+<td>Send <code>type: "legacy"</code> with <code>gasPrice: 0</code></td>
+</tr>
+<tr>
+<td>Cirrus <code>{"code":"42P01", …}</code></td>
+<td>Table doesn't exist</td>
+<td>Check the <code>BlockApps-&lt;Contract&gt;[-&lt;name&gt;]</code> spelling</td>
+</tr>
+</tbody>
+</table>
+<h2 id="reference-implementation">Reference implementation<a class="headerlink" href="#reference-implementation" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>app/backend/src/utils/txBuilder.ts</code>, <code>txHelper.ts</code>, <code>appApiHelper.ts</code></li>
+<li><code>app/backend/src/api/services/*.service.ts</code></li>
+<li><code>app/ui/src/pages/Transfer.tsx</code> (external-wallet legacy transaction)</li>
 </ul>
 
 
@@ -3680,7 +3441,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -3781,7 +3542,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       

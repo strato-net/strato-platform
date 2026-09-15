@@ -1,0 +1,5144 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="STRATO platform technical documentation (use-case first, end-user + developer)">
+      
+      
+        <meta name="author" content="BlockApps">
+      
+      
+        <link rel="canonical" href="https://docs.strato.nexus/release-notes/">
+      
+      
+        <link rel="prev" href="../faq/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Release Notes - Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../css/timeago.css">
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#release-notes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
+      
+  <img src="../assets/strato-logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Release Notes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
+      
+  <img src="../assets/strato-logo.svg" alt="logo">
+
+    </a>
+    Docs
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tokenomics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tokenomics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../litepaper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Litepaper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/first-time-user/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    First-Time User
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/borrow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Borrow USDST
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/mint-cdp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mint USDST (CDP)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/swap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Swap Tokens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/liquidity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Provide Liquidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/bridge/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bridge Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guides/rewards/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manage Rewards
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Scenarios
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Scenarios
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/grow-position/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Grow Your Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/maximize-yield/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Maximize Yield
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/dca-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DCA Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/platform-migration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Migration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/portfolio-rebalancing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Portfolio Rebalancing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/risk-hedging/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Risk Management & Hedging
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/leverage-long/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leverage Long Position
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/multi-asset-strategy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Asset Strategy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/collateral-optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collateral Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/arbitrage-market-making/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arbitrage & Market Making
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scenarios/withdrawals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Withdrawals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing to STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing to STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contribute/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building Apps on STRATO
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building Apps on STRATO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start (5 min)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Building
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/e2e/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    E2E Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/contract-addresses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build-apps/quick-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Cheat Sheet
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    App API (Getting Started)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/interactive-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive Reference (Swagger)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/strato-node-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Platform API (Advanced)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../safety/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Safety & Risk
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#190" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="18.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1810" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.9
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#187-188" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.7 – 18.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#186" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#185" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#184" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#181-183" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.1 – 18.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#180" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#179" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.9
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#178" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#177" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#176" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#175" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#174" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#173" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#172" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#171" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#170-1701" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.0 – 17.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1615" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.15
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1613-1614" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.13 – 16.14
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1612" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.12
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1611" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1610" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#169-1691" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.9 – 16.9.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#168" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#167" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#166-1662" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.6 – 16.6.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#165" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#164" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#163-1631" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.3 – 16.3.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#162" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#161" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#160-1601" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.0 – 16.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#159-1591" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.9 – 15.9.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#158" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#157" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#156" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#155" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#154" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#153" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#152" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#151-1511" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.1 – 15.1.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1501-1504" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.0.1 – 15.0.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#145-1452" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.5 – 14.5.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#141-144" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.1 – 14.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#124-1242" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.4 – 12.4.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1231-1235" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3.1 – 12.3.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#123" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1221-1223" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2.1 – 12.2.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#122" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#121" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1141-1142" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4.1 – 11.4.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1131" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#19x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="19.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#191" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#190" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="18.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1810" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#189" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.9
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#187-188" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.7 – 18.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#186" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#185" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#184" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#181-183" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.1 – 18.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#180" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#179" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.9
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#178" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#177" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#176" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#175" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#174" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#173" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#172" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#171" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#170-1701" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17.0 – 17.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1615" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.15
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1613-1614" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.13 – 16.14
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1612" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.12
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1611" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1610" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.10
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#169-1691" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.9 – 16.9.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#168" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#167" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#166-1662" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.6 – 16.6.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#165" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#164" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#163-1631" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.3 – 16.3.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#162" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#161" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#160-1601" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.0 – 16.0.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#159-1591" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.9 – 15.9.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#158" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.8
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#157" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.7
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#156" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.6
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#155" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#154" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#153" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#152" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#151-1511" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.1 – 15.1.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1501-1504" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.0.1 – 15.0.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#150" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#145-1452" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.5 – 14.5.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#141-144" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.1 – 14.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#140" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#124-1242" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.4 – 12.4.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1231-1235" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3.1 – 12.3.5
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#123" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1221-1223" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2.1 – 12.2.3
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#122" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#121" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11x" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.x
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11.x">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1141-1142" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4.1 – 11.4.2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#114" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.4
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1131" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.3.1
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="release-notes">Release Notes<a class="headerlink" href="#release-notes" title="Permanent link">&para;</a></h1>
+<p>These notes cover STRATO releases <strong>11.4 through 19.1</strong>. Notes for 11.3 and earlier are on the legacy documentation site, <a href="https://old-docs.strato.nexus">old-docs.strato.nexus</a>.</p>
+<p><strong>Versioning.</strong> Releases are tagged <code>MAJOR.MINOR[.PATCH]</code> (for example <code>18.10</code> or <code>16.6.2</code>). Release candidates are tagged <code>-rcN</code> first (for example <code>19.1-rc0</code>). The repository's <code>VERSION</code> file holds the current version. There is no 13.x. Since 15.x, minor releases ship about once a week.</p>
+<p><strong>The 15.0 gap.</strong> Seven months passed between 14.5.2 (March 24, 2025) and 15.0 (October 31, 2025). During that time the DeFi application (lending, CDP/USDST, swap pools, bridge, rewards) was built into the repository, and the core platform was reworked around it.</p>
+<p><strong>Repository.</strong> The source moved from <code>github.com/blockapps/strato-platform</code> to <a href="https://github.com/strato-net/strato-platform">github.com/strato-net/strato-platform</a> during the 16.5 cycle (March 2026). PR numbers carry over.</p>
+<p>Each entry lists only changes that users, developers or node operators can see.</p>
+<hr />
+<h2 id="19x">19.x<a class="headerlink" href="#19x" title="Permanent link">&para;</a></h2>
+<h3 id="191">19.1<a class="headerlink" href="#191" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-15</em></p>
+<div class="admonition warning">
+<p class="admonition-title">Streaming backend: Kafka replaced by JLog</p>
+<p>The default node now uses an embedded JLog streaming backend instead of a Kafka broker. Snapshots now capture JLog state and are published under a versioned prefix (<code>&lt;network&gt;/v2/</code>). Kafka-era (<code>v1</code>) snapshots stay at the unversioned root for older builds, so the two never overwrite each other. The Kafka pruning options in <code>strato-snapshot</code> are gone. See <a href="../node/operations/">Node operations</a>.</p>
+</div>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Kafka replaced by embedded JLog as the default streaming backend, with JLog support in <code>strato-snapshot</code> (#7489).</li>
+</ul>
+<p><strong>Added</strong></p>
+<ul>
+<li><code>strato-ps</code> and <code>strato-barometer</code> report the block position of each pipeline stage. The vm-runner position now updates after every block (#7482).</li>
+<li>v3 pool APYs are included in "best available APY" (#7486). The v3 liquidity monitor adds a cooldown between notifications (#7487).</li>
+<li>Tracking dashboard: wallet and activity breakdown behind the snapshot tiles (#7481).</li>
+<li>Browser tab titles use the form "STRATO | page" (#7499).</li>
+</ul>
+<h3 id="190">19.0<a class="headerlink" href="#190" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-10</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>HyperEVM (chain 999) support in the bridge relayer, app UI and RPC proxy (#7476), plus oracle configuration for WHYPE and KHYPE.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>The bridge relayer queries <code>eth_getLogs</code> in block windows and no longer ignores RPC errors that come back with HTTP 200.</li>
+</ul>
+<hr />
+<h2 id="18x">18.x<a class="headerlink" href="#18x" title="Permanent link">&para;</a></h2>
+<h3 id="1810">18.10<a class="headerlink" href="#1810" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-10</em></p>
+<div class="admonition warning">
+<p class="admonition-title">SolidVM operator-precedence fork</p>
+<p>The SolidVM parser now follows Solidity's operator precedence. Before, assignment bound tighter than <code>&amp;&amp;</code>/<code>||</code> (so <code>flag = flag || cond</code> stored only <code>flag</code>), the ternary bound tighter than <code>&amp;&amp;</code>/<code>||</code>, equality bound tighter than the relational operators, and <code>**</code> and assignment were left-associative. Parsing is consensus-visible, so the change is gated by <code>isOperatorPrecedenceForkActive</code>. New networks get it from genesis. On <strong>upquark and helium no fork height is scheduled yet</strong>, so they keep the old parsing. See <a href="../solidvm/">SolidVM</a>.</p>
+</div>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>SolidVM operator precedence (fork-gated, see above).</li>
+<li>The SolidVM typechecker no longer rejects a contract that inherits a modifier referencing a <code>private</code> state variable of its base.</li>
+<li><code>eth_call</code> bounds ABI array lengths while decoding (#7472).</li>
+<li>StablePool fixes from an internal audit and better liquidity attribution (#7475). <code>MercataBridge</code> gains <code>cancelAndSweepWithdrawalBatch</code>.</li>
+<li><code>convoke</code> raises the open-file limit for the processes it launches.</li>
+</ul>
+<h3 id="189">18.9<a class="headerlink" href="#189" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-08</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>JSON-RPC: real <code>logsBloom</code> in new block headers and receipts, receipt logs filled in, <code>eth_getTransactionByHash</code>, and 0x-prefixed hashes accepted. <code>eth_getLogs</code> hardened (#7463).</li>
+<li>Flash borrow on PoolV3 (#7460).</li>
+<li>CDP view functions so third parties can read CDP state on-chain (#7469).</li>
+<li><code>v3LiquidityManager</code> service that alerts when v3 pool liquidity drifts from the oracle price, plus a script that repositions v3 liquidity around spot (#7450).</li>
+<li>SaveUSDST can be bridged, with clearer messages about withdrawal capacity (#7464, #7466).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>CSRF: the old session token stays valid briefly while the token rotates (#7465).</li>
+<li>The oracle picks asset addresses per network (#7454).</li>
+</ul>
+<h3 id="187-188">18.7 – 18.8<a class="headerlink" href="#187-188" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-03</em></p>
+<ul>
+<li>A long Redis warmup no longer crashes the node (#7448).</li>
+<li>Robinhood chain production bridge configuration (#7446).</li>
+<li>Apex dependency audit, phase 3 (#7420).</li>
+<li>Fixes to the app's milestone popup and to PostHog analytics (#7444, #7447, #7457, #7458).</li>
+</ul>
+<h3 id="186">18.6<a class="headerlink" href="#186" title="Permanent link">&para;</a></h3>
+<p><em>2026-09-01</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>YieldVault: a permissionless function to sweep surplus profit (#7407), plus protocol-fee revenue reporting for it (#7426).</li>
+<li>Product landing pages under <code>/defi</code> (#7412).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>Space leak in the <code>strato-sequencer</code> Blockstanbul context (#7439).</li>
+</ul>
+<h3 id="185">18.5<a class="headerlink" href="#185" title="Permanent link">&para;</a></h3>
+<p><em>2026-08-28</em></p>
+<div class="admonition warning">
+<p class="admonition-title">Staking V2, block rewards and fork heights</p>
+<p>This release adds Staking V2 (<code>StratoStakingV2</code>, <code>ValidatorRegistryV2</code>, <code>FeeRouter</code>), <code>BlockHeaderV3</code> with stake-weighted proposer selection, receipts roots in block headers, and per-block rewards to the proposer through <code>FeeRouter</code>. These changes are consensus-visible and gated by fork height:</p>
+<table>
+<thead>
+<tr>
+<th>Network</th>
+<th>Staking activation, receipts root</th>
+<th>Stake events from governance, block-reward receipts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>helium</td>
+<td>250,000</td>
+<td>300,000</td>
+</tr>
+<tr>
+<td>upquark</td>
+<td>1,000,000</td>
+<td>1,000,000</td>
+</tr>
+</tbody>
+</table>
+<p>Other networks run the new rules from genesis. Changes made after the staking fork went into separate V2 contracts. The 18.4 contract versions stay in place so pre-fork blocks replay unchanged (#7433). See <a href="../platform/consensus/">Consensus and staking</a>.</p>
+</div>
+<p><strong>Added</strong></p>
+<ul>
+<li>Staking V2 and block rewards. Consensus reads the validator set from the staking contract (#7403, #7410).</li>
+<li>Receipts roots and the light-client RPC methods <code>strato_getReceiptProof</code> and <code>strato_getFinalizedHeader</code>, plus SolidVM BLS12-381 builtins.</li>
+<li>FlashMint (#7408, #7423).</li>
+<li>v3 pools: 0.01% fee tier; fee tiers are no longer hardcoded (#7402, #7430). Robinhood chain SPY token can be bridged in and out (#7383).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Faster sync: p2p block download, sequencer replay and SolidVM replay were optimized, and RTS flags are chosen from machine size (#7397, #7409, #7416, #7431).</li>
+<li>A node discards new transactions while it is more than 1,000 blocks behind. Slipstream indexing now counts toward <code>isSynced</code>.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>AlarmClock thread leak in the sequencer round timer (#7427). Non-validators no longer flood ROUNDCHANGE messages.</li>
+<li>Slipstream: higher throughput, a bounded SQL statement cache, and handling of invalid UTF-8 (#7425). Duplicate database index creation prevented (#7428).</li>
+</ul>
+<h3 id="184">18.4<a class="headerlink" href="#184" title="Permanent link">&para;</a></h3>
+<p><em>2026-08-20</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>NFT support (ERC-721 contracts ported from OpenZeppelin) and NFT-based PoolV3 positions (#7335, #7345).</li>
+<li>A parameterized Poseidon2 builtin in SolidVM (#7385).</li>
+<li>Gold and silver yield vaults (#7384).</li>
+<li>PSM upgrade: mint directly into the savings vault, and redeem in one step (#7375).</li>
+<li><code>tracking-bot</code>, plus a tracking dashboard with an interactive user timeline, map widget and finer link metrics (#7377, #7378, #7381, #7352).</li>
+<li>A CDP liquidation alert on the dashboard (#7367).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>PostHog replaces Lucky Orange for app analytics (#7364).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>The <code>strato-p2p</code> merge channel is bounded, so producers get backpressure (#7391).</li>
+<li><code>install_deps.sh</code> and macOS build fixes (#7360).</li>
+</ul>
+<h3 id="181-183">18.1 – 18.3<a class="headerlink" href="#181-183" title="Permanent link">&para;</a></h3>
+<p><em>2026-08-11 – 2026-08-13</em></p>
+<ul>
+<li>Explore page: a Buy button and recent swaps for each token (#7332). v3 pool prices fall back to the pool price when no oracle is configured (#7340).</li>
+<li>Admin vote UI: server-side pagination, and simulation that matches the call the vote actually sends (#7257).</li>
+<li>One-click follow-up actions after a bridge transfer (#7272).</li>
+<li>Net-balance fixes and npm dependency audits (#7329, #7334).</li>
+</ul>
+<h3 id="180">18.0<a class="headerlink" href="#180" title="Permanent link">&para;</a></h3>
+<p><em>2026-08-10</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li><code>strato_*</code> JSON-RPC methods for simulating and tracing SolidVM transactions (#7284). Stateful functions are supported in <code>eth_call</code> and the <code>debug_*</code> methods. nginx rate-limits the Bloc simulate endpoint and blocks <code>strato_*</code> methods on the public <code>/rpc</code> endpoint unless the node is set up with <code>--publicStratoRpc</code>.</li>
+<li>BLS12-381 support, BN254 fixes, Poseidon2, and gas metering for the BLS, BN254 and Poseidon builtins (#7321).</li>
+<li>SMD: nested multisig UX (#7323).</li>
+<li>App: v3 pool admin (#7316), a Simulate button on the admin page, and an Explore tab for STRATO tokens.</li>
+<li>YieldVault: opt-in funded accrual.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>Partially rolled back a HexaLiteral typechecker change (#7327).</li>
+</ul>
+<hr />
+<h2 id="17x">17.x<a class="headerlink" href="#17x" title="Permanent link">&para;</a></h2>
+<h3 id="179">17.9<a class="headerlink" href="#179" title="Permanent link">&para;</a></h3>
+<p><em>2026-08-03</em></p>
+<ul>
+<li>Cirrus indexing fixes, including struct arrays (#7313). Deposit wallet selection in the Fund flow fixed (#7310).</li>
+</ul>
+<h3 id="178">17.8<a class="headerlink" href="#178" title="Permanent link">&para;</a></h3>
+<p><em>2026-07-31</em></p>
+<div class="admonition warning">
+<p class="admonition-title"><code>mercata/</code> renamed to <code>app/</code></p>
+<p>The DeFi application directory <code>mercata/</code> is now <code>app/</code> (backend, UI, contracts, services). Update any scripts, paths or build tooling that refer to <code>mercata/</code> (#7294).</p>
+</div>
+<p><strong>Added</strong></p>
+<ul>
+<li>JSON-RPC: <code>eth_getBlockReceipts</code> and <code>debug_traceBlockByHash</code>.</li>
+<li>An optional attribution suffix on SolidVM transactions (ERC-8021 style), exposed through the API.</li>
+<li>Apex status returns the validator address list (#7302).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Snapshot fixes: consumed Kafka logs are pruned before a snapshot, restores announce the Cirrus rebuild step, and restores work across user IDs (#7297, #7303).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>A SolidVM storage decoder bug (#7293). Trade page refactor (#7299).</li>
+</ul>
+<h3 id="177">17.7<a class="headerlink" href="#177" title="Permanent link">&para;</a></h3>
+<p><em>2026-07-28</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>PoolV3 concentrated-liquidity pools (Uniswap v3 style), with trade and liquidity UI (#7207).</li>
+<li>Tracking and referral links service, enabled with <code>TRACKING_ENABLED</code> (#7277, #7280, #7281).</li>
+<li>A <code>strato-logrotate</code> service for node logs (#7255). Health endpoints report the peer count (#7265).</li>
+<li>Email notification when a native-token withdrawal is over the instant threshold and needs Safe multisig approval (#7215).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>JSON-RPC <code>eth_getBlockByNumber</code> and <code>eth_getBlockByHash</code> follow the Ethereum spec (#7276).</li>
+<li>Cirrus: a new Slipstream storage decoder (#7274); contracts created by other contracts inherit the creator's Cirrus namespace (#7248); apostrophes supported in values (#7256).</li>
+<li><code>strato-up</code> keeps snapshot work on the node's data drive and skips restore for existing nodes (#7251). <code>make</code> warns when <code>~/.local/bin</code> is not on <code>PATH</code> (#7253).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>p2p reuses one stream environment per connection, which reduces memory (#7273). <code>forceWipe</code> stops <code>ethereum-jsonrpc</code> before restarting (#7283).</li>
+</ul>
+<h3 id="176">17.6<a class="headerlink" href="#176" title="Permanent link">&para;</a></h3>
+<p><em>2026-07-14</em></p>
+<ul>
+<li>Better NAT handling in p2p and <code>ethereum-discover</code> (#7230).</li>
+<li><code>ethereum-jsonrpc</code> uses a shared HTTP manager, which fixes a file-descriptor leak (#7216).</li>
+<li>SMD bug fixes (#7227).</li>
+<li>App navigation simplified: Borrow, Lending, Safety and Liquidations tabs hidden; Vault moved to Advanced (#7231, #7232).</li>
+</ul>
+<h3 id="175">17.5<a class="headerlink" href="#175" title="Permanent link">&para;</a></h3>
+<p><em>2026-07-09</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li><strong>Staking Phase 1</strong>: <code>StratoStaking</code> and <code>ValidatorRegistry</code> contracts (delegation, rewards, unbonding, commission) and a Staking page in the app.</li>
+<li>SaveUSDST vault: funded automatic accrual.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li><code>ethereum-jsonrpc</code> is protected from memory spikes on log queries (#7213). Sequencer memory stays bounded during sync, and Kafka fetches use less memory (#7208).</li>
+<li>SMD 401 errors with OAuth login when the wallet extension is installed (#7204).</li>
+</ul>
+<h3 id="174">17.4<a class="headerlink" href="#174" title="Permanent link">&para;</a></h3>
+<p><em>2026-07-01</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li><strong>STRATO Wallet</strong> browser extension (<code>strato-wallet/</code>), with Ethereum, Base and Linea networks and bridging (#7181).</li>
+<li>SMD rewrite: explorer, dashboard, contract editor, and multisig wallet management (#7141, #7198).</li>
+<li>Vault: generation and storage of MPC key shards (#7184).</li>
+<li><code>DirectMintPSM</code> contract and UI (#6688).</li>
+<li><code>eth_call</code> returns struct values (#7180).</li>
+<li>External wallets can create contracts through their on-chain User wallet.</li>
+</ul>
+<h3 id="173">17.3<a class="headerlink" href="#173" title="Permanent link">&para;</a></h3>
+<p><em>2026-06-25</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>Node snapshots: <code>strato-snapshot</code> tooling built into <code>strato-up</code>, with public downloads and reuse of a local snapshot when its sha256 matches (#7109, #7126).</li>
+<li>A more detailed public <code>/health</code> (#7085).</li>
+<li>localAuth: first-run admin setup from the CLI and a recovery phrase for users.</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>The API and p2p indexers merged into one <code>strato-indexer</code> process.</li>
+<li>Streaming backends became pluggable and an embedded JLog backend was added. Kafka stayed the default.</li>
+<li><code>minPeers</code> defaults to 10 (#7099). <code>strato-api</code> uses up to 4 cores and starts on machines with fewer (#7110, #7131). App, SMD, PostgREST and docs containers run as the host user; Apex runs as non-root.</li>
+<li>Failed transactions stay in the block, so their fees are still collected.</li>
+<li>Referral and card flows removed from the app (#7137).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li><code>convoke</code>: out-of-memory in log tailing, <code>convoke.log</code> getting overwritten, and orphaned process groups at shutdown (#7114, #7130).</li>
+<li>The sequencer commits the correct best sequenced block on restart (#7103). A bagger CodeNotFound fix (#7097). Code-collection encoding for <code>create</code>/<code>create2</code> (#7150).</li>
+</ul>
+<h3 id="172">17.2<a class="headerlink" href="#172" title="Permanent link">&para;</a></h3>
+<p><em>2026-05-31</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>Native bridge contracts <code>StratoNativeBridge</code> and <code>StratoNativeCustodyVault</code>: native deposits and withdrawals, with an instant lane and a Safe-approved lane, plus app UI.</li>
+<li>A sandboxed VM mode (#7063).</li>
+<li>Vault: configurable database connection and a vault password change tool (#7044, #7054).</li>
+<li>Litepaper and tokenomics pages in the docs (#7041, #7065).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>JSON-RPC <code>eth_call</code> can no longer commit VM state and rejects mutating functions (#7066).</li>
+<li>The bridge only routes USDC/USDT to STRATO stablecoins (#7022).</li>
+</ul>
+<h3 id="171">17.1<a class="headerlink" href="#171" title="Permanent link">&para;</a></h3>
+<p><em>2026-05-13</em></p>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Redis, Postgres, Kafka and local-auth bind to localhost only.</li>
+<li>Node processes crash on critical Redis write failures instead of continuing silently.</li>
+<li>Apex reads the block number from Redis and returns the node address in its status response (#7024).</li>
+</ul>
+<p><strong>Added</strong></p>
+<ul>
+<li>USDC yield vault and YieldVault transfers (#7019, #7027).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>An expired STRATO session no longer falls back to a wallet session (#7016). Read-only RPC proxy calls pass nginx auth (#7002).</li>
+</ul>
+<h3 id="170-1701">17.0 – 17.0.1<a class="headerlink" href="#170-1701" title="Permanent link">&para;</a></h3>
+<p><em>2026-05-07 – 2026-05-11</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>Wallet-only (MetaMask) use across the app: swap, borrow, vaults, metal buys and bridge (#6940 and follow-ups). The STRATO chain's native currency symbol is USDST (tUSDST on testnets), and Stratoscan is set as its block explorer.</li>
+<li>JSON-RPC: <code>eth_getLogs</code> returns real events from Cirrus with server-side topic filtering, and Cirrus event tables gain a <code>transaction_hash</code> column. <code>eth_call</code> supports auto-generated getters for public state variables and returns proper JSON-RPC errors on revert.</li>
+<li><code>strato-patch-app</code> for replacing app images on a node.</li>
+<li>Carry vaults can compose multiple strategies (#6917).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li><code>morphTx</code> for Ethereum-format transactions (#6918, #6919). Question marks in contract state data are escaped (#6984).</li>
+<li>17.0.1: external-wallet RPC reads go through the backend proxy (#7000), and a "403 Security validation failed" error is fixed (#7001).</li>
+</ul>
+<hr />
+<h2 id="16x">16.x<a class="headerlink" href="#16x" title="Permanent link">&para;</a></h2>
+<h3 id="1615">16.15<a class="headerlink" href="#1615" title="Permanent link">&para;</a></h3>
+<p><em>2026-04-21</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>MetaMask and STRATO wallet signing through EIP-712, with EIP-2718 transaction versioning (<code>txVersion</code>) (#6874).</li>
+<li>The metadata API exposes <code>evmChainId</code>.</li>
+<li>DefiLlama adapter (#6870).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Node address settings consolidated into one <code>nodeUrl</code> in <code>ethconf.yaml</code>. nginx uses the machine hostname as the canonical URL.</li>
+<li>The metadata endpoint no longer returns <code>nodePubKey</code> or <code>nodeAddress</code>.</li>
+<li>localAuth login and logout fixed; OAuth consent is accepted automatically.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>A crash when recovering a public key from an invalid signature. A change to the genesis block Pool contract (#6877).</li>
+</ul>
+<h3 id="1613-1614">16.13 – 16.14<a class="headerlink" href="#1613-1614" title="Permanent link">&para;</a></h3>
+<p><em>2026-04-15 – 2026-04-16</em></p>
+<ul>
+<li>Cirrus namespace is enforced: creating a table requires a User contract (#6783).</li>
+<li>A development flow for updating the app on a running node (#6771).</li>
+<li>SolidVM fixes for broader Solidity compatibility: file-level <code>using</code> statements, optional mapping type identifiers, <code>$</code> in identifiers, and reference-resolution fixes (#6687).</li>
+</ul>
+<h3 id="1612">16.12<a class="headerlink" href="#1612" title="Permanent link">&para;</a></h3>
+<p><em>2026-04-13</em></p>
+<ul>
+<li>Cirrus foreign keys replaced by functions (#6749).</li>
+<li>YieldVault rewritten as a carry vault with explicit capital management (#6723).</li>
+<li>A warning before transfers to addresses with no transactions on the network (#6739).</li>
+<li>Stable pool swap-fee and APY fixes (#6745, #6759). Vault API performance improvements (#6721, #6744).</li>
+</ul>
+<h3 id="1611">16.11<a class="headerlink" href="#1611" title="Permanent link">&para;</a></h3>
+<p><em>2026-04-09</em></p>
+<ul>
+<li><strong>Ethereum JSON-RPC is exposed publicly</strong> at <code>/rpc</code> on the main node port (#6713). See <a href="../reference/json-rpc/">JSON-RPC</a>.</li>
+<li>ERC-4626 and YieldVault (carry vaults for ETH and wBTC) (#6686, #6693).</li>
+<li>DefiLlama TVL adapter (#6667). USDST/STRATO price history chart and stacked APY in the app.</li>
+<li>A node reports itself out of sync only when it is actually falling behind (#6684).</li>
+</ul>
+<h3 id="1610">16.10<a class="headerlink" href="#1610" title="Permanent link">&para;</a></h3>
+<p><em>2026-04-03</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>Ethereum-format (legacy) transactions run through SolidVM. Native-value transfers are treated as USDST ERC-20 transfers, and <code>eth_getBalance</code> returns the USDST balance, for MetaMask compatibility. <code>eth_call</code> is implemented in vm-runner. Transactions carry a chain ID.</li>
+<li><code>--localAuth</code> mode: Ory Hydra and Kratos bundled on the node.</li>
+<li>A single <code>--sslDir</code> flag turns on SSL.</li>
+<li>Support for rebasing tokens such as Aave aTokens (#6621, #6622, #6623). A DefiLlama metrics endpoint for TVL and stablecoins (#6626).</li>
+</ul>
+<p><strong>Removed</strong></p>
+<ul>
+<li>Faucet code, the <code>InsertTX</code> tool and the <code>vrun</code> interpreter.</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>SolidVM returns an empty list for empty response values (#6660).</li>
+</ul>
+<h3 id="169-1691">16.9 – 16.9.1<a class="headerlink" href="#169-1691" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-25 – 2026-03-26</em></p>
+<ul>
+<li>The Ethereum JSON-RPC server is back, behind an on/off flag, with initial MetaMask compatibility.</li>
+<li>SaveUSDST vault (#6559) and rebasing-token support (#6501).</li>
+<li>Container logs are written to the node directory. The nginx port is configurable.</li>
+<li>Larger Postgres shared memory for heavy PostgREST queries (#6580).</li>
+<li>16.9.1: fixes to rewards season wording and stable-pool incentive APY.</li>
+</ul>
+<h3 id="168">16.8<a class="headerlink" href="#168" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-19</em></p>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Node management moved to the <code>strato-*</code> CLI: <code>strato-login</code>, <code>strato-up</code>, <code>strato-down</code> and <code>strato-ps</code> replace the old start, stop and status scripts. OAuth credentials live in <code>~/.secrets/strato_credentials.yaml</code>. See <a href="../node/install/">Install a node</a>.</li>
+<li><code>strato-setup</code> generates <code>docker-compose.yml</code> from typed Haskell. <code>convoke</code> manages the Docker Compose lifecycle.</li>
+<li>More configuration (<code>httpPort</code>, <code>svmTrace</code>) moved into <code>ethconf.yaml</code>. OAuth and Postgres secrets are read from mounted files.</li>
+</ul>
+<p><strong>Added</strong></p>
+<ul>
+<li>Multi-token StablePool support in the app, and pause/disable controls for StablePools (#6467, #6511).</li>
+</ul>
+<h3 id="167">16.7<a class="headerlink" href="#167" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-16</em></p>
+<ul>
+<li>Hot wallet support (#6465). Linea Sepolia (#6480).</li>
+<li>Trading desk view and a redesigned Fund page (#6128, #6468).</li>
+<li>Error handling and token-expiry checks in <code>strato-auth</code> (#6484).</li>
+<li>The debugger and fuzzer dependencies were removed from vm-runner (#6476). p2p memory improvements (#6477).</li>
+<li>A load-testing suite (#6393).</li>
+</ul>
+<h3 id="166-1662">16.6 – 16.6.2<a class="headerlink" href="#166-1662" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-10 – 2026-03-13</em></p>
+<ul>
+<li>MetalForge "Buy Metals" flow for GOLDST and SILVST (#6431).</li>
+<li>Linea bridge support and one-to-many bridge routing (#6454, #6384).</li>
+<li>Legacy GitBook docs removed in favor of these MkDocs docs (#6414).</li>
+<li><code>strato-sequencer</code> bootstraps itself from <code>genesis.json</code>. vm-runner no longer writes SQL directly; state changes go to the indexers. A node starts with <code>isSynced=false</code> (#6471).</li>
+<li>16.6.1: fixed a MetaMask connection hang caused by STRATO's oversized chain ID (#6459).</li>
+</ul>
+<h3 id="165">16.5<a class="headerlink" href="#165" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-05</em></p>
+<p><strong>Removed</strong></p>
+<ul>
+<li>The <code>vault-proxy</code> service. Vault calls go through nginx or the vault client directly.</li>
+<li>The <code>legacy/</code> directory, including the old marketplace and the <code>blockapps-rest</code> source (#6394). The simulator folder (#6425).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Runtime flags moved to <code>ethconf.yaml</code>. Secrets are read from files instead of command-line flags.</li>
+<li><code>convoke</code> shuts down gracefully on SIGTERM.</li>
+</ul>
+<p><strong>Added</strong></p>
+<ul>
+<li>SolidVM: <code>abi.encode</code>, <code>abi.encodePacked</code> and <code>abi.decode</code>; a <code>base64encode</code> builtin; batch UserOperations in User contracts (#6382).</li>
+<li>A credit card top-up service and flow (#6383).</li>
+</ul>
+<h3 id="164">16.4<a class="headerlink" href="#164" title="Permanent link">&para;</a></h3>
+<p><em>2026-03-02</em></p>
+<ul>
+<li>SolidVM <code>verifyP256</code> builtin (#6344).</li>
+<li>Cirrus indexing no longer needs the <code>record</code> keyword (#6062).</li>
+<li>OSS policy docs and license updates (#6372).</li>
+</ul>
+<h3 id="163-1631">16.3 – 16.3.1<a class="headerlink" href="#163-1631" title="Permanent link">&para;</a></h3>
+<p><em>2026-02-23 – 2026-02-25</em></p>
+<ul>
+<li>The <code>strato-api</code> spec moved from Swagger 2.0 to OpenAPI 3.0. New <code>strato-auth</code> CLI and shell completions.</li>
+<li>Pause and disable controls for swap pools (#6248). The app returns to the same page after login (#6317).</li>
+<li>16.3.1: Apex stops using the c-ares curl build, which fixes DNS resolution problems (#6328).</li>
+</ul>
+<h3 id="162">16.2<a class="headerlink" href="#162" title="Permanent link">&para;</a></h3>
+<p><em>2026-02-19</em></p>
+<ul>
+<li>The local session ends when the Keycloak session expires, which stops repeated refresh errors (#6264).</li>
+<li>App API error messages are sanitized (#6273).</li>
+<li>A parsing fix for the <code>network</code> field of raw transactions (#6309).</li>
+<li>The oracle uses DefiLlama instead of LiveCoinWatch (#6288).</li>
+</ul>
+<h3 id="161">16.1<a class="headerlink" href="#161" title="Permanent link">&para;</a></h3>
+<p><em>2026-02-12</em></p>
+<div class="admonition warning">
+<p class="admonition-title">helium fork: pass-by-reference</p>
+<p>Pass-by-reference for memory arrays and structs is gated behind a helium fork at block <strong>33,918</strong> (#6277).</p>
+</div>
+<ul>
+<li>SolidVM: <code>memory</code>, <code>storage</code> and <code>calldata</code> keywords now have effect on function parameters, <code>address(bytes32)</code> casts work, and a zero modulus no longer crashes (#6240).</li>
+<li>Groth16 prover libraries (native, snarkjs and rapidsnark wrappers) and a baby-jubjub curve library. <code>airlock</code> can unshield and transfer. New <code>strato-call</code> CLI.</li>
+<li>Base chain bridge support (#6166). Token symbols can be up to 12 characters (#6256).</li>
+<li><code>NGINX_TRUST_PROXY_CIDRS</code> lets trusted proxies set <code>X-Forwarded-For</code> (#6254).</li>
+<li>The <code>lithium</code> network was added for local development.</li>
+</ul>
+<h3 id="160-1601">16.0 – 16.0.1<a class="headerlink" href="#160-1601" title="Permanent link">&para;</a></h3>
+<p><em>2026-02-05 – 2026-02-06</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>STRATO Vault (#6138).</li>
+<li><code>airlock</code>, a Railgun privacy wallet CLI (#6173). A Poseidon hash builtin.</li>
+<li>SolidVM: <code>block.chainid</code>; sized type casts (<code>uint256(...)</code>, <code>bytes32(...)</code>); per-operation gas charges for arithmetic and string operations (#6143); address/integer conversion; hex literals as bytes; struct literals and file-level structs and enums in API arguments.</li>
+<li>Guest mode: public API endpoints and pages for visitors who are not logged in (#6106, #6139).</li>
+<li>Tokens can be renamed (#6148).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>A state root mismatch seen on helium (#6186). <code>CodeCollectionAdded</code> is emitted only when a code collection is actually new (#6161).</li>
+</ul>
+<h3 id="159-1591">15.9 – 15.9.1<a class="headerlink" href="#159-1591" title="Permanent link">&para;</a></h3>
+<p><em>2026-01-29 – 2026-02-02</em></p>
+<ul>
+<li>Validators vote for a round change when the proposer hasn't proposed a block (#6131).</li>
+<li>Fixed a bagger crash on low account balance (#6130). Duplicate <code>CodeCollectionAdded</code> messages removed (#6152).</li>
+<li>wstETH support (#6126). Collateral config manager (#5950).</li>
+</ul>
+<h3 id="158">15.8<a class="headerlink" href="#158" title="Permanent link">&para;</a></h3>
+<p><em>2026-01-26</em></p>
+<ul>
+<li>Oracle server updates (#6080). Balance checks count vouchers (#6114).</li>
+<li>LP token price history (#6093). Admin issues are paginated (#6120).</li>
+</ul>
+<h3 id="157">15.7<a class="headerlink" href="#157" title="Permanent link">&para;</a></h3>
+<p><em>2026-01-22</em></p>
+<ul>
+<li>This technical documentation site (MkDocs) was added (#6105).</li>
+<li>CDP redesign, a new borrow flow with a risk slider, and a new landing and portfolio design (#5891, #5992, #6051).</li>
+<li>Minimum withdrawal of 10 USDST (#6109, #6115). Bridge-in mints more vouchers (#6043).</li>
+<li>Fixed a Slipstream crash in the storage decoder (#6066).</li>
+</ul>
+<hr />
+<h2 id="15x">15.x<a class="headerlink" href="#15x" title="Permanent link">&para;</a></h2>
+<h3 id="156">15.6<a class="headerlink" href="#156" title="Permanent link">&para;</a></h3>
+<p><em>2026-01-15</em></p>
+<ul>
+<li>PKCE for OAuth in nginx (#6004).</li>
+<li>Referrals: a referral service and a referral management page.</li>
+<li>Bridge and file server URLs updated (#5993). XAUt oracle (#5958).</li>
+</ul>
+<h3 id="155">15.5<a class="headerlink" href="#155" title="Permanent link">&para;</a></h3>
+<p><em>2025-12-30</em></p>
+<ul>
+<li>StablePool (stableswap) pools (#5906).</li>
+<li>Node sync-time tracking (#5953).</li>
+<li>More oracle price sources, including sUSDS (#5940, #5945).</li>
+</ul>
+<h3 id="154">15.4<a class="headerlink" href="#154" title="Permanent link">&para;</a></h3>
+<p><em>2025-12-23</em></p>
+<ul>
+<li>Market-closure logic and weekend price feeds for metals (#5900).</li>
+<li>Testnet label in the app (#5898). The dark theme is passed through to Keycloak (#5909).</li>
+</ul>
+<h3 id="153">15.3<a class="headerlink" href="#153" title="Permanent link">&para;</a></h3>
+<p><em>2025-12-18</em></p>
+<p><strong>Removed</strong></p>
+<ul>
+<li>The <code>--blockstanbul</code> flag, from both <code>strato-sequencer</code> and vm-runner. The non-PBFT consensus path is gone; PBFT is the only mode (#5814, #5849).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>The <code>strato-api</code> <code>/transaction</code> endpoint can filter by timestamp, and stored timestamps are block times (#5850, #5853).</li>
+<li>Bloc converts string arguments that look like JSON arrays or objects (#5871).</li>
+</ul>
+<h3 id="152">15.2<a class="headerlink" href="#152" title="Permanent link">&para;</a></h3>
+<p><em>2025-12-11</em></p>
+<ul>
+<li>Dark mode (#5760). Rewards leaderboard (#5766).</li>
+<li>AdminRegistry issues can be dismissed (#5789).</li>
+<li>RPC calls go through the app backend (#5780).</li>
+<li>Slipstream stamps proxies with the implementation's contract name, which fixes typed Cirrus views (#5749).</li>
+<li>Remaining <code>stratomercata.com</code> links now point to <code>strato.nexus</code> (#5829).</li>
+</ul>
+<h3 id="151-1511">15.1 – 15.1.1<a class="headerlink" href="#151-1511" title="Permanent link">&para;</a></h3>
+<p><em>2025-12-04</em></p>
+<ul>
+<li>Rewards program: the <code>Rewards</code> contract (position and one-time activities), the <code>rewards-poller</code> service, and rewards UI (#5722, #5733, #5751).</li>
+<li>App UI v2 (#5670).</li>
+<li>Cirrus history tables gain <code>valid_from</code> and <code>valid_to</code> columns, with faster history updates.</li>
+<li>Gas-free autosave for Easy Savings (#5694).</li>
+</ul>
+<h3 id="1501-1504">15.0.1 – 15.0.4<a class="headerlink" href="#1501-1504" title="Permanent link">&para;</a></h3>
+<p><em>2025-11-07 – 2025-11-26</em></p>
+<ul>
+<li>15.0.1: fixed nested <code>super</code> calls (#5544). Delegatecall events for genesis contracts (#5528). <code>transaction_sender</code> added to events (#5512). Network and <code>svmTrace</code> flags for the start script (#5543).</li>
+<li>15.0.3: bridge admin UI for deposits and withdrawals (#5577). Swap price-impact and minimum-received display (#5606). The block timestamp is refreshed when a block is made (#5630). The identity server was removed.</li>
+<li>15.0.4: nodes accept up to 1 s ping time to Vault (#5695). Rewards program groundwork (#5668).</li>
+</ul>
+<h3 id="150">15.0<a class="headerlink" href="#150" title="Permanent link">&para;</a></h3>
+<p><em>2025-10-31</em></p>
+<div class="admonition warning">
+<p class="admonition-title">Breaking platform changes in 15.0</p>
+<ul>
+<li><strong>EVM removed.</strong> SolidVM is the only execution engine.</li>
+<li><strong>X.509 certificates removed.</strong> Validators and admins are Ethereum addresses. On-chain identity comes from the genesis <code>UserRegistry</code>. The identity provider, marketplace, notification and payment servers were dropped from platform builds.</li>
+<li><strong>Code-pointer contract creation (<code>CodeAtAccount</code>) removed.</strong> Contracts are upgraded through the Proxy pattern.</li>
+<li><strong>New networks.</strong> 15.0 introduces the <code>helium</code> testnet and the <code>upquark</code> mainnet, with new genesis blocks. Older networks are legacy. See <a href="../platform/networks/">Networks</a>.</li>
+<li><strong>Every transaction pays a fee.</strong> vm-runner calls the genesis <code>Decider</code> contract before each transaction.</li>
+</ul>
+</div>
+<p><strong>Added</strong></p>
+<ul>
+<li>The DeFi application (imported as <code>mercata/</code> in June 2025): lending pool, CDP engine minting USDST, swap pools, SafetyModule, TokenFactory, MercataBridge, RewardsChef, price oracle, vouchers, and AdminRegistry governance with on-chain voting. These are deployed as proxied genesis-block contracts.</li>
+<li>Transaction fees collected through the <code>Decider</code> contract, paid with a voucher or in USDST. See <a href="../platform/transactions-and-fees/">Transactions and fees</a>.</li>
+<li>Native (non-Docker) node build: the <code>convoke</code> process manager, <code>install_deps.sh</code>, and an optional Nix build (<code>NIX=true make</code>).</li>
+<li>SolidVM: <code>staticcall</code>; the <code>modexp</code>, <code>ecAdd</code>, <code>ecMul</code> and <code>ecPairing</code> precompiles; checks for unsigned integer underflow; <code>$</code> in identifiers; indexed variadic event arguments; a <code>solid-vm-cli</code> test runner.</li>
+<li>The STRATO VS Code extension was published, with a debug adapter.</li>
+<li>Cirrus rewritten for upgradeable contracts (contract, record, storage and history tables). The <code>eth</code> and <code>cirrus</code> databases are separate.</li>
+<li>nginx CSRF protection and CSP and security headers. SMD moved to <code>/smd</code>.</li>
+<li>Mempool flush.</li>
+</ul>
+<p><strong>Removed</strong></p>
+<ul>
+<li>The EVM, X.509 and certificate contracts, <code>CodeAtAccount</code>, private transactions, chain IDs in the transaction submission API, the faucet, the account nonce limit, and legacy genesis block formats.</li>
+<li>Cirrus <code>indexed@</code> event tables and per-contract <code>history@</code> tables. History is now in <code>history@storage</code> and <code>history@mapping</code>. See <a href="../reference/cirrus/">Cirrus</a>.</li>
+</ul>
+<hr />
+<h2 id="14x">14.x<a class="headerlink" href="#14x" title="Permanent link">&para;</a></h2>
+<h3 id="145-1452">14.5 – 14.5.2<a class="headerlink" href="#145-1452" title="Permanent link">&para;</a></h3>
+<p><em>2025-03-05 – 2025-03-24</em></p>
+<ul>
+<li>Marketplace: buy-and-stake flow (#3711), wallet disconnect (#3714), a CATA transfer fix (#3765).</li>
+<li>14.5.1–14.5.2: WBTC bridge address update and price-fluctuation calculation fixes.</li>
+</ul>
+<h3 id="141-144">14.1 – 14.4<a class="headerlink" href="#141-144" title="Permanent link">&para;</a></h3>
+<p><em>2025-02-21 – 2025-02-25</em></p>
+<ul>
+<li>14.2: <code>ethereum-discover</code> fix (#3750).</li>
+<li>14.3: Blockstanbul messages are broadcast to all peers (the p2p filter was removed) (#3751).</li>
+<li>14.1 and 14.4: USDST account and STRATs display fixes, a logo update, and removal of the trending section.</li>
+</ul>
+<h3 id="140">14.0<a class="headerlink" href="#140" title="Permanent link">&para;</a></h3>
+<p><em>2025-02-21</em></p>
+<div class="admonition warning">
+<p class="admonition-title">Private chains removed</p>
+<p>The rest of the private-chain code was removed from the core. The chain databases and <code>chainId</code> columns were dropped from Postgres, and the transaction route ignores <code>chainid</code>. Private-chain endpoints had already been removed in 12.2.1.</p>
+</div>
+<p><strong>Added</strong></p>
+<ul>
+<li>Marketplace lending: USDST is minted on borrow, loans can be partly repaid, the default liquidation ratio is 80%, and WBTCST, ETHST and a GOLDST oracle are supported (#3651, #3672, #3676, #3703, #3736).</li>
+<li>nginx rate limiting (#3710, #3715).</li>
+<li>Apache 2.0 license and license metadata on all packages (#3677, #3688).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>The default Blockstanbul round period is 120 s (#3681; also in 12.4.1).</li>
+</ul>
+<p><strong>Removed</strong></p>
+<ul>
+<li><code>TxrIndexer</code>, and private-chain support (see above).</li>
+</ul>
+<hr />
+<h2 id="12x">12.x<a class="headerlink" href="#12x" title="Permanent link">&para;</a></h2>
+<h3 id="124-1242">12.4 – 12.4.2<a class="headerlink" href="#124-1242" title="Permanent link">&para;</a></h3>
+<p><em>2024-12-27 – 2025-01-30</em></p>
+<ul>
+<li>12.4: ETHST bridge wallet flow; liquidation ratio on reserves; maximum borrow based on LTV (#3644, #3645, #3652).</li>
+<li>12.4.1: default Blockstanbul round period changed to 120 s.</li>
+<li>12.4.2: access-token refresh is retried when it fails. Email removed from the profile.</li>
+</ul>
+<h3 id="1231-1235">12.3.1 – 12.3.5<a class="headerlink" href="#1231-1235" title="Permanent link">&para;</a></h3>
+<p><em>2024-12-06 – 2024-12-26</em></p>
+<ul>
+<li>ETH staking and ETHST: an ETH oracle using TWAP, an ETH bridge contract, and <code>BridgeableTokens.sol</code> (#3627, #3632, #3633, #3634).</li>
+<li>Staked positions are aggregated (#3620). The oracle container gets a heartbeat health check (#3637).</li>
+<li>Order-details and bridge configuration fixes.</li>
+</ul>
+<h3 id="123">12.3<a class="headerlink" href="#123" title="Permanent link">&para;</a></h3>
+<p><em>2024-12-06</em></p>
+<ul>
+<li>Marketplace staking: Reserve and Escrow contracts, staking UI, borrowing against staked assets (up to 50%), the CATA reward token and TVL display (#3553, #3583, #3602, #3612).</li>
+<li>Oracle service (#3547).</li>
+<li>Supported pragmas consolidated in the SolidVM code collection (#3532). VS Code extension fixes (#3589).</li>
+</ul>
+<h3 id="1221-1223">12.2.1 – 12.2.3<a class="headerlink" href="#1221-1223" title="Permanent link">&para;</a></h3>
+<p><em>2024-11-11 – 2024-11-19</em></p>
+<p><strong>Removed</strong></p>
+<ul>
+<li>Private-chain endpoints and much of the private-chain code in the sequencer. <code>blockapps-rest</code> no longer uses <code>/chain</code> endpoints or <code>chainId</code> parameters (#3526).</li>
+<li>Total difficulty (a proof-of-work leftover). It now refers to the block number (#3541).</li>
+</ul>
+<p><strong>Added</strong></p>
+<ul>
+<li>Partial IPv6 support (#3531).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li><code>ethereum-discover</code> checks <code>udp_enable_time</code> for bonded and available peers.</li>
+<li>The sequencer checkpoint is written to LevelDB.</li>
+<li>The identity server no longer uses default org logic (#3556).</li>
+</ul>
+<h3 id="122">12.2<a class="headerlink" href="#122" title="Permanent link">&para;</a></h3>
+<p><em>2024-10-28</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li><code>block.proposer</code> in SolidVM (#3453, #3516).</li>
+<li><code>pragma solidvm 12.0</code>; pragmas cascade to include earlier pragma sets.</li>
+<li>The wire cache is back in <code>strato-p2p</code>, which cuts duplicate Blockstanbul messages (#3440).</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>Slipstream indexes only genesis contracts and top-level abstract contracts (or concrete contracts when a code collection has no abstracts) (#3461).</li>
+<li>The default nonce limit is 4000 (#3503).</li>
+<li>nginx logs the original client IP (#3505).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>Struct decoding in Slipstream, Cirrus foreign-key updates, and p2p repeatedly reconnecting to offline peers (#3472).</li>
+<li><code>solidvm 11.4</code> typechecker fixes (#3495).</li>
+</ul>
+<p><strong>Removed</strong></p>
+<ul>
+<li>Gossip fanout (<code>txGossipFanout</code>). Transactions are broadcast to all peers (#3508).</li>
+</ul>
+<h3 id="121">12.1<a class="headerlink" href="#121" title="Permanent link">&para;</a></h3>
+<p><em>2024-10-16</em></p>
+<ul>
+<li>Slipstream foreign-key insert order fixed (#3451). Struct value reassignment fixed.</li>
+<li>Marketplace: STRATS as an asset (#3392), bridging with BlockApps tokens (#3204), checkout confirmation (#3411).</li>
+</ul>
+<h3 id="120">12.0<a class="headerlink" href="#120" title="Permanent link">&para;</a></h3>
+<p><em>2024-09-23</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li><code>BlockHeaderV2</code> block header format, supported in the <code>eth</code> database, <code>strato-api</code> and SMD.</li>
+<li>The <code>indexed</code> keyword on event fields, with <code>indexed@</code> Cirrus event tables (#3427, #3432).</li>
+<li>Cirrus event array tables and foreign keys between event and contract tables (#3368, #3412).</li>
+<li><code>pragma solidvm 11.5</code> (#3426).</li>
+<li>A strict gas mode for the bagger. The bagger drops transactions that run out of gas (#3419).</li>
+<li>A strict sequencer mode that crashes on block authentication errors (off by default). An <code>INSTRUMENTATION</code> flag for per-process memory metrics.</li>
+</ul>
+<p><strong>Changed</strong></p>
+<ul>
+<li>The VM sends less data to Slipstream (#3329), and fewer redundant Postgres queries run.</li>
+</ul>
+<p><strong>Removed</strong></p>
+<ul>
+<li>The block Kafka topic. The transaction-result indexer no longer indexes chain, certificate or validator events.</li>
+</ul>
+<hr />
+<h2 id="11x">11.x<a class="headerlink" href="#11x" title="Permanent link">&para;</a></h2>
+<h3 id="1141-1142">11.4.1 – 11.4.2<a class="headerlink" href="#1141-1142" title="Permanent link">&para;</a></h3>
+<p><em>2024-08-30</em></p>
+<ul>
+<li>Marketplace: the rewards server handles ACH payments (#3363); "Liter" unit for spirits (#3354); redemption shipping address shown to issuers (#3355).</li>
+</ul>
+<h3 id="114">11.4<a class="headerlink" href="#114" title="Permanent link">&para;</a></h3>
+<p><em>2024-08-15</em></p>
+<p><strong>Added</strong></p>
+<ul>
+<li>Contracts can be created from a code pointer (<code>CodePtr</code> transactions).</li>
+<li><code>pragma safeExternalCalls</code> and <code>pragma solidvm 11.4</code>, which adds decimal precision strictness and a <code>truncate</code> method for decimals.</li>
+<li>Typechecking of <code>emit</code> statements, modifier definitions and <code>revert</code> statements (#3246, #3286, #3299).</li>
+<li>Accessing mappings of other contracts (#3297). Functions and state-variable accessors are indexed by type signature (#3220).</li>
+<li>Marketplace: payment options, notification and rewards servers, and email confirmations (#3247, #3266, #3278, #3320).</li>
+</ul>
+<p><strong>Fixed</strong></p>
+<ul>
+<li>A race where the node reported itself synced before the last blocks had run (#3237).</li>
+<li>p2p threads erroring out could take down all p2p threads.</li>
+<li><code>truncate</code> rounded instead of truncating (#3303).</li>
+</ul>
+<h3 id="1131">11.3.1<a class="headerlink" href="#1131" title="Permanent link">&para;</a></h3>
+<p><em>2024-07-10</em></p>
+<ul>
+<li>Slipstream stores arrays inside event tables, or in a separate array table otherwise.</li>
+<li>SolidVM <code>try</code>/<code>catch</code> always throws an exception instead of possibly crashing the node (#3213).</li>
+<li>The <code>paymentServerUrl</code> flag was removed from <code>strato-api</code>.</li>
+<li>Marketplace: payment server revamp (Stripe ACH flows, transaction fees) and decimal support in asset contracts (#3196, #3206, #3210).</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 19:30:12 UTC"><span class="timeago" datetime="2026-09-15T19:30:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 19:30:12 UTC">2026-09-15</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2026 BlockApps - STRATO Platform
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://t.me/strato_net" target="_blank" rel="noopener" title="Telegram Community" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 8a248 248 0 1 0 0 496 248 248 0 1 0 0-496m115 168.7c-3.7 39.2-19.9 134.4-28.1 178.3-3.5 18.6-10.3 24.8-16.9 25.4-14.4 1.3-25.3-9.5-39.3-18.7-21.8-14.3-34.2-23.2-55.3-37.2-24.5-16.1-8.6-25 5.3-39.5 3.7-3.8 67.1-61.5 68.3-66.7.2-.7.3-3.1-1.2-4.4s-3.6-.8-5.1-.5c-2.2.5-37.1 23.5-104.6 69.1-9.9 6.8-18.9 10.1-26.9 9.9-8.9-.2-25.9-5-38.6-9.1-15.5-5-27.9-7.7-26.8-16.3.6-4.5 6.7-9 18.4-13.7 72.3-31.5 120.5-52.3 144.6-62.3 68.9-28.6 83.2-33.6 92.5-33.8 2.1 0 6.6.5 9.6 2.9 2 1.7 3.2 4.1 3.5 6.7.5 3.2.6 6.5.4 9.8z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://support.blockapps.net" target="_blank" rel="noopener" title="Support Portal" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512m0-336c-17.7 0-32 14.3-32 32 0 13.3-10.7 24-24 24s-24-10.7-24-24c0-44.2 35.8-80 80-80s80 35.8 80 80c0 47.2-36 67.2-56 74.5v3.8c0 13.3-10.7 24-24 24s-24-10.7-24-24v-8.1c0-20.5 14.8-35.2 30.1-40.2 6.4-2.1 13.2-5.5 18.2-10.3 4.3-4.2 7.7-10 7.7-19.6 0-17.7-14.3-32-32-32zm-32 192a32 32 0 1 1 64 0 32 32 0 1 1-64 0"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://docs.strato.nexus" target="_blank" rel="noopener" title="Documentation" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M384 512H96c-53 0-96-43-96-96V96C0 43 43 0 96 0h304c26.5 0 48 21.5 48 48v288c0 20.9-13.4 38.7-32 45.3V448c17.7 0 32 14.3 32 32s-14.3 32-32 32zM96 384c-17.7 0-32 14.3-32 32s14.3 32 32 32h256v-64zm32-232c0 13.3 10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24H152c-13.3 0-24 10.7-24 24m24 72c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="../js/timeago.min.js"></script>
+      
+        <script src="../js/timeago_mkdocs_material.js"></script>
+      
+    
+  </body>
+</html>

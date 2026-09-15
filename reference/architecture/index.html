@@ -24,16 +24,16 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>System Architecture - STRATO Technical Docs</title>
+        <title>System Architecture - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -1111,6 +1109,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1134,7 +1138,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1152,8 +1346,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1284,10 +1478,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" checked>
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1305,8 +1499,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1343,10 +1537,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10_1" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11_1" checked>
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1364,8 +1558,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1470,22 +1664,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#system-components" class="md-nav__link">
+  <a href="#request-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        System Components
+        Request Path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="System Components">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-frontend-ui" class="md-nav__link">
+  <a href="#nginx" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Frontend (UI)
+        nginx
       
     </span>
   </a>
@@ -1493,10 +1698,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-backend" class="md-nav__link">
+  <a href="#app-ui-and-backend" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Backend
+        App UI and backend
       
     </span>
   </a>
@@ -1504,10 +1709,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-strato-node" class="md-nav__link">
+  <a href="#strato-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. STRATO Node
+        strato-api
       
     </span>
   </a>
@@ -1515,10 +1720,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-cirrus-indexer" class="md-nav__link">
+  <a href="#json-rpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Cirrus (Indexer)
+        JSON-RPC
       
     </span>
   </a>
@@ -1526,10 +1731,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-external-services" class="md-nav__link">
+  <a href="#cirrus" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. External Services
+        Cirrus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-processes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core processes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#off-node-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Off-node services
       
     </span>
   </a>
@@ -1538,6 +1776,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Surfaces
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1554,10 +1803,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#user-action-borrow-usdst" class="md-nav__link">
+  <a href="#transaction-signed-by-the-platform-custodial" class="md-nav__link">
     <span class="md-ellipsis">
       
-        User Action: Borrow USDST
+        Transaction signed by the platform (custodial)
       
     </span>
   </a>
@@ -1565,10 +1814,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexing-pipeline" class="md-nav__link">
+  <a href="#transaction-signed-by-a-wallet-self-custody" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Indexing Pipeline
+        Transaction signed by a wallet (self-custody)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing
       
     </span>
   </a>
@@ -1581,44 +1841,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#smart-contract-architecture" class="md-nav__link">
+  <a href="#smart-contracts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Smart Contract Architecture
+        Smart Contracts
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Smart Contract Architecture">
+    <nav class="md-nav" aria-label="Smart Contracts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#core-contracts" class="md-nav__link">
+  <a href="#ownership-and-admin-control" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core Contracts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#contract-ownership" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contract Ownership
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#access-control" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Access Control
+        Ownership and admin control
       
     </span>
   </a>
@@ -1654,10 +1892,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#transaction-security" class="md-nav__link">
+  <a href="#keys-and-signing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transaction Security
+        Keys and signing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fees-and-consensus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fees and consensus
       
     </span>
   </a>
@@ -1670,91 +1930,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scalability" class="md-nav__link">
+  <a href="#monitoring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scalability
+        Monitoring
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Scalability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current State
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-scaling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Scaling
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring-observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring &amp; Observability
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring &amp; Observability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#alerting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Alerting
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1763,56 +1945,6 @@
     <span class="md-ellipsis">
       
         Deployment
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Deployment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#environments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Environments
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cicd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CI/CD
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-topology" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network Topology
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#api-design" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API Design
       
     </span>
   </a>
@@ -1900,10 +2032,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -1921,8 +2053,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2021,10 +2153,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2042,8 +2174,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2139,6 +2271,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2154,10 +2290,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2175,8 +2311,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2270,6 +2406,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2331,6 +2932,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2358,22 +2986,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#system-components" class="md-nav__link">
+  <a href="#request-path" class="md-nav__link">
     <span class="md-ellipsis">
       
-        System Components
+        Request Path
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="System Components">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Components">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-frontend-ui" class="md-nav__link">
+  <a href="#nginx" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Frontend (UI)
+        nginx
       
     </span>
   </a>
@@ -2381,10 +3020,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-backend" class="md-nav__link">
+  <a href="#app-ui-and-backend" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Backend
+        App UI and backend
       
     </span>
   </a>
@@ -2392,10 +3031,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-strato-node" class="md-nav__link">
+  <a href="#strato-api" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. STRATO Node
+        strato-api
       
     </span>
   </a>
@@ -2403,10 +3042,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-cirrus-indexer" class="md-nav__link">
+  <a href="#json-rpc" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Cirrus (Indexer)
+        JSON-RPC
       
     </span>
   </a>
@@ -2414,10 +3053,43 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#5-external-services" class="md-nav__link">
+  <a href="#cirrus" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. External Services
+        Cirrus
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-processes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core processes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#off-node-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Off-node services
       
     </span>
   </a>
@@ -2426,6 +3098,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-surfaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Surfaces
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2442,10 +3125,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#user-action-borrow-usdst" class="md-nav__link">
+  <a href="#transaction-signed-by-the-platform-custodial" class="md-nav__link">
     <span class="md-ellipsis">
       
-        User Action: Borrow USDST
+        Transaction signed by the platform (custodial)
       
     </span>
   </a>
@@ -2453,10 +3136,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#indexing-pipeline" class="md-nav__link">
+  <a href="#transaction-signed-by-a-wallet-self-custody" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Indexing Pipeline
+        Transaction signed by a wallet (self-custody)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#indexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Indexing
       
     </span>
   </a>
@@ -2469,44 +3163,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#smart-contract-architecture" class="md-nav__link">
+  <a href="#smart-contracts" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Smart Contract Architecture
+        Smart Contracts
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Smart Contract Architecture">
+    <nav class="md-nav" aria-label="Smart Contracts">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#core-contracts" class="md-nav__link">
+  <a href="#ownership-and-admin-control" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Core Contracts
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#contract-ownership" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contract Ownership
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#access-control" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Access Control
+        Ownership and admin control
       
     </span>
   </a>
@@ -2542,10 +3214,32 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#transaction-security" class="md-nav__link">
+  <a href="#keys-and-signing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transaction Security
+        Keys and signing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-access" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data access
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fees-and-consensus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fees and consensus
       
     </span>
   </a>
@@ -2558,91 +3252,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#scalability" class="md-nav__link">
+  <a href="#monitoring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Scalability
+        Monitoring
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Scalability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current State
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#future-scaling" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Future Scaling
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#monitoring-observability" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Monitoring &amp; Observability
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Monitoring &amp; Observability">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Logging
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Metrics
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#alerting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Alerting
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2651,56 +3267,6 @@
     <span class="md-ellipsis">
       
         Deployment
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Deployment">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#environments" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Environments
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cicd" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        CI/CD
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#network-topology" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Network Topology
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#api-design" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API Design
       
     </span>
   </a>
@@ -2736,384 +3302,325 @@
 
 
 <h1 id="system-architecture">System Architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h1>
-<p>High-level overview of the STRATO platform architecture.</p>
-<h2 id="system-components">System Components<a class="headerlink" href="#system-components" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>┌─────────────┐
-│   Browser   │ (User Interface)
-└──────┬──────┘
-       │ HTTPS
-       ▼
-┌─────────────────────────┐
-│   Backend API           │ (Node.js + TypeScript)
-└───────┬─────────────────┘
-        │
-        ├─► Cirrus (Indexer)     [PostgreSQL]
-        ├─► STRATO Node (Blockchain)
-        └─► External Services (RPC Proxy, File Server)
-</code></pre></div>
-<h3 id="1-frontend-ui">1. Frontend (UI)<a class="headerlink" href="#1-frontend-ui" title="Permanent link">&para;</a></h3>
-<p><strong>Technology:</strong> React + TypeScript + Vite</p>
-<p><strong>Key Features:</strong></p>
+<p>How a STRATO node serves apps: request routing, how transactions and indexed data flow, the platform contracts, and the security model. For the source-level view, see <a href="../../contribute/architecture/">Contributor Architecture</a>.</p>
+<h2 id="request-path">Request Path<a class="headerlink" href="#request-path" title="Permanent link">&para;</a></h2>
+<p>Every STRATO node runs the same stack. nginx is the single public entry point. It routes each path to the app, the core APIs, Cirrus or JSON-RPC.</p>
+<pre class="mermaid"><code>flowchart LR
+  client["Browser / API client / wallet"] --&gt;|HTTPS| nginx
+  subgraph node["STRATO node"]
+    nginx["nginx&lt;br/&gt;(routing, OIDC login, CSRF)"]
+    ui["app-ui"]
+    backend["app-backend"]
+    api["strato-api&lt;br/&gt;(core API + Bloc)"]
+    rpc["ethereum-jsonrpc"]
+    postgrest["PostgREST"]
+    pg[("Postgres&lt;br/&gt;cirrus DB")]
+    core["core processes&lt;br/&gt;p2p, sequencer, vm-runner,&lt;br/&gt;indexer, slipstream"]
+  end
+  vault["Vault"]
+  nginx --&gt;|"/"| ui
+  nginx --&gt;|"/api/*"| backend
+  nginx --&gt;|"/bloc/v2.2/*, /strato-api/*"| api
+  nginx --&gt;|"/rpc"| rpc
+  nginx --&gt;|"/cirrus/search/*"| postgrest
+  nginx --&gt;|"/strato/v2.3/key, /signature"| vault
+  backend --&gt;|"node APIs via nginx"| nginx
+  backend --&gt;|"read-only SQL"| pg
+  postgrest --&gt; pg
+  api --&gt; core
+  rpc --&gt; core
+  api --&gt;|"server-side signing"| vault
+  core --&gt;|"slipstream writes"| pg</code></pre>
+<p>Two routing details:</p>
 <ul>
-<li>Single-page application (SPA)</li>
-<li>Real-time balance updates</li>
-<li>Multi-step transaction flows</li>
-<li>Responsive design (mobile + desktop)</li>
+<li><strong>app-backend calls the node back through nginx.</strong> Inside the node it uses <code>NODE_URL=http://nginx:8081</code>, so it hits the same <code>/bloc/v2.2</code>, <code>/strato-api/eth/v1.2</code> and <code>/cirrus/search</code> routes as external clients.</li>
+<li><strong>Vault is a separate service.</strong> Nodes use a shared Vault by default. With <code>--localAuth</code>, the node runs its own Vault.</li>
 </ul>
-<p><strong>State Management:</strong></p>
+<h2 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h2>
+<h3 id="nginx">nginx<a class="headerlink" href="#nginx" title="Permanent link">&para;</a></h3>
+<p>nginx is the edge proxy (OpenResty with lua-resty-openidc). It handles:</p>
 <ul>
-<li>React Context API for global state</li>
-<li>Local storage for pending transactions</li>
-<li>WebSocket for real-time updates</li>
+<li><strong>Login:</strong> OAuth2/OIDC. Browsers use the authorization-code flow; API clients send a bearer token.</li>
+<li><strong>CSRF protection</strong> on browser routes.</li>
+<li><strong>Rate limiting</strong> on transaction simulation.</li>
+<li><strong>JSON-RPC guarding:</strong> it blocks STRATO-specific methods on public <code>/rpc</code>.</li>
 </ul>
-<p><strong>Components:</strong></p>
+<h3 id="app-ui-and-backend">App UI and backend<a class="headerlink" href="#app-ui-and-backend" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Dashboard (portfolio overview)</li>
-<li>Bridge (deposit/withdraw)</li>
-<li>Swap (AMM trading)</li>
-<li>Liquidity (pool management)</li>
-<li>Lending (supply/borrow)</li>
-<li>CDP (mint USDST)</li>
-<li>Rewards (Reward Points accrual/claiming)</li>
+<li><strong>app-ui</strong> is a Vite/React single-page app, served at <code>/</code>.</li>
+<li><strong>app-backend</strong> is an Express/TypeScript API, served at <code>/api/*</code>. Interactive docs are at <code>/api/docs</code> (see <a href="../api/">App API</a>). The backend has no database of its own. It does the following:<ul>
+<li>reads indexed contract data from Cirrus, both through PostgREST and through a read-only Postgres connection</li>
+<li>reads node metadata from <code>/strato-api/eth/v1.2/metadata</code></li>
+<li>builds transactions and submits them through Bloc, or returns them unsigned for wallet signing</li>
+<li>proxies RPC calls to supported external chains at <code>/api/rpc/{chainId}</code> (used by the UI's external-chain wallet connections and bridge flows)</li>
 </ul>
-<h3 id="2-backend">2. Backend<a class="headerlink" href="#2-backend" title="Permanent link">&para;</a></h3>
-<p><strong>Technology:</strong> Node.js + Express + TypeScript</p>
-<p><strong>Responsibilities:</strong></p>
+</li>
+</ul>
+<h3 id="strato-api">strato-api<a class="headerlink" href="#strato-api" title="Permanent link">&para;</a></h3>
+<p>strato-api serves two APIs:</p>
 <ul>
-<li>API gateway for frontend</li>
-<li>Authentication (OAuth)</li>
-<li>Business logic orchestration</li>
-<li>External RPC proxy</li>
-<li>Transaction preparation &amp; submission</li>
+<li><strong>Core API</strong> at <code>/strato-api/eth/v1.2/*</code>: accounts, blocks, transactions, receipts, storage, metadata. It also accepts already-signed transactions.</li>
+<li><strong>Bloc API</strong> at <code>/bloc/v2.2/*</code>: contract-level calls, server-side signing, unsigned transaction building and simulation.</li>
 </ul>
-<p><strong>Key Services:</strong></p>
+<p>See <a href="../strato-node-api/">Core Platform API</a>.</p>
+<h3 id="json-rpc">JSON-RPC<a class="headerlink" href="#json-rpc" title="Permanent link">&para;</a></h3>
+<p><code>/rpc</code> serves the standard Ethereum JSON-RPC methods and is on by default. STRATO extension methods (<code>strato_*</code>) are blocked on public <code>/rpc</code> unless the node runs with <code>--publicStratoRpc</code>. See <a href="../json-rpc/">JSON-RPC</a>.</p>
+<h3 id="cirrus">Cirrus<a class="headerlink" href="#cirrus" title="Permanent link">&para;</a></h3>
+<p>Cirrus is three parts:</p>
 <ul>
-<li><strong>Auth Service</strong>: User authentication and session management</li>
-<li><strong>Token Service</strong>: Token metadata and balance queries</li>
-<li><strong>Swap Service</strong>: Pool discovery and swap routing</li>
-<li><strong>Lending Service</strong>: Collateral and borrowing logic</li>
-<li><strong>CDP Service</strong>: Vault management and mint planning</li>
-<li><strong>Rewards Service</strong>: Reward accrual calculations</li>
-<li><strong>Bridge Service</strong>: Cross-chain deposit/withdraw tracking</li>
+<li><strong>slipstream</strong> indexes contract state and events into the Postgres <code>cirrus</code> database.</li>
+<li><strong>PostgREST</strong> exposes that database read-only at <code>/cirrus/search/*</code>.</li>
+<li><strong>The <code>cirrus</code> database</strong> holds the data. Tables are named after contracts.</li>
 </ul>
-<p><strong>Database:</strong></p>
+<p>See <a href="../cirrus/">Cirrus</a>.</p>
+<h3 id="core-processes">Core processes<a class="headerlink" href="#core-processes" title="Permanent link">&para;</a></h3>
+<p>The core processes are native binaries on the node host:</p>
 <ul>
-<li>None (stateless, queries Cirrus directly)</li>
+<li><code>ethereum-discover</code> and <code>strato-p2p</code>: networking</li>
+<li><code>strato-sequencer</code>: PBFT ordering and commit</li>
+<li><code>vm-runner</code>: SolidVM execution</li>
+<li><code>strato-indexer</code> and <code>slipstream</code>: indexing</li>
 </ul>
-<h3 id="3-strato-node">3. STRATO Node<a class="headerlink" href="#3-strato-node" title="Permanent link">&para;</a></h3>
-<p><strong>Technology:</strong> Custom blockchain node (EVM-compatible)</p>
-<p><strong>Responsibilities:</strong></p>
+<p>They pass events through embedded JLog streaming.</p>
+<h3 id="dashboard">Dashboard<a class="headerlink" href="#dashboard" title="Permanent link">&para;</a></h3>
+<p>The STRATO Management Dashboard is served at <code>/smd/</code>. Its backend, apex, serves <code>/apex-api/*</code> and the node <code>/health</code> endpoint.</p>
+<h3 id="off-node-services">Off-node services<a class="headerlink" href="#off-node-services" title="Permanent link">&para;</a></h3>
+<p>These run outside the node's compose stack:</p>
 <ul>
-<li>Transaction execution</li>
-<li>Smart contract deployment</li>
-<li>State management</li>
-<li>Block production</li>
-<li>P2P networking (if multi-node)</li>
+<li>bridge relayer</li>
+<li>price oracle</li>
+<li>rewards poller</li>
+<li>tracking-link service</li>
+<li>Highway file server</li>
+<li>the shared Vault</li>
 </ul>
-<p><strong>Key Features:</strong></p>
-<ul>
-<li>Solidity smart contract support</li>
-<li>EVM compatibility (with STRATO extensions)</li>
-<li>Fast finality (~1-2 second block times)</li>
-<li>Deterministic execution</li>
-</ul>
-<p><strong>APIs:</strong></p>
-<ul>
-<li>ETH JSON-RPC (standard Ethereum endpoints)</li>
-<li>STRATO-specific extensions</li>
-<li>WebSocket for event subscriptions</li>
-</ul>
-<h3 id="4-cirrus-indexer">4. Cirrus (Indexer)<a class="headerlink" href="#4-cirrus-indexer" title="Permanent link">&para;</a></h3>
-<p><strong>Technology:</strong> PostgreSQL + Custom indexing service</p>
-<p><strong>Responsibilities:</strong></p>
-<ul>
-<li>Index blockchain state into relational database</li>
-<li>Provide fast queries for UI/backend</li>
-<li>Store contract metadata and attributes</li>
-<li>Track balances, transfers, events</li>
-</ul>
-<p><strong>Indexed Data:</strong></p>
-<ul>
-<li>Token contracts (balances, metadata, attributes)</li>
-<li>Swap pools (reserves, ratios, LP tokens)</li>
-<li>Lending positions (supplied, borrowed)</li>
-<li>CDP vaults (collateral, minted)</li>
-<li>Rewards activities (accrual, claims)</li>
-</ul>
-<p><strong>Query API:</strong></p>
-<ul>
-<li>PostgREST interface (RESTful queries on PostgreSQL)</li>
-<li>Filter, sort, paginate indexed data</li>
-<li>Complex joins and aggregations</li>
-</ul>
-<h3 id="5-external-services">5. External Services<a class="headerlink" href="#5-external-services" title="Permanent link">&para;</a></h3>
-<p><strong>RPC Proxy:</strong></p>
-<ul>
-<li>Routes external blockchain calls (e.g., Ethereum mainnet)</li>
-<li>Automatic failover between providers</li>
-<li>Rate limiting and caching</li>
-</ul>
-<p><strong>File Server:</strong></p>
-<ul>
-<li>Stores token images, logos, banners</li>
-<li>Static asset hosting</li>
-</ul>
+<h2 id="api-surfaces">API Surfaces<a class="headerlink" href="#api-surfaces" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Served by</th>
+<th>Access</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/</code></td>
+<td>app-ui</td>
+<td>Public</td>
+</tr>
+<tr>
+<td><code>/api/*</code></td>
+<td>app-backend</td>
+<td>OIDC session (browser) or bearer token; CSRF on browser sessions; some endpoints allow anonymous access</td>
+</tr>
+<tr>
+<td><code>/bloc/v2.2/*</code></td>
+<td>strato-api (Bloc)</td>
+<td>Reads allowed anonymously. <code>POST /transaction</code> and <code>/transaction/parallel</code> require login and are signed with the user's Vault key. <code>POST /transaction/simulate</code> is rate-limited.</td>
+</tr>
+<tr>
+<td><code>/strato-api/eth/v1.2/*</code></td>
+<td>strato-api (core API)</td>
+<td>Permissionless: reads, plus submitting already-signed transactions</td>
+</tr>
+<tr>
+<td><code>/strato/v2.3/key</code>, <code>/strato/v2.3/signature</code></td>
+<td>Vault</td>
+<td>User key and signing operations</td>
+</tr>
+<tr>
+<td><code>/cirrus/search/*</code></td>
+<td>PostgREST</td>
+<td>GET only</td>
+</tr>
+<tr>
+<td><code>/rpc</code></td>
+<td>ethereum-jsonrpc</td>
+<td>Public; <code>strato_*</code> extensions blocked unless <code>--publicStratoRpc</code></td>
+</tr>
+<tr>
+<td><code>/smd/</code>, <code>/apex-api/*</code>, <code>/health</code></td>
+<td>smd, apex</td>
+<td>Dashboard and health status</td>
+</tr>
+</tbody>
+</table>
 <h2 id="data-flow">Data Flow<a class="headerlink" href="#data-flow" title="Permanent link">&para;</a></h2>
-<h3 id="user-action-borrow-usdst">User Action: Borrow USDST<a class="headerlink" href="#user-action-borrow-usdst" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>1. User enters borrow amount in UI
-   ▼
-2. UI calls GET /lending/positions (check current collateral)
-   ▼
-3. Backend queries Cirrus for collateral balances
-   ▼
-4. UI calculates required collateral (auto-planner)
-   ▼
-5. User approves multi-step flow (deposit + borrow)
-   ▼
-6. UI calls POST /lending/supply (deposit collateral)
-   ▼
-7. Backend prepares transaction, sends to STRATO Node
-   ▼
-8. STRATO Node executes smart contract (supply)
-   ▼
-9. Cirrus indexes new state (updated collateral balance)
-   ▼
-10. UI calls POST /lending/borrow (borrow USDST)
-   ▼
-11. Backend prepares borrow transaction
-   ▼
-12. STRATO Node executes smart contract (borrow)
-   ▼
-13. Cirrus indexes borrowed amount
-   ▼
-14. UI shows updated positions (health factor, debt)
+<h3 id="transaction-signed-by-the-platform-custodial">Transaction signed by the platform (custodial)<a class="headerlink" href="#transaction-signed-by-the-platform-custodial" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The user acts in the UI, which calls an <code>/api/*</code> endpoint.</li>
+<li>The backend builds the contract calls and posts them to <code>/bloc/v2.2/transaction/parallel</code>, passing along the user's access token.</li>
+<li>strato-api signs with the user's key held in Vault. The user's key is created on first authenticated use.</li>
+<li>The sequencer orders the transaction into a block through PBFT consensus.</li>
+<li>vm-runner executes the block with SolidVM. The fee is charged through the Decider contract (see <a href="../../platform/transactions-and-fees/">Transactions and Fees</a>).</li>
+<li>slipstream writes the resulting contract state and events to the <code>cirrus</code> database.</li>
+<li>The UI refreshes: the backend reads the new state from Cirrus, and transaction results come from Bloc.</li>
+</ol>
+<h3 id="transaction-signed-by-a-wallet-self-custody">Transaction signed by a wallet (self-custody)<a class="headerlink" href="#transaction-signed-by-a-wallet-self-custody" title="Permanent link">&para;</a></h3>
+<ol>
+<li>The backend builds the transactions but returns them unsigned instead of submitting them.</li>
+<li>The wallet signs them. Supported wallets are the STRATO wallet extension, MetaMask and WalletConnect.</li>
+<li>The signed transaction goes to <code>/api/rpc/submit</code>, which forwards it to <code>/strato-api/eth/v1.2/transaction</code>. Wallets can also submit directly with <code>eth_sendRawTransaction</code> on <code>/rpc</code>.</li>
+<li>Execution and indexing then proceed as in the custodial flow.</li>
+</ol>
+<p>See <a href="../../platform/identity-and-vault/">Identity and Vault</a>.</p>
+<h3 id="indexing">Indexing<a class="headerlink" href="#indexing" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>committed block → vm-runner (SolidVM) → contract state + events
+                                          │
+                                          ▼
+                              slipstream → Postgres "cirrus" DB → PostgREST (/cirrus/search)
+                                                              └→ app-backend (read-only SQL)
 </code></pre></div>
-<h3 id="indexing-pipeline">Indexing Pipeline<a class="headerlink" href="#indexing-pipeline" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>STRATO Node (produces blocks)
-   │
-   ▼ Event logs
-Cirrus Indexer (listens to events)
-   │
-   ├─► Parse Transfer events → Update balances
-   ├─► Parse Mint/Burn events → Update supplies
-   ├─► Parse Swap events → Update pool reserves
-   └─► Parse Borrow/Repay events → Update lending positions
-   │
-   ▼ Write to PostgreSQL
-Cirrus Database (indexed state)
-   │
-   ▼ Backend queries
-App API (serves UI)
-</code></pre></div>
-<h2 id="smart-contract-architecture">Smart Contract Architecture<a class="headerlink" href="#smart-contract-architecture" title="Permanent link">&para;</a></h2>
-<h3 id="core-contracts">Core Contracts<a class="headerlink" href="#core-contracts" title="Permanent link">&para;</a></h3>
-<p><strong>Token.sol:</strong></p>
+<p>Cirrus is updated after blocks are committed and executed, so indexed data can briefly lag the chain head.</p>
+<h2 id="smart-contracts">Smart Contracts<a class="headerlink" href="#smart-contracts" title="Permanent link">&para;</a></h2>
+<p>The platform contracts live in <code>app/contracts/concrete/</code>. They are written in Solidity syntax and run on SolidVM. For deployed addresses, see <a href="../../build-apps/contract-addresses/">Contract Addresses</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Main contracts</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tokens</td>
+<td><code>Token</code>, <code>TokenFactory</code>, <code>TokenMetadata</code></td>
+<td>ERC20 tokens created through the factory. Transfers revert on failure instead of returning <code>false</code>. Tokens are pausable.</td>
+</tr>
+<tr>
+<td>Pools</td>
+<td><code>Pool</code>, <code>PoolFactory</code>, <code>StablePool</code>, <code>PoolV3</code>, <code>PoolV3Factory</code>, <code>PositionManagerV3</code>, <code>DirectMintPSM</code></td>
+<td>Constant-product AMM pools, stable pools, concentrated-liquidity (V3) pools, direct-mint PSM</td>
+</tr>
+<tr>
+<td>Lending</td>
+<td><code>LendingPool</code>, <code>LiquidityPool</code>, <code>CollateralVault</code>, <code>LendingRegistry</code>, <code>PoolConfigurator</code>, <code>RateStrategy</code>, <code>PriceOracle</code>, <code>SafetyModule</code></td>
+<td>Supply and borrow, collateral, interest rates, prices. The safety module holds USDST and issues sUSDST.</td>
+</tr>
+<tr>
+<td>CDP</td>
+<td><code>CDPEngine</code>, <code>CDPVault</code>, <code>CDPRegistry</code>, <code>CDPReserve</code></td>
+<td>Collateralized debt positions that mint USDST; the reserve holds USDST fees</td>
+</tr>
+<tr>
+<td>Bridge</td>
+<td><code>MercataBridge</code>, <code>StratoNativeBridge</code>, <code>StratoNativeCustodyVault</code>, <code>CreditCardTopUp</code></td>
+<td>Deposits and withdrawals between STRATO and external EVM chains; separate lifecycle for STRATO-native assets</td>
+</tr>
+<tr>
+<td>Savings and vaults</td>
+<td><code>SaveUSDSTVault</code>, <code>YieldVault</code>, <code>Vault</code>, <code>VaultFactory</code></td>
+<td>USDST savings vault; ERC-4626 yield vault; multi-asset vault</td>
+</tr>
+<tr>
+<td>Rewards</td>
+<td><code>Rewards</code></td>
+<td>Activity-based rewards, fed by the rewards poller</td>
+</tr>
+<tr>
+<td>Vouchers</td>
+<td><code>Voucher</code>, <code>PayFeesWithVoucher</code></td>
+<td>Fee vouchers</td>
+</tr>
+<tr>
+<td>Metals</td>
+<td><code>MetalForge</code></td>
+<td>Metal token minting</td>
+</tr>
+<tr>
+<td>NFTs</td>
+<td><code>NFT</code>, <code>NFTFactory</code></td>
+<td>ERC-721 tokens</td>
+</tr>
+<tr>
+<td>Flash</td>
+<td><code>FlashMint</code></td>
+<td>Flash-minting</td>
+</tr>
+<tr>
+<td>Staking</td>
+<td><code>StratoStaking</code>, <code>ValidatorRegistry</code>, <code>StratoStakingV2</code>, <code>ValidatorRegistryV2</code>, <code>FeeRouter</code></td>
+<td>Validator staking and fee routing</td>
+</tr>
+<tr>
+<td>Governance and admin</td>
+<td><code>AdminRegistry</code>, <code>MercataGovernance</code>, <code>FeeCollector</code></td>
+<td>Admin voting, the validator set, protocol fee collection</td>
+</tr>
+<tr>
+<td>Users</td>
+<td><code>UserRegistry</code></td>
+<td>On-chain user identities</td>
+</tr>
+<tr>
+<td>Upgrades</td>
+<td><code>Proxy</code></td>
+<td>Delegatecall proxy: storage stays in the proxy while the logic contract can be replaced</td>
+</tr>
+</tbody>
+</table>
+<p>Some contracts are pre-deployed in the genesis block. Their sources are in <code>strato/core/strato-genesis/resources/strato/</code>:</p>
 <ul>
-<li>ERC20 implementation</li>
-<li>Mintable/burnable (with access control)</li>
-<li>Pausable for emergencies</li>
+<li><code>Decider</code> / <code>DeciderState</code>: transaction fees</li>
+<li><code>MercataGovernance</code>: the validator set</li>
+<li><code>UserRegistry</code></li>
+<li><code>FeeRouter</code></li>
 </ul>
-<p><strong>Pool.sol:</strong></p>
+<h3 id="ownership-and-admin-control">Ownership and admin control<a class="headerlink" href="#ownership-and-admin-control" title="Permanent link">&para;</a></h3>
+<p>The deployment (<code>BaseCodeCollection.sol</code>) transfers ownership of platform contracts to <strong>AdminRegistry</strong>. Examples include <code>FeeCollector</code>, <code>TokenFactory</code>, <code>PoolFactory</code> and <code>LendingRegistry</code>.</p>
+<p>AdminRegistry controls owner-only functions in two ways:</p>
 <ul>
-<li>AMM swap pool (constant product formula)</li>
-<li>Add/remove liquidity</li>
-<li>LP token minting/burning</li>
+<li><strong>Admin voting.</strong> An admin calls <code>castVoteOnIssue(target, function, args)</code>, which opens an issue or votes on an existing one. The call executes once the votes reach a threshold. The threshold is set per target and function, or falls back to a default. It is expressed in basis points of the admin count.</li>
+<li><strong>Whitelist.</strong> A whitelisted <code>(target, function, caller)</code> entry lets a specific non-admin account execute that function directly. For example, <code>FlashMint</code> is whitelisted to mint and burn USDST.</li>
 </ul>
-<p><strong>LendingPool.sol:</strong></p>
-<ul>
-<li>Supply/withdraw collateral</li>
-<li>Borrow/repay USDST</li>
-<li>Health factor calculations</li>
-<li>Liquidations</li>
-</ul>
-<p><strong>CDP.sol:</strong></p>
-<ul>
-<li>Vault management</li>
-<li>Mint/burn USDST</li>
-<li>Collateralization ratio enforcement</li>
-<li>Liquidations</li>
-</ul>
-<p><strong>AdminRegistry.sol:</strong></p>
-<ul>
-<li>Governance and admin actions</li>
-<li>Whitelist management</li>
-<li>Multi-sig voting for critical operations</li>
-</ul>
-<h3 id="contract-ownership">Contract Ownership<a class="headerlink" href="#contract-ownership" title="Permanent link">&para;</a></h3>
-<p>Most contracts are owned by <strong>AdminRegistry</strong>:</p>
-<ul>
-<li>Allows governance control</li>
-<li>Enables whitelist-based permissions</li>
-<li>Prevents single-point-of-failure</li>
-</ul>
-<p><strong>Example: LP Token</strong>
-<div class="highlight"><pre><span></span><code>LP Token (owner: AdminRegistry)
-   ▲
-   │ mint() calls
-Pool Contract (whitelisted to mint LP tokens)
-</code></pre></div></p>
-<h3 id="access-control">Access Control<a class="headerlink" href="#access-control" title="Permanent link">&para;</a></h3>
-<p><strong>Modifiers:</strong></p>
-<ul>
-<li><code>onlyOwner</code>: Owner or AdminRegistry</li>
-<li><code>onlyWhitelisted</code>: Specific whitelist entries</li>
-<li><code>whenNotPaused</code>: Emergency pause mechanism</li>
-</ul>
-<p><strong>Whitelist Pattern:</strong>
-<div class="highlight"><pre><span></span><code>whitelist<span class="p">[</span>LP_TOKEN_ADDRESS<span class="p">][</span><span class="s2">&quot;mint&quot;</span><span class="p">][</span>POOL_ADDRESS<span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">true</span>
-</code></pre></div></p>
-<p>Allows Pool to call <code>mint()</code> on LP Token.</p>
+<p>Several contracts, including <code>Pool</code>, <code>StablePool</code> and <code>YieldVault</code>, use reentrancy guards. <code>Token</code>, <code>Vault</code>, <code>YieldVault</code> and <code>SaveUSDSTVault</code> are pausable.</p>
 <h2 id="security-model">Security Model<a class="headerlink" href="#security-model" title="Permanent link">&para;</a></h2>
 <h3 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h3>
-<p><strong>Frontend → Backend:</strong></p>
 <ul>
-<li>OAuth 2.0 access tokens</li>
-<li>Refresh tokens for session extension</li>
-<li>Token expiry and automatic refresh</li>
+<li><strong>Identity provider:</strong> OAuth2/OIDC. By default this is Keycloak at <code>keycloak.blockapps.net</code> (realm <code>mercata</code>). A node started with <code>--localAuth</code> uses bundled Ory Hydra and Kratos instead.</li>
+<li><strong>Enforcement:</strong> nginx validates logins and tokens. Browsers get a session protected by CSRF checks; API clients send bearer tokens.</li>
+<li><strong>On-chain identity:</strong> usernames map to user contracts through <code>UserRegistry</code>. There are no X.509 certificates.</li>
 </ul>
-<p><strong>Backend → STRATO Node:</strong></p>
+<h3 id="keys-and-signing">Keys and signing<a class="headerlink" href="#keys-and-signing" title="Permanent link">&para;</a></h3>
 <ul>
-<li>User's private key held in backend (encrypted)</li>
-<li>Or user signs transactions client-side (MetaMask-style)</li>
+<li><strong>Custodial:</strong> the Vault holds user keys, and Bloc signs transactions server-side for logged-in users.</li>
+<li><strong>Self-custody:</strong> users sign in their own wallet, and the backend only builds unsigned transactions.</li>
 </ul>
-<h3 id="transaction-security">Transaction Security<a class="headerlink" href="#transaction-security" title="Permanent link">&para;</a></h3>
-<p><strong>Multi-sig for Admin:</strong></p>
+<h3 id="data-access">Data access<a class="headerlink" href="#data-access" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Critical operations require multiple admin approvals</li>
-<li>Implemented via AdminRegistry voting</li>
+<li>Cirrus is read-only: PostgREST accepts only GET, and the backend's Postgres connection is read-only.</li>
+<li>Postgres (5432) and Redis (6379) are published on 127.0.0.1 only. strato-api (3000) binds to the Docker bridge address on Linux (<code>172.17.0.1</code>) and to localhost elsewhere.</li>
+<li><code>ethereum-jsonrpc</code> (8545) listens on all host interfaces, so keep 8545 closed in your firewall and use nginx's <code>/rpc</code> route. Only nginx (HTTP/HTTPS) and the p2p port (30303 TCP/UDP) should be reachable from outside. See <a href="../../node/requirements/">Node requirements</a>.</li>
 </ul>
-<p><strong>Approval Pattern:</strong></p>
+<h3 id="fees-and-consensus">Fees and consensus<a class="headerlink" href="#fees-and-consensus" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Users approve token spending before transactions</li>
-<li>Prevents unauthorized fund movements</li>
+<li><strong>Fees:</strong> every transaction pays a fee through the Decider contract. See <a href="../../platform/transactions-and-fees/">Transactions and Fees</a>.</li>
+<li><strong>Consensus:</strong> blocks are ordered by PBFT (blockstanbul) among the validator set recorded in <code>MercataGovernance</code>. The default block period is 1000 ms. See <a href="../../platform/consensus/">Consensus</a>.</li>
 </ul>
-<p><strong>Reentrancy Guards:</strong></p>
+<h2 id="monitoring">Monitoring<a class="headerlink" href="#monitoring" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Smart contracts use reentrancy protection</li>
-<li>Prevents common exploit patterns</li>
+<li><strong>Metrics:</strong> each node runs Prometheus. It scrapes <code>strato-sequencer</code>, strato-api, <code>strato-p2p</code>, <code>vm-runner</code>, <code>slipstream</code>, the process monitor, apex and nginx (<code>prometheus-packager/strato_prometheus.yml</code>). No alerting rules ship with the node.</li>
+<li><strong>Logs:</strong> native processes and containers write to the node's <code>logs/</code> directory. <code>strato-logrotate</code> rotates them.</li>
+<li><strong>Health:</strong> <code>strato-ps</code> shows node status, and <code>/health</code> (apex) reports health over HTTP.</li>
 </ul>
-<h2 id="scalability">Scalability<a class="headerlink" href="#scalability" title="Permanent link">&para;</a></h2>
-<h3 id="current-state">Current State<a class="headerlink" href="#current-state" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Single STRATO node (sufficient for testnet/small scale)</li>
-<li>Cirrus indexes single node</li>
-<li>Backend scales horizontally (stateless)</li>
-</ul>
-<h3 id="future-scaling">Future Scaling<a class="headerlink" href="#future-scaling" title="Permanent link">&para;</a></h3>
-<p><strong>Multi-node Blockchain:</strong></p>
-<ul>
-<li>Add validator nodes for decentralization</li>
-<li>Consensus mechanism for block production</li>
-</ul>
-<p><strong>Sharding/Rollups:</strong></p>
-<ul>
-<li>Layer 2 solutions for higher throughput</li>
-<li>Offload computation to rollups</li>
-</ul>
-<p><strong>Caching:</strong></p>
-<ul>
-<li>Redis for frequently accessed data</li>
-<li>CDN for static assets</li>
-</ul>
-<h2 id="monitoring-observability">Monitoring &amp; Observability<a class="headerlink" href="#monitoring-observability" title="Permanent link">&para;</a></h2>
-<h3 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Backend: Structured JSON logs</li>
-<li>STRATO Node: Block production logs</li>
-<li>Cirrus: Indexing progress logs</li>
-</ul>
-<h3 id="metrics">Metrics<a class="headerlink" href="#metrics" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Transaction throughput (TPS)</li>
-<li>API response times</li>
-<li>Indexing lag (blocks behind)</li>
-<li>Error rates</li>
-</ul>
-<h3 id="alerting">Alerting<a class="headerlink" href="#alerting" title="Permanent link">&para;</a></h3>
-<ul>
-<li>Node downtime</li>
-<li>Indexing failures</li>
-<li>High error rates</li>
-<li>Unusual transaction patterns</li>
-</ul>
+<p>See <a href="../../node/operations/">Node Operations</a>.</p>
 <h2 id="deployment">Deployment<a class="headerlink" href="#deployment" title="Permanent link">&para;</a></h2>
-<h3 id="environments">Environments<a class="headerlink" href="#environments" title="Permanent link">&para;</a></h3>
-<p><strong>Development:</strong></p>
 <ul>
-<li>Local STRATO node</li>
-<li>Local Cirrus instance</li>
-<li>Frontend dev server (Vite)</li>
-</ul>
-<p><strong>Testnet:</strong></p>
-<ul>
-<li>Hosted STRATO node</li>
-<li>Hosted Cirrus + PostgreSQL</li>
-<li>Backend API on cloud (e.g., AWS)</li>
-<li>Frontend static hosting (S3 + CloudFront)</li>
-</ul>
-<p><strong>Mainnet:</strong></p>
-<ul>
-<li>Production-grade infrastructure</li>
-<li>Multi-node blockchain (validators)</li>
-<li>Database replication</li>
-<li>Load balancers for backend</li>
-</ul>
-<h3 id="cicd">CI/CD<a class="headerlink" href="#cicd" title="Permanent link">&para;</a></h3>
-<p><strong>Pipeline:</strong></p>
-<ol>
-<li>Code commit → GitHub</li>
-<li>Automated tests (unit + integration)</li>
-<li>Build artifacts (Docker images)</li>
-<li>Deploy to testnet (auto)</li>
-<li>Manual approval for mainnet</li>
-<li>Deploy to mainnet</li>
-</ol>
-<h2 id="network-topology">Network Topology<a class="headerlink" href="#network-topology" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Frontend │────▶│ Backend  │────▶│  STRATO  │
-│  (SPA)   │     │   API    │     │   Node   │
-└──────────┘     └────┬─────┘     └────┬─────┘
-                      │                 │
-                      ▼                 ▼
-                 ┌─────────┐       ┌────────┐
-                 │ Cirrus  │◀──────│ Events │
-                 │  (PG)   │       └────────┘
-                 └─────────┘
-</code></pre></div>
-<p><strong>Request Flow:</strong></p>
-<ul>
-<li>User action → Frontend → Backend API → STRATO Node</li>
-<li>Node emits events → Cirrus indexes</li>
-<li>Cirrus provides fast queries → Backend → Frontend</li>
-</ul>
-<h2 id="api-design">API Design<a class="headerlink" href="#api-design" title="Permanent link">&para;</a></h2>
-<p><strong>RESTful Principles:</strong></p>
-<ul>
-<li>Resource-based URLs (<code>/tokens</code>, <code>/pools</code>, <code>/lending</code>)</li>
-<li>Standard HTTP methods (GET, POST, PUT, DELETE)</li>
-<li>JSON request/response bodies</li>
-<li>HTTP status codes for errors</li>
-</ul>
-<p><strong>Pagination:</strong></p>
-<ul>
-<li><code>limit</code> and <code>offset</code> query parameters</li>
-<li><code>totalCount</code> in response</li>
-</ul>
-<p><strong>Filtering:</strong></p>
-<ul>
-<li>PostgREST-style operators (<code>eq</code>, <code>neq</code>, <code>gt</code>, etc.)</li>
-<li>Applied via query parameters</li>
-</ul>
-<p><strong>Versioning:</strong></p>
-<ul>
-<li><code>/v2</code> in URL path</li>
-<li>Allows breaking changes without disrupting existing clients</li>
+<li><strong>Nodes</strong> are built from source and started with <code>strato-up</code>. Each node runs the same stack, including the app UI and backend and the dashboard. See <a href="../../node/">Run a Node</a>.</li>
+<li><strong>Networks:</strong> <code>upquark</code> is the production mainnet and <code>helium</code> is the public testnet. See <a href="../../platform/networks/">Networks</a>.</li>
+<li><strong>Separate deployments:</strong> the shared Vault, Highway file server, bridge relayer, oracle, rewards poller and tracking service run outside the node.</li>
+<li><strong>CI:</strong> builds and tests run in Jenkins (<code>pipelines/</code>). See <a href="../../contribute/contributing/#continuous-integration">Contributing</a>.</li>
 </ul>
 <h2 id="related-docs">Related Docs<a class="headerlink" href="#related-docs" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../api/">App API</a> - DeFi operations API</li>
-<li><a href="../strato-node-api/">Core Platform API</a> - Direct blockchain interaction</li>
-<li><a href="../../build-apps/e2e/">E2E Examples</a> - Complete application examples</li>
+<li><a href="../api/">App API</a>: DeFi operations API</li>
+<li><a href="../strato-node-api/">Core Platform API</a>: core API and Bloc</li>
+<li><a href="../cirrus/">Cirrus</a>: indexed contract data</li>
+<li><a href="../json-rpc/">JSON-RPC</a>: Ethereum-compatible RPC</li>
+<li><a href="../../contribute/architecture/">Contributor Architecture</a>: source layout and processes</li>
+<li><a href="../../build-apps/e2e/">E2E Examples</a>: complete application examples</li>
 </ul>
 
 
@@ -3137,7 +3644,7 @@ Pool Contract (whitelisted to mint LP tokens)
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -3238,7 +3745,7 @@ Pool Contract (whitelisted to mint LP tokens)
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       

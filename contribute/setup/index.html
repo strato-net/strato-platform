@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://docs.strato.nexus/contribute/setup/">
       
       
-        <link rel="prev" href="../../scenarios/withdrawals/">
+        <link rel="prev" href="../../node/operations/">
       
       
         <link rel="next" href="../architecture/">
@@ -24,16 +24,16 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Setup - STRATO Technical Docs</title>
+        <title>Setup - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -1105,6 +1103,202 @@
       
   
   
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
     
   
   
@@ -1131,10 +1325,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" checked>
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1152,8 +1346,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1249,14 +1443,47 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-clone-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Clone the Repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-install-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Install Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Build
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Build">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#required-tools" class="md-nav__link">
+  <a href="#useful-make-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required Tools
+        Useful Make targets
       
     </span>
   </a>
@@ -1269,33 +1496,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#clone-the-repository" class="md-nav__link">
+  <a href="#4-log-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Clone the Repository
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Clone the Repository">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-clone-the-strato-platform-monorepo" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Clone the STRATO Platform Monorepo
+        4. Log in
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#2-install-git-hooks-optional-but-recommended" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#5-run-a-local-node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Install Git Hooks (Optional but Recommended)
+        5. Run a Local Node
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Run a Local Node">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clean-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clean restart
       
     </span>
   </a>
@@ -1308,22 +1535,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build" class="md-nav__link">
+  <a href="#6-development-loops" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build
+        6. Development Loops
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Build">
+    <nav class="md-nav" aria-label="6. Development Loops">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-build-everything" class="md-nav__link">
+  <a href="#core-haskell" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Build Everything
+        Core (Haskell)
       
     </span>
   </a>
@@ -1331,10 +1558,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-build-individual-components" class="md-nav__link">
+  <a href="#contracts-solidvm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Build Individual Components
+        Contracts (SolidVM)
       
     </span>
   </a>
@@ -1342,10 +1569,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-3-generate-docker-compose-files-only" class="md-nav__link">
+  <a href="#app-images-on-a-running-node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 3: Generate Docker Compose Files Only
+        App images on a running node
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#app-backend-and-ui-outside-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App backend and UI outside Docker
       
     </span>
   </a>
@@ -1358,185 +1596,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-locally" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run Locally
+        Troubleshooting
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Run Locally">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-build-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Build STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-start-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Start STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-verify-its-running" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Verify It's Running
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-access-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Access Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-stop-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Stop STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-wipe-and-start-fresh" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Wipe and Start Fresh
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-in-docker-production-like" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run in Docker (Production-like)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Run in Docker (Production-like)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-prepare-docker-compose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Prepare Docker Compose
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-configure-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Configure Environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Start
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-wipe-docker-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Wipe Docker Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-failures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Failures
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runtime-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runtime Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1664,10 +1730,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1685,8 +1751,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1723,10 +1789,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1744,8 +1810,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1872,10 +1938,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -1893,8 +1959,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1993,10 +2059,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2014,8 +2080,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2111,6 +2177,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2126,10 +2196,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2147,8 +2217,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2242,6 +2312,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2303,6 +2838,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2349,14 +2911,47 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Prerequisites">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-clone-the-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Clone the Repository
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-install-dependencies" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Install Dependencies
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Build
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Build">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#required-tools" class="md-nav__link">
+  <a href="#useful-make-targets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Required Tools
+        Useful Make targets
       
     </span>
   </a>
@@ -2369,33 +2964,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#clone-the-repository" class="md-nav__link">
+  <a href="#4-log-in" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Clone the Repository
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Clone the Repository">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-clone-the-strato-platform-monorepo" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Clone the STRATO Platform Monorepo
+        4. Log in
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#2-install-git-hooks-optional-but-recommended" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#5-run-a-local-node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Install Git Hooks (Optional but Recommended)
+        5. Run a Local Node
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Run a Local Node">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#clean-restart" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clean restart
       
     </span>
   </a>
@@ -2408,22 +3003,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#build" class="md-nav__link">
+  <a href="#6-development-loops" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Build
+        6. Development Loops
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Build">
+    <nav class="md-nav" aria-label="6. Development Loops">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#option-1-build-everything" class="md-nav__link">
+  <a href="#core-haskell" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Build Everything
+        Core (Haskell)
       
     </span>
   </a>
@@ -2431,10 +3026,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-2-build-individual-components" class="md-nav__link">
+  <a href="#contracts-solidvm" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Build Individual Components
+        Contracts (SolidVM)
       
     </span>
   </a>
@@ -2442,10 +3037,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#option-3-generate-docker-compose-files-only" class="md-nav__link">
+  <a href="#app-images-on-a-running-node" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 3: Generate Docker Compose Files Only
+        App images on a running node
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#app-backend-and-ui-outside-docker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App backend and UI outside Docker
       
     </span>
   </a>
@@ -2458,185 +3064,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-locally" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Run Locally
+        Troubleshooting
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Run Locally">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-build-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Build STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-start-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Start STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-verify-its-running" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Verify It's Running
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-access-logs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Access Logs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-stop-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Stop STRATO
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#6-wipe-and-start-fresh" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. Wipe and Start Fresh
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-in-docker-production-like" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run in Docker (Production-like)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Run in Docker (Production-like)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-prepare-docker-compose" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Prepare Docker Compose
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-configure-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Configure Environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-start" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Start
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-wipe-docker-deployment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Wipe Docker Deployment
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-failures" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Build Failures
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#runtime-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runtime Errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2680,344 +3114,316 @@
 
 
 <h1 id="setup-contributing-to-strato">Setup - Contributing to STRATO<a class="headerlink" href="#setup-contributing-to-strato" title="Permanent link">&para;</a></h1>
-<p>This guide covers everything you need to start contributing to the STRATO platform codebase.</p>
+<p>This page covers how to build STRATO from source, run a local node, and work on the app layer.</p>
 <hr />
 <h2 id="who-is-this-for">Who is This For?<a class="headerlink" href="#who-is-this-for" title="Permanent link">&para;</a></h2>
 <p><strong>You're in the right place if you want to:</strong></p>
 <ul>
-<li>Contribute to the STRATO blockchain core (Haskell)</li>
-<li>Develop smart contracts for the DeFi layer (Solidity)</li>
-<li>Work on the backend API (Node.js/TypeScript)</li>
-<li>Build the frontend UI (React/TypeScript)</li>
-<li>Improve infrastructure and services</li>
+<li>Change the blockchain core (Haskell, <code>strato/</code>)</li>
+<li>Write or test the platform's smart contracts (SolidVM, <code>app/contracts/</code>)</li>
+<li>Work on the app backend (<code>app/backend/</code>) or UI (<code>app/ui/</code>)</li>
+<li>Work on off-chain services (<code>app/services/</code>) or node tooling</li>
 </ul>
 <p><strong>Not what you're looking for?</strong></p>
 <ul>
-<li>Building apps that use STRATO? → See <a href="../../build-apps/overview/">Building Apps on STRATO</a></li>
-<li>Running your own node? → See Node Operators (coming soon)</li>
+<li>Building apps that use STRATO? See <a href="../../build-apps/overview/">Building Apps on STRATO</a>.</li>
+<li>Running a node without changing code? See <a href="../../node/">Run a Node</a>.</li>
 </ul>
 <hr />
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<h3 id="required-tools">Required Tools<a class="headerlink" href="#required-tools" title="Permanent link">&para;</a></h3>
-<h4 id="1-stack-haskell-build-tool">1. Stack (Haskell Build Tool)<a class="headerlink" href="#1-stack-haskell-build-tool" title="Permanent link">&para;</a></h4>
-<p><strong>What:</strong> Build tool for Haskell code (blockchain core)</p>
-<p><strong>Install:</strong> https://docs.haskellstack.org/en/stable/install_and_upgrade/</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-sSL<span class="w"> </span>https://get.haskellstack.org/<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
-</code></pre></div>
-<p><strong>Verify:</strong></p>
-<div class="highlight"><pre><span></span><code>stack<span class="w"> </span>--version
-</code></pre></div>
-<h4 id="2-docker-with-compose-plugin">2. Docker with Compose Plugin<a class="headerlink" href="#2-docker-with-compose-plugin" title="Permanent link">&para;</a></h4>
-<p><strong>What:</strong> Runtime environment for running STRATO components</p>
-<p><strong>Install:</strong> https://docs.docker.com/engine/install/</p>
-<p><strong>Verify:</strong></p>
-<div class="highlight"><pre><span></span><code>docker<span class="w"> </span>--version
-docker<span class="w"> </span>compose<span class="w"> </span>version
-</code></pre></div>
-<h4 id="3-nodejs-18-and-npm">3. Node.js 18+ and npm<a class="headerlink" href="#3-nodejs-18-and-npm" title="Permanent link">&para;</a></h4>
-<p><strong>What:</strong> For building frontend and backend components</p>
-<p><strong>Install:</strong> https://nodejs.org/ or use nvm</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Using nvm (recommended)</span>
-curl<span class="w"> </span>-o-<span class="w"> </span>https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>bash
-nvm<span class="w"> </span>install<span class="w"> </span><span class="m">18</span>
-nvm<span class="w"> </span>use<span class="w"> </span><span class="m">18</span>
-</code></pre></div>
-<p><strong>Verify:</strong></p>
-<div class="highlight"><pre><span></span><code>node<span class="w"> </span>--version<span class="w">  </span><span class="c1"># Should be v18.x or higher</span>
-npm<span class="w"> </span>--version
-</code></pre></div>
-<h4 id="4-system-libraries">4. System Libraries<a class="headerlink" href="#4-system-libraries" title="Permanent link">&para;</a></h4>
-<p>You have two options:</p>
-<p><strong>Option A: Install System-wide</strong></p>
-<p><strong>Ubuntu 24.04:</strong></p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>libleveldb-dev<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>liblzma-dev<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>libpq-dev<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>libsecp256k1-dev<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>libsodium-dev<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>postgresql-client
-</code></pre></div>
-<p><strong>macOS (requires Homebrew):</strong></p>
-<div class="highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>--quiet<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>leveldb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>postgresql<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>libsodium<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>pkg-config<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>secp256k1<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>xz
-</code></pre></div>
-<p><strong>Option B: Use Nix (Recommended for consistency)</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Install Nix</span>
-curl<span class="w"> </span>-L<span class="w"> </span>https://nixos.org/nix/install<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
-
-<span class="c1"># Nix packages are predefined in the project</span>
-<span class="c1"># No manual library installation needed</span>
-</code></pre></div>
-<p><strong>Verify:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Check if libraries are available</span>
-pkg-config<span class="w"> </span>--modversion<span class="w"> </span>leveldb
-pkg-config<span class="w"> </span>--modversion<span class="w"> </span>libsodium
-</code></pre></div>
-<h4 id="5-oauth-client-credentials">5. OAuth Client Credentials<a class="headerlink" href="#5-oauth-client-credentials" title="Permanent link">&para;</a></h4>
-<p><strong>What:</strong> Required to connect to STRATO network</p>
-<p><strong>How to get:</strong></p>
-<ol>
-<li>Go to <a href="https://support.blockapps.net/">support.blockapps.net</a></li>
-<li>Sign in</li>
-<li>Click "Request Client Credentials"</li>
-<li>You'll receive:</li>
-<li><code>OAUTH_DISCOVERY_URL</code></li>
-<li><code>OAUTH_CLIENT_ID</code></li>
-<li><code>OAUTH_CLIENT_SECRET</code></li>
-</ol>
-<p><strong>Keep these safe!</strong> You'll need them to run STRATO locally.</p>
+<p><code>install_deps.sh</code> supports these platforms:</p>
+<ul>
+<li>macOS Sequoia (15.x) and Tahoe (26.x)</li>
+<li>Ubuntu 24.04 LTS and 26.04 LTS</li>
+<li>Amazon Linux 2023</li>
+<li>Oracle Linux 8.10</li>
+</ul>
+<p>You need:</p>
+<ul>
+<li><strong>git</strong></li>
+<li><strong>Docker</strong> with the Compose plugin. On Linux, run Docker as your own user (member of the <code>docker</code> group), not as root.</li>
+<li><strong>Haskell Stack</strong>. The compiler version comes from <code>strato/stack.yaml</code>.</li>
+<li><strong>System libraries</strong>: LevelDB, secp256k1, libsodium, libpq, librdkafka, xz/lzma, GMP, zlib, and <code>logrotate</code>.</li>
+<li><strong>Node.js 22.12 or later, below 23</strong>, only if you run the app backend or UI outside Docker. Both <code>app/backend/package.json</code> and <code>app/ui/package.json</code> declare <code>"node": "&gt;=22.12 &lt;23.0"</code>.</li>
+<li><strong>OAuth client credentials</strong> to run a node against the shared Keycloak. Request them at <a href="https://support.blockapps.net/">support.blockapps.net</a>. You don't need them if you run the node with <code>--localAuth</code> (see <a href="#4-log-in">Log in</a>).</li>
+</ul>
 <hr />
-<h2 id="clone-the-repository">Clone the Repository<a class="headerlink" href="#clone-the-repository" title="Permanent link">&para;</a></h2>
-<h3 id="1-clone-the-strato-platform-monorepo">1. Clone the STRATO Platform Monorepo<a class="headerlink" href="#1-clone-the-strato-platform-monorepo" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>git@github.com:blockapps/strato-platform.git
+<h2 id="1-clone-the-repository">1. Clone the Repository<a class="headerlink" href="#1-clone-the-repository" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/strato-net/strato-platform
 <span class="nb">cd</span><span class="w"> </span>strato-platform
 </code></pre></div>
-<p><strong>What's included:</strong></p>
-<div class="highlight"><pre><span></span><code>strato-platform/
-├── strato/              # Blockchain core (Haskell)
-├── mercata/             # DeFi application layer
-│   ├── contracts/       # Smart contracts (Solidity)
-│   ├── backend/         # REST API (Node.js/TypeScript)
-│   ├── ui/              # Web UI (React/TypeScript)
-│   └── services/        # Background services
-├── bootstrap-docker/    # Production deployment
-├── nginx-packager/      # Reverse proxy
-└── docs/                # Documentation
-</code></pre></div>
-<h3 id="2-install-git-hooks-optional-but-recommended">2. Install Git Hooks (Optional but Recommended)<a class="headerlink" href="#2-install-git-hooks-optional-but-recommended" title="Permanent link">&para;</a></h3>
-<p><strong>Pre-commit hook:</strong> Automatically removes trailing whitespace</p>
-<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>scripts/hooks/pre-commit<span class="w"> </span>.git/hooks/pre-commit
-chmod<span class="w"> </span>+x<span class="w"> </span>.git/hooks/pre-commit
-</code></pre></div>
+<p>If you plan to open pull requests, fork the repository first. See <a href="../contributing/">Contributing Guidelines</a>.</p>
 <hr />
-<h2 id="build">Build<a class="headerlink" href="#build" title="Permanent link">&para;</a></h2>
-<h3 id="option-1-build-everything">Option 1: Build Everything<a class="headerlink" href="#option-1-build-everything" title="Permanent link">&para;</a></h3>
-<div class="admonition tip">
-<p class="admonition-title">First Time Building?</p>
-<p>The first build will take <strong>15-30 minutes</strong> as Stack downloads dependencies and compiles the Haskell codebase. Subsequent builds are much faster (2-5 minutes for incremental changes).</p>
+<h2 id="2-install-dependencies">2. Install Dependencies<a class="headerlink" href="#2-install-dependencies" title="Permanent link">&para;</a></h2>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Install script (recommended)</label><label for="__tabbed_1_2">Manual (Ubuntu)</label><label for="__tabbed_1_3">Manual (macOS)</label><label for="__tabbed_1_4">Nix</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="highlight"><pre><span></span><code>./install_deps.sh
+</code></pre></div>
+<p>The script installs git, Docker, Stack and the system libraries. On Linux it also adds your user to the <code>docker</code> group. To use that group in your current shell, run:</p>
+<div class="highlight"><pre><span></span><code>newgrp<span class="w"> </span>docker
+docker<span class="w"> </span>ps
+</code></pre></div>
+<p>On Amazon Linux 2023 and Oracle Linux 8.10, the script builds LevelDB, secp256k1 and librdkafka from source.</p>
 </div>
-<p><strong>With system-wide libraries:</strong></p>
+<div class="tabbed-block">
+<p>Install <a href="https://docs.haskellstack.org/en/stable/install_and_upgrade/">Stack</a> and <a href="https://docs.docker.com/engine/install/ubuntu/">Docker Engine with the Compose plugin</a>. Then add your user to the <code>docker</code> group:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>groupadd<span class="w"> </span>docker<span class="w"> </span><span class="p">;</span><span class="w"> </span>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>newgrp<span class="w"> </span>docker<span class="w"> </span><span class="p">;</span><span class="w"> </span>docker<span class="w"> </span>ps
+</code></pre></div>
+<p>Install the libraries that <code>install_deps.sh</code> installs:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>--no-install-recommends<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>build-essential<span class="w"> </span>curl<span class="w"> </span>libgmp-dev<span class="w"> </span>zlib1g-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>libleveldb-dev<span class="w"> </span>liblzma-dev<span class="w"> </span>libpq-dev<span class="w"> </span>librdkafka-dev<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>libsecp256k1-dev<span class="w"> </span>libsodium-dev<span class="w"> </span>logrotate<span class="w"> </span>postgresql-client
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Install <a href="https://brew.sh/">Homebrew</a> and Docker Desktop. Then install:</p>
+<div class="highlight"><pre><span></span><code>brew<span class="w"> </span>install<span class="w"> </span>--quiet<span class="w"> </span>git<span class="w"> </span>haskell-stack
+brew<span class="w"> </span>install<span class="w"> </span>--quiet<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>gmp<span class="w"> </span>leveldb<span class="w"> </span>libpq<span class="w"> </span>librdkafka<span class="w"> </span>libsodium<span class="w"> </span>logrotate<span class="w"> </span>pkgconf<span class="w"> </span>secp256k1<span class="w"> </span>xz
+</code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>Install <a href="https://nix.dev/install-nix.html">Nix</a> and Docker. Build with <code>NIX=true make</code> (see below). This passes <code>--nix</code> to Stack, which uses <code>strato/nix/stack.nix</code> to provide the libraries, so you don't install them system-wide.</p>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">librdkafka</p>
+<p>The default node no longer runs Kafka (19.1 uses embedded JLog streaming). The Kafka streaming backends are still in the Stack build, so librdkafka is still a build dependency.</p>
+</div>
+<hr />
+<h2 id="3-build">3. Build<a class="headerlink" href="#3-build" title="Permanent link">&para;</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Do not use root or sudo</p>
+<p>Run <code>make</code>, <code>strato-login</code> and <code>strato-up</code> as your normal user. Running them as root causes permission problems.</p>
+</div>
 <div class="highlight"><pre><span></span><code>make
 </code></pre></div>
-<p><strong>With Nix:</strong></p>
+<p>With Nix:</p>
 <div class="highlight"><pre><span></span><code><span class="nv">NIX</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span>make
 </code></pre></div>
-<p><strong>What this does:</strong></p>
-<ul>
-<li>Compiles the Haskell blockchain core (<code>strato</code>, <code>vm-runner</code>, <code>cirrus</code>)</li>
-<li>Builds the Solidity smart contracts (<code>mercata/contracts</code>)</li>
-<li>Builds the Node.js backend API (<code>mercata/backend</code>)</li>
-<li>Builds the React frontend UI (<code>mercata/ui</code>)</li>
-<li>Generates Docker Compose files</li>
-</ul>
-<p><strong>Build output:</strong></p>
-<div class="highlight"><pre><span></span><code>✓ strato-core
-✓ vm-runner
-✓ cirrus
-✓ mercata-contracts
-✓ mercata-backend
-✓ mercata-ui
-✓ docker-compose files generated
-</code></pre></div>
-<h3 id="option-2-build-individual-components">Option 2: Build Individual Components<a class="headerlink" href="#option-2-build-individual-components" title="Permanent link">&para;</a></h3>
-<p>If you're only working on a specific part:</p>
-<p><strong>Backend only:</strong></p>
-<div class="highlight"><pre><span></span><code>make<span class="w"> </span>mercata-backend
-</code></pre></div>
-<p><strong>Frontend only:</strong></p>
-<div class="highlight"><pre><span></span><code>make<span class="w"> </span>mercata-ui
-</code></pre></div>
-<p><strong>Contracts only:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mercata/contracts
-npm<span class="w"> </span>install
-npm<span class="w"> </span>run<span class="w"> </span>compile
-</code></pre></div>
-<p><strong>Blockchain core only:</strong></p>
-<div class="highlight"><pre><span></span><code>make<span class="w"> </span>strato-core
-</code></pre></div>
-<h3 id="option-3-generate-docker-compose-files-only">Option 3: Generate Docker Compose Files Only<a class="headerlink" href="#option-3-generate-docker-compose-files-only" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>make<span class="w"> </span>docker-compose
-</code></pre></div>
-<p>This overwrites existing <code>docker-compose.yml</code> files with the latest configuration.</p>
-<hr />
-<h2 id="run-locally">Run Locally<a class="headerlink" href="#run-locally" title="Permanent link">&para;</a></h2>
-<h3 id="1-build-strato">1. Build STRATO<a class="headerlink" href="#1-build-strato" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>strato-platform
-make
-</code></pre></div>
-<p><strong>What this does:</strong></p>
-<ul>
-<li>Compiles the Haskell blockchain core</li>
-<li>Builds Solidity smart contracts</li>
-<li>Builds Node.js backend API</li>
-<li>Builds React frontend UI</li>
-</ul>
-<p><strong>Time:</strong> First build takes 15-30 minutes, subsequent builds are 2-5 minutes.</p>
-<h3 id="2-start-strato">2. Start STRATO<a class="headerlink" href="#2-start-strato" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>./start<span class="w"> </span>my_node_name
-</code></pre></div>
-<p><strong>What this does:</strong></p>
-<ul>
-<li>Starts all STRATO components (blockchain, API, UI, services)</li>
-<li>Creates a local node directory (<code>my_node_name/</code>)</li>
-<li>Blockchain data stored in <code>my_node_name/strato-data/</code></li>
-<li>Logs in <code>my_node_name/logs/</code></li>
-</ul>
-<p><strong>First-time setup:</strong></p>
-<p>The first run will:</p>
+<p>The default target does the following:</p>
 <ol>
-<li>Initialize the blockchain database</li>
-<li>Deploy core contracts</li>
-<li>Start API servers</li>
-<li>Launch the UI</li>
+<li>Writes <code>BUILD_METADATA</code>: the version plus a content hash for each image.</li>
+<li>Runs <code>stack install</code> in <code>strato/</code>. This installs every Haskell executable to <code>~/.local/bin</code>, including <code>strato-setup</code>, <code>convoke</code>, the node processes and <code>solid-vm-cli</code>.</li>
+<li>Installs the <code>bin/</code> scripts to <code>~/.local/bin</code>: <code>strato-login</code>, <code>strato-up</code>, <code>strato-down</code>, <code>strato-ps</code>, <code>strato-patch-app</code>, <code>strato-user-add</code>, <code>strato-snapshot</code> and <code>strato-logrotate</code>.</li>
+<li>Builds these Docker images: apex, nginx, postgrest, prometheus, smd, app-backend, app-ui, bridge, bridge-nginx, tracking, tracking-nginx, tracking-ui and local-auth.</li>
 </ol>
-<p><strong>This takes 2-5 minutes.</strong></p>
-<h3 id="3-verify-its-running">3. Verify It's Running<a class="headerlink" href="#3-verify-its-running" title="Permanent link">&para;</a></h3>
-<p><strong>Check the blockchain API:</strong></p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:8080/strato-api/eth/v1.2/account
+<p>Each image is tagged with the version and a hash of its source directory. <code>make</code> skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with <code>-Wall -Werror</code>, so any warning fails the build.</p>
+<p>If <code>~/.local/bin</code> is not on your <code>PATH</code>, <code>make</code> prints a note. Run <code>source ~/.profile</code> or open a new terminal.</p>
+<h3 id="useful-make-targets">Useful Make targets<a class="headerlink" href="#useful-make-targets" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>make</code></td>
+<td>Builds everything listed above (target <code>local</code>)</td>
+</tr>
+<tr>
+<td><code>make app</code></td>
+<td>Builds only the <code>app-backend</code> and <code>app-ui</code> images, then prints a <code>strato-patch-app</code> command</td>
+</tr>
+<tr>
+<td><code>make nginx</code>, <code>make apex</code>, <code>make smd</code>, <code>make app-ui</code>, ...</td>
+<td>Builds one image if its tag is missing</td>
+</tr>
+<tr>
+<td><code>make nginx-force</code>, <code>make app-ui-force</code>, ...</td>
+<td>Rebuilds one image unconditionally</td>
+</tr>
+<tr>
+<td><code>make pretty</code></td>
+<td>Formats all tracked <code>.hs</code> files with ormolu (runs in Docker)</td>
+</tr>
+<tr>
+<td><code>make hoogle</code></td>
+<td>Generates and serves local Haddock/Hoogle docs for <code>strato/</code></td>
+</tr>
+<tr>
+<td><code>make install-completions</code></td>
+<td>Installs shell completions for <code>airlock</code>, <code>baby-jubjub-cli</code> and <code>strato-barometer</code></td>
+</tr>
+<tr>
+<td><code>make uninstall</code></td>
+<td>Removes the <code>strato-*</code> scripts, <code>strato-setup</code> and <code>convoke</code> from <code>~/.local/bin</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-log-in">4. Log in<a class="headerlink" href="#4-log-in" title="Permanent link">&para;</a></h2>
+<p>Run this once per machine:</p>
+<div class="highlight"><pre><span></span><code>strato-login
 </code></pre></div>
-<p><strong>Expected response:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;accounts&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
-<span class="p">}</span>
-</code></pre></div>
-<p><strong>Check the REST API:</strong></p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>http://localhost:3000/api/health
-</code></pre></div>
-<p><strong>Expected response:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;healthy&quot;</span>
-<span class="p">}</span>
-</code></pre></div>
-<p><strong>Check the UI:</strong></p>
-<p>Open your browser: http://localhost:3001</p>
-<p>You should see the STRATO DeFi interface.</p>
-<h3 id="4-access-logs">4. Access Logs<a class="headerlink" href="#4-access-logs" title="Permanent link">&para;</a></h3>
-<p><strong>All logs:</strong></p>
-<div class="highlight"><pre><span></span><code>tail<span class="w"> </span>-f<span class="w"> </span>my_node_name/logs/*.log
-</code></pre></div>
-<p><strong>Blockchain core:</strong></p>
-<div class="highlight"><pre><span></span><code>tail<span class="w"> </span>-f<span class="w"> </span>my_node_name/logs/strato-core.log
-</code></pre></div>
-<p><strong>Backend API:</strong></p>
-<div class="highlight"><pre><span></span><code>tail<span class="w"> </span>-f<span class="w"> </span>my_node_name/logs/mercata-backend.log
-</code></pre></div>
-<p><strong>UI:</strong></p>
-<div class="highlight"><pre><span></span><code>tail<span class="w"> </span>-f<span class="w"> </span>my_node_name/logs/mercata-ui.log
-</code></pre></div>
-<h3 id="5-stop-strato">5. Stop STRATO<a class="headerlink" href="#5-stop-strato" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c1"># Graceful shutdown</span>
-./stop
-
-<span class="c1"># Force stop</span>
-pkill<span class="w"> </span>-f<span class="w"> </span>strato
-</code></pre></div>
-<h3 id="6-wipe-and-start-fresh">6. Wipe and Start Fresh<a class="headerlink" href="#6-wipe-and-start-fresh" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>./forceWipe
-rm<span class="w"> </span>-rf<span class="w"> </span>my_node_name/
-./start<span class="w"> </span>my_node_name
-</code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Wipe Deletes All Data</p>
-<p>This removes all blockchain data, contracts, and transactions. Use only for testing/development.</p>
+<p>It asks for three values and saves them to <code>~/.secrets/strato_credentials.yaml</code>:</p>
+<ul>
+<li><strong>OAuth discovery URL</strong>. The default is <code>https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration</code>.</li>
+<li><strong>Client ID</strong></li>
+<li><strong>Client secret</strong></li>
+</ul>
+<p>Use <code>strato-login --force</code> to replace saved credentials. Don't pass OAuth credentials as environment variables.</p>
+<p>If the credentials file is missing, <code>strato-up</code> stops with <code>OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first.</code></p>
+<div class="admonition tip">
+<p class="admonition-title">No Keycloak credentials? Use local auth</p>
+<p><code>strato-up mynode --localAuth</code> bundles Ory Hydra and Kratos plus a node-local Vault, so you don't need <code>strato-login</code>. The first run creates an admin user, named <code>admin</code> unless you set <code>LOCAL_AUTH_ADMIN_USERNAME</code>. To add users, run <code>strato-user-add mynode &lt;username&gt;</code>. See <code>local-auth/README.md</code> and <a href="../../platform/identity-and-vault/">Identity and Vault</a>.</p>
 </div>
 <hr />
-<h2 id="run-in-docker-production-like">Run in Docker (Production-like)<a class="headerlink" href="#run-in-docker-production-like" title="Permanent link">&para;</a></h2>
-<p>For a fully Dockerized setup (similar to production):</p>
-<h3 id="1-prepare-docker-compose">1. Prepare Docker Compose<a class="headerlink" href="#1-prepare-docker-compose" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>cp<span class="w"> </span>docker-compose.allDocker.yml<span class="w"> </span>bootstrap-docker/docker-compose.yml
-<span class="nb">cd</span><span class="w"> </span>bootstrap-docker
+<h2 id="5-run-a-local-node">5. Run a Local Node<a class="headerlink" href="#5-run-a-local-node" title="Permanent link">&para;</a></h2>
+<p>Start a testnet node from the latest published snapshot. Restoring a snapshot is much faster than syncing from genesis:</p>
+<div class="highlight"><pre><span></span><code>strato-up<span class="w"> </span>mynode<span class="w"> </span>--network<span class="o">=</span>helium<span class="w"> </span>--snapshot
 </code></pre></div>
-<h3 id="2-configure-environment">2. Configure Environment<a class="headerlink" href="#2-configure-environment" title="Permanent link">&para;</a></h3>
-<p>Edit <code>strato-run.sh</code> with your credentials:</p>
-<div class="highlight"><pre><span></span><code><span class="nv">NODE_HOST</span><span class="o">=</span><span class="s1">&#39;localhost&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">network</span><span class="o">=</span><span class="s1">&#39;helium&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">OAUTH_CLIENT_ID</span><span class="o">=</span><span class="s1">&#39;your-client-id-here&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="nv">OAUTH_CLIENT_SECRET</span><span class="o">=</span><span class="s1">&#39;your-client-secret-here&#39;</span><span class="w"> </span><span class="se">\</span>
-./strato
-</code></pre></div>
-<p><strong>Network options:</strong></p>
-<ul>
-<li><code>network='helium'</code> - Testnet</li>
-<li><code>network='upquark'</code> - Mainnet</li>
+<p><code>strato-up</code> does the following:</p>
+<ol>
+<li>Runs <code>strato-setup</code>, which creates <code>mynode/</code> containing:<ul>
+<li><code>.ethereumH/ethconf.yaml</code> (the node configuration)</li>
+<li><code>secrets/</code></li>
+<li><code>genesis.json</code></li>
+<li>a generated <code>docker-compose.yml</code></li>
+<li><code>commands.txt</code> (the list of native processes)</li>
+<li><code>logs/</code></li>
 </ul>
-<h3 id="3-start">3. Start<a class="headerlink" href="#3-start" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>./strato-run.sh
-</code></pre></div>
-<p><strong>This will:</strong></p>
+</li>
+<li>With <code>--snapshot</code>, restores the snapshot into the new node directory. If <code>mynode/</code> already exists, it ignores <code>--snapshot</code>.</li>
+<li>Starts <code>convoke</code> in the background. <code>convoke</code> runs <code>docker compose -p strato up -d --wait</code>, then starts each line of <code>commands.txt</code> as a host process. If any process exits, convoke tears the whole node down.</li>
+</ol>
+<p>Other notes:</p>
 <ul>
-<li>Pull Docker images</li>
-<li>Start all services in containers</li>
-<li>Expose ports (8080, 3000, 3001)</li>
+<li>The network defaults to <code>upquark</code> (mainnet). Use <code>--network=helium</code> for testnet.</li>
+<li>nginx serves the node on <code>--httpPort</code> (default <code>8081</code>). With <code>--sslDir=/path/to/ssl</code>, which must contain <code>server.pem</code> and <code>server.key</code>, it serves on 443.</li>
+<li>For all flags, see <a href="../../node/configuration/">Node configuration</a>.</li>
 </ul>
-<h3 id="4-wipe-docker-deployment">4. Wipe Docker Deployment<a class="headerlink" href="#4-wipe-docker-deployment" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>bootstrap-docker
-sudo<span class="w"> </span>./strato<span class="w"> </span>--wipe
+<p>Check status and stop:</p>
+<div class="highlight"><pre><span></span><code>strato-ps<span class="w">      </span><span class="c1"># status of the node</span>
+strato-down<span class="w">    </span><span class="c1"># stop the node</span>
 </code></pre></div>
+<p><code>strato-ps</code> and <code>strato-down</code> default to the last node you set up. That path is stored in <code>~/.strato/default-node</code>. You can also pass a node directory, for example <code>strato-down mynode</code>.</p>
+<p>Logs are in <code>mynode/logs/</code>:</p>
+<ul>
+<li>one file per native process, named after the command (for example <code>logs/vm-runner</code> and <code>logs/strato-p2p</code>)</li>
+<li><code>logs/convoke.log</code></li>
+<li>the container logs</li>
+</ul>
+<h3 id="clean-restart">Clean restart<a class="headerlink" href="#clean-restart" title="Permanent link">&para;</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Always restart from a clean node directory</p>
+<p>Don't start a node on top of an existing or partially stopped <code>mynode</code>. Reused state gives unreliable results, for example a stray second process. The only reliable sequence is:</p>
+<div class="highlight"><pre><span></span><code>strato-down
+rm<span class="w"> </span>-rf<span class="w"> </span>mynode<span class="w">        </span><span class="c1"># or: mv mynode mynode.backup</span>
+strato-up<span class="w"> </span>mynode<span class="w"> </span>--network<span class="o">=</span>helium<span class="w"> </span>--snapshot
+</code></pre></div>
+<p>Manage the node only with <code>strato-down</code> and <code>strato-up</code>. Don't start or kill individual processes or <code>convoke</code> by hand.</p>
+</div>
 <hr />
-<h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
-<h3 id="build-failures">Build Failures<a class="headerlink" href="#build-failures" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> <code>stack: command not found</code></p>
-<p><strong>Solution:</strong> Install Stack:</p>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-sSL<span class="w"> </span>https://get.haskellstack.org/<span class="w"> </span><span class="p">|</span><span class="w"> </span>sh
+<h2 id="6-development-loops">6. Development Loops<a class="headerlink" href="#6-development-loops" title="Permanent link">&para;</a></h2>
+<h3 id="core-haskell">Core (Haskell)<a class="headerlink" href="#core-haskell" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Edit code under <code>strato/</code>.</li>
+<li>Rebuild with <code>make</code>, or run <code>cd strato &amp;&amp; stack install</code> if you only changed Haskell code.</li>
+<li>Do a <a href="#clean-restart">clean restart</a>.</li>
+</ol>
+<p>To build or test a single package:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>strato
+stack<span class="w"> </span>build<span class="w"> </span>slipstream
+stack<span class="w"> </span><span class="nb">test</span><span class="w"> </span>slipstream
 </code></pre></div>
-<p><strong>Problem:</strong> <code>Could not find module 'Crypto.Secp256k1'</code></p>
-<p><strong>Solution:</strong> Install system libraries:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Ubuntu</span>
-sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libsecp256k1-dev
-
-<span class="c1"># macOS</span>
-brew<span class="w"> </span>install<span class="w"> </span>secp256k1
+<h3 id="contracts-solidvm">Contracts (SolidVM)<a class="headerlink" href="#contracts-solidvm" title="Permanent link">&para;</a></h3>
+<p>Contract tests are <code>*.test.sol</code> files under <code>app/contracts/tests/</code>. <code>solid-vm-cli</code> runs them, and <code>make</code> installs it. Run a test from its own directory:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>app/contracts/tests/Lending
+solid-vm-cli<span class="w"> </span><span class="nb">test</span><span class="w"> </span>&lt;File&gt;.test.sol
 </code></pre></div>
-<p><strong>Problem:</strong> <code>cabal: Missing dependency on a foreign library: * Missing (or bad) C library: leveldb</code></p>
-<p><strong>Solution:</strong> Install leveldb:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Ubuntu</span>
-sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libleveldb-dev
-
-<span class="c1"># macOS</span>
-brew<span class="w"> </span>install<span class="w"> </span>leveldb
+<p><code>app/contracts/tests/test.sh &lt;File&gt;.test.sol</code> runs the same command and prints pass/fail counts. Deployment scripts are documented in <code>app/contracts/deploy/README.md</code>.</p>
+<h3 id="app-images-on-a-running-node">App images on a running node<a class="headerlink" href="#app-images-on-a-running-node" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code>make<span class="w"> </span>app
+strato-patch-app<span class="w"> </span>mynode<span class="w"> </span>app-backend:&lt;tag&gt;<span class="w"> </span>app-ui:&lt;tag&gt;
 </code></pre></div>
-<h3 id="runtime-errors">Runtime Errors<a class="headerlink" href="#runtime-errors" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Port already in use (8080, 3000, 3001)</p>
-<p><strong>Solution:</strong></p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Find and kill processes</span>
-lsof<span class="w"> </span>-ti:8080<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-9
-lsof<span class="w"> </span>-ti:3000<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-9
-lsof<span class="w"> </span>-ti:3001<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-9
+<p>Use the exact tags that <code>make app</code> prints.</p>
+<ul>
+<li><strong>Node stopped:</strong> the new images take effect on the next <code>strato-up</code>.</li>
+<li><strong>Node running:</strong> recreate only the app containers from the node directory. Use the same environment variables you started the node with:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>mynode
+&lt;ENV<span class="w"> </span>VARS&gt;<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-p<span class="w"> </span>strato<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--no-deps<span class="w"> </span>app-backend<span class="w"> </span>app-ui
 </code></pre></div>
-<p><strong>Problem:</strong> Database connection failed</p>
-<p><strong>Solution:</strong> Ensure PostgreSQL is running:</p>
-<div class="highlight"><pre><span></span><code><span class="c1"># Check status</span>
-docker<span class="w"> </span>ps<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>postgres
-
-<span class="c1"># Restart</span>
-docker-compose<span class="w"> </span>restart<span class="w"> </span>postgres
+<h3 id="app-backend-and-ui-outside-docker">App backend and UI outside Docker<a class="headerlink" href="#app-backend-and-ui-outside-docker" title="Permanent link">&para;</a></h3>
+<p>This loop runs the backend and UI with hot reload, behind the standalone app nginx. It follows <code>app/README.md</code>.</p>
+<p><strong>Backend</strong> (port 3001):</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>app/backend
+npm<span class="w"> </span>i
+<span class="nv">OAUTH_DISCOVERY_URL</span><span class="o">=</span>https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OAUTH_CLIENT_ID</span><span class="o">=</span>&lt;client-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OAUTH_CLIENT_SECRET</span><span class="o">=</span>&lt;client-secret&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">NODE_URL</span><span class="o">=</span>&lt;node<span class="w"> </span>URL&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">BASE_URL</span><span class="o">=</span>http://localhost<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">postgres_host</span><span class="o">=</span>&lt;postgres<span class="w"> </span>host&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">postgres_password</span><span class="o">=</span>&lt;postgres<span class="w"> </span>password&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>npm<span class="w"> </span>run<span class="w"> </span>dev
 </code></pre></div>
-<p><strong>Problem:</strong> OAuth authentication failed</p>
-<p><strong>Solution:</strong> Verify your credentials in <code>strato-run.sh</code> or request new ones at <a href="https://support.blockapps.net/">support.blockapps.net</a>.</p>
+<p>The backend exits at startup in these cases:</p>
+<ul>
+<li><code>OAUTH_DISCOVERY_URL</code>, <code>OAUTH_CLIENT_ID</code>, <code>OAUTH_CLIENT_SECRET</code> or <code>NODE_URL</code> is missing.</li>
+<li><code>postgres_password</code> is missing. The backend opens a read-only connection to the node's <code>cirrus</code> Postgres database. It uses <code>postgres_host</code> (default <code>postgres</code>), <code>postgres_port</code> (default <code>5432</code>) and <code>postgres_user</code> (default <code>postgres</code>).</li>
+</ul>
+<p>On a local node, Postgres listens on <code>127.0.0.1:5432</code> and the password is in <code>mynode/secrets/postgres_password</code>.</p>
+<p><strong>UI</strong> (port 8080; the Vite dev server proxies <code>/api</code> to <code>localhost:3001</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>app/ui
+npm<span class="w"> </span>i
+npm<span class="w"> </span>run<span class="w"> </span>dev
+</code></pre></div>
+<p><strong>nginx</strong> (port 80). Login only works through nginx. The Vite server on 8080 does not handle authentication.</p>
+<div class="highlight"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>app/nginx
+<span class="nv">OAUTH_DISCOVERY_URL</span><span class="o">=</span>https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OAUTH_CLIENT_ID</span><span class="o">=</span>&lt;client-id&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">OAUTH_CLIENT_SECRET</span><span class="o">=</span>&lt;client-secret&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">NODE_URL</span><span class="o">=</span>&lt;node<span class="w"> </span>URL&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.nginx-standalone.yml<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--build
+</code></pre></div>
+<p>Open <a href="http://localhost">http://localhost</a>.</p>
+<ul>
+<li><code>NODE_URL</code> must match the backend's <code>NODE_URL</code>, because nginx proxies <code>/rpc</code> to <code>NODE_URL/rpc</code>.</li>
+<li>Port 80 must be free. Check with <code>lsof -i :80</code>.</li>
+<li><code>npm i</code> in either package also builds <code>app/packages/shared-types</code> through a <code>postinstall</code> hook.</li>
+</ul>
+<hr />
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p><strong><code>permission denied while trying to connect to the Docker daemon socket</code></strong></p>
+<p>Your user is not in the <code>docker</code> group, or the current shell hasn't picked the group up yet:</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>usermod<span class="w"> </span>-aG<span class="w"> </span>docker<span class="w"> </span><span class="nv">$USER</span>
+newgrp<span class="w"> </span>docker<span class="w">     </span><span class="c1"># or log out and back in</span>
+docker<span class="w"> </span>ps
+</code></pre></div>
+<p>Don't work around this with <code>sudo make</code> or <code>sudo strato-up</code>.</p>
+<p><strong><code>strato-up: command not found</code></strong></p>
+<p><code>~/.local/bin</code> is not on your <code>PATH</code>. Run <code>source ~/.profile</code>, or open a new terminal.</p>
+<p><strong><code>OAuth credentials not found at ~/.secrets/strato_credentials.yaml</code></strong></p>
+<p>Run <code>strato-login</code>, or start the node with <code>--localAuth</code>.</p>
+<p><strong><code>Error: STRATO is already running in ... Run 'strato-down' first</code></strong></p>
+<p>A convoke process from this node directory is still alive. Run <code>strato-down</code>, then do a <a href="#clean-restart">clean restart</a>.</p>
+<p><strong>Node behaves oddly after a restart</strong></p>
+<p>Don't reuse the node directory. Follow the <a href="#clean-restart">clean restart</a> sequence.</p>
+<p><strong>Setup warns that RAM is not enough for from-genesis sync</strong></p>
+<p>On small machines, vm-runner alone needs about 3.5 GB during genesis sync. Start the node with <code>--snapshot</code>. For sizing, see <a href="../../node/requirements/">Node requirements</a>.</p>
+<p><strong>macOS: <code>ar: @....rsp: No such file or directory</code> while linking</strong></p>
+<p>Newer Xcode command line tools changed <code>ar</code>. Run <code>./install_deps.sh</code> again. It patches the Stack-installed GHC settings and cleans stale build caches.</p>
+<p><strong>Missing C library (<code>leveldb</code>, <code>secp256k1</code>, <code>rdkafka</code>, <code>sodium</code>, <code>pq</code>)</strong></p>
+<p>Run <code>./install_deps.sh</code> again, or install the libraries listed in <a href="#2-install-dependencies">Install Dependencies</a>.</p>
+<p><strong><code>http://localhost</code> doesn't load with the standalone app nginx</strong></p>
+<ul>
+<li>Disable any VPN, which can break Docker networking.</li>
+<li>Try a private browser window, since a cached 301 redirect to https can interfere.</li>
+<li>On Linux, if <code>host.docker.internal</code> doesn't resolve, pass <code>HOST_IP=172.17.0.1</code>.</li>
+</ul>
 <hr />
 <h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p>Now that you have STRATO running locally:</p>
 <ol>
-<li><strong>Understand the architecture</strong> → Read <a href="../architecture/">Architecture</a></li>
-<li><strong>Choose your focus area:</strong></li>
-<li><strong>Blockchain Core</strong> - Haskell codebase (<code>strato/</code>)</li>
-<li><strong>Smart Contracts</strong> - Solidity contracts (<code>mercata/contracts/</code>)</li>
-<li><strong>Backend API</strong> - Node.js/TypeScript (<code>mercata/backend/</code>)</li>
-<li><strong>Frontend UI</strong> - React/TypeScript (<code>mercata/ui/</code>)</li>
-<li><strong>Services</strong> - Background services (<code>mercata/services/</code>)</li>
-<li><strong>Make your first contribution</strong> → Read <a href="../contributing/">Contributing Guidelines</a></li>
+<li>Read the <a href="../architecture/">Architecture</a> guide.</li>
+<li>Read the <a href="../contributing/">Contributing Guidelines</a> before opening a pull request.</li>
 </ol>
-<div class="admonition note">
-<p class="admonition-title">Component Guides Coming Soon</p>
-<p>Detailed guides for each component area will be added in future updates.</p>
-</div>
 <hr />
 <h2 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h2>
 <ul>
@@ -3047,7 +3453,7 @@ docker-compose<span class="w"> </span>restart<span class="w"> </span>postgres
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -3148,7 +3554,7 @@ docker-compose<span class="w"> </span>restart<span class="w"> </span>postgres
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       

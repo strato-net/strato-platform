@@ -18,22 +18,22 @@
         <link rel="prev" href="../arbitrage-market-making/">
       
       
-        <link rel="next" href="../../contribute/setup/">
+        <link rel="next" href="../../node/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <link rel="icon" href="../../assets/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Withdrawals - STRATO Technical Docs</title>
+        <title>Withdrawals - Docs</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -50,8 +50,8 @@
         
         
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Poppins";--md-code-font:"Geist Mono"}</style>
       
     
     
@@ -75,7 +75,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#withdrawals-bridge-assets-back-to-ethereum" class="md-skip">
+        <a href="#withdrawals-bridge-assets-out" class="md-skip">
           Skip to content
         </a>
       
@@ -100,10 +100,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="STRATO Technical Docs" class="md-header__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-header__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -114,7 +113,7 @@
       <div class="md-header__ellipsis">
         <div class="md-header__topic">
           <span class="md-ellipsis">
-            STRATO Technical Docs
+            Docs
           </span>
         </div>
         <div class="md-header__topic" data-md-component="header-topic">
@@ -133,20 +132,20 @@
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
       </label>
     
   
     
     
     
-    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="custom"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="fill:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
       </label>
     
   
@@ -226,13 +225,12 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="STRATO Technical Docs" class="md-nav__button md-logo" aria-label="STRATO Technical Docs" data-md-component="logo">
+    <a href="../.." title="Docs" class="md-nav__button md-logo" aria-label="Docs" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/strato-logo.svg" alt="logo">
 
     </a>
-    STRATO Technical Docs
+    Docs
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
@@ -1133,10 +1131,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#what-you-can-bridge-out" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        What You Can Bridge Out
       
     </span>
   </a>
@@ -1144,10 +1142,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-you-can-withdraw" class="md-nav__link">
+  <a href="#how-bridge-out-works" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What You Can Withdraw
+        How Bridge-Out Works
       
     </span>
   </a>
@@ -1155,44 +1153,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-1-withdraw-usdst-as-stablecoins" class="md-nav__link">
+  <a href="#step-by-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Withdraw USDST as Stablecoins
+        Step-by-Step
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 1: Withdraw USDST as Stablecoins">
+    <nav class="md-nav" aria-label="Step-by-Step">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-you-get" class="md-nav__link">
+  <a href="#tracking" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What You Get
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#how-to-withdraw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to Withdraw
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#claiming-on-ethereum" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claiming on Ethereum
+        Tracking
       
     </span>
   </a>
@@ -1205,288 +1181,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-2-withdraw-wrapped-tokens-as-ethereum-assets" class="md-nav__link">
+  <a href="#exiting-to-stablecoins" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Withdraw Wrapped Tokens as Ethereum Assets
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 2: Withdraw Wrapped Tokens as Ethereum Assets">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-you-get_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What You Get
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#how-to-withdraw_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to Withdraw
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#claiming-on-ethereum_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claiming on Ethereum
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-partial-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: Partial Withdrawal
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example: Partial Withdrawal">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#you-can-withdraw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        You can withdraw:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-closing-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional: Closing Positions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optional: Closing Positions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#close-liquidity-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Close Liquidity Positions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay-lending-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay Lending Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#burn-cdp-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Burn CDP Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#withdraw-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Withdraw Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#costs-timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Costs &amp; Timing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Costs &amp; Timing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#transaction-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#time-required" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Time Required
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#important-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Important Notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Important Notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#about-withdrawal-approvals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Withdrawal Approvals
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#about-gas-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Gas Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#about-asset-conversions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Asset Conversions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cannot-bridge-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Cannot bridge collateral"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#withdrawal-taking-too-long" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Withdrawal taking too long"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#partial-withdrawals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Partial Withdrawals
+        Exiting to Stablecoins
       
     </span>
   </a>
@@ -1494,10 +1192,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bridge-back-anytime" class="md-nav__link">
+  <a href="#example-partial-exit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bridge Back Anytime
+        Example: Partial Exit
       
     </span>
   </a>
@@ -1505,65 +1203,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        Troubleshooting
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#continue-using-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue using STRATO:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#take-a-break" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Take a break:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#need-more-assets-on-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need more assets on STRATO?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-guides" class="md-nav__link">
+  <a href="#related" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Guides
+        Related
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Related Guides">
+    <nav class="md-nav" aria-label="Related">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1608,6 +1267,12 @@
     
       
         
+          
+        
+      
+        
+      
+        
       
         
       
@@ -1631,7 +1296,197 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+          <div class="md-nav__link md-nav__container">
+            <a href="../../node/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a Node
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_9" id="__nav_9_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Run a Node
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install & Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../node/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
             
   
   
@@ -1649,8 +1504,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_9">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1781,10 +1636,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
         
           
-          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="">
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
             
   
   
@@ -1802,8 +1657,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1840,10 +1695,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_1" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_1" >
         
           
-          <label class="md-nav__link" for="__nav_10_1" id="__nav_10_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_1" id="__nav_11_1_label" tabindex="0">
             
   
   
@@ -1861,8 +1716,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_1">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_1">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1989,10 +1844,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_2" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_2" >
         
           
-          <label class="md-nav__link" for="__nav_10_2" id="__nav_10_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_2" id="__nav_11_2_label" tabindex="0">
             
   
   
@@ -2010,8 +1865,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_2_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_2">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_2">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2110,10 +1965,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_10_3" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11_3" >
         
           
-          <label class="md-nav__link" for="__nav_10_3" id="__nav_10_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_11_3" id="__nav_11_3_label" tabindex="0">
             
   
   
@@ -2131,8 +1986,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_10_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_10_3">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_11_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11_3">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2228,6 +2083,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -2243,10 +2102,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_11" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_12" >
         
           
-          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="">
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="">
             
   
   
@@ -2264,8 +2123,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_11">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2359,6 +2218,471 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cirrus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cirrus (Indexed Data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/json-rpc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ethereum JSON-RPC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_13" >
+        
+          
+          <label class="md-nav__link" for="__nav_13" id="__nav_13_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_13">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Platform
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/networks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Networks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/consensus/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Consensus & Staking
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/identity-and-vault/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Identity & Vault
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../platform/transactions-and-fees/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transactions & Fees
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_14" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../solidvm/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SolidVM
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_14" id="__nav_14_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_14_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_14">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    SolidVM
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Language Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Error Handling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/differences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differences from Solidity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/upgrades/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upgradeable Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../solidvm/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing with solid-vm-cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2420,6 +2744,33 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release-notes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Release Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -2447,10 +2798,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#what-you-can-bridge-out" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        What You Can Bridge Out
       
     </span>
   </a>
@@ -2458,10 +2809,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-you-can-withdraw" class="md-nav__link">
+  <a href="#how-bridge-out-works" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What You Can Withdraw
+        How Bridge-Out Works
       
     </span>
   </a>
@@ -2469,44 +2820,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-1-withdraw-usdst-as-stablecoins" class="md-nav__link">
+  <a href="#step-by-step" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 1: Withdraw USDST as Stablecoins
+        Step-by-Step
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Option 1: Withdraw USDST as Stablecoins">
+    <nav class="md-nav" aria-label="Step-by-Step">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-you-get" class="md-nav__link">
+  <a href="#tracking" class="md-nav__link">
     <span class="md-ellipsis">
       
-        What You Get
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#how-to-withdraw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to Withdraw
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#claiming-on-ethereum" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claiming on Ethereum
+        Tracking
       
     </span>
   </a>
@@ -2519,288 +2848,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#option-2-withdraw-wrapped-tokens-as-ethereum-assets" class="md-nav__link">
+  <a href="#exiting-to-stablecoins" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Option 2: Withdraw Wrapped Tokens as Ethereum Assets
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Option 2: Withdraw Wrapped Tokens as Ethereum Assets">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-you-get_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What You Get
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#how-to-withdraw_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to Withdraw
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#claiming-on-ethereum_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claiming on Ethereum
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#example-partial-withdrawal" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example: Partial Withdrawal
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Example: Partial Withdrawal">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#you-can-withdraw" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        You can withdraw:
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-closing-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional: Closing Positions
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Optional: Closing Positions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#close-liquidity-positions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Close Liquidity Positions
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repay-lending-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repay Lending Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#burn-cdp-debt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Burn CDP Debt
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#withdraw-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Withdraw Collateral
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#costs-timing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Costs &amp; Timing
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Costs &amp; Timing">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#transaction-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Transaction Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#time-required" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Time Required
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#important-notes" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Important Notes
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Important Notes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#about-withdrawal-approvals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Withdrawal Approvals
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#about-gas-costs" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Gas Costs
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#about-asset-conversions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        About Asset Conversions
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#common-issues" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Common Issues
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Common Issues">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cannot-bridge-collateral" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Cannot bridge collateral"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#insufficient-balance" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Insufficient balance"
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#withdrawal-taking-too-long" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Withdrawal taking too long"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#partial-withdrawals" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Partial Withdrawals
+        Exiting to Stablecoins
       
     </span>
   </a>
@@ -2808,10 +2859,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#bridge-back-anytime" class="md-nav__link">
+  <a href="#example-partial-exit" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bridge Back Anytime
+        Example: Partial Exit
       
     </span>
   </a>
@@ -2819,65 +2870,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        Troubleshooting
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Next Steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#continue-using-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Continue using STRATO:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#take-a-break" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Take a break:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#need-more-assets-on-strato" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Need more assets on STRATO?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#related-guides" class="md-nav__link">
+  <a href="#related" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Related Guides
+        Related
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Related Guides">
+    <nav class="md-nav" aria-label="Related">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2913,366 +2925,123 @@
 
 
 
-<h1 id="withdrawals-bridge-assets-back-to-ethereum">Withdrawals: Bridge Assets Back to Ethereum<a class="headerlink" href="#withdrawals-bridge-assets-back-to-ethereum" title="Permanent link">&para;</a></h1>
-<p>Simple guide to withdrawing your assets from STRATO back to Ethereum.</p>
-<hr />
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>You can withdraw assets from STRATO back to Ethereum at any time. You have two withdrawal options depending on your asset type.</p>
+<h1 id="withdrawals-bridge-assets-out">Withdrawals: Bridge Assets Out<a class="headerlink" href="#withdrawals-bridge-assets-out" title="Permanent link">&para;</a></h1>
+<p>Move tokens from STRATO to an external EVM network with the <strong>Bridge Out</strong> page.</p>
 <div class="admonition warning">
-<p class="admonition-title">Important</p>
-<ul>
-<li>All withdrawals require <strong>approval</strong> by the bridge</li>
-<li>Withdrawals are <strong>not instantaneous</strong> (typically 10-30 minutes)</li>
-<li>You can withdraw assets <strong>while keeping positions open</strong> on STRATO</li>
-</ul>
+<p class="admonition-title">Bridge-outs are reviewed, not instant</p>
+<p>Every request is escrowed on STRATO and processed by bridge operators. The app states that bridge outs are <strong>processed within 1-3 business days</strong>. Once submitted, a request can't be edited, so double-check the destination address.</p>
 </div>
 <hr />
-<h2 id="what-you-can-withdraw">What You Can Withdraw<a class="headerlink" href="#what-you-can-withdraw" title="Permanent link">&para;</a></h2>
-<p>You can withdraw <strong>any assets in your wallet</strong> on STRATO:</p>
-<ul>
-<li>✅ Tokens sitting in your wallet (not locked as collateral)</li>
-<li>✅ Assets after removing liquidity positions</li>
-<li>✅ Tokens after repaying debts and withdrawing collateral</li>
-</ul>
-<div class="admonition note">
-<p class="admonition-title">Collateral Cannot Be Withdrawn</p>
-<p>Assets locked as collateral in Lending or CDP positions cannot be directly withdrawn. To withdraw collateral:
-1. Repay the associated debt
-2. Withdraw the collateral to your wallet
-3. Then bridge it to Ethereum</p>
-<p><strong>Or:</strong> Keep your positions active and only withdraw free assets</p>
-</div>
-<hr />
-<h2 id="option-1-withdraw-usdst-as-stablecoins">Option 1: Withdraw USDST as Stablecoins<a class="headerlink" href="#option-1-withdraw-usdst-as-stablecoins" title="Permanent link">&para;</a></h2>
-<p><strong>Best for:</strong> Users who want to exit with stablecoins</p>
-<h3 id="what-you-get">What You Get<a class="headerlink" href="#what-you-get" title="Permanent link">&para;</a></h3>
-<p>USDST on STRATO can be withdrawn as:
-- <strong>USDC</strong> on Ethereum, or
-- <strong>USDT</strong> on Ethereum</p>
-<p>Both maintain the same value (1:1 peg).</p>
-<h3 id="how-to-withdraw">How to Withdraw<a class="headerlink" href="#how-to-withdraw" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Go to Withdrawals</strong> (in sidebar)</li>
-<li><strong>From:</strong> STRATO → <strong>To:</strong> Ethereum</li>
-<li><strong>Asset:</strong> Select <strong>USDST</strong></li>
-<li><strong>Withdraw as:</strong> Choose <strong>USDC</strong> or <strong>USDT</strong></li>
-<li><strong>Amount:</strong> Enter amount to withdraw</li>
-<li><strong>Review:</strong></li>
-<li>STRATO transaction fee: ~$0.10</li>
-<li>Ethereum claim gas: ~$15-30 (paid when claiming)</li>
-<li>Processing time: 10-30 minutes</li>
-<li><strong>Click "Request Withdrawal"</strong></li>
-<li><strong>Approve transaction</strong></li>
-</ol>
-<h3 id="claiming-on-ethereum">Claiming on Ethereum<a class="headerlink" href="#claiming-on-ethereum" title="Permanent link">&para;</a></h3>
-<p><strong>After 10-30 minutes:</strong></p>
-<ol>
-<li>Your withdrawal will be ready to claim</li>
-<li>Go to Ethereum and visit the claim page</li>
-<li>Pay Ethereum gas (~$15-30) to claim your USDC/USDT</li>
-<li>Tokens arrive in your Ethereum wallet</li>
-</ol>
-<div class="admonition note">
-<p class="admonition-title">Withdrawal Timing</p>
-<p>Withdrawals are subject to approval and are not instant. Typical processing time is 10-30 minutes, but may vary based on network conditions.</p>
-</div>
-<hr />
-<h2 id="option-2-withdraw-wrapped-tokens-as-ethereum-assets">Option 2: Withdraw Wrapped Tokens as Ethereum Assets<a class="headerlink" href="#option-2-withdraw-wrapped-tokens-as-ethereum-assets" title="Permanent link">&para;</a></h2>
-<p><strong>Best for:</strong> Users who want to exit with ETH, WBTC, or other Ethereum-native assets</p>
-<h3 id="what-you-get_1">What You Get<a class="headerlink" href="#what-you-get_1" title="Permanent link">&para;</a></h3>
-<p>STRATO wrapped tokens can be withdrawn as their Ethereum equivalents:</p>
+<h2 id="what-you-can-bridge-out">What You Can Bridge Out<a class="headerlink" href="#what-you-can-bridge-out" title="Permanent link">&para;</a></h2>
+<p>Only tokens <strong>in your STRATO wallet</strong> that have a bridge route to the destination network. Positions must be closed first:</p>
 <table>
 <thead>
 <tr>
-<th>STRATO Token</th>
-<th>Ethereum Token</th>
+<th>Position</th>
+<th>How to free the tokens</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>ETHST</strong></td>
-<td><strong>ETH</strong> (or WETH)</td>
+<td>CDP collateral</td>
+<td><strong>Borrow → Your Vaults</strong>: <strong>Repay USDST</strong> / <strong>Repay All USDST</strong>, then <strong>Withdraw</strong> / <strong>Withdraw Max</strong></td>
 </tr>
 <tr>
-<td><strong>WBTCST</strong></td>
-<td><strong>WBTC</strong></td>
+<td>Swap pool liquidity</td>
+<td><strong>Advanced → Swap Pools</strong>: <strong>Withdraw Liquidity</strong></td>
 </tr>
 <tr>
-<td><strong>GOLDST</strong></td>
-<td><strong>GOLDST</strong></td>
+<td>V3 liquidity</td>
+<td><strong>V3 Liquidity</strong> page: withdraw the position</td>
 </tr>
 <tr>
-<td><strong>SILVST</strong></td>
-<td><strong>SILVST</strong></td>
+<td>USDST Savings Vault</td>
+<td><strong>Earn → USDST Savings Vault</strong>: <strong>Withdraw</strong></td>
 </tr>
 <tr>
-<td><strong>sUSDSST</strong></td>
-<td><strong>sUSDS</strong> (Sky)</td>
+<td>Unclaimed rewards</td>
+<td><strong>Rewards</strong>: claim</td>
 </tr>
 </tbody>
 </table>
-<h3 id="how-to-withdraw_1">How to Withdraw<a class="headerlink" href="#how-to-withdraw_1" title="Permanent link">&para;</a></h3>
+<p>You can bridge out free tokens and leave other positions open. If a vault still has debt, collateral withdrawals must keep it above its minimum collateralization ratio.</p>
+<hr />
+<h2 id="how-bridge-out-works">How Bridge-Out Works<a class="headerlink" href="#how-bridge-out-works" title="Permanent link">&para;</a></h2>
+<p>STRATO has two bridge routes. The app picks the right one for the token.</p>
+<p><strong>Standard route</strong> (assets that came from external chains, such as ETH, WBTC, USDC and USDT):</p>
 <ol>
-<li><strong>Go to Withdrawals</strong> (in sidebar)</li>
-<li><strong>From:</strong> STRATO → <strong>To:</strong> Ethereum</li>
-<li><strong>Asset:</strong> Select your asset (e.g., <strong>ETHST</strong>)</li>
-<li><strong>Withdraw as:</strong> Shows corresponding token (e.g., <strong>ETH</strong>)</li>
-<li><strong>Amount:</strong> Enter amount to withdraw</li>
-<li><strong>Review:</strong></li>
-<li>STRATO transaction fee: ~$0.10</li>
-<li>Ethereum claim gas: ~$15-30 (paid when claiming)</li>
-<li>Processing time: 10-30 minutes</li>
-<li><strong>Click "Request Withdrawal"</strong></li>
-<li><strong>Approve transaction</strong></li>
+<li>Your tokens are escrowed in the STRATO bridge contract.</li>
+<li>The bridge relayer prepares the payout as a <strong>Safe multisig transaction</strong> from bridge custody on the destination network.</li>
+<li>Once the multisig approves and executes it, the tokens are sent to your address and the escrow on STRATO is burned.</li>
 </ol>
-<h3 id="claiming-on-ethereum_1">Claiming on Ethereum<a class="headerlink" href="#claiming-on-ethereum_1" title="Permanent link">&para;</a></h3>
-<p><strong>After 10-30 minutes:</strong></p>
+<p><strong>Native route</strong> (STRATO-native tokens such as USDST, GOLDST, SILVST, STRATO and saveUSDST, bridged to Ethereum):</p>
 <ol>
-<li>Your withdrawal will be ready to claim</li>
-<li>Go to Ethereum and visit the claim page</li>
-<li>Pay Ethereum gas (~$15-30) to claim your assets</li>
-<li>Tokens arrive in your Ethereum wallet</li>
+<li>Your tokens are locked in STRATO's custody vault.</li>
+<li>A representation token is minted to your address on the destination network. Assets can have an instant lane for amounts under a per-asset threshold, which executes after a review delay. Anything else waits for manual Safe approval.</li>
 </ol>
+<p>Either way, there is <strong>no claim step</strong> for you on the destination network: the tokens arrive at the address you bridged to.</p>
+<hr />
+<h2 id="step-by-step">Step-by-Step<a class="headerlink" href="#step-by-step" title="Permanent link">&para;</a></h2>
+<ol>
+<li>In the sidebar, open <strong>Bridge Out</strong>.</li>
+<li>Click <strong>Connect External Wallet</strong>. Tokens go to <strong>this wallet's address</strong>.</li>
+<li>Select the token.</li>
+<li>To change the destination network, open the advanced options below the button.</li>
+<li>Enter the amount. <strong>Max</strong> already allows for the transaction fee and any per-withdrawal limit. If the page shows "bridge capacity reached", withdrawals for that token are temporarily full.</li>
+<li>Click <strong>Bridge Out</strong>, review the confirmation, then click <strong>Yes, Bridge Assets</strong>.</li>
+</ol>
+<p><strong>Fees:</strong> The request costs STRATO transaction fees (0.01 USDST or one voucher per call; the app budgets 0.02 USDST for approve + request). See <a href="../../platform/transactions-and-fees/">Transactions and Fees</a>.</p>
+<h3 id="tracking">Tracking<a class="headerlink" href="#tracking" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Bridge Out Summary</strong> shows your pending bridge-outs and total bridged out over 30 days.</li>
+<li><strong>Bridge Out History</strong> lists each request and its status.</li>
+<li><strong>View Transactions</strong> opens the full bridge transaction history.</li>
+</ul>
 <div class="admonition note">
-<p class="admonition-title">Withdrawal Timing</p>
-<p>Withdrawals are subject to approval and are not instant. Typical processing time is 10-30 minutes, but may vary based on network conditions.</p>
+<p class="admonition-title">Stuck requests</p>
+<p>On the standard route, if a request is still unprocessed 48 hours after you submitted it, the bridge contract lets the sender abort and get the escrowed tokens back. The app has no button for this, so contact support.</p>
 </div>
 <hr />
-<h2 id="example-partial-withdrawal">Example: Partial Withdrawal<a class="headerlink" href="#example-partial-withdrawal" title="Permanent link">&para;</a></h2>
-<p><strong>Your position:</strong>
-- 10 ETHST collateral in Lending
-- 5,000 USDST borrowed
-- 5 ETHST sitting in wallet (free)
-- 2,000 USDST sitting in wallet (free)</p>
-<h3 id="you-can-withdraw">You can withdraw:<a class="headerlink" href="#you-can-withdraw" title="Permanent link">&para;</a></h3>
-<p><strong>Option 1: Withdraw free assets only</strong>
-- Bridge 5 ETHST → 5 ETH on Ethereum
-- Bridge 2,000 USDST → 2,000 USDC on Ethereum
-- <strong>Keep your lending position active</strong>
-- No need to close anything</p>
-<p><strong>Option 2: Close position first, then withdraw</strong>
-- Repay 5,000 USDST debt (need to get more USDST first)
-- Withdraw 10 ETHST collateral to wallet
-- Bridge everything to Ethereum
-- <strong>Full exit from STRATO</strong></p>
-<p><strong>Most users choose Option 1</strong> - withdraw some assets while keeping positions active.</p>
-<hr />
-<h2 id="optional-closing-positions">Optional: Closing Positions<a class="headerlink" href="#optional-closing-positions" title="Permanent link">&para;</a></h2>
-<p>If you want to withdraw collateral, you'll need to close positions first. Here's how:</p>
-<h3 id="close-liquidity-positions">Close Liquidity Positions<a class="headerlink" href="#close-liquidity-positions" title="Permanent link">&para;</a></h3>
+<h2 id="exiting-to-stablecoins">Exiting to Stablecoins<a class="headerlink" href="#exiting-to-stablecoins" title="Permanent link">&para;</a></h2>
+<p>On the native route, USDST bridges out as USDST. To receive USDC or USDT instead:</p>
 <ol>
-<li><strong>Go to Advanced → Swap Pools tab</strong></li>
-<li>Find your liquidity position</li>
-<li><strong>Click "Remove Liquidity"</strong></li>
-<li>Enter <strong>100%</strong> (remove all)</li>
-<li><strong>Confirm</strong> (~$0.10 gas)</li>
-<li>Wait 1-2 seconds</li>
-<li>Repeat for all pools</li>
+<li>Convert first: redeem USDST on <strong>Advanced → PSM</strong> (subject to available redemption liquidity and the fee shown), or swap on <strong>Trade</strong>.</li>
+<li>Bridge out the USDC or USDT, choosing a network where that token has a route.</li>
 </ol>
-<p><strong>Result:</strong> Underlying tokens returned to your wallet</p>
 <hr />
-<h3 id="repay-lending-debt">Repay Lending Debt<a class="headerlink" href="#repay-lending-debt" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Go to Borrow</strong> (sidebar)</li>
-<li>Find your borrowed asset</li>
-<li><strong>Click "Repay" in the table</strong></li>
-<li>Enter amount (or click "Repay Max")</li>
-<li><strong>Confirm</strong> (~$0.10 gas)</li>
-</ol>
-<p><strong>Result:</strong> Debt cleared, can now withdraw collateral</p>
-<hr />
-<h3 id="burn-cdp-debt">Burn CDP Debt<a class="headerlink" href="#burn-cdp-debt" title="Permanent link">&para;</a></h3>
-<ol>
-<li><strong>Go to Advanced → Mint tab</strong></li>
-<li>Find your CDP vault</li>
-<li><strong>Click "Repay"</strong> (burns USDST)</li>
-<li>Enter amount (or click "Repay Max")</li>
-<li><strong>Confirm</strong> (~$0.10 gas)</li>
-</ol>
-<p><strong>Result:</strong> CDP debt cleared</p>
-<hr />
-<h3 id="withdraw-collateral">Withdraw Collateral<a class="headerlink" href="#withdraw-collateral" title="Permanent link">&para;</a></h3>
-<p><strong>From Lending:</strong>
-1. <strong>Go to Borrow</strong> (sidebar)
-2. Find your collateral
-3. <strong>Click "Withdraw" in the table</strong>
-4. Enter amount (or click "Withdraw Max")
-5. <strong>Confirm</strong> (~$0.10 gas)</p>
-<p><strong>From CDP:</strong>
-1. <strong>Go to Advanced → Mint tab</strong>
-2. Find your vault
-3. <strong>Click "Withdraw"</strong>
-4. Enter amount (or click "Withdraw Max")
-5. <strong>Confirm</strong> (~$0.10 gas)</p>
-<p><strong>Result:</strong> All collateral back in your wallet</p>
-<hr />
-<h2 id="costs-timing">Costs &amp; Timing<a class="headerlink" href="#costs-timing" title="Permanent link">&para;</a></h2>
-<h3 id="transaction-costs">Transaction Costs<a class="headerlink" href="#transaction-costs" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Action</th>
-<th>Cost</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Close positions on STRATO</td>
-<td>$0.50 - $1.50</td>
-</tr>
-<tr>
-<td>Request withdrawal</td>
-<td>~$0.10</td>
-</tr>
-<tr>
-<td>Claim on Ethereum</td>
-<td>$15-30 (Ethereum gas)</td>
-</tr>
-<tr>
-<td><strong>Total per withdrawal</strong></td>
-<td><strong>~$15-32</strong></td>
-</tr>
-</tbody>
-</table>
-<h3 id="time-required">Time Required<a class="headerlink" href="#time-required" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Step</th>
-<th>Time</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Close all positions</td>
-<td>10-20 min</td>
-</tr>
-<tr>
-<td>Request withdrawal</td>
-<td>2 min</td>
-</tr>
-<tr>
-<td><strong>Wait for approval</strong></td>
-<td><strong>10-30 min</strong></td>
-</tr>
-<tr>
-<td>Claim on Ethereum</td>
-<td>5 min</td>
-</tr>
-<tr>
-<td><strong>Total</strong></td>
-<td><strong>~30-60 min</strong></td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="important-notes">Important Notes<a class="headerlink" href="#important-notes" title="Permanent link">&para;</a></h2>
-<h3 id="about-withdrawal-approvals">About Withdrawal Approvals<a class="headerlink" href="#about-withdrawal-approvals" title="Permanent link">&para;</a></h3>
-<div class="admonition warning">
-<p class="admonition-title">Approval Process</p>
+<h2 id="example-partial-exit">Example: Partial Exit<a class="headerlink" href="#example-partial-exit" title="Permanent link">&para;</a></h2>
+<p>You have an ETH vault with USDST debt, plus free ETH and USDST in your wallet.</p>
 <ul>
-<li>All withdrawals must be <strong>approved by the bridge</strong></li>
-<li>Approvals typically take <strong>10-30 minutes</strong></li>
-<li>During high network congestion, may take longer</li>
-<li>You cannot cancel once submitted</li>
-<li>Check withdrawal status on the Withdrawals page</li>
-</ul>
-</div>
-<h3 id="about-gas-costs">About Gas Costs<a class="headerlink" href="#about-gas-costs" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>STRATO gas:</strong> Very cheap (~$0.10 per transaction)</li>
-<li><strong>Ethereum gas:</strong> Expensive ($15-30 per claim)</li>
-<li><strong>Tip:</strong> Batch multiple withdrawals if possible to save on Ethereum gas</li>
-</ul>
-<h3 id="about-asset-conversions">About Asset Conversions<a class="headerlink" href="#about-asset-conversions" title="Permanent link">&para;</a></h3>
-<ul>
-<li><strong>USDST → USDC/USDT:</strong> 1:1 conversion (no slippage)</li>
-<li><strong>ETHST → ETH:</strong> 1:1 conversion (no slippage)</li>
-<li><strong>Wrapped tokens:</strong> Always convert back to original Ethereum asset</li>
+<li><strong>Keep the vault open:</strong> Bridge out only the free ETH (standard route) and convert the free USDST to USDC before bridging it out.</li>
+<li><strong>Full exit:</strong> Repay all USDST, withdraw the ETH collateral, then bridge everything out.</li>
 </ul>
 <hr />
-<h2 id="common-issues">Common Issues<a class="headerlink" href="#common-issues" title="Permanent link">&para;</a></h2>
-<h3 id="cannot-bridge-collateral">"Cannot bridge collateral"<a class="headerlink" href="#cannot-bridge-collateral" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Asset is locked as collateral</p>
-<p><strong>Solution:</strong>
-- Option A: Close position (repay debt, withdraw collateral, then bridge)
-- Option B: Keep position active, only bridge free assets in your wallet</p>
-<hr />
-<h3 id="insufficient-balance">"Insufficient balance"<a class="headerlink" href="#insufficient-balance" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Don't have enough USDST to repay debt</p>
-<p><strong>Fix:</strong>
-- Remove liquidity first to get USDST
-- Swap other assets to USDST
-- Or bridge in more USDC from Ethereum</p>
-<hr />
-<h3 id="withdrawal-taking-too-long">"Withdrawal taking too long"<a class="headerlink" href="#withdrawal-taking-too-long" title="Permanent link">&para;</a></h3>
-<p><strong>Problem:</strong> Approval is delayed</p>
-<p><strong>Normal:</strong>
-- 10-30 minutes is standard
-- Can be longer during congestion</p>
-<p><strong>Check:</strong>
-- Go to Withdrawals page
-- View pending status
-- If &gt; 1 hour, contact support</p>
-<hr />
-<h2 id="partial-withdrawals">Partial Withdrawals<a class="headerlink" href="#partial-withdrawals" title="Permanent link">&para;</a></h2>
-<p>You don't have to withdraw everything:</p>
-<p><strong>Common scenarios:</strong>
-1. <strong>Withdraw profits</strong> - Bridge out gains while keeping positions active
-2. <strong>Emergency funds</strong> - Bridge some assets to Ethereum, keep most on STRATO
-3. <strong>Rebalancing</strong> - Withdraw some assets, bridge in others
-4. <strong>Taking profits</strong> - Withdraw trading gains, keep core positions</p>
-<p><strong>Example:</strong>
-- Earned 2 ETHST in yield
-- Bridge 2 ETHST to Ethereum (take profits, receive 2 ETH)
-- Keep 10 ETHST lending position active on STRATO
-- No need to close anything</p>
-<hr />
-<h2 id="bridge-back-anytime">Bridge Back Anytime<a class="headerlink" href="#bridge-back-anytime" title="Permanent link">&para;</a></h2>
-<p><strong>Withdrawing doesn't mean you're leaving!</strong></p>
-<p><strong>You can:</strong>
-- Withdraw and bridge back anytime
-- Keep positions active while withdrawing other assets
-- Bridge in more assets whenever needed
-- No penalties for withdrawals</p>
-<p><strong>Common pattern:</strong>
-- Withdraw profits to Ethereum periodically
-- Keep core positions active on STRATO
-- Bridge in more when opportunities arise</p>
-<hr />
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
-<p><strong>After successful withdrawal:</strong></p>
-<h3 id="continue-using-strato">Continue using STRATO:<a class="headerlink" href="#continue-using-strato" title="Permanent link">&para;</a></h3>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p><strong>Bridge Out button is disabled</strong></p>
 <ul>
-<li>Keep your positions active</li>
-<li>Bridge in more assets when needed</li>
-<li>Withdraw profits periodically</li>
+<li>No external wallet connected, no token or network selected, the amount is invalid, or bridge capacity is reached.</li>
+<li>Not enough USDST or vouchers for the fee.</li>
 </ul>
-<h3 id="take-a-break">Take a break:<a class="headerlink" href="#take-a-break" title="Permanent link">&para;</a></h3>
+<p><strong>Can't withdraw vault collateral</strong></p>
 <ul>
-<li>Withdrawn assets safe in your Ethereum wallet</li>
-<li>Positions remain active on STRATO (if you kept them)</li>
-<li>Bridge back anytime</li>
+<li>Repay debt first, or withdraw less so the vault stays above its minimum collateralization ratio.</li>
 </ul>
-<h3 id="need-more-assets-on-strato">Need more assets on STRATO?<a class="headerlink" href="#need-more-assets-on-strato" title="Permanent link">&para;</a></h3>
+<p><strong>Request is taking a long time</strong></p>
 <ul>
-<li>Bridge assets back (reverse process)</li>
-<li>Use the Deposits page to bridge in</li>
-<li>Welcome back anytime! 👋</li>
+<li>Requests stay pending until reviewed and executed. Check <strong>Bridge Out History</strong>. If it is past the stated processing window, contact support with the request details.</li>
 </ul>
 <hr />
-<h2 id="related-guides">Related Guides<a class="headerlink" href="#related-guides" title="Permanent link">&para;</a></h2>
+<h2 id="related">Related<a class="headerlink" href="#related" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong><a href="../../guides/bridge/">Bridge Guide</a></strong> - Detailed bridge instructions</li>
-<li><strong><a href="../../guides/borrow/">Borrow Guide</a></strong> - How to repay debts</li>
-<li><strong><a href="../../guides/mint-cdp/">CDP Guide</a></strong> - How to close CDP positions</li>
-<li><strong><a href="../../safety/">Safety Guide</a></strong> - Risk management</li>
+<li><a href="../../guides/bridge/">Bridge Guide</a></li>
+<li><a href="../../guides/mint-cdp/">Mint USDST (CDP) Guide</a></li>
+<li><a href="../../guides/liquidity/">Liquidity Guide</a></li>
+<li><a href="../../safety/">Safety Guide</a></li>
 </ul>
 <h3 id="need-help">Need Help?<a class="headerlink" href="#need-help" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Support</strong>: <a href="https://support.blockapps.net">support.blockapps.net</a></li>
 <li><strong>Telegram</strong>: <a href="https://t.me/strato_net">t.me/strato_net</a></li>
-<li><strong>Docs</strong>: <a href="https://docs.strato.nexus">docs.strato.nexus</a></li>
 </ul>
 
 
@@ -3296,7 +3065,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="May 28, 2026 04:56:30 UTC"><span class="timeago" datetime="2026-05-28T04:56:30+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="May 28, 2026 04:56:30 UTC">2026-05-28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 15, 2026 20:52:01 UTC"><span class="timeago" datetime="2026-09-15T20:52:01+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 15, 2026 20:52:01 UTC">2026-09-15</span>
   </span>
 
     
@@ -3397,7 +3166,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.indexes", "navigation.instant", "navigation.tracking", "navigation.top", "navigation.expand", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.action.edit", "content.action.view"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
         <script src="../../js/timeago.min.js"></script>
       
