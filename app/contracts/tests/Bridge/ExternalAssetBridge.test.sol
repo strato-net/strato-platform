@@ -237,7 +237,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bridge.setMintPolicy(address(stratoToken), 1000000e18, 1000e18);
     }
 
-    function _depositSignatures(
+    function _attestDeposit(
         address router,
         uint256 id,
         address sender,
@@ -249,7 +249,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
         uint256 action,
         address actionToken,
         uint256 minFinalOut
-    ) internal returns (bytes) {
+    ) internal {
         verifierOne.do(
             address(bridge),
             "attestDepositSettlement",
@@ -284,14 +284,13 @@ contract Describe_ExternalAssetBridge is Authorizable {
             minFinalOut,
             bridge.depositGenerations(externalChainId, router, id)
         );
-        return new bytes(0);
     }
 
-    function _withdrawalSignatures(
+    function _attestWithdrawal(
         uint256 withdrawalId,
         string reservationId,
         string txHash
-    ) internal returns (bytes) {
+    ) internal {
         verifierOne.do(
             address(bridge),
             "attestWithdrawalRelease",
@@ -306,7 +305,6 @@ contract Describe_ExternalAssetBridge is Authorizable {
             reservationId,
             txHash
         );
-        return new bytes(0);
     }
 
     function it_initializes_once_with_separate_operator_and_guardian() {
@@ -334,6 +332,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
     }
 
     function it_atomically_settles_a_plain_deposit() {
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            25e18,
+            "0xABCDEF",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -348,20 +359,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                25e18,
-                "0xABCDEF",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         require(
@@ -457,8 +455,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            new bytes(0)
+            0
         ) {
         } catch {
             reverted = true;
@@ -496,8 +493,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            new bytes(0)
+            0
         );
         require(
             stratoToken.balanceOf(address(user)) == 25e18,
@@ -529,6 +525,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
         bridge.setBridgeOperator(address(this));
 
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e6,
+            "0xabcdef",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         bridge.settleDeposit(
             externalChainId,
             depositRouter,
@@ -541,20 +550,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e6,
-                "0xabcdef",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         require(
@@ -594,6 +590,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bridge.setBridgeOperator(address(this));
 
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         try bridge.settleDeposit(
             externalChainId,
             depositRouter,
@@ -606,20 +615,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         ) {
         } catch {
             reverted = true;
@@ -639,6 +635,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
             1000e18,
             100e18
         );
+        _attestDeposit(
+            depositRouter,
+            2,
+            address(0x2222),
+            ordinaryExternalToken,
+            10e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         bridge.settleDeposit(
             externalChainId,
             depositRouter,
@@ -651,20 +660,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                2,
-                address(0x2222),
-                ordinaryExternalToken,
-                10e18,
-                "0xbbbb",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
         require(
             stratoToken.balanceOf(address(user)) == 10e18,
@@ -681,6 +677,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
             false
         );
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x1234",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            1
+        );
         try user.do(
             address(bridge),
             "settleDeposit",
@@ -695,25 +704,25 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.AUTO_ROUTE),
             address(saveVault),
-            1,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x1234",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                1
-            )
+            1
         ) {
         } catch {
             reverted = true;
         }
         require(reverted, "Unprivileged relayer should not force fallback");
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x1234",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            1
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -728,20 +737,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.AUTO_ROUTE),
             address(saveVault),
-            1,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x1234",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                1
-            )
+            1
         );
 
         require(
@@ -766,6 +762,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
     }
 
     function it_settles_multiple_deposits_from_one_external_transaction() {
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -780,20 +789,20 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
+        );
+        _attestDeposit(
+            depositRouter,
+            2,
+            address(0x1111),
+            externalToken,
+            15e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
         );
         relayer.do(
             address(bridge),
@@ -809,20 +818,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                2,
-                address(0x1111),
-                externalToken,
-                15e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         require(
@@ -832,6 +828,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
     }
 
     function it_rejects_duplicate_router_deposit_ids() {
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -846,23 +855,23 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         try relayer.do(
             address(bridge),
             "settleDeposit",
@@ -877,20 +886,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xbbbb",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         ) {
         } catch {
             reverted = true;
@@ -918,6 +914,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bridge.abortDeposit(externalChainId, depositRouter, 1);
 
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x2222),
+            externalToken,
+            15e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         try relayer.do(
             address(bridge),
             "settleDeposit",
@@ -932,20 +941,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x2222),
-                externalToken,
-                15e18,
-                "0xbbbb",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         ) {
         } catch {
             reverted = true;
@@ -969,14 +965,14 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bool staleRejected = false;
         try relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 1,
             address(0x2222), externalToken, 15e18, "0xbbbb", address(user), address(stratoToken),
-            uint256(DepositAction.NONE), address(0), 0, new bytes(0)) {} catch { staleRejected = true; }
+            uint256(DepositAction.NONE), address(0), 0) {} catch { staleRejected = true; }
         require(staleRejected, "Reuse must invalidate old attestations");
         staleRejected = false;
         try verifierOne.do(address(bridge), "attestDepositSettlement", externalChainId, depositRouter, 1,
             address(0x2222), externalToken, 15e18, "0xbbbb", address(user), address(stratoToken),
             uint256(DepositAction.NONE), address(0), 0, 0) {} catch { staleRejected = true; }
         require(staleRejected, "In-flight attestations must be bound to the old generation");
-        _depositSignatures(depositRouter, 1, address(0x2222), externalToken, 15e18, "0xbbbb",
+        _attestDeposit(depositRouter, 1, address(0x2222), externalToken, 15e18, "0xbbbb",
             address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
         relayer.do(
             address(bridge),
@@ -992,8 +988,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            new bytes(0)
+            0
         );
 
         require(
@@ -1025,8 +1020,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            new bytes(0)
+            0
         ) {
         } catch {
             reverted = true;
@@ -1039,6 +1033,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             "mint",
             address(bridge)
+        );
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
         );
         relayer.do(
             address(bridge),
@@ -1054,20 +1061,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
         require(
             stratoToken.balanceOf(address(user)) == 10e18,
@@ -1086,6 +1080,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
             100
         );
 
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0xaaaa",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -1100,20 +1107,20 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0xaaaa",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
+        );
+        _attestDeposit(
+            nextRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            15e18,
+            "0xbbbb",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
         );
         relayer.do(
             address(bridge),
@@ -1129,20 +1136,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                nextRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                15e18,
-                "0xbbbb",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         require(
@@ -1166,6 +1160,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
 
     function it_executes_auto_route_and_delivers_the_final_token() {
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            10e18
+        );
         try user.do(
             address(bridge),
             "settleDepositWithRoute",
@@ -1180,26 +1187,26 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             address(saveVault),
             10e18,
-            _saveRoute(10e18),
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x2345",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                10e18
-            )
+            _saveRoute(10e18)
         ) {
         } catch {
             reverted = true;
         }
         require(reverted, "Unprivileged relayer should not select route steps");
         bridge.setBridgeOperator(address(this));
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            10e18
+        );
         bridge.settleDepositWithRoute(
             externalChainId,
             depositRouter,
@@ -1212,20 +1219,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             address(saveVault),
             10e18,
-            _saveRoute(10e18),
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x2345",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                10e18
-            )
+            _saveRoute(10e18)
         );
 
         require(
@@ -1248,6 +1242,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
 
     function it_falls_back_when_auto_route_misses_the_minimum() {
         bridge.setBridgeOperator(address(this));
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            11e18
+        );
         bridge.settleDepositWithRoute(
             externalChainId,
             depositRouter,
@@ -1260,20 +1267,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             address(saveVault),
             11e18,
-            _saveRoute(1),
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x2345",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                11e18
-            )
+            _saveRoute(1)
         );
 
         require(
@@ -1307,25 +1301,25 @@ contract Describe_ExternalAssetBridge is Authorizable {
             10e18
         );
         bool reverted = false;
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x3456",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            10e18
+        );
         try user.do(
             address(bridge),
             "confirmReviewedDeposit",
             externalChainId,
             depositRouter,
-            1,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x3456",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                10e18
-            )
+            1
         ) {
         } catch {
             reverted = true;
@@ -1338,24 +1332,24 @@ contract Describe_ExternalAssetBridge is Authorizable {
             externalChainId, depositRouter, 1, address(0x1111), externalToken, 10e18, "0x3456",
             address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 10e18
         ));
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x3456",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            10e18
+        );
         bridge.confirmReviewedDepositWithRoute(
             externalChainId,
             depositRouter,
             1,
-            _saveRoute(10e18),
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                10e18,
-                "0x3456",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.AUTO_ROUTE),
-                address(saveVault),
-                10e18
-            )
+            _saveRoute(10e18)
         );
 
         require(
@@ -1388,6 +1382,19 @@ contract Describe_ExternalAssetBridge is Authorizable {
             100e18
         );
 
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            5e18,
+            "0x5678",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.NONE),
+            address(0),
+            0
+        );
         relayer.do(
             address(bridge),
             "settleDeposit",
@@ -1402,20 +1409,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
             address(stratoToken),
             uint256(DepositAction.NONE),
             address(0),
-            0,
-            _depositSignatures(
-                depositRouter,
-                1,
-                address(0x1111),
-                externalToken,
-                5e18,
-                "0x5678",
-                address(user),
-                address(stratoToken),
-                uint256(DepositAction.NONE),
-                address(0),
-                0
-            )
+            0
         );
 
         bool reverted = false;
@@ -1543,17 +1537,17 @@ contract Describe_ExternalAssetBridge is Authorizable {
             "0xaaaa",
             "0xbbbb"
         );
+        _attestWithdrawal(
+            withdrawalId,
+            "0xaaaa",
+            "0xcccc"
+        );
         user.do(
             address(bridge),
             "finalizeWithdrawal",
             withdrawalId,
             "0xaaaa",
-            "0xcccc",
-            _withdrawalSignatures(
-                withdrawalId,
-                "0xaaaa",
-                "0xcccc"
-            )
+            "0xcccc"
         );
 
         (
@@ -1588,7 +1582,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
         bool replayReverted = false;
         try {
-            bridge.finalizeWithdrawal(withdrawalId, "0xaaaa", "0xcccc", bytes(""));
+            bridge.finalizeWithdrawal(withdrawalId, "0xaaaa", "0xcccc");
         } catch {
             replayReverted = true;
         }
@@ -1833,17 +1827,23 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
 
         bool reverted = false;
+        try verifierOne.do(
+            address(bridge),
+            "attestWithdrawalRelease",
+            withdrawalId,
+            "0xaaaa",
+            "0xbbbb"
+        ) {} catch {
+            reverted = true;
+        }
+        require(reverted, "Verifier must reject a mismatched reservation");
+        reverted = false;
         try relayer.do(
             address(bridge),
             "finalizeWithdrawal",
             withdrawalId,
             "0xaaaa",
-            "0xbbbb",
-            _withdrawalSignatures(
-                withdrawalId,
-                "0xaaaa",
-                "0xbbbb"
-            )
+            "0xbbbb"
         ) {
         } catch {
             reverted = true;
@@ -1865,7 +1865,8 @@ contract Describe_ExternalAssetBridge is Authorizable {
             relayer.do(address(bridge), "recordWithdrawalReservation", id, reservation, "0xdddd");
             fastForward(11);
             relayer.do(address(bridge), "recordWithdrawalCancellation", id, reservation, "0xeeee");
-            bridge.finalizeWithdrawal(id, reservation, "0xcccc", _withdrawalSignatures(id, reservation, "0xcccc"));
+            _attestWithdrawal(id, reservation, "0xcccc");
+            bridge.finalizeWithdrawal(id, reservation, "0xcccc");
         }
         require(stratoToken.balanceOf(address(bridge)) == 0, "Both released withdrawals must finalize and burn escrow");
     }
@@ -1874,13 +1875,13 @@ contract Describe_ExternalAssetBridge is Authorizable {
         relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
             address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
             uint256(DepositAction.NONE), address(0), 0);
-        bytes proof = _depositSignatures(depositRouter, 1, address(0x1111), externalToken, 10e18,
+        _attestDeposit(depositRouter, 1, address(0x1111), externalToken, 10e18,
             "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
         bytes32 digest = bridge.getDepositSettlementDigest(externalChainId, depositRouter, 1,
             address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
             uint256(DepositAction.NONE), address(0), 0);
         bool reverted = false;
-        try user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1, proof) {}
+        try user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1) {}
         catch { reverted = true; }
         require(reverted, "Attestations must not substitute for governance review");
         reverted = false;
@@ -1888,7 +1889,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
         catch { reverted = true; }
         require(reverted, "Operator must not approve its own review");
         bridge.approveReviewedDeposit(externalChainId, depositRouter, 1, digest);
-        user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1, proof);
+        user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1);
         require(stratoToken.balanceOf(address(user)) == 10e18, "Approved review must settle");
     }
 
@@ -1944,21 +1945,21 @@ contract Describe_ExternalAssetBridge is Authorizable {
 
     function it_limits_all_mints_and_preserves_consumption_on_policy_updates() {
         bridge.setMintPolicy(address(stratoToken), 10e18, 1e18);
-        _depositSignatures(depositRouter, 1, address(0x1111), externalToken, 6e18, "0xaaaa",
+        _attestDeposit(depositRouter, 1, address(0x1111), externalToken, 6e18, "0xaaaa",
             address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
         relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 1, address(0x1111), externalToken, 6e18,
-            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0, bytes(""));
+            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
         bridge.setMintPolicy(address(stratoToken), 10e18, 1e18);
-        _depositSignatures(depositRouter, 2, address(0x1111), externalToken, 6e18, "0xbbbb",
+        _attestDeposit(depositRouter, 2, address(0x1111), externalToken, 6e18, "0xbbbb",
             address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1);
         bool rejected = false;
         try relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 2, address(0x1111), externalToken, 6e18,
-            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1, bytes("")) {} catch { rejected = true; }
+            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1) {} catch { rejected = true; }
         require(rejected, "Fallback mint must share the plain mint limit; resetting policy must not refill it");
         require(stratoToken.balanceOf(address(user)) == 6e18, "Failed mint must be atomic");
         fastForward(2);
         relayer.do(address(bridge), "settleDeposit", externalChainId, depositRouter, 2, address(0x1111), externalToken, 6e18,
-            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1, bytes(""));
+            "0xbbbb", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(metalToken), 1);
         require(stratoToken.balanceOf(address(user)) == 12e18, "Elapsed refill must permit retry");
     }
 

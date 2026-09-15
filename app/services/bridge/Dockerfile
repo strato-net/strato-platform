@@ -38,6 +38,9 @@ COPY services/bridge/package*.json ./
 # Copy pre-built node_modules from builder (already pruned to production deps)
 COPY --from=builder /build/services/bridge/node_modules ./node_modules
 
+COPY --from=builder /build/packages/shared-types/package.json /packages/shared-types/package.json
+COPY --from=builder /build/packages/shared-types/dist /packages/shared-types/dist
+
 COPY --from=builder /build/services/bridge/dist ./dist
 
 EXPOSE 3003
@@ -45,5 +48,7 @@ EXPOSE 3003
 ENV PORT=3003
 
 USER node
+
+RUN node -e "require('./dist/utils/routeQuoteUtils')"
 
 CMD ["node", "dist/index.js"] 

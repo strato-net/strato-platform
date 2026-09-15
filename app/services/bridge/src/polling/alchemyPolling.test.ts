@@ -262,6 +262,26 @@ test("falls back only after a deterministic routed settlement failure", async ()
   assert.equal(fallbackCalls, 1);
 });
 
+test("keeps missing route dependencies and STRATO serialization errors retryable", async () => {
+  const { attemptRoutedSettlementWithFallback } = await import("./alchemyPolling");
+  const { isTransportRouteError } = await import("../utils/routeFailure");
+  for (const message of [
+    "Bridge route metadata is unavailable",
+    "Forge oracle price is unavailable",
+    "STRATO_APP_API_URL is not configured",
+    "argValueToValue: Expected TypeEnum to be a string",
+    "parse error: call arguments: expecting hexadecimal digit",
+  ]) {
+    const error = new Error(message);
+    assert.equal(isTransportRouteError(error), true);
+    const result = await attemptRoutedSettlementWithFallback({} as any,
+      async () => { throw error; },
+      async () => { assert.fail("An unavailable dependency must not trigger fallback"); });
+    assert.equal(result.error, error);
+    assert.equal(result.usedFallback, false);
+  }
+});
+
 test("applies rebase only when the exact route requires it", async () => {
   const [{ getRoutedDepositAmount }, { getRouteRebaseKey }] = await Promise.all([
     import("./alchemyPolling"),

@@ -2,6 +2,8 @@
 
 Purpose: Cross-system token bridging into and out of STRATO.
 
+STRATO settlement calls rely on verifier attestations recorded on-chain for the exact settlement digest. `settleDeposit`, `settleDepositWithRoute`, `confirmReviewedDeposit`, `confirmReviewedDepositWithRoute`, and `finalizeWithdrawal` do not accept an `attestationProof` argument. The bridge service and EAB implementation must use this same interface; quorum and replay checks remain mandatory.
+
 Deployment scope: this is a fresh ExternalAssetBridge deployment with new proxies and no legacy deposits, withdrawals, or custody balances to migrate. Legacy cutover/drain procedures are not part of this rollout. Existing deployments, if present on the same network, remain independent.
 
 Key contracts:
@@ -18,7 +20,7 @@ Non-native bridge-in:
 3. Three independent verifier services validate the external event and custody movement against their own RPC providers and record STRATO attestations. After any two attest, any relayer may settle a plain deposit; recorded reviews additionally require digest-bound AdminRegistry approval. Routed and reviewed-routed deposits additionally require the bridge operator so an arbitrary relayer cannot select route steps or force source-token fallback. Both operations atomically record and complete the deposit while preserving `DepositInitiated` and `DepositCompleted`. ExternalAssetBridge converts the verified raw external amount to STRATO decimals and applies any required inbound rebase factor on-chain.
 4. Save and Forge remain user-facing destinations, but both are TokenRouter routes encoded as `AUTO_ROUTE = 4`. Legacy action ordinals 2 and 3 are not executed by ExternalAssetBridge.
 5. Before external submission the UI requires an authenticated STRATO account as recipient, connects the external wallet only as the external-chain signer, switches it to the selected chain, and states the exact STRATO source token and amount the recipient will receive if routing fails. DepositRouter accepts only `AUTO_ROUTE = 4` with a nonzero destination token and positive `minFinalOut`.
-6. Deterministic quote or route-execution errors settle through `DepositActionFallback`. Transport errors remain retryable because submission may be ambiguous; RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
+6. Deterministic quote or route-execution errors settle through `DepositActionFallback`. Missing route metadata, unavailable quote dependencies, and transport errors remain retryable because data or submission may be ambiguous; RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
 7. Reviewed deposits are re-verified and resolved through `confirmReviewedDepositWithRoute` (or source-token fallback), or owner-governed `abortDeposit`.
 
 `externalTxHash` is metadata, not replay identity. Multiple deposits in one external transaction settle and report action outcomes independently.

@@ -3,6 +3,22 @@ const normalizeHex = (value: unknown): unknown =>
     ? value.toLowerCase()
     : value;
 
+export const sanitizeRpcError = (error: unknown, rpcUrl: string): string => {
+  const endpoint = new URL(rpcUrl);
+  let message = error instanceof Error ? error.message : String(error);
+  const sensitive = [rpcUrl, endpoint.username, endpoint.password,
+    ...endpoint.pathname.split("/"), ...endpoint.searchParams.values()];
+  for (const value of sensitive.filter(Boolean).sort((a, b) => b.length - a.length)) {
+    message = message.split(value).join("[redacted]");
+    try {
+      message = message.split(decodeURIComponent(value)).join("[redacted]");
+    } catch { /* Keep malformed URL components redacted as received. */ }
+  }
+  return message.replace(/https?:\/\/[^\s"']+/gi, "[redacted URL]")
+    .replace(/Bearer\s+[^\s"']+/gi, "Bearer [redacted]")
+    .replace(/[\r\n\t]/g, " ").slice(0, 240);
+};
+
 export const receiptFingerprint = (receipt: any): string =>
   JSON.stringify({
     transactionHash: normalizeHex(receipt?.transactionHash),

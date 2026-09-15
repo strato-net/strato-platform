@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { RouteAction } from "@strato/shared-types";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 for (const name of [
   "ALCHEMY_API_KEY",
@@ -30,6 +33,137 @@ for (const name of [
 process.env.SENDGRID_API_KEY = "SG.test.test";
 
 const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
+const bridgeSource = readFileSync(path.resolve(__dirname, "../../../../contracts/concrete/Bridge/ExternalAssetBridge.sol"), "utf8");
+const assertSettlementArguments = (input: any) => {
+  const signature = bridgeSource.match(new RegExp(`function ${input.method}\\s*\\(([^)]*)\\)`));
+  assert.ok(signature, `Missing contract method ${input.method}`);
+  const names = signature[1].split(",").map((argument) => argument.trim().split(/\s+/).pop());
+  assert.deepEqual(Object.keys(input.args).sort(), names.sort());
+};
+
+test("normalizes Cirrus asset and deposit identity filters for ETH and mixed-case ERC-20 addresses", async (t) => {
+  const { cirrus } = await import("../utils/api");
+  const service = await import("./cirrusService");
+  const eth = "0".repeat(40), usdc = "a".repeat(40), target = "b".repeat(40);
+  t.mock.method(cirrus, "get", async (table: string, { params }: any) => {
+    if (table.endsWith("-routes")) {
+      assert.equal(params.key, `in.(${eth},${usdc})`);
+      assert.equal(params.key2, "eq.11155111");
+      assert.equal(params["value->>depositsEnabled"], "eq.true");
+      return [eth, usdc].map((token) => ({ key: token, key2: 11155111, key3: target,
+        value: { externalToken: token, stratoToken: target, externalChainId: "11155111",
+          depositsEnabled: true, externalDecimals: token === eth ? "18" : "6" } }));
+    }
+    assert.equal(params.key2, `eq.${target}`);
+    return [{ status: "4", stratoToken: target, stratoTokenAmount: "100" }];
+  });
+  const assets = await service.getAssetInfo([`0x${eth}`, `0x${usdc.toUpperCase()}`], 11155111);
+  assert.equal(assets.get(`${eth}:11155111:${target}`)?.externalDecimals, 18);
+  assert.equal(assets.get(`${usdc}:11155111:${target}`)?.externalDecimals, 6);
+  assert.equal(await service.getDepositStatusByIdentity(11155111, `0x${target.toUpperCase()}`, "4"), "4");
+  assert.equal((await service.getDepositSettlementInfoByIdentity(11155111, `0x${target.toUpperCase()}`, "4"))?.stratoTokenAmount, "100");
+});
+
+test("AUTO_ROUTE retries missing Cirrus metadata then submits a named-enum route; slippage alone permits fallback", async (t) => {
+  const api = await import("../utils/api");
+  const { config } = await import("../config");
+  const rpc = await import("./rpcService");
+  const recovery = await import("./depositRecoveryService");
+  const verification = await import("./verificationService");
+  const attestation = await import("./settlementAttestationService");
+  const voucher = await import("./voucherService");
+  const strato = await import("../utils/stratoHelper");
+  const { depositStateService: state } = await import("./depositStateService");
+  const { blockTrackingService: blocks } = await import("./blockTrackingService");
+  const logger = await import("../utils/logger");
+  const { reconcileExternalDeposits } = await import("../polling/alchemyPolling");
+  const oldAppUrl = config.api.appUrl;
+  config.api.appUrl = "https://app.example";
+  t.after(() => { config.api.appUrl = oldAppUrl; });
+  const router = "a".repeat(40), target = "b".repeat(40), output = "c".repeat(40), token = "0".repeat(40);
+  const deposit = { externalChainId: 11155111, depositRouter: `0x${router}`, depositId: "4",
+    externalSender: `0x${output}`, externalToken: `0x${token}`, externalTokenAmount: "100",
+    observedExternalTokenAmount: "100", externalTxHash: `0x${"d".repeat(64)}`,
+    externalBlockHash: `0x${"e".repeat(64)}`, externalBlockNumber: 16,
+    externalBlockTimestamp: Date.now(), externalLogIndex: 0, detectedAt: Date.now(),
+    stratoRecipient: `0x${output}`, targetStratoToken: `0x${target}`,
+    action: "4", actionToken: `0x${output}`, minFinalOut: "90" };
+  let metadataAvailable = false, reviewedMetadataAvailable = true, quotedOut = "95";
+  t.mock.method(api.cirrus, "get", async (table: string, { params }: any) => {
+    if (table.endsWith("-chains")) return [{ key: 11155111, value: { enabled: true, depositRouter: router, vault: output, lastProcessedBlock: "15" } }];
+    if (table.endsWith("-depositRouters")) return [];
+    if (table.endsWith("-routeRebaseRequired")) return [];
+    if (table.endsWith("-deposits")) return params.select === "value->>status" || reviewedMetadataAvailable
+      ? [{ status: "2", stratoToken: target, stratoTokenAmount: "100" }] : [];
+    assert.ok(table.endsWith("-routes"), table);
+    assert.equal(params.key, `in.(${token})`);
+    return metadataAvailable ? [{ key: token, key2: 11155111, key3: target,
+      value: { depositsEnabled: true, externalToken: token, stratoToken: target, externalDecimals: "18" } }] : [];
+  });
+  const quotes = t.mock.method(api.app, "get", async (_path: string, { params }: any) => {
+    assert.equal(params.amount, "100");
+    assert.equal(params.tokenOut, deposit.actionToken);
+    return { tokenIn: target, tokenOut: output, amountIn: "100", amountOut: quotedOut,
+      steps: [{ action: RouteAction.FORGE, target: router, tokenIn: target, tokenOut: output,
+        amountIn: "100", amountOut: quotedOut, minAmountOut: quotedOut,
+        parameter1: "0", parameter2: "0", direction: false, factoryPoolIndex: "0" }] };
+  });
+  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
+  t.mock.method(rpc, "getChainLogs", async () => []);
+  t.mock.method(verification, "verifyDetectedDepositsBatch", async () => new Map([[verification.depositIdentity(deposit), { state: "verified" as const }]]));
+  t.mock.method(state, "listReviews", async () => []);
+  t.mock.method(state, "list", async () => [{ deposit, status: "pending" as const }]);
+  t.mock.method(state, "oldestPendingBlock", async () => 16);
+  t.mock.method(state, "pruneSettled", async () => undefined);
+  const settled = t.mock.method(state, "markSettled", async () => undefined);
+  const failed = t.mock.method(state, "markSettlementFailed", async () => undefined);
+  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 15);
+  t.mock.method(logger, "logError", async () => undefined);
+  t.mock.method(attestation, "attestDepositSettlement", async () => undefined);
+  t.mock.method(voucher, "mintVouchersForDeposits", async () => undefined);
+  const calls: any[] = [];
+  t.mock.method(strato, "execute", async (input: any) => {
+    assertSettlementArguments(input);
+    calls.push(strato.buildFunctionTx(input).txs[0].payload);
+    return { status: "Success", hash: "settlement" };
+  });
+  await reconcileExternalDeposits(11155111);
+  assert.equal(quotes.mock.callCount(), 0);
+  assert.equal(calls.length, 0);
+  assert.equal(settled.mock.callCount(), 0);
+  assert.equal(failed.mock.callCount(), 1);
+
+  metadataAvailable = true;
+  await reconcileExternalDeposits(11155111);
+  assert.equal(calls[0].method, "settleDepositWithRoute");
+  assert.equal(calls[0].args.steps[0].action, "FORGE");
+  assert.equal(calls[0].args.steps[0].minAmountOut, "90");
+  assert.equal("attestationProof" in calls[0].args, false);
+  assert.equal(settled.mock.callCount(), 1);
+
+  quotedOut = "80";
+  await reconcileExternalDeposits(11155111);
+  assert.equal(calls[1].method, "settleDeposit");
+  assert.equal(calls[1].args.action, "4");
+  assert.equal(calls[1].args.minFinalOut, "90");
+  assert.equal(settled.mock.callCount(), 2);
+
+  const { confirmReviewedDeposit } = await import("./bridgeService");
+  t.mock.method(state, "getByIdentity", async () => ({ deposit, status: "review" as const }));
+  quotedOut = "95";
+  await confirmReviewedDeposit(11155111, deposit.depositRouter, "4");
+  assert.equal(calls[2].method, "confirmReviewedDepositWithRoute");
+  assert.equal(calls[2].args.steps[0].action, "FORGE");
+  reviewedMetadataAvailable = false;
+  await assert.rejects(confirmReviewedDeposit(11155111, deposit.depositRouter, "4"), /settlement data is unavailable/);
+  assert.equal(calls.length, 3);
+  reviewedMetadataAvailable = true;
+  quotedOut = "80";
+  await confirmReviewedDeposit(11155111, deposit.depositRouter, "4");
+  assert.equal(calls[3].method, "confirmReviewedDeposit");
+});
 
 test("legacy withdrawal polling can be disabled without disabling EAB polling", async (t) => {
   const { config } = await import("../config");
@@ -75,6 +209,7 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
     return { status: "Success", hash: "test" };
   };
   (stratoHelper as any).executeAsRelayer = async (input: any) => {
+    assertSettlementArguments(input);
     relayerCalls.push(input);
     return { status: "Success", hash: "test" };
   };
@@ -119,7 +254,6 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
       action: "0",
       actionToken: "0000000000000000000000000000000000000000",
       minFinalOut: "0",
-      attestationProof: "",
     },
   });
 });
@@ -225,7 +359,6 @@ test("confirms reviewed deposits through the bridge operator", async () => {
       externalChainId: 1,
       depositRouter: "router",
       depositId: "7",
-      attestationProof: "",
     },
   });
   let recovered = false;
@@ -265,6 +398,7 @@ test("isolates a failed settlement from later deposits", async () => {
 test("reads pending deposits and vault custody from ExternalAssetBridge", async () => {
   const { cirrus } = await import("../utils/api");
   const requestedUrls: string[] = [];
+  let externalDecimals = 18;
   (cirrus as any).get = async (url: string) => {
     requestedUrls.push(url);
     if (url.includes("-deposits")) {
@@ -288,7 +422,7 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
         key3: "strato-token",
         value: {
           depositsEnabled: true,
-          externalDecimals: 18,
+          externalDecimals,
           externalToken: "external-token",
           stratoToken: "strato-token",
         },
@@ -319,6 +453,8 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
   assert.ok(
     requestedUrls.every((url) => url.includes("BlockApps-ExternalAssetBridge")),
   );
+  externalDecimals = 0;
+  assert.equal((await getDepositsByStatus("1"))[0].externalDecimals, 0);
 });
 
 test("reserves and releases before finalizing a routine withdrawal", async () => {
@@ -333,6 +469,7 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
     return { status: "Success", hash: `${input.method}-hash` };
   };
   (stratoHelper as any).executeAsRelayer = async (input: any) => {
+    if (input.method === "finalizeWithdrawal") assertSettlementArguments(input);
     trace.push(`relayer:${input.method}`);
     return { status: "Success", hash: `${input.method}-hash` };
   };

@@ -501,6 +501,24 @@ Deposit of raw external `X`:
 3. STRATO user up by `S`. Verifier threshold met; one mint; retries do not mint
    again.
 
+AUTO_ROUTE activation requires separate native-token and ERC-20 canaries
+(ETH and USDC on Sepolia). Use the
+deployed app, bridge, and verifiers; retain the external and STRATO transaction
+hashes and balance changes for each test:
+
+| Test | Required result |
+|---|---|
+| Plain deposit | Recipient receives the bridged source token in amount `S`, exactly once. |
+| AUTO_ROUTE success | One `AutoRouted` event for the deposit identity; `finalToken` matches the requested token and `finalAmount >= minFinalOut`. Verify that token's recipient balance increase. |
+| AUTO_ROUTE fallback | In a controlled testnet test, use a minimum above the executable quote. One `DepositActionFallback` event; recipient receives `fallbackToken` and `fallbackAmount`, with no successful `AutoRouted` event. |
+| Reviewed recovery | After governance approval, confirm the existing deposit through the operations endpoint. Verify its routed or fallback outcome and recipient balance; retry must not mint twice. |
+
+`DepositCompleted`, status `4`, and a successful `settleDepositWithRoute` call
+also occur on fallback. They do not prove AUTO_ROUTE succeeded. Match
+`AutoRouted` / `DepositActionFallback` by chain, router, and deposit ID. Missing
+Cirrus metadata or unavailable quote dependencies must retry, then enter review
+after the settlement grace period; they must not immediately trigger fallback.
+
 Withdrawal of raw STRATO `S` under auto and bucket limits (withdrawals-on only):
 
 1. Record STRATO user, escrow, supply, vault custody, recipient, and the vault
@@ -511,7 +529,34 @@ Withdrawal of raw STRATO `S` under auto and bucket limits (withdrawals-on only):
    it is not deleted. `totalReserved` decreases by `X`. One STRATO burn. Retries
    do not pay or burn twice.
 
+Unit tests and read-only quotes do not replace these deployed-API canaries.
+Do not mark an unexecuted or fallback-only AUTO_ROUTE test as passed.
+
 Pause on any mismatch.
+
+## Existing EAB: remove the unused settlement proof argument
+
+This interface update requires a matching EAB implementation and bridge image.
+Do not deploy only the service. Keep the existing EAB proxy and storage.
+
+1. Record pending deposit/withdrawal identities and the current implementation
+   and image digests. Have infra stop the EAB runtime for the interface update.
+2. From `app/contracts`, run the upgrade below. Complete both AdminRegistry
+   gates described in step 2; additional administrators vote the printed issues.
+
+```bash
+npm run upgrade -- --proxy-address <EXTERNAL_ASSET_BRIDGE_PROXY> --contract-name ExternalAssetBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
+```
+
+3. Verify the proxy points to the new implementation and its five settlement
+   entrypoints have no `attestationProof` parameter. Storage, attestation digests,
+   and verifier quorum must remain unchanged.
+4. Deploy the matching bridge image, then start the runtime. No Sepolia contract
+   or verifier-policy update is required for this interface change.
+5. Verify a pending plain deposit reaches STRATO settlement through the real API.
+   Deposits already in review require the reviewed-deposit recovery flow. Test
+   AUTO_ROUTE, reviewed settlement, and withdrawal finalization before declaring
+   the interface update complete. Do not re-deposit to recover a pending transfer.
 
 ## Failure handling
 

@@ -621,6 +621,68 @@ test("requests internal traces from every verification RPC", async () => {
   delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });
 
+test("waits for confirmations before tracing, then requires both RPCs on retry", async (t) => {
+  const rpcEnv = [`CHAIN_${chainId}_RPC_URL`, `CHAIN_${chainId}_VERIFICATION_RPC_URLS`, `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`];
+  const original = rpcEnv.map((key) => process.env[key]);
+  t.after(() => rpcEnv.forEach((key, index) => { if (original[index] === undefined) delete process.env[key]; else process.env[key] = original[index]; }));
+  process.env[rpcEnv[0]] = "https://primary-rpc";
+  process.env[rpcEnv[1]] = "https://secondary-rpc";
+  process.env[rpcEnv[2]] = "12";
+  const { fetch } = await import("../utils/api");
+  const value = detectedDeposit("1", 0, { externalToken: ZERO_ADDRESS });
+  const receipt = { transactionHash: value.externalTxHash, blockHash: value.externalBlockHash,
+    blockNumber: "0x10", status: "0x1", to: depositRouter, logs: [depositReceiptLog(value)] };
+  const traceUrls: string[] = [];
+  let unavailable = true;
+  t.mock.method(fetch, "post", async (url: string, requests: any[]) => requests.map((request) => {
+    if (request.method === "eth_getTransactionReceipt") return { id: request.id, result: receipt };
+    traceUrls.push(url);
+    return unavailable && url.includes("secondary")
+      ? { id: request.id, error: { code: -32000, message: "Trace not yet available" } }
+      : { id: request.id, result: ethTracePair(0) };
+  }));
+  const { depositIdentity, verifyDetectedDepositsBatch } = await verificationService;
+  const confirming = await verifyDetectedDepositsBatch([value], 27, custodyAddress);
+  assert.equal(confirming.get(depositIdentity(value))?.state, "confirming");
+  assert.deepEqual(traceUrls, []);
+  await assert.rejects(verifyDetectedDepositsBatch([value], 28, custodyAddress), /provider=secondary-rpc.*Trace not yet available/);
+  unavailable = false;
+  traceUrls.length = 0;
+  const verified = await verifyDetectedDepositsBatch([value], 28, custodyAddress);
+  assert.equal(verified.get(depositIdentity(value))?.state, "verified");
+  assert.deepEqual(traceUrls, ["https://primary-rpc", "https://secondary-rpc"]);
+});
+
+test("reports trace RPC failures without exposing endpoint credentials and rejects malformed batches", async (t) => {
+  const envKey = `CHAIN_${chainId}_RPC_URL`;
+  const old = process.env[envKey];
+  t.after(() => { if (old === undefined) delete process.env[envKey]; else process.env[envKey] = old; });
+  const url = "https://rpc-user:rpc-password@primary-rpc/v2/secret-path?apiKey=secret-query";
+  process.env[envKey] = url;
+  const { fetch } = await import("../utils/api");
+  const { getInternalTransactionsBatch } = await import("./rpcService");
+  const hash = `0x${"dd".repeat(32)}`;
+  const cases = [
+    [{ id: 1, error: { code: -32601, message: `trace_transaction unavailable ${url} secret-path secret-query rpc-password` } }],
+    [], [{ id: 1, result: [] }, { id: 1, result: [] }],
+    [{ id: 1.5, result: [] }], [{ result: [] }], [null], [{ id: 1, result: null }],
+    { error: { code: -32005, message: "Batch rate limit exceeded" } },
+  ];
+  for (const response of cases) {
+    const mock = t.mock.method(fetch, "post", async () => response as any);
+    await assert.rejects(getInternalTransactionsBatch(chainId, [hash]), (error: Error) => {
+      assert.match(error.message, /provider=primary-rpc/);
+      assert.doesNotMatch(error.message, /secret-path|secret-query|rpc-user|rpc-password/);
+      if (response === cases[0]) {
+        assert.ok(error.message.includes(hash));
+        assert.match(error.message, /code=-32601.*trace_transaction unavailable/);
+      }
+      return true;
+    });
+    mock.mock.restore();
+  }
+});
+
 test("accepts a router deposit invoked through a smart wallet", async () => {
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const api = await import("../utils/api");

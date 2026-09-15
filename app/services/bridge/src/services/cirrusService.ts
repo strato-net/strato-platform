@@ -94,7 +94,7 @@ export const getAssetInfo = async (
 ): Promise<Map<string, AssetInfo>> => {
   const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-routes`, {
     params: {
-      key: `in.(${externalTokenAddress.join(",")})`,
+      key: `in.(${externalTokenAddress.map(toCirrusAddress).join(",")})`,
       ...(externalChainId ? { key2: `eq.${externalChainId}` } : {}),
       "value->>depositsEnabled": "eq.true",
       address: `eq.${externalAssetBridgeAddress}`,
@@ -310,10 +310,10 @@ export const getDepositsByStatus = async (
     }) => {
       const externalToken = v?.externalToken;
       const asset = assetMapping.get(
-        `${externalToken}:${externalChainId}:${v?.stratoToken}`,
+        getRouteRebaseKey(externalToken, externalChainId, v?.stratoToken),
       );
 
-      if (!asset || !asset?.externalDecimals)
+      if (!asset || !Number.isInteger(asset.externalDecimals) || asset.externalDecimals < 0)
         throw new Error(
           `Asset info not found for external token ${externalToken} on chain ${externalChainId}`
         );
@@ -350,7 +350,7 @@ export const getDepositStatusByIdentity = async (
       params: {
         address: `eq.${externalAssetBridgeAddress}`,
         key: `eq.${externalChainId}`,
-        key2: `eq.${depositRouter.replace(/^0x/i, "")}`,
+        key2: `eq.${toCirrusAddress(depositRouter)}`,
         key3: `eq.${depositId}`,
         select: "value->>status",
         limit: 1,
@@ -378,7 +378,7 @@ export const getDepositSettlementInfoByIdentity = async (
       params: {
         address: `eq.${externalAssetBridgeAddress}`,
         key: `eq.${externalChainId}`,
-        key2: `eq.${depositRouter.replace(/^0x/i, "")}`,
+        key2: `eq.${toCirrusAddress(depositRouter)}`,
         key3: `eq.${depositId}`,
         select:
           "value->>status,value->>stratoToken,value->>stratoTokenAmount",

@@ -291,10 +291,12 @@ export const verifyDetectedDepositsBatch = async (
       ).values(),
     ];
     const receipts = await getTransactionReceiptsBatch(chainId, txHashes);
+    const confirmations = getDepositConfirmationPolicy(chainId);
     const routers = new Set(chainDeposits.map((deposit) => normalizeAddress(deposit.depositRouter)));
     const nativeTxHashes = txHashes.filter((hash) => {
       const receipt = receipts.get(hash);
       if (!receipt || receipt.__rpcDisagreement || !isOkStatus(receipt)) return false;
+      if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) return false;
       try {
         const parsed = parseReceiptDeposits(receipt, chainId, routers);
         return parsed.deposits.some((deposit) => deposit.externalToken === ZERO_ADDRESS);
@@ -354,7 +356,6 @@ export const verifyDetectedDepositsBatch = async (
           setTransactionState(transactionDeposits, { state: "relocated" });
           continue;
         }
-        const confirmations = getDepositConfirmationPolicy(chainId);
         if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) {
           setTransactionState(transactionDeposits, { state: "confirming" });
           continue;

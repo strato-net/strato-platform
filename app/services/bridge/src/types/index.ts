@@ -1,4 +1,5 @@
 import type { ProposeTransactionProps } from "@safe-global/api-kit";
+import type { RouteStep } from "@strato/shared-types";
 
 // ---------------- Utility Types ----------------
 export type NonEmptyArray<T> = [T, ...T[]];
@@ -115,8 +116,12 @@ export interface ActionDepositArgs extends DepositArgs {
   minFinalOut: string;
 }
 
+export interface StratoRouteStep extends Omit<RouteStep, "action"> {
+  action: string;
+}
+
 export interface RouteDepositArgs extends ActionDepositArgs {
-  steps: import("@strato/shared-types").RouteStep[];
+  steps: StratoRouteStep[];
 }
 
 export interface ConfirmDepositArgs {

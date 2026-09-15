@@ -1,14 +1,15 @@
 import {
   RouteQuoteResponse,
-  RouteStep,
+  RouteAction,
   RouteStepQuote,
 } from "@strato/shared-types";
+import type { StratoRouteStep } from "../types";
 
 const normalizeAddress = (value: string): string =>
   value.toLowerCase().replace(/^0x/, "");
 
-const toExecutableRouteStep = (step: RouteStepQuote): RouteStep => ({
-  action: step.action,
+const toExecutableRouteStep = (step: RouteStepQuote): StratoRouteStep => ({
+  action: RouteAction[step.action],
   target: step.target,
   tokenIn: step.tokenIn,
   tokenOut: step.tokenOut,
@@ -24,7 +25,7 @@ export const getExecutableRouteSteps = (
   tokenIn: string,
   tokenOut: string,
   minFinalOut: string,
-): RouteStep[] => {
+): StratoRouteStep[] => {
   if (
     quote.steps.length === 0 ||
     quote.steps.length > 6 ||
@@ -38,6 +39,9 @@ export const getExecutableRouteSteps = (
   const quotedFinalOut = BigInt(quote.amountOut);
   const requestedFinalOut = BigInt(minFinalOut);
   return quote.steps.map((step) => {
+    if (!Number.isInteger(step.action) || typeof RouteAction[step.action] !== "string") {
+      throw new Error("Invalid action in route quote");
+    }
     const proportionalMinimum =
       (BigInt(step.amountOut) * requestedFinalOut) / quotedFinalOut;
     return {

@@ -1,4 +1,4 @@
-import { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
+import { receiptFingerprint, traceFingerprint, sanitizeRpcError } from "../utils/rpcEvidence";
 export { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
 import { JsonRpcProvider } from "ethers";
 import { fetch } from "../utils/api";
@@ -142,24 +142,41 @@ export const getInternalTransactionsBatch = async (
   }));
 
   const providers = await Promise.all(getChainRpcUrls(chainId).map(async (url) => {
-    const response: any[] = await fetch.post(url, batchRequest);
-    if (!Array.isArray(response)) throw new Error("Invalid trace RPC response");
+    const context = `trace_transaction chain=${chainId} provider=${new URL(url).hostname}`;
+    let response: any;
+    try {
+      response = await fetch.post(url, batchRequest);
+    } catch (error) {
+      throw new Error(`${context}: ${sanitizeRpcError(error, url)}`);
+    }
+    if (!Array.isArray(response)) {
+      throw new Error(`${context}: Invalid trace RPC response${response?.error ? ` code=${Number(response.error.code)} message=${sanitizeRpcError(response.error.message, url)}` : ""}`);
+    }
     const results = new Map<string, any[]>();
     for (const item of response) {
-      const index = Number(item.id) - 1;
-      if (item.error || !Array.isArray(item.result) || index < 0 || index >= txHashes.length || results.has(txHashes[index])) {
-        throw new Error("Missing, duplicate or failed trace RPC response");
+      const index = Number(item?.id) - 1;
+      if (!Number.isInteger(index) || index < 0 || index >= txHashes.length) {
+        throw new Error(`${context}: Invalid trace RPC response ID`);
+      }
+      const txContext = `${context} tx=${txHashes[index]}`;
+      if (item.error) {
+        throw new Error(`${txContext}: Trace RPC failed code=${Number(item.error.code)} message=${sanitizeRpcError(item.error.message, url)}`);
+      }
+      if (!Array.isArray(item.result) || results.has(txHashes[index])) {
+        throw new Error(`${txContext}: Invalid or duplicate trace RPC response`);
       }
       results.set(txHashes[index], item.result);
+    }
+    for (const hash of txHashes) {
+      if (!results.has(hash)) throw new Error(`${context} tx=${hash}: Missing trace RPC response`);
     }
     return results;
   }));
   const result = new Map<string, any[]>();
   for (const hash of txHashes) {
     const traces = providers.map((provider) => provider.get(hash));
-    if (traces.some((value) => !value)) throw new Error("Missing trace RPC response");
     if (traces.some((value) => traceFingerprint(value!) !== traceFingerprint(traces[0]!))) {
-      throw new Error("Trace RPC disagreement");
+      throw new Error(`Trace RPC disagreement chain=${chainId} tx=${hash}`);
     }
     result.set(hash, traces[0]!);
   }

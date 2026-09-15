@@ -719,8 +719,7 @@ contract record ExternalAssetBridge is Ownable {
         address stratoToken,
         uint256 action,
         address actionToken,
-        uint256 minFinalOut,
-        bytes attestationProof
+        uint256 minFinalOut
     ) external whenDepositsOpen {
         _requireSettlementAttestations(
             getDepositSettlementDigest(
@@ -736,8 +735,7 @@ contract record ExternalAssetBridge is Ownable {
                 action,
                 actionToken,
                 minFinalOut
-            ),
-            attestationProof
+            )
         );
         require(
             action == uint256(DepositAction.NONE) ||
@@ -778,8 +776,7 @@ contract record ExternalAssetBridge is Ownable {
         address stratoToken,
         address expectedTokenOut,
         uint256 minFinalOut,
-        RouteStep[] steps,
-        bytes attestationProof
+        RouteStep[] steps
     ) external onlyBridgeOperator whenDepositsOpen {
         _requireSettlementAttestations(
             getDepositSettlementDigest(
@@ -795,8 +792,7 @@ contract record ExternalAssetBridge is Ownable {
                 uint256(DepositAction.AUTO_ROUTE),
                 expectedTokenOut,
                 minFinalOut
-            ),
-            attestationProof
+            )
         );
         _recordDeposit(
             externalChainId,
@@ -893,19 +889,17 @@ contract record ExternalAssetBridge is Ownable {
     function _requireReviewedDepositAttestations(
         uint256 externalChainId,
         address depositRouter,
-        uint256 depositId,
-        bytes attestationProof
+        uint256 depositId
     ) internal view {
         bytes32 digest = getReviewedDepositDigest(externalChainId, depositRouter, depositId);
         require(depositReviewApprovals[externalChainId][depositRouter][depositId] == digest, "EAB: owner review required");
-        _requireSettlementAttestations(digest, attestationProof);
+        _requireSettlementAttestations(digest);
     }
 
     function confirmReviewedDeposit(
         uint256 externalChainId,
         address depositRouter,
-        uint256 depositId,
-        bytes attestationProof
+        uint256 depositId
     ) external whenDepositsOpen {
         DepositActionIntent intent = depositActions[
             externalChainId
@@ -916,7 +910,7 @@ contract record ExternalAssetBridge is Ownable {
                 msg.sender == bridgeOperator,
             "EAB: routed settlement requires operator"
         );
-        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, attestationProof);
+        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId);
         _confirmDeposit(
             externalChainId,
             depositRouter,
@@ -928,10 +922,9 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId,
-        RouteStep[] steps,
-        bytes attestationProof
+        RouteStep[] steps
     ) external onlyBridgeOperator whenDepositsOpen {
-        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, attestationProof);
+        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId);
         _recordDepositRoute(
             externalChainId,
             depositRouter,
@@ -1338,8 +1331,7 @@ contract record ExternalAssetBridge is Ownable {
     function finalizeWithdrawal(
         uint256 withdrawalId,
         string reservationId,
-        string externalTxHash,
-        bytes attestationProof
+        string externalTxHash
     ) public {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
@@ -1361,8 +1353,7 @@ contract record ExternalAssetBridge is Ownable {
                 withdrawalId,
                 normalizedReservationId,
                 normalizedExternalTxHash
-            ),
-            attestationProof
+            )
         );
 
         _burnFunds(withdrawal.stratoToken, withdrawal.stratoTokenAmount);
@@ -1461,7 +1452,7 @@ contract record ExternalAssetBridge is Ownable {
             withdrawalAuthorizations[withdrawalId].destinationVault != address(0),
             "EAB: missing destination vault"
         );
-        _requireSettlementAttestations(getWithdrawalRefundDigest(withdrawalId), bytes(""));
+        _requireSettlementAttestations(getWithdrawalRefundDigest(withdrawalId));
 
         _refundFunds(
             withdrawal.stratoToken,
@@ -1577,13 +1568,8 @@ contract record ExternalAssetBridge is Ownable {
     }
 
     function _requireSettlementAttestations(
-        bytes32 digest,
-        bytes attestationProof
+        bytes32 digest
     ) internal view {
-        require(
-            attestationProof.length == 0,
-            "EAB: unsupported attestation proof"
-        );
         require(
             settlementVerifierThreshold > 0,
             "EAB: verifier threshold not set"
