@@ -64,14 +64,14 @@
   --strato-tint: rgba(125, 211, 252, 0.08);
 }
 
-/* Header */
+/* Header: navy in light mode, black in dark mode */
 .md-header {
   box-shadow: none;
-  border-bottom: 1px solid transparent;
 }
 
 [data-md-color-scheme="slate"] .md-header {
-  border-bottom-color: var(--strato-night-border);
+  background-color: #000000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .md-header__button.md-logo img,
@@ -80,12 +80,79 @@
   width: auto;
 }
 
-.md-header__title {
-  font-weight: 500;
+/* Logos are all white in dark mode, as in the app */
+[data-md-color-scheme="slate"] .md-logo img {
+  filter: brightness(0) invert(1);
+}
+
+.md-header__topic:first-child {
+  font-weight: 400;
+}
+
+/* Header order: menu button, logo, title, then the rest */
+.md-header__inner > * {
+  order: 2;
+}
+
+.md-header__inner > label[for="__drawer"] {
+  order: 0;
+}
+
+.md-header__inner > .md-logo {
+  order: 1;
 }
 
 .md-search__form {
   border-radius: 9999px;
+}
+
+[data-md-color-scheme="slate"] .md-search__form {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-md-color-scheme="slate"] .md-search__form:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+@media screen and (max-width: 76.234375em) {
+  .md-header__button.md-logo {
+    display: block;
+  }
+
+  /* Drawer title: logo only */
+  .md-nav--primary > .md-nav__title[for="__drawer"] {
+    font-size: 0;
+  }
+
+  [data-md-color-scheme="slate"] .md-nav--primary > .md-nav__title[for="__drawer"] {
+    background-color: #000000;
+  }
+}
+
+@media screen and (min-width: 76.25em) {
+  /* Sidebar title: the app's logo instead of the site name */
+  .md-nav--primary > .md-nav__title {
+    font-size: 0;
+    height: auto;
+    padding-bottom: 0.4rem;
+  }
+
+  .md-nav--primary > .md-nav__title .md-nav__button.md-logo {
+    display: block;
+    width: 6.4rem;
+    height: 2.1rem;
+    margin: 0;
+    padding: 0;
+    background: url("../assets/strato-logo-light.png") left center / contain no-repeat;
+  }
+
+  .md-nav--primary > .md-nav__title .md-nav__button.md-logo img {
+    display: none;
+  }
+
+  [data-md-color-scheme="slate"] .md-nav--primary > .md-nav__title .md-nav__button.md-logo {
+    background-image: url("../assets/strato-logo-dark.png");
+  }
 }
 
 /* Typography */
