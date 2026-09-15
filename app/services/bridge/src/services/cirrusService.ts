@@ -1,4 +1,5 @@
 import { cirrus } from "../utils/api";
+import { ensureHexPrefix } from "../utils/utils";
 import { config } from "../config";
 import { logInfo } from "../utils/logger";
 import {
@@ -57,19 +58,27 @@ export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
     ]);
   }
 
+  // Cirrus returns contract addresses as bare lowercase hex (no 0x); ethers treats such strings as
+  // ENS names. Normalise once here so every consumer (config validation, Contract/getLogs, comparisons)
+  // receives 0x-prefixed addresses. Values that are not 40-hex addresses pass through unchanged.
+  const prefixed = (address: unknown): string | undefined =>
+    typeof address === "string" && /^[0-9a-fA-F]{40}$/.test(address)
+      ? ensureHexPrefix(address)
+      : (address as string | undefined);
   const normalize = (v: any, key: string): ChainInfo => ({
     externalChainId: Number(key),
-    depositRouter: v.depositRouter,
+    depositRouter: prefixed(v.depositRouter) as string,
     depositRouters: [
-      ...new Set([
-        v.depositRouter,
-        ...(routersByChain.get(Number(key)) || []),
-      ]),
+      ...new Set(
+        [v.depositRouter, ...(routersByChain.get(Number(key)) || [])]
+          .map(prefixed)
+          .filter((router): router is string => Boolean(router)),
+      ),
     ],
     lastProcessedBlock: Number(v.lastProcessedBlock),
     enabled: !!v.enabled,
-    custody: v.custody,
-    vault: v.vault,
+    custody: prefixed(v.custody),
+    vault: prefixed(v.vault),
     chainName: v.chainName,
   });
 

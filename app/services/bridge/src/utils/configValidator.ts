@@ -485,7 +485,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
 
         try {
           const vault = new Contract(
-            chain.vault,
+            ensureHexPrefix(chain.vault),
             EXTERNAL_VAULT_ABI,
             new JsonRpcProvider(rpcUrl),
           );
