@@ -7,6 +7,7 @@ import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
 import { logInfo } from "../utils/logger";
 import { DepositInfo } from "../types";
+import { depositKeyTxHash } from "./depositEventService";
 
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
@@ -136,8 +137,8 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
 
   // Process each chain's deposits in batches
   for (const [chainId, chainDeposits] of depositsByChain) {
-    // Dedupe txHashes
-    const txHashes = [...new Set(chainDeposits.map(d => d.externalTxHash))];
+    // Deposit keys may carry a "#<depositId>" suffix; receipts are per source transaction
+    const txHashes = [...new Set(chainDeposits.map(d => depositKeyTxHash(d.externalTxHash)))];
     if (txHashes.length === 0) continue;
     
     // Batch fetch receipts and internal transactions
@@ -149,7 +150,8 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     // Verify each deposit using the batched data
     for (const deposit of chainDeposits) {
       try {
-        const receipt = receipts.get(deposit.externalTxHash);
+        const sourceTxHash = depositKeyTxHash(deposit.externalTxHash);
+        const receipt = receipts.get(sourceTxHash);
         if (!receipt) {
           results.set(deposit.externalTxHash, fail(deposit.externalTxHash, "No receipt found"));
           continue;
@@ -170,7 +172,7 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
 
         // Branch to appropriate verifier
         const error = ctx.isETH 
-          ? verifyEthDeposit(receipt, internalTxsMap.get(deposit.externalTxHash) || [], ctx)
+          ? verifyEthDeposit(receipt, internalTxsMap.get(sourceTxHash) || [], ctx)
           : verifyErc20Deposit(receipt, ctx);
 
         results.set(deposit.externalTxHash, error);

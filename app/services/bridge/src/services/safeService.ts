@@ -4,6 +4,7 @@ import { NonEmptyArray, WithdrawalInfo, SafeTransactionData } from "../types";
 import {
   groupByChain,
   createWithdrawalProposals,
+  initializeSafeForChain,
   proposeTransactions,
 } from "../utils/safeHelper";
 import { retry } from "../utils/api";
@@ -32,22 +33,46 @@ export const createSafeTransactions = async (
   return allTransactionProposals;
 };
 
+// Returns the safeTxHashes the Safe transaction service accepted
 export const proposeSafeTransactions = async (
   transactionProposals: NonEmptyArray<SafeTransactionData>,
-): Promise<void> => {
+): Promise<string[]> => {
   const proposalsByChain = groupByChain(transactionProposals);
-  
+  const proposed: string[] = [];
+
   for (const [externalChainId, chainProposals] of proposalsByChain) {
-    await proposeTransactions(chainProposals, externalChainId);
+    proposed.push(...(await proposeTransactions(chainProposals, externalChainId)));
   }
-  
-  logInfo("SafeService", `Proposed ${transactionProposals.length} Safe transactions across ${proposalsByChain.size} chains`);
+
+  logInfo("SafeService", `Proposed ${proposed.length} of ${transactionProposals.length} Safe transactions across ${proposalsByChain.size} chains`);
+  return proposed;
+};
+
+export type SafeTxStatus = "executed" | "rejected" | "pending" | "not_found";
+
+// The Safe service answers 404 for a transaction it has never been sent
+const getSafeTransactionOrNull = async (apiKit: SafeApiKit, safeTxHash: string) => {
+  try {
+    return await apiKit.getTransaction(safeTxHash);
+  } catch (error: any) {
+    if (Number(error?.statusCode) === 404) return null;
+    throw error;
+  }
+};
+
+// The Safe's executed nonce: a transaction below it that has not run never will
+export const getSafeOnChainNonce = async (
+  chainId: number,
+  safeAddress: string,
+): Promise<number> => {
+  const { protocolKit } = await initializeSafeForChain(chainId, safeAddress);
+  return Number(await protocolKit.getNonce());
 };
 
 export const checkSafeTxStatus = async (
   transactionKey: string,
   apiKit: SafeApiKit,
-): Promise<"executed" | "rejected" | "pending"> => {
+): Promise<SafeTxStatus> => {
   if (!transactionKey) return "pending";
 
   const safeTxHash = transactionKey.startsWith("0x")
@@ -56,9 +81,13 @@ export const checkSafeTxStatus = async (
 
   try {
     const tx = await retry(
-      () => apiKit.getTransaction(safeTxHash),
+      () => getSafeTransactionOrNull(apiKit, safeTxHash),
       { logPrefix: "SafeService" }
     );
+    if (!tx) {
+      logInfo("SafeService", `Safe transaction status: not proposed`, { safeTxHash });
+      return "not_found";
+    }
 
     if (tx.isExecuted && tx.isSuccessful) {
       logInfo("SafeService", `Safe transaction status: executed`, { safeTxHash });
@@ -95,12 +124,12 @@ export const checkSafeTxStatus = async (
 export const monitorSafeTransactionStatusBatch = async (
   withdrawals: NonEmptyArray<{ id: Number, safeTxHash: string }>,
   chainId: bigint
-): Promise<Map<Number, "executed" | "rejected" | "pending">> => {
+): Promise<Map<Number, SafeTxStatus>> => {
   if (!withdrawals.length) return new Map();
 
   const apiKit = new SafeApiKit({ chainId, apiKey: config.safe.apiKey });
 
-  const results = new Map<Number, "executed" | "rejected" | "pending">();
+  const results = new Map<Number, SafeTxStatus>();
   
   for (let i = 0; i < withdrawals.length; i++) {
     const { id, safeTxHash } = withdrawals[i];

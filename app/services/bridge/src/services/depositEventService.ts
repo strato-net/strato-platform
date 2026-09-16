@@ -1,8 +1,8 @@
-import { Interface } from "ethers";
+import { Interface, ZeroAddress } from "ethers";
 import {
   ActionDepositArgs,
-  DepositArgs,
   NonEmptyArray,
+  WindowDeposit,
 } from "../types";
 import { normalizeAddress } from "../utils/utils";
 
@@ -22,25 +22,24 @@ export interface RawDepositLog {
   transactionHash: string;
 }
 
-export interface ClassifiedDepositLogs {
-  standardDeposits: DepositArgs[];
-  actionDeposits: ActionDepositArgs[];
-}
+// Mirrors MercataBridge._normalizeDepositKey: lowercase 0x-prefixed hash, optional "#<depositId>"
+export const canonicalDepositKey = (key: string): string => {
+  const [hash, depositId] = key.split("#");
+  const hex = hash.trim().replace(/^0x/i, "").toLowerCase();
+  return depositId === undefined
+    ? `0x${hex}`
+    : `0x${hex}#${BigInt(depositId).toString()}`;
+};
 
-export type ParsedDepositEvent =
-  | {
-      kind: "standard";
-      deposit: DepositArgs;
-    }
-  | {
-      kind: "action";
-      deposit: ActionDepositArgs;
-    };
+// The source transaction hash a deposit key refers to
+export const depositKeyTxHash = (key: string): string => key.split("#")[0];
+
+type ParsedDepositLog = Omit<WindowDeposit, "depositKey" | "sharesTransaction">;
 
 export const parseDepositLog = (
   log: RawDepositLog,
   externalChainId: number,
-): ParsedDepositEvent => {
+): ParsedDepositLog => {
   const parsed = depositEvents.parseLog({
     topics: log.topics,
     data: log.data,
@@ -48,40 +47,56 @@ export const parseDepositLog = (
   if (!parsed) {
     throw new Error("Log does not match a supported deposit event");
   }
+  if (!log.transactionHash) {
+    throw new Error(
+      `Deposit log without a transaction hash at block ${log.blockNumber}, index ${log.logIndex}`,
+    );
+  }
 
-  const base: DepositArgs = {
+  const base = {
     externalChainId,
     externalSender: normalizeAddress(parsed.args.sender),
     externalToken: normalizeAddress(parsed.args.token),
     externalTokenAmount: parsed.args.amount.toString(),
-    externalTxHash: log.transactionHash,
+    externalTxHash: log.transactionHash.toLowerCase(),
     stratoRecipient: normalizeAddress(parsed.args.stratoAddress),
     targetStratoToken: normalizeAddress(parsed.args.targetStratoToken),
+    depositId: parsed.args.depositId.toString(),
+    blockNumber: Number(log.blockNumber),
+    logIndex: Number(log.logIndex),
   };
   if (parsed.name === "DepositRouted") {
-    return { kind: "standard", deposit: base };
+    return {
+      ...base,
+      kind: "standard",
+      action: "0",
+      actionToken: ZeroAddress,
+      minFinalOut: "0",
+    };
   }
   if (parsed.name !== "DepositRoutedWithAction") {
     throw new Error(`Unsupported deposit event ${parsed.name}`);
   }
 
-  const deposit: ActionDepositArgs = {
+  return {
     ...base,
+    kind: "action",
     action: parsed.args.action.toString(),
     actionToken: normalizeAddress(parsed.args.actionToken),
     minFinalOut: parsed.args.minFinalOut.toString(),
   };
-
-  return {
-    kind: "action",
-    deposit,
-  };
 };
 
-export const classifyDepositLogs = (
+/**
+ * Turn the deposit logs of one block window into deposits ordered as they happened.
+ * A transaction that emitted several deposits keys each one by its router deposit id,
+ * so one smart-wallet batch or bundle cannot stall the window.
+ */
+export const extractWindowDeposits = (
   logs: RawDepositLog[],
   externalChainId: number,
-): ClassifiedDepositLogs => {
+): WindowDeposit[] => {
+  // Some RPCs repeat identical logs; keep one copy of each
   const uniqueLogs = Array.from(
     new Map(
       logs.map((log) => [
@@ -97,38 +112,57 @@ export const classifyDepositLogs = (
       ]),
     ).values(),
   );
-  const groups = new Map<string, RawDepositLog[]>();
-  uniqueLogs.forEach((log, index) => {
-    const transactionHash =
-      log.transactionHash ||
-      `missing-${log.blockNumber || "block"}-${log.logIndex || index}`;
-    const key = transactionHash.toLowerCase();
-    groups.set(key, [...(groups.get(key) || []), log]);
-  });
 
-  const result: ClassifiedDepositLogs = {
-    standardDeposits: [],
-    actionDeposits: [],
-  };
+  const parsed = uniqueLogs
+    .map((log) => parseDepositLog(log, externalChainId))
+    .sort((a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex);
 
-  for (const [groupKey, groupedLogs] of groups.entries()) {
-    const transactionHash = groupedLogs[0].transactionHash || groupKey;
-    if (groupedLogs.length > 1) {
+  const depositsPerTx = new Map<string, number>();
+  const seenIds = new Set<string>();
+  for (const deposit of parsed) {
+    if (seenIds.has(deposit.depositId)) {
       throw new Error(
-        `Multiple deposit events found for transaction ${transactionHash}`,
+        `Deposit id ${deposit.depositId} appears twice in one window on chain ${externalChainId}`,
       );
     }
-
-    const parsed = parseDepositLog(groupedLogs[0], externalChainId);
-    if (parsed.kind === "standard") {
-      result.standardDeposits.push(parsed.deposit);
-    } else {
-      result.actionDeposits.push(parsed.deposit);
-    }
+    seenIds.add(deposit.depositId);
+    depositsPerTx.set(
+      deposit.externalTxHash,
+      (depositsPerTx.get(deposit.externalTxHash) || 0) + 1,
+    );
   }
 
-  return result;
+  return parsed.map((deposit) => {
+    const sharesTransaction = depositsPerTx.get(deposit.externalTxHash)! > 1;
+    return {
+      ...deposit,
+      sharesTransaction,
+      depositKey: sharesTransaction
+        ? `${deposit.externalTxHash}#${deposit.depositId}`
+        : deposit.externalTxHash,
+    };
+  });
 };
+
+// Arguments for MercataBridge.recordDepositWindow
+export const buildDepositWindowArgs = (
+  externalChainId: number,
+  lastProcessedBlock: number,
+  deposits: WindowDeposit[],
+) => ({
+  externalChainId,
+  lastProcessedBlock,
+  depositIds: deposits.map((deposit) => deposit.depositId),
+  externalSenders: deposits.map((deposit) => deposit.externalSender),
+  externalTokens: deposits.map((deposit) => deposit.externalToken),
+  externalTokenAmounts: deposits.map((deposit) => deposit.externalTokenAmount),
+  externalTxHashes: deposits.map((deposit) => deposit.depositKey),
+  stratoRecipients: deposits.map((deposit) => deposit.stratoRecipient),
+  targetStratoTokens: deposits.map((deposit) => deposit.targetStratoToken),
+  actions: deposits.map((deposit) => deposit.action),
+  actionTokens: deposits.map((deposit) => deposit.actionToken),
+  minFinalOuts: deposits.map((deposit) => deposit.minFinalOut),
+});
 
 export const buildActionDepositBatchArgs = (
   depositArgs: NonEmptyArray<ActionDepositArgs>,

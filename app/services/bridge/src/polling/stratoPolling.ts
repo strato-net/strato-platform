@@ -9,7 +9,9 @@ import {
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
+  proposeRecordedCustodyTxs,
 } from "../services/bridgeService";
+import { withdrawalProposalJournal } from "../services/withdrawalProposalJournal";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
@@ -24,6 +26,7 @@ import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
+import { startNonOverlappingPolling as startPolling } from "../utils/polling";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -39,19 +42,7 @@ const startNonOverlappingPolling = (
   operation: string,
   pollingInterval: number,
   poll: () => Promise<void>,
-): void => {
-  const run = async () => {
-    try {
-      await poll();
-    } catch (e: any) {
-      logError("StratoPolling", e as Error, { operation });
-    } finally {
-      setTimeout(run, pollingInterval);
-    }
-  };
-
-  void run();
-};
+): void => startPolling("StratoPolling", operation, pollingInterval, poll);
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
@@ -60,6 +51,8 @@ export const startWithdrawalRequestPolling = (): void => {
     try {
       // Check Voucher and USDST balances regularly
       await checkBalances();
+
+      await withdrawalProposalJournal.prune([]);
 
       const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
       if (initiatedWithdrawals.length === 0) return;
@@ -249,20 +242,27 @@ export const startWithdrawalTxPolling = (): void => {
       // Monitor per chain only the with-hash subset
       for (const [chainId, withdrawals] of byChain) {
         const statuses = await monitorSafeTransactionStatusBatch(withdrawals as NonEmptyArray<Withdrawal>, safeToBigInt(chainId));
-        for (const { id } of withdrawals) {
-          const st = statuses.get(id);
-          if (st === "executed") toFinalize.push(id);
-          else if (st === "rejected") toReject.push(id);
+        const neverProposed: Withdrawal[] = [];
+        for (const withdrawal of withdrawals) {
+          const st = statuses.get(withdrawal.id);
+          if (st === "executed") toFinalize.push(withdrawal.id);
+          else if (st === "rejected") toReject.push(withdrawal.id);
+          else if (st === "not_found") neverProposed.push(withdrawal);
+        }
+        if (neverProposed.length) {
+          toReject.push(...(await proposeRecordedCustodyTxs(neverProposed, Number(chainId))));
         }
       }
 
       if (toFinalize.length)
         for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
           await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
+          await withdrawalProposalJournal.prune(batch.map(String));
         }
       if (toReject.length)
         for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
           await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
+          await withdrawalProposalJournal.prune(batch.map(String));
         }
     } catch (e: any) {
       logError("StratoPolling", e as Error, {

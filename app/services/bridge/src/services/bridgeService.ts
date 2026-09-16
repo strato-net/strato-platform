@@ -6,8 +6,9 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
-import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { createSafeTransactions, getSafeOnChainNonce, proposeSafeTransactions } from "./safeService";
+import { withdrawalProposalJournal } from "./withdrawalProposalJournal";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
 import { eth } from "../utils/api";
@@ -18,7 +19,6 @@ import {
   getNativeMintProposalExecution,
   proposeNativeMint,
 } from "./nativeMintService";
-import { buildActionDepositBatchArgs } from "./depositEventService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -155,7 +155,7 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  const finalizeResult = await execute({
+  await execute({
     contractName: "StratoNativeBridge",
     contractAddress: config.nativeBridge.address!,
     method: "finalizeWithdrawal",
@@ -165,9 +165,6 @@ const syncManualNativeMintProposal = async (
       nativeMintProposalHash: proposalReference,
     },
   });
-  if (finalizeResult.status !== "Success") {
-    return true;
-  }
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
   return true;
 };
@@ -187,139 +184,6 @@ const recordNativeWithdrawalProposal = async (
   });
 };
 
-const isDuplicateDepositError = (error: unknown): boolean => {
-  const message = (error as Error).message;
-  return (
-    message.includes("MB: dup key") ||
-    message.includes("MB: duplicate deposit")
-  );
-};
-
-const recordStandardDeposit = async (deposit: DepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "deposit",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-    },
-  });
-};
-
-const recordActionDeposit = async (deposit: ActionDepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "depositWithAction",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-      action: deposit.action,
-      actionToken: deposit.actionToken,
-      minFinalOut: deposit.minFinalOut,
-    },
-  });
-};
-
-const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
-  deposits: NonEmptyArray<T>,
-  recordOne: (deposit: T) => Promise<void>,
-) => {
-  for (const deposit of deposits) {
-    try {
-      await recordOne(deposit);
-    } catch (error) {
-      if (!isDuplicateDepositError(error)) throw error;
-      logInfo(
-        "BridgeService",
-        `Deposit already recorded: ${deposit.externalTxHash}`,
-      );
-    }
-  }
-};
-
-export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
-  const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
-  const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
-  const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
-  const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
-  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
-  const targetStratoTokens = depositArgs.map((deposit) => deposit.targetStratoToken);
-
-  try {
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "depositBatch",
-      args: {
-        externalChainIds,
-        externalTxHashes,
-        externalTokens,
-        externalTokenAmounts,
-        stratoRecipients,
-        externalSenders,
-        targetStratoTokens,
-      },
-    });
-
-    logInfo(
-      "BridgeService",
-      `Successfully deposited ${depositArgs.length} deposits`,
-    );
-  } catch (error) {
-    if (isDuplicateDepositError(error)) {
-      logInfo(
-        "BridgeService",
-        `Standard deposit batch contained an existing deposit; recovering item-by-item`,
-      );
-      await recoverMixedDuplicateBatch(depositArgs, recordStandardDeposit);
-      return;
-    }
-    throw error;
-  }
-};
-
-export const depositBatchWithAction = async (
-  depositArgs: NonEmptyArray<ActionDepositArgs>,
-) => {
-  const args = buildActionDepositBatchArgs(depositArgs);
-
-  try {
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "depositBatchWithAction",
-      args,
-    });
-    logInfo(
-      "BridgeService",
-      `Successfully recorded ${depositArgs.length} action deposits`,
-    );
-  } catch (error) {
-    if (isDuplicateDepositError(error)) {
-      logInfo(
-        "BridgeService",
-        `Action deposit batch contained an existing deposit; recovering item-by-item`,
-      );
-      await recoverMixedDuplicateBatch(depositArgs, recordActionDeposit);
-      return;
-    }
-    throw error;
-  }
-};
-
 export const recordNativeDepositBatch = async (
   depositArgs: NonEmptyArray<NativeDepositArgs>
 ) => {
@@ -328,7 +192,7 @@ export const recordNativeDepositBatch = async (
   }
 
   try {
-    const result = await execute(
+    await execute(
       depositArgs.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
@@ -345,12 +209,6 @@ export const recordNativeDepositBatch = async (
         },
       }))
     );
-
-    if (result.status !== "Success") {
-      throw new Error(
-        `Native deposit record still ${result.status}; will retry`,
-      );
-    }
 
     logInfo(
       "BridgeService",
@@ -379,7 +237,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    const result = await execute({
+    await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "confirmDepositBatch",
@@ -388,14 +246,6 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
         externalTxHashes,
       },
     });
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} deposits`,
-      );
-      return;
-    }
 
     logInfo(
       "BridgeService",
@@ -431,7 +281,7 @@ export const confirmNativeDepositBatch = async (
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    const result = await execute(
+    await execute(
       deposits.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
@@ -443,14 +293,6 @@ export const confirmNativeDepositBatch = async (
         },
       }))
     );
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Native deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} native deposits`,
-      );
-      return;
-    }
 
     logInfo(
       "BridgeService",
@@ -584,39 +426,56 @@ const confirmEligibleWithdrawalBatch = async (
   withdrawals: NonEmptyArray<WithdrawalInfo>,
 ) => {
   const transactionProposals = await createSafeTransactions(withdrawals);
+  if (!transactionProposals || transactionProposals.length === 0) return;
 
-  if (transactionProposals && transactionProposals.length > 0) {
-    const withdrawalIds = withdrawals.map((w) => w.withdrawalId);
-    const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
+  // Proposals come back grouped by chain, so pair ids and hashes from the proposals themselves
+  const withdrawalIds = transactionProposals.map((tx) => tx.withdrawalId);
+  const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
 
-    try {
-      logInfo("BridgeService", "Confirming non-native withdrawals on STRATO", {
-        withdrawalIds,
+  // Keep the signed payouts before STRATO can point at them: if the confirmation lands but
+  // proposing fails, the withdrawal-tx poller proposes exactly this transaction later
+  await withdrawalProposalJournal.record(
+    transactionProposals.map((proposal) => ({
+      withdrawalId: proposal.withdrawalId,
+      proposal,
+    })),
+  );
+
+  try {
+    logInfo("BridgeService", "Confirming non-native withdrawals on STRATO", {
+      withdrawalIds,
+      custodyTxHashes,
+    });
+    // Resolves only on success; a pending or failed confirmation throws before any payout is proposed
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "confirmWithdrawalBatch",
+      args: {
+        ids: withdrawalIds,
         custodyTxHashes,
-      });
-      await execute({
-        contractName: "MercataBridge",
-        contractAddress: config.bridge.address!,
-        method: "confirmWithdrawalBatch",
-        args: {
-          ids: withdrawalIds,
-          custodyTxHashes,
-        },
-      });
-      await proposeSafeTransactions(transactionProposals as NonEmptyArray<SafeTransactionData>);
-    } catch (executeError) {
-      const errorMessage = (executeError as Error).message;
-      if (errorMessage.includes("MB: bad state")) {
-        logInfo(
-          "BridgeService",
-          `Withdrawals already confirmed by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
-        );
-        return;
-      }
-      throw executeError;
+      },
+    });
+  } catch (executeError) {
+    const errorMessage = (executeError as Error).message;
+    if (errorMessage.includes("MB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Withdrawals already confirmed: ${withdrawalIds.join(", ")}; only the custody tx recorded on STRATO will be proposed`,
+      );
+      return;
     }
+    throw executeError;
+  }
 
-    const emailPromises = transactionProposals.map(async (proposal) => {
+  const proposed = new Set(
+    await proposeSafeTransactions(transactionProposals as NonEmptyArray<SafeTransactionData>),
+  );
+  await withdrawalProposalJournal.markProposed([...proposed]);
+
+  const emailPromises = transactionProposals
+    .filter((proposal) => proposed.has(proposal.safeTxHash))
+    .map(async (proposal) => {
       try {
         await sendEmail(proposal.safeTxHash, proposal.externalChainId);
         return "success";
@@ -629,14 +488,66 @@ const confirmEligibleWithdrawalBatch = async (
       }
     });
 
-    const emailResults = await Promise.all(emailPromises);
-    const successCount = emailResults.filter((r) => r === "success").length;
-    const failureCount = emailResults.filter((r) => r === "failed").length;
+  const emailResults = await Promise.all(emailPromises);
+  const successCount = emailResults.filter((r) => r === "success").length;
+  const failureCount = emailResults.filter((r) => r === "failed").length;
+  logInfo(
+    "BridgeService",
+    `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+  );
+};
+
+/**
+ * Propose custody transactions that STRATO recorded but the Safe service never received,
+ * using the relayer's saved copy. Returns the withdrawals whose saved transaction can never
+ * execute because its Safe nonce was used by something else; those must be aborted.
+ */
+export const proposeRecordedCustodyTxs = async (
+  withdrawals: Array<{ id: Number; safeTxHash: string }>,
+  externalChainId: number,
+): Promise<Number[]> => {
+  const unexecutable: Number[] = [];
+  const toPropose: SafeTransactionData[] = [];
+  const onChainNonces = new Map<string, number>();
+
+  for (const { id, safeTxHash } of withdrawals) {
+    const entry = await withdrawalProposalJournal.get(safeTxHash);
+    if (!entry) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${id} points at Safe transaction ${safeTxHash}, which the Safe service does not have and this relayer has no copy of; resolve it manually`,
+        ),
+      );
+      continue;
+    }
+
+    const { safeAddress, nonce } = entry.proposal;
+    if (!onChainNonces.has(safeAddress)) {
+      onChainNonces.set(safeAddress, await getSafeOnChainNonce(externalChainId, safeAddress));
+    }
+    // It was never proposed, so nobody else could have signed or executed it: a used nonce
+    // means another transaction took the slot and this payout can never happen
+    if (nonce < onChainNonces.get(safeAddress)!) {
+      logInfo(
+        "BridgeService",
+        `Withdrawal ${id} custody tx ${safeTxHash} was never proposed and Safe nonce ${nonce} is already used; aborting so the escrow is refunded`,
+      );
+      unexecutable.push(id);
+      continue;
+    }
     logInfo(
       "BridgeService",
-      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+      `Withdrawal ${id} custody tx ${safeTxHash} was recorded on STRATO but never proposed; proposing the saved transaction`,
     );
+    toPropose.push(entry.proposal);
   }
+
+  if (toPropose.length > 0) {
+    const proposed = await proposeSafeTransactions(toPropose as NonEmptyArray<SafeTransactionData>);
+    await withdrawalProposalJournal.markProposed(proposed);
+  }
+  return unexecutable;
 };
 
 export const finaliseWithdrawalBatch = async (
@@ -792,7 +703,8 @@ export const finalizeNativeWithdrawalBatch = async (
         externalTxHash,
       );
 
-      const result = await execute({
+      // A pending finalize throws; the mint hash stays cached so the retry reuses it
+      await execute({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
         method: "finalizeWithdrawal",
@@ -802,14 +714,6 @@ export const finalizeNativeWithdrawalBatch = async (
           nativeMintProposalHash: "",
         },
       });
-
-      if (result.status !== "Success") {
-        logInfo(
-          "BridgeService",
-          `Native withdrawal ${withdrawal.withdrawalId} destination mint succeeded but STRATO finalize is still ${result.status}`,
-        );
-        continue;
-      }
 
       pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
       successful += 1;
