@@ -3,7 +3,7 @@ const winston = require("winston-color");
 
 
 async function getLatestHealth() {
-  const [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo] = await Promise.all([
+  const [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo, jsonRpcInfo] = await Promise.all([
     models.CurrentHealth.findOne({
       where: {
         processName: "HealthStat",
@@ -68,14 +68,44 @@ async function getLatestHealth() {
         "additionalInfo",
       ],
       raw: true,
-    })
+    }),
+
+    // Written by the node-health-check daemon; null until its first poll.
+    models.CurrentHealth.findOne({
+      where: {
+        processName: "JsonRpcStat",
+      },
+      attributes: [
+        "latestHealthStatus",
+        "latestCheckTimestamp",
+        "lastFailureTimestamp",
+        "additionalInfo",
+      ],
+      raw: true,
+    }),
   ]);
   
-  return [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo];
+  return [healthInfo, stallInfo, systemInfo, syncInfo, networkInfo, jsonRpcInfo];
 }
 
-function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
+function parseJson(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return {};
+  }
+}
+
+// jsonRpcInfo is the "JsonRpcStat" row (may be null before the daemon's first
+// poll, or on compose files that never enabled the check). Only a row marked
+// enabled can make the node unhealthy.
+function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo, jsonRpcInfo = null) {
   const currentTime = Date.now();
+  const jsonRpcDetails = jsonRpcInfo ? parseJson(jsonRpcInfo.additionalInfo) : {};
+  const jsonRpcEnabled = jsonRpcDetails.enabled === true;
+  const jsonRpcHealth = jsonRpcEnabled ? !!jsonRpcInfo.latestHealthStatus : true;
   const healthStatHealth = healthInfo.latestHealthStatus;
   const stallStatHealth = stallInfo.latestHealthStatus;
   const systemStatHealth = systemInfo.latestHealthStatus;
@@ -84,7 +114,7 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
   const isSyncStalled = JSON.parse(syncInfo.additionalInfo)?.isStalled;
   const systemWarnings = JSON.parse(systemInfo.additionalInfo).Alerts;
 
-  const health = healthStatHealth && stallStatHealth && !isSyncStalled;
+  const health = healthStatHealth && stallStatHealth && !isSyncStalled && jsonRpcHealth;
   const healthStatus = isSyncStalled
     ? "SYNC STALLED"
     : !health
@@ -111,6 +141,12 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
 
   if (!systemStatHealth) {
     healthIssues.push(`Node's host is unhealthy. Reasons: ${systemWarnings || "Reason currently unknown."}`);
+  }
+
+  if (jsonRpcEnabled && !jsonRpcHealth) {
+    healthIssues.push(
+      `JSON-RPC service (ethereum-jsonrpc) is down. Reason: ${jsonRpcDetails.error || "no response"}`
+    );
   }
 
   return {
@@ -145,6 +181,16 @@ function consolidateHealthData(healthInfo, stallInfo, systemInfo, syncInfo) {
         warnings: systemWarnings,
         latestCheckTimestamp: systemInfo.latestCheckTimestamp,
         lastFailureTimestamp: systemInfo.lastFailureTimestamp,
+      },
+      jsonRpc: {
+        enabled: jsonRpcInfo ? jsonRpcEnabled : null,
+        health: jsonRpcInfo ? jsonRpcHealth : null,
+        url: jsonRpcDetails.url || null,
+        blockNumber: jsonRpcDetails.blockNumber ?? null,
+        error: jsonRpcDetails.error || null,
+        consecutiveFailures: jsonRpcDetails.consecutiveFailures ?? null,
+        latestCheckTimestamp: jsonRpcInfo ? jsonRpcInfo.latestCheckTimestamp : null,
+        lastFailureTimestamp: jsonRpcInfo ? jsonRpcInfo.lastFailureTimestamp : null,
       },
     },
   };

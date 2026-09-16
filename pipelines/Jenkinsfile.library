@@ -144,6 +144,89 @@ def checkNodeIsGettingBlocks() {
   '''
 }
 
+/**
+ * JSON-RPC smoke test against the running node (through nginx /rpc): Postgres-backed
+ * methods, a contract read on a genesis contract via eth_call, its latency, and
+ * concurrent eth_calls. Run it once the node is producing/syncing blocks.
+ */
+def checkNodeRpc() {
+  writeFile file: "check_rpc.sh", text: '''#!/bin/bash -le
+    # JSON-RPC smoke test. Goes through nginx (/rpc) like a wallet would and exercises
+    # both read paths of ethereum-jsonrpc: Postgres-backed methods (eth_chainId,
+    # eth_blockNumber, eth_getCode) and vm-runner-backed methods (eth_call), single and
+    # concurrent. A node whose RPC answers block queries but not contract reads fails here.
+    # RPC_URL can be overridden to run the same checks against any node.
+    RPC_URL=${RPC_URL:-https://$(</host)/rpc}
+    # Genesis Voucher contract: an ERC20 present from block 0 on every STRATO network.
+    VOUCHER=0x000000000000000000000000000000000000100e
+    SEL_TOTAL_SUPPLY=0x18160ddd
+    SEL_DECIMALS=0x313ce567
+    CONCURRENCY=8
+
+    rpc() { # method params-json
+      local body
+      body=$(printf '{"jsonrpc":"2.0","id":1,"method":"%s","params":%s}' "$1" "$2")
+      curl --silent --show-error --max-time 35 -X POST "$RPC_URL" -H 'Content-Type: application/json' --data "$body"
+    }
+    result_of() { jq -r 'if .error then "ERROR: " + (.error.message // (.error|tostring)) else (.result // "ERROR: no result") end' <<< "$1"; }
+    fail() { echo "RPC CHECK FAILED: $*"; exit 1; }
+
+    echo "RPC endpoint: $RPC_URL"
+
+    R=$(result_of "$(rpc eth_chainId '[]')")
+    [[ "$R" =~ ^0x[0-9a-fA-F]+$ ]] || fail "eth_chainId -> $R"
+    echo "eth_chainId -> $R"
+
+    R=$(result_of "$(rpc eth_blockNumber '[]')")
+    [[ "$R" =~ ^0x[0-9a-fA-F]+$ ]] || fail "eth_blockNumber -> $R"
+    BLOCK=$((R))
+    (( BLOCK > 0 )) || fail "eth_blockNumber is 0"
+    echo "eth_blockNumber -> $BLOCK"
+
+    PARAMS=$(printf '["%s","latest"]' "$VOUCHER")
+    R=$(result_of "$(rpc eth_getCode "$PARAMS")")
+    [[ "$R" =~ ^0x[0-9a-fA-F]{2,}$ ]] || fail "eth_getCode(genesis Voucher) -> $R"
+    echo "eth_getCode(genesis Voucher) -> ${#R} chars"
+
+    # Single contract reads: the vm-runner path. Each must return a uint256 quickly.
+    for SEL in $SEL_TOTAL_SUPPLY $SEL_DECIMALS; do
+      PARAMS=$(printf '[{"to":"%s","data":"%s"},"latest"]' "$VOUCHER" "$SEL")
+      START=$SECONDS
+      R=$(result_of "$(rpc eth_call "$PARAMS")")
+      ELAPSED=$((SECONDS - START))
+      [[ "$R" =~ ^0x[0-9a-fA-F]{64}$ ]] || fail "eth_call $SEL -> $R (${ELAPSED}s)"
+      (( ELAPSED < 10 )) || fail "eth_call $SEL took ${ELAPSED}s"
+      echo "eth_call $SEL -> $R (${ELAPSED}s)"
+    done
+
+    # Concurrent contract reads: every response must come back with a value. This is the
+    # regression check for VM calls losing each other's responses under load.
+    PARAMS=$(printf '[{"to":"%s","data":"%s"},"latest"]' "$VOUCHER" "$SEL_TOTAL_SUPPLY")
+    TMP=$(mktemp -d)
+    for i in $(seq 1 $CONCURRENCY); do
+      ( result_of "$(rpc eth_call "$PARAMS")" > "$TMP/$i" ) &
+    done
+    wait
+    OK=$(cat "$TMP"/* | grep -cE '^0x[0-9a-fA-F]{64}$' || true)
+    if (( OK != CONCURRENCY )); then
+      echo "responses:"; cat "$TMP"/*; rm -rf "$TMP"
+      fail "only $OK/$CONCURRENCY concurrent eth_call succeeded"
+    fi
+    rm -rf "$TMP"
+    echo "$CONCURRENCY/$CONCURRENCY concurrent eth_call succeeded"
+
+    # eth_getBalance runs balanceOf on the native token through eth_call but maps any
+    # failure to 0x0, so this only proves the method answers.
+    R=$(result_of "$(rpc eth_getBalance '["0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859","latest"]')")
+    [[ "$R" =~ ^0x[0-9a-fA-F]+$ ]] || fail "eth_getBalance -> $R"
+    echo "eth_getBalance -> $R"
+
+    echo "RPC checks passed"
+  '''
+  sh 'chmod +x check_rpc.sh'
+  sh './check_rpc.sh'
+}
+
 def spinUpVault() {
   writeFile file: "run-vault.sh", text: """#!/bin/bash
   sudo \\

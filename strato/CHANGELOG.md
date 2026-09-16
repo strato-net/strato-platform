@@ -17,6 +17,8 @@ so that they could be properly moved to their respective version's subsection.
 ## [Unrealeased]
 ### Added
 - Partial support for ipv6
+- `/health` and `/status` report the JSON-RPC server: a `jsonRpc` block with the probe details, and the node turns `UNHEALTHY` with a `healthIssues` entry when `ethereum-jsonrpc` stops answering `eth_blockNumber` for three consecutive health polls. Only active on nodes started with `--jsonrpc` (the apex container now receives `JSONRPC_ENABLED` and `RPC_PORT` from the generated docker-compose).
+- Autobuild pipeline: JSON-RPC smoke test through nginx `/rpc` once the node has blocks, covering Postgres-backed methods, an `eth_call` contract read on the genesis Voucher with a latency bound, and eight concurrent `eth_call`s.
 - `Blockchain.Forks.isOperatorPrecedenceForkActive`: the SolidVM parser's operator table is now a fork-gated choice. Live networks (helium, upquark, forktest) keep the legacy table until a height is scheduled; every other network gets Solidity's precedence from genesis. The code-collection cache is keyed by the choice.
 
 ### Changed

@@ -215,3 +215,65 @@ describe('Tests - Node-level Health Check', function () {
 
   })
 })
+
+describe('Tests - JSON-RPC Health Check', function () {
+  const utils = require('../lib/utils');
+  const now = Date.now();
+  const row = (latestHealthStatus, additionalInfo) => ({
+    latestHealthStatus,
+    latestCheckTimestamp: now,
+    lastFailureTimestamp: now - 60000,
+    additionalInfo,
+  });
+  // HealthStat, StallStat, SystemInfoStat, SyncStat rows of a healthy, synced node
+  const healthyNode = () => [
+    row(true, ''),
+    { ...row(true, null), validBlocksIncreased: true, hasPendingTxs: false },
+    row(true, JSON.stringify({ Alerts: [] })),
+    row(true, JSON.stringify({ isStalled: false })),
+  ];
+
+  it('no JsonRpcStat row yet - node health unaffected', function () {
+    const res = utils.consolidateHealthData(...healthyNode(), null);
+    assert.equal(res.health, true);
+    assert.equal(res.healthStatus, 'HEALTHY');
+    assert.equal(res.healthData.jsonRpc.enabled, null);
+  });
+
+  it('JSON-RPC disabled on the node - node health unaffected even if marked failed', function () {
+    const res = utils.consolidateHealthData(...healthyNode(), row(false, JSON.stringify({ enabled: false })));
+    assert.equal(res.health, true);
+    assert.equal(res.healthStatus, 'HEALTHY');
+    assert.equal(res.healthIssues.length, 0);
+    assert.equal(res.healthData.jsonRpc.enabled, false);
+  });
+
+  it('JSON-RPC enabled and answering - HEALTHY with details', function () {
+    const details = { enabled: true, url: 'http://node:8545/', blockNumber: 1234, consecutiveFailures: 0 };
+    const res = utils.consolidateHealthData(...healthyNode(), row(true, JSON.stringify(details)));
+    assert.equal(res.health, true);
+    assert.equal(res.healthStatus, 'HEALTHY');
+    assert.equal(res.healthData.jsonRpc.health, true);
+    assert.equal(res.healthData.jsonRpc.blockNumber, 1234);
+    assert.equal(res.healthData.jsonRpc.url, 'http://node:8545/');
+  });
+
+  it('JSON-RPC enabled and down - UNHEALTHY with an issue', function () {
+    const details = { enabled: true, url: 'http://node:8545/', error: 'connect ECONNREFUSED', consecutiveFailures: 3 };
+    const res = utils.consolidateHealthData(...healthyNode(), row(false, JSON.stringify(details)));
+    assert.equal(res.health, false);
+    assert.equal(res.healthStatus, 'UNHEALTHY');
+    assert.equal(res.healthIssues.length, 1);
+    assert.include(res.healthIssues[0], 'JSON-RPC service (ethereum-jsonrpc) is down');
+    assert.include(res.healthIssues[0], 'ECONNREFUSED');
+    assert.equal(res.healthData.jsonRpc.health, false);
+    assert.equal(res.healthData.jsonRpc.consecutiveFailures, 3);
+  });
+
+  it('checkJsonRpc is a no-op when the node runs without --jsonrpc', async function () {
+    // JSONRPC_ENABLED is not set in the test environment
+    const [isUp, details] = await nodeHealthCheckJs.checkJsonRpc();
+    assert.equal(isUp, true);
+    assert.equal(details.enabled, false);
+  });
+});
