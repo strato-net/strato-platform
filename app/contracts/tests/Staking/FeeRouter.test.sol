@@ -1,5 +1,6 @@
 import "../../concrete/Staking/FeeRouter.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
+import "../../concrete/Lending/PriceOracle.sol";
 import "../Util.sol";
 
 contract record MockGovernance {
@@ -57,12 +58,19 @@ contract record FeeRouterHarness is FeeRouter {
     address public feeCollectorAddr;
     address public governanceAddr;
     address public stakingFallbackAddr;
+    address public stratoAddr;
+    address public priceOracleAddr;
 
     function configure(address v, address u, address f, address g) public {
         voucherAddr = v;
         usdstAddr = u;
         feeCollectorAddr = f;
         governanceAddr = g;
+    }
+
+    function configureStrato(address s, address o) public {
+        stratoAddr = s;
+        priceOracleAddr = o;
     }
 
     function setStakingFallback(address s) public { stakingFallbackAddr = s; }
@@ -72,6 +80,8 @@ contract record FeeRouterHarness is FeeRouter {
     function _feeCollector() internal view override returns (address) { return feeCollectorAddr; }
     function _governance() internal view override returns (address) { return governanceAddr; }
     function _stakingFallback() internal view override returns (address) { return stakingFallbackAddr; }
+    function _strato() internal view override returns (address) { return stratoAddr; }
+    function _priceOracle() internal view override returns (address) { return priceOracleAddr; }
 }
 
 contract record Signer is FeeRouterHarness {
@@ -91,6 +101,7 @@ contract Describe_FeeRouter {
     FeeRouterHarness router;
     Signer signer;
     User feeCollector;
+    PriceOracle oracle;
 
     function beforeAll() public {
         feeCollector = new User();
@@ -247,10 +258,10 @@ contract Describe_FeeRouter {
 
     function it_still_notifies_staking_on_the_voucher_path() public {
         gov.setStakingContract(address(staking));
-        voucher.mint(address(signer), 1e18);
+        Signer voucherOnly = _signerWithVoucher();
 
-        signer.pay(address(router));
-        require(voucher.balances(address(signer)) == 0, "voucher burned");
+        voucherOnly.pay(address(router));
+        require(voucher.balances(address(voucherOnly)) == 0, "voucher burned");
         require(usdst.balanceOf(address(feeCollector)) == 0, "no USDST charged");
         require(staking.processed() == 1, "processBlock still called");
     }
@@ -261,6 +272,157 @@ contract Describe_FeeRouter {
 
         signer.pay(address(router));
         require(usdst.balanceOf(address(feeCollector)) == 1e16, "fee paid although processBlock reverted");
+    }
+
+    // ---- payment order: STRATO, then USDST, then a voucher ----
+
+    function _signerWithVoucher() internal returns (Signer) {
+        Signer s = new Signer();
+        s.configure(address(voucher), address(usdst), address(feeCollector), address(gov));
+        voucher.mint(address(s), 1e18);
+        return s;
+    }
+
+    // A STRATO token the signer holds 1 of, priced at `price` by a fresh oracle.
+    function _stratoFees(uint price) internal returns (Token) {
+        Token strato = Token(factory.createTokenWithInitialOwner(
+            "STRATO", "STRATO Token", new string[](0), new string[](0), new string[](0), "STRATO", 0, 18, address(this)));
+        strato.setStatus(2);
+        strato.mint(address(signer), 1e18);
+        oracle = new PriceOracle(address(this));
+        if (price > 0) oracle.setAssetPrice(address(strato), price);
+        signer.configureStrato(address(strato), address(oracle));
+        return strato;
+    }
+
+    function it_charges_a_cents_worth_of_strato_at_the_oracle_price() public {
+        Token strato = _stratoFees(5e17); // $0.50
+        voucher.mint(address(signer), 1e18);
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(feeCollector)) == 2e16, "0.02 STRATO at $0.50");
+        require(strato.balanceOf(address(signer)) == 1e18 - 2e16, "signer paid in STRATO");
+        require(usdst.balanceOf(address(signer)) == 1e18, "no USDST charged");
+        require(voucher.balances(address(signer)) == 1e18, "no voucher burned");
+    }
+
+    function it_rounds_the_strato_fee_up() public {
+        Token strato = _stratoFees(3e18); // $3: 1/300 STRATO is not a whole number of wei
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(feeCollector)) == 3333333333333334, "rounded up");
+    }
+
+    // STRATO fees are not split with staking yet: the whole fee goes to the collector,
+    // but staking still gets its per-transaction processBlock.
+    function it_sends_strato_fees_to_the_collector_and_still_notifies_staking() public {
+        gov.setStakingContract(address(staking));
+        staking.setProposerFeeBps(5000);
+        Token strato = _stratoFees(1e18);
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(feeCollector)) == 1e16, "whole fee to the collector");
+        require(strato.balanceOf(address(staking)) == 0, "no STRATO to staking");
+        require(usdst.balanceOf(address(staking)) == 0, "no USDST to staking");
+        require(staking.processed() == 1, "processBlock called");
+    }
+
+    function it_pays_usdst_while_strato_is_paused() public {
+        Token strato = _stratoFees(1e18);
+        strato.pause();
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(signer)) == 1e18, "STRATO untouched");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "paid in USDST");
+    }
+
+    function it_pays_usdst_when_strato_has_no_price() public {
+        Token strato = _stratoFees(0);
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(signer)) == 1e18, "STRATO untouched");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "paid in USDST");
+    }
+
+    function it_pays_usdst_when_the_strato_price_is_stale() public {
+        Token strato = _stratoFees(1e18);
+
+        fastForward(3600, 1);
+        signer.pay(address(router));
+        require(strato.balanceOf(address(feeCollector)) == 1e16, "an hour old is still usable");
+
+        fastForward(1, 1);
+        signer.pay(address(router));
+        require(strato.balanceOf(address(feeCollector)) == 1e16, "no STRATO past the hour");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "paid in USDST instead");
+    }
+
+    function it_pays_usdst_when_strato_is_short() public {
+        Token strato = _stratoFees(1e16); // $0.01: the fee is a whole STRATO, the signer has exactly 1
+        oracle.setAssetPrice(address(strato), 1e16 - 1);
+
+        signer.pay(address(router));
+        require(strato.balanceOf(address(signer)) == 1e18, "STRATO untouched");
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "paid in USDST");
+    }
+
+    function it_skips_strato_where_the_network_names_none() public {
+        voucher.mint(address(signer), 1e18);
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(feeCollector)) == 1e16, "paid in USDST");
+        require(voucher.balances(address(signer)) == 1e18, "voucher kept");
+    }
+
+    function it_prefers_usdst_over_a_voucher() public {
+        voucher.mint(address(signer), 1e18);
+
+        signer.pay(address(router));
+        require(usdst.balanceOf(address(signer)) == 1e18 - 1e16, "USDST charged");
+        require(voucher.balances(address(signer)) == 1e18, "voucher kept");
+    }
+
+    // A signer holding part of the fee must not pay part in USDST and then a voucher on
+    // top: the USDST step declines before moving anything.
+    function it_burns_a_voucher_without_touching_a_short_usdst_balance() public {
+        gov.setStakingContract(address(staking));
+        staking.setProposerFeeBps(5000);
+        Signer s = _signerWithVoucher();
+        usdst.mint(address(s), 1e16 - 1);
+
+        s.pay(address(router));
+        require(voucher.balances(address(s)) == 0, "voucher burned");
+        require(usdst.balanceOf(address(s)) == 1e16 - 1, "USDST untouched");
+        require(usdst.balanceOf(address(staking)) == 0, "nothing to staking");
+        require(usdst.balanceOf(address(feeCollector)) == 0, "nothing to the collector");
+    }
+
+    function it_takes_the_whole_usdst_fee_for_staking_from_an_exact_balance() public {
+        gov.setStakingContract(address(staking));
+        staking.setProposerFeeBps(10000);
+        Signer s = new Signer();
+        s.configure(address(voucher), address(usdst), address(feeCollector), address(gov));
+        usdst.mint(address(s), 1e16);
+
+        s.pay(address(router));
+        require(usdst.balanceOf(address(staking)) == 1e16, "all of it to staking");
+        require(usdst.balanceOf(address(s)) == 0, "signer paid exactly once");
+    }
+
+    function it_reverts_when_no_option_can_pay() public {
+        Token strato = _stratoFees(1e18);
+        Signer broke = new Signer();
+        broke.configure(address(voucher), address(usdst), address(feeCollector), address(gov));
+        broke.configureStrato(address(strato), address(oracle));
+        strato.mint(address(broke), 1e16 - 1);
+        usdst.mint(address(broke), 1e16 - 1);
+
+        bool reverted = false;
+        try broke.pay(address(router)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "unpaid fee fails the transaction");
     }
 
     function it_reverts_when_the_signer_cannot_pay() public {
