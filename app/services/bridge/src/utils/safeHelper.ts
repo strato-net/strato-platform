@@ -18,6 +18,7 @@ import { logError, logInfo } from "./logger";
 import { getRebaseFactors } from "../services/cirrusService";
 import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
+import { buildWithdrawalOrigin } from "./withdrawalOrigin";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -313,6 +314,7 @@ export async function createWithdrawalProposals(
 
     transactionProposals.push({
       withdrawalId: String(withdrawal.withdrawalId),
+      origin: buildWithdrawalOrigin(config.bridge.address!, String(withdrawal.withdrawalId)),
       safeAddress: toAddress,
       safeTransactionData: safeTransaction.data,
       safeTxHash,

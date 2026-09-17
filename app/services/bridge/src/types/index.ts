@@ -71,6 +71,8 @@ export interface SafeTransactionResult {
 // Clear types for Safe transaction data
 export interface SafeTransactionData {
   withdrawalId: string;
+  // Tags the payout with its withdrawal on the Safe Transaction Service
+  origin: string;
   safeAddress: string;
   safeTransactionData: any;
   safeTxHash: string;

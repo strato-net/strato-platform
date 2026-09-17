@@ -169,7 +169,12 @@ npm start
 ### Withdrawal Payout Safety
 
 - A Safe payout is proposed only after `confirmWithdrawalBatch` succeeded with its hash, so a withdrawal can reach the Safe with at most the one custody transaction STRATO recorded
-- Signed payouts are saved to `data/withdrawalProposals.json` before the confirmation is sent. If STRATO records a custody tx that the Safe service never received, the withdrawal-tx poller proposes the saved copy, or aborts the withdrawal (refunding the escrow) when that Safe nonce was already used by another transaction
+- Every payout carries its withdrawal in the Safe transaction's `origin` (`{"name","bridge","withdrawalId"}`, see `withdrawalOrigin.ts`). Before building a payout, the relayer reads the Safes' queued and recent executed transactions:
+  - one tagged payout already there: it is recorded on STRATO instead of proposing another
+  - more than one: nothing happens and an error is logged; reject the extras in the Safe
+- Signed payouts are saved to `data/withdrawalProposals.json` before the confirmation is sent. If STRATO records a custody tx that the Safe service never received, the withdrawal-tx poller proposes the saved copy, or aborts the withdrawal (refunding the escrow) when that Safe nonce was already used by another transaction. Neither happens while the Safe holds any tagged payout for that withdrawal
+- The custody tx of a pending withdrawal comes from the withdrawal record (the `WithdrawalPending` event table is only a fallback). A withdrawal with no custody tx hash is logged for manual resolution, never aborted
+- Payouts proposed before the `origin` tag existed are invisible to these checks: before rollout, reject any queued payout whose withdrawal is still `INITIATED` on STRATO
 
 ### Deposit Window Rollout
 

@@ -388,3 +388,43 @@ test("legacy: action deposits go through depositBatchWithAction", async () => {
   assert.deepEqual(h.calls[1].args.actions, ["2"]);
   assert.deepEqual(h.calls[1].args.minFinalOuts, ["9"]);
 });
+
+// ---------------- recovery path ----------------
+
+test("recovery records missed deposits and moves no checkpoint (window mode)", async () => {
+  const h = harness({ useDepositWindow: true });
+  const deposits = [deposit(), deposit()];
+  await h.recorder.recordDeposits(CHAIN_ID, deposits);
+
+  assert.deepEqual(h.methods(), ["recordDepositWindow"]);
+  assert.equal(h.calls[0].args.lastProcessedBlock, 0);
+  deposits.forEach((d) => assert.equal(h.records.get(d.depositKey), 1));
+  assert.deepEqual(h.onChain, []);
+  assert.deepEqual(h.local, []);
+});
+
+test("recovery records missed deposits and moves no checkpoint (legacy mode)", async () => {
+  const h = harness({ useDepositWindow: false });
+  await h.recorder.recordDeposits(CHAIN_ID, [deposit()]);
+
+  assert.deepEqual(h.methods(), ["depositBatch"]);
+  assert.deepEqual(h.onChain, []);
+  assert.deepEqual(h.local, []);
+});
+
+test("recovery leaves a retired-route deposit dead-lettered, not recorded", async () => {
+  const h = harness({ useDepositWindow: false, disabledRoutes: [[USDC, USDST]] });
+  const retired = deposit({ externalToken: USDC, targetStratoToken: USDST });
+  await h.recorder.recordDeposits(CHAIN_ID, [retired]);
+
+  assert.deepEqual(h.deadLetters.map((d) => d.key), [retired.depositKey]);
+  assert.equal(h.records.has(retired.depositKey), false);
+  assert.deepEqual(h.onChain, []);
+  assert.deepEqual(h.local, []);
+});
+
+test("recovery does nothing when every deposit is already recorded", async () => {
+  const h = harness({ useDepositWindow: true });
+  await h.recorder.recordDeposits(CHAIN_ID, []);
+  assert.deepEqual(h.calls, []);
+});

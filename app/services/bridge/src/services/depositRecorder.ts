@@ -165,7 +165,7 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
       () => false,
     );
     await verifyRecorded(externalChainId, recorded);
-    await deps.execute(windowCall(externalChainId, toBlock, []));
+    if (toBlock > 0) await deps.execute(windowCall(externalChainId, toBlock, []));
   };
 
   // Legacy path: depositBatch keys deposits by tx hash only, and the checkpoint is a separate call
@@ -189,9 +189,8 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
     }
   };
 
-  const recordLegacy = async (
+  const recordLegacyDeposits = async (
     externalChainId: number,
-    toBlock: number,
     deposits: WindowDeposit[],
   ): Promise<void> => {
     const eligible: WindowDeposit[] = [];
@@ -245,7 +244,6 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
     );
 
     await verifyRecorded(externalChainId, [...recordedStandard, ...recordedAction]);
-    await deps.commitOnChainCheckpoint(externalChainId, toBlock);
   };
 
   // Only an observed record lets the checkpoint pass a deposit
@@ -264,6 +262,26 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
   };
 
   /**
+   * Record deposits that were missed, leaving every checkpoint where it is.
+   * Used for recovery, where the window they belong to was scanned long ago.
+   */
+  const recordDeposits = async (
+    externalChainId: number,
+    deposits: WindowDeposit[],
+  ): Promise<void> => {
+    if (deposits.length === 0) return;
+    if (deps.useDepositWindow) {
+      await recordWithWindow(externalChainId, 0, deposits);
+    } else {
+      await recordLegacyDeposits(externalChainId, deposits);
+    }
+    logInfo(
+      "DepositRecorder",
+      `Recorded ${deposits.length} missed deposits on chain ${externalChainId}`,
+    );
+  };
+
+  /**
    * Record the deposits of one scanned block window, then move the checkpoint to toBlock.
    * Throws, leaving every checkpoint where it was, unless each deposit is observably
    * on STRATO or durably dead-lettered.
@@ -277,7 +295,8 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
       if (deps.useDepositWindow) {
         await recordWithWindow(externalChainId, toBlock, deposits);
       } else {
-        await recordLegacy(externalChainId, toBlock, deposits);
+        await recordLegacyDeposits(externalChainId, deposits);
+        await deps.commitOnChainCheckpoint(externalChainId, toBlock);
       }
       logInfo(
         "DepositRecorder",
@@ -287,7 +306,7 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
     await deps.commitLocalCheckpoint(externalChainId, toBlock);
   };
 
-  return { recordWindow };
+  return { recordWindow, recordDeposits };
 };
 
 export const depositRecorder = createDepositRecorder({

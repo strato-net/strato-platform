@@ -7,7 +7,14 @@ import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
-import { createSafeTransactions, getSafeOnChainNonce, proposeSafeTransactions } from "./safeService";
+import {
+  createSafeTransactions,
+  findWithdrawalPayouts,
+  getSafeOnChainNonce,
+  proposeSafeTransactions,
+  WithdrawalPayout,
+} from "./safeService";
+import { groupByChain } from "../utils/safeHelper";
 import { withdrawalProposalJournal } from "./withdrawalProposalJournal";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -422,10 +429,75 @@ export const confirmWithdrawalBatch = async (
   }
 };
 
+const payoutSafes = () => [config.safe.address, config.safe.hotWalletAddress];
+
+// Payouts the Safes already hold for these withdrawals, looked up on each withdrawal's own chain
+const findExistingPayouts = async (
+  withdrawals: WithdrawalInfo[],
+): Promise<Map<string, WithdrawalPayout[]>> => {
+  const existing = new Map<string, WithdrawalPayout[]>();
+  for (const [chainId, chainWithdrawals] of groupByChain(withdrawals)) {
+    const payouts = await findWithdrawalPayouts(chainId, payoutSafes());
+    for (const withdrawal of chainWithdrawals) {
+      const found = payouts.get(String(withdrawal.withdrawalId));
+      if (found?.length) existing.set(String(withdrawal.withdrawalId), found);
+    }
+  }
+  return existing;
+};
+
+/**
+ * A withdrawal still INITIATED on STRATO whose payout is already in a Safe is never given a
+ * second payout. With exactly one payout, record that one on STRATO; with more, a human must
+ * reject the extras first.
+ */
+const adoptExistingPayouts = async (existing: Map<string, WithdrawalPayout[]>) => {
+  for (const [withdrawalId, payouts] of existing) {
+    const hashes = payouts.map((payout) => payout.safeTxHash);
+    if (payouts.length > 1) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${withdrawalId} has ${payouts.length} payouts in the Safe (${hashes.join(", ")}); reject all but one before it can proceed`,
+        ),
+      );
+      continue;
+    }
+
+    logInfo(
+      "BridgeService",
+      `Withdrawal ${withdrawalId} already has Safe payout ${hashes[0]}; recording it instead of proposing another`,
+    );
+    try {
+      await execute({
+        contractName: "MercataBridge",
+        contractAddress: config.bridge.address!,
+        method: "confirmWithdrawalBatch",
+        args: { ids: [withdrawalId], custodyTxHashes: hashes },
+      });
+    } catch (error) {
+      // Usually Cirrus had not caught up with a confirmation that already landed
+      if ((error as Error).message.includes("MB: bad state")) continue;
+      throw error;
+    }
+    logError(
+      "BridgeService",
+      new Error(
+        `Withdrawal ${withdrawalId} had Safe payout ${hashes[0]} without a STRATO confirmation; it is now recorded`,
+      ),
+    );
+  }
+};
+
 const confirmEligibleWithdrawalBatch = async (
   withdrawals: NonEmptyArray<WithdrawalInfo>,
 ) => {
-  const transactionProposals = await createSafeTransactions(withdrawals);
+  const existing = await findExistingPayouts(withdrawals);
+  await adoptExistingPayouts(existing);
+  const unpaid = withdrawals.filter((w) => !existing.has(String(w.withdrawalId)));
+  if (unpaid.length === 0) return;
+
+  const transactionProposals = await createSafeTransactions(unpaid as NonEmptyArray<WithdrawalInfo>);
   if (!transactionProposals || transactionProposals.length === 0) return;
 
   // Proposals come back grouped by chain, so pair ids and hashes from the proposals themselves
@@ -509,6 +581,7 @@ export const proposeRecordedCustodyTxs = async (
   const unexecutable: Number[] = [];
   const toPropose: SafeTransactionData[] = [];
   const onChainNonces = new Map<string, number>();
+  const existingPayouts = await findWithdrawalPayouts(externalChainId, payoutSafes());
 
   for (const { id, safeTxHash } of withdrawals) {
     const entry = await withdrawalProposalJournal.get(safeTxHash);
@@ -517,6 +590,18 @@ export const proposeRecordedCustodyTxs = async (
         "BridgeService",
         new Error(
           `Withdrawal ${id} points at Safe transaction ${safeTxHash}, which the Safe service does not have and this relayer has no copy of; resolve it manually`,
+        ),
+      );
+      continue;
+    }
+
+    // Neither propose nor abort while the Safe holds any payout for this withdrawal
+    const existing = existingPayouts.get(String(id)) ?? [];
+    if (existing.length > 0) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${id} records custody tx ${safeTxHash}, but the Safe holds payout(s) ${existing.map((p) => p.safeTxHash).join(", ")} for it; resolve it manually`,
         ),
       );
       continue;

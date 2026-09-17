@@ -8,6 +8,8 @@ import {
   proposeTransactions,
 } from "../utils/safeHelper";
 import { retry } from "../utils/api";
+import { parseWithdrawalOrigin } from "../utils/withdrawalOrigin";
+import { SafeMultisigTransactionResponse } from "@safe-global/types-kit";
 import { config } from "../config";
 
 export const createSafeTransactions = async (
@@ -58,6 +60,63 @@ const getSafeTransactionOrNull = async (apiKit: SafeApiKit, safeTxHash: string) 
     if (Number(error?.statusCode) === 404) return null;
     throw error;
   }
+};
+
+export interface WithdrawalPayout {
+  withdrawalId: string;
+  safeTxHash: string;
+  safeAddress: string;
+  nonce: number;
+  isExecuted: boolean;
+}
+
+const PAGE_SIZE = 100;
+// A payout whose STRATO confirmation went missing surfaces within minutes, well inside this window
+const RECENT_EXECUTED_LIMIT = 100;
+
+/**
+ * Payouts this bridge already has in the given Safes, keyed by withdrawal id: every queued
+ * transaction that can still execute, plus the most recent successful executions.
+ * Only transactions tagged by this bridge (see withdrawalOrigin.ts) are counted.
+ */
+export const findWithdrawalPayouts = async (
+  chainId: number,
+  safeAddresses: Array<string | undefined>,
+): Promise<Map<string, WithdrawalPayout[]>> => {
+  const apiKit = new SafeApiKit({ chainId: BigInt(chainId), apiKey: config.safe.apiKey });
+  const payouts = new Map<string, WithdrawalPayout[]>();
+
+  for (const safeAddress of new Set(safeAddresses.filter((a): a is string => !!a))) {
+    const { nonce } = await retry(() => apiKit.getSafeInfo(safeAddress), { logPrefix: "SafeService" });
+    const queued: SafeMultisigTransactionResponse[] = [];
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const page = await retry(
+        () => apiKit.getPendingTransactions(safeAddress, { currentNonce: Number(nonce), limit: PAGE_SIZE, offset }),
+        { logPrefix: "SafeService" },
+      );
+      queued.push(...page.results);
+      if (!page.next || page.results.length === 0) break;
+    }
+    const executed = await retry(
+      () => apiKit.getMultisigTransactions(safeAddress, { executed: true, ordering: "-nonce", limit: RECENT_EXECUTED_LIMIT }),
+      { logPrefix: "SafeService" },
+    );
+
+    for (const tx of [...queued, ...executed.results.filter((t) => t.isSuccessful)]) {
+      const withdrawalId = parseWithdrawalOrigin(config.bridge.address!, tx.origin);
+      if (!withdrawalId) continue;
+      const list = payouts.get(withdrawalId) ?? [];
+      list.push({
+        withdrawalId,
+        safeTxHash: tx.safeTxHash,
+        safeAddress,
+        nonce: Number(tx.nonce),
+        isExecuted: tx.isExecuted,
+      });
+      payouts.set(withdrawalId, list);
+    }
+  }
+  return payouts;
 };
 
 // The Safe's executed nonce: a transaction below it that has not run never will

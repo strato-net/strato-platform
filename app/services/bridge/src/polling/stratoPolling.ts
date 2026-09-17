@@ -211,59 +211,71 @@ export const startNativeDepositInitiatedPolling = (): void => {
   );
 };
 
+type PendingWithdrawal = { id: Number, safeTxHash: string };
+
+// Settle PENDING_REVIEW withdrawals from their custody tx: finalize executed payouts, abort rejected ones
+export const processPendingWithdrawals = async (): Promise<void> => {
+  const pending: WithdrawalInfo[] = await getWithdrawalsByStatus("2");
+  if (!Array.isArray(pending) || pending.length === 0) return;
+
+  // The record carries the custody tx it was confirmed with; the event table is only a fallback
+  const withoutHash = pending
+    .filter((w) => !w.custodyTxHash)
+    .map((w) => String(w.withdrawalId));
+  const eventHashes: Record<string, string | null> = withoutHash.length
+    ? await getSafeTxHashFromEvents(withoutHash)
+    : {};
+
+  const toFinalize: Array<Number> = [];
+  const toReject: Array<Number> = [];
+
+  const byChain = new Map<bigint, Array<PendingWithdrawal>>();
+  for (const w of pending) {
+    const id = Number(w.withdrawalId);
+    const safeTxHash = w.custodyTxHash || eventHashes[String(w.withdrawalId)];
+    if (!safeTxHash) {
+      // Never refund on a missing hash: the payout may already be queued or paid
+      logError(
+        "StratoPolling",
+        new Error(`Withdrawal ${id} is pending review but no custody tx hash was found; leaving it for manual resolution`),
+      );
+      continue;
+    }
+    const cid = safeToBigInt(w.externalChainId);
+    (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({ id, safeTxHash });
+  }
+
+  for (const [chainId, withdrawals] of byChain) {
+    const statuses = await monitorSafeTransactionStatusBatch(withdrawals as NonEmptyArray<PendingWithdrawal>, safeToBigInt(chainId));
+    const neverProposed: PendingWithdrawal[] = [];
+    for (const withdrawal of withdrawals) {
+      const st = statuses.get(withdrawal.id);
+      if (st === "executed") toFinalize.push(withdrawal.id);
+      else if (st === "rejected") toReject.push(withdrawal.id);
+      else if (st === "not_found") neverProposed.push(withdrawal);
+    }
+    if (neverProposed.length) {
+      toReject.push(...(await proposeRecordedCustodyTxs(neverProposed, Number(chainId))));
+    }
+  }
+
+  if (toFinalize.length)
+    for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
+      await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
+      await withdrawalProposalJournal.prune(batch.map(String));
+    }
+  if (toReject.length)
+    for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
+      await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
+      await withdrawalProposalJournal.prune(batch.map(String));
+    }
+};
+
 export const startWithdrawalTxPolling = (): void => {
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
-  type Withdrawal = { id: Number, safeTxHash: string };
   const poll = async () => {
     try {
-      const pending: WithdrawalInfo[] = await getWithdrawalsByStatus("2");
-      if (!Array.isArray(pending) || pending.length === 0) return;
-
-      // ids -> safeTxHash
-      const ids = pending.map(w => String(w.withdrawalId));
-      const hashMap = await getSafeTxHashFromEvents(ids);
-
-      const toFinalize: Array<Number> = [];
-      const toReject: Array<Number> = [];
-
-      // Group ONLY items with hashes; collect no-hash separately
-      const byChain = new Map<bigint, Array<Withdrawal>>();
-      for (const w of pending) {
-        const id = Number(w.withdrawalId);
-        const h = hashMap[id];
-        if (!h) {
-          toReject.push(id); // or keep pending per your policy
-          continue;
-        }
-        const cid = safeToBigInt(w.externalChainId);
-        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({ id, safeTxHash: h });
-      }
-
-      // Monitor per chain only the with-hash subset
-      for (const [chainId, withdrawals] of byChain) {
-        const statuses = await monitorSafeTransactionStatusBatch(withdrawals as NonEmptyArray<Withdrawal>, safeToBigInt(chainId));
-        const neverProposed: Withdrawal[] = [];
-        for (const withdrawal of withdrawals) {
-          const st = statuses.get(withdrawal.id);
-          if (st === "executed") toFinalize.push(withdrawal.id);
-          else if (st === "rejected") toReject.push(withdrawal.id);
-          else if (st === "not_found") neverProposed.push(withdrawal);
-        }
-        if (neverProposed.length) {
-          toReject.push(...(await proposeRecordedCustodyTxs(neverProposed, Number(chainId))));
-        }
-      }
-
-      if (toFinalize.length)
-        for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
-          await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
-          await withdrawalProposalJournal.prune(batch.map(String));
-        }
-      if (toReject.length)
-        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
-          await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
-          await withdrawalProposalJournal.prune(batch.map(String));
-        }
+      await processPendingWithdrawals();
     } catch (e: any) {
       logError("StratoPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
