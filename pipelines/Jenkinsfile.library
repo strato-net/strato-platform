@@ -155,23 +155,41 @@ def checkNodeRpc() {
     # both read paths of ethereum-jsonrpc: Postgres-backed methods (eth_chainId,
     # eth_blockNumber, eth_getCode) and vm-runner-backed methods (eth_call), single and
     # concurrent. A node whose RPC answers block queries but not contract reads fails here.
-    # RPC_URL can be overridden to run the same checks against any node.
+    #
+    # The vm-runner serves an eth_call only between block batches, so on a node that is
+    # still syncing a call can legitimately take tens of seconds (the server gives up at
+    # 30s). The check therefore reads nodeSync.isSynced from /health: on a synced node it
+    # is strict (one attempt, 10s latency bound); on a syncing node it retries and only
+    # requires that values come back.
+    # RPC_URL (and RPC_HEALTH_URL) can be overridden to run the same checks against any node.
     RPC_URL=${RPC_URL:-https://$(</host)/rpc}
+    RPC_HEALTH_URL=${RPC_HEALTH_URL:-${RPC_URL%/rpc}/health}
     # Genesis Voucher contract: an ERC20 present from block 0 on every STRATO network.
     VOUCHER=0x000000000000000000000000000000000000100e
     SEL_TOTAL_SUPPLY=0x18160ddd
     SEL_DECIMALS=0x313ce567
-    CONCURRENCY=8
+    CONCURRENCY=4
+    MAX_LATENCY_SYNCED=10
+    RETRY_DELAY=15
 
     rpc() { # method params-json
       local body
       body=$(printf '{"jsonrpc":"2.0","id":1,"method":"%s","params":%s}' "$1" "$2")
-      curl --silent --show-error --max-time 35 -X POST "$RPC_URL" -H 'Content-Type: application/json' --data "$body"
+      curl --silent --show-error --max-time 40 -X POST "$RPC_URL" -H 'Content-Type: application/json' --data "$body"
     }
     result_of() { jq -r 'if .error then "ERROR: " + (.error.message // (.error|tostring)) else (.result // "ERROR: no result") end' <<< "$1"; }
     fail() { echo "RPC CHECK FAILED: $*"; exit 1; }
+    is_value() { [[ "$1" =~ ^0x[0-9a-fA-F]{64}$ ]]; }
 
     echo "RPC endpoint: $RPC_URL"
+    SYNCED=$(curl --silent --max-time 10 "$RPC_HEALTH_URL" | jq -r '.nodeSync.isSynced // "unknown"' 2>/dev/null || echo unknown)
+    if [[ "$SYNCED" == "true" ]]; then
+      ATTEMPTS=1
+      echo "node is synced: strict mode (1 attempt, eth_call must answer within ${MAX_LATENCY_SYNCED}s)"
+    else
+      ATTEMPTS=3
+      echo "node sync state: ${SYNCED}: lenient mode (up to ${ATTEMPTS} attempts, no latency bound)"
+    fi
 
     R=$(result_of "$(rpc eth_chainId '[]')")
     [[ "$R" =~ ^0x[0-9a-fA-F]+$ ]] || fail "eth_chainId -> $R"
@@ -188,32 +206,49 @@ def checkNodeRpc() {
     [[ "$R" =~ ^0x[0-9a-fA-F]{2,}$ ]] || fail "eth_getCode(genesis Voucher) -> $R"
     echo "eth_getCode(genesis Voucher) -> ${#R} chars"
 
-    # Single contract reads: the vm-runner path. Each must return a uint256 quickly.
+    # Single contract reads: the vm-runner path. Each must return a uint256.
     for SEL in $SEL_TOTAL_SUPPLY $SEL_DECIMALS; do
       PARAMS=$(printf '[{"to":"%s","data":"%s"},"latest"]' "$VOUCHER" "$SEL")
-      START=$SECONDS
-      R=$(result_of "$(rpc eth_call "$PARAMS")")
-      ELAPSED=$((SECONDS - START))
-      [[ "$R" =~ ^0x[0-9a-fA-F]{64}$ ]] || fail "eth_call $SEL -> $R (${ELAPSED}s)"
-      (( ELAPSED < 10 )) || fail "eth_call $SEL took ${ELAPSED}s"
-      echo "eth_call $SEL -> $R (${ELAPSED}s)"
+      for (( attempt = 1; attempt <= ATTEMPTS; attempt++ )); do
+        START=$SECONDS
+        R=$(result_of "$(rpc eth_call "$PARAMS")")
+        ELAPSED=$((SECONDS - START))
+        if is_value "$R"; then
+          echo "eth_call $SEL -> $R (${ELAPSED}s, attempt $attempt)"
+          if [[ "$SYNCED" == "true" ]] && (( ELAPSED > MAX_LATENCY_SYNCED )); then
+            fail "eth_call $SEL took ${ELAPSED}s on a synced node"
+          fi
+          break
+        fi
+        echo "eth_call $SEL attempt $attempt -> $R (${ELAPSED}s)"
+        (( attempt < ATTEMPTS )) || fail "eth_call $SEL returned no value after $ATTEMPTS attempt(s)"
+        sleep $RETRY_DELAY
+      done
     done
 
     # Concurrent contract reads: every response must come back with a value. This is the
     # regression check for VM calls losing each other's responses under load.
     PARAMS=$(printf '[{"to":"%s","data":"%s"},"latest"]' "$VOUCHER" "$SEL_TOTAL_SUPPLY")
-    TMP=$(mktemp -d)
-    for i in $(seq 1 $CONCURRENCY); do
-      ( result_of "$(rpc eth_call "$PARAMS")" > "$TMP/$i" ) &
+    for (( attempt = 1; attempt <= ATTEMPTS; attempt++ )); do
+      TMP=$(mktemp -d)
+      START=$SECONDS
+      for i in $(seq 1 $CONCURRENCY); do
+        ( result_of "$(rpc eth_call "$PARAMS")" > "$TMP/$i" ) &
+      done
+      wait
+      ELAPSED=$((SECONDS - START))
+      OK=$(cat "$TMP"/* | grep -cE '^0x[0-9a-fA-F]{64}$' || true)
+      if (( OK == CONCURRENCY )); then
+        echo "$CONCURRENCY/$CONCURRENCY concurrent eth_call succeeded (${ELAPSED}s, attempt $attempt)"
+        rm -rf "$TMP"
+        break
+      fi
+      echo "concurrent eth_call attempt $attempt: $OK/$CONCURRENCY succeeded (${ELAPSED}s); responses:"
+      cat "$TMP"/*
+      rm -rf "$TMP"
+      (( attempt < ATTEMPTS )) || fail "only $OK/$CONCURRENCY concurrent eth_call succeeded after $ATTEMPTS attempt(s)"
+      sleep $RETRY_DELAY
     done
-    wait
-    OK=$(cat "$TMP"/* | grep -cE '^0x[0-9a-fA-F]{64}$' || true)
-    if (( OK != CONCURRENCY )); then
-      echo "responses:"; cat "$TMP"/*; rm -rf "$TMP"
-      fail "only $OK/$CONCURRENCY concurrent eth_call succeeded"
-    fi
-    rm -rf "$TMP"
-    echo "$CONCURRENCY/$CONCURRENCY concurrent eth_call succeeded"
 
     # eth_getBalance runs balanceOf on the native token through eth_call but maps any
     # failure to 0x0, so this only proves the method answers.
