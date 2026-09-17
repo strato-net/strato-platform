@@ -16,6 +16,7 @@ import EthBlock (EthBlock(..), txToEthValue)
 import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
 import Blockchain.Data.LogsBloom (emptyLogsBloom)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
+import ResponseDispatcher (withPendingResponse)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMConfigured, ethConf)
@@ -40,7 +41,7 @@ import Text.Format (format)
 import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (void, when, zipWithM)
 import Control.Monad.IO.Class
-import Control.Monad.Composable.Streaming (consumeFromLatest)
+import Control.Concurrent.MVar (takeMVar)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
@@ -306,17 +307,17 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout waitMicros $ runStreamMConfigured "ethereum-jsonrpc" $
-    consumeFromLatest "jsonrpcresponse"
-      (void $ writeSeqVmTasks [VmJsonRpcCommand c])
-      (\responses ->
-        let matched = filter ((jrcId c ==) . fst) (responses :: [(String, B.ByteString)])
-        in case matched of
-          ((_, val) : _) -> return $ Just $ Bin.decode (BL.fromStrict val)
-          [] -> return Nothing
-      )
+  -- Register for the response first, then submit the command. The response
+  -- topic has a single consumer per process (see ResponseDispatcher) that
+  -- fills the slot registered under the request id; waiting here does not
+  -- touch the topic, so concurrent requests cannot consume each other's
+  -- replies.
+  result <- withPendingResponse (jrcId c) $ \slot ->
+    timeout waitMicros $ do
+      void $ runStreamMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
+      takeMVar slot
   return $ case result of
-    Just resp -> resp
+    Just val -> Bin.decode (BL.fromStrict val)
     Nothing -> Error (jrcId c) "timeout waiting for vm-runner response"
 
 eth_getBalance :: Method Server
