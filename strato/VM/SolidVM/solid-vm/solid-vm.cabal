@@ -41,6 +41,7 @@ library
     , blockapps-mpdbs
     , bytestring
     , common-log
+    , composable-monads-base
     , containers
     , cryptohash
     , crypton
@@ -166,6 +167,7 @@ benchmark codebench
     , binary
     , bytestring
     , common-log
+    , composable-monads-base
     , containers
     , criterion
     , deepseq

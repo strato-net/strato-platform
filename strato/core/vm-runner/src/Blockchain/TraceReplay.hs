@@ -27,7 +27,8 @@ import Blockchain.Data.ExecResults (calculateReturned)
 import Blockchain.Data.TransactionDef (Transaction)
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.JsonRpcCommand (runJsonRpcCommandSandboxed, traceToJson)
-import Blockchain.MemVMContext (MemContextM, VMType (..), evalSandboxedContextM)
+import Blockchain.VMContext (ContextM, evalSandboxedContextM)
+import Blockchain.Wiring ()
 import Blockchain.Model.WrappedBlock (OutputTx (..), wrapIngestBlockTransaction)
 import Blockchain.Sequencer.CallSpec (TraceOptions (..))
 import Blockchain.Sequencer.Event
@@ -36,7 +37,6 @@ import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex)
 import Blockchain.VMContext (CurrentBlockHash (..), VMBase)
 import Control.Monad (when)
-import Control.Monad.Trans.Except (runExceptT)
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
@@ -49,9 +49,9 @@ import Text.Format (format)
 
 -- | Like runJsonRpcCommandSandboxed, but additionally handles the
 -- block-replay trace command, which needs the block-processing machinery.
-runJsonRpcCommandTraced :: forall m. (VMBase m, MonadMonitor m) => JsonRpcCommand -> m JsonRpcResponse
+runJsonRpcCommandTraced :: JsonRpcCommand -> ContextM JsonRpcResponse
 runJsonRpcCommandTraced (JRCTraceBlockTxs header txs mTarget opts id) =
-  evalSandboxedContextM (traceBlockTxs header txs mTarget opts id :: MemContextM 'Sandboxed m JsonRpcResponse)
+  evalSandboxedContextM (traceBlockTxs header txs mTarget opts id)
 runJsonRpcCommandTraced c = runJsonRpcCommandSandboxed c
 
 traceBlockTxs ::
@@ -100,7 +100,7 @@ traceBlockTxs header txs mTarget opts id = do
           then Just <$> newVmTracer (traceStatements opts)
           else pure Nothing
       Mod.put (Mod.Proxy @(Maybe VmTracer)) mTracer
-      eRes <- runExceptT $ addTransaction header remGas t proposer
+      eRes <- addTransaction header remGas t proposer
       Mod.put (Mod.Proxy @(Maybe VmTracer)) Nothing
       acc' <- case mTracer of
         Nothing -> pure acc

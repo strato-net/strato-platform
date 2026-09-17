@@ -1,7 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -17,12 +20,11 @@ module Blockchain.Sequencer.Monad
     Modification(..),
     SequencerContext (..),
     SequencerConfig (..),
-    SequencerM,
-    SequencerMTest,
+    SequencerM (..),
+    SequencerRow,
     BlockPeriod (..),
     RoundPeriod (..),
     runSequencerM,
-    runSequencerMTest,
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
@@ -35,6 +37,7 @@ module Blockchain.Sequencer.Monad
   )
 where
 
+import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Constants
@@ -58,10 +61,12 @@ import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
 import Control.Monad (unless, when)
+import Control.Monad.Catch (MonadCatch, MonadMask)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base (AccessibleEnv, Eff, InternalState, Logger, ReaderEnv, StateCell, evalStateEff, withReaderEnv, withResources)
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
+import Control.Monad.Composable.Vault (HasVault, VaultData, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Conduit.TMChan
@@ -75,6 +80,7 @@ import qualified Database.LevelDB as LDB
 import System.Directory (createDirectoryIfMissing)
 import Text.Format
 import Prelude hiding (round)
+import Prometheus (MonadMonitor)
 
 data Modification a = Modification a | Deletion deriving (Show)
 
@@ -127,15 +133,15 @@ data SequencerConfig = SequencerConfig
     redisConn :: RBDB.RedisConnection
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (VaultM (LoggingT IO)))))
+type SequencerRow = '[StateCell SequencerContext, ReaderEnv SequencerConfig, IORef StreamEnv, InternalState, VaultData, Logger]
 
--- Test version without VaultM - relies on external HasVault instance for the base monad
-type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (LoggingT IO))))
+newtype SequencerM a = SequencerM {unSequencerM :: Eff SequencerRow a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadState SequencerContext, MonadReader SequencerConfig, MonadLogger, MonadLoggerIO, MonadResource, HasVault, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
+instance Mod.Accessible DependentBlockDB SequencerM where
   access _ = asks dependentBlockDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
+instance Mod.Accessible LDB.DB SequencerM where
   access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
 {-
 class HasNamespace a where
@@ -146,47 +152,47 @@ instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
 -}
-instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
+instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (View, Maybe Block)) SequencerM where
   access _ = use latestViewAndProposal
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe View)) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe View)) SequencerM where
   access _ = use armedViewTimer
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) SequencerM where
   access _ = use roundTimerClock
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (View, UTCTime))) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe (View, UTCTime))) SequencerM where
   access _ = use armedRoundTimer
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan View) (ReaderT SequencerConfig m) where
+instance Mod.Accessible (TMChan View) SequencerM where
   access _ = asks blockstanbulTimeouts
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible BlockPeriod (ReaderT SequencerConfig m) where
+instance Mod.Accessible BlockPeriod SequencerM where
   access _ = asks blockstanbulBlockPeriod
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RoundPeriod (ReaderT SequencerConfig m) where
+instance Mod.Accessible RoundPeriod SequencerM where
   access _ = asks blockstanbulRoundPeriod
 
-instance {-# OVERLAPPING #-} Mod.Accessible View SequencerM where
+instance Mod.Accessible View SequencerM where
   access _ = currentView
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RBDB.RedisConnection (ReaderT SequencerConfig m) where
+instance Mod.Accessible RBDB.RedisConnection SequencerM where
   access _ = asks redisConn
 
-instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
+instance (Keccak256 `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
+instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext c = c `deepseq` modify' (blockstanbulContext .~ c)
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
+instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
       Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
@@ -196,15 +202,11 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
-instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.Modifiable BestSequencedBlock (StateT SequencerContext m) where
-  get   = lift . Mod.get
-  put p = lift . Mod.put p
 
-
-runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> Eff '[Logger] a
 runSequencerM vaultUrl' c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runVaultM vaultUrl' . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
+  runVaultM vaultUrl' . withResources . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
@@ -213,7 +215,7 @@ runSequencerM vaultUrl' c bc m = do
     armedVT <- liftIO $ newIORef Nothing
     roundClock <- liftIO $ newIORef Nothing
     armedRT <- liftIO $ newIORef Nothing
-    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
+    withReaderEnv c{dependentBlockDB = depBlock} $ evalStateEff
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
@@ -222,31 +224,7 @@ runSequencerM vaultUrl' c bc m = do
           _roundTimerClock = roundClock,
           _armedRoundTimer = armedRT
         }
-  return $ fst a
-
--- Test version without VaultM - relies on external HasVault instance
-runSequencerMTest :: SequencerConfig -> BlockstanbulContext -> SequencerMTest a -> (LoggingT IO) a
-runSequencerMTest c bc m = do
-  liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runStreamMConfigured (kafkaClientId c) $ do
-    let dbCS = depBlockDBCacheSize c
-        dbPath = depBlockDBPath c
-        stxSize = seenTransactionDBSize c
-    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
-    armedVT <- liftIO $ newIORef Nothing
-    roundClock <- liftIO $ newIORef Nothing
-    armedRT <- liftIO $ newIORef Nothing
-    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
-      SequencerContext
-        { _seenTransactionDB = mkSeenTxDB stxSize,
-          _blockstanbulContext = bc,
-          _latestViewAndProposal = latestVandP,
-          _armedViewTimer = armedVT,
-          _roundTimerClock = roundClock,
-          _armedRoundTimer = armedRT
-        }
-  return $ fst a
+      (unSequencerM m)
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmTask
 pairToVmTx = uncurry VmTx
@@ -381,7 +359,7 @@ fuseChannels = do
       streamingAddress = (fromString $ streamingHost k, fromIntegral $ streamingPort k)
 
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
-  (debugLog . transPipe lift)
+  debugLog
     <$> mergeSources
       [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire

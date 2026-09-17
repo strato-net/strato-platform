@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -26,7 +27,7 @@ import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.DataDefs as DD
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.TransactionDef as TD
-import Blockchain.Data.TransactionResult
+import Blockchain.Data.TransactionResult ()
 import Blockchain.Database.MerklePatricia (StateRoot (..))
 import Blockchain.Model.WrappedBlock (OutputBlock (..), OutputTx (..))
 import Blockchain.Strato.Model.Address
@@ -37,6 +38,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext hiding (state)
+import Blockchain.Wiring ()
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
@@ -51,8 +53,6 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Except
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -69,12 +69,7 @@ import Text.Format
 baggerBlockHash :: Keccak256
 baggerBlockHash = hash "This is the bagger block hash. It is a dummy value used to keep track of the bagger's state roots through time"
 
-type MonadBagger m =
-  ( VMBase m,
-    Mod.Accessible TRC.Cache m,
-    Mod.Modifiable B.BaggerState m,
-    Mod.Yields m TransactionResult
-  )
+type MonadBagger m = VMBase m
 
 data TxMiningResult = TxMiningResult
   { tmrFailure :: Maybe TransactionFailureCause,
@@ -598,28 +593,23 @@ wasSeen OutputTx {otHash = sha} = do
   return ret
 
 isValidForPool :: MonadBagger m => OutputTx -> m (Either TxRejection ())
-isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
+isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
   -- todo: is this everything that can be checked? be more pedantic and check for neg. balance, etc?
-  state <- lift getBaggerState
+  state <- getBaggerState
   let intrinsicGas = B.calculateIntrinsicGasAtNextBlock state t
       txn = TD.nonce bt
       txFee = B.calculateIntrinsicTxFee state t
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
       gLimit = Conf.gasLimit (networkConfig ethConf)
-  when (intrinsicGas >= gLimit)
-    . throwE
-    $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
-  (addressNonce, addressBalance) <- lift $ getAddressNonceAndBalance address
-  when (addressNonce > txn)
-    . throwE
-    $ NonceTooLow Validation Incoming addressNonce t
-  when (addressBalance < txFee)
-    . throwE
-    $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= toInteger (Conf.txSizeLimit (networkConfig ethConf)))
-    . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger (Conf.txSizeLimit (networkConfig ethConf))) t
-  return ()
+      sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
+  (addressNonce, addressBalance) <- getAddressNonceAndBalance address
+  return $
+    if
+      | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
+      | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
+      | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t
+      | txSize >= sizeLimit -> Left $ TXSizeLimitExceeded Validation Incoming txSize sizeLimit t
+      | otherwise -> Right ()
 
 addToSeen :: MonadBagger m => OutputTx -> m ()
 addToSeen t = updateBaggerState (B.addToSeen t)

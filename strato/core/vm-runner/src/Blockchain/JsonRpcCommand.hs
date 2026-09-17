@@ -26,7 +26,8 @@ import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.VmTrace (CallFrame, TraceLog (..), VmTracer, newVmTracer, takeTraceRoots)
 import Blockchain.Data.ExecResults (ExecResults (..))
-import Blockchain.MemVMContext (MemContextM, VMType (..), evalSandboxedContextM)
+import Blockchain.VMContext (ContextM, evalSandboxedContextM)
+import Blockchain.Wiring ()
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TraceOptions (..), TxCreateObject (..), TxFuncCallObject (..))
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
@@ -86,9 +87,8 @@ runJsonRpcCommand =
 -- to the real state, but every write lands in an in-memory overlay that is
 -- discarded when the command finishes. This makes it safe to simulate
 -- state-changing calls and contract creations.
-runJsonRpcCommandSandboxed :: forall m. VMBase m => JsonRpcCommand -> m JsonRpcResponse
-runJsonRpcCommandSandboxed c =
-  evalSandboxedContextM (runJsonRpcCommand' c :: MemContextM 'Sandboxed m JsonRpcResponse)
+runJsonRpcCommandSandboxed :: JsonRpcCommand -> ContextM JsonRpcResponse
+runJsonRpcCommandSandboxed = evalSandboxedContextM . runJsonRpcCommand'
 
 runJsonRpcCommand' :: VMBase m => JsonRpcCommand -> m JsonRpcResponse
 runJsonRpcCommand' c@JRCGetBalance {jrcAddress = address, jrcId = id} = do

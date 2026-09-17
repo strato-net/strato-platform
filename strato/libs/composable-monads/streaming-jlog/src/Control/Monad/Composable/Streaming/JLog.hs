@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -55,7 +57,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 import Control.Monad (void, forever, when)
 import Control.Monad.Composable.Base
-import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString.Lazy as LBS
@@ -93,7 +94,7 @@ type ClientId = Text
 type StreamAddress = (String, Int)  -- (basePath, unused port)
 type ConsumerGroup = Text
 
-type StreamM = ReaderT (IORef StreamEnv)
+type StreamM es = Eff (IORef StreamEnv ': es)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 
 data StreamEnv = StreamEnv
@@ -113,18 +114,18 @@ getStreamEnv = do
   ref <- accessEnv
   liftIO $ readIORef ref
 
-runStreamMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runStreamMUsingEnv env f = do
   ref <- liftIO $ newIORef env
-  runReaderT f ref
+  provide ref f
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM clientId addr f = withRunInIO $ \runInIO -> bracket
   (createStreamEnvIO clientId addr)
   closeStreamEnvIO
   (\env -> do
     ref <- newIORef env
-    runInIO $ runReaderT f ref)
+    runInIO $ provide ref f)
 
 createStreamEnvIO :: ClientId -> StreamAddress -> IO StreamEnv
 createStreamEnvIO clientId (basePath, _port) = do

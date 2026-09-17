@@ -30,37 +30,27 @@ import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB ()
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
-import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Bootstrap
 import Blockchain.Database.MerklePatricia.NodeData ()
-import Blockchain.EthConf
-import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Event
-import Blockchain.JsonRpcCommand
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
+import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.StateRootMismatch
-import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
-import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot ()
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
-import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
-import Conduit hiding (Flush)
 import Control.Monad
 import Control.Monad.Change.Alter ()
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import Data.Maybe
@@ -68,80 +58,74 @@ import qualified Data.Text as T
 import Executable.EthereumVM2
 import Text.Format (format)
 
-ethereumVM :: LoggingT IO ()
-ethereumVM = runResourceT $ do
-  ctx <- initContext
-  void . runStreamMConfigured "ethereum-vm" $ execContextM' ctx $ do
+ethereumVM :: ContextM ()
+ethereumVM = do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
-    bootstrapIfFirstRun
+  bootstrapIfFirstRun
 
-    initializeBestBlock
+  initializeBestBlock
 
-    failures <- runConsume consumerGroup seqVmTasksTopicName $ \seqEvents -> do
+  failures <- runConsume consumerGroup seqVmTasksTopicName $ \seqEvents -> do
 
-        let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
-        $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
-        case maybeSelfAddress of
-          Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
-          Nothing -> pure ()
+      let maybeSelfAddress = listToMaybe [ addr | VmSelfAddress addr <- toList seqEvents ]
+      $logInfoS "ethereumVM/maybeSelfAddress" $ T.pack $ format maybeSelfAddress
+      case maybeSelfAddress of
+        Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
+        Nothing -> pure ()
 
-        -- Handle flush mempool events immediately
-        forM_ seqEvents $ \event -> case event of
-          VmFlushMempool req -> handleVmFlushMempool req
-          _ -> return ()
+      -- Handle flush mempool events immediately
+      forM_ seqEvents $ \event -> case event of
+        VmFlushMempool req -> handleVmFlushMempool req
+        _ -> return ()
 
-        recordBaggerMetrics =<< contextGets _baggerState
-        logEventSummaries seqEvents
+      recordBaggerMetrics =<< contextGets _baggerState
+      logEventSummaries seqEvents
 
-        let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
-        failures <- fmap concat . runConduit $
-          yield vmInEventBatch
-            .| handleVmTasks
-            .| mapMaybeM routeOutEvent
-            .| sinkList
+      let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
+      failures <- handleVmTasks vmInEventBatch
 
-        loopTimeit "compactContextM" $ compactContextM
+      loopTimeit "compactContextM" $ compactContextM
 
-        return $ if null failures then Nothing else Just failures
+      return $ if null failures then Nothing else Just failures
 
-    for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
-      StateRootMismatch BlockDelta{..} -> do
-        let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _inBlock
-        runStateRootMismatchM $ do
-          sd <- runConduit $ stateDiff' Nothing bNum bHash _inBlock _derived
-             .| headDefC (error $ err ++ "\nError encountered while analyzing stateRoot mismatch")
-          $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
-      ValidatorMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "There was a validator mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
-        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found in block header:        " ++ show (fst _inBlock)
-        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived)
-        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock)
-        $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived)
-      StakeMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "There was a stake update mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
-        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found in block header:    " ++ show _inBlock
-        $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found from running block: " ++ show _derived
-      RoundMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/RoundMismatch" . T.pack $ "Block #" ++ show bNum ++ ", hash " ++ format bHash ++ " has PBFT round " ++ show _inBlock ++ " behind its parent's round " ++ show _derived
-      VersionMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
-        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock
-        $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Latest supported block header version by system: " ++ show _derived
-      UnclesMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "There was a mismatch between uncles in block #" ++ show bNum
-        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "Received uncle hashes: " ++ format _inBlock
-        $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "But expected: " ++ format _derived
-      UnexpectedBlockNumber BlockDelta{..} -> do
-        $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "Expected block number: " ++ show _derived
-        $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
-      ReceiptsRootMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
-        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root in block header: " ++ format _inBlock
-        $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Derived receipts root:         " ++ format _derived
-    error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
+  for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
+    StateRootMismatch BlockDelta{..} -> do
+      let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _inBlock
+      withFetchMissingNodes $ do
+        sds <- stateDiff' Nothing bNum bHash _inBlock _derived
+        let sd = fromMaybe (error $ err ++ "\nError encountered while analyzing stateRoot mismatch") (listToMaybe sds)
+        $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
+    ValidatorMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "There was a validator mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+      $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found in block header:        " ++ show (fst _inBlock)
+      $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived)
+      $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock)
+      $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived)
+    StakeMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "There was a stake update mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+      $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found in block header:    " ++ show _inBlock
+      $logErrorS "ethereumVM/StakeMismatch" . T.pack $ "Stake updates found from running block: " ++ show _derived
+    RoundMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/RoundMismatch" . T.pack $ "Block #" ++ show bNum ++ ", hash " ++ format bHash ++ " has PBFT round " ++ show _inBlock ++ " behind its parent's round " ++ show _derived
+    VersionMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+      $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock
+      $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Latest supported block header version by system: " ++ show _derived
+    UnclesMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "There was a mismatch between uncles in block #" ++ show bNum
+      $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "Received uncle hashes: " ++ format _inBlock
+      $logErrorS "ethereumVM/UnclesMismatch" . T.pack $ "But expected: " ++ format _derived
+    UnexpectedBlockNumber BlockDelta{..} -> do
+      $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "Expected block number: " ++ show _derived
+      $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
+    ReceiptsRootMismatch BlockDelta{..} -> do
+      $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+      $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root in block header: " ++ format _inBlock
+      $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Derived receipts root:         " ++ format _derived
+  error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-bootstrapIfFirstRun :: (VMBase m, HasContext m, Mod.Accessible RedisConnection m) => m ()
+bootstrapIfFirstRun :: ContextM ()
 bootstrapIfFirstRun = do
   genesisInfo <- getGenesisInfo
   let genesisBlock = genesisInfoToBlock genesisInfo
@@ -156,7 +140,7 @@ bootstrapIfFirstRun = do
       populateStorageDBs genesisInfo genesisBlock Nothing
     Just _ -> $logInfoS "bootstrap" "Bootstrapping not needed"
 
-initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
+initializeBestBlock :: ContextM ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
@@ -201,29 +185,6 @@ logEventSummaries evs = do
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
     numberIt i x = show i ++ " " ++ x ++ "s"
-
--- KAFKA
-
-routeOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m (Maybe [BlockVerificationFailure])
-routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
-routeOutEvent oev = Nothing <$ sendOutEvent oev
-
-sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
-sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutASM asm) =
-  when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
-    timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
-      void $ produceIndexEvents [AddressStateUpdates asm]
-sendOutEvent (OutJSONRPC r) = produceResponse r
-sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
-sendOutEvent (OutBlockVerificationFailure _) = pure ()
-sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
-sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
-sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
 
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"

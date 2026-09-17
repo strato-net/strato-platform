@@ -10,7 +10,9 @@ module Main where
 -- HFlags
 
 import BlockApps.Init
-import BlockApps.Logging
+import BlockApps.Logging (runLogging)
+import Control.Monad.Composable.Base (runEff)
+import Blockchain.VMContext (evalContextM, initContext)
 -- HFlags
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
@@ -30,5 +32,5 @@ main = do
   runInstrumentation "vm-runner"
   void $ $initHFlags "Ethereum VM"
   let metricsRunner = run 8009 metricsApp
-      runVM = runLoggingT ethereumVM
+      runVM = runEff . runLogging $ evalContextM "ethereum-vm" initContext ethereumVM
   race_ metricsRunner runVM

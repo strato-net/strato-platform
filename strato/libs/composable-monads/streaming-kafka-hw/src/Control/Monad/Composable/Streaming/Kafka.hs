@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -61,7 +63,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 import Control.Monad (forM_, void)
 import Control.Monad.Composable.Base
-import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString as B
@@ -111,11 +112,11 @@ type ConsumerGroup = Text
 type KafkaClientId = ClientId
 type KafkaAddress = StreamAddress
 
-type StreamM = ReaderT (IORef StreamEnv)
+type StreamM es = Eff (IORef StreamEnv ': es)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 
 -- Deprecated aliases
-type KafkaM = StreamM
+type KafkaM es = StreamM es
 type HasKafka m = HasStreaming m
 type KafkaEnv = StreamEnv
 
@@ -149,20 +150,20 @@ getStreamEnv = do
 getKafkaEnv :: HasStreaming m => m StreamEnv
 getKafkaEnv = getStreamEnv
 
-runStreamMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runStreamMUsingEnv env f = do
   ref <- liftIO $ newIORef env
-  runReaderT f ref
+  provide ref f
 
 -- Deprecated alias
-runKafkaMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
+runKafkaMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated alias
-runKafkaM :: MonadUnliftIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM :: KafkaClientId -> KafkaAddress -> StreamM es a -> Eff es a
 runKafkaM = runStreamM
 
 ----------------------

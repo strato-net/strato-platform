@@ -20,6 +20,7 @@ library:
   - blockDB
   - bytestring
   - common-log
+  - composable-monads-base
   - containers
   - format
   - streaming
@@ -42,6 +43,7 @@ executables:
       - blockapps-init
       - blockDB
       - common-log
+      - composable-monads-base
       - containers
       - hflags
       - monad-alter

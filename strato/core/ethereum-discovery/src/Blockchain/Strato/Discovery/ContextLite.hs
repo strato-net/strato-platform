@@ -1,4 +1,7 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
@@ -15,6 +18,9 @@
 
 module Blockchain.Strato.Discovery.ContextLite
   ( ContextLite (..),
+    DiscoveryM (..),
+    DiscoveryRow,
+    runDiscoveryM,
     UDPPacket (..),
     initContextLite,
     addPeer,
@@ -71,30 +77,39 @@ data ContextLite = ContextLite
 
 newtype UDPPacket = UDPPacket { getUDPPacket :: (B.ByteString, SockAddr) }
 
-instance {-# OVERLAPPING #-} Monad m => Accessible SQLDB (ReaderT ContextLite m) where
+-- | The discovery monad: 'ContextLite' over resources, the vault and the logger.
+type DiscoveryRow = '[ReaderEnv ContextLite, InternalState, VaultData, Logger]
+
+newtype DiscoveryM a = DiscoveryM {unDiscoveryM :: Eff DiscoveryRow a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadReader ContextLite, MonadLogger, MonadLoggerIO, MonadResource, HasVault)
+
+runDiscoveryM :: ContextLite -> DiscoveryM a -> Eff '[InternalState, VaultData, Logger] a
+runDiscoveryM ctx (DiscoveryM m) = withReaderEnv ctx m
+
+instance Accessible SQLDB DiscoveryM where
   access _ = asks liteSQLDB
 
-instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT ContextLite m) where
+instance AccessibleEnv SQLDB DiscoveryM where
   accessEnv = asks liteSQLDB
 
-instance {-# OVERLAPPING #-} Monad m => Accessible Socket (ReaderT ContextLite m) where
+instance Accessible Socket DiscoveryM where
   access _ = asks sock
 
-instance {-# OVERLAPPING #-} Monad m => Accessible UDPPort (ReaderT ContextLite m) where
+instance Accessible UDPPort DiscoveryM where
   access _ = asks myUdpPort
 
-instance {-# OVERLAPPING #-} Monad m => Accessible TCPPort (ReaderT ContextLite m) where
+instance Accessible TCPPort DiscoveryM where
   access _ = asks myTcpPort
 
-instance {-# OVERLAPPING #-} Monad m => Accessible RBDB.RedisConnection (ReaderT ContextLite m) where
+instance Accessible RBDB.RedisConnection DiscoveryM where
   access _ = asks redisBlockDB
 
-instance {-# OVERLAPPING #-} MonadIO m => Accessible [Validator] (ReaderT ContextLite m) where
+instance Accessible [Validator] DiscoveryM where
   access _ = do
     bestSequencedBlock <- fromMaybe (error "missing BestSequencedBlock in redis") <$> RBDB.withRedisBlockDB getBestSequencedBlockInfo
     return $ bestSequencedBlockValidators bestSequencedBlock
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Replaceable Host PPeer (ReaderT ContextLite m) where
+instance A.Replaceable Host PPeer DiscoveryM where
   replace _ host peer = do
     maybePeer <- getPeerByIP host
     void . sqlQuery $ actions maybePeer
@@ -107,15 +122,15 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Replaceable Host PPeer (Reader
             [ PPeerPubkey SQL.=. pPeerPubkey peer
             ]
           return (SQL.entityKey peer')
-      getPeerByIP :: Host -> ReaderT ContextLite m (Maybe (SQL.Entity PPeer))
+      getPeerByIP :: Host -> DiscoveryM (Maybe (SQL.Entity PPeer))
       getPeerByIP host' = listToMaybe <$> sqlQuery actions'
         where
           actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable IP PPeer (ReaderT ContextLite m) where
+instance A.Selectable IP PPeer DiscoveryM where
   select _ = getPeerByIP
     where
-      getPeerByIP :: IP -> ReaderT ContextLite m (Maybe PPeer)
+      getPeerByIP :: IP -> DiscoveryM (Maybe PPeer)
       getPeerByIP ip' =
         sqlQuery actions >>= \case
           [] -> return Nothing
@@ -126,17 +141,17 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable IP PPeer (ReaderT C
         where
           actions = SQL.selectList [PPeerIp SQL.==. Just ip'] []
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable SockAddr B.ByteString (ReaderT ContextLite m) where
+instance A.Replaceable SockAddr B.ByteString DiscoveryM where
   replace _ addr' packet = do
     sock' <- asks sock
     liftIO $ catch
       (void $ NB.sendTo sock' packet addr')
-      (\(err :: IOError) -> runLoggingT . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
+      (\(err :: IOError) -> runEff . runLogging . $logErrorS "NB.sendTo" . T.pack $ "Could not send data to " <> show addr' <> "; got error: " <> show err)
 
-instance {-# OVERLAPPING #-} A.Selectable (Host, UDPPort, B.ByteString) Point IO where
-  select _ (domain, UDPPort udpPortNum, theMsg) = catch
+instance {-# OVERLAPPABLE #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point m where
+  select _ (domain, UDPPort udpPortNum, theMsg) = liftIO $ catch
     (withSocketsDo $ bracket getSocket close (talk theMsg))
-    (\(err :: IOError) -> runLoggingT ($logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
+    (\(err :: IOError) -> (runEff . runLogging $ $logErrorS "withSocketsDo" . T.pack $ "Got error: " <> show err) >> return Nothing)
     where
       getSocket :: IO Socket
       getSocket = do
@@ -155,25 +170,22 @@ instance {-# OVERLAPPING #-} A.Selectable (Host, UDPPort, B.ByteString) Point IO
         --use the Haskell timeout....  I did try setting socket options also, but that didn't work.
         timeout 5000000 $ secPubKeyToPoint . processDataStream' <$> NB.recv socket' 2000
 
-instance {-# OVERLAPPING #-} A.Selectable (Maybe Host, UDPPort) SockAddr IO where
-  select _ (Nothing, UDPPort udpPortNum) = do
+instance {-# OVERLAPPABLE #-} MonadIO m => A.Selectable (Maybe Host, UDPPort) SockAddr m where
+  select _ (Nothing, UDPPort udpPortNum) = liftIO $ do
     fmap (fmap addrAddress . listToMaybe) $
       getAddrInfo
         (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
         Nothing
         (Just (show udpPortNum))
-  select _ (Just ip, UDPPort udpPortNum) = do
+  select _ (Just ip, UDPPort udpPortNum) = liftIO $ do
     fmap (fmap addrAddress . listToMaybe) $ catch
       (getAddrInfo
         (Just defaultHints {addrFlags = [AI_ALL]})
         (Just $ hostToString ip)
         (Just $ show udpPortNum))
-      (\(err :: IOError) -> runLoggingT ($logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return [])
+      (\(err :: IOError) -> (runEff . runLogging $ $logErrorS "getAddrInfo" . T.pack $ "Got error: " <> show err) >> return [])
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT ContextLite m) where
-  select p = liftIO . A.select p
-
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Awaitable UDPPacket (ReaderT ContextLite m) where
+instance Mod.Awaitable UDPPacket DiscoveryM where
   await = do
     sock' <- asks sock
     mPacket <- liftIO . timeout 10000000 $ NB.recvFrom sock' 80000

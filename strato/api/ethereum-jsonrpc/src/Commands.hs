@@ -10,6 +10,7 @@ module Commands
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..), txToEthValue)
@@ -306,7 +307,7 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout waitMicros $ runStreamMConfigured "ethereum-jsonrpc" $
+  result <- timeout waitMicros . runEff $ runStreamMConfigured "ethereum-jsonrpc" $
     consumeFromLatest "jsonrpcresponse"
       (void $ writeSeqVmTasks [VmJsonRpcCommand c])
       (\responses ->

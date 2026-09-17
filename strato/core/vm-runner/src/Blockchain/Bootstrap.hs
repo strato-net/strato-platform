@@ -23,13 +23,12 @@ import Blockchain.Data.BlockHeader (number, currentValidators)
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
-import Blockchain.DB.CodeDB
-import Blockchain.DB.HashDB
-import Blockchain.DB.StateDB (HasStateDB)
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.EthConf as UEC
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
+import Blockchain.VMContext (ContextM)
+import Blockchain.Wiring ()
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
@@ -43,17 +42,14 @@ import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash,
 import qualified Blockchain.Stream.Action as A
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
-import Conduit
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
-import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
-import Data.String (fromString)
 import Data.Maybe
 import qualified Data.Sequence as S
 import qualified Data.Text as T
@@ -61,60 +57,19 @@ import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
 import Text.Format
 
--- | Transformer that provides read-only access to a map of AddressStates.
--- Used during genesis bootstrap to allow address-based imports in compilation.
-newtype WithAddressStateMap m a = WithAddressStateMap 
-  { unWithAddressStateMap :: ReaderT (Map.Map Ad.Address AddressState) m a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadLogger)
-
-instance MonadTrans WithAddressStateMap where
-  lift = WithAddressStateMap . lift
-
-instance {-# OVERLAPPING #-} Monad m => A.Selectable Ad.Address AddressState (WithAddressStateMap m) where
-  select _ addr = WithAddressStateMap $ asks (Map.lookup addr)
-
-instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (WithAddressStateMap m) where
-  lookup p k = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k = lift $ A.delete p k
-
-runWithAddressStateMap :: Map.Map Ad.Address AddressState -> WithAddressStateMap m a -> m a
-runWithAddressStateMap addrMap action = runReaderT (unWithAddressStateMap action) addrMap
-
-addrInfoToAddressState :: GI.AddressInfo -> AddressState
-addrInfoToAddressState (GI.NonContract _ bal) = 
-  blankAddressState { addressStateBalance = bal }
-addrInfoToAddressState (GI.ContractNoStorage _ bal ch) = 
-  blankAddressState { addressStateBalance = bal, addressStateCodeHash = ch }
-addrInfoToAddressState (GI.SolidVMContractWithStorage _ bal ch _) = 
-  blankAddressState { addressStateBalance = bal, addressStateCodeHash = ch }
-
 populateStorageDBs ::
-  ( MonadLogger m,
-    MonadIO m,
-    HasCodeDB m,
-    HasStateDB m,
-    HasHashDB m,
-    (Ad.Address `A.Alters` AddressState) m
-  ) =>
   GenesisInfo ->
   Block ->
   Maybe Word256 ->
-  m ()
+  ContextM ()
 populateStorageDBs genesisInfo genesisBlock genesisChainId = do
-  -- Create topics (connection auto-closes after)
-  liftIO $ UEC.runStreamMConfigured "vm-runner-bootstrap" $ do
-    createTopicAndWait IdxKafka.indexEventsTopicName
-    createTopicAndWait "vmevents"
-    createTopicAndWait "jsonrpcresponse"
-    createTopicAndWait "vm_tasks"
-  -- Create a persistent connection for publishing
-  let k = UEC.streamingConfig UEC.ethConf
-  streamEnv <- liftIO $ createStreamEnv "vm-runner-bootstrap" (fromString $ UEC.streamingHost k, fromIntegral $ UEC.streamingPort k)
+  createTopicAndWait IdxKafka.indexEventsTopicName
+  createTopicAndWait "vmevents"
+  createTopicAndWait "jsonrpcresponse"
+  createTopicAndWait "vm_tasks"
   let pub sd vmes = do
-        void . runStreamMUsingEnv streamEnv $ do
-          for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
-          produceVMEvents vmes
+        for_ sd $ \diff -> IdxKafka.produceIndexEvents [IdxModel.StateDiffEntry diff]
+        void $ produceVMEvents vmes
   let sr = GI.stateRoot genesisInfo
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -124,10 +79,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
       events' = GI.events genesisInfo
       delegatecalls' = GI.delegatecalls genesisInfo
 
-  let addressStateMap = Map.fromList 
-        [(GI.addrInfoAddress ai, addrInfoToAddressState ai) | ai <- GI.addressInfo genesisInfo]
-
-  ccas <- runWithAddressStateMap addressStateMap $
+  ccas <-
     fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
       let srcHash = hash $ T.encodeUtf8 src
       cc <- codeCollectionFromHash False True srcHash
@@ -159,7 +111,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
-  liftIO $ bootstrapIndexer OutputBlock
+  bootstrapIndexer OutputBlock
     { obOrigin = Origin.Direct,
       obBlockData = blockBlockData genesisBlock,
       obReceiptTransactions = [],  -- genesis block has no transactions
@@ -209,15 +161,12 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
 
-bootstrapIndexer :: OutputBlock -> IO ()
+bootstrapIndexer :: HasStreaming m => OutputBlock -> m ()
 bootstrapIndexer obGB = do
-  putStrLn "About to bootstrap index events"
-  res <-
-    UEC.runStreamMConfigured "strato-api-indexer" $
-    IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
-
-  print res
-  putStrLn "bootstrapIndex genesis seed successful!"
+  liftIO $ putStrLn "About to bootstrap index events"
+  res <- IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
+  liftIO $ print res
+  liftIO $ putStrLn "bootstrapIndex genesis seed successful!"
 
 seedDatabases ::
   ( MonadIO m,

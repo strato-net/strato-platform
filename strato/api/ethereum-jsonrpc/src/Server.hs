@@ -5,6 +5,7 @@ module Server
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
 import Blockchain.EthConf (runStreamMConfigured)
@@ -23,7 +24,7 @@ startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
   let port = 8545
-  runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+  runEff $ runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   putStrLn $ "Listening on port " ++ show port
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
   runSettings (setPort port $ setTimeout 150 defaultSettings) app

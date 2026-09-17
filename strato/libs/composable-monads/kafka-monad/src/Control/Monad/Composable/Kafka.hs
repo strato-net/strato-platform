@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -61,7 +63,6 @@ import Control.Lens
 import Control.Monad (void)
 import Control.Monad.Composable.Base
 import Control.Monad.Loops
-import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
 import qualified Data.Aeson as JSON
@@ -85,7 +86,7 @@ import Network.Kafka.Protocol hiding (ClientId)
 
 
 -- Generic streaming type aliases
-type StreamM = ReaderT (IORef KafkaState)
+type StreamM es = Eff (IORef KafkaState ': es)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
 type ClientId = Text
 type StreamAddress = (String, Int)
@@ -99,7 +100,7 @@ data StreamEnv = StreamEnv
   }
 
 -- Deprecated aliases for backward compatibility
-type KafkaM = StreamM
+type KafkaM es = StreamM es
 type HasKafka m = HasStreaming m
 type KafkaEnv = StreamEnv
 
@@ -132,11 +133,11 @@ kafkaStateToStreamEnv kafkaState = do
 getStreamEnv :: HasStreaming m => m StreamEnv
 getStreamEnv = StreamEnv <$> accessEnv
 
-runStreamMUsingEnv :: StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runStreamMUsingEnv env f =
-  runReaderT f $ streamStateIORef env
+  provide (streamStateIORef env) f
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated aliases (accept old types for backward compatibility)
@@ -147,10 +148,10 @@ createKafkaEnv (KString cid) (Host (KString host), Port port) =
 getKafkaEnv :: HasStreaming m => m StreamEnv
 getKafkaEnv = getStreamEnv
 
-runKafkaMUsingEnv :: StreamEnv -> StreamM m a -> m a
+runKafkaMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
-runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM :: KafkaClientId -> KafkaAddress -> StreamM es a -> Eff es a
 runKafkaM cid addr f = flip runStreamMUsingEnv f =<< createKafkaEnv cid addr
 
 execKafka ::
@@ -302,10 +303,10 @@ conduitBatchSource :: (MonadIO m, Binary a) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do
   env <- createStreamEnv clientId streamAddress
-  startingOffset <- runStreamMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+  startingOffset <- liftIO . runEff . runStreamMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      items <- runStreamMUsingEnv env $ fetchItems topicName offset
+      items <- liftIO . runEff . runStreamMUsingEnv env $ fetchItems topicName offset
       yield items
       return $ offset + fromIntegral (length items)
 

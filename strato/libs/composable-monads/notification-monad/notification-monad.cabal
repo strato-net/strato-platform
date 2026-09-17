@@ -18,6 +18,7 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , composable-monads-base
     , http-client
     , http-client-tls
     , monad-alter

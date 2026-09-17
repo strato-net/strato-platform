@@ -135,7 +135,8 @@ import Text.Tools
 import UnliftIO hiding (assert)
 
 
-type SolidVMBase m = VMBase m
+-- | The evaluator runs in the node monad and nowhere else.
+type SolidVMBase m = (m ~ ContextM)
 
 onTraced :: Monad m => m () -> m ()
 onTraced = when (Conf.svmTrace (Conf.debugConfig ethConf))

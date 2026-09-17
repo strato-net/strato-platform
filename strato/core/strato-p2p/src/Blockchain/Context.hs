@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns          #-}
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -35,6 +37,8 @@ module Blockchain.Context
     , initConfig
     , initContext
     , runContextM
+    , ContextM(..)
+    , ContextRow
     , blockstanbulPeerAddr
     , getBlockHeaders
     , putBlockHeaders
@@ -55,6 +59,7 @@ import           Control.Exception                       hiding (bracket, catch)
 import           Control.Lens                            hiding (Context)
 import qualified Control.Monad.Change.Alter              as A
 import qualified Control.Monad.Change.Modify             as Mod
+import           Control.Monad.Catch                     (MonadCatch, MonadMask)
 import           Control.Monad.Composable.Vault
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
@@ -176,7 +181,10 @@ makeLenses ''Context
 
 newtype GenesisBlockHash = GenesisBlockHash {unGenesisBlockHash :: Keccak256}
 
-type ContextM = ReaderT Config (ResourceT (VaultM (LoggingT IO)))
+type ContextRow = '[ReaderEnv Config, InternalState, VaultData, Logger]
+
+newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadReader Config, MonadLogger, MonadLoggerIO, MonadResource, HasVault)
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
@@ -221,7 +229,7 @@ instance RunsServer ContextM where
         (handler conduits ip pn)
         (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
-instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
+instance (Keccak256 `A.Alters` BlockHeader) ContextM where
   lookup _ = RBDB.withRedisBlockDB . getHeader
   insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
   delete _ = void . RBDB.withRedisBlockDB . deleteHeader
@@ -232,7 +240,7 @@ instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) wher
   insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
   deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
+instance Mod.Modifiable WorldBestBlock ContextM where
   get _ =
     RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
       Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
@@ -243,7 +251,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Co
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True -> return ()
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
+instance Mod.Modifiable BestBlock ContextM where
   get _ =
     RBDB.withRedisBlockDB getBestBlockInfo <&> \case
       Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
@@ -253,7 +261,7 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config 
       Left err -> error $ "Failed to update best block in Redis: " ++ show err
       Right _ -> return ()
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
+instance Mod.Modifiable BestSequencedBlock ContextM where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
       Nothing -> do
@@ -265,10 +273,10 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
       Left err -> error $ "Failed to update best sequenced block in Redis: " ++ show err
       Right _ -> return ()
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
+instance A.Selectable Integer (Canonical BlockHeader) ContextM where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
 
-instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
+instance (Keccak256 `A.Alters` OutputBlock) ContextM where
   lookup _ = RBDB.withRedisBlockDB . getBlock
   insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
   delete _ = void . RBDB.withRedisBlockDB . deleteBlock
@@ -279,7 +287,7 @@ instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) wher
   insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
   deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
 
-instance MonadIO m => (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) (ReaderT Config m) where
+instance (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) ContextM where
   lookup _ k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
     let b = S.member k wms
@@ -307,7 +315,7 @@ instance MonadIO m => (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) (Reader
              in (wms', ())
         )
 
-instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) (ReaderT Config m) where
+instance ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) ContextM where
   lookup _ k = do
     wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
     let b = S.member k wms
@@ -326,22 +334,18 @@ instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
-instance {-# OVERLAPPING #-}
-  ( MonadUnliftIO m
-  ) =>
-  Mod.Accessible GenesisBlockHash (ReaderT Config m)
-  where
+instance Mod.Accessible GenesisBlockHash ContextM where
   access _ = GenesisBlockHash <$> getGenesisBlockHash
 
-instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
+instance Mod.Modifiable Context ContextM where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
 
-instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
+instance Mod.Modifiable ActionTimestamp ContextM where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
+instance Mod.Accessible ActionTimestamp ContextM where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 -- Short, because only one connection now acts on a given gap: if that peer
@@ -362,7 +366,7 @@ class HasResyncGate m where
   -- all connections in the process.
   tryResyncFrom :: Integer -> m Bool
 
-instance MonadIO m => HasResyncGate (ReaderT Config m) where
+instance HasResyncGate ContextM where
   tryResyncFrom n = do
     ref <- asks configLastResync
     now <- liftIO getCurrentTime
@@ -374,7 +378,7 @@ instance MonadIO m => HasResyncGate (ReaderT Config m) where
             then (old, False)
             else (LastResync (Just (n, now)), True)
 
-instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
+instance Mod.Modifiable [BlockHeader] ContextM where
   get _ = do
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
@@ -394,10 +398,10 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)}, ()))
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
+instance Mod.Accessible [BlockHeader] ContextM where
   access _ = Mod.get (Proxy @[BlockHeader])
 
-instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
+instance Mod.Modifiable RemainingBlockHeaders ContextM where
   get _ = do
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
@@ -413,23 +417,23 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {remainingBlockHeaders = (k, now)}, ()))
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
+instance Mod.Accessible RemainingBlockHeaders ContextM where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
 
-instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
+instance Mod.Modifiable PeerAddress ContextM where
   get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
+instance Mod.Accessible PeerAddress ContextM where
   access _ = Mod.get (Proxy @PeerAddress)
 
-instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
+instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = asks configRedisBlockDB
 
-instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
+instance AccessibleEnv SQLDB ContextM where
   accessEnv = asks configSQLDB
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
+instance A.Selectable Host PPeer ContextM where
   select _ host' =
     sqlQuery actions >>= \case
       [] -> return Nothing
@@ -437,7 +441,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Host PPeer (ReaderT
     where
       actions = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
+instance A.Selectable Point PPeer ContextM where
   select _ pk =
     sqlQuery actions >>= \case
       [] -> return Nothing
@@ -445,13 +449,10 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (Reader
     where
       actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+instance Mod.Outputs ContextM [IngestEvent] where
   output ie = do
     envVar <- asks configStreamEnv
-    withMVar envVar $ \env -> void . runStreamMUsingEnv env $ SK.writeUnseqEvents ie
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
-  select p = liftIO . A.select p
+    withMVar envVar $ \env -> void . ContextM . runStreamMUsingEnv env $ SK.writeUnseqEvents ie
 
 type MonadP2P m =
   ( MonadIO m,
@@ -525,12 +526,8 @@ getActionTimestamp = Mod.access (Proxy @ActionTimestamp)
 clearActionTimestamp :: Mod.Modifiable ActionTimestamp m => m ()
 clearActionTimestamp = Mod.put (Proxy @ActionTimestamp) emptyActionTimestamp
 
-runContextM ::
-  MonadUnliftIO m =>
-  r ->
-  ReaderT r (ResourceT m) a ->
-  m ()
-runContextM r = void . runResourceT . flip runReaderT r
+runContextM :: Config -> ContextM a -> Eff '[VaultData, Logger] ()
+runContextM r (ContextM m) = void . withResources $ withReaderEnv r m
 
 initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
 initConfig wireMessagesRef = do

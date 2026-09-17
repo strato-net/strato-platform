@@ -10,6 +10,7 @@
 module Handlers.QueuedTransactions
   ( API,
     server,
+    getQueuedRawTransactions,
   )
 where
 
@@ -21,7 +22,6 @@ import Control.Monad.Composable.SQL
 import Database.Persist.Postgresql
 import Servant
 import Settings
-import UnliftIO
 
 type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
 
@@ -30,8 +30,11 @@ server = getQueuedTransactions
 
 ---------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible [RawTransaction] (SQLM m) where
-  access _ =
+instance {-# OVERLAPPABLE #-} HasSQL m => Accessible [RawTransaction] m where
+  access _ = getQueuedRawTransactions
+
+getQueuedRawTransactions :: HasSQL m => m [RawTransaction]
+getQueuedRawTransactions =
     fmap (map entityVal) . sqlQuery $
       selectList
         [RawTransactionBlockNumber ==. (-1)]

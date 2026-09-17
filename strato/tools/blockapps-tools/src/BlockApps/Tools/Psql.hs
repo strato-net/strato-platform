@@ -3,6 +3,7 @@
 module BlockApps.Tools.Psql where
 
 import BlockApps.Logging
+import Control.Monad.Composable.Base (runEff)
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.Strato.Discovery.Data.Peer as DataPeer
@@ -12,7 +13,8 @@ import HFlags
 migrate :: String -> IO ()
 migrate tables = do
   _ <- $initHFlags "migrate" -- I'm not sure that this makes sense to interleave with Ann, but we need minLogLevel
-  runLoggingT
+  runEff
+    . runLogging
     . withPostgresqlConn connStr
     $ runSqlConn $
       runMigration $

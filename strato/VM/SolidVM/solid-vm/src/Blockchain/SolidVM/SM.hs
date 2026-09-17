@@ -1,8 +1,13 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -11,6 +16,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -70,7 +76,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SolidStorageDB
-import Blockchain.DB.StateDB
+import Blockchain.DB.StateDB ()
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import qualified Blockchain.Database.MerklePatricia as MP
@@ -92,16 +98,15 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
+import Blockchain.Wiring ()
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
 import Control.Arrow ((&&&))
 import Control.Lens hiding (Context)
 import Control.Monad
-import Control.Monad.Catch (MonadCatch)
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Reader
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
@@ -118,6 +123,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
 import Debugger
+import Control.Monad.Composable.Base hiding (getEnv)
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
@@ -180,7 +186,25 @@ data SState = SState
 
 makeLenses ''SState
 
-type SM m = ReaderT (IORef SState) m
+-- | The evaluator is a large mutually recursive group. Over a transformer
+-- stack GHC cannot eta-expand it, so every bind allocates a closure per layer.
+-- 'SM' is the node's row plus the evaluator's state cell, as one flat
+-- @Env -> IO@ layer; nothing is stacked underneath.
+newtype SM a = SM {unSM :: Eff (IORef SState ': ContextRow) a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger)
+
+-- | Run a node action from the evaluator: the same environment viewed without
+-- the evaluator-state slot.
+host :: ContextM a -> SM a
+host (ContextM m) = SM (withEnv (\(_ :& rest) -> rest) m)
+{-# INLINE host #-}
+
+instance A.Selectable FilePath (Either String String) SM where
+  select p k = host (A.select p k)
+
+stateRef :: SM (IORef SState)
+stateRef = SM accessEnv
+{-# INLINE stateRef #-}
 
 class Monad m => MonadGas m where
   chargeGasState :: Gas -> m GasInfo
@@ -191,69 +215,37 @@ class Monad m => MonadDebugHot m where
 class Monad m => MonadCallStack m where
   popCallInfoState :: m (Maybe CallInfo)
 
-type MonadSM m =
-  ( (Address `A.Alters` AddressState) m,
-    A.Selectable Address AddressState m,
-    HasStateDB m,
-    HasCodeDB m,
-    (Keccak256 `A.Alters` BlockSummary) m,
-    HasRawStorageDB m,
-    HasMemAddressStateDB m,
-    HasMemRawStorageDB m,
-    Mod.Accessible Env.Environment m,
-    Mod.Accessible [SourcePosition] m,
-    Mod.Accessible VariableSet m,
-    Mod.Modifiable GasInfo m,
-    Mod.Modifiable MemDBs m,
-    Mod.Modifiable Env.Environment m,
-    Mod.Modifiable Env.Sender m,
-    Mod.Modifiable [CallInfo] m,
-    Mod.Modifiable Action m,
-    Mod.Modifiable (Q.Seq Event) m,
-    Mod.Modifiable (Q.Seq Action.Delegatecall) m,
-    Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) m,
-    Mod.Modifiable (Maybe DebugSettings) m,
-    Mod.Modifiable (Maybe VmTracer) m,
-    MonadGas m,
-    MonadDebugHot m,
-    MonadCallStack m,
-    MonadUnliftIO m, --todo: remove
-    MonadCatch m,
-    MonadLogger m
-  )
+-- | The evaluator is written against an abstract @m@ but only ever runs in
+-- 'SM'. Fixing @m ~ SM@ here makes every evaluator function compile to
+-- monomorphic code (all instances resolve statically, no dictionaries are
+-- passed) without touching its signatures.
+type MonadSM m = (m ~ SM)
 
-get :: MonadUnliftIO m => SM m SState
-get = readIORef =<< ask
+get :: SM SState
+get = readIORef =<< stateRef
 {-# INLINE get #-}
 
-gets :: MonadUnliftIO m => (SState -> a) -> SM m a
+gets :: (SState -> a) -> SM a
 gets f = f <$> get
 {-# INLINE gets #-}
 
-modify :: MonadUnliftIO m => (SState -> SState) -> SM m ()
-modify f = ask >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
+modify :: (SState -> SState) -> SM ()
+modify f = stateRef >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
 {-# INLINE modify #-}
 
-instance MonadUnliftIO m => HasMemAddressStateDB (SM m) where
+instance HasMemAddressStateDB SM where
   getAddressStateTxDBMap = gets $ _stateTxMap . _ssMemDBs
   putAddressStateTxDBMap m = modify $ ssMemDBs . stateTxMap .~ m
   getAddressStateBlockDBMap = gets $ _stateBlockMap . _ssMemDBs
   putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
-instance MonadUnliftIO m => HasMemRawStorageDB (SM m) where
+instance HasMemRawStorageDB SM where
   getMemRawStorageTxDB = gets $ _storageTxMap . _ssMemDBs
   putMemRawStorageTxMap m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
-instance
-  ( MonadUnliftIO m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    MonadLogger m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
-  ) =>
-  (RawStorageKey `A.Alters` RawStorageValue) (SM m)
+instance (RawStorageKey `A.Alters` RawStorageValue) SM
   where
   lookup _ k   = do
     cs <- gets callStack
@@ -299,14 +291,7 @@ instance
           callStack = c':cs'
         }
 
-instance
-  ( MonadUnliftIO m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    MonadLogger m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
-  ) =>
-  (Address `A.Alters` AddressState) (SM m)
+instance (Address `A.Alters` AddressState) SM
   where
   lookup _ a = do
     cs <- gets callStack
@@ -360,14 +345,7 @@ instance
           callStack = c':cs'
         }
 
-instance
-  ( MonadUnliftIO m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    MonadLogger m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (N.NibbleString `A.Alters` N.NibbleString) m
-  ) =>
-  A.Selectable Address AddressState (SM m)
+instance A.Selectable Address AddressState SM
   where
   select = A.lookup
 
@@ -385,95 +363,93 @@ lookupStateFrames address (ci : rest) = case M.lookup address (stateMap ci) of
   Nothing -> lookupStateFrames address rest
 {-# INLINE lookupStateFrames #-}
 
-instance
-  (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m) =>
-  (Maybe Word256 `A.Alters` MP.StateRoot) (SM m)
+instance (Maybe Word256 `A.Alters` MP.StateRoot) SM
   where
   lookup p chainId = do
     (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
     mSR <- view (stateRoots . at (bh, chainId)) <$> Mod.get (Mod.Proxy @MemDBs)
     case mSR of
       Just sr -> pure $ Just sr
-      Nothing -> lift $ A.lookup p chainId
+      Nothing -> host $ A.lookup p chainId
   insert p chainId sr = do
     (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.insert (bh, chainId) sr
-    lift $ A.insert p chainId sr
+    Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots %~ M.insert (bh, chainId) sr)
+    host $ A.insert p chainId sr
   delete p chainId = do
     (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots %= M.delete (bh, chainId)
-    lift $ A.delete p chainId
+    Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots %~ M.delete (bh, chainId))
+    host $ A.delete p chainId
 
-instance MonadUnliftIO m => Mod.Modifiable CurrentBlockHash (SM m) where
+instance Mod.Modifiable CurrentBlockHash SM where
   get _ = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
-  put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
+  put _ md = Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (currentBlock ?~ md)
 
-instance (Keccak256 `A.Alters` BlockSummary) m => (Keccak256 `A.Alters` BlockSummary) (SM m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p = lift . A.delete p
+instance (Keccak256 `A.Alters` BlockSummary) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
 
-instance (MP.StateRoot `A.Alters` MP.NodeData) m => (MP.StateRoot `A.Alters` MP.NodeData) (SM m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p = lift . A.delete p
+instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
 
-instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p = lift . A.delete p
+instance (Keccak256 `A.Alters` DBCode) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
 
-instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
-  lookup p = lift . A.lookup p
-  insert p k = lift . A.insert p k
-  delete p = lift . A.delete p
+instance (N.NibbleString `A.Alters` N.NibbleString) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
 
-instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
+instance Mod.Accessible Env.Environment SM where
   access _ = gets env
 
-instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
+instance Mod.Modifiable Env.Environment SM where
   get _   = gets env
   put _ m = modify $ \ss -> ss{ env = m }
 
-instance MonadUnliftIO m => Mod.Modifiable (Maybe DebugSettings) (SM m) where
+instance Mod.Modifiable (Maybe DebugSettings) SM where
   get _ = gets ssDebugSettingsValue
   put _ d = modify $ \ss ->
     ss {ssDebugSettingsValue = d, ssDbgHot = isJust d || isJust (ssVmTracerValue ss)}
 
-instance MonadUnliftIO m => Mod.Modifiable (Maybe VmTracer) (SM m) where
+instance Mod.Modifiable (Maybe VmTracer) SM where
   get _ = gets ssVmTracerValue
   put _ t = modify $ \ss ->
     ss {ssVmTracerValue = t, ssDbgHot = isJust (ssDebugSettingsValue ss) || isJust t}
 
-instance MonadUnliftIO m => MonadDebugHot (SM m) where
+instance MonadDebugHot SM where
   debugIsHot = gets ssDbgHot
   {-# INLINE debugIsHot #-}
 
-instance MonadUnliftIO m => MonadCallStack (SM m) where
-  popCallInfoState = ask >>= \ref -> liftIO $ atomicModifyIORef' ref $ \ss ->
+instance MonadCallStack SM where
+  popCallInfoState = stateRef >>= \ref -> liftIO $ atomicModifyIORef' ref $ \ss ->
     case callStack ss of
       [] -> (ss, Nothing)
       ci : rest -> (ss {callStack = rest}, Just ci)
   {-# INLINE popCallInfoState #-}
 
-instance MonadUnliftIO m => Mod.Modifiable Env.Sender (SM m) where
+instance Mod.Modifiable Env.Sender SM where
   get _ = Env.Sender . Env.sender <$> gets env
   put _ (Env.Sender s) = modify $ \ss@SState {env = e} -> ss {env = e {Env.sender = s}}
 
-instance MonadUnliftIO m => Mod.Modifiable [CallInfo] (SM m) where
+instance Mod.Modifiable [CallInfo] SM where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss {callStack = cs}
 
-instance MonadUnliftIO m => Mod.Modifiable MemDBs (SM m) where
+instance Mod.Modifiable MemDBs SM where
   get _ = gets _ssMemDBs
   put _ md = modify $ ssMemDBs .~ md
 
-instance MonadUnliftIO m => Mod.Modifiable GasInfo (SM m) where
+instance Mod.Modifiable GasInfo SM where
   get _ = gets _gasInfo
   put _ g = modify $ gasInfo .~ g
 
-instance MonadUnliftIO m => MonadGas (SM m) where
-  chargeGasState !gas = ask >>= \ref -> liftIO $ do
+instance MonadGas SM where
+  chargeGasState !gas = stateRef >>= \ref -> liftIO $ do
     ss <- readIORef ref
     let gi = _gasInfo ss
         !newLeft = _gasLeft gi - gas
@@ -483,23 +459,23 @@ instance MonadUnliftIO m => MonadGas (SM m) where
     pure gi'
   {-# INLINE chargeGasState #-}
 
-instance MonadUnliftIO m => Mod.Modifiable Action (SM m) where
+instance Mod.Modifiable Action SM where
   get _ = gets _action
   put _ a = modify $ action .~ a
 
-instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Event) (SM m) where
+instance Mod.Modifiable (Q.Seq Event) SM where
   get _ = gets (Action._events . _action)
   put _ q = modify $ action . Action.events .~ q
 
-instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) where
+instance Mod.Modifiable (Q.Seq Action.Delegatecall) SM where
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
-instance MonadUnliftIO m => Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) (SM m) where
+instance Mod.Modifiable (OMap.OMap (Text, Keccak256) CodeCollection) SM where
   get _ = gets (Action._newCodeCollections . _action)
   put _ q = modify $ action . Action.newCodeCollections .~ q
 
-variableSet :: VMBase m => SM m VariableSet
+variableSet :: SM VariableSet
 variableSet = do
   cis <- Mod.get (Mod.Proxy @[CallInfo])
   let textSet = S.fromList . M.keys
@@ -513,25 +489,20 @@ variableSet = do
       globals = M.singleton "State Variables" stateVars
   pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
 
-instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible VariableSet (SM m) where
+instance Mod.Accessible VariableSet SM where
   access _ = variableSet
 
-instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible [SourcePosition] (SM m) where
+instance Mod.Accessible [SourcePosition] SM where
   access _ = do
     cis <- Mod.get (Mod.Proxy @[CallInfo])
     pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
 
 runSM ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
-    Mod.Modifiable ContextState m,
-    Mod.Modifiable GasCap m
-  ) =>
   (Maybe Code) ->
   Env.Environment ->
   GasInfo ->
-  SM m a ->
-  m (Env.Environment, Either SolidException a)
+  SM a ->
+  ContextM (Env.Environment, Either SolidException a)
 runSM maybeCode envBefore gi f = do
   contextState <- Mod.get (Mod.Proxy @ContextState)
   let csMemDBs = _memDBs contextState
@@ -551,7 +522,7 @@ runSM maybeCode envBefore gi f = do
             ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer
           }
   startingStateRef <- newIORef startingState
-  eVal <- try $ runReaderT f startingStateRef
+  eVal <- try . ContextM $ provide startingStateRef (unSM f)
   sstateAfter <- readIORef startingStateRef
   let envAfter = env sstateAfter
   case eVal of
@@ -573,7 +544,7 @@ runSM maybeCode envBefore gi f = do
           throwIO se
         else return (envAfter, Left se)
     Right value -> do
-      Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
+      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (memDBs .~ _ssMemDBs sstateAfter)
       return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
@@ -1054,14 +1025,14 @@ initializeAction acct = do
   act <- Mod.get (Mod.Proxy @Action)
   unless (OMap.member acct (Action._actionData act)) $ do
     let newData = Action.ActionData (Action.SolidVMDiff M.empty)
-    Mod.modifyStatefully_ (Mod.Proxy @Action) $
-      Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
+    Mod.modify_ (Mod.Proxy @Action) $
+      pure . (Action.actionData %~ Action.omapInsertWith Action.mergeActionData acct newData)
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
+  Mod.modify_ (Mod.Proxy @Action) $
+    pure . (Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %~ ins)
 
 addEvent :: (MonadIO m, Mod.Modifiable (Q.Seq Event) m, Mod.Modifiable (Maybe VmTracer) m) => Event -> m ()
 addEvent newEvent = do

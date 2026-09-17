@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -17,12 +18,12 @@ module SolidVM.Solidity.Fuzzer
 where
 
 import BlockApps.Logging
-import Blockchain.MemVMContext
+import Blockchain.Wiring (contextModify')
 import Blockchain.SolidVM.Simple hiding (runningTests)
 import Blockchain.Strato.Model.Address
-import Blockchain.VMContext (VMBase, runningTests)
+import Blockchain.VMContext (VMBase, runningTests, evalMemContextM)
+import Control.Monad.Composable.Base (runEff, withNoLogger)
 import Control.Lens
-import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Reader
@@ -79,14 +80,14 @@ success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
 defaultHook :: Monad m => Int -> FuzzerTestAndResult -> m FuzzerTestAndResult
 defaultHook _ r = pure r
 
-runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
+runFuzzer :: (MonadUnliftIO m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
   (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
   SourceMap ->
   m [FuzzerTestAndResult]
 runFuzzer dSettings compile src = runFuzzerWithHook dSettings compile src defaultHook
 
-runFuzzerWithHook :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
+runFuzzerWithHook :: (MonadUnliftIO m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
   (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
   SourceMap ->
@@ -100,8 +101,8 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
     ctx <- FuzzerContext args <$> newIORef (error "_fuzzerContextBlockHeader not initialized")
-    runNoLoggingT . evalMemContextM dSettings . flip runReaderT ctx $ do
-      lift . modify' $ runningTests .~ True
+    withRunInIO $ \run -> runEff . withNoLogger . evalMemContextM (run . A.select (A.Proxy @(Either String String))) dSettings . flip runReaderT ctx $ do
+      lift . contextModify' $ runningTests .~ True
       let contractsInSourceOrder =
             sortBy (comparing (\(_, c') -> c' ^. contractContext . sourceAnnotationStart)) (M.toList $ _contracts cc)
        in fmap concat . for contractsInSourceOrder $ \(cName, c) ->
@@ -114,7 +115,7 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
               case beforeAllRes of
                 Just ff@FuzzerFailure{} -> do
                   let res = withTestName "beforeAll" ff
-                  _ <- lift . lift . lift $ hook 0 res
+                  _ <- liftIO . run $ hook 0 res
                   pure []
                 _ -> do
                   let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
@@ -132,7 +133,7 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
                             _ <- for (M.lookup "afterEach" $ _functions c) $ test addr "afterEach"
                             pure result
                         | otherwise -> pure Nothing
-                    maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
+                    maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (liftIO . run . hook i) mResult
                     ) (1, []) functionsInSourceOrder
                   _ <- for (M.lookup "afterAll" $ _functions c) $ test addr "afterAll"
                   pure testResults

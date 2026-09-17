@@ -39,6 +39,7 @@ library
     , blockapps-highway-api
     , bytestring
     , common-log
+    , composable-monads-base
     , conduit
     , filepath
     , http-client
@@ -72,6 +73,7 @@ executable blockapps-highway-server
     , blockapps-init
     , bytestring
     , common-log
+    , composable-monads-base
     , hflags
     , http-client
     , http-client-tls
@@ -106,6 +108,7 @@ test-suite highway-spec
     , blockapps-highway-server
     , bytestring
     , common-log
+    , composable-monads-base
     , hflags
     , hspec
     , http-client

@@ -42,9 +42,11 @@ library
     , classy-prelude
     , clock
     , common-log
+    , composable-monads-base
     , conduit
     , containers
     , directory
+    , exceptions
     , format
     , hflags
     , lens
@@ -74,6 +76,7 @@ executable forced-config-change
   build-depends:
       base
     , blockstanbul
+    , composable-monads-base
     , hflags
     , seqevents
     , strato-conf
@@ -92,6 +95,7 @@ executable strato-sequencer
     , blockapps-init
     , blockstanbul
     , common-log
+    , composable-monads-base
     , format
     , hedis
     , hflags

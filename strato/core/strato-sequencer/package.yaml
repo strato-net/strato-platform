@@ -24,8 +24,10 @@ library:
     - bytestring
     - clock
     - common-log
+    - composable-monads-base
     - conduit
     - directory
+    - exceptions
     - format
     - hflags
     - streaming
@@ -59,6 +61,7 @@ executables:
       - blockDB
       - blockstanbul
       - common-log
+      - composable-monads-base
       - format
       - hedis
       - hflags
@@ -81,6 +84,7 @@ executables:
     other-modules: []
     dependencies:
       - blockstanbul
+      - composable-monads-base
       - hflags
       - streaming
       - seqevents

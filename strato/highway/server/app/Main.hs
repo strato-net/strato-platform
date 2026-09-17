@@ -14,6 +14,7 @@ import Strato.Monad
 import Strato.Server
 import BlockApps.Init
 import BlockApps.Logging
+import Control.Monad.Composable.Base (Eff, Logger, runEff)
 import Options
 
 import Aws as Aws (makeCredentials)
@@ -73,9 +74,9 @@ highway3DMacroFont =
 main :: IO ()
 main = do
   _ <- $initHFlags "Setup Highway Wrapper AWS settings"
-  runLoggingT initHighway
+  runEff $ runLogging initHighway
 
-initHighway :: LoggingT IO ()
+initHighway :: Eff '[Logger] ()
 initHighway = do
   $logInfoS "highway/initHighway" $ T.pack $ "Starting up highway."
   liftIO $ blockappsInit "blockapps-highway-server"

@@ -41,6 +41,7 @@ library
     , blockapps-vault-wrapper-client
     , bytestring
     , common-log
+    , composable-monads-base
     , conduit
     , containers
     , data-default
@@ -84,6 +85,7 @@ executable genesis-builder
     , blockapps-mpdbs
     , bytestring
     , common-log
+    , composable-monads-base
     , conduit
     , data-default
     , strato-genesis
