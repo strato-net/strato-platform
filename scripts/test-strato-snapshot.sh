@@ -450,4 +450,35 @@ if resolve_uri "" false "" helium "" 2>/dev/null; then
   exit 1
 fi
 
+# --- State-only snapshot: a replica joins a cluster the source cell writes ---
+STATE_ONLY="$TMP/state-only.tar.gz"
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
+  --network helium \
+  --output "$STATE_ONLY" \
+  --state-only \
+  --metadata-url "file://$TMP/metadata.json" \
+  --last-block-url "file://$TMP/last.json" \
+  --cirrus-tip-url "file://$TMP/cirrus.json" \
+  --skip-smoke-test
+
+if tar -tzf "$STATE_ONLY" | grep -q 'postgres-dumps'; then
+  echo "a state-only archive must carry no database dumps" >&2
+  exit 1
+fi
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" inspect "$STATE_ONLY" > "$TMP/state-only-inspect.out"
+if grep -q 'postgres-dumps' "$TMP/state-only-inspect.out"; then
+  echo "a state-only manifest must not list database dumps" >&2
+  exit 1
+fi
+
+REPLICA="$TMP/replica"
+make_target_node "$REPLICA"
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$REPLICA" \
+  --source "$STATE_ONLY" \
+  --network helium \
+  --force
+assert_file "$REPLICA/.ethereumH/state/value"
+assert_file "$REPLICA/redis/appendonly.aof"
+assert_file "$REPLICA/kafka/log"
+
 echo "strato-snapshot fixture tests passed"

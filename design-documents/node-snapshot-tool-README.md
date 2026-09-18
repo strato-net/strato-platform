@@ -130,6 +130,46 @@ child service. If `strato-ps` says `Convoke: Not running` but Docker containers
 are healthy, also check metadata and host services before assuming the node is
 down.
 
+## Cells That Share a Database Cluster
+
+A core cell in a tiered deployment keeps `eth` and `cirrus` in a shared cluster
+(Aurora), not in a local `postgres/` data dir, and every cell on that cluster
+shares one copy of them. Two options cover that:
+
+```bash
+# Snapshot a synced cell: chain state from the node dir, eth/cirrus from the cluster.
+bin/strato-snapshot create "$NODE_DIR" --network helium \
+  --postgres-host strato-tiered.cluster-xxxx.us-east-1.rds.amazonaws.com \
+  --postgres-user postgres --postgres-password-file /etc/strato/pgpassword
+
+# Snapshot for replicas that join the same cluster: chain state only.
+bin/strato-snapshot create "$NODE_DIR" --network helium --state-only
+```
+
+Restoring follows the same split:
+
+- A **state-only** archive carries no dumps, so restore leaves the cluster's
+  databases untouched. This is what a second or third cell on one cluster needs:
+  it catches up on chain state and joins the databases the first cell writes.
+- An archive **with** dumps restores them into the node's local data dir as
+  usual, or into a cluster with `--postgres-host ... --replace-databases`. The
+  confirmation flag is required because that replaces `eth` and `cirrus` for
+  every node on that cluster, so it is for standing up a new deployment, not for
+  adding a cell to a running one. `--skip-databases` ignores the dumps instead.
+
+Loading into a cluster drops each database and rebuilds it from the dump rather
+than restoring over what is there. Restoring over a live `cirrus` cannot work:
+its generated views depend on one another, so the drops fail, the creates that
+follow collide with the objects still standing, and the rows land in the old
+table shape. Dropping is also what makes the cluster hold exactly the snapshot's
+contents and nothing left over. Connections are closed as each database goes,
+so the API tier and any other cell on the cluster see errors until the load
+finishes and they reconnect.
+
+The password is read from the file given by `--postgres-password-file`, inside
+the client container's environment only; it never reaches the payload or the
+logs.
+
 ## Create a Snapshot
 
 Start from a fully synced local node. By default, `create` requires metadata to

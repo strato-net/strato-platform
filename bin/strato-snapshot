@@ -36,7 +36,6 @@ init_workdir() {
   mkdir -p "$WORKDIR" 2>/dev/null || die "could not create work directory: $WORKDIR"
   WORKDIR="$(cd "$WORKDIR" && pwd)"
 }
-init_workdir
 
 usage() {
   cat <<'EOF'
@@ -71,6 +70,12 @@ Create options:
                              behind the committed consumer offsets (safe: every
                              consumer resumes at or after its committed offset)
                              to keep the archive small.
+  --state-only               Leave eth/cirrus out of the payload: for replicas
+                             that share the cluster this node writes to.
+  --postgres-host <host>     Dump eth/cirrus from this cluster instead of the
+                             node's local data dir (a cell on Aurora). With
+                             --postgres-port, --postgres-user and
+                             --postgres-password-file.
   --skip-smoke-test          Do not restore/start-test the created artifact.
   --smoke-node-dir <dir>     Directory to use for create smoke test.
   --smoke-timeout <seconds>  Smoke-test metadata timeout. Default: 600.
@@ -80,6 +85,14 @@ Restore options:
   --start                    Start the node after restore.
   --include-prometheus       Restore prometheus/ if present.
   --allow-version-drift      Do not enforce major STRATO version compatibility.
+  --skip-databases           Keep the target cluster's eth/cirrus as they are.
+  --databases <a,b>          Load only these captured databases (default: all).
+  --postgres-host <host>     Load the dumps into this cluster instead of the
+                             node's local data dir; needs --replace-databases,
+                             since it replaces eth/cirrus for every node on it.
+  --replace-databases        Confirm replacing eth/cirrus on --postgres-host.
+                             Each one is dropped and rebuilt from the dump, so
+                             every connection to it is closed as it is loaded.
 
 Smoke-test options:
   --node-dir <dir>           Directory to restore into. Defaults to a temp dir.
@@ -94,6 +107,9 @@ die() {
   echo "Error: $*" >&2
   exit 1
 }
+
+# After die(), which it uses when the work directory cannot be created.
+init_workdir
 
 warn() {
   echo "Warning: $*" >&2
@@ -1298,7 +1314,9 @@ strato_version = "unknown"
 if ":" in strato_image:
     strato_version = strato_image.rsplit(":", 1)[1]
 
-payload = ["ethereumH", "postgres-dumps/eth.dump", "postgres-dumps/cirrus.dump", "redis", "kafka"]
+payload = ["ethereumH", "redis", "kafka"]
+if os.environ.get("SNAPSHOT_STATE_ONLY") != "true":
+    payload[1:1] = ["postgres-dumps/eth.dump", "postgres-dumps/cirrus.dump"]
 if include_prometheus == "true":
     payload.append("prometheus")
 
@@ -1329,6 +1347,23 @@ PY
 # Image used for the throwaway postgres container that dumps/loads the captured
 # databases. Must match the node's postgres major version to read the data dir.
 SNAPSHOT_POSTGRES_IMAGE="postgres:14.18"
+
+# A core cell in a tiered deployment keeps eth and cirrus in a shared cluster
+# (Aurora), not in a local data dir, and every cell on that cluster shares one
+# copy of them. --postgres-host makes create dump from the cluster and restore
+# load into it; --state-only leaves the databases out of the payload entirely,
+# which is what a replica joining an already-populated cluster needs.
+SNAPSHOT_PG_HOST=""
+SNAPSHOT_PG_PORT="5432"
+SNAPSHOT_PG_USER="postgres"
+SNAPSHOT_PG_PASSWORD_FILE=""
+# Node dir whose ethconf.yaml carries the cluster credentials (set by create/restore).
+SNAPSHOT_PG_NODE_DIR=""
+# Which of the captured databases a run touches (--databases): all of them by default.
+SNAPSHOT_DATABASES=""
+export SNAPSHOT_STATE_ONLY="false"
+SNAPSHOT_SKIP_DATABASES="false"
+SNAPSHOT_REPLACE_DATABASES="false"
 # Databases captured into the snapshot. These hold only public blockchain data
 # (chain state and indexed contract storage). The local-only `oauth` database
 # (node key, user keys) is intentionally NOT captured.
@@ -1499,6 +1534,123 @@ load_databases() {
     docker exec "$cid" rm -f "/tmp/$db.dump" >/dev/null 2>&1 || true
   done
   pg_temp_stop "$cid"
+}
+
+# Run a postgres client tool against an external cluster, with the dumps
+# directory mounted at /dumps. The password is read from its file inside the
+# container's environment only; it is never echoed or written to the payload.
+# The cluster password, without anyone copying it around: the node's own
+# ethconf.yaml already carries the credentials it connects with, so a node dir
+# is enough. --postgres-password-file overrides it for a node dir that has none.
+external_pg_password() {
+  if [[ -n "$SNAPSHOT_PG_PASSWORD_FILE" ]]; then
+    [[ -r "$SNAPSHOT_PG_PASSWORD_FILE" ]] || die "cannot read $SNAPSHOT_PG_PASSWORD_FILE"
+    cat "$SNAPSHOT_PG_PASSWORD_FILE"
+    return 0
+  fi
+  local conf="$SNAPSHOT_PG_NODE_DIR/.ethereumH/ethconf.yaml"
+  [[ -f "$conf" ]] || die "no --postgres-password-file and no $conf to read the cluster password from"
+  local pw
+  pw="$(read_ethconf_value "$conf" sqlConfig password 2>/dev/null || true)"
+  [[ -n "$pw" ]] || die "could not read sqlConfig.password from $conf; pass --postgres-password-file"
+  printf '%s' "$pw"
+}
+
+external_pg() {
+  local dumps_dir="$1"; shift
+  docker run --rm -v "$dumps_dir:/dumps" \
+    -e PGPASSWORD="$(external_pg_password)" "$SNAPSHOT_POSTGRES_IMAGE" \
+    "$@" -h "$SNAPSHOT_PG_HOST" -p "$SNAPSHOT_PG_PORT" -U "$SNAPSHOT_PG_USER"
+}
+
+# Dump eth and cirrus straight from the shared cluster (create --postgres-host).
+dump_databases_external() {
+  local dest_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && { mkdir -p "$dest_dir"; for db in "${SNAPSHOT_PG_DATABASES[@]}"; do printf -- 'offline fixture dump\n' > "$dest_dir/$db.dump"; done; return 0; }
+  mkdir -p "$dest_dir"
+  local db
+  for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
+    info "Dumping database '$db' from $SNAPSHOT_PG_HOST..."
+    external_pg "$dest_dir" pg_dump --no-owner --no-privileges -Fc -f "/dumps/$db.dump" -d "$db" \
+      || die "pg_dump failed for database '$db' on $SNAPSHOT_PG_HOST"
+  done
+}
+
+# The databases a run touches: all captured ones, or those named by --databases.
+selected_databases() {
+  if [[ -z "$SNAPSHOT_DATABASES" ]]; then
+    printf '%s\n' "${SNAPSHOT_PG_DATABASES[@]}"
+    return 0
+  fi
+  local want db found known
+  IFS=',' read -ra want <<< "$SNAPSHOT_DATABASES"
+  for db in "${want[@]}"; do
+    db="$(printf '%s' "$db" | tr -d '[:space:]')"
+    [[ -n "$db" ]] || continue
+    found=false
+    for known in "${SNAPSHOT_PG_DATABASES[@]}"; do [[ "$known" == "$db" ]] && found=true; done
+    [[ "$found" == true ]] || die "--databases: '$db' is not one of: ${SNAPSHOT_PG_DATABASES[*]}"
+    printf '%s\n' "$db"
+  done
+}
+
+# Clear a database on the shared cluster before reloading it. Restoring over a
+# live one does not work: cirrus' generated views depend on each other, so the
+# drops a --clean restore issues fail, every CREATE that follows collides with
+# the object still standing, and the COPY lands in the old table shape. Other
+# nodes and the API tier hold pooled connections, and the drop is refused while
+# any of them is attached, so close them first and retry -- a pool reconnecting
+# in the gap between the two statements is the normal case, not a failure.
+reset_database_external() {
+  local dumps_dir="$1" db="$2" attempt
+  external_pg "$dumps_dir" psql -d postgres -v ON_ERROR_STOP=1 -tAc \
+    "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 || return 0
+  info "Removing the existing '$db' database on $SNAPSHOT_PG_HOST (the snapshot replaces it)..."
+  for attempt in 1 2 3 4 5; do
+    external_pg "$dumps_dir" psql -d postgres -tAc \
+      "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$db' AND pid <> pg_backend_pid()" \
+      >/dev/null 2>&1 || true
+    if external_pg "$dumps_dir" psql -d postgres -v ON_ERROR_STOP=1 -tAc \
+      "DROP DATABASE IF EXISTS \"$db\"" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  die "'$db' on $SNAPSHOT_PG_HOST could not be replaced: something keeps reconnecting to it (stop the services that use it and retry)"
+}
+
+# Load eth and cirrus into the shared cluster (restore --postgres-host). This
+# replaces their contents, so it is for a cluster being populated for the first
+# time, not for a replica joining cells that are already writing to it.
+load_databases_external() {
+  local dumps_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  local db jobs
+  jobs="$(snapshot_pg_jobs)"
+  for db in $(selected_databases); do
+    [[ -f "$dumps_dir/$db.dump" ]] || die "snapshot missing database dump: $db.dump"
+    reset_database_external "$dumps_dir" "$db"
+    info "Creating database '$db' on $SNAPSHOT_PG_HOST if it is absent..."
+    external_pg "$dumps_dir" psql -d postgres -v ON_ERROR_STOP=1 -tAc \
+      "SELECT 1 FROM pg_database WHERE datname = '$db'" | grep -q 1 \
+      || external_pg "$dumps_dir" psql -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\"" >/dev/null \
+      || die "failed to create database '$db' on $SNAPSHOT_PG_HOST"
+    info "Rebuilding database '$db' from dump on $SNAPSHOT_PG_HOST (data load + index rebuild)..."
+    # pg_restore's diagnostics are the only way to tell a fatal load from the
+    # benign complaints it makes about objects it may not own, so keep them.
+    # Kept outside the work directory, which is purged on the next run, and
+    # somewhere the user running the restore can write (not /var/log).
+    local log_dir="${SNAPSHOT_PG_NODE_DIR:-.}/logs"
+    mkdir -p "$log_dir" 2>/dev/null || log_dir="${TMPDIR:-/tmp}"
+    local log="$log_dir/snapshot-$db-restore.log"
+    if ! external_pg "$dumps_dir" pg_restore --no-owner --no-privileges \
+      -j "$jobs" -d "$db" "/dumps/$db.dump" > "$log" 2>&1; then
+      warn "pg_restore reported errors for '$db'; the distinct ones, most frequent first ($log has them all):"
+      grep -E '^pg_restore: (error|warning)' "$log" | sed -E 's/ (at line [0-9]+|LINE [0-9]+).*//' \
+        | sort | uniq -c | sort -rn | head -15 >&2 || true
+      die "failed to restore dump for database '$db' on $SNAPSHOT_PG_HOST (see $log)"
+    fi
+  done
 }
 
 # --- Kafka consumed-history pruning (create) --------------------------------
@@ -1738,8 +1890,14 @@ stage_payload() {
   # Capture only the public blockchain databases (eth, cirrus) as logical dumps,
   # not the raw postgres data dir. This excludes the local-only `oauth` database
   # (node key, user keys) and avoids shipping a node-specific postgres password.
-  [[ -d "$node_dir/postgres" ]] || die "postgres state directory not found"
-  dump_databases "$node_dir/postgres" "$staging/payload/postgres-dumps"
+  if [[ "$SNAPSHOT_STATE_ONLY" == "true" ]]; then
+    info "State-only snapshot: no database dumps (a replica shares the cluster this node writes to)."
+  elif [[ -n "$SNAPSHOT_PG_HOST" ]]; then
+    dump_databases_external "$staging/payload/postgres-dumps"
+  else
+    [[ -d "$node_dir/postgres" ]] || die "postgres state directory not found (a node whose databases are in an external cluster needs --postgres-host or --state-only)"
+    dump_databases "$node_dir/postgres" "$staging/payload/postgres-dumps"
+  fi
 
   if [[ "$include_prometheus" == "true" && -d "$node_dir/prometheus" ]]; then
     copy_dir_contents_without_appledouble "$node_dir/prometheus" "$staging/payload/prometheus"
@@ -1766,9 +1924,6 @@ restore_payload() {
   local include_prometheus="$3"
 
   [[ -d "$extracted/payload" ]] || die "payload missing from archive"
-  [[ -d "$extracted/payload/postgres-dumps" ]] || die "payload missing postgres-dumps/"
-  [[ -f "$node_dir/secrets/postgres_password" ]] \
-    || die "target node has no secrets/postgres_password; run strato-setup first"
 
   info "Moving restored state (.ethereumH, redis, kafka) into node..."
   remove_restored_state "$node_dir"
@@ -1796,9 +1951,21 @@ restore_payload() {
   # keeps its own postgres password and local-only `oauth` DB; no foreign
   # credentials are imported (A2), and no node/user-specific data from the
   # source rides along (B3).
-  local node_password
-  node_password="$(<"$node_dir/secrets/postgres_password")"
-  load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
+  if [[ ! -d "$extracted/payload/postgres-dumps" ]]; then
+    info "State-only payload: leaving the databases alone (this node shares a cluster that already holds them)."
+  elif [[ "$SNAPSHOT_SKIP_DATABASES" == "true" ]]; then
+    info "--skip-databases: leaving the databases alone."
+  elif [[ -n "$SNAPSHOT_PG_HOST" ]]; then
+    [[ "$SNAPSHOT_REPLACE_DATABASES" == "true" ]] \
+      || die "loading dumps into $SNAPSHOT_PG_HOST replaces eth and cirrus for every node on that cluster; pass --replace-databases to confirm, or --skip-databases to keep them"
+    load_databases_external "$extracted/payload/postgres-dumps"
+  else
+    [[ -f "$node_dir/secrets/postgres_password" ]] \
+      || die "target node has no secrets/postgres_password; run strato-setup first"
+    local node_password
+    node_password="$(<"$node_dir/secrets/postgres_password")"
+    load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
+  fi
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
     rm -rf "$node_dir/prometheus"
@@ -1866,6 +2033,7 @@ cmd_restore() {
   local node_dir source use_snapshot timestamp bucket network force start include_prometheus allow_version_drift
   node_dir="$1"
   shift
+  SNAPSHOT_PG_NODE_DIR="$node_dir"
   source=""
   use_snapshot="false"
   timestamp=""
@@ -1887,6 +2055,13 @@ cmd_restore() {
       --start) start="true"; shift ;;
       --include-prometheus) include_prometheus="true"; shift ;;
       --allow-version-drift) allow_version_drift="true"; shift ;;
+      --skip-databases) SNAPSHOT_SKIP_DATABASES="true"; shift ;;
+      --databases) SNAPSHOT_DATABASES="$2"; shift 2 ;;
+      --replace-databases) SNAPSHOT_REPLACE_DATABASES="true"; shift ;;
+      --postgres-host) SNAPSHOT_PG_HOST="$2"; shift 2 ;;
+      --postgres-port) SNAPSHOT_PG_PORT="$2"; shift 2 ;;
+      --postgres-user) SNAPSHOT_PG_USER="$2"; shift 2 ;;
+      --postgres-password-file) SNAPSHOT_PG_PASSWORD_FILE="$2"; shift 2 ;;
       *) die "unknown restore option: $1" ;;
     esac
   done
@@ -1960,6 +2135,7 @@ cmd_create() {
   local wait_timeout wait_interval include_prometheus skip_smoke smoke_node_dir smoke_timeout skip_kafka_prune
   node_dir="$1"
   shift
+  SNAPSHOT_PG_NODE_DIR="$node_dir"
   network=""
   output=""
   metadata_url=""
@@ -1990,6 +2166,11 @@ cmd_create() {
       --wait-interval) wait_interval="$2"; shift 2 ;;
       --include-prometheus) include_prometheus="true"; shift ;;
       --skip-kafka-prune) skip_kafka_prune="true"; shift ;;
+      --state-only) SNAPSHOT_STATE_ONLY="true"; shift ;;
+      --postgres-host) SNAPSHOT_PG_HOST="$2"; shift 2 ;;
+      --postgres-port) SNAPSHOT_PG_PORT="$2"; shift 2 ;;
+      --postgres-user) SNAPSHOT_PG_USER="$2"; shift 2 ;;
+      --postgres-password-file) SNAPSHOT_PG_PASSWORD_FILE="$2"; shift 2 ;;
       --skip-smoke-test) skip_smoke="true"; shift ;;
       --smoke-node-dir) smoke_node_dir="$2"; shift 2 ;;
       --smoke-timeout) smoke_timeout="$2"; shift 2 ;;
