@@ -101,6 +101,14 @@
         },
         "KHYPE": {
           "targetAssetAddress": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Upquark"
         },
         "LIT": {
@@ -649,6 +657,14 @@
         },
         "KHYPE": {
           "targetAssetAddress": "d885844fd502040326e59d3cd9273bfd3cb78748",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Helium"
         },
         "LIT": {

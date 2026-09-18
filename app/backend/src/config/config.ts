@@ -67,6 +67,7 @@ export const hiddenSwapPools: Set<string> = new Set([
 // Yield-bearing tokens. APY computed from on-chain exchange rate history mapping.
 export const yieldBenchmarks = [
   { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925" },
+  { tokenSymbol: "KHYPE", baseSymbol: "WHYPE", tokenAddress: "d885844fd502040326e59d3cd9273bfd3cb78748" },
   { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d" },
   { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64" },
   { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca" },
@@ -193,6 +194,11 @@ export const defaultEthCarryVaultFor: Record<string, string> = {
   "33056204878082667": "a94905d8bd117e9bfbe57aadffd7abbea760e028", // Upquark mainnet
 };
 
+export const defaultHypeCarryVaultFor: Record<string, string> = {
+  "114784819836269": "52042da4c65e8226472b4869019a0aee6d920e21", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet: populate after deployment
+};
+
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
   "114784819836269": "97d3b5da244094dd940a173b42240b36eb79dceb", // Helium testnet
   "33056204878082667": "0b5831edcab6f06256a790340426236c31bb463f", // Upquark mainnet
@@ -240,6 +246,7 @@ export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
+export let hypeCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
 export let stratoNativeBridge: string = '';
@@ -389,6 +396,7 @@ export function setVaultConfig(networkId: string) {
 
 export function setCarryVaultConfig(networkId: string) {
   ethCarryVault = process.env.ETH_CARRY_VAULT || defaultEthCarryVaultFor[networkId] || "";
+  hypeCarryVault = process.env.HYPE_CARRY_VAULT || defaultHypeCarryVaultFor[networkId] || "";
   wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
 }
 
@@ -461,6 +469,7 @@ export async function getInternalAddresses() {
     saveUsdstVault,
     usdcYieldVault,
     ethCarryVault,
+    hypeCarryVault,
     wbtcCarryVault,
     goldstYieldVault,
     silvstYieldVault
