@@ -43,7 +43,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
-import Blockchain.Strato.Indexer.Model (IndexEvent (..))
+import Blockchain.Strato.Indexer.Model (IndexEvent (..), indexEventLabel)
 import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot ()
@@ -210,20 +210,37 @@ routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasStreaming m, HasContext m) => VmOutEvent -> m ()
 sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
-sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
-sendOutEvent (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
-sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
+sendOutEvent (OutIndexEvent e) = sendIndexEvents [e]
+sendOutEvent (OutStateDiff diff) = sendIndexEvents [StateDiffEntry diff]
+sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ sendIndexEvents [LogDBEntry l]
+sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ sendIndexEvents (EventDBEntry <$> e)
 sendOutEvent (OutASM asm) =
   when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
-      void $ produceIndexEvents [AddressStateUpdates asm]
+      sendIndexEvents [AddressStateUpdates asm]
 sendOutEvent (OutJSONRPC r) = produceResponse r
 sendOutEvent (OutBlock o) = void $ writeUnseqEvents [IEBlock $ blockToIngestBlock TO.Quarry $ outputBlockToBlock o]
 sendOutEvent (OutBlockVerificationFailure _) = pure ()
 sendOutEvent (OutGetMPNodes mpNodes) = void $ writeUnseqEvents [IEGetMPNodes mpNodes]
 sendOutEvent (OutMPNodesResponse o nds) = void $ writeUnseqEvents [IEMPNodesResponse o nds]
 sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepareResponse dec]
+
+-- | Publish index events and report, without rethrowing, any the broker
+-- refused. Losing one leaves a hole the indexer fills on its next resync;
+-- rethrowing here would kill vm-runner and, through convoke, the whole node --
+-- which is how helium block 595971 took all four validators offline (on a
+-- different topic; see 'produceIndexEvents').
+-- So this logs at error level, names the events, and lets block application
+-- continue.
+sendIndexEvents :: (MonadLogger m, HasStreaming m) => [IndexEvent] -> m ()
+sendIndexEvents events = do
+  rejections <- produceIndexEvents events
+  unless (null rejections) $
+    $logErrorS "sendOutEvent/indexEvent" . T.pack $
+      "DROPPED index events ["
+        ++ intercalate ", " (map indexEventLabel events)
+        ++ "]; the indexer will be missing them until a resync. Broker said: "
+        ++ intercalate "; " rejections
 
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
