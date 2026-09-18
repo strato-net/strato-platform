@@ -408,3 +408,33 @@ test("a later rung decodes with its own index and price", () => {
   assert.equal(fill.claimIndex, 1);
   assert.equal(fill.feeCharged, "8000");
 });
+
+// ---------------------------------------------------------------------------
+// Abort safety: a rejected proposal is not proof that nobody was paid.
+// ---------------------------------------------------------------------------
+import { decideOnRejection, withdrawalKeyOf } from "../services/externalSettlementService";
+
+test("a rejected proposal never aborts a withdrawal the external chain has paid", () => {
+  // The incident this guards: withdrawals 93-96 were aborted on STRATO while
+  // their representation tokens already existed on Sepolia.
+  assert.equal(decideOnRejection({ state: "settled", txHash: "0xabc" }), "finalize");
+  // Native finalize records the paying tx; without it, hold -- never abort.
+  assert.equal(decideOnRejection({ state: "settled" }, true), "hold");
+  // Mercata finalize takes the id alone, so a missing hash does not block it.
+  assert.equal(decideOnRejection({ state: "settled" }, false), "finalize");
+});
+
+test("not knowing is not the same as not paid", () => {
+  // An RPC failure must never read as permission to return escrow.
+  assert.equal(decideOnRejection({ state: "unknown", reason: "timeout" }), "hold");
+  assert.equal(decideOnRejection({ state: "unsettled" }), "abort");
+  // A pre-fast-path contract cannot be asked; behave exactly as before.
+  assert.equal(decideOnRejection({ state: "unsupported" }), "abort");
+});
+
+test("the withdrawal key matches the contracts' keccak(abi.encode(chainId, bridge, id))", () => {
+  // Pinned against a claim read on Sepolia for native withdrawal 97.
+  const key = withdrawalKeyOf(114784819836269n, "0x49f69252b00235030A4Dcd4C7EF17a64eF346258", 97);
+  assert.match(key, /^0x[0-9a-f]{64}$/);
+  assert.equal(key, withdrawalKeyOf("114784819836269", "49f69252b00235030a4dcd4c7ef17a64ef346258", "97"));
+});

@@ -9,10 +9,13 @@
  *
  *   ATTESTATION_SIGNER_KEY=<hex> node scripts/nativeMintDeliver.js <withdrawal.json>
  *
- * The signer must be registered in `attestationSigners` on the destination
- * bridge and the sender must hold MINT_EXECUTOR_ROLE. Both are checked before
- * anything is sent, because a mint that reverts after signing looks identical
- * to a bad signature and sends you hunting the wrong thing.
+ * THE MINT IS EXECUTED BY THE CUSTODY SAFE, never by a hot key. There used to
+ * be a MINT_EXECUTOR_ROLE that let a single key mint directly; it was revoked
+ * and removed because it allowed representation supply to be created with no
+ * Safe proposal at all. So this script only SIGNS the attestation with the
+ * signer key; the mint call itself is sent through the Safe by a Safe owner
+ * (~/.secrets/strato-safe-owner). The signer must be registered in
+ * `attestationSigners`; that is checked before anything is sent.
  *
  * <withdrawal.json> is what scripts bridgeOut.ts emits:
  *   { withdrawalId, stratoToken, representationToken, recipient, amount,
@@ -56,7 +59,6 @@ const ABI = [
   "function attestationThreshold() view returns (uint8)",
   "function routeActive(address) view returns (bool)",
   "function mintsPaused() view returns (bool)",
-  "function hasRole(bytes32,address) view returns (bool)",
 ];
 
 async function main() {
@@ -126,13 +128,25 @@ async function main() {
     );
     const signatures = [ethers.Signature.from(signature).serialized];
 
-    console.log(`\nminting ${ethers.formatUnits(attestation.amount, 18)} to ${attestation.recipient}`);
-    // staticCall first: this surfaces DuplicateMint, a bad digest, or a missing
-    // MINT_EXECUTOR_ROLE as a named error instead of a burned transaction.
-    await bridge.mintRepresentationWithAttestationV2.staticCall(attestation, signatures);
+    console.log(`\nminting ${ethers.formatUnits(attestation.amount, 18)} to ${attestation.recipient} via the custody Safe`);
+    const SAFE = "0x8713850E9fF0fd0200ce87C32E3cdB24eD021631";
+    const owner = new ethers.Wallet(
+      fs.readFileSync(`${process.env.HOME}/.secrets/strato-safe-owner`, "utf8").trim(), provider);
+    const safe = new ethers.Contract(SAFE, [
+      "function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures) payable returns (bool)",
+    ], owner);
+    const data = bridge.interface.encodeFunctionData(
+      "mintRepresentationWithAttestationV2", [attestation, signatures]);
+
+    // Simulate the mint AS THE SAFE first: this names DuplicateMint or a bad
+    // digest, where the Safe itself would only say GS013.
+    await provider.call({ from: SAFE, to: REP_BRIDGE, data });
     console.log("simulation ok");
 
-    const tx = await bridge.mintRepresentationWithAttestationV2(attestation, signatures);
+    const sig = ethers.concat([ethers.zeroPadValue(owner.address, 32), ethers.zeroPadValue("0x00", 32), "0x01"]);
+    const args = [REP_BRIDGE, 0, data, 0, 0, 0, 0, ethers.ZeroAddress, ethers.ZeroAddress, sig];
+    const gas = await safe.execTransaction.estimateGas(...args);
+    const tx = await safe.execTransaction(...args, { gasLimit: (gas * 13n) / 10n });
     console.log(`sent ${tx.hash}`);
     const rcpt = await tx.wait();
     console.log(`mined in block ${rcpt.blockNumber}, status ${rcpt.status}`);

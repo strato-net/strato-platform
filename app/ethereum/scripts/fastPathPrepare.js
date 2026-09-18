@@ -14,6 +14,13 @@
  * copy of it -- the one check that cannot be faked locally.
  *
  *   PRIVATE_KEY=... npx hardhat run scripts/fastPathPrepare.js --network sepolia
+ *
+ * UPGRADE_ONLY=1 emits just `upgradeToAndCall` and skips the initializer. That
+ * is the right mode for a SECOND upgrade of an already-configured proxy: the
+ * fast-path settings live in storage and survive the implementation swap, and
+ * `initializeFastPath` is a reinitializer whose version has already been
+ * consumed, so calling it again reverts InvalidInitialization. The
+ * reinitializer pre-check is skipped in this mode for the same reason.
  */
 const { ethers, upgrades, network } = require("hardhat");
 
@@ -78,6 +85,8 @@ const TARGETS = {
   },
 };
 
+const UPGRADE_ONLY = process.env.UPGRADE_ONLY === "1";
+
 const IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 // ERC-7201 namespace of OZ Initializable: uint64 _initialized packed low.
 const INITIALIZABLE_SLOT = "0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00";
@@ -122,6 +131,8 @@ function activationCalls(name, proxy, impl, cfg) {
     value: "0",
     data: upgradeable.encodeFunctionData("upgradeToAndCall", [impl, "0x"]),
   }];
+
+  if (UPGRADE_ONLY) return calls;
 
   if (name === "DepositRouter") {
     const iface = new ethers.Interface([
@@ -171,7 +182,7 @@ async function main() {
 
     const before = await currentImplementation(target.proxy);
     console.log(`  live implementation: ${before}`);
-    await assertReinitializerCanRun(target);
+    if (!UPGRADE_ONLY) await assertReinitializerCanRun(target);
 
     // Register the live implementation under the LEGACY factory -- the truth --
     // so the layout comparison is old-against-new and prepareUpgrade actually
@@ -189,6 +200,14 @@ async function main() {
     // already running, the manifest is lying and the batch would be a no-op
     // followed by a revert. Refuse to emit calldata for that.
     if (ethers.getAddress(String(impl)) === before) {
+      // In UPGRADE_ONLY this is the ordinary case for a contract whose source
+      // did not change in this round: identical bytecode legitimately resolves
+      // to the address already running, and there is nothing to upgrade. Only
+      // a FIRST upgrade treats it as the manifest lying.
+      if (UPGRADE_ONLY) {
+        console.log(`  unchanged bytecode -- nothing to upgrade, omitted from the batch`);
+        continue;
+      }
       throw new Error(
         `prepareUpgrade returned the LIVE implementation (${impl}) for ${target.name}. ` +
         `The manifest maps new bytecode to the old address; delete .openzeppelin ` +

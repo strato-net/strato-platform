@@ -641,7 +641,39 @@ contract Describe_BridgeFastPath is Authorizable {
 
         // Governance can still abort. That is the admin-rejection risk a
         // solver prices, and it must stay available for incidents.
+        //
+        // But the ESCROW MUST FOLLOW THE CLAIM. The user was already paid on
+        // the far chain out of the solver's pocket; refunding them here would
+        // pay them twice and turn an honest fill into the solver's loss. This
+        // assertion is what the original version of this test was missing --
+        // it aborted and never looked at who got the money.
+        uint256 userBefore = bridgedToken.balanceOf(address(user));
+        uint256 solverBefore = bridgedToken.balanceOf(address(solverA));
         relayer.do(bridgeAddress, "abortWithdrawal", id);
+        require(
+            bridgedToken.balanceOf(address(solverA)) == solverBefore + 100e18,
+            "the escrow reimburses the solver who already paid the user"
+        );
+        require(
+            bridgedToken.balanceOf(address(user)) == userBefore,
+            "the user is not refunded on top of the solver's payment"
+        );
+    }
+
+    function it_fastpath_unclaimed_abort_still_refunds_the_sender() {
+        bridgedToken.mint(address(user), 100e18);
+        user.do(bridgedTokenAddress, "approve", bridgeAddress, 100e18);
+        uint256 id = user.do(
+            bridgeAddress, "requestWithdrawalWithFee",
+            externalChainId, externalRecipient, externalToken, bridgedTokenAddress, 100e18, 3e18
+        );
+        // No claim on record: nobody fronted anything, so it is the sender's money.
+        uint256 userBefore = bridgedToken.balanceOf(address(user));
+        relayer.do(bridgeAddress, "abortWithdrawal", id);
+        require(
+            bridgedToken.balanceOf(address(user)) == userBefore + 100e18,
+            "an unclaimed abort refunds the sender exactly as before"
+        );
     }
 
     function it_fastpath_withdrawal_claim_must_respect_the_schedule() {
@@ -991,7 +1023,18 @@ contract Describe_BridgeFastPath is Authorizable {
         user.doExpectingFailure(
             nativeBridgeAddress, "abortWithdrawal", "SNB: claimed by solver", id
         );
+        // As on MercataBridge: the vault unlock follows the claim.
+        uint256 userBefore = nativeToken.balanceOf(address(user));
+        uint256 solverBefore = nativeToken.balanceOf(address(solverA));
         relayer.do(nativeBridgeAddress, "abortWithdrawal", id);
+        require(
+            nativeToken.balanceOf(address(solverA)) == solverBefore + 50e18,
+            "the unlocked escrow goes to the solver holding the claim"
+        );
+        require(
+            nativeToken.balanceOf(address(user)) == userBefore,
+            "and not back to a sender who was already paid"
+        );
     }
 
     function it_fastpath_native_announcement_is_fillable_but_never_confirmable() {

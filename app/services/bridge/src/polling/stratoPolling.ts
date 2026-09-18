@@ -9,6 +9,7 @@ import {
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
+  triageRejectedWithdrawals,
 } from "../services/bridgeService";
 import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositInfo, NativeDepositInfo, ConfirmDepositArgs, ConfirmNativeDepositArgs } from "../types";
 import {
@@ -260,10 +261,19 @@ export const startWithdrawalTxPolling = (): void => {
         for (const batch of chunk(toFinalize, POLLING_BATCH_SIZE)) {
           await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
         }
-      if (toReject.length)
-        for (const batch of chunk(toReject, POLLING_BATCH_SIZE)) {
+      if (toReject.length) {
+        // Ask the external chain before giving any escrow back.
+        const rejectedSet = new Set(toReject.map(Number));
+        const triaged = await triageRejectedWithdrawals(
+          pending.filter((w) => rejectedSet.has(Number(w.withdrawalId))),
+        );
+        for (const batch of chunk(triaged.finalize, POLLING_BATCH_SIZE)) {
+          await finaliseWithdrawalBatch(batch as NonEmptyArray<Number>);
+        }
+        for (const batch of chunk(triaged.abort, POLLING_BATCH_SIZE)) {
           await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
         }
+      }
     } catch (e: any) {
       logError("StratoPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
@@ -285,12 +295,18 @@ export const startNativeWithdrawalRequestPolling = (): void => {
         await getNativeWithdrawalsByStatus("1");
       if (initiatedWithdrawals.length === 0) return;
 
-      const instantWithdrawals = initiatedWithdrawals.filter(
-        (withdrawal) => withdrawal.useInstantPath,
-      );
-      const approvalWithdrawals = initiatedWithdrawals.filter(
-        (withdrawal) => !withdrawal.useInstantPath,
-      );
+      // EVERY native withdrawal goes through a custody-Safe proposal now.
+      //
+      // The "instant" lane had the relayer mint directly with a hot key that
+      // held MINT_EXECUTOR_ROLE. That role has been revoked and removed: it was
+      // a makeshift fast path, and it let one key mint with no Safe proposal,
+      // which is how representation supply once ran ahead of what STRATO had
+      // locked. Solvers are the fast path -- they front their own inventory --
+      // and minting is the slow path. `useInstantPath` is still recorded on
+      // chain, so it is deliberately ignored here rather than trusted: routing
+      // on it would send those withdrawals to a mint call that now reverts.
+      const instantWithdrawals: NativeWithdrawalInfo[] = [];
+      const approvalWithdrawals = initiatedWithdrawals;
 
       if (instantWithdrawals.length > 0) {
         for (const batch of chunk(instantWithdrawals, POLLING_BATCH_SIZE)) {

@@ -60,8 +60,15 @@ contract StratoNativeRepresentationBridge is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
     bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
-    // Grant this role only to the custody Safe.
-    bytes32 public constant MINT_EXECUTOR_ROLE = keccak256("MINT_EXECUTOR_ROLE");
+    // There is deliberately NO separate mint-executor role. One existed
+    // (MINT_EXECUTOR_ROLE, v1.1.0) so a relayer hot key could mint small
+    // withdrawals without waiting for the custody Safe -- a makeshift fast
+    // path. It also meant one key holding that role plus an attestation-signer
+    // key could mint with no Safe proposal at all, which is how representation
+    // supply once ran 4,000 ahead of what STRATO had locked. Solvers are the
+    // fast path now, and they front their OWN inventory; minting is the slow
+    // path and belongs to the bridge admin (the custody Safe) alone. A stale
+    // grant of the old role hash on a live proxy confers nothing.
     bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
         "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline)"
     );
@@ -426,7 +433,6 @@ contract StratoNativeRepresentationBridge is
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UNPAUSER_ROLE, admin);
         _grantRole(ATTESTATION_ADMIN_ROLE, admin);
-        _grantRole(MINT_EXECUTOR_ROLE, admin);
         maxAttestationValiditySeconds = 7 days;
     }
 
@@ -444,7 +450,7 @@ contract StratoNativeRepresentationBridge is
     function mintRepresentationWithAttestation(
         NativeMintAttestation calldata attestation,
         bytes[] calldata signatures
-    ) external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused nonReentrant {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused whenMintsNotPaused nonReentrant {
         _verifyAttestationSignatures(attestationDigest(attestation), signatures);
 
         NativeMintAttestationV2 memory widened;
@@ -490,7 +496,7 @@ contract StratoNativeRepresentationBridge is
     function mintRepresentationWithAttestationV2(
         NativeMintAttestationV2 calldata attestation,
         bytes[] calldata signatures
-    ) external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused nonReentrant {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused whenMintsNotPaused nonReentrant {
         _verifyAttestationSignatures(attestationDigestV2(attestation), signatures);
         _settleMint(attestation, true);
     }
@@ -1295,7 +1301,7 @@ contract StratoNativeRepresentationBridge is
      *         it one-shot; {initialize} has already run on the deployed proxy.
      *
      * @dev Version 3, not 2. This proxy has ALREADY been reinitialized once --
-     *      the v1.1.0 upgrade that granted MINT_EXECUTOR_ROLE left the live
+     *      the v1.1.0 upgrade (which added the since-removed mint-executor role) left the live
      *      Sepolia proxy at `_initialized == 2` -- so `reinitializer(2)` can
      *      never pass here and reverts with InvalidInitialization(). The
      *      version counts initializations of the PROXY, not releases of the

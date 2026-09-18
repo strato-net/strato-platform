@@ -74,7 +74,6 @@ describe("StratoNativeRepresentationBridge fast path", function () {
     await bridge.setTokenMapping(stratoToken, await token.getAddress());
     await bridge.setAttestationSigner(signer.address, true);
     await bridge.setAttestationThreshold(1);
-    await bridge.grantRole(await bridge.MINT_EXECUTOR_ROLE(), mintExecutor.address);
 
     await bridge.initializeFastPath(
       HALF_LIFE, FEE_BPS, await bond.getAddress(), BOND, treasury.address, TTL
@@ -234,7 +233,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       const before = await ctx.token.balanceOf(ctx.user.address);
       await ctx.bridge
-        .connect(ctx.mintExecutor)
+        .connect(ctx.admin)
         .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
       expect(await ctx.token.balanceOf(ctx.user.address)).to.equal(before + AMOUNT);
     });
@@ -260,7 +259,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(attestation, [signature])
       ).to.emit(ctx.bridge, "WithdrawalClaimSettled");
 
@@ -284,7 +283,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await ctx.bridge.connect(ctx.solverB).fillWithdrawal(terms, exitFee, false, 0);
 
       await ctx.bridge
-        .connect(ctx.mintExecutor)
+        .connect(ctx.admin)
         .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
 
       // A fronted 970 and was bought out at 990: it keeps 20. B paid 990 and is
@@ -314,7 +313,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)])
       ).to.emit(ctx.bridge, "WithdrawalClaimVoided");
 
@@ -329,14 +328,14 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       const overFee = await attestationFor(ctx, terms, { maxFee: AMOUNT });
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(overFee, [await signV2(ctx, overFee)])
       ).to.be.revertedWithCustomError(ctx.bridge, "FeeTooLarge");
 
       const badHalfLife = await attestationFor(ctx, terms, { feeHalfLife: 259201n });
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(badHalfLife, [await signV2(ctx, badHalfLife)])
       ).to.be.revertedWithCustomError(ctx.bridge, "BadHalfLife");
     });
@@ -348,7 +347,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       const unsigned = await attestationFor(ctx, terms);
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(unsigned, [await signV2(ctx, { ...unsigned, amount: 1n })])
       ).to.be.revertedWithCustomError(ctx.bridge, "BadAttestationSignatures");
 
@@ -358,7 +357,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       });
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(notYet, [await signV2(ctx, notYet)])
       ).to.be.revertedWithCustomError(ctx.bridge, "AttestationNotReady");
 
@@ -376,12 +375,12 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       const signature = await signV2(ctx, attestation);
 
       await ctx.bridge
-        .connect(ctx.mintExecutor)
+        .connect(ctx.admin)
         .mintRepresentationWithAttestationV2(attestation, [signature]);
 
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestationV2(attestation, [signature])
       ).to.be.revertedWithCustomError(ctx.bridge, "DuplicateMint");
       await expect(
@@ -405,7 +404,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await expect(
         ctx.bridge
-          .connect(ctx.mintExecutor)
+          .connect(ctx.admin)
           .mintRepresentationWithAttestation(v1, [v1Signature])
       ).to.be.revertedWithCustomError(ctx.bridge, "ClaimExists");
     });
@@ -418,7 +417,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       const before = await ctx.token.balanceOf(ctx.user.address);
       await ctx.bridge
-        .connect(ctx.mintExecutor)
+        .connect(ctx.admin)
         .mintRepresentationWithAttestation(v1, [v1Signature]);
       expect(await ctx.token.balanceOf(ctx.user.address)).to.equal(before + AMOUNT);
     });
@@ -502,7 +501,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       expect(await ctx.token.totalSupply()).to.equal(supplyBefore);
 
       await ctx.bridge
-        .connect(ctx.mintExecutor)
+        .connect(ctx.admin)
         .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
 
       // And the mint adds exactly the amount, once.

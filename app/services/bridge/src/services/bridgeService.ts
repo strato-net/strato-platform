@@ -1,3 +1,4 @@
+import { decideRejectedWithdrawal } from "./externalSettlementService";
 import {
   config,
   getChainRpcUrl,
@@ -146,6 +147,37 @@ const syncManualNativeMintProposal = async (
   }
 
   if (result.status === "rejected") {
+    // "Rejected" only means OUR proposal did not execute. Whether the mint
+    // happened is a separate question with an on-chain answer, and aborting
+    // without asking it returns the escrow for tokens that already exist.
+    const { decision, state } = await decideRejectedWithdrawal(
+      `native withdrawal ${withdrawal.withdrawalId}`,
+      {
+        kind: "native",
+        chainId: Number(withdrawal.externalChainId),
+        contract: withdrawal.externalBridge,
+        sourceChainId: await getStratoNetworkId(),
+        sourceBridge: config.nativeBridge.address!,
+        withdrawalId: withdrawal.withdrawalId,
+      },
+    );
+    if (decision === "hold") return true;
+    if (decision === "finalize") {
+      const done = await execute({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "finalizeWithdrawal",
+        args: {
+          id: Number(withdrawal.withdrawalId),
+          externalTxHash: (state as { txHash: string }).txHash,
+          nativeMintProposalHash: "",
+        },
+      });
+      if (done.status === "Success") {
+        announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+      }
+      return true;
+    }
     await execute({
       contractName: "StratoNativeBridge",
       contractAddress: config.nativeBridge.address!,
@@ -906,6 +938,41 @@ export const finaliseWithdrawalBatch = async (
   }
 };
 
+/**
+ * Split rejected Mercata withdrawals into those safe to abort and those the
+ * external chain says were already paid (finalize instead). Anything that
+ * cannot be determined is held: it appears in neither list and is looked at
+ * again on the next poll.
+ */
+export const triageRejectedWithdrawals = async (
+  rejected: WithdrawalInfo[],
+): Promise<{ abort: Number[]; finalize: Number[] }> => {
+  const out = { abort: [] as Number[], finalize: [] as Number[] };
+  if (rejected.length === 0) return out;
+  const [sourceChainId, chains] = await Promise.all([
+    getStratoNetworkId(),
+    getEnabledChains(),
+  ]);
+  for (const w of rejected) {
+    const id = Number(w.withdrawalId);
+    const router = chains.get(Number(w.externalChainId))?.depositRouter;
+    // No router means a chain that settles by plain Safe transfer, which has
+    // no on-chain flag to consult: the pre-fast-path behaviour applies.
+    if (!router) { out.abort.push(id); continue; }
+    const { decision } = await decideRejectedWithdrawal(`withdrawal ${id}`, {
+      kind: "mercata",
+      chainId: Number(w.externalChainId),
+      contract: router,
+      sourceChainId,
+      sourceBridge: config.bridge.address!,
+      withdrawalId: id,
+    });
+    if (decision === "abort") out.abort.push(id);
+    else if (decision === "finalize") out.finalize.push(id);
+  }
+  return out;
+};
+
 export const handleRejectedWithdrawalBatch = async (
   ids: NonEmptyArray<Number>,
 ) => {
@@ -1148,10 +1215,8 @@ export const queueManualNativeWithdrawalBatch = async (
   const sourceChainId = await getStratoNetworkId();
 
   for (const withdrawal of withdrawals) {
-    if (withdrawal.useInstantPath) {
-      continue;
-    }
-
+    // No `useInstantPath` skip: the hot-key mint lane is gone, so an
+    // instant-flagged withdrawal is proposed to the Safe like any other.
     const recordedProposalReference = normalizeOptionalHash(
       withdrawal.nativeMintProposalHash,
     );

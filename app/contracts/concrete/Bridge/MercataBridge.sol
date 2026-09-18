@@ -117,6 +117,9 @@ contract record MercataBridge is Ownable {
     event DepositPendingReview(uint256 srcChainId, string srcTxHash);
 
     /// @notice Emitted when a withdrawal is aborted and funds are refunded
+    /// @notice An aborted withdrawal's escrow went to the solver holding its claim,
+    ///         because that solver had already paid the recipient externally.
+    event WithdrawalEscrowReleasedToClaimant(uint256 indexed withdrawalId, address indexed claimant, uint256 amount);
     event WithdrawalAborted(uint256 withdrawalId);
 
     /// @notice Emitted when a withdrawal is completed and tokens are burned
@@ -1995,10 +1998,30 @@ contract record MercataBridge is Ownable {
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
 
-        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        // WHO GETS THE ESCROW. Normally the sender -- it is their money and the
+        // withdrawal did not happen. But if a solver holds the claim, the
+        // sender has ALREADY been paid on the external chain, out of the
+        // solver's own pocket, and the escrow is what was going to reimburse
+        // that solver. Returning it to the sender would pay them twice and
+        // leave the solver with nothing: the abort would convert an honest
+        // fill into a loss. So the escrow follows the claim. The record that
+        // proves the solver's entitlement is the one {recordWithdrawalClaim}
+        // mirrored here from the external chain. The claimant is an
+        // external-chain address; for a key-based solver the same key controls
+        // the same address on STRATO.
+        address payee = w.stratoSender;
+        address claimant = withdrawalClaims[id].claimant;
+        if (claimant != address(0)) {
+            payee = claimant;
+        }
+
+        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, payee, w.stratoTokenAmount);
         require(actualRefundedAmount > 0, "MB: no tokens refunded");
 
         emit WithdrawalAborted(id);
+        if (claimant != address(0)) {
+            emit WithdrawalEscrowReleasedToClaimant(id, claimant, actualRefundedAmount);
+        }
     }
 
     /**

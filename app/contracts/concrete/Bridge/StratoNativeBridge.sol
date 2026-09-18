@@ -244,6 +244,7 @@ contract record StratoNativeBridge is Ownable {
     event NativeWithdrawalPending(uint256 indexed withdrawalId, string externalTxHash);
     event NativeWithdrawalProposalRecorded(uint256 indexed withdrawalId, string nativeMintProposalHash);
     event NativeWithdrawalCompleted(uint256 indexed withdrawalId, string externalTxHash, string nativeMintProposalHash);
+    event NativeWithdrawalEscrowReleasedToClaimant(uint256 indexed withdrawalId, address indexed claimant, uint256 amount);
     event NativeWithdrawalAborted(uint256 indexed withdrawalId);
     event InstantWithdrawalDelayUpdated(uint256 previousDelaySeconds, uint256 newDelaySeconds);
 
@@ -885,14 +886,27 @@ contract record StratoNativeBridge is Ownable {
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
 
+        // The escrow follows the claim, for the same reason as on
+        // MercataBridge: a solver that holds the claim has already delivered
+        // the representation tokens to the sender, and unlocking to the sender
+        // would pay them twice while the solver absorbs the loss.
+        address payee = w.stratoSender;
+        address claimant = withdrawalClaims[id].claimant;
+        if (claimant != address(0)) {
+            payee = claimant;
+        }
+
         uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
             w.stratoToken,
-            w.stratoSender,
+            payee,
             w.stratoTokenAmount
         );
         require(actualUnlockedAmount > 0, "SNB: no tokens unlocked");
 
         emit NativeWithdrawalAborted(id);
+        if (claimant != address(0)) {
+            emit NativeWithdrawalEscrowReleasedToClaimant(id, claimant, actualUnlockedAmount);
+        }
     }
 
     /**
