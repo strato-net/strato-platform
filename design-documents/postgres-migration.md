@@ -2,7 +2,7 @@
 
 Phase 2 of the tiered deployment. Each node's `eth` and `cirrus` databases
 move from the `postgres` container in its directory to the shared Aurora
-PostgreSQL cluster (`infra/data-plane`). Afterwards the core's indexer and
+PostgreSQL cluster (the ha-infra repo's `data-plane`). Afterwards the core's indexer and
 slipstream write the cluster's writer endpoint, and PostgREST (later the API
 tier and the app backend) read the reader endpoint.
 
@@ -24,7 +24,7 @@ tier and the app backend) read the reader endpoint.
 Per node, inside a maintenance window. The chain keeps running on the other
 validators; this node is down for the duration of the dump and restore.
 
-1. Deploy the cluster once per environment (`infra/data-plane`), allowing the
+1. Deploy the cluster once per environment (the ha-infra repo's `data-plane`), allowing the
    node's security group or CIDR on port 5432. Note the writer and reader
    endpoints and the secret name.
 2. Rehearse on a testnet node first. Time the dump and restore: a from-genesis

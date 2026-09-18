@@ -1,7 +1,8 @@
 #app-version:<VERSION>
 # STRATO app tier on a VM: the app's nginx (OAuth, CSRF, sessions), backend
 # state; run several copies behind a load balancer with session stickiness.
-# The AWS shape of the same thing is infra/ (CDK).
+# The AWS shape of the same thing is the ha-infra repo (CDK):
+# https://github.com/strato-net/ha-infra
 #   NODE_URL            public URL of the STRATO API tier or node
 #   postgres_*          the node's cirrus database (read-only pool), until the
 #                       managed cluster exists

@@ -395,8 +395,8 @@ trips with promotion after 32 slots and 67 without, and the next call
 none.
 
 **Live follower mirror (2026-09-11).** The run happened on a core cell
-deployed with `infra/core-cell` into a personal AWS account against an
-Aurora cluster from `infra/data-plane`: a full node (`--role=node`) that
+deployed with the ha-infra repo's `core-cell` into a personal AWS account against an
+Aurora cluster from its `data-plane`: a full node (`--role=node`) that
 synced Mercata **mainnet** from genesis (194.8k blocks in about eight hours,
 bound by the p2p block fetch) and then followed the live tip, its indexer
 holding the writer lease and building the SQL mirror in Aurora as it went.

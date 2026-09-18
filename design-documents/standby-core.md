@@ -94,7 +94,7 @@ Standby, from the writer's snapshot (trie, Redis, local Kafka):
 strato-up --role=node --writer=false --validatorBehavior=false --cellId=core-b --peerDatabase=peers_core_b --pghost=<same> --password=... --snapshot=... <dir>
 ```
 
-On AWS, `infra/core-cell` is the CDK app for one such host: an Ubuntu EC2
+On AWS, the ha-infra repo's `core-cell` is the CDK app for one such host: an Ubuntu EC2
 instance that extracts the binaries from the strato image, runs `strato-up
 --role=core` against the shared Aurora cluster with `--cellId`,
 `--peerDatabase`, `--writer` and `--validatorBehavior` from its context, and

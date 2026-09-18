@@ -1,7 +1,7 @@
 # Observability
 
 Section 8 of the tiered deployment plan, as a CDK skeleton in
-`infra/observability` plus the metrics the processes had to grow for it.
+the ha-infra repo's `observability` app plus the metrics the processes had to grow for it.
 
 ## What is measured
 
@@ -87,7 +87,7 @@ spends one unit; gas is free at price zero.
 
 ## Alerts
 
-Managed Prometheus evaluates `infra/observability/rules/chain-health.yaml`
+Managed Prometheus evaluates `observability/rules/chain-health.yaml` in the ha-infra repo
 and routes by severity through its alertmanager to two SNS topics.
 
 | Pages | Warns |
@@ -108,7 +108,7 @@ PagerDuty subscribes to the pages topic and Slack to the warnings topic.
 
 ## Dashboards
 
-Four Grafana boards in `infra/observability/dashboards/`, pushed with
+Four Grafana boards in `observability/dashboards/` in the ha-infra repo, pushed with
 `scripts/push-dashboards.sh`:
 
 - **Infrastructure map**: the X-Ray service map as a node graph (traffic

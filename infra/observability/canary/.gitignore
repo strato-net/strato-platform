@@ -1,4 +1,0 @@
-# The Synthetics asset layout puts the handler inside node_modules, and npm
-# prunes loose files there, so the sources live in src/ and `npm run canary`
-# copies them in after installing the signing libraries.
-nodejs/node_modules/

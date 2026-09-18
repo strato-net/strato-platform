@@ -1,7 +1,7 @@
 # The shared message bus
 
 Phase 4 of the tiered deployment. An external Kafka-compatible cluster (MSK,
-`infra/data-plane` bus stack) sits between the edge tiers and the cores.
+the ha-infra repo's `data-plane` bus stack) sits between the edge tiers and the cores.
 Three topics, one partition each, replication factor 2, seven days'
 retention:
 
