@@ -234,8 +234,43 @@ export interface UserTimeline {
   items: TimelineItem[];
 }
 
-// Today's cross-link snapshot (GET /metrics/daily). Windows are UTC days;
-// deltas compare against the same elapsed window yesterday.
+// The windows the snapshot panel can look at. Both metrics endpoints take the
+// same `period`, so the tiles and the table under them always agree.
+export type MetricsPeriod = 'today' | 'yesterday' | '7d' | '30d';
+
+export const METRICS_PERIODS: { value: MetricsPeriod; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: '7d', label: '7 days' },
+  { value: '30d', label: '30 days' },
+];
+
+export const METRICS_PERIOD_TITLES: Record<MetricsPeriod, string> = {
+  today: 'Today',
+  yesterday: 'Yesterday',
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+};
+
+// Trailing form, for sentences ("3 wallets in the last 7 days")
+export const METRICS_PERIOD_SUFFIX: Record<MetricsPeriod, string> = {
+  today: 'today',
+  yesterday: 'yesterday',
+  '7d': 'in the last 7 days',
+  '30d': 'in the last 30 days',
+};
+
+// What a delta is measured against
+export const METRICS_PERIOD_BASELINE: Record<MetricsPeriod, string> = {
+  today: 'in the same window yesterday',
+  yesterday: 'the day before',
+  '7d': 'in the previous 7 days',
+  '30d': 'in the previous 30 days',
+};
+
+// Cross-link snapshot (GET /metrics/daily?period=). Windows are whole UTC
+// days; deltas compare against the window of the same length before it (only
+// its same elapsed slice while the current window is still running).
 export interface MetricDelta {
   value: number;
   previous: number;
@@ -251,7 +286,11 @@ export interface DailySnapshotLink {
 }
 
 export interface DailySnapshot {
-  date: string; // YYYY-MM-DD (UTC)
+  period: MetricsPeriod;
+  days: number; // UTC days the window covers (1, 7 or 30)
+  date: string; // YYYY-MM-DD (UTC): the window's last day
+  startDate: string;
+  endDate: string;
   generatedAt: string;
   hour: number; // current UTC hour: the last (partial) opensByHour bucket
   linksTotal: number;
@@ -265,13 +304,13 @@ export interface DailySnapshot {
   bridgeIns: number;
   actions: MetricDelta;
   actionLinks: number;
-  opensByHour: number[];
+  opensByHour: number[]; // 24 UTC hour-of-day buckets, summed over the window
   topLinks: DailySnapshotLink[];
 }
 
-// Rows behind the four Daily Snapshot tiles (GET /metrics/daily/breakdown),
-// over the same UTC-today window as the tiles themselves. Lists are
-// newest-first and capped server-side (`truncated`).
+// Rows behind the four snapshot tiles (GET /metrics/daily/breakdown?period=),
+// over the same window as the tiles themselves. Lists are newest-first and
+// capped server-side (`truncated`).
 export interface BreakdownLink {
   id: string;
   slug: string;
@@ -296,7 +335,13 @@ export interface WalletRow {
   connector: string | null;
   connectedAt: string;
   firstOpenAt: string | null;
+  secondsToConnect: number | null; // open -> wallet connection
+  firstSeenAt: string; // first tracked connection ever
+  returning: boolean; // first seen before this window started
+  visits: number; // visits in the window this wallet connected in
+  engagedVisits: number; // of those, the ones that reached the app
   link: BreakdownLink | null;
+  referrer: string | null;
   city: string | null;
   country: string | null;
   bridgeIns: number;
@@ -336,7 +381,11 @@ export interface BreakdownSection<Row> {
 }
 
 export interface DailyBreakdown {
-  date: string;
+  period: MetricsPeriod;
+  days: number;
+  date: string; // the window's last day, as in the snapshot
+  startDate: string;
+  endDate: string;
   generatedAt: string;
   opens: BreakdownSection<OpenRow>;
   wallets: BreakdownSection<WalletRow>;
@@ -408,8 +457,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const getMe = () => apiFetch<{ authorized: boolean }>('/me');
-export const getDailySnapshot = () => apiFetch<DailySnapshot>('/metrics/daily');
-export const getDailyBreakdown = () => apiFetch<DailyBreakdown>('/metrics/daily/breakdown');
+export const getDailySnapshot = (period: MetricsPeriod = 'today') =>
+  apiFetch<DailySnapshot>(`/metrics/daily?period=${period}`);
+export const getDailyBreakdown = (period: MetricsPeriod = 'today') =>
+  apiFetch<DailyBreakdown>(`/metrics/daily/breakdown?period=${period}`);
 export const listLinks = () => apiFetch<LinkSummary[]>('/links');
 export const getLink = (id: string) => apiFetch<LinkDetail>(`/links/${id}`);
 export const getWallet = (linkId: string, address: string) =>
