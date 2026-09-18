@@ -7,12 +7,14 @@ import {
 import {
   depositBatch,
   depositBatchWithAction,
+  depositBatchWithFee,
 } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
 import {
   ActionDepositArgs,
   ChainInfo,
   DepositArgs,
+  FeeDepositArgs,
   NonEmptyArray,
 } from "../types";
 import {
@@ -51,7 +53,7 @@ export const planLogWindows = (
 };
 
 const applyRebaseFactors = async (
-  deposits: Array<DepositArgs | ActionDepositArgs>,
+  deposits: Array<DepositArgs | ActionDepositArgs | FeeDepositArgs>,
 ) => {
   if (deposits.length === 0) return;
   const targetTokens = [...new Set(deposits.map((d) => d.targetStratoToken))];
@@ -78,6 +80,7 @@ const recordDeposits = async (
   await applyRebaseFactors([
     ...classified.standardDeposits,
     ...classified.actionDeposits,
+    ...classified.feeDeposits,
   ]);
   if (classified.standardDeposits.length > 0) {
     await depositBatch(
@@ -87,6 +90,11 @@ const recordDeposits = async (
   if (classified.actionDeposits.length > 0) {
     await depositBatchWithAction(
       classified.actionDeposits as NonEmptyArray<ActionDepositArgs>,
+    );
+  }
+  if (classified.feeDeposits.length > 0) {
+    await depositBatchWithFee(
+      classified.feeDeposits as NonEmptyArray<FeeDepositArgs>,
     );
   }
 };

@@ -2,6 +2,7 @@ import { Interface } from "ethers";
 import {
   ActionDepositArgs,
   DepositArgs,
+  FeeDepositArgs,
   NonEmptyArray,
 } from "../types";
 import { normalizeAddress } from "../utils/utils";
@@ -9,6 +10,7 @@ import { normalizeAddress } from "../utils/utils";
 const DEPOSIT_EVENTS_ABI = [
   "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
   "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint8 action, address actionToken, uint256 minFinalOut)",
+  "event DepositRoutedWithFee(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee, uint256 requestedAt, uint256 feeHalfLife)",
 ];
 
 const depositEvents = new Interface(DEPOSIT_EVENTS_ABI);
@@ -25,6 +27,7 @@ export interface RawDepositLog {
 export interface ClassifiedDepositLogs {
   standardDeposits: DepositArgs[];
   actionDeposits: ActionDepositArgs[];
+  feeDeposits: FeeDepositArgs[];
 }
 
 export type ParsedDepositEvent =
@@ -35,6 +38,10 @@ export type ParsedDepositEvent =
   | {
       kind: "action";
       deposit: ActionDepositArgs;
+    }
+  | {
+      kind: "fee";
+      deposit: FeeDepositArgs;
     };
 
 export const parseDepositLog = (
@@ -61,6 +68,22 @@ export const parseDepositLog = (
   if (parsed.name === "DepositRouted") {
     return { kind: "standard", deposit: base };
   }
+
+  if (parsed.name === "DepositRoutedWithFee") {
+    return {
+      kind: "fee",
+      deposit: {
+        ...base,
+        maxFee: parsed.args.maxFee.toString(),
+        // The ORIGIN chain's timestamp, passed through unchanged. STRATO
+        // measures the fee decay from here, so relayer lag is refunded to the
+        // user; substituting a local clock would hand that back to the solver.
+        requestedAt: parsed.args.requestedAt.toString(),
+        feeHalfLife: parsed.args.feeHalfLife.toString(),
+      },
+    };
+  }
+
   if (parsed.name !== "DepositRoutedWithAction") {
     throw new Error(`Unsupported deposit event ${parsed.name}`);
   }
@@ -109,6 +132,7 @@ export const classifyDepositLogs = (
   const result: ClassifiedDepositLogs = {
     standardDeposits: [],
     actionDeposits: [],
+    feeDeposits: [],
   };
 
   for (const [groupKey, groupedLogs] of groups.entries()) {
@@ -122,6 +146,8 @@ export const classifyDepositLogs = (
     const parsed = parseDepositLog(groupedLogs[0], externalChainId);
     if (parsed.kind === "standard") {
       result.standardDeposits.push(parsed.deposit);
+    } else if (parsed.kind === "fee") {
+      result.feeDeposits.push(parsed.deposit);
     } else {
       result.actionDeposits.push(parsed.deposit);
     }
@@ -129,6 +155,20 @@ export const classifyDepositLogs = (
 
   return result;
 };
+
+export const buildFeeDepositBatchArgs = (
+  depositArgs: NonEmptyArray<FeeDepositArgs>,
+) => ({
+  externalChainIds: depositArgs.map((deposit) => deposit.externalChainId),
+  externalSenders: depositArgs.map((deposit) => deposit.externalSender),
+  externalTokens: depositArgs.map((deposit) => deposit.externalToken),
+  externalTokenAmounts: depositArgs.map((deposit) => deposit.externalTokenAmount),
+  externalTxHashes: depositArgs.map((deposit) => deposit.externalTxHash),
+  stratoRecipients: depositArgs.map((deposit) => deposit.stratoRecipient),
+  targetStratoTokens: depositArgs.map((deposit) => deposit.targetStratoToken),
+  maxFees: depositArgs.map((deposit) => deposit.maxFee),
+  requestedAts: depositArgs.map((deposit) => deposit.requestedAt),
+});
 
 export const buildActionDepositBatchArgs = (
   depositArgs: NonEmptyArray<ActionDepositArgs>,

@@ -29,6 +29,31 @@ export const getCurrentBlockNumber = async (
   return parseInt(unwrapRpcResult(response, "eth_blockNumber", chainId) || "0", 16);
 };
 
+/**
+ * The timestamp of one block on an external chain.
+ *
+ * Needed verbatim, not approximated: STRATO evaluates a solver's fee against
+ * the committed decay schedule AT THIS TIMESTAMP, so substituting a local clock
+ * would either reject an honest claim or let a late one collect an early fee.
+ */
+export const getBlockTimestamp = async (
+  chainId: number,
+  blockNumber: number,
+): Promise<string> => {
+  const rpcUrl = getChainRpcUrl(chainId);
+  const response: any = await fetch.post(rpcUrl, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "eth_getBlockByNumber",
+    params: [decimalToHex(blockNumber.toString()), false],
+  });
+  const block = unwrapRpcResult(response, "eth_getBlockByNumber", chainId);
+  if (!block?.timestamp) {
+    throw new Error(`Block ${blockNumber} on chain ${chainId} has no timestamp`);
+  }
+  return BigInt(block.timestamp).toString();
+};
+
 // Get logs for a specific chain
 export const getChainLogs = async (
   chainId: number,

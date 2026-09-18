@@ -24,7 +24,14 @@ const NONCE_CONFLICT_CODES = [409, 422];
 const NONCE_CONFLICT_PATTERNS = /nonce|already exists|conflict/i;
 
 // Module-scope heavy objects
-const erc20Interface = new Interface(ERC20_ABI);
+const erc20Interface = new Interface(ERC20_ABI.concat([
+  "function approve(address spender, uint256 amount) public returns (bool)",
+]));
+
+const SETTLEMENT_ABI = [
+  "function settleWithdrawal((uint256 sourceChainId,address sourceBridge,uint256 withdrawalId,address token,address recipient,uint256 amount,uint256 maxFee,uint256 requestedAt,uint256 feeHalfLife) terms) payable returns (address)",
+];
+const settlementInterface = new Interface(SETTLEMENT_ABI);
 
 export function buildTxDescriptor(params: {
   type: "eth" | "erc20";
@@ -71,6 +78,162 @@ export function buildTxDescriptor(params: {
     options: { 
       nonce: params.nonce
     },
+  };
+}
+
+/**
+ * The withdrawal terms the external-chain router settles against. Every field
+ * is fixed when the user made the request, which is the whole point: the
+ * payload below names the withdrawal, never a payee, so signers can sign it
+ * before any solver exists and it still routes correctly once one appears.
+ */
+export function buildWithdrawalTerms(withdrawal: WithdrawalInfo) {
+  return {
+    sourceChainId: withdrawal.sourceChainId!,
+    sourceBridge: safeChecksum(withdrawal.sourceBridge!),
+    withdrawalId: String(withdrawal.withdrawalId),
+    token: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS
+      ? ZERO_ADDRESS
+      : safeChecksum(withdrawal.externalToken),
+    recipient: safeChecksum(withdrawal.externalRecipient),
+    amount: withdrawal.externalTokenAmount,
+    maxFee: withdrawal.feeTerms?.maxFee ?? "0",
+    requestedAt: withdrawal.feeTerms?.requestedAt ?? "0",
+    feeHalfLife: withdrawal.feeTerms?.feeHalfLife ?? "0",
+  };
+}
+
+/**
+ * Whether this withdrawal can be settled through the router.
+ *
+ * `settlementRouter` is only set once the router has been CONFIRMED to support
+ * routed settlement (see {routerSupportsSettlement}), so this stays a cheap
+ * synchronous check at proposal time.
+ *
+ * A withdrawal that cannot be routed keeps the direct transfer it was requested
+ * under. That covers two cases which both have to keep working: one requested
+ * before the fast-path upgrade, and one bound for a chain whose router has not
+ * been upgraded yet. The migration has to drain in-flight withdrawals and serve
+ * un-upgraded chains, not strand either.
+ */
+export function canRouteSettlement(withdrawal: WithdrawalInfo): boolean {
+  return Boolean(
+    withdrawal.settlementRouter &&
+      withdrawal.sourceBridge &&
+      withdrawal.sourceChainId &&
+      withdrawal.feeTerms,
+  );
+}
+
+// Per chain+router+settler, cached for the process: a router's implementation
+// only changes on an upgrade, and a stale "no" costs a slow withdrawal while a
+// stale "yes" costs a stalled one.
+const settlementSupport = new Map<string, boolean>();
+
+/**
+ * Whether `router` can route a payout for `settler` on this chain.
+ *
+ * ASKED ON CHAIN, NEVER ASSUMED. STRATO commits a fee schedule to every
+ * withdrawal once it is upgraded, including zero-fee ones, but the external
+ * routers upgrade independently and on their own schedule -- Robinhood and
+ * HyperEVM will still be on the old implementation when Sepolia and Base
+ * Sepolia are new. Proposing a `settleWithdrawal` to a router that has no such
+ * function makes the Safe transaction revert and the withdrawal stall, so the
+ * capability is probed rather than inferred from a version number or a config
+ * flag someone has to remember to set.
+ *
+ * `payoutSettlers` answers the whole question in one call: the selector only
+ * exists on the new implementation, and a `true` also means this wallet is
+ * allowed to call it. Anything else -- old implementation, settler not seeded,
+ * unreachable RPC -- reads as "not yet", and the withdrawal takes the direct
+ * transfer it would have taken anyway.
+ */
+export async function routerSupportsSettlement(
+  chainId: number,
+  router: string,
+  settler: string,
+): Promise<boolean> {
+  const key = `${chainId}:${router.toLowerCase()}:${settler.toLowerCase()}`;
+  const cached = settlementSupport.get(key);
+  if (cached !== undefined) return cached;
+
+  let supported = false;
+  // Destroyed in `finally`: a JsonRpcProvider keeps a live poller, and a probe
+  // that leaves one behind leaks a handle per chain and stops a process from
+  // exiting on its own.
+  let provider;
+  try {
+    provider = new JsonRpcProvider(getChainRpcUrl(chainId));
+    const probe = new Interface([
+      "function payoutSettlers(address) view returns (bool)",
+    ]);
+    const result = await provider.call({
+      to: safeChecksum(router),
+      data: probe.encodeFunctionData("payoutSettlers", [safeChecksum(settler)]),
+    });
+    supported = probe.decodeFunctionResult("payoutSettlers", result)[0] === true;
+  } catch {
+    supported = false;
+  } finally {
+    provider?.destroy();
+  }
+
+  if (!supported) {
+    logInfo(
+      "SafeService",
+      `Router ${router} on chain ${chainId} is not routing settlements for ${settler}; ` +
+        `withdrawals there stay on the direct transfer`,
+    );
+  }
+  settlementSupport.set(key, supported);
+  return supported;
+}
+
+/**
+ * The STATIC settlement payload: the Safe calls the router, and the router pays
+ * whoever holds the claim -- the recipient if nobody does, the last solver in
+ * the ladder if one does.
+ *
+ * CUSTODY NEVER RESTS IN THE ROUTER. For an ERC20 this is a MultiSend of
+ * [approve(router, amount), settleWithdrawal(terms)], so the allowance is
+ * created and consumed inside one atomic transaction and the router only ever
+ * directs a transfer it does not hold. For the native asset the settlement call
+ * carries the value directly.
+ */
+export function buildSettlementDescriptor(params: {
+  withdrawal: WithdrawalInfo;
+  nonce: number;
+}): { transactions: MetaTransactionData[]; options: { nonce: number } } {
+  const { withdrawal, nonce } = params;
+  const router = safeChecksum(withdrawal.settlementRouter!);
+  const terms = buildWithdrawalTerms(withdrawal);
+  const isNative = ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS;
+
+  const settle: MetaTransactionData = {
+    to: router,
+    value: isNative ? withdrawal.externalTokenAmount : "0",
+    data: settlementInterface.encodeFunctionData("settleWithdrawal", [terms]),
+    operation: OperationType.Call,
+  };
+
+  if (isNative) {
+    return { transactions: [settle], options: { nonce } };
+  }
+
+  return {
+    transactions: [
+      {
+        to: safeChecksum(withdrawal.externalToken),
+        value: "0",
+        data: erc20Interface.encodeFunctionData("approve", [
+          router,
+          withdrawal.externalTokenAmount,
+        ]),
+        operation: OperationType.Call,
+      },
+      settle,
+    ],
+    options: { nonce },
   };
 }
 
@@ -295,19 +458,28 @@ export async function createWithdrawalProposals(
       nonce = currentNonce++;
       protocolKitForWithdrawal = protocolKit;
     }
-    const descriptor = buildTxDescriptor({
-      type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
-      externalRecipient: withdrawal.externalRecipient,
-      externalTokenAmount: withdrawal.externalTokenAmount,
-      externalToken: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
-      nonce,
-    });
+    // A fast-path withdrawal is settled through the router, so that a solver
+    // who claims it AFTER this proposal is signed is still the one paid. A
+    // pre-upgrade withdrawal has no router and keeps the direct transfer.
+    const descriptor = canRouteSettlement(withdrawal)
+      ? buildSettlementDescriptor({ withdrawal, nonce })
+      : buildTxDescriptor({
+          type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
+          externalRecipient: withdrawal.externalRecipient,
+          externalTokenAmount: withdrawal.externalTokenAmount,
+          externalToken: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
+          nonce,
+        });
 
     const safeTransaction = await protocolKitForWithdrawal.createTransaction(descriptor);
     const safeTxHash = await protocolKitForWithdrawal.getTransactionHash(safeTransaction);
     const signature = await protocolKitForWithdrawal.signHash(safeTxHash);
 
-    logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${withdrawal.withdrawalId}, hot: ${!!withdrawal.useHotWallet}`);
+    logInfo(
+      "SafeService",
+      `Created tx proposal: nonce ${nonce}, withdrawalId ${withdrawal.withdrawalId}, ` +
+        `hot: ${!!withdrawal.useHotWallet}, routed: ${canRouteSettlement(withdrawal)}`,
+    );
 
     transactionProposals.push({
       safeAddress: toAddress,

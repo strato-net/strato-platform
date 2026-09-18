@@ -1,0 +1,21 @@
+{
+  "name": "strato-solver",
+  "version": "1.0.0",
+  "description": "Solver bot: fills STRATO bridge transfers ahead of the slow path",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "test": "npm run build && node --test dist/pricing.test.js dist/decide.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.6",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.14.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

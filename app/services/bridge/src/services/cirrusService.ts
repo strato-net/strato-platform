@@ -9,6 +9,7 @@ import {
   NativeDepositInfo,
   AssetInfo,
   BridgeInfo,
+  FeeTerms,
 } from "../types";
 
 const { bridge, nativeBridge, oracle } = config;
@@ -226,6 +227,83 @@ export const getNativeDepositsByStatus = async (
   return data.map(({ value, key: depositId }) => ({
     ...value,
     depositId,
+  }));
+};
+
+/**
+ * The solver fee schedules committed for a set of withdrawals.
+ *
+ * Read from the side table rather than from the withdrawal record: the fee
+ * terms were deliberately added as their own mapping so that existing Cirrus
+ * tables and their consumers did not change shape, which also means the
+ * withdrawal query cannot see them.
+ *
+ * An absent entry is not an error. It means the withdrawal was requested before
+ * the fast-path upgrade and must still settle the old way.
+ */
+const readFeeTerms = async (
+  table: string,
+  address: string | undefined,
+  ids: string[],
+): Promise<Map<string, FeeTerms>> => {
+  const result = new Map<string, FeeTerms>();
+  const unique = [...new Set(ids)];
+  if (!address || unique.length === 0) return result;
+
+  const data = await cirrus
+    .get(`/${table}`, {
+      params: {
+        key: `in.(${unique.join(",")})`,
+        address: `eq.${address}`,
+        select: "key,value",
+      },
+    })
+    .catch(() => []);
+
+  for (const row of Array.isArray(data) ? data : []) {
+    const value = row?.value;
+    if (!value?.set) continue;
+    result.set(String(row.key), {
+      maxFee: String(value.maxFee ?? "0"),
+      requestedAt: String(value.requestedAt ?? "0"),
+      feeHalfLife: String(value.feeHalfLife ?? "0"),
+    });
+  }
+
+  return result;
+};
+
+export const getWithdrawalFeeTerms = (ids: string[]) =>
+  readFeeTerms(`${MERCATA_BRIDGE_URL}-withdrawalFeeTerms`, bridgeAddress, ids);
+
+export const getNativeWithdrawalFeeTerms = (ids: string[]) =>
+  readFeeTerms(`${NATIVE_BRIDGE_URL}-withdrawalFeeTerms`, nativeBridgeAddress, ids);
+
+/**
+ * Deposits a stranger announced against a bond, which the relayer has not yet
+ * adopted. Status 6 is ANNOUNCED.
+ *
+ * These are unverified claims and must never be confirmed from here: only the
+ * relayer's own deposit record moves one to INITIATED. The relayer reads them
+ * to decide whether to confirm the announcement's bond or reject it.
+ */
+export const getAnnouncedDeposits = async (): Promise<DepositInfo[]> => {
+  const data = await cirrus
+    .get(`/${MERCATA_BRIDGE_URL}-deposits?select=*`, {
+      params: {
+        "value->>bridgeStatus": "eq.6",
+        address: `eq.${bridgeAddress}`,
+        order: "value->>timestamp.asc",
+      },
+    })
+    .catch(() => []);
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  return data.map(({ value, key: externalChainId, key2: externalTxHash }) => ({
+    ...value,
+    externalChainId,
+    externalTxHash,
   }));
 };
 
