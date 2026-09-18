@@ -33,6 +33,7 @@ const VAULT_ICON_FILES: Record<string, string> = {
 const SHARE_SYMBOL_TO_VAULT_KEY: Record<string, string> = {
   saveusdst: SAVE_USDST_VAULT_KEY,
   carryeth: "eth-carry",
+  carryhype: "hype-carry",
   carrywbtc: "wbtc-carry",
   yieldusdc: "usdc-yield",
   yieldgoldst: "goldst-yield",

@@ -39,6 +39,11 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=eth-carry';
   }
 
+  // HYPE Carry Vault
+  if (lowerName.includes('hype carry vault')) {
+    return '/dashboard/earn-yield-vault?vault=hype-carry';
+  }
+
   // wBTC Carry Vault
   if (lowerName.includes('wbtc carry vault')) {
     return '/dashboard/earn-yield-vault?vault=wbtc-carry';
