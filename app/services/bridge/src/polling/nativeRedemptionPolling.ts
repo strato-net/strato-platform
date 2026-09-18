@@ -1,6 +1,7 @@
 import { config, getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE } from "../config";
 import { getCurrentBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
-import { getEnabledChains } from "../services/cirrusService";
+import { getEnabledChains, getEnabledNativeChainIds } from "../services/cirrusService";
+import { collectNativeRedemptionChainIds } from "./nativeRedemptionChains";
 import { recordNativeDepositBatch } from "../services/bridgeService";
 import { nativeBlockTrackingService } from "../services/nativeBlockTrackingService";
 import { NativeDepositArgs } from "../types";
@@ -84,17 +85,33 @@ const pollChainNativeRedemptions = async (chainId: number) => {
 export const startNativeRedemptionPolling = () => {
   const poll = async () => {
     try {
-      const enabledChains = Array.from((await getEnabledChains()).values());
+      // Native routes can target chains that have no MercataBridge deposit router,
+      // so poll the union of native route chains and deposit chains. One lookup
+      // failing must not stop polling on the chains the other one returned.
+      const [nativeRouteChains, depositChains] = await Promise.allSettled([
+        getEnabledNativeChainIds(),
+        getEnabledChains(),
+      ]);
 
-      await Promise.all(
-        enabledChains.map(async (chainInfo) => {
-          if (!chainInfo.externalChainId) {
-            return;
-          }
+      if (nativeRouteChains.status === "rejected") {
+        logError("NativeRedemptionPolling", nativeRouteChains.reason as Error, {
+          operation: "getEnabledNativeChainIds",
+        });
+      }
+      if (depositChains.status === "rejected") {
+        logError("NativeRedemptionPolling", depositChains.reason as Error, {
+          operation: "getEnabledChains",
+        });
+      }
 
-          await pollChainNativeRedemptions(Number(chainInfo.externalChainId));
-        }),
+      const chainIds = collectNativeRedemptionChainIds(
+        nativeRouteChains.status === "fulfilled" ? nativeRouteChains.value : [],
+        depositChains.status === "fulfilled"
+          ? Array.from(depositChains.value.values()).map((chainInfo) => chainInfo.externalChainId)
+          : [],
       );
+
+      await Promise.all(chainIds.map((chainId) => pollChainNativeRedemptions(chainId)));
     } catch (error) {
       logError("NativeRedemptionPolling", error as Error, {
         operation: "startNativeRedemptionPolling",
