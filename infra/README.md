@@ -3,6 +3,10 @@
 AWS CDK apps for the tiered STRATO deployment. Each directory is an
 independent CDK app with its own `package.json`, context contract and README.
 
+> **This repo cannot synth on its own.** It needs a `strato-platform` checkout
+> beside it at `../strato-platform`, or at the path in `STRATO_PLATFORM_DIR`.
+> See [The strato-platform checkout](#the-strato-platform-checkout).
+
 | App | Stacks | What it owns |
 | --- | --- | --- |
 | `data-plane` | `StratoData-<env>-*` | VPC, Aurora Postgres cluster, message bus |
@@ -11,9 +15,42 @@ independent CDK app with its own `package.json`, context contract and README.
 | `app-tier` | `StratoApp-<env>-{Network,Tier}` | ECS app tier |
 | `observability` | see its README | Dashboards, alarms, canaries, collector configs |
 
-Deploy order for a fresh environment: `data-plane`, `core-cell`, `api-tier`,
-`app-tier`, then `observability`. Each app: `cd <app> && npm ci`, then
-`npx cdk deploy` with the context values its README lists.
+Each app: `cd <app> && npm ci`, then `npx cdk deploy` with the context values
+its README lists.
+
+## Deploy order
+
+`data-plane`, `core-cell`, `api-tier` (Network and Tier), the front door
+(`StratoApi-<env>-FrontDoor`) **and its DNS record**, `app-tier`, then
+`observability`.
+
+- The front door and its DNS record must exist before the app tier deploys.
+  The app backend blocks until `<nodeUrl>/strato-api/eth/v1.2/metadata`
+  answers `isSynced: true`, and cannot tell an unresolvable name from a lagging
+  node: the service never turns healthy and CloudFormation rolls back after
+  about three hours.
+- An app tier stack that rolls back takes its ALB with it. Re-point the front
+  door's `appOriginDomainName` at the new ALB from the stack output afterwards.
+
+## Environments
+
+`environments/<env>.sh` records the context a live environment was deployed
+with and runs `cdk` with it:
+
+```sh
+export STRATO_PLATFORM_DIR=~/src/strato-platform   # if not at ../strato-platform
+environments/tiered.sh api-tier diff --no-change-set
+environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoor
+```
+
+`tiered` is account 406773134706, us-east-1, serving
+https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean
+except `StratoCell-tiered-cell-a-Host`, which shows two expected changes: the
+Grafana ingress rule on 3001 leaves the template (`grafanaCidrs` is empty; the
+rule is already gone from the live security group), and the `NodeScripts`
+asset follows `bin/` in strato-platform. The second changes UserData, so CDK
+reports the instance as "may be replaced": read the diff before deploying it.
+`observability` is not deployed in this account.
 
 ## The strato-platform checkout
 
