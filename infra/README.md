@@ -45,11 +45,22 @@ environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoo
 
 `tiered` is account 406773134706, us-east-1, serving
 https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean
-except `StratoCell-tiered-cell-a-Host`, which shows two expected changes: the
-Grafana ingress rule on 3001 leaves the template (`grafanaCidrs` is empty; the
-rule is already gone from the live security group), and the `NodeScripts`
-asset follows `bin/` in strato-platform. The second changes UserData, so CDK
-reports the instance as "may be replaced": read the diff before deploying it.
+except `StratoCell-tiered-cell-a-Host`, whose template is behind the instance
+in three known ways:
+
+- the Grafana ingress rule on 3001 from 0.0.0.0/0 is still in the template but
+  already gone from the live security group; `grafanaCidrs` is empty, so a
+  deploy removes it from the template too;
+- the `Bootstrap` and `NodeScripts` assets follow `cell-bootstrap.sh` here and
+  `bin/` in strato-platform, both changed since the cell was deployed;
+- the Grafana Keycloak login (`grafanaPublicUrl`, `grafanaAdminGroups`,
+  `grafanaViewerGroups`) and the newer strato image were applied to the
+  running instance by hand, because cloud-init does not run again.
+
+All of these change UserData, so CDK reports the instance as "may be
+replaced". For this cell that means rebuilding a synced node: read the diff
+and never accept it casually.
+
 `observability` is not deployed in this account.
 
 ## The strato-platform checkout

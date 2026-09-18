@@ -102,6 +102,14 @@ export interface ApiTierConfig {
    * (coreSecurityGroupId) is opened to the tasks on that port.
    */
   prometheusHost?: string;
+  /**
+   * A core cell running Grafana (the core-cell app's `grafana`): this ALB gains a /grafana* rule
+   * forwarding to that instance, so the front door can reach it over the one public hostname, and
+   * the cell's security group is opened on that port to this load balancer alone. Access control is
+   * Grafana's own Keycloak login, not this rule.
+   */
+  grafanaInstanceId?: string;
+  grafanaPort: number;
   /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. */
   csrfStateless: boolean;
 }
@@ -179,5 +187,7 @@ export function loadConfig(app: App): ApiTierConfig {
     nginxSessionSecretName: optional(app, "nginxSessionSecretName"),
     csrfStateless: String(ctx(app, "csrfStateless", "false")) === "true",
     prometheusHost: optional(app, "prometheusHost"),
+    grafanaInstanceId: optional(app, "grafanaInstanceId"),
+    grafanaPort: Number(ctx(app, "grafanaPort", "3001")),
   };
 }

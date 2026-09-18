@@ -23,7 +23,10 @@ const APP_PATHS = ["/api-docs*", "/api/*", "/history-api/*"];
  * logout live here for both UIs (the node template honors returnTo), as they
  * did on a single node; the app tier's nginx reads the same session cookie.
  */
-const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/docs*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping"];
+// "/grafana*" reaches a core cell's Grafana: the API tier's ALB has a rule that
+// forwards it to that instance (grafanaInstanceId there). Grafana runs its own
+// Keycloak login, so this only carries the request to it.
+const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/docs*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping", "/grafana*"];
 
 /**
  * Viewer-request functions for the two buckets. Client-side routes (no file

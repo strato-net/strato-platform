@@ -63,11 +63,14 @@ export class CoreCellStack extends Stack {
       this.securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), "Lets Encrypt HTTP-01 challenge");
     }
     if (config.grafana) {
-      // Not webCidrs: that is the public web port, and this Grafana serves plain
-      // HTTP with anonymous viewer access, so inheriting 0.0.0.0/0 would publish
-      // the node's metrics to anyone. Default is no rule at all - reach it with
-      // `aws ssm start-session --document-name AWS-StartPortForwardingSession`
-      // - and -c grafanaCidrs=... opens it to named networks only.
+      // Not webCidrs: that is the public web port, and without grafanaPublicUrl
+      // this Grafana serves plain HTTP with anonymous viewer access, so
+      // inheriting 0.0.0.0/0 would publish the node's metrics to anyone.
+      // Default is no rule at all - reach it with `aws ssm start-session
+      // --document-name AWS-StartPortForwardingSession`, or through the API
+      // tier's ALB, which opens this port to itself alone and puts Grafana's
+      // Keycloak login in front. -c grafanaCidrs=... opens it to named
+      // networks as well.
       for (const cidr of config.grafanaCidrs) this.securityGroup.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(3001), "Grafana");
     }
     config.clientSecurityGroupIds.forEach((sgId, i) => {
@@ -198,6 +201,9 @@ export class CoreCellStack extends Stack {
       LOCAL_AUTH: String(config.localAuth),
       OAUTH_SECRET_ID: config.oauthSecretName ?? "",
       GRAFANA: String(config.grafana),
+      GRAFANA_PUBLIC_URL: config.grafanaPublicUrl ?? "",
+      GRAFANA_ADMIN_GROUPS: config.grafanaAdminGroups.join(","),
+      GRAFANA_VIEWER_GROUPS: config.grafanaViewerGroups.join(","),
       PROMETHEUS_EXPOSE: String(config.exposePrometheus),
       ETHCONF_PARAMETER: config.ethconfParameterName ?? "",
       DASHBOARDS_S3: dashboards.s3ObjectUrl,
