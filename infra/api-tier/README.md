@@ -26,6 +26,10 @@ calls to the core node's VPC-facing Kafka listener (port 9094, enabled with
    `.ethereumH/ethconf.yaml` base64-encoded, under the name given as
    `ethconfParameterName` (about 2.6 KB; fits a standard parameter).
 4. A regional ACM certificate for the node hostname.
+5. `-c ethconfParameterName=...`: the node config, which the core cell publishes
+   there each boot (`ethconfParameterName` in the core-cell app). Without a cell
+   publishing it, create the parameter by hand from a node's `ethconf.yaml`
+   (base64, SecureString).
 
 ## Deploy and cut over
 
@@ -124,6 +128,11 @@ Two nginx tiers then answer one hostname, so they must agree on sessions:
   name-only reference is misread as name plus random suffix and ECS fails with
   AccessDenied (a secret this stack created under
   `sessionSecretName` stays in place, unused; renaming it would collide).
+- **One secret for every client.** `-c oauthJsonSecretName=<JSON {discoveryUrl,
+  clientId, clientSecret}>` serves both strato-api (which writes its credentials
+  file from the three values) and nginx, instead of `oauthCredentialsSecretName`'s
+  YAML. The app tier's `oauthSecretName` and a core cell's `oauthSecretName` take
+  the same secret, so one secret covers the deployment.
 - **One OAuth client.** `-c nginxOauthSecretName=<JSON {discoveryUrl, clientId,
   clientSecret}>` gives this tier's nginx the app tier's client (strato-api
   keeps the node's credentials file). Login and logout for both UIs run here;

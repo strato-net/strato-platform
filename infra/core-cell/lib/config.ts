@@ -40,13 +40,31 @@ export interface CoreCellConfig {
   oauthSecretName?: string;
   /** A Grafana container on the host (port 3001, anonymous viewer) reading the node's own Prometheus, with the repo's dashboards. */
   grafana: boolean;
+  /**
+   * SSM parameter this cell publishes its generated ethconf.yaml to (base64, SecureString), which is
+   * what the API tier reads as ETHCONF_BASE64. Written on every boot, so the tiers follow a re-setup.
+   * With several cells on one cluster, set it on the writer only: the last writer would otherwise win.
+   */
+  ethconfParameterName?: string;
   /** Publish the node's Prometheus on the cell's private address, port 9090, for the API tier's apex (its prometheusHost). The API tier app opens the security group to its tasks. */
   exposePrometheus: boolean;
   /** Public hostname of the node: a Let's Encrypt certificate is obtained for it on the host (HTTP-01 on port 80), the machine hostname is set to it (the node URL derives from the hostname), and the node serves https. */
   tlsHostname?: string;
   letsEncryptEmail?: string;
-  /** Who may reach the app (httpPort, 443) and Grafana (3001). */
+  /** Who may reach the app (httpPort, 443). */
   webCidrs: string[];
+  /** Who may reach Grafana (3001) directly. Empty by default: with no CIDR here it is reachable only through SSM port forwarding, or through the API tier's ALB when that tier sets `grafanaInstanceId`. */
+  grafanaCidrs: string[];
+  /**
+   * Put Grafana behind a Keycloak login instead of anonymous viewer access. Needs `grafanaPublicUrl`
+   * (where the browser reaches it, e.g. https://host/grafana/) and `oauthSecretName`, whose
+   * {discoveryUrl, clientId, clientSecret} the host resolves at boot - the value never leaves the
+   * instance. Anonymous access is turned off, and a user is admitted only when one of their Keycloak
+   * groups appears in `grafanaAdminGroups` or `grafanaViewerGroups`, so those groups ARE the whitelist.
+   */
+  grafanaPublicUrl?: string;
+  grafanaAdminGroups: string[];
+  grafanaViewerGroups: string[];
   /** The node's HTTP port (networkConfig.httpPort): nginx publishes it and 443. */
   httpPort: number;
   /** Per-cell peer store database on Postgres (`--peerDatabase`). Superseded by `peerStore: sqlite`, the default; only read when `peerStore` is `postgres`. */
@@ -148,9 +166,14 @@ export function loadConfig(app: App): CoreCellConfig {
     oauthSecretName: optional(app, "oauthSecretName"),
     grafana: bool(app, "grafana", "false"),
     exposePrometheus: bool(app, "exposePrometheus", "false"),
+    ethconfParameterName: optional(app, "ethconfParameterName"),
     tlsHostname: optional(app, "tlsHostname"),
     letsEncryptEmail: optional(app, "letsEncryptEmail"),
     webCidrs: list(app, "webCidrs", "0.0.0.0/0"),
+    grafanaCidrs: list(app, "grafanaCidrs", ""),
+    grafanaPublicUrl: optional(app, "grafanaPublicUrl"),
+    grafanaAdminGroups: list(app, "grafanaAdminGroups", ""),
+    grafanaViewerGroups: list(app, "grafanaViewerGroups", ""),
     httpPort: Number(ctx(app, "httpPort", "8081")),
     peerDatabase: optional(app, "peerDatabase"),
     peerStore: peerStore(app),

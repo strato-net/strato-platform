@@ -61,7 +61,9 @@ container on a full-node cell (moved out of that cell's box). A frontend with
 no CloudFront traffic in the time range shows as a dashed "not deployed" box.
 CloudWatch names a distribution only by its id, so the hidden dashboard
 variable `frontend_labels` names them (`E123ABC=SMD,E456DEF=App UI`); an
-unnamed distribution is shown as the app UI. Its code lives in
+unnamed distribution is shown as the app UI. A distribution with no datapoints
+in the time range is not drawn, and one named `-` is hidden: CloudWatch keeps
+listing a deleted distribution's metrics for about two weeks. Its code lives in
 `dashboards/src/tier-map.getOption.js`; `scripts/embed-tier-map.py` writes it
 and the panel's queries into `dashboards/infrastructure-map.json`.
 

@@ -96,10 +96,12 @@ submits transactions to this cell.
 | `localAuth` | `false` | with role node: local OpenID provider instead of Keycloak; admin `admin`, password in `/etc/strato/local-auth-admin-password` on the host |
 | `oauthSecretName` | none | without localAuth: Secrets Manager secret, JSON `{discoveryUrl, clientId, clientSecret}`, holding the node's Keycloak client (confidential, service accounts enabled, the node's URL among its redirect URIs). The host writes it as strato-login would; strato-setup then creates the node key in the shared vault (`--vaultUrl`, default vault.blockapps.net) under that client |
 | `frontendLabels` | none | with `grafana`: names for the tier map's CloudFront distributions (`E123ABC=SMD,E456DEF=App UI`) |
+| `ethconfParameterName` | none | SSM parameter this cell publishes its generated `ethconf.yaml` to (base64, SecureString, rewritten each boot): the API tier reads it as its node config (`-c ethconfParameterName=` there). Set it on the writer cell only |
 | `exposePrometheus` | `false` | publish the node's Prometheus on the cell's private IP, port 9090 (a socat container), for the API tier's apex: pass `-c prometheusHost=<PrivateDnsName>:9090` there |
 | `grafana` | `false` | Grafana container on port 3001 (anonymous viewer; admin password in `/etc/strato/grafana-admin-password`) over the node's Prometheus, with the repo's dashboards |
 | `tlsHostname` / `letsEncryptEmail` | none | public hostname (an A record to the cell's Elastic IP): the host obtains a Let's Encrypt certificate for it over port 80, sets its hostname to it, and the node serves `https://<hostname>/` (the app URL, the OAuth issuer) |
-| `webCidrs` | `0.0.0.0/0` | who may reach the app (`httpPort`, 443) and Grafana (3001) |
+| `webCidrs` | `0.0.0.0/0` | who may reach the app (`httpPort`, 443) |
+| `grafanaCidrs` | none | who may reach Grafana (3001). Empty means no ingress rule: Grafana serves plain HTTP with anonymous viewer access, so it must not inherit the public `webCidrs`. Reach it with `aws ssm start-session --target <instance> --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["3001"],"localPortNumber":["3001"]}'`, or name your own networks here |
 | `httpPort` | `8081` | the node's HTTP port; nginx publishes it (plain HTTP) and 443 |
 | `peerStore` | `sqlite` | where the cell keeps peers and sync tasks (`--peerStore`): `sqlite` is a file in the node directory, so a database failover or maintenance no longer restarts ethereum-discover and strato-p2p; `postgres` keeps them in the cluster as a monolith does
 | `peerDatabase` | none | per-cell peer store database on Postgres (`--peerDatabase`); only read with `peerStore: postgres`. strato-p2p keeps block reads on the eth database and peers on this one |

@@ -1,10 +1,11 @@
-import { CfnOutput, Duration, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import { InstanceIdTarget } from "aws-cdk-lib/aws-elasticloadbalancingv2-targets";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
@@ -41,7 +42,19 @@ export class ApiTierStack extends Stack {
 
     // --- Secrets and the node config ---
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
-    const oauthYaml = secretsmanager.Secret.fromSecretNameV2(this, "OauthYamlSecret", config.secrets.oauthCredentialsYaml);
+    // Either the credentials file as one secret, or a JSON secret whose three fields both
+    // strato-api and nginx take as OAUTH_* variables (see oauthJsonSecretName).
+    const oauthJson = config.oauthJsonSecretName
+      ? (config.oauthJsonSecretName.startsWith("arn:")
+          ? secretsmanager.Secret.fromSecretCompleteArn(this, "OauthJsonSecret", config.oauthJsonSecretName)
+          : secretsmanager.Secret.fromSecretNameV2(this, "OauthJsonSecret", config.oauthJsonSecretName))
+      : undefined;
+    const oauthYaml = oauthJson ? undefined : secretsmanager.Secret.fromSecretNameV2(this, "OauthYamlSecret", config.secrets.oauthCredentialsYaml);
+    const oauthFields = (secret: secretsmanager.ISecret) => ({
+      OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(secret, "discoveryUrl"),
+      OAUTH_CLIENT_ID: ecs.Secret.fromSecretsManager(secret, "clientId"),
+      OAUTH_CLIENT_SECRET: ecs.Secret.fromSecretsManager(secret, "clientSecret"),
+    });
     const session: secretsmanager.ISecret = config.createSessionSecret
       ? new secretsmanager.Secret(this, "SessionSecret", {
           secretName: config.secrets.session,
@@ -73,7 +86,9 @@ export class ApiTierStack extends Stack {
 
     // --- ECS ---
     const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/api/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
+    // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
+    // and the next create of this stack then fails with "already exists".
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/api/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
     const task = new ecs.FargateTaskDefinition(this, "Task", {
       cpu: 2048,
       memoryLimitMiB: 4096,
@@ -106,7 +121,7 @@ export class ApiTierStack extends Stack {
       secrets: {
         ...ethconfEnv,
         postgres_password: ecs.Secret.fromSecretsManager(postgres, "password"),
-        OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml),
+        ...(oauthYaml ? { OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml) } : oauthFields(oauthJson!)),
         ...(busSecret
           ? { BUS_SASL_USERNAME: ecs.Secret.fromSecretsManager(busSecret, "username"), BUS_SASL_PASSWORD: ecs.Secret.fromSecretsManager(busSecret, "password") }
           : {}),
@@ -205,14 +220,10 @@ export class ApiTierStack extends Stack {
       secrets: {
         ...ethconfEnv,
         SESSION_SECRET: ecs.Secret.fromSecretsManager(nginxSession),
-        OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml),
+        ...(oauthYaml ? { OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml) } : {}),
         // docker-run.sh prefers these over the credentials file's client.
-        ...(nginxOauth
-          ? {
-              OAUTH_DISCOVERY_URL: ecs.Secret.fromSecretsManager(nginxOauth, "discoveryUrl"),
-              OAUTH_CLIENT_ID: ecs.Secret.fromSecretsManager(nginxOauth, "clientId"),
-              OAUTH_CLIENT_SECRET: ecs.Secret.fromSecretsManager(nginxOauth, "clientSecret"),
-            }
+        ...(nginxOauth || oauthJson
+          ? oauthFields((nginxOauth ?? oauthJson)!)
           : {}),
       },
       healthCheck: {
@@ -253,8 +264,11 @@ export class ApiTierStack extends Stack {
     if (config.postgresSecurityGroupId) {
       ec2.SecurityGroup.fromSecurityGroupId(this, "ClusterSg", config.postgresSecurityGroupId).addIngressRule(taskSg, ec2.Port.tcp(config.postgresPort), `${name} tasks`);
     }
-    if (config.coreSecurityGroupId) {
-      const core = ec2.SecurityGroup.fromSecurityGroupId(this, "CoreSg", config.coreSecurityGroupId);
+    const coreSg = config.coreSecurityGroupId
+      ? ec2.SecurityGroup.fromSecurityGroupId(this, "CoreSg", config.coreSecurityGroupId)
+      : undefined;
+    if (coreSg) {
+      const core = coreSg;
       core.addIngressRule(taskSg, ec2.Port.tcp(config.kafkaPort), `${name} tasks: Kafka`);
       core.addIngressRule(taskSg, ec2.Port.tcp(3000), `${name} tasks: strato-api`);
       core.addIngressRule(taskSg, ec2.Port.tcp(8545), `${name} tasks: jsonrpc`);
@@ -298,8 +312,16 @@ export class ApiTierStack extends Stack {
           sslPolicy: elbv2.SslPolicy.RECOMMENDED_TLS,
         })
       : http;
-    if (albCertificate && props.extraCertificates?.length) {
-      listener.addCertificates("ExtraCertificates", props.extraCertificates.map((c) => elbv2.ListenerCertificate.fromCertificateManager(c)));
+    const extraCertificates = [
+      ...(props.extraCertificates ?? []).map((c) => elbv2.ListenerCertificate.fromCertificateManager(c)),
+      // CloudFront forwards the front door's Host header, so this ALB must serve its certificate.
+      // Skipped when the listener already serves it as its default certificate.
+      ...(config.frontDoorCertificateArn && config.frontDoorCertificateArn !== config.albCertificateArn
+        ? [elbv2.ListenerCertificate.fromArn(config.frontDoorCertificateArn)]
+        : []),
+    ];
+    if (albCertificate && extraCertificates.length) {
+      listener.addCertificates("ExtraCertificates", extraCertificates);
     }
     listener.addTargets("Nginx", {
       port: config.httpPort,
@@ -312,6 +334,32 @@ export class ApiTierStack extends Stack {
       // a re-pin after a deploy only costs one CSRF refresh.
       stickinessCookieDuration: Duration.days(1),
     });
+
+    // --- Grafana on a core cell, reached through this ALB ---
+    // Grafana runs on the cell, not in this tier, and the only public name in
+    // front of it is the front door, so /grafana* comes in over CloudFront,
+    // lands here and is forwarded to the instance. Grafana itself does the
+    // Keycloak login (generic_oauth) and refuses anyone outside the whitelisted
+    // group, so this rule is routing only - it is not the access control. The
+    // cell's 3001 stays shut to everything except this load balancer.
+    if (config.grafanaInstanceId) {
+      const grafanaTargets = new elbv2.ApplicationTargetGroup(this, "GrafanaTargets", {
+        vpc,
+        port: config.grafanaPort,
+        protocol: elbv2.ApplicationProtocol.HTTP,
+        targetType: elbv2.TargetType.INSTANCE,
+        targets: [new InstanceIdTarget(config.grafanaInstanceId, config.grafanaPort)],
+        // Served under the sub path, so the health endpoint is under it too.
+        healthCheck: { path: "/grafana/api/health", interval: Duration.seconds(30), healthyThresholdCount: 2 },
+        deregistrationDelay: Duration.seconds(30),
+      });
+      listener.addTargetGroups("Grafana", {
+        priority: 10,
+        conditions: [elbv2.ListenerCondition.pathPatterns(["/grafana", "/grafana/*"])],
+        targetGroups: [grafanaTargets],
+      });
+      coreSg?.addIngressRule(albSg, ec2.Port.tcp(config.grafanaPort), `${name} alb: Grafana`);
+    }
 
     // --- Weighted cutover on the node hostname ---
     // Two weighted records with the same name: the node(s) and this tier.

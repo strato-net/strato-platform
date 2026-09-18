@@ -11,8 +11,8 @@ import { ApiTierConfig } from "./config";
 
 export interface FrontDoorStackProps extends StackProps {
   config: ApiTierConfig;
-  /** The us-east-1 certificate for `config.frontDoorDomainName`, also attached to both tiers' ALBs. */
-  certificate: acm.ICertificate;
+  /** The us-east-1 certificate for `config.frontDoorDomainName`, also attached to both tiers' ALBs; omitted when config.frontDoorCertificateArn names an existing one. */
+  certificate?: acm.ICertificate;
 }
 
 /** The app backend's paths: the app tier's nginx. */
@@ -23,7 +23,10 @@ const APP_PATHS = ["/api-docs*", "/api/*", "/history-api/*"];
  * logout live here for both UIs (the node template honors returnTo), as they
  * did on a single node; the app tier's nginx reads the same session cookie.
  */
-const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/docs*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping"];
+// "/grafana*" reaches a core cell's Grafana: the API tier's ALB has a rule that
+// forwards it to that instance (grafanaInstanceId there). Grafana runs its own
+// Keycloak login, so this only carries the request to it.
+const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-api*", "/apex-ws/*", "/rpc*", "/docs*", "/login*", "/auth/*", "/csrf-init", "/health", "/_ping", "/grafana*"];
 
 /**
  * Viewer-request functions for the two buckets. Client-side routes (no file
@@ -68,8 +71,15 @@ export class FrontDoorStack extends Stack {
     super(scope, id, props);
     const { config } = props;
     if (!config.frontDoorDomainName) throw new Error("FrontDoorStack needs frontDoorDomainName");
-    if (!config.domainName) throw new Error("FrontDoorStack reaches this tier by its hostname over https: set domainName");
+    const apiOrigin = config.apiOriginDomainName ?? config.domainName;
+    if (!apiOrigin) throw new Error("FrontDoorStack reaches this tier over https: set domainName, or apiOriginDomainName for its ALB");
     if (!config.appOriginDomainName) throw new Error("FrontDoorStack needs appOriginDomainName (the app tier ALB's DNS name or hostname, serving https)");
+    const certificate =
+      props.certificate ??
+      (config.frontDoorCertificateArn
+        ? acm.Certificate.fromCertificateArn(this, "FrontDoorCert", config.frontDoorCertificateArn)
+        : undefined);
+    if (!certificate) throw new Error("FrontDoorStack needs a certificate: pass one or set frontDoorCertificateArn");
 
     const bucketProps: s3.BucketProps = {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -92,7 +102,7 @@ export class FrontDoorStack extends Stack {
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     });
     const appTier = tierBehavior(config.appOriginDomainName);
-    const apiTier = tierBehavior(config.domainName);
+    const apiTier = tierBehavior(apiOrigin);
 
     const fn = (fid: string, comment: string, code: string) =>
       new cloudfront.Function(this, fid, { runtime: cloudfront.FunctionRuntime.JS_2_0, comment, code: cloudfront.FunctionCode.fromInline(code) });
@@ -118,7 +128,7 @@ export class FrontDoorStack extends Stack {
         ...Object.fromEntries(API_PATHS.map((p) => [p, apiTier])),
       },
       domainNames: [config.frontDoorDomainName],
-      certificate: props.certificate,
+      certificate,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
     });
 

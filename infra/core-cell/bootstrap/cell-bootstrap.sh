@@ -174,6 +174,19 @@ if [[ ! -d $NODE_DIR ]]; then
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
   fi
 fi
+# 4d. Publish the node config for the API tier (its ETHCONF_BASE64). The tier
+# overrides hosts and credentials at startup, so what it takes from here is the
+# network identity and the ports; SecureString because the file carries the
+# node's database password. Rewritten on every boot so a re-setup propagates.
+if [[ -n "${ETHCONF_PARAMETER:-}" ]]; then
+  if aws ssm put-parameter --name "$ETHCONF_PARAMETER" --type SecureString --overwrite \
+       --tier Intelligent-Tiering --value "$(base64 -w0 < "$NODE_DIR/.ethereumH/ethconf.yaml")" >/dev/null; then
+    log "published the node config to $ETHCONF_PARAMETER"
+  else
+    log "warning: could not publish the node config to $ETHCONF_PARAMETER; the API tier reads it there"
+  fi
+fi
+
 # 4c. The generated compose names the node's own images by bare name (as on a
 # developer machine after `make docker`); local mode does not apply --repoUrl.
 # Pull each from the registry and tag it with the name compose expects.
@@ -331,6 +344,67 @@ for path in sys.argv[2:]:
 PY
   fi
   if [[ ! -s /etc/strato/grafana-admin-password ]]; then (umask 077; openssl rand -base64 18 | tr -d '/+=' | cut -c1-20 > /etc/strato/grafana-admin-password); fi
+  # Grafana behind Keycloak (GRAFANA_PUBLIC_URL): the login is Grafana's own
+  # generic_oauth, and the whitelist is group membership - role_attribute_path
+  # resolves to Admin or Viewer only for the named groups, and with
+  # role_attribute_strict a user in none of them is refused outright rather
+  # than let in with a default role. The client secret is resolved here, on the
+  # instance, with the instance role and written 0400 for Grafana's uid; it is
+  # read through *__FILE so it never appears in the container's environment,
+  # in docker inspect, or in this log.
+  grafana_oauth=()
+  # Anonymous viewer, unless the Keycloak block below replaces it. Exactly one
+  # of these two is passed: a later -e would win silently, which is not a thing
+  # to leave a reader to work out.
+  grafana_access=(-e GF_AUTH_ANONYMOUS_ENABLED=true -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer -e GF_AUTH_ANONYMOUS_ORG_NAME="Main Org.")
+  if [[ -n "${GRAFANA_PUBLIC_URL:-}" && -n "${OAUTH_SECRET_ID:-}" ]]; then
+    oauth_json=$(aws secretsmanager get-secret-value --secret-id "$OAUTH_SECRET_ID" --query SecretString --output text)
+    discovery=$(printf '%s' "$oauth_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["discoveryUrl"])')
+    client_id=$(printf '%s' "$oauth_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["clientId"])')
+    (umask 077; printf '%s' "$oauth_json" | python3 -c 'import json,sys; sys.stdout.write(json.load(sys.stdin)["clientSecret"])' > /etc/strato/grafana-oauth-client-secret)
+    unset oauth_json
+    chown 472:472 /etc/strato/grafana-oauth-client-secret; chmod 0400 /etc/strato/grafana-oauth-client-secret
+    # Endpoints come from the realm's discovery document rather than being
+    # assembled from the issuer by hand, so a realm layout change cannot
+    # silently point Grafana at the wrong URL. The document is public.
+    disco=$(curl -fsS --max-time 20 "$discovery" || true)
+    auth_url=$(printf '%s' "$disco" | python3 -c 'import json,sys; print(json.load(sys.stdin)["authorization_endpoint"])' 2>/dev/null || true)
+    token_url=$(printf '%s' "$disco" | python3 -c 'import json,sys; print(json.load(sys.stdin)["token_endpoint"])' 2>/dev/null || true)
+    api_url=$(printf '%s' "$disco" | python3 -c 'import json,sys; print(json.load(sys.stdin)["userinfo_endpoint"])' 2>/dev/null || true)
+    if [[ -n "$auth_url" && -n "$token_url" && -n "$api_url" ]]; then
+      # groups[] comes from a Keycloak group-membership mapper on the client.
+      role_path="'Viewer'"
+      admin_expr=""; viewer_expr=""
+      for g in ${GRAFANA_ADMIN_GROUPS//,/ }; do admin_expr+="contains(groups[*], '$g') || "; done
+      for g in ${GRAFANA_VIEWER_GROUPS//,/ }; do viewer_expr+="contains(groups[*], '$g') || "; done
+      admin_expr=${admin_expr% || }; viewer_expr=${viewer_expr% || }
+      if [[ -n "$admin_expr" && -n "$viewer_expr" ]]; then role_path="($admin_expr) && 'Admin' || ($viewer_expr) && 'Viewer' || ''"
+      elif [[ -n "$admin_expr" ]]; then role_path="($admin_expr) && 'Admin' || ''"
+      elif [[ -n "$viewer_expr" ]]; then role_path="($viewer_expr) && 'Viewer' || ''"
+      fi
+      grafana_access=(-e GF_AUTH_ANONYMOUS_ENABLED=false)
+      grafana_oauth=(
+        -e GF_AUTH_DISABLE_LOGIN_FORM=false
+        -e GF_AUTH_GENERIC_OAUTH_ENABLED=true
+        -e GF_AUTH_GENERIC_OAUTH_NAME=Keycloak
+        -e GF_AUTH_GENERIC_OAUTH_CLIENT_ID="$client_id"
+        -e GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET__FILE=/run/secrets/grafana-oauth-client-secret
+        -e GF_AUTH_GENERIC_OAUTH_SCOPES="openid email profile"
+        -e GF_AUTH_GENERIC_OAUTH_AUTH_URL="$auth_url"
+        -e GF_AUTH_GENERIC_OAUTH_TOKEN_URL="$token_url"
+        -e GF_AUTH_GENERIC_OAUTH_API_URL="$api_url"
+        -e GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH="$role_path"
+        # No mapped group means no role, and strict turns that into a refused login.
+        -e GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT=true
+        -e GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN=false
+        -e GF_AUTH_GENERIC_OAUTH_USE_PKCE=true
+        -v /etc/strato/grafana-oauth-client-secret:/run/secrets/grafana-oauth-client-secret:ro
+      )
+      log "grafana: Keycloak login enabled for $client_id (admin groups: ${GRAFANA_ADMIN_GROUPS:-none}, viewer groups: ${GRAFANA_VIEWER_GROUPS:-none})"
+    else
+      log "warning: could not read the OpenID discovery document at $discovery; leaving Grafana on anonymous access"
+    fi
+  fi
   # Grafana runs as uid 472 inside its container and reads the file itself.
   chown 472:472 /etc/strato/grafana-admin-password; chmod 0400 /etc/strato/grafana-admin-password
   # The node's containers share the compose network; wait for it to exist.
@@ -338,8 +412,11 @@ PY
   docker rm -f strato-grafana >/dev/null 2>&1 || true
   docker run -d --name strato-grafana --restart unless-stopped --network strato_default -p 3001:3000 \
     -e GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana-admin-password \
-    -e GF_AUTH_ANONYMOUS_ENABLED=true -e GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer -e GF_AUTH_ANONYMOUS_ORG_NAME="Main Org." \
-    -e GF_SERVER_ROOT_URL="http://${node_host:-localhost}:3001/" -e GF_SECURITY_COOKIE_SECURE=false "${grafana_plugins[@]}" \
+    "${grafana_access[@]}" \
+    -e GF_SERVER_ROOT_URL="${GRAFANA_PUBLIC_URL:-http://${node_host:-localhost}:3001/}" \
+    -e GF_SERVER_SERVE_FROM_SUB_PATH="$([[ -n "${GRAFANA_PUBLIC_URL:-}" ]] && echo true || echo false)" \
+    -e GF_SECURITY_COOKIE_SECURE="$([[ "${GRAFANA_PUBLIC_URL:-}" == https://* ]] && echo true || echo false)" \
+    "${grafana_oauth[@]}" "${grafana_plugins[@]}" \
     -v /etc/strato/grafana-admin-password:/run/secrets/grafana-admin-password:ro \
     -v $G/provisioning:/etc/grafana/provisioning:ro -v $G/dashboards:/var/lib/grafana/dashboards:ro \
     grafana/grafana-oss:11.2.0 >/dev/null

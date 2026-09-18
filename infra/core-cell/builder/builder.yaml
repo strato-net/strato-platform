@@ -113,6 +113,11 @@ Resources:
           find scaling -name '._*' -delete
           cd scaling
           # The Makefile hashes tracked files with git; make this tree a repo of its own.
+          # A tarball made elsewhere carries its own uids: take ownership and mark the
+          # tree safe, or git refuses ("dubious ownership") and the version splice in
+          # strato-version fails with "Not in a git repository".
+          chown -R root:root /build/scaling
+          git config --global --add safe.directory /build/scaling
           git init -q && git config user.email builder@local && git config user.name builder && git add -A && git commit -qm "builder snapshot"
           echo "== build at $(date -u) on $(nproc) cpus"
           # GHC and the snapshot's packages compile from scratch here (the long part).

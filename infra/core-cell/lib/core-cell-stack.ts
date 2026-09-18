@@ -62,7 +62,15 @@ export class CoreCellStack extends Stack {
       this.securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), "Lets Encrypt HTTP-01 challenge");
     }
     if (config.grafana) {
-      for (const cidr of config.webCidrs) this.securityGroup.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(3001), "Grafana");
+      // Not webCidrs: that is the public web port, and without grafanaPublicUrl
+      // this Grafana serves plain HTTP with anonymous viewer access, so
+      // inheriting 0.0.0.0/0 would publish the node's metrics to anyone.
+      // Default is no rule at all - reach it with `aws ssm start-session
+      // --document-name AWS-StartPortForwardingSession`, or through the API
+      // tier's ALB, which opens this port to itself alone and puts Grafana's
+      // Keycloak login in front. -c grafanaCidrs=... opens it to named
+      // networks as well.
+      for (const cidr of config.grafanaCidrs) this.securityGroup.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(3001), "Grafana");
     }
     config.clientSecurityGroupIds.forEach((sgId, i) => {
       const client = ec2.SecurityGroup.fromSecurityGroupId(this, `ClientSg${i}`, sgId, { mutable: false });
@@ -118,6 +126,20 @@ export class CoreCellStack extends Stack {
     if (parameterArns.length > 0) {
       role.addToPolicy(new iam.PolicyStatement({ actions: ["ssm:GetParameter", "ssm:GetParameters"], resources: parameterArns }));
     }
+    // The node config this cell publishes for the API tier: written as a SecureString
+    // (the file carries the node's database password), so the role also needs to encrypt
+    // with the account's SSM key.
+    if (config.ethconfParameterName) {
+      const arn = this.formatArn({ service: "ssm", resource: "parameter", resourceName: config.ethconfParameterName.replace(/^\//, "") });
+      role.addToPolicy(new iam.PolicyStatement({ actions: ["ssm:PutParameter", "ssm:GetParameter"], resources: [arn] }));
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"],
+          resources: ["*"],
+          conditions: { StringEquals: { "kms:ViaService": `ssm.${this.region}.amazonaws.com` } },
+        }),
+      );
+    }
     if (config.extraBinariesS3) {
       const m = config.extraBinariesS3.match(/^s3:\/\/([^/]+)\/(.*)$/);
       if (!m) throw new Error(`extraBinariesS3 must be s3://bucket/prefix/, got ${config.extraBinariesS3}`);
@@ -172,7 +194,11 @@ export class CoreCellStack extends Stack {
       LOCAL_AUTH: String(config.localAuth),
       OAUTH_SECRET_ID: config.oauthSecretName ?? "",
       GRAFANA: String(config.grafana),
+      GRAFANA_PUBLIC_URL: config.grafanaPublicUrl ?? "",
+      GRAFANA_ADMIN_GROUPS: config.grafanaAdminGroups.join(","),
+      GRAFANA_VIEWER_GROUPS: config.grafanaViewerGroups.join(","),
       PROMETHEUS_EXPOSE: String(config.exposePrometheus),
+      ETHCONF_PARAMETER: config.ethconfParameterName ?? "",
       DASHBOARDS_S3: dashboards.s3ObjectUrl,
       PEER_DATABASE: config.peerDatabase ?? "",
       PEER_STORE: config.peerStore,

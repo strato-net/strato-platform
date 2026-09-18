@@ -19,6 +19,13 @@ away from the node.
    - optionally a JSON secret with the backend's API keys (`-c backendSecretName=...`)
 3. Build the UI: `cd app/ui && npm ci && npm run build`.
 4. Allow the task security group (stack output `TaskSecurityGroupId`) on the node's Postgres port.
+5. **`-c nodeUrl=...` must already resolve in DNS.** The backend will not serve
+   until `<nodeUrl>/strato-api/eth/v1.2/metadata` answers `isSynced: true`, and
+   it cannot tell a name that does not resolve from a node that is behind: it
+   logs `Node is still syncing` every 30 s, the task never turns healthy, and
+   CloudFormation eventually rolls the stack back. When the app tier sits behind
+   a front door, deploy the front door and point its record at the distribution
+   *before* deploying this stack.
 
 ## Deploy
 

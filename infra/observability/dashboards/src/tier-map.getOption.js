@@ -18,7 +18,9 @@
 //
 // CloudWatch knows a CloudFront distribution only by its id. The hidden
 // dashboard variable frontend_labels names them ("E123ABC=SMD,E456DEF=App
-// UI"); an unnamed distribution is shown as the app UI.
+// UI"); an unnamed distribution is shown as the app UI, and one named "-" is
+// hidden (a deleted distribution keeps its metrics listed for about two weeks).
+// A distribution with no datapoints in the dashboard's range is not drawn.
 //
 // Queries (refIds):
 //   tasks      Logs Insights over the Container Insights performance groups:
@@ -230,21 +232,33 @@ const cdnNames = new Map(
     .map((pair) => pair.split("=").map((s) => s.trim()))
     .filter((pair) => pair.length === 2 && pair[0] && pair[1]),
 );
-const appOf = (name) => (/smd/i.test(name) ? "smd" : "app-ui");
+// The apps a distribution serves, from its name: one named for both ("App UI +
+// SMD", a front door serving every UI on one hostname) counts for both.
+const servesOf = (name) => {
+  const smd = /smd/i.test(name), app = /app/i.test(name);
+  return smd && app ? ["app-ui", "smd"] : smd ? ["smd"] : ["app-ui"];
+};
 const cdns = new Map();
 const cdnFor = (id) => {
-  if (!cdns.has(id)) cdns.set(id, { id, requests: 0, bytes: 0, e4: null, e5: null });
+  if (!cdns.has(id)) cdns.set(id, { id, requests: 0, bytes: 0, e4: null, e5: null, points: 0 });
   return cdns.get(id);
 };
-for (const f of byRef("cdn")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).requests = total(f);
+for (const f of byRef("cdn")) {
+  if (!label(f, "DistributionId")) continue;
+  const c = cdnFor(label(f, "DistributionId"));
+  c.requests = total(f);
+  c.points += numbersOf(f).length;
+}
 for (const f of byRef("cdnBytes")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).bytes = total(f);
 for (const f of byRef("cdn4xx")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).e4 = average(f);
 for (const f of byRef("cdn5xx")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).e5 = average(f);
 for (const c of cdns.values()) {
   const name = cdnNames.get(c.id) || "App UI";
+  if (name === "-" || c.points === 0) continue;
   frontends.push({
     kind: "frontend",
-    app: appOf(name),
+    app: servesOf(name)[0],
+    serves: servesOf(name),
     where: "cdn",
     title: name,
     subtitle: `S3 via CloudFront ${c.id}`,
@@ -334,7 +348,7 @@ const cellItems = Array.from(cells.values()).map((c) => {
 // A frontend with no CloudFront deployment (or no traffic in the range,
 // which CloudWatch cannot tell apart) still gets a box, so the gap shows.
 for (const [app, title] of [["app-ui", "App UI"], ["smd", "SMD"]]) {
-  if (!frontends.some((f) => f.app === app && f.where === "cdn")) {
+  if (!frontends.some((f) => (f.serves || [f.app]).includes(app) && f.where === "cdn")) {
     frontends.push({ kind: "frontend", app, where: "none", missing: true, title, subtitle: "no CloudFront deployment with traffic in range", sub: [{ name: "S3 + CloudFront", detail: "not seen", ok: true, neutral: true }] });
   }
 }
@@ -429,9 +443,10 @@ const appLb = kind(appCol, "lb"), appTasks = kind(appCol, "task");
 const apiLb = kind(apiCol, "lb"), apiTasks = kind(apiCol, "task");
 // CloudFront serves each UI from S3 and sends its API, login and RPC paths to
 // the tier behind it: the app UI's to the app load balancer, the SMD's to the
-// API tier's.
+// API tier's; a front door serving both sends to both.
 for (const f of feCol.filter((a) => a.item.where === "cdn")) {
-  for (const l of f.item.app === "smd" ? apiLb : appLb) across(f.right, f.mid, l.left, l.mid, violet);
+  const lbs = (f.item.serves || [f.item.app]).flatMap((app) => (app === "smd" ? apiLb : appLb));
+  for (const l of lbs) across(f.right, f.mid, l.left, l.mid, violet);
 }
 // A frontend container on a cell is served by that cell's nginx, which also
 // fronts the cell's own app backend and strato-api.

@@ -66,7 +66,11 @@ export interface ApiTierConfig {
    * tier. A DNS-validated certificate is created for the hostname and attached to this ALB.
    */
   frontDoorDomainName?: string;
+  /** An existing us-east-1 certificate for `frontDoorDomainName`; without one the app creates a DNS-validated one. */
+  frontDoorCertificateArn?: string;
   appOriginDomainName?: string;
+  /** Where the front door sends this tier's paths, when the tier has no public hostname of its own: its ALB's DNS name. Defaults to `domainName`. */
+  apiOriginDomainName?: string;
   deployAppUi: boolean;
   /** Values for the app UI's config.js (as app/ui/render-config.sh writes them). */
   appUiPosthogKey?: string;
@@ -80,6 +84,13 @@ export interface ApiTierConfig {
    */
   nginxOauthSecretName?: string;
   /**
+   * One JSON secret {discoveryUrl, clientId, clientSecret} for every OAuth client here, instead of
+   * `secrets.oauthCredentialsYaml`: strato-api builds its credentials file from the three values
+   * (api-doit.sh) and nginx runs the login flow with them. The same secret serves the app tier
+   * (`oauthSecretName` there) and a core cell (`oauthSecretId`), so one secret covers the deployment.
+   */
+  oauthJsonSecretName?: string;
+  /**
    * The session secret nginx uses, when it differs from `secrets.session` (which this stack may own).
    * Behind a front door both tiers' nginx must share one secret: name the app tier's here, as its
    * complete ARN when the name ends in "-" and six characters (strato/app/session-secret does).
@@ -91,6 +102,14 @@ export interface ApiTierConfig {
    * (coreSecurityGroupId) is opened to the tasks on that port.
    */
   prometheusHost?: string;
+  /**
+   * A core cell running Grafana (the core-cell app's `grafana`): this ALB gains a /grafana* rule
+   * forwarding to that instance, so the front door can reach it over the one public hostname, and
+   * the cell's security group is opened on that port to this load balancer alone. Access control is
+   * Grafana's own Keycloak login, not this rule.
+   */
+  grafanaInstanceId?: string;
+  grafanaPort: number;
   /** Stateless CSRF tokens in nginx (CSRF_STATELESS=true): an HMAC of the session under the session secret, valid in every copy and tier sharing that secret. */
   csrfStateless: boolean;
 }
@@ -156,14 +175,19 @@ export function loadConfig(app: App): ApiTierConfig {
     networkName: optional(app, "networkName"),
     wagmiProjectId: optional(app, "wagmiProjectId"),
     frontDoorDomainName: optional(app, "frontDoorDomainName"),
+    frontDoorCertificateArn: optional(app, "frontDoorCertificateArn"),
     appOriginDomainName: optional(app, "appOriginDomainName"),
+    apiOriginDomainName: optional(app, "apiOriginDomainName"),
     deployAppUi: String(ctx(app, "deployAppUi", "false")) === "true",
     appUiPosthogKey: optional(app, "appUiPosthogKey"),
     appUiPosthogHost: optional(app, "appUiPosthogHost"),
     appUiGoogleAnalyticsId: optional(app, "appUiGoogleAnalyticsId"),
     nginxOauthSecretName: optional(app, "nginxOauthSecretName"),
+    oauthJsonSecretName: optional(app, "oauthJsonSecretName"),
     nginxSessionSecretName: optional(app, "nginxSessionSecretName"),
     csrfStateless: String(ctx(app, "csrfStateless", "false")) === "true",
     prometheusHost: optional(app, "prometheusHost"),
+    grafanaInstanceId: optional(app, "grafanaInstanceId"),
+    grafanaPort: Number(ctx(app, "grafanaPort", "3001")),
   };
 }

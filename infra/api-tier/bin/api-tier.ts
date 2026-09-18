@@ -27,9 +27,10 @@ const smdCertificate = config.smdDomainName
 // The front door's hostname: the same arrangement, for the distribution that
 // serves every UI. The app tier's ALB needs this certificate too
 // (-c extraCertificateArns=... there, from this stack's CertificateArn output).
-const frontDoorCertificate = config.frontDoorDomainName
+const frontDoorCertificate = config.frontDoorDomainName && !config.frontDoorCertificateArn
   ? new CertificateStack(app, `${prefix}-FrontDoorCertificate`, { env, domainName: config.frontDoorDomainName })
   : undefined;
+
 const extraCertificates = [smdCertificate, frontDoorCertificate].flatMap((c) => (c ? [c.certificate] : []));
 new ApiTierStack(app, `${prefix}-Tier`, {
   env,
@@ -41,6 +42,7 @@ new ApiTierStack(app, `${prefix}-Tier`, {
 if (config.smdDomainName) {
   new SmdUiStack(app, `${prefix}-Smd`, { env, config, certificate: smdCertificate?.certificate });
 }
-if (frontDoorCertificate) {
-  new FrontDoorStack(app, `${prefix}-FrontDoor`, { env, config, certificate: frontDoorCertificate.certificate });
+// With frontDoorCertificateArn the stacks resolve that certificate themselves.
+if (config.frontDoorDomainName) {
+  new FrontDoorStack(app, `${prefix}-FrontDoor`, { env, config, certificate: frontDoorCertificate?.certificate });
 }

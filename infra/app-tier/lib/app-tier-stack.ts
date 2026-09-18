@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, Stack, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
@@ -37,13 +37,23 @@ export class AppTierStack extends Stack {
     // --- Secrets: named here, resolved by ECS at task start ---
     const oauth = secretsmanager.Secret.fromSecretNameV2(this, "OauthSecret", config.secrets.oauth);
     const postgresPassword = secretsmanager.Secret.fromSecretNameV2(this, "PostgresPasswordSecret", config.secrets.postgresPassword);
+    // When this tier shares a hostname with an API tier (one front door, one
+    // strato_session cookie), both nginx copies must hold the SAME session
+    // secret: the API tier mints the session at login, this one has to decrypt
+    // it, and with csrfStateless the secret is also the HMAC key for the CSRF
+    // token. Point `sessionSecretName` at that tier's secret with
+    // createSessionSecret=false; a complete ARN is accepted because a name
+    // ending in a hyphen and six characters (…session-secret) is otherwise
+    // misread as name-plus-random-suffix.
     const session: secretsmanager.ISecret = config.createSessionSecret
       ? new secretsmanager.Secret(this, "SessionSecret", {
           secretName: config.secrets.session,
           description: `${name} session secret`,
           generateSecretString: { passwordLength: 64, excludePunctuation: true },
         })
-      : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
+      : config.secrets.session.startsWith("arn:")
+        ? secretsmanager.Secret.fromSecretCompleteArn(this, "SessionSecret", config.secrets.session)
+        : secretsmanager.Secret.fromSecretNameV2(this, "SessionSecret", config.secrets.session);
     const backendSecret = config.secrets.backend
       ? secretsmanager.Secret.fromSecretNameV2(this, "BackendSecret", config.secrets.backend)
       : undefined;
@@ -51,7 +61,9 @@ export class AppTierStack extends Stack {
     // --- ECS ---
     const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
     this.cluster = cluster;
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/app/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
+    // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
+    // and the next create of this stack then fails with "already exists".
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/app/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
 
     const task = new ecs.FargateTaskDefinition(this, "Task", {
       cpu: 1024,
