@@ -116,13 +116,18 @@ const variable = (name) => {
     return "";
   }
 };
-const ENV = variable("env").toLowerCase();
+// A cell's own Prometheus has no env label to fill $env from, so the cell's
+// bootstrap writes the environment's name over this placeholder when it
+// provisions the dashboard; under Managed Prometheus it is left alone and
+// $env answers.
+const PINNED_ENV = "__ENV__";
+const ENV = (PINNED_ENV.startsWith("__") ? variable("env") : PINNED_ENV).toLowerCase();
 const pct = (x) => (numeric(x) ? `${Math.round(x)}%` : "");
 // "strato-app-testnet" -> app, "strato-api-testnet" -> api, and nothing else
 // in the account: another deployment's "...-node-app-lb" is not this app tier.
 // Takes the bare name, not the ALB dimension value, which starts with "app/"
-// (the load balancer type). Without $env (the panel edited on its own) any
-// strato-<tier>-... name counts.
+// (the load balancer type). With no environment known at all (the panel
+// pasted into another dashboard) any strato-<tier>-... name counts.
 const tierOf = (name) => {
   const m = /^strato-(app|api)-(.+)$/i.exec(name);
   return m && (!ENV || m[2].toLowerCase() === ENV) ? m[1].toLowerCase() : null;
