@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { GrafanaServiceConfig } from "./grafana-stack";
 
 /**
  * Everything that differs between environments, from CDK context. The
@@ -26,6 +27,12 @@ export interface ObservabilityConfig {
   managedPrometheus: boolean;
   /** Managed Grafana workspace (needs IAM Identity Center or SAML). Off = read X-Ray and CloudWatch from another Grafana, e.g. the cell's. */
   managedGrafana: boolean;
+  /**
+   * Grafana as a Fargate service behind an existing load balancer (`-c grafanaService=true`), for an
+   * account without Identity Center. Needs managedPrometheus, vpcId, grafanaPublicUrl,
+   * grafanaAlbListenerArn and grafanaAlbSecurityGroupId.
+   */
+  grafanaService?: GrafanaServiceConfig;
   /** Grafana authentication: AWS_SSO (IAM Identity Center) or SAML. */
   grafanaAuth: "AWS_SSO" | "SAML";
   grafanaVersion: string;
@@ -70,6 +77,20 @@ export function loadConfig(app: App): ObservabilityConfig {
     canaryGasLimit: Number(ctx(app, "canaryGasLimit", "1000000")),
     managedPrometheus: ctx(app, "managedPrometheus", "true") === "true",
     managedGrafana: ctx(app, "managedGrafana", "true") === "true",
+    grafanaService:
+      ctx(app, "grafanaService", "false") === "true"
+        ? {
+            vpcId: ctx(app, "vpcId"),
+            publicUrl: ctx(app, "grafanaPublicUrl"),
+            oauthSecretName: optional(app, "oauthSecretName"),
+            adminGroups: list(app, "grafanaAdminGroups"),
+            viewerGroups: list(app, "grafanaViewerGroups"),
+            albListenerArn: ctx(app, "grafanaAlbListenerArn"),
+            albSecurityGroupId: ctx(app, "grafanaAlbSecurityGroupId"),
+            rulePriority: Number(ctx(app, "grafanaRulePriority", "9")),
+            frontendLabels: optional(app, "frontendLabels"),
+          }
+        : undefined,
     grafanaAuth: ctx(app, "grafanaAuth", "AWS_SSO") as "AWS_SSO" | "SAML",
     grafanaVersion: ctx(app, "grafanaVersion", "10.4"),
     auroraClusterIdentifier: optional(app, "auroraClusterIdentifier"),

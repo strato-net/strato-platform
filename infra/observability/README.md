@@ -73,6 +73,17 @@ listing a deleted distribution's metrics for about two weeks. Its code lives in
 `dashboards/src/tier-map.getOption.js`; `scripts/embed-tier-map.py` writes it
 and the panel's queries into `dashboards/infrastructure-map.json`.
 
+Without IAM Identity Center there is no Managed Grafana, and a core cell is
+not the place for a web application: `-c grafanaService=true` runs Grafana as
+a Fargate service (`StratoObs-<env>-Grafana`) from the image in `grafana/`,
+with the plugins and these dashboards inside it. It reads Managed Prometheus,
+CloudWatch and X-Ray with its task role, logs people in through Keycloak
+(`oauthSecretName`; the groups in `grafanaAdminGroups` and
+`grafanaViewerGroups` are the whitelist, and it never falls back to anonymous
+access), and is reached through a `/grafana*` rule it adds to an existing
+load balancer's listener. It keeps no state: a new task is a whole Grafana.
+Deploying it builds the image, so it needs Docker.
+
 What it needs:
 
 - The Business Charts panel plugin (`volkovlabs-echarts-panel`). Version 7

@@ -175,7 +175,11 @@ if [[ ! -d $NODE_DIR ]]; then
     # is the first cell of an empty cluster. An unset value (a cell.env from
     # before this flag) skips too.
     [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]] || snap+=(--skip-databases)
-    sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" \
+    # The archive is unpacked in the work directory: on the data volume, which
+    # has the room (the root volume does not) and which the node user can write
+    # (this script's own directory, where strato-snapshot would default, it cannot).
+    install -d -o $NODE_USER -g $NODE_USER "$STRATO_ROOT/.snapshot-work"
+    sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" STRATO_SNAPSHOT_WORKDIR="$STRATO_ROOT/.snapshot-work" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
   fi
 fi
