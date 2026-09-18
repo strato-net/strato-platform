@@ -257,6 +257,9 @@ export class CoreCellStack extends Stack {
       keyPair: config.keyPairName ? ec2.KeyPair.fromKeyPairName(this, "KeyPair", config.keyPairName) : undefined,
       userData,
       userDataCausesReplacement: false,
+      // IMDSv2 is enforced through a launch template CDK adds, whose name must be
+      // unique in the account: bin/core-cell.ts turns on uniqueImdsv2TemplateName,
+      // without which every cell's is "CellLaunchTemplate" and a second cannot be created.
       requireImdsv2: true,
       detailedMonitoring: true,
       instanceName: name,

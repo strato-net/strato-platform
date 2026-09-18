@@ -111,6 +111,7 @@ submits transactions to this cell.
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
 | `snapshotBucket` | `strato-snapshots` | bucket for published snapshots; granted read when set |
 | `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
+| `legacyLaunchTemplateName` | `false` | keep the launch template's old shared name; only for a cell created before the names were made unique, where renaming would replace the instance |
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
 | `p2pCidrs` | `0.0.0.0/0` | who may reach 30303 tcp/udp |
@@ -130,6 +131,13 @@ submits transactions to this cell.
 - Replacing the instance (a new instance type, a new AMI) keeps the data
   volume only if it is detached and reattached by hand; the stack does not
   do that for you. A follower can instead be rebuilt from a snapshot.
+
+## Deleting a cell stack
+
+The Host stack has termination protection on, which also blocks deleting one
+that rolled back before it created anything: clear it first
+(`aws cloudformation update-termination-protection --no-enable-termination-protection`).
+The instance and its data volume are retained on delete; see the repo README.
 
 ## Not done here
 

@@ -115,6 +115,11 @@ export interface CoreCellConfig {
   /** Secrets Manager names the host may create or update (to publish the node's OAuth client credentials for the API and app tiers). */
   publishSecretNames: string[];
   terminationProtection: boolean;
+  /**
+   * Keep the launch template's old, shared name ("CellLaunchTemplate"). Only for a cell created
+   * before the names were made unique: renaming replaces the template and then the instance.
+   */
+  legacyLaunchTemplateName: boolean;
 }
 
 function present(v: unknown): boolean {
@@ -210,5 +215,6 @@ export function loadConfig(app: App): CoreCellConfig {
     prometheusWorkspaceArn: optional(app, "prometheusWorkspaceArn"),
     publishSecretNames: list(app, "publishSecretNames", ""),
     terminationProtection: bool(app, "terminationProtection", "true"),
+    legacyLaunchTemplateName: bool(app, "legacyLaunchTemplateName", "false"),
   };
 }
