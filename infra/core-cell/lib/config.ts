@@ -53,18 +53,8 @@ export interface CoreCellConfig {
   letsEncryptEmail?: string;
   /** Who may reach the app (httpPort, 443). */
   webCidrs: string[];
-  /** Who may reach Grafana (3001) directly. Empty by default: with no CIDR here it is reachable only through SSM port forwarding, or through the API tier's ALB when that tier sets `grafanaInstanceId`. */
+  /** Who may reach Grafana (3001). Empty by default: this Grafana runs with anonymous viewer access over plain HTTP, so it does NOT inherit the public webCidrs. With no CIDR here it is reachable only through SSM port forwarding. */
   grafanaCidrs: string[];
-  /**
-   * Put Grafana behind a Keycloak login instead of anonymous viewer access. Needs `grafanaPublicUrl`
-   * (where the browser reaches it, e.g. https://host/grafana/) and `oauthSecretName`, whose
-   * {discoveryUrl, clientId, clientSecret} the host resolves at boot - the value never leaves the
-   * instance. Anonymous access is turned off, and a user is admitted only when one of their Keycloak
-   * groups appears in `grafanaAdminGroups` or `grafanaViewerGroups`, so those groups ARE the whitelist.
-   */
-  grafanaPublicUrl?: string;
-  grafanaAdminGroups: string[];
-  grafanaViewerGroups: string[];
   /** The node's HTTP port (networkConfig.httpPort): nginx publishes it and 443. */
   httpPort: number;
   /** Per-cell peer store database on Postgres (`--peerDatabase`). Superseded by `peerStore: sqlite`, the default; only read when `peerStore` is `postgres`. */
@@ -171,9 +161,6 @@ export function loadConfig(app: App): CoreCellConfig {
     letsEncryptEmail: optional(app, "letsEncryptEmail"),
     webCidrs: list(app, "webCidrs", "0.0.0.0/0"),
     grafanaCidrs: list(app, "grafanaCidrs", ""),
-    grafanaPublicUrl: optional(app, "grafanaPublicUrl"),
-    grafanaAdminGroups: list(app, "grafanaAdminGroups", ""),
-    grafanaViewerGroups: list(app, "grafanaViewerGroups", ""),
     httpPort: Number(ctx(app, "httpPort", "8081")),
     peerDatabase: optional(app, "peerDatabase"),
     peerStore: peerStore(app),
