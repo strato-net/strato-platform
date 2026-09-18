@@ -214,6 +214,7 @@ export class CoreCellStack extends Stack {
       VM_QUERY: String(config.vmQuery),
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
       SNAPSHOT_BUCKET: config.snapshotBucket ?? "",
+      SNAPSHOT_SKIP_DATABASES: String(config.snapshotSkipDatabases),
       EXTRA_SETUP_FLAGS: config.extraSetupFlags,
       BUNDLED_APP: String(config.bundledApp),
       APP_URL: config.appUrl ?? "",
@@ -245,7 +246,10 @@ export class CoreCellStack extends Stack {
 
     this.instance = new ec2.Instance(this, "Cell", {
       vpc,
-      vpcSubnets: { subnetType: config.subnetType === "public" ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: {
+        subnetType: config.subnetType === "public" ? ec2.SubnetType.PUBLIC : ec2.SubnetType.PRIVATE_WITH_EGRESS,
+        ...(config.availabilityZone ? { availabilityZones: [config.availabilityZone] } : {}),
+      },
       instanceType: new ec2.InstanceType(config.instanceType),
       machineImage: ec2.MachineImage.fromSsmParameter(config.amiParameter, { os: ec2.OperatingSystemType.LINUX }),
       securityGroup: this.securityGroup,

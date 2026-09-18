@@ -9,6 +9,8 @@ export interface CoreCellConfig {
   vpcId?: string;
   /** "public" (Elastic IP, reachable by peers) or "private" (dial-out only, behind the NAT). */
   subnetType: "public" | "private";
+  /** Pin the host to one availability zone. Unset, every cell lands in the VPC's first subnet of `subnetType`, so two cells share a zone. */
+  availabilityZone?: string;
   instanceType: string;
   rootVolumeGiB: number;
   /** Separate gp3 volume for the node directory: LevelDB, Kafka and Redis state, logs. */
@@ -81,6 +83,13 @@ export interface CoreCellConfig {
   /** Snapshot to restore on first boot: an s3:// URI or a published timestamp ("latest"). */
   snapshotSource?: string;
   snapshotBucket?: string;
+  /**
+   * Restore the chain state only and leave eth and cirrus alone (`strato-snapshot restore
+   * --skip-databases`). True by default: a cell's databases are on a shared cluster, which another
+   * cell may be writing, and loading a snapshot's dumps would replace them for every node on it.
+   * False only for the first cell of an empty cluster.
+   */
+  snapshotSkipDatabases: boolean;
   /** Extra strato-setup flags appended verbatim on first boot (for example --vaultUrl=...). */
   extraSetupFlags: string;
   /** With role node: run the app (app-ui, app-backend) on this host (`--bundledApp`). false when the app tier serves it; the node's root then redirects to `appUrl`. */
@@ -148,6 +157,7 @@ export function loadConfig(app: App): CoreCellConfig {
     cellId,
     vpcId: optional(app, "vpcId"),
     subnetType,
+    availabilityZone: optional(app, "availabilityZone"),
     instanceType: ctx(app, "instanceType", "m6i.xlarge"),
     rootVolumeGiB: Number(ctx(app, "rootVolumeGiB", "40")),
     dataVolumeGiB: Number(ctx(app, "dataVolumeGiB", "200")),
@@ -184,6 +194,7 @@ export function loadConfig(app: App): CoreCellConfig {
     vmQuery: bool(app, "vmQuery", "false"),
     snapshotSource: optional(app, "snapshotSource"),
     snapshotBucket: optional(app, "snapshotBucket"),
+    snapshotSkipDatabases: bool(app, "snapshotSkipDatabases", "true"),
     extraSetupFlags: String(ctx(app, "extraSetupFlags", "")),
     bundledApp: bool(app, "bundledApp", "true"),
     appUrl: optional(app, "appUrl"),

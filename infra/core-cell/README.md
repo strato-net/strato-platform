@@ -110,6 +110,8 @@ submits transactions to this cell.
 | `vmQuery` | `false` | run vm-query on the cell |
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
 | `snapshotBucket` | `strato-snapshots` | bucket for published snapshots; granted read when set |
+| `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
+| `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
 | `p2pCidrs` | `0.0.0.0/0` | who may reach 30303 tcp/udp |
 | `clientSecurityGroupIds` | none | allowed on 9094 (Kafka), 3000 and 8545: the API tier's task security group |

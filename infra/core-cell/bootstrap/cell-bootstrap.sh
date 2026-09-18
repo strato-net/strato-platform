@@ -170,6 +170,11 @@ if [[ ! -d $NODE_DIR ]]; then
   if [[ -n "$SNAPSHOT_SOURCE" ]]; then
     [[ -n "$SNAPSHOT_BUCKET" ]] && export STRATO_SNAPSHOT_BUCKET="$SNAPSHOT_BUCKET"
     if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then snap=(--source "$SNAPSHOT_SOURCE"); else snap=(--snapshot="$SNAPSHOT_SOURCE"); fi
+    # The cell's eth and cirrus are on a shared cluster that another cell may
+    # be writing: take the chain state and leave them alone, unless told this
+    # is the first cell of an empty cluster. An unset value (a cell.env from
+    # before this flag) skips too.
+    [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]] || snap+=(--skip-databases)
     sudo -u $NODE_USER -H env PATH="$PATH" STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" \
       strato-snapshot restore "$NODE_DIR" "${snap[@]}" --network "$NETWORK" --force
   fi

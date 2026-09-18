@@ -43,6 +43,13 @@ environments/tiered.sh api-tier diff --no-change-set
 environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoor
 ```
 
+The environment runs two core cells so that one can be rebuilt without an
+outage: `cell-a` (us-east-1a) is the writer and hosts Grafana, `cell-b`
+(us-east-1b) is a follower restored from the published snapshot with the
+shared databases left alone. The API tier still reads one cell (`kafkaHost`,
+`prometheusHost` are cell-a's): the second cell is a warm spare for the chain
+state, not yet a failover target.
+
 `tiered` is account 406773134706, us-east-1, serving
 https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean
 except `StratoCell-tiered-cell-a-Host`, whose template is behind the instance
