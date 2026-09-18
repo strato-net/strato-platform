@@ -61,7 +61,10 @@ All of these change UserData, so CDK reports the instance as "may be
 replaced". For this cell that means rebuilding a synced node: read the diff
 and never accept it casually.
 
-`observability` is not deployed in this account.
+`observability` runs in traces-only mode here (no IAM Identity Center for
+Managed Grafana, so Grafana and Prometheus stay on the cell). Its two SNS
+topics, `strato-tiered-pages` and `strato-tiered-warnings`, have no
+subscribers yet: alarms change state but notify nobody until one is added.
 
 ## The strato-platform checkout
 

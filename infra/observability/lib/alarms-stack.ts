@@ -76,7 +76,10 @@ export class AlarmsStack extends Stack {
           alarmName: `${name}-alb-5xx-${i}`,
           alarmDescription: `5xx responses over 1 percent of requests on ${lb}`,
           metric: new cloudwatch.MathExpression({
-            expression: "100 * (FILL(elb, 0) + FILL(target, 0)) / MAX([requests, 1])",
+            // The IF guards the division in a minute with no requests. MAX is
+            // not the way: it reduces one series to a scalar, and CloudWatch
+            // rejects MAX([requests, 1]) when the alarm is created.
+            expression: "100 * (FILL(elb, 0) + FILL(target, 0)) / IF(FILL(requests, 0) > 0, requests, 1)",
             usingMetrics: { elb: elb5xx, target: target5xx, requests },
             label: "5xx percent",
             period: Duration.minutes(1),
