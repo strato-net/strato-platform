@@ -175,10 +175,10 @@ export class ObservabilityStack extends Stack {
       // Fail at synth, not at run time.
       const assetModules = path.join(__dirname, "..", "canary", "nodejs", "node_modules");
       if (!fs.existsSync(path.join(assetModules, "health.js"))) {
-        throw new Error("canary/nodejs/node_modules/health.js is missing: run `npm run canary` in infra/observability first");
+        throw new Error("canary/nodejs/node_modules/health.js is missing: run `npm run canary` in observability first");
       }
       if (config.canaryKeySecretName && !fs.existsSync(path.join(assetModules, "@noble", "curves"))) {
-        throw new Error("canaryKeySecretName is set but the signing libraries are not installed: run `npm run canary` in infra/observability first");
+        throw new Error("canaryKeySecretName is set but the signing libraries are not installed: run `npm run canary` in observability first");
       }
       const canaryKey = config.canaryKeySecretName
         ? secretsmanager.Secret.fromSecretNameV2(this, "CanaryKeySecret", config.canaryKeySecretName)

@@ -12,7 +12,7 @@ export interface ApiTierConfig {
   apexImage?: string;
   /** Swagger UI for the API docs at /docs/ (the spec and initializer come from the nginx image). Default swaggerapi/swagger-ui:v5.29.2, as on a node; `-c docs=false` leaves it out. */
   docsImage?: string;
-  /** Aurora endpoints (infra/data-plane outputs) and the core's VPC-facing Kafka listener. */
+  /** Aurora endpoints (data-plane outputs) and the core's VPC-facing Kafka listener. */
   postgresWriterHost: string;
   postgresReaderHost: string;
   postgresPort: number;
@@ -21,7 +21,7 @@ export interface ApiTierConfig {
   kafkaPort: number;
   /** The node's networkConfig.httpPort: nginx listens on it inside the container. */
   httpPort: number;
-  /** Shared message bus (infra/data-plane MSK stack): bootstrap host, SASL/SCRAM secret, submit mode. */
+  /** Shared message bus (data-plane MSK stack): bootstrap host, SASL/SCRAM secret, submit mode. */
   busHost?: string;
   busPort: number;
   busSubmitMode: string;

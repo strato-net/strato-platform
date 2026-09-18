@@ -4,6 +4,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
+import * as fs from "fs";
 import * as path from "path";
 import { CoreCellConfig } from "./config";
 
@@ -162,8 +163,14 @@ export class CoreCellStack extends Stack {
 
     // --- Bootstrap: the script and the repo's node scripts, as one asset ---
     const bootstrap = new s3assets.Asset(this, "Bootstrap", { path: path.join(__dirname, "..", "bootstrap") });
+    // bin/strato-* live in the strato-platform checkout: a sibling of this repo
+    // by default, or wherever STRATO_PLATFORM_DIR points.
+    const platformBin = path.resolve(process.env.STRATO_PLATFORM_DIR ?? path.resolve(__dirname, "../../../strato-platform"), "bin");
+    if (!fs.existsSync(path.join(platformBin, "strato-up"))) {
+      throw new Error(`${platformBin} has no strato-up; set STRATO_PLATFORM_DIR to a strato-platform checkout`);
+    }
     const nodeScripts = new s3assets.Asset(this, "NodeScripts", {
-      path: path.join(__dirname, "..", "..", "..", "bin"),
+      path: platformBin,
       exclude: ["strato-pg-migrate", "strato-patch-app"],
     });
     const dashboards = new s3assets.Asset(this, "Dashboards", { path: path.join(__dirname, "..", "..", "observability", "dashboards") });

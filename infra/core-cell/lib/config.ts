@@ -24,7 +24,7 @@ export interface CoreCellConfig {
   extraBinariesS3?: string;
   /** `--network` for strato-setup; the network definition carries the bootnodes and chain id. */
   network: string;
-  /** Aurora endpoints (infra/data-plane outputs) and the master secret (JSON, "password" field). */
+  /** Aurora endpoints (data-plane outputs) and the master secret (JSON, "password" field). */
   postgresWriterHost: string;
   postgresReaderHost: string;
   postgresPort: number;

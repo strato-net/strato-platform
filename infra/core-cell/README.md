@@ -3,7 +3,7 @@
 CDK app for one core cell of the tiered deployment: an EC2 host running the
 node's consensus, VM and indexer processes under convoke, with Redis, the
 Kafka broker and Prometheus in containers beside them, against the shared
-Aurora cluster from `infra/data-plane`. It is the same layout the testnet
+Aurora cluster from `data-plane`. It is the same layout the testnet
 hosts run by hand today, built from nothing at boot and supervised by systemd.
 
 A cell is a **follower** by default: `--writer=false` (it indexes into the
@@ -20,7 +20,7 @@ host unchanged). At first boot the instance, with its own role:
 1. installs docker, the binaries' runtime libraries and the CloudWatch agent;
 2. formats and mounts the data volume at `/var/lib/strato`;
 3. pulls the strato image from ECR and copies its `/usr/local/bin` onto the
-   host, plus the repo's `bin/strato-*` scripts (shipped as a stack asset);
+   host, plus strato-platform's `bin/strato-*` scripts (shipped as a stack asset);
 4. reads the Aurora master secret and runs `strato-up --role=core ...` once,
    which sets the node directory up (`/var/lib/strato/node`), restores a
    snapshot when one was given, and starts convoke;
@@ -38,7 +38,7 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
 1. The `strato` image in ECR (`make docker`), and the `prometheus` and
    streaming images beside it under the same registry prefix (the generated
    compose pulls them with `--repoUrl`).
-2. The Aurora cluster (`infra/data-plane`), allowing this stack's security
+2. The Aurora cluster (`data-plane`), allowing this stack's security
    group (output `SecurityGroupId`) on 5432, and its master secret
    `strato/<env>/postgres`.
 3. The network's VPC id when the cell must peer with existing validators

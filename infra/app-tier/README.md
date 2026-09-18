@@ -30,7 +30,7 @@ away from the node.
 ## Deploy
 
 ```sh
-cd infra/app-tier && npm ci
+cd app-tier && npm ci
 npx cdk synth --strict \
   -c envName=testnet \
   -c nginxImage=<ecr>/app-nginx:<tag> -c backendImage=<ecr>/app-backend:<tag> \

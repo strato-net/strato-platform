@@ -12,7 +12,7 @@ credentials are generated into Secrets Manager under `strato/<env>/postgres`
 ## Deploy
 
 ```sh
-cd infra/data-plane && npm ci
+cd data-plane && npm ci
 npx cdk synth --strict -c envName=testnet -c vpcId=vpc-0123 \
   -c clientSecurityGroupIds=sg-node,sg-apptasks -c clientCidrs=10.0.0.0/16
 npx cdk deploy -c ...   # same context

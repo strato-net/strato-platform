@@ -17,7 +17,7 @@ calls to the core node's VPC-facing Kafka listener (port 9094, enabled with
 
 1. Images in ECR: `strato`, `nginx`, `postgrest`, and optionally `smd` and
    `apex` (`make docker`).
-2. The Aurora cluster (`infra/data-plane`) and a core node with
+2. The Aurora cluster (`data-plane`) and a core node with
    `--kafkaExternalHost`, both allowing this stack's task security group
    (output `TaskSecurityGroupId`) on 5432 and 9094 respectively.
 3. Secrets Manager: the Aurora master secret (from the data-plane stack), the
@@ -34,7 +34,7 @@ calls to the core node's VPC-facing Kafka listener (port 9094, enabled with
 ## Deploy and cut over
 
 ```sh
-cd infra/api-tier && npm ci
+cd api-tier && npm ci
 npx cdk deploy --all \
   -c envName=testnet -c vpcId=vpc-0123 \
   -c stratoImage=<ecr>/strato:<tag> -c nginxImage=<ecr>/nginx:<tag> -c postgrestImage=<ecr>/postgrest:<tag> \
