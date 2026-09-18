@@ -24,12 +24,19 @@ KAFKA_PRUNE_CONTAINER="strato-snapshot-kafka-prune"
 # separate data drive can be slower and may lack free space for a full snapshot.
 # (SCRIPT_DIR is not a good base here: once installed via `make install`, it
 # points at ~/.local/bin, not the repo.)
-# Default: $PWD/.snapshot-work. Override with STRATO_SNAPSHOT_WORKDIR.
+# Default: $PWD/.snapshot-work, falling back to a temp directory when the
+# working directory is not writable. Override with STRATO_SNAPSHOT_WORKDIR.
+# The fallback matters because this runs unattended: a cell's bootstrap invokes
+# it as the node user from wherever the boot script sits (/opt/strato/bootstrap,
+# root-owned), and dying there leaves a new cell with no chain state at all.
 init_workdir() {
   if [[ -n "${STRATO_SNAPSHOT_WORKDIR:-}" ]]; then
     WORKDIR="$STRATO_SNAPSHOT_WORKDIR"
-  else
+  elif [[ -w "$PWD" ]]; then
     WORKDIR="$PWD/.snapshot-work"
+  else
+    WORKDIR="${TMPDIR:-/tmp}/strato-snapshot-work.$(id -u)"
+    warn "$PWD is not writable; using $WORKDIR for scratch space"
   fi
   # Purge any leftovers from prior (possibly crashed) runs, then recreate.
   rm -rf "$WORKDIR" 2>/dev/null || true
@@ -108,12 +115,13 @@ die() {
   exit 1
 }
 
-# After die(), which it uses when the work directory cannot be created.
-init_workdir
-
 warn() {
   echo "Warning: $*" >&2
 }
+
+# After die() and warn(), both of which it uses: the work directory may be
+# unwritable (fatal) or merely not where we expected (a warning).
+init_workdir
 
 info() {
   echo "$*" >&2
