@@ -24,7 +24,7 @@ def prom(ref, expr):
     return {"refId": ref, "datasource": PROM, "expr": expr, "instant": True, "range": False, "legendFormat": "{{instance}} {{job}}"}
 panel = {
     "id": 100, "type": "volkovlabs-echarts-panel", "title": "Tier map: frontends, app tier, API tier, shared data plane, core cells",
-    "description": "One box per running thing: each frontend wherever it is served (S3 behind CloudFront, or a container on a cell), each load balancer, each ECS task (health and performance, a row per container), each Aurora instance, each core cell (a row per process and per container). Amber = writer, blue = reader, violet = edge, green/red = up/down, dashed grey = not deployed. Name CloudFront distributions with the hidden frontend_labels variable (E123ABC=SMD; E456DEF=- hides a deleted one). Distributions without datapoints in the range are not drawn.",
+    "description": "One box per running thing: each frontend wherever it is served (S3 behind CloudFront, or a container on a cell), each load balancer, each ECS task (health and performance, a row per container), each Aurora instance, each core cell (a row per process and per container). Amber = writer, blue = reader, violet = edge, green/red = up/down, dashed grey = not deployed. Scoped to $env: load balancers and clusters named strato-<tier>-$env, RDS instances of the stratodata-$env stack. Name CloudFront distributions with the hidden frontend_labels variable (E123ABC=SMD, E456DEF=Portal; once one is named, unnamed ones are not drawn). Distributions without datapoints in the range are not drawn.",
     "gridPos": {"x": 0, "y": 0, "w": 24, "h": 28},
     "datasource": MIXED,
     "targets": [
@@ -63,10 +63,13 @@ else:
         p["gridPos"]["y"] += panel["gridPos"]["h"]
     d["panels"].insert(0, panel)
 templating = d.setdefault("templating", {}).setdefault("list", [])
+FRONTEND_LABELS_HELP = "Names for the tier map's CloudFront distributions: <DistributionId>=<name>, comma separated (E123ABC=SMD,E456DEF=Portal). A name with app or SMD in it is that UI; any other name is a frontend that calls the API tier. Once one is named, unnamed distributions are not drawn; <DistributionId>=- hides one (a deleted distribution stays listed for about two weeks)."
 if not any(v.get("name") == "frontend_labels" for v in templating):
     templating.append({"name": "frontend_labels", "label": "Frontend labels", "type": "textbox", "hide": 2, "query": "",
-                       "current": {"text": "", "value": ""}, "options": [],
-                       "description": "Names for the tier map's CloudFront distributions: <DistributionId>=<name>, comma separated (E123ABC=SMD). An unnamed distribution is shown as the App UI; <DistributionId>=- hides one (a deleted distribution stays listed for about two weeks)."})
+                       "current": {"text": "", "value": ""}, "options": []})
+for v in templating:
+    if v.get("name") == "frontend_labels":
+        v["description"] = FRONTEND_LABELS_HELP
 inputs = d.setdefault("__inputs", [])
 if not any(i.get("name") == "DS_CLOUDWATCH_LOGS" for i in inputs):
     inputs.append({"name": "DS_CLOUDWATCH_LOGS", "label": "CloudWatch Logs", "description": "A second CloudWatch data source, used only by the tier map's Logs Insights query", "type": "datasource", "pluginId": "cloudwatch", "pluginName": "CloudWatch"})

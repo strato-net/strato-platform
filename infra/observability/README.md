@@ -60,8 +60,14 @@ behind CloudFront (requests, bytes served, 4xx and 5xx error rates), or as a
 container on a full-node cell (moved out of that cell's box). A frontend with
 no CloudFront traffic in the time range shows as a dashed "not deployed" box.
 CloudWatch names a distribution only by its id, so the hidden dashboard
-variable `frontend_labels` names them (`E123ABC=SMD,E456DEF=App UI`); an
-unnamed distribution is shown as the app UI. A distribution with no datapoints
+variable `frontend_labels` names them (`E123ABC=SMD,E456DEF=App UI,E789GHI=Portal`).
+A name with "app" or "SMD" in it is that UI; any other name is a frontend of
+its own, drawn with its arrow to the API tier. Once any distribution is named,
+unnamed ones are not drawn; with nothing named, every distribution is shown as
+the app UI. The CloudWatch queries are account-wide, so the map picks the
+deployment out by `$env`: load balancers and ECS clusters named
+`strato-<tier>-<env>` and the RDS instances of the `StratoData-<env>-Postgres`
+stack, which matters in an account that holds anything else. A distribution with no datapoints
 in the time range is not drawn, and one named `-` is hidden: CloudWatch keeps
 listing a deleted distribution's metrics for about two weeks. Its code lives in
 `dashboards/src/tier-map.getOption.js`; `scripts/embed-tier-map.py` writes it

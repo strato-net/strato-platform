@@ -18,9 +18,18 @@
 //
 // CloudWatch knows a CloudFront distribution only by its id. The hidden
 // dashboard variable frontend_labels names them ("E123ABC=SMD,E456DEF=App
-// UI"); an unnamed distribution is shown as the app UI, and one named "-" is
-// hidden (a deleted distribution keeps its metrics listed for about two weeks).
-// A distribution with no datapoints in the dashboard's range is not drawn.
+// UI,E789GHI=Portal"). A name with "app" or "SMD" in it is that UI; any other
+// name is a frontend of its own that calls the API tier. Once any distribution
+// is named, the list is the deployment's frontends and unnamed distributions
+// are not drawn (the account may hold other people's); with nothing named,
+// every distribution is shown as the app UI. One named "-" is hidden (a
+// deleted distribution keeps its metrics listed for about two weeks). A
+// distribution with no datapoints in the dashboard's range is not drawn.
+//
+// The CloudWatch queries are account-wide (a dimension takes "*" or one
+// value), so the deployment is picked out here by $env: load balancers and ECS
+// clusters named strato-<tier>-<env>, and the RDS instances of the data-plane
+// stack (stratodata-<env>-...).
 //
 // Queries (refIds):
 //   tasks      Logs Insights over the Container Insights performance groups:
@@ -98,11 +107,28 @@ const rowsFrom = (frame) => {
   return [row];
 };
 const byRef = (ref) => frames.filter((f) => f.refId === ref);
+const variable = (name) => {
+  try {
+    const replace = ctx && ctx.grafana && ctx.grafana.replaceVariables;
+    const v = typeof replace === "function" ? String(replace("${" + name + "}")) : "";
+    return v.includes("$") ? "" : v;
+  } catch (e) {
+    return "";
+  }
+};
+const ENV = variable("env").toLowerCase();
 const pct = (x) => (numeric(x) ? `${Math.round(x)}%` : "");
-// "strato-app-testnet" -> app, "strato-api-testnet" -> api. Matched as a
-// whole dash-separated word: ALB dimension values start with "app/" (the
-// load balancer type), which a plain substring test takes for the app tier.
-const tierOf = (name) => (/(^|-)app(-|$)/i.test(name) ? "app" : /(^|-)api(-|$)/i.test(name) ? "api" : null);
+// "strato-app-testnet" -> app, "strato-api-testnet" -> api, and nothing else
+// in the account: another deployment's "...-node-app-lb" is not this app tier.
+// Takes the bare name, not the ALB dimension value, which starts with "app/"
+// (the load balancer type). Without $env (the panel edited on its own) any
+// strato-<tier>-... name counts.
+const tierOf = (name) => {
+  const m = /^strato-(app|api)-(.+)$/i.exec(name);
+  return m && (!ENV || m[2].toLowerCase() === ENV) ? m[1].toLowerCase() : null;
+};
+// RDS instance ids come from the data-plane stack's name (StratoData-<env>-Postgres).
+const ownDb = (id) => (ENV ? id.toLowerCase().startsWith(`stratodata-${ENV}-`) : /^stratodata-/i.test(id));
 const rate = (bytesPerSecond) => {
   if (!numeric(bytesPerSecond)) return "?";
   const b = Number(bytesPerSecond);
@@ -216,27 +242,20 @@ for (const lb of lbs.values()) {
   edges[lb.tier].push(lb);
 }
 
-// --- Frontends: the app UI and SMD, wherever they are served ---
+// --- Frontends: the app UI, SMD and other API consumers, wherever they are served ---
 const frontends = [];
-let labelSpec = "";
-try {
-  const replace = ctx && ctx.grafana && ctx.grafana.replaceVariables;
-  labelSpec = typeof replace === "function" ? String(replace("${frontend_labels}")) : "";
-} catch (e) {
-  labelSpec = "";
-}
-if (labelSpec.includes("$")) labelSpec = "";
 const cdnNames = new Map(
-  labelSpec
+  variable("frontend_labels")
     .split(",")
     .map((pair) => pair.split("=").map((s) => s.trim()))
     .filter((pair) => pair.length === 2 && pair[0] && pair[1]),
 );
 // The apps a distribution serves, from its name: one named for both ("App UI +
-// SMD", a front door serving every UI on one hostname) counts for both.
+// SMD", a front door serving every UI on one hostname) counts for both, and
+// one named for neither ("Portal") is a frontend of its own.
 const servesOf = (name) => {
-  const smd = /smd/i.test(name), app = /app/i.test(name);
-  return smd && app ? ["app-ui", "smd"] : smd ? ["smd"] : ["app-ui"];
+  const smd = /smd/i.test(name), app = /\bapp\b/i.test(name);
+  return smd && app ? ["app-ui", "smd"] : smd ? ["smd"] : app ? ["app-ui"] : ["other"];
 };
 const cdns = new Map();
 const cdnFor = (id) => {
@@ -253,7 +272,7 @@ for (const f of byRef("cdnBytes")) if (label(f, "DistributionId")) cdnFor(label(
 for (const f of byRef("cdn4xx")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).e4 = average(f);
 for (const f of byRef("cdn5xx")) if (label(f, "DistributionId")) cdnFor(label(f, "DistributionId")).e5 = average(f);
 for (const c of cdns.values()) {
-  const name = cdnNames.get(c.id) || "App UI";
+  const name = cdnNames.get(c.id) || (cdnNames.size ? "-" : "App UI");
   if (name === "-" || c.points === 0) continue;
   frontends.push({
     kind: "frontend",
@@ -274,6 +293,7 @@ for (const c of cdns.values()) {
 // --- Shared data plane: Aurora writer and readers ---
 const readerIds = new Set(byRef("lag").map((f) => label(f, "DBInstanceIdentifier")).filter(Boolean));
 const dataPlane = byRef("rds")
+  .filter((f) => ownDb(label(f, "DBInstanceIdentifier")))
   .map((f) => {
     const id = label(f, "DBInstanceIdentifier");
     const role = readerIds.has(id) ? "reader" : "writer";
@@ -353,7 +373,8 @@ for (const [app, title] of [["app-ui", "App UI"], ["smd", "SMD"]]) {
   }
 }
 const whereOrder = { cdn: 0, cell: 1, none: 2 };
-frontends.sort((a, b) => (a.app === b.app ? whereOrder[a.where] - whereOrder[b.where] : a.app === "app-ui" ? -1 : 1));
+const appOrder = { "app-ui": 0, smd: 1, other: 2 };
+frontends.sort((a, b) => appOrder[a.app] - appOrder[b.app] || whereOrder[a.where] - whereOrder[b.where] || a.title.localeCompare(b.title));
 
 // --- Palette (Grafana dark theme) ---
 const ink = "#d0d7de", dim = "#8b949e", green = "#3fb950", red = "#f85149", amber = "#d29922", blue = "#58a6ff", violet = "#a371f7", absent = "#6e7681";
@@ -443,9 +464,10 @@ const appLb = kind(appCol, "lb"), appTasks = kind(appCol, "task");
 const apiLb = kind(apiCol, "lb"), apiTasks = kind(apiCol, "task");
 // CloudFront serves each UI from S3 and sends its API, login and RPC paths to
 // the tier behind it: the app UI's to the app load balancer, the SMD's to the
-// API tier's; a front door serving both sends to both.
+// API tier's; a front door serving both sends to both. Any other frontend
+// (a portal, a solver) is a consumer of the API tier.
 for (const f of feCol.filter((a) => a.item.where === "cdn")) {
-  const lbs = (f.item.serves || [f.item.app]).flatMap((app) => (app === "smd" ? apiLb : appLb));
+  const lbs = (f.item.serves || [f.item.app]).flatMap((app) => (app === "app-ui" ? appLb : apiLb));
   for (const l of lbs) across(f.right, f.mid, l.left, l.mid, violet);
 }
 // A frontend container on a cell is served by that cell's nginx, which also

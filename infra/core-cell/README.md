@@ -95,7 +95,7 @@ submits transactions to this cell.
 | `bundledPostgrest` | `true` | with role node: run PostgREST (the Cirrus API at `/cirrus`) on this host; `false` when the API tier serves Cirrus (the node's `/cirrus` answers 502) |
 | `localAuth` | `false` | with role node: local OpenID provider instead of Keycloak; admin `admin`, password in `/etc/strato/local-auth-admin-password` on the host |
 | `oauthSecretName` | none | without localAuth: Secrets Manager secret, JSON `{discoveryUrl, clientId, clientSecret}`, holding the node's Keycloak client (confidential, service accounts enabled, the node's URL among its redirect URIs). The host writes it as strato-login would; strato-setup then creates the node key in the shared vault (`--vaultUrl`, default vault.blockapps.net) under that client |
-| `frontendLabels` | none | with `grafana`: names for the tier map's CloudFront distributions (`E123ABC=SMD,E456DEF=App UI`) |
+| `frontendLabels` | none | with `grafana`: names for the tier map's CloudFront distributions (`E123ABC=SMD,E456DEF=App UI,E789GHI=Portal`); once set, unnamed distributions are not drawn |
 | `ethconfParameterName` | none | SSM parameter this cell publishes its generated `ethconf.yaml` to (base64, SecureString, rewritten each boot): the API tier reads it as its node config (`-c ethconfParameterName=` there). Set it on the writer cell only |
 | `exposePrometheus` | `false` | publish the node's Prometheus on the cell's private IP, port 9090 (a socat container), for the API tier's apex: pass `-c prometheusHost=<PrivateDnsName>:9090` there |
 | `grafana` | `false` | Grafana container on port 3001 (anonymous viewer; admin password in `/etc/strato/grafana-admin-password`) over the node's Prometheus, with the repo's dashboards |
