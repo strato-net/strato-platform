@@ -40,8 +40,14 @@ brokerConfig = BrokerConfig
       , ("KAFKA_LOG_RETENTION_HOURS", "168")
       , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
       , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-      , ("KAFKA_MAX_REQUEST_SIZE", "2500000")
-      , ("KAFKA_MESSAGE_MAX_BYTES", "2500000")
+      -- A single VMEvent is one indivisible record: CodeCollectionAdded carries
+      -- a whole parsed code collection and has been measured at 2.7 MB for a
+      -- pair of large deploys. The size a broker actually accepts is about HALF
+      -- this limit (a v0 produce is up-converted and re-checked), so 8,000,000
+      -- buys roughly 4 MB of headroom. Keep it below milena's defaultMaxBytes
+      -- (16 MiB) or accepted records become unfetchable.
+      , ("KAFKA_MAX_REQUEST_SIZE", "8000000")
+      , ("KAFKA_MESSAGE_MAX_BYTES", "8000000")
       , ("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
       , ("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
       , ("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")

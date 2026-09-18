@@ -349,8 +349,8 @@ generateDockerComposeAllDocker = do
             , ("KAFKA_LOG_RETENTION_HOURS", "168")
             , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
             , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-            , ("KAFKA_MAX_REQUEST_SIZE", "${KAFKA_MAX_REQUEST_SIZE:-2500000}")
-            , ("KAFKA_MESSAGE_MAX_BYTES", "${KAFKA_MESSAGE_MAX_BYTES:-2500000}")
+            , ("KAFKA_MAX_REQUEST_SIZE", "${KAFKA_MAX_REQUEST_SIZE:-8000000}")
+            , ("KAFKA_MESSAGE_MAX_BYTES", "${KAFKA_MESSAGE_MAX_BYTES:-8000000}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec start-kafka.sh >> /logs/kafka.log 2>&1"]

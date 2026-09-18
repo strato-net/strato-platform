@@ -167,9 +167,17 @@ defaultRequestTimeout = 10000
 defaultMinBytes :: MinBytes
 defaultMinBytes = MinBytes 0
 
--- | Default: @4 * 1024 * 1024@
+-- | Default: @16 * 1024 * 1024@
+--
+-- This is the per-partition ceiling on a Fetch, and it must stay ABOVE the
+-- broker's @message.max.bytes@. Fetch here is pinned to API v0, where a broker
+-- returns an empty message set - no error - for a partition whose next record
+-- is larger than the request's maxBytes. A record the broker accepts but the
+-- client can never fetch wedges that consumer silently and permanently, which
+-- is worse than a refused produce. Pairs with the 8,000,000 the generated
+-- broker config sets.
 defaultMaxBytes :: MaxBytes
-defaultMaxBytes = 4 * 1024 * 1024
+defaultMaxBytes = 16 * 1024 * 1024
 
 -- | Default: @0@
 defaultMaxWaitTime :: MaxWaitTime
