@@ -9,10 +9,11 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_busHost, flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_kafkaExternalHost, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
@@ -358,9 +359,20 @@ generateDockerCompose role = do
             ++ ["9094:9094" | externalListener]
         }
 
+  -- Scrape jobs whose process this node does not run. Kept in step with
+  -- Generator.hs's commands.txt and roleHasService above: strato-api (the
+  -- "core-api" job) only with roleRunsApi, apex and nginx only on RoleNode,
+  -- strato-ingest only with a message bus. Without this their targets sit DOWN
+  -- forever on a core cell.
+  let prometheusSkipJobs =
+        [ "core-api" | not (roleRunsApi role) ]
+        ++ [ j | not (roleHasService role "nginx"), j <- ["nginx", "apex"] ]
+        ++ [ "strato-ingest" | null flags_busHost ]
+
   let prometheus = def
         { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
         , user = Just userGid
+        , environment = Just $ Map.fromList [("PROMETHEUS_SKIP_JOBS", intercalate "," prometheusSkipJobs)]
         , extra_hosts = hostGateway
         , volumes = Just
             [ "./logs:/logs"
