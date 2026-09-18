@@ -116,6 +116,14 @@ export interface CoreCellConfig {
   publishSecretNames: string[];
   terminationProtection: boolean;
   /**
+   * Watch the writer lease and take it when its holder stops heartbeating (`strato-lease-watch` on
+   * the host), after `autoPromoteAfter` consecutive stale observations ten seconds apart. Off by
+   * default: a validator's standby must not promote itself, since the validator identity step in
+   * design-documents/standby-core.md is a human decision. Safe between followers.
+   */
+  autoPromote: boolean;
+  autoPromoteAfter: number;
+  /**
    * Keep the launch template's old, shared name ("CellLaunchTemplate"). Only for a cell created
    * before the names were made unique: renaming replaces the template and then the instance.
    */
@@ -215,6 +223,8 @@ export function loadConfig(app: App): CoreCellConfig {
     prometheusWorkspaceArn: optional(app, "prometheusWorkspaceArn"),
     publishSecretNames: list(app, "publishSecretNames", ""),
     terminationProtection: bool(app, "terminationProtection", "true"),
+    autoPromote: bool(app, "autoPromote", "false"),
+    autoPromoteAfter: Number(ctx(app, "autoPromoteAfter", "3")),
     legacyLaunchTemplateName: bool(app, "legacyLaunchTemplateName", "false"),
   };
 }

@@ -489,6 +489,63 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now strato-cell-containers.timer
 
+# --- 7c. Automatic promotion: take the writer lease when its holder goes quiet ---
+# Every cell watches the lease (strato-promote --status, which claims nothing)
+# and claims it only after AUTO_PROMOTE_AFTER consecutive looks, ten seconds
+# apart, found it stale or unheld. strato-promote calls a heartbeat stale at
+# 30 s, so the default of 3 means the writer has been silent for about a
+# minute: a long pause on a healthy writer is not a failover. The claim itself
+# is strato-promote without --force, which refuses a heartbeating holder, and
+# every indexer batch re-asserts the lease in its own transaction, so two cells
+# deciding at once is safe: one claim wins and the other cell stays a standby.
+# Each claim is logged and counted in CloudWatch (STRATO/Cell WriterLeaseClaimed)
+# so that a failover nobody asked for does not go unseen.
+if [[ "${AUTO_PROMOTE:-false}" == "true" ]]; then
+  log "automatic promotion after ${AUTO_PROMOTE_AFTER:-3} stale observations"
+  cat > /usr/local/bin/strato-lease-watch <<'SCRIPT'
+#!/bin/bash
+set -uo pipefail
+. /etc/strato/cell.env
+export AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1} AWS_PAGER=""
+need=${AUTO_PROMOTE_AFTER:-3}
+cell=${TLS_HOSTNAME:-$(hostname)}
+cd /var/lib/strato/node
+stale=0
+while sleep 10; do
+  status=$(strato-promote --status 2>&1) || { stale=0; continue; }
+  if grep -q "held by ${CELL_ID} " <<<"$status"; then stale=0; continue; fi
+  if grep -Eq '\(stale\)$|^writer lease: unheld' <<<"$status"; then stale=$((stale + 1)); else stale=0; continue; fi
+  echo "lease looks abandoned ($stale/$need): $(head -1 <<<"$status")"
+  (( stale < need )) && continue
+  # A cell whose own indexer is down cannot write either; leave the lease for another.
+  curl -fsS -m 3 -o /dev/null http://localhost:10779/metrics || { echo "not claiming: this cell's strato-indexer is not answering"; continue; }
+  if out=$(strato-promote 2>&1); then
+    echo "CLAIMED the writer lease: $(tail -1 <<<"$out")"
+    aws cloudwatch put-metric-data --namespace STRATO/Cell \
+      --metric-data "MetricName=WriterLeaseClaimed,Dimensions=[{Name=Cell,Value=$cell}],Value=1,Unit=Count" || true
+  else
+    echo "claim refused: $(tail -2 <<<"$out" | head -1)"
+  fi
+  stale=0
+done
+SCRIPT
+  chmod 0755 /usr/local/bin/strato-lease-watch
+  cat > /etc/systemd/system/strato-lease-watch.service <<UNIT
+[Unit]
+Description=Take the writer lease when its holder stops heartbeating
+After=strato-cell.service
+[Service]
+User=$NODE_USER
+ExecStart=/usr/local/bin/strato-lease-watch
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now strato-lease-watch.service
+fi
+
 # --- 8. Log rotation for the node's process logs ---
 cat > /etc/cron.daily/strato-logrotate <<EOF
 #!/bin/sh

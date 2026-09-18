@@ -270,9 +270,8 @@ export class ApiTierStack extends Stack {
     if (coreSg) {
       const core = coreSg;
       core.addIngressRule(taskSg, ec2.Port.tcp(config.kafkaPort), `${name} tasks: Kafka`);
-      core.addIngressRule(taskSg, ec2.Port.tcp(3000), `${name} tasks: strato-api`);
-      core.addIngressRule(taskSg, ec2.Port.tcp(8545), `${name} tasks: jsonrpc`);
-      core.addIngressRule(taskSg, ec2.Port.tcp(8093), `${name} tasks: vault wrapper`);
+      // Nothing else: a core cell runs no strato-api, jsonrpc or vault wrapper
+      // (this tier runs its own, and signs against the external vault).
       if (config.prometheusHost) {
         const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
         core.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);

@@ -22,7 +22,7 @@ if (app.node.tryGetContext("frontend") === "true") {
       cellInstanceIds: list("cellInstanceIds"),
       cellSecurityGroupIds: list("cellSecurityGroupIds"),
       clientSecurityGroupIds: list("clientSecurityGroupIds"),
-      submitPort: Number(app.node.tryGetContext("submitPort") ?? "8040"),
+      submitPort: Number(app.node.tryGetContext("submitPort") ?? "8088"),
       healthPath: String(app.node.tryGetContext("healthPath") ?? "/health"),
     },
   });

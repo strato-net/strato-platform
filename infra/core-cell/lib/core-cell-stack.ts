@@ -215,6 +215,8 @@ export class CoreCellStack extends Stack {
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
       SNAPSHOT_BUCKET: config.snapshotBucket ?? "",
       SNAPSHOT_SKIP_DATABASES: String(config.snapshotSkipDatabases),
+      AUTO_PROMOTE: String(config.autoPromote),
+      AUTO_PROMOTE_AFTER: String(config.autoPromoteAfter),
       EXTRA_SETUP_FLAGS: config.extraSetupFlags,
       BUNDLED_APP: String(config.bundledApp),
       APP_URL: config.appUrl ?? "",

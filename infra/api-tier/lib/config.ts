@@ -35,7 +35,7 @@ export interface ApiTierConfig {
   createSessionSecret: boolean;
   /** An existing regional certificate for the ALB. Without it, and with `domainName` set, the app creates a DNS-validated one (see CertificateStack). */
   albCertificateArn?: string;
-  /** Security groups this stack opens to its tasks at deploy time: the Aurora cluster's (5432) and the core cell's (9094 Kafka, 3000 strato-api, 8545 jsonrpc). Without them, allow the output TaskSecurityGroupId by hand. */
+  /** Security groups this stack opens to its tasks at deploy time: the Aurora cluster's (5432) and the core cell's (9094 Kafka, and its Prometheus port with prometheusHost). Without them, allow the output TaskSecurityGroupId by hand. */
   postgresSecurityGroupId?: string;
   coreSecurityGroupId?: string;
   /** The tier's public hostname. With `hostedZoneId` it is the node hostname being cut over (weighted records below); without one it is a CNAME to the ALB kept at the registrar. */
