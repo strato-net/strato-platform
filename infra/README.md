@@ -57,7 +57,11 @@ full follower of the chain with its own Kafka, sharing the Aurora cluster.
   internal load balancer on the cells' Kafka port, sticky by source address
   and health-checked on each cell's sequencer. The API tier only produces,
   so it does not matter which cell a task lands on. Every cell must advertise
-  the load balancer's name (`kafkaExternalHost`), or clients bypass it.
+  the load balancer's name (`kafkaExternalHost`): the API's Kafka client
+  reconnects to the advertised address, so a cell advertising itself would
+  keep being chosen after it died. The client does not retry: when a cell
+  fails, submits from the tasks pinned to it return 500 until the health
+  check ejects it (10 s interval, 2 failures, so about 20 s), then succeed.
 
 Rolling the load balancer out, or adding a cell to it: deploy `core-frontend`;
 record its `DnsName` as `CORE_NLB` in `environments/tiered.sh`; on each cell,

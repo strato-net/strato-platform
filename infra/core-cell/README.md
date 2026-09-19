@@ -134,6 +134,20 @@ submits transactions to this cell.
   volume only if it is detached and reattached by hand; the stack does not
   do that for you. A follower can instead be rebuilt from a snapshot.
 
+## When the first boot fails
+
+`/var/log/strato-cell-bootstrap.log` says where. The script stops at the first
+error, and a failure in the setup or restore step leaves the host without its
+systemd unit. Running `/opt/strato/bootstrap/cell-bootstrap.sh` again as root
+is safe: setup and restore run only while the node directory does not exist,
+so a second run carries on from the step after them.
+
+`stratoImage` is one image of a release, and the node's compose file asks for
+the others (prometheus, nginx, app-nginx) under the same version prefix, which
+is the platform's git hash. A strato image rebuilt alone has a prefix the other
+images were never pushed under, and `docker compose up` fails on a missing
+tag: push or copy the full set before pointing a cell at it.
+
 ## Deleting a cell stack
 
 The Host stack has termination protection on, which also blocks deleting one
