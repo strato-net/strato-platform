@@ -20,7 +20,10 @@ where
 
 import BlockApps.Logging
 import Blockchain.BlockChain (addTransaction, recoverProposer)
-import Blockchain.DB.ChainDB (getChainStateRoot, putBlockHeaderInChainDB)
+import Blockchain.Data.BlockSummary (BlockSummary, bSumStateRoot)
+import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Strato.Model.ExtendedWord (Word256)
+import qualified Control.Monad.Change.Alter as A
 import Blockchain.Data.BlockHeader (BlockHeader, getBlockGasLimit, parentHash)
 import Blockchain.Data.VmTrace (cfTo, newVmTracer, takeTraceRoots, VmTracer)
 import Blockchain.Data.ExecResults (calculateReturned)
@@ -67,15 +70,15 @@ traceBlockTxs header txs mTarget opts id = do
   case recoverProposer header of
     Left err -> return $ Error id err
     Right proposer ->
-      getChainStateRoot Nothing (parentHash header) >>= \case
+      A.lookup (A.Proxy @BlockSummary) (parentHash header) >>= \case
         Nothing ->
           return . Error id $
             "parent state not available for block " ++ format (parentHash header)
-        Just _ -> do
+        Just parentSum -> do
           -- Anchor this block at its parent's post-state root; all writes stay
           -- in the sandbox overlay.
-          putBlockHeaderInChainDB header
           Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+          A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (bSumStateRoot parentSum)
           let otxs = mapMaybe (wrapIngestBlockTransaction bh) txs
               dropped = length txs - length otxs
           when (dropped > 0) $

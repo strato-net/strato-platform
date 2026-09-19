@@ -29,7 +29,6 @@ import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState)
 import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
@@ -59,14 +58,11 @@ import Control.Monad.Composable.Streaming
 import Control.Applicative ((<|>))
 import Data.Foldable (for_)
 import Control.Monad.IO.Class
-import qualified Data.ByteString as B
-import Data.Default
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
 import Data.Traversable (for)
-import qualified Database.LevelDB as DB
 import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
 import UnliftIO
@@ -184,23 +180,6 @@ instance Mod.Accessible TRC.Cache ContextM where
 instance {-# OVERLAPPING #-} HasStreaming m => m `Mod.Yields` TransactionResult where
   yield tr = void $ produceVMEvents [NewTransactionResult tr]
 
-vmBlockHashRootKey :: B.ByteString
-vmBlockHashRootKey = "block_hash_root"
-
-instance Mod.Modifiable BlockHashRoot ContextM where
-  get _ = getBackend >>= \case
-    Persistent d -> disk d
-    Memory o -> _memBlockHashRoot <$> readIORef o
-    Sandbox o d -> readIORef o >>= \m -> case _memBlockHashRoot m of
-      BlockHashRoot bh | bh == MP.emptyTriePtr -> disk d
-      bhr -> pure bhr
-    where
-      disk d = BlockHashRoot . maybe MP.emptyTriePtr MP.StateRoot <$> DB.get (MP.unStateDB $ _stateDB d) def vmBlockHashRootKey
-  put _ bhr@(BlockHashRoot (MP.StateRoot sr)) = getBackend >>= \case
-    Persistent d -> DB.put (MP.unStateDB $ _stateDB d) def vmBlockHashRootKey sr
-    Memory o -> modifyIORef' o $ memBlockHashRoot .~ bhr
-    Sandbox o _ -> modifyIORef' o $ memBlockHashRoot .~ bhr
-
 instance Mod.Modifiable CurrentBlockHash ContextM where
   get _ = fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . gets $ view $ memDBs . currentBlock
   put _ bh = modify $ memDBs . currentBlock ?~ bh
@@ -248,7 +227,8 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
       mSR <- gets $ view $ memDBs . stateRoots . at (bh, chainId)
       case mSR of
         Just sr -> pure $ Just sr
-        Nothing -> getChainStateRoot chainId bh
+        -- The header's state root is already stored in the block's summary.
+        Nothing -> fmap bSumStateRoot <$> A.lookup (A.Proxy @BlockSummary) bh
   insert _ chainId sr = do
     mBH <- gets $ view $ memDBs . currentBlock
     case mBH of
@@ -261,7 +241,6 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
       Nothing -> pure ()
       Just (CurrentBlockHash bh) -> do
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
-        deleteChainStateRoot chainId bh
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
   lookup _ k = readStore memCodeDB (\d -> genericLookupCodeDB (pure $ _codeDB d) k) k

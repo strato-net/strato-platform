@@ -10,7 +10,6 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.DB.ChainDB (getChainStateRoot)
 import Blockchain.Data.AddressStateDB (AddressState (..))
 import Blockchain.Data.BlockHeader (number, stateRoot)
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
@@ -450,9 +449,6 @@ auditLastBlock lastB = do
   let expectSR = stateRoot (obBlockData lastB)
       expectHash = outputBlockHash lastB
   (accountCount, storageCount) <- runEff . runLogging . evalContextM "vm-apply-audit" initReplayContext $ do
-      diskSR <- getChainStateRoot Nothing expectHash
-      unless (diskSR == Just expectSR) $
-        error $ "AUDIT fail: persisted root mismatch: expected=" ++ show expectSR ++ " disk=" ++ show diskSR
       accountPairs <- MP.unsafeGetAllKeyVals expectSR
       let states =
             [ rlpDecode (rlpDeserialize (rlpDecode encoded)) :: AddressState

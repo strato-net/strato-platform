@@ -19,7 +19,6 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Blockstanbul.Authentication
 --import           Blockchain.Data.Block
 
-import Blockchain.DB.ChainDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StorageDB
 import qualified Blockchain.Data.AddressStateDB as DD
@@ -307,7 +306,6 @@ processNewBestBlock bh bd txShas = do
           }
   $logInfoS "Bagger.processNewBestBlock" . T.pack $ show (length hashMap) ++ " private hashses in Bagger cache"
   putBaggerState $ state {B.seen = S.empty, B.miningCache = newMiningCache}
-  migrateBlockHeader bd baggerBlockHash
   withBagger $ do
     demoteUnexecutables
     promoteExecutables
@@ -739,4 +737,7 @@ buildRewardedBlockHeader bd = do
   return bd {stateRoot = rewardedStateRoot}
 
 withBagger :: MonadBagger m => m a -> m a
-withBagger = withCurrentBlockHash baggerBlockHash
+withBagger f = withCurrentBlockHash baggerBlockHash $ do
+  best <- B.bestBlockHeader . B.miningCache <$> getBaggerState
+  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot best)
+  f

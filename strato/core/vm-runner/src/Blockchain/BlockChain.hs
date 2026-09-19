@@ -31,7 +31,6 @@ import qualified Blockchain.Bagger as Bagger
 import Blockchain.Bagger.Transactions
 import qualified Blockchain.DB.AddressStateDB as NoCache
 import qualified Blockchain.DB.BlockSummaryDB as BSDB
-import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB ()
 import Blockchain.DB.HashDB ()
 import Blockchain.DB.MemAddressStateDB
@@ -217,9 +216,8 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             ++ show (length otxs)
             ++ "TXs)."
 
-        putBlockHeaderInChainDB bd
-
         bSum <- setParentStateRoot b
+        A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (bSumStateRoot bSum)
         -- Retained block-map entries are only valid if this block starts from the root they were flushed into.
         startSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
         fr <- _flushedRoot <$> Mod.get (Mod.Proxy @MemDBs)
@@ -246,7 +244,6 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             -- wrong sends whoever is debugging to the wrong block.
             pure $ map (BlockVerificationFailure (number bd) obh) failures
           _ -> do
-            forM_ postRewardSR $ putChainStateRoot Nothing obh
             P.incCounter vmBlocksValid
             P.incCounter vmBlocksMined
             P.incCounter vmBlocksProcessed

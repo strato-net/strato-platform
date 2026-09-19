@@ -24,7 +24,9 @@ import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
 import Blockchain.BlockDB
-import Blockchain.DB.ChainDB
+import Blockchain.DB.BlockSummaryDB (hasBSum)
+import Blockchain.Data.Block (blockBlockData)
+import qualified Blockchain.Data.TXOrigin as Origin
 import Blockchain.DB.CodeDB ()
 import Blockchain.DB.StateDB (setStateDBStateRoot)
 import Blockchain.Data.AddressStateDB ()
@@ -130,15 +132,15 @@ bootstrapIfFirstRun = do
   genesisInfo <- getGenesisInfo
   let genesisBlock = genesisInfoToBlock genesisInfo
       genesisHash = blockHash genesisBlock
-  maybeGenesisStateRoot <- getChainStateRoot Nothing genesisHash
-  case maybeGenesisStateRoot of -- If first run, then bootstrap
-    Nothing -> withCurrentBlockHash genesisHash $ do
+  bootstrapped <- hasBSum genesisHash
+  if bootstrapped
+    then $logInfoS "bootstrap" "Bootstrapping not needed"
+    else withCurrentBlockHash genesisHash $ do
       $logInfoS "bootstrap" "Bootstrapping"
-      bootstrapChainDB genesisHash $ stateRoot genesisInfo
+      writeBlockSummary OutputBlock {obOrigin = Origin.Direct, obBlockData = blockBlockData genesisBlock, obReceiptTransactions = [], obBlockUncles = []}
       setStateDBStateRoot Nothing  $ stateRoot genesisInfo
       seedDatabases genesisBlock
       populateStorageDBs genesisInfo genesisBlock Nothing
-    Just _ -> $logInfoS "bootstrap" "Bootstrapping not needed"
 
 initializeBestBlock :: ContextM ()
 initializeBestBlock = do

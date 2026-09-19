@@ -43,7 +43,6 @@ module Blockchain.VMContext
     memHashDB,
     memCodeDB,
     memBlockSummaryDB,
-    memBlockHashRoot,
     stateTxMap,
     stateBlockMap,
     storageBlockMap,
@@ -92,7 +91,6 @@ import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 import Blockchain.Constants
 import Blockchain.DB.BlockSummaryDB
-import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
@@ -192,15 +190,14 @@ data MemContextDBs = MemContextDBs
   { _memStateDB :: M.Map MP.StateRoot MP.NodeData,
     _memHashDB :: M.Map N.NibbleString N.NibbleString,
     _memCodeDB :: M.Map Keccak256 DBCode,
-    _memBlockSummaryDB :: M.Map Keccak256 BlockSummary,
-    _memBlockHashRoot :: BlockHashRoot
+    _memBlockSummaryDB :: M.Map Keccak256 BlockSummary
   }
   deriving (Generic)
 
 makeLenses ''MemContextDBs
 
 instance Default MemContextDBs where
-  def = MemContextDBs M.empty M.empty M.empty M.empty (BlockHashRoot MP.emptyTriePtr)
+  def = MemContextDBs M.empty M.empty M.empty M.empty
 
 -- | Where the stores live. 'Sandbox' reads through to the persistent stores
 -- on a miss and keeps every write in the overlay (eth_call, tracing).
@@ -334,7 +331,6 @@ withCurrentBlockHash bh f = do
 withCurrentBlockHashNoCommit ::
   ( MonadUnliftIO m,
     Mod.Modifiable MemDBs m,
-    Mod.Modifiable BlockHashRoot m,
     Mod.Modifiable CurrentBlockHash m
   ) =>
   Keccak256 ->
@@ -342,10 +338,7 @@ withCurrentBlockHashNoCommit ::
   m a
 withCurrentBlockHashNoCommit bh f = do
   memDBs' <- Mod.get (Mod.Proxy @MemDBs)
-  blockHashRoot' <- Mod.get (Mod.Proxy @BlockHashRoot)
-  let restore = do
-        Mod.put (Mod.Proxy @BlockHashRoot) blockHashRoot'
-        Mod.put (Mod.Proxy @MemDBs) memDBs'
+  let restore = Mod.put (Mod.Proxy @MemDBs) memDBs'
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f `onException` restore
   restore
