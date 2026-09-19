@@ -33,6 +33,7 @@ module Blockchain.DB.MemAddressStateDB
 where
 
 import qualified Blockchain.DB.AddressStateDB as DB
+import BlockApps.Logging (MonadLogger)
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
@@ -174,15 +175,13 @@ resetAddressStateTxDBMap :: (Monad m, HasMemAddressStateDB m) => m ()
 resetAddressStateTxDBMap = putAddressStateTxDBMap M.empty
 
 flushMemAddressStateDB ::
-  (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+  (MonadLogger m, HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   m ()
 flushMemAddressStateDB = do
   bm <- getAddressStateBlockDBMap
   let dirtyEntries = dirtyBlockMap bm
-  forM_ dirtyEntries $ \(address, modification) ->
-    case modification of
-      ASModification addressState -> DB.putAddressState address addressState
-      ASDeleted -> DB.deleteAddressState address
+  DB.putAddressStates [(address, addressState) | (address, ASModification addressState) <- dirtyEntries]
+  forM_ [address | (address, ASDeleted) <- dirtyEntries] DB.deleteAddressState
   -- Flushed entries stay in the block map as reads (deleted accounts drop out);
   -- the map is cleared per input batch and whenever the state root diverges (addBlock).
   let dropDeleted (address, ASDeleted) = HM.delete address

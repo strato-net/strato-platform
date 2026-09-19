@@ -17,6 +17,7 @@ module Blockchain.DB.AddressStateDB
   ( getAddressStateMaybe,
     getAllAddressStates,
     putAddressState,
+    putAddressStates,
     deleteAddressState,
     addressStateExists,
     getAddressFromHash,
@@ -25,6 +26,8 @@ module Blockchain.DB.AddressStateDB
   )
 where
 
+import BatchMerge (putManyKeyValExisted)
+import BlockApps.Logging (MonadLogger)
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
@@ -38,6 +41,7 @@ import Control.Monad (liftM, unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.Foldable (for_)
 import Data.Maybe
 import qualified Data.NibbleString as N
 
@@ -78,6 +82,17 @@ putAddressState address newState = do
   setStateDBStateRoot Nothing sr'
   where
     addrNibbles = addressAsNibbleString address
+
+-- | One-pass insert of many accounts into the state trie (same as the
+-- storage flush); avoids rewriting the shared path once per account.
+putAddressStates :: (MonadLogger m, HasStateDB m, HasHashDB m) => [(Address, AddressState)] -> m ()
+putAddressStates [] = pure ()
+putAddressStates states = do
+  sr <- getStateRoot Nothing
+  let inserts = [(addressAsNibbleString a, rlpEncode $ rlpSerialize $ rlpEncode s) | (a, s) <- states]
+  (sr', existed) <- putManyKeyValExisted sr inserts
+  for_ inserts $ \(k, _) -> unless (k `elem` existed) $ hashDBPut k
+  setStateDBStateRoot Nothing sr'
 
 deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do
