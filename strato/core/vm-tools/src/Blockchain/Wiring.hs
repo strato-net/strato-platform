@@ -277,8 +277,6 @@ instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
   delete _ k = writeStore memHashDB (\d -> genericDeleteHashDB (pure $ _hashDB d) k) k Nothing
 
 instance HasMemRawStorageDB ContextM where
-  getMemRawStorageTxDB = gets $ view $ memDBs . storageTxMap
-  putMemRawStorageTxMap theMap = modify $ memDBs . storageTxMap .~ theMap
   getMemRawStorageBlockDB = gets $ view $ memDBs . storageBlockMap
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 

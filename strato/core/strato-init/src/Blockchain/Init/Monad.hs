@@ -46,10 +46,9 @@ data SetupDBs = SetupDBs
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB :: HashDB,
     codeDB :: CodeDB,
-    localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
-    localStorageBlock :: IORef (M.Map (Address, StoragePath) (DirtyFlag, BasicValue)),
+    localStorageBlock :: IORef (BlockMap (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Address (DirtyFlag, AddressStateModification))
+    localAddressStateBlock :: IORef (BlockMap Address AddressStateModification)
   }
 
 type HasDBs m = Mod.Accessible SetupDBs m
@@ -69,11 +68,10 @@ runSetupDBMInDir baseDir mv = do
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
-  m1 <- liftIO $ newIORef M.empty
-  m2 <- liftIO $ newIORef M.empty
+  m2 <- liftIO $ newIORef emptyBlockMap
   m3 <- liftIO $ newIORef M.empty
-  m4 <- liftIO $ newIORef M.empty
-  provide (SetupDBs sdb srRef hdb cdb m1 m2 m3 m4) mv
+  m4 <- liftIO $ newIORef emptyBlockMap
+  provide (SetupDBs sdb srRef hdb cdb m2 m3 m4) mv
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)
@@ -86,10 +84,6 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (MP.StateRoot `A.Alters` MP.Nod
   delete _ = MP.genericDeleteDB $ fmap stateDB $ Mod.access Mod.Proxy
 
 instance (Monad m, MonadIO m, HasDBs m) => HasMemRawStorageDB m where
-  getMemRawStorageTxDB = liftIO . readIORef . localStorageTx =<<  Mod.access Mod.Proxy
-  putMemRawStorageTxMap theMap = do
-    lstref <- fmap localStorageTx $ Mod.access Mod.Proxy
-    liftIO $ atomicWriteIORef lstref theMap
   getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< Mod.access Mod.Proxy
   putMemRawStorageBlockMap theMap = do
     lsbref <- fmap localStorageBlock $ Mod.access Mod.Proxy

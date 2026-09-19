@@ -240,8 +240,6 @@ instance HasMemAddressStateDB SM where
   putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
 
 instance HasMemRawStorageDB SM where
-  getMemRawStorageTxDB = gets $ _storageTxMap . _ssMemDBs
-  putMemRawStorageTxMap m = modify $ ssMemDBs . storageTxMap .~ m
   getMemRawStorageBlockDB = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 

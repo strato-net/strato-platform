@@ -91,6 +91,7 @@ import Control.Applicative ((<|>))
 import Control.Lens hiding (filtered)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base ()
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -141,6 +142,9 @@ addBlocks unfiltered = do
           ( "Inserting " ++ show (length filtered) ++ " blocks(s) starting with "
               ++ (show . number . obBlockData $ firstBlock)
           )
+      -- Block-map entries retained past flushes live for one input batch.
+      putAddressStateBlockDBMap emptyBlockMap
+      putMemRawStorageBlockMap emptyBlockMap
       didReplaceBest <- newIORef False
       replacedBest <- newIORef (error "addBlocks.replacedBest: evaluating uninitialized BestBlockInfo!")
       -- srLog gathers a chain of better block stateroots. The last one found should be the best block,
@@ -216,6 +220,12 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         putBlockHeaderInChainDB bd
 
         bSum <- setParentStateRoot b
+        -- Retained block-map entries are only valid if this block starts from the root they were flushed into.
+        startSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+        fr <- _flushedRoot <$> Mod.get (Mod.Proxy @MemDBs)
+        when (startSR /= fr) $ do
+          putAddressStateBlockDBMap emptyBlockMap
+          putMemRawStorageBlockMap emptyBlockMap
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 
@@ -313,13 +323,11 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   runPatches bd
 
-  flushMemStorageTxDBToBlockDB
-
   when (Conf.sqlDiff $ vmConfig ethConf) $
     emitOut . OutVMEvents =<< sendNewActionMessage b trrs
 
   timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
-  flushMemAddressStateTxToBlockDB
+  resetAddressStateTxDBMap
   timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
 
@@ -327,15 +335,14 @@ sendNewActionMessage :: (HasMemRawStorageDB m) =>
                         OutputBlock -> [TxRunResult] -> m [VMEvent]
 sendNewActionMessage b trrs = do
   let bd = obBlockData b
-  theMap <- getMemRawStorageBlockDB
+  bm <- getMemRawStorageBlockDB
 
+  -- Only this block's writes: the block map also retains reads from earlier blocks.
   let recombined :: Map Address ActionData
       recombined =
         fmap (ActionData . SolidVMDiff)
         $ M.fromListWith M.union
-        [ (addr, M.singleton path val)
-        | ((addr, path), (_, val)) <- M.toList theMap
-        ]
+        [ (addr, M.singleton path val) | ((addr, path), val) <- dirtyBlockMap bm ]
 
       action :: Action
       action = Action {
@@ -373,8 +380,7 @@ addTransactions blockData txs proposer =
     go blockGas (t : rest) trrs = do
       let bt = otBaseTx t
       beforeMap <- getAddressStateTxDBMap
-      flushMemAddressStateTxToBlockDB
-      flushMemStorageTxDBToBlockDB
+      resetAddressStateTxDBMap
 
       (!deltaT, !result) <- timeIt $ addTransaction blockData blockGas t proposer
 
@@ -419,8 +425,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
   case result of
     Right execResult -> do
       let nextRemGas = remGas - (TD.gasLimit bt - calculateReturned bt execResult)
-      flushMemAddressStateTxToBlockDB
-      flushMemStorageTxDBToBlockDB
+      resetAddressStateTxDBMap
       mineTransactions' header nextRemGas (ran `DL.snoc` trr) txs mSelfAddress
     Left failure -> do
       return $ Bagger.TxMiningResult (Just failure) (DL.toList ran) unran remGas Nothing

@@ -46,10 +46,10 @@ module Blockchain.VMContext
     memBlockHashRoot,
     stateTxMap,
     stateBlockMap,
-    storageTxMap,
     storageBlockMap,
     stateRoots,
     currentBlock,
+    flushedRoot,
     memDBs,
     baggerState,
     bestBlockInfo,
@@ -130,6 +130,7 @@ import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
 import Data.Binary
 import Data.Default
+import qualified Data.HashSet as HS
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
@@ -209,12 +210,14 @@ data Backend
   | Sandbox (IORef MemContextDBs) ContextDBs
 
 data MemDBs = MemDBs
-  { _stateTxMap :: !(M.Map Address AddressStateModification),
-    _stateBlockMap :: !(M.Map Address (DirtyFlag, AddressStateModification)),
-    _storageTxMap :: !(M.Map (Address, StoragePath) BasicValue),
-    _storageBlockMap :: !(M.Map (Address, StoragePath) (DirtyFlag, BasicValue)),
+  { -- Accounts modified by the current transaction (for its TransactionResult only).
+    _stateTxMap :: !(M.Map Address AddressStateModification),
+    _stateBlockMap :: !(BlockMap Address AddressStateModification),
+    _storageBlockMap :: !(BlockMap (Address, StoragePath) BasicValue),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
-    _currentBlock :: !(Maybe CurrentBlockHash)
+    _currentBlock :: !(Maybe CurrentBlockHash),
+    -- State root the block-map entries retained past the last flush are valid for.
+    _flushedRoot :: !(Maybe MP.StateRoot)
   }
   deriving (Generic, NFData, Show)
 
@@ -224,11 +227,11 @@ instance Default MemDBs where
   def =
     MemDBs
       { _stateTxMap = M.empty,
-        _stateBlockMap = M.empty,
-        _storageTxMap = M.empty,
-        _storageBlockMap = M.empty,
+        _stateBlockMap = emptyBlockMap,
+        _storageBlockMap = emptyBlockMap,
         _stateRoots = M.empty,
-        _currentBlock = Nothing
+        _currentBlock = Nothing,
+        _flushedRoot = Nothing
       }
 
 data ContextState = ContextState
@@ -320,11 +323,11 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
-  flushMemStorageTxDBToBlockDB
   flushMemStorageDB
-  flushMemAddressStateTxToBlockDB
+  resetAddressStateTxDBMap
   flushMemAddressStateDB
-  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots .~ M.empty)
+  sr <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots .~ M.empty) . (flushedRoot .~ sr)
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
 
@@ -570,8 +573,9 @@ getNewAddressWithSalt address salt hsh args = do
 
 purgeStorageMap :: HasMemStorageDB m => Address -> m ()
 purgeStorageMap address = do
-  storageMap <- getMemRawStorageTxDB
-  putMemRawStorageTxMap $ M.filterWithKey (const . (/= address) . fst) storageMap
+  -- Drop the address's pending (unflushed) writes.
+  bm <- getMemRawStorageBlockDB
+  putMemRawStorageBlockMap $ foldr deleteBlockMap bm [k | k@(a, _) <- HS.toList (bmDirty bm), a == address]
 
 getContextBestBlockInfo :: (Functor m, Mod.Accessible ContextState m) => m ContextBestBlockInfo
 getContextBestBlockInfo = _bestBlockInfo <$> Mod.access Mod.Proxy
