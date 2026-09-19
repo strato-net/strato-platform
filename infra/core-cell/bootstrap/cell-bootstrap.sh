@@ -162,7 +162,7 @@ if [[ ! -d $NODE_DIR ]]; then
   sudo -u $NODE_USER -H env PATH="$PATH" \
     strato-setup "$NODE_DIR" --role="$ROLE" --network="$NETWORK" --nodeHost="$node_host" \
       --pghost="$PG_WRITER_HOST" --pgReaderHost="$PG_READER_HOST" --password="$pg_password" \
-      --kafkaExternalHost="$private_dns" --cellId="$CELL_ID" "${peerdb[@]}" --peerStore="${PEER_STORE:-postgres}" \
+      --kafkaExternalHost="${KAFKA_EXTERNAL_HOST:-$private_dns}" --cellId="$CELL_ID" "${peerdb[@]}" --peerStore="${PEER_STORE:-postgres}" \
       --writer="$WRITER" --validatorBehavior="$VALIDATOR_BEHAVIOR" --repoUrl="$REPO_URL" \
       "${vmq[@]}" "${apps[@]}" "${auth[@]}" "${ssl[@]}" "${extra[@]}"
   unset pg_password

@@ -116,6 +116,13 @@ export interface CoreCellConfig {
   publishSecretNames: string[];
   terminationProtection: boolean;
   /**
+   * The name this cell's broker advertises on its VPC-facing listener (9094). Default: the host's
+   * private DNS name, for clients that reach the cell directly. Behind the environment's load
+   * balancer (-c frontend=true) it must be the load balancer's name, or clients leave it after
+   * their first connection.
+   */
+  kafkaExternalHost?: string;
+  /**
    * Watch the writer lease and take it when its holder stops heartbeating (`strato-lease-watch` on
    * the host), after `autoPromoteAfter` consecutive stale observations ten seconds apart. Off by
    * default: a validator's standby must not promote itself, since the validator identity step in
@@ -223,6 +230,7 @@ export function loadConfig(app: App): CoreCellConfig {
     prometheusWorkspaceArn: optional(app, "prometheusWorkspaceArn"),
     publishSecretNames: list(app, "publishSecretNames", ""),
     terminationProtection: bool(app, "terminationProtection", "true"),
+    kafkaExternalHost: optional(app, "kafkaExternalHost"),
     autoPromote: bool(app, "autoPromote", "false"),
     autoPromoteAfter: Number(ctx(app, "autoPromoteAfter", "3")),
     legacyLaunchTemplateName: bool(app, "legacyLaunchTemplateName", "false"),

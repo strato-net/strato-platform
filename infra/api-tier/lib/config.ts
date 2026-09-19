@@ -38,6 +38,8 @@ export interface ApiTierConfig {
   /** Security groups this stack opens to its tasks at deploy time: the Aurora cluster's (5432) and the core cell's (9094 Kafka, and its Prometheus port with prometheusHost). Without them, allow the output TaskSecurityGroupId by hand. */
   postgresSecurityGroupId?: string;
   coreSecurityGroupId?: string;
+  /** Open the core cell's Kafka port to the tasks (default). False when `kafkaHost` is the core tier's load balancer, which the cells admit instead. */
+  openCoreKafka: boolean;
   /** The tier's public hostname. With `hostedZoneId` it is the node hostname being cut over (weighted records below); without one it is a CNAME to the ALB kept at the registrar. */
   domainName?: string;
   /** Weighted cutover: the node hostname's Route 53 zone and the current node addresses. */
@@ -159,6 +161,7 @@ export function loadConfig(app: App): ApiTierConfig {
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     coreSecurityGroupId: optional(app, "coreSecurityGroupId"),
+    openCoreKafka: String(ctx(app, "openCoreKafka", "true")) === "true",
     albCertificateArn: optional(app, "albCertificateArn"),
     hostedZoneId: optional(app, "hostedZoneId"),
     domainName: optional(app, "domainName"),

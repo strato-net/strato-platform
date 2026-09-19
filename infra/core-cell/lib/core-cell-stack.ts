@@ -215,6 +215,7 @@ export class CoreCellStack extends Stack {
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
       SNAPSHOT_BUCKET: config.snapshotBucket ?? "",
       SNAPSHOT_SKIP_DATABASES: String(config.snapshotSkipDatabases),
+      KAFKA_EXTERNAL_HOST: config.kafkaExternalHost ?? "",
       AUTO_PROMOTE: String(config.autoPromote),
       AUTO_PROMOTE_AFTER: String(config.autoPromoteAfter),
       EXTRA_SETUP_FLAGS: config.extraSetupFlags,

@@ -111,6 +111,7 @@ submits transactions to this cell.
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
 | `snapshotBucket` | `strato-snapshots` | bucket for published snapshots; granted read when set |
 | `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
+| `kafkaExternalHost` | the host's private DNS name | the name the broker advertises on 9094; the environment load balancer's name when the cell is behind one (`-c frontend=true`) |
 | `autoPromote` | `false` | watch the writer lease and take it after `autoPromoteAfter` (3) consecutive stale observations, about a minute of silence; each claim is counted in CloudWatch (`STRATO/Cell` `WriterLeaseClaimed`). Not for a validator's standby |
 | `legacyLaunchTemplateName` | `false` | keep the launch template's old shared name; only for a cell created before the names were made unique, where renaming would replace the instance |
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |

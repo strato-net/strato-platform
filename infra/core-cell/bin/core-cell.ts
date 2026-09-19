@@ -22,8 +22,9 @@ if (app.node.tryGetContext("frontend") === "true") {
       cellInstanceIds: list("cellInstanceIds"),
       cellSecurityGroupIds: list("cellSecurityGroupIds"),
       clientSecurityGroupIds: list("clientSecurityGroupIds"),
-      submitPort: Number(app.node.tryGetContext("submitPort") ?? "8088"),
-      healthPath: String(app.node.tryGetContext("healthPath") ?? "/health"),
+      kafkaPort: Number(app.node.tryGetContext("kafkaPort") ?? "9094"),
+      healthPort: Number(app.node.tryGetContext("healthPort") ?? "8050"),
+      healthPath: String(app.node.tryGetContext("healthPath") ?? "/metrics"),
     },
   });
 } else {
