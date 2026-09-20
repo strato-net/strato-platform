@@ -83,12 +83,13 @@ instance Format AddressStateModification where
   format (ASModification addressState) = "Address Modified:\n" ++ format addressState
   format ASDeleted = "Address Deleted"
 
--- | The block-level flush map: every value known (read from the trie or written
--- by a transaction), plus the keys written since the last flush.  A flush
--- touches only the dirty keys instead of scanning the whole map (which is
--- retained across blocks).
+-- | The block-level flush map: everything known about a key (read from the trie,
+-- including that the trie has no value for it, or written by a transaction),
+-- plus the keys written since the last flush.  A flush touches only the dirty
+-- keys instead of scanning the whole map (which is retained across blocks).
 data BlockMap k v = BlockMap
-  { bmEntries :: !(HM.HashMap k v),
+  { -- | @Nothing@ records that the trie was read and has no value for the key.
+    bmEntries :: !(HM.HashMap k (Maybe v)),
     bmDirty :: !(HS.HashSet k)
   }
   deriving (Show, Generic)
@@ -98,21 +99,22 @@ instance (NFData k, NFData v) => NFData (BlockMap k v)
 emptyBlockMap :: BlockMap k v
 emptyBlockMap = BlockMap HM.empty HS.empty
 
-lookupBlockMap :: (Eq k, Hashable k) => k -> BlockMap k v -> Maybe v
+-- | @Nothing@: not known, read the trie.  @Just Nothing@: known absent.
+lookupBlockMap :: (Eq k, Hashable k) => k -> BlockMap k v -> Maybe (Maybe v)
 lookupBlockMap k = HM.lookup k . bmEntries
 
--- | Remember a value read from the trie.
-insertReadBlockMap :: (Eq k, Hashable k) => k -> v -> BlockMap k v -> BlockMap k v
+-- | Remember what the trie returned for a key (a value, or nothing).
+insertReadBlockMap :: (Eq k, Hashable k) => k -> Maybe v -> BlockMap k v -> BlockMap k v
 insertReadBlockMap k v bm = bm {bmEntries = HM.insert k v (bmEntries bm)}
 
 -- | Write a value; it is flushed to the trie at the end of the block.
 insertBlockMap :: (Eq k, Hashable k) => k -> v -> BlockMap k v -> BlockMap k v
-insertBlockMap k v (BlockMap entries dirty) = BlockMap (HM.insert k v entries) (HS.insert k dirty)
+insertBlockMap k v (BlockMap entries dirty) = BlockMap (HM.insert k (Just v) entries) (HS.insert k dirty)
 
 insertManyBlockMap :: (Eq k, Hashable k) => M.Map k v -> BlockMap k v -> BlockMap k v
 insertManyBlockMap kvs (BlockMap entries dirty) =
   BlockMap
-    (L.foldl' (\acc (k, v) -> HM.insert k v acc) entries (M.toList kvs))
+    (L.foldl' (\acc (k, v) -> HM.insert k (Just v) acc) entries (M.toList kvs))
     (L.foldl' (flip HS.insert) dirty (M.keys kvs))
 
 -- | Forget a key; reads fall through to the trie again.
@@ -121,7 +123,7 @@ deleteBlockMap k (BlockMap entries dirty) = BlockMap (HM.delete k entries) (HS.d
 
 -- | This block's writes, in flush order.
 dirtyBlockMap :: (Eq k, Hashable k) => BlockMap k v -> [(k, v)]
-dirtyBlockMap (BlockMap entries dirty) = [(k, v) | k <- HS.toList dirty, Just v <- [HM.lookup k entries]]
+dirtyBlockMap (BlockMap entries dirty) = [(k, v) | k <- HS.toList dirty, Just (Just v) <- [HM.lookup k entries]]
 
 class HasMemAddressStateDB m where
   -- | Accounts modified by the current transaction.  Only feeds the per-tx
@@ -138,12 +140,12 @@ getAddressStateMaybe ::
 getAddressStateMaybe address = do
   theBMap <- getAddressStateBlockDBMap
   case lookupBlockMap address theBMap of
-    Just (ASModification addressState) -> return $ Just addressState
-    Just ASDeleted -> return $ Just blankAddressState
-    Nothing -> do
+    Just (Just (ASModification addressState)) -> return $ Just addressState
+    Just (Just ASDeleted) -> return $ Just blankAddressState
+    _ -> do
       result <- DB.getAddressStateMaybe address
       forM_ result $ \addressState ->
-        putAddressStateBlockDBMap $ insertReadBlockMap address (ASModification addressState) theBMap
+        putAddressStateBlockDBMap $ insertReadBlockMap address (Just (ASModification addressState)) theBMap
       return result
 
 putAddressStateModification ::

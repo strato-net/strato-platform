@@ -105,10 +105,10 @@ genericLookupRawStorageDB ::
 genericLookupRawStorageDB key = do
   theBMap <- getMemRawStorageBlockDB
   case lookupBlockMap key theBMap of
-    Just val -> return $ Just val
+    Just known -> return known
     Nothing -> do
       mVal <- getRawStorageKeyValDBMaybe key
-      for_ mVal $ \value -> putMemRawStorageBlockMap $ insertReadBlockMap key value theBMap
+      putMemRawStorageBlockMap $ insertReadBlockMap key mVal theBMap
       return mVal
 
 genericLookupWithDefaultRawStorageDB ::
