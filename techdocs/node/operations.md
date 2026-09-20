@@ -97,11 +97,13 @@ On an existing directory, `strato-up` does two things:
 Restart on a fresh node directory, not on top of the existing one. This applies after a crash or a stall, after changing flags, and after building a new release. The only in-place restart the repository documents is starting the same build again, for example after `strato-patch-app`.
 
 ```bash
+strato-snapshot pull mynode  # optional: download the snapshot while the node still runs
 strato-down mynode
 mv mynode mynode.old        # or: rm -rf mynode
 strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
 ```
 
+- **Downtime.** `strato-snapshot pull` fetches the latest snapshot into the download cache ahead of time, so `strato-up --snapshot` restores from the cached archive instead of downloading it while the node is down. Run both from the same directory.
 - **Keys.** With the default external auth, the node key and user keys live in the Vault, so a clean restart doesn't lose them.
 - **Local auth.** With `--localAuth`, the keys are in the node directory, and moving or deleting it removes them. Restore them by choosing "Restore from an existing recovery phrase" when `strato-up` sets up the admin.
 
@@ -119,6 +121,7 @@ cd strato-platform
 git fetch --tags
 git checkout <release-tag>        # for example 19.1
 make
+strato-snapshot pull mynode  # optional: download the snapshot while the node still runs
 strato-down mynode
 mv mynode mynode.old
 strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
@@ -143,7 +146,7 @@ Published snapshots live at `s3://strato-snapshots/<network>/v2/`:
 
 - **Download.** Archives are fetched over public HTTPS with `curl` or `wget`. No AWS credentials are needed.
 - **Verification.** Each archive is checked against its `.sha256` file before use.
-- **Cache.** A downloaded archive is kept in `./.snapshot-downloads/` and reused while its checksum still matches. You can delete that directory to reclaim space.
+- **Cache.** A downloaded archive is kept in `./.snapshot-downloads/` and reused while its checksum still matches. The checksum is computed during the download and recorded next to the archive, so an unchanged cached archive is not re-read. `strato-snapshot pull` fills this cache ahead of a restart. After a download, older archives of the same network in the cache are deleted automatically. Archives of other networks stay, and you can delete the directory at any time to reclaim space.
 
 Common tasks:
 
@@ -153,6 +156,10 @@ strato-up mynode --network=helium --snapshot
 
 # Start from a specific snapshot
 strato-up mynode --network=helium --snapshot=20260601-13:05:00Z
+
+# Download the latest snapshot for mynode's network while the node still runs,
+# so a later strato-up --snapshot or restore from this directory skips the download
+strato-snapshot pull mynode
 
 # Show what a published snapshot contains
 strato-snapshot inspect --snapshot --network helium
