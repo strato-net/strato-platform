@@ -7,9 +7,11 @@ describe("StratoNativeRepresentationBridge", function () {
   let stratoRecipient;
   let attestationSigner;
   let otherSigner;
+  let mintExecutor;
   let bridge;
   let token;
   let stratoToken;
+  let mintExecutorRole;
   const sourceChainId = 2001n;
   const sourceWithdrawalId = 17n;
   let sourceBridge;
@@ -67,12 +69,13 @@ describe("StratoNativeRepresentationBridge", function () {
   async function mintWithAttestation(overrides = {}) {
     const attestation = await buildAttestation(overrides);
     const signature = await signAttestation(attestationSigner, attestation);
-    await bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]);
+    await bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]);
     return attestation;
   }
 
   beforeEach(async function () {
-    [admin, user, stratoRecipient, attestationSigner, otherSigner] = await ethers.getSigners();
+    [admin, user, stratoRecipient, attestationSigner, otherSigner, mintExecutor] =
+      await ethers.getSigners();
 
     const Token = await ethers.getContractFactory("StratoNativeRepresentationToken");
     token = await upgrades.deployProxy(
@@ -98,6 +101,9 @@ describe("StratoNativeRepresentationBridge", function () {
     await bridge.setTokenMapping(stratoToken, await token.getAddress());
     await bridge.setAttestationSigner(attestationSigner.address, true);
     await bridge.setAttestationThreshold(1);
+
+    mintExecutorRole = await bridge.MINT_EXECUTOR_ROLE();
+    await bridge.grantRole(mintExecutorRole, mintExecutor.address);
   });
 
   it("mints representation tokens with a valid STRATO withdrawal attestation", async function () {
@@ -105,7 +111,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(attestationSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     )
       .to.emit(bridge, "RepresentationMinted")
       .withArgs(
@@ -128,6 +134,68 @@ describe("StratoNativeRepresentationBridge", function () {
     expect(await token.transfersEnabled()).to.equal(false);
   });
 
+  it("grants MINT_EXECUTOR_ROLE to the initial admin", async function () {
+    expect(mintExecutorRole).to.equal(ethers.id("MINT_EXECUTOR_ROLE"));
+    expect(await bridge.hasRole(mintExecutorRole, admin.address)).to.equal(true);
+    expect(await bridge.getRoleAdmin(mintExecutorRole)).to.equal(ethers.ZeroHash);
+  });
+
+  it("rejects a validly signed attestation submitted by the attestation signer", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(attestationSigner).mintRepresentationWithAttestation(attestation, [signature]),
+    )
+      .to.be.revertedWithCustomError(bridge, "AccessControlUnauthorizedAccount")
+      .withArgs(attestationSigner.address, mintExecutorRole);
+
+    expect(await token.totalSupply()).to.equal(0n);
+  });
+
+  it("rejects a validly signed attestation submitted by any non-executor", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+    )
+      .to.be.revertedWithCustomError(bridge, "AccessControlUnauthorizedAccount")
+      .withArgs(user.address, mintExecutorRole);
+
+    expect(await token.totalSupply()).to.equal(0n);
+  });
+
+  it("does not let an attestation signer grant itself MINT_EXECUTOR_ROLE", async function () {
+    await expect(
+      bridge.connect(attestationSigner).grantRole(mintExecutorRole, attestationSigner.address),
+    )
+      .to.be.revertedWithCustomError(bridge, "AccessControlUnauthorizedAccount")
+      .withArgs(attestationSigner.address, ethers.ZeroHash);
+  });
+
+  it("stops minting once MINT_EXECUTOR_ROLE is revoked", async function () {
+    await bridge.revokeRole(mintExecutorRole, mintExecutor.address);
+
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, attestation);
+
+    await expect(
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
+    )
+      .to.be.revertedWithCustomError(bridge, "AccessControlUnauthorizedAccount")
+      .withArgs(mintExecutor.address, mintExecutorRole);
+  });
+
+  it("still requires valid attestation signatures from the mint executor", async function () {
+    const attestation = await buildAttestation();
+    const signature = await signAttestation(mintExecutor, attestation);
+
+    await expect(
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
+    ).to.be.revertedWithCustomError(bridge, "BadAttestationSignatures");
+  });
+
   it("blocks holder transfers until transfers are enabled", async function () {
     await mintWithAttestation({ amount: 100n });
 
@@ -148,7 +216,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(otherSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "BadAttestationSignatures");
   });
 
@@ -160,7 +228,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(attestationSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "AttestationExpired");
   });
 
@@ -173,7 +241,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(attestationSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "AttestationNotReady");
   });
 
@@ -186,7 +254,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(attestationSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "InvalidAttestation");
   });
 
@@ -205,7 +273,7 @@ describe("StratoNativeRepresentationBridge", function () {
     const signature = await signAttestation(attestationSigner, attestation);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "InvalidAttestation");
   });
 
@@ -213,10 +281,10 @@ describe("StratoNativeRepresentationBridge", function () {
     const attestation = await buildAttestation();
     const signature = await signAttestation(attestationSigner, attestation);
 
-    await bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]);
+    await bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]);
 
     await expect(
-      bridge.connect(user).mintRepresentationWithAttestation(attestation, [signature]),
+      bridge.connect(mintExecutor).mintRepresentationWithAttestation(attestation, [signature]),
     ).to.be.revertedWithCustomError(bridge, "DuplicateMint");
   });
 

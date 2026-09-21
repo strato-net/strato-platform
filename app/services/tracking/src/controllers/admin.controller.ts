@@ -9,7 +9,7 @@ import {
   invalidateSnapshot,
 } from "../services/attributionService";
 import { getUserTimeline } from "../services/timelineService";
-import { getDailySnapshot } from "../services/metricsService";
+import { getDailyBreakdown, getDailySnapshot } from "../services/metricsService";
 import { isValidDestination } from "../utils/destinations";
 import { normalizeAddress } from "../utils/addresses";
 
@@ -27,6 +27,12 @@ export const list = async (_req: AuthorizedRequest, res: Response): Promise<void
 // GET /tracking-api/metrics/daily — today's cross-link snapshot
 export const dailyMetrics = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
   res.json(await getDailySnapshot());
+};
+
+// GET /tracking-api/metrics/daily/breakdown — the rows behind the snapshot
+// tiles, over the same UTC-today window
+export const dailyBreakdown = async (_req: AuthorizedRequest, res: Response): Promise<void> => {
+  res.json(await getDailyBreakdown());
 };
 
 // GET /tracking-api/links/:id

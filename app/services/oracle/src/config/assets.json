@@ -95,6 +95,18 @@
           "targetAssetAddress": "b8fa2db41236b1421eb8aea8a52826ba32096fbf",
           "comment": "Robinhood NVDA bridge token"
         },
+        "WHYPE": {
+          "targetAssetAddress": "9d09a358e7401e8047c01fdcaf143f7a016f5488",
+          "comment": "Wrapped HYPE (HyperEVM) on Upquark"
+        },
+        "KHYPE": {
+          "targetAssetAddress": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
+          "comment": "Kinetiq Staked HYPE on Upquark"
+        },
+        "LIT": {
+          "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
+          "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
+        },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
           "submit": false,
@@ -291,7 +303,9 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ]
         },
         "CoinMarketCap": {
@@ -311,7 +325,11 @@
             "RETH",
             "USDC",
             "USDT",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "NVDA",
+            "SPY"
           ]
         },
         "Metals.dev": {
@@ -361,7 +379,10 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "LIT"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -378,7 +399,10 @@
             "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "sp500-xstock",
             "NVDA": "nvidia-robinhood-tokenized-stock",
-            "WEETH": "wrapped-eeth"
+            "WEETH": "wrapped-eeth",
+            "WHYPE": "wrapped-hype",
+            "KHYPE": "kinetic-staked-hype",
+            "LIT": "lighter"
           }
         },
         "CoinAPI": {
@@ -398,9 +422,13 @@
             "TSLAX",
             "SPY",
             "SPYX",
-            "NVDA",
-            "WEETH"
-          ]
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
+          }
         },
         "DefiLlama": {
           "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
@@ -421,7 +449,10 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "LIT"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -438,7 +469,10 @@
             "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "coingecko:sp500-xstock",
             "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
-            "WEETH": "coingecko:wrapped-eeth"
+            "WEETH": "coingecko:wrapped-eeth",
+            "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
+            "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
+            "LIT": "coingecko:lighter"
           }
         },
         "DexScreener": {
@@ -446,10 +480,12 @@
           "parse": "dexscreener",
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
-            "SUSDS"
+            "SUSDS",
+            "LIT"
           ],
           "symbolMapping": {
-            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd"
+            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
+            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2"
           }
         },
         "CommodityPriceAPI": {
@@ -607,6 +643,18 @@
           "targetAssetAddress": "d7fe8f62a5efbd8dd0f59ac94b13e022818178fc",
           "comment": "Robinhood NVDA bridge token on Helium"
         },
+        "WHYPE": {
+          "targetAssetAddress": "f9fb3d66c60dbd6eb5a7d125ed4c96f095994ed9",
+          "comment": "Wrapped HYPE (HyperEVM) on Helium"
+        },
+        "KHYPE": {
+          "targetAssetAddress": "d885844fd502040326e59d3cd9273bfd3cb78748",
+          "comment": "Kinetiq Staked HYPE on Helium"
+        },
+        "LIT": {
+          "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
+          "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2."
+        },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
           "submit": false,
@@ -803,7 +851,9 @@
             "USDC",
             "USDT",
             "TSLAX",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
           ]
         },
         "CoinMarketCap": {
@@ -823,7 +873,11 @@
             "RETH",
             "USDC",
             "USDT",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "NVDA",
+            "SPY"
           ]
         },
         "Metals.dev": {
@@ -873,7 +927,10 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "LIT"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -890,7 +947,10 @@
             "SPY": "spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "sp500-xstock",
             "NVDA": "nvidia-robinhood-tokenized-stock",
-            "WEETH": "wrapped-eeth"
+            "WEETH": "wrapped-eeth",
+            "WHYPE": "wrapped-hype",
+            "KHYPE": "kinetic-staked-hype",
+            "LIT": "lighter"
           }
         },
         "CoinAPI": {
@@ -910,9 +970,13 @@
             "TSLAX",
             "SPY",
             "SPYX",
-            "NVDA",
-            "WEETH"
-          ]
+            "WEETH",
+            "WHYPE",
+            "KHYPE"
+          ],
+          "symbolMapping": {
+            "WHYPE": "HYPE"
+          }
         },
         "DefiLlama": {
           "url": "https://pro-api.llama.fi/${API_KEY}/coins/prices/current/${SYMBOLS}",
@@ -933,7 +997,10 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "WEETH"
+            "WEETH",
+            "WHYPE",
+            "KHYPE",
+            "LIT"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -950,7 +1017,10 @@
             "SPY": "coingecko:spdr-s-p-500-etf-trust-robinhood-tokenized-stock",
             "SPYX": "coingecko:sp500-xstock",
             "NVDA": "coingecko:nvidia-robinhood-tokenized-stock",
-            "WEETH": "coingecko:wrapped-eeth"
+            "WEETH": "coingecko:wrapped-eeth",
+            "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
+            "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
+            "LIT": "coingecko:lighter"
           }
         },
         "DexScreener": {
@@ -958,10 +1028,12 @@
           "parse": "dexscreener",
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
-            "SUSDS"
+            "SUSDS",
+            "LIT"
           ],
           "symbolMapping": {
-            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd"
+            "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
+            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2"
           }
         },
         "CommodityPriceAPI": {

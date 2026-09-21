@@ -1,474 +1,120 @@
 # Risk Management & Hedging
 
-Protect your DeFi positions from market volatility and liquidation risk.
+Keep USDST vaults and liquidity positions safe through price swings, using the tools the app actually has.
+
+!!! warning "What STRATO does not offer"
+    The STRATO app has **no** short positions, perpetual futures, options, stop-loss or limit orders, conditional or automated orders, and no built-in price or liquidation alerts. Hedging on STRATO means managing debt, collateral and asset mix yourself, and monitoring your positions.
 
 ---
 
-## The Strategy
+## Know Your Liquidation Point
 
-Use stablecoins and diversification to hedge against collateral price drops while maintaining DeFi positions.
+Liquidation on the **Borrow** page (USDST vaults, CDP) works per vault:
 
-**What you'll learn:**
+- **CR** = collateral value at the oracle price ÷ debt (debt grows with the per-asset stability fee).
+- **Health Factor** (shown in the app) = CR ÷ the asset's liquidation ratio.
+- When Health Factor falls **below 1.0**, any other user can liquidate the vault. They repay part of the debt (capped by the asset's close factor and by the collateral left) and receive collateral worth that repayment **plus a liquidation penalty**, valued at the oracle price. There is no grace period or auction.
 
-- Hedge collateral volatility
-- Reduce liquidation risk
-- Maintain upside exposure
-- Balance risk and return
-
-**Result:** Sleep better while staying in DeFi
-
----
-
-## Complete Example: Hedge 10 ETHST Position
-
-**Your situation:**
-
-- Collateral: 10 ETHST ($30,000)
-- Borrowed: 16,000 USDST
-- Health Factor: 1.5
-- **Problem:** Worried about ETHST crash
-
-**The hedge:**
-
-1. Mint additional USDST via CDP
-2. Swap portion to stablecoins
-3. Hold as safety buffer
-4. If ETHST drops: Use stables to add collateral
-
-**Time needed:** 10 minutes  
-**Cost:** ~$0.50 gas + swap fees
-
----
-
-## Understanding DeFi Risks
-
-### Primary Risks
-
-**1. Collateral Volatility**
-- ETHST drops 30% → Health factor plummets
-- Risk: Liquidation
-
-**2. Interest Rate Changes**
-- Borrow rates spike during volatility
-- Debt grows faster
-
-**3. Smart Contract Risk**
-- Platform exploits (rare but possible)
-- Mitigation: Audited contracts, insurance
-
-**4. Liquidation Cascade**
-- Market-wide selloff
-- Mass liquidations drive prices lower
-
----
-
-## Hedging Strategy 1: Stable Collateral Mix
-
-**Mix volatile and stable collateral**
-
-### Implementation
-
-**Starting:**
-
-- 10 ETHST ($30,000) = 100% volatile
-
-**Target:**
-
-- 6 ETHST ($18,000) = 60% volatile
-- 12,000 USDST ($12,000) = 40% stable
-
-**Steps:**
-
-1. **Mint USDST via CDP:**
-
-   - Mint 6,000 USDST (low CR)
-   - Stability fee: 2.5%
-
-2. **Swap to stablecoins:**
-
-   - Swap 6,000 USDST → USDST
-   - Cost: ~$18 (0.3% fee)
-
-3. **Supply USDST as collateral:**
-
-   - Add 6,000 USDST to collateral
-   - Now have mixed collateral
-
-4. **Optional - Remove some ETH:**
-
-   - Withdraw 2 ETHST    - Sell or hold separately
-   - Keep 8 ETHST + 6,000 USDST collateral
-
-**Result:**
-```
-Before:
-
-- 10 ETHST collateral
-- 16,000 USDST debt
-- HF: 1.5
-- Risk: High (100% ETHST exposure)
-
-After:
-
-- 8 ETHST + 6,000 USDST collateral
-- 22,000 USDST debt (16k original + 6k new)
-- HF: 1.09
-- Risk: Lower (60% ETHST, 40% stable)
-```
-
-### Impact Analysis
-
-**If ETHST drops 25%:**
-
-**Without hedge:**
-
-- Collateral: $22,500 (10 ETHST @ $2,250)
-- Debt: 16,000
-- HF: 1.12 (safe)
-
-**With hedge:**
-
-- Collateral: $24,000 (8 ETHST @ $2,250 + 6k USDST)
-- Debt: 22,000
-- HF: 0.87 (liquidated!)
-
-**Wait, that's worse!** Need to adjust...
-
----
-
-## Hedging Strategy 2: Safety Buffer (Better)
-
-**Hold stablecoins OUTSIDE collateral as emergency fund**
-
-### Implementation
-
-**Step 1: Create Safety Buffer**
-
-1. **Mint USDST via CDP:**
-
-   - Use 10 ETHST collateral
-   - Mint 7,000 USDST
-   - CR: 286% (safe)
-
-2. **Swap to stablecoins:**
-
-   - Swap to 7,000 USDST    - Hold in wallet (NOT as collateral)
-
-3. **Keep borrowing position:**
-
-   - 10 ETHST collateral
-   - 16,000 borrowed + 7,000 minted = 23,000 debt
-   - HF: 1.04 (safe with buffer ready!)
-
-**Result:**
-```
-Collateral: 10 ETHST ($30,000)
-Debt: 23,000 USDST
-HF: 1.04
-Safety buffer: 7,000 USDST in wallet
-```
-
-### Using the Safety Buffer
-
-**If ETHST drops 25% ($3,000 → $2,250):**
-
-1. **Without buffer:**
-
-   - Collateral: $22,500
-   - Debt: 23,000
-   - HF: 0.78 → LIQUIDATED ❌
-
-2. **With buffer:**
-
-   - Use 7,000 USDST from wallet
-   - Swap → 3.11 ETHST (at $2,250)
-   - Supply as collateral
-   - New collateral: 13.11 ETHST ($29,498)
-   - HF: 1.03 ✅ Saved!
-
-**The buffer saved you from liquidation**
-
----
-
-## Hedging Strategy 3: Delta-Neutral Position
-
-**Advanced: Maintain DeFi position with zero price exposure**
-
-### Concept
-
-- Long ETHST (via collateral)
-- Short ETHST (via perps or options)
-- Net: Zero price exposure
-- Earn: Lending/LP fees minus short costs
-
-**Implementation on STRATO:**
-
-1. **Supply 10 ETHST collateral**
-2. **Borrow USDST against it**
-3. **Short ETHST on another platform** (e.g., dYdX, GMX)
-4. **Net exposure:** Zero ETHST price risk
-
-**Pros:**
-
-- Completely hedged
-- Earn DeFi yields without price risk
-- Perfect for ranging markets
-
-**Cons:**
-
-- Complex to manage
-- Shorting costs (funding rates)
-- Need account on derivatives platform
-- May not be net profitable
-
-**Not commonly recommended for most users**
-
----
-
-## Hedging Strategy 4: Gradual De-Risking
-
-**As market becomes uncertain, gradually reduce risk**
-
-### Phase 1: Normal Market
+For a vault whose debt stays constant:
 
 ```
-Collateral: 10 ETHST
-Debt: 15,000 USDST
-HF: 1.2
-Risk: Moderate
+Price drop that triggers liquidation = 1 − 1 / Health Factor
+Liquidation price                    = current oracle price / Health Factor
 ```
 
-### Phase 2: Volatility Increases
+Because the stability fee keeps adding to debt, Health Factor drifts down slowly even when prices don't move.
 
-**Actions:**
-
-1. Repay 3,000 USDST
-2. Improve HF to 1.4
-3. Cost: Interest stops on repaid amount
-
-```
-Collateral: 10 ETHST
-Debt: 12,000 USDST
-HF: 1.4
-Risk: Lower
-```
-
-### Phase 3: Market Crashing
-
-**Actions:**
-
-1. Repay another 5,000 USDST
-2. HF increases to 2.57
-3. Very safe from liquidation
-
-```
-Collateral: 10 ETHST
-Debt: 7,000 USDST
-HF: 2.57
-Risk: Very low
-```
-
-### Phase 4: Recovery
-
-**Actions:**
-
-1. Borrow again as market stabilizes
-2. Return to normal risk level
-3. Missed some downside, kept position open
-
-**This is the simplest and most reliable hedge strategy**
+Mechanics and screenshots: [Mint USDST via CDP](../guides/mint-cdp.md). General safety: [Safety Guide](../safety.md).
 
 ---
 
+## Tool 1: Reduce Debt
 
-## Cost-Benefit Analysis
+The simplest and most reliable hedge.
 
-### Strategy 1: Mixed Collateral
+1. **Borrow** → your vault → **Repay USDST** (or **Repay All USDST**).
+2. Partial repays can't leave debt below the asset's debt floor. If they would, repay all.
 
-| Metric | Value |
-|--------|-------|
-| Setup cost | $18 (swap fees) |
-| Ongoing cost | Increased debt interest |
-| Benefit | Reduced volatility |
-| Best for | Conservative users |
+To restore a target Health Factor `h` after a price drop `d` (as a fraction), with pre-drop collateral value `C`, debt `D` and liquidation ratio `L`:
 
-### Strategy 2: Safety Buffer
-
-| Metric | Value |
-|--------|-------|
-| Setup cost | $18 (swap fees) |
-| Ongoing cost | Opportunity cost on buffer |
-| Benefit | Emergency protection |
-| Best for | Moderate risk-takers |
-
-### Strategy 3: Delta-Neutral
-
-| Metric | Value |
-|--------|-------|
-| Setup cost | Varies (exchange fees) |
-| Ongoing cost | Shorting funding rates |
-| Benefit | Zero price risk |
-| Best for | Advanced traders |
-
-### Strategy 4: Gradual De-Risk
-
-| Metric | Value |
-|--------|-------|
-| Setup cost | None |
-| Ongoing cost | Reduced interest (benefit!) |
-| Benefit | Simple, effective |
-| Best for | Everyone |
-
-**Recommendation: Strategy 4 (Gradual De-Risk) for most users**
-
----
-
-## Real Example: 2022 Bear Market
-
-**User: Bob**
-
-**May 2022:**
-
-- Collateral: 10 ETHST @ $3,000 = $30k
-- Debt: 15,000 USDST
-- HF: 1.2
-
-**Bob's action:** Implemented Safety Buffer
-- Minted 5,000 USDST via CDP
-- Swapped to USDST - Held as emergency fund
-
-**November 2022:**
-
-- ETHST crashed to $1,200 (-60%)
-- Collateral now: $12,000
-- Debt: 20,000 (15k + 5k minted)
-- HF: Would be 0.36 → LIQUIDATED
-
-**Bob's response:**
-
-- Used 5,000 USDST buffer
-- Bought 4.16 ETHST @ $1,200
-- Added to collateral
-- New collateral: 14.16 ETHST @ $1,200 = $17k
-- New HF: 0.51 (still liquidated!)
-
-**Bob needed more buffer!**
-
-**Lesson:** In extreme crashes (>50%), even buffers may not be enough
-
----
-
-## Recommended Buffer Sizes
-
-**By leverage level:**
-
-| Leverage | Debt/Collateral | Buffer Size | Can Survive Drop |
-|----------|-----------------|-------------|------------------|
-| Low | 30-40% | 10% | 40-50% crash |
-| Medium | 50-60% | 20% | 30-35% crash |
-| High | 60-70% | 30% | 20-25% crash |
-
-**Formula:**
 ```
-Buffer = (Target drop% × Collateral value) - Available borrowing room
+Repay needed R = D − C × (1 − d) / (h × L)      (none needed if R ≤ 0)
 ```
 
-**Example:**
+---
 
-- Want to survive 40% drop
-- Collateral: $30k
-- Current debt: $15k (50%)
-- Max debt: $22.5k (75%)
-- Available room: $7.5k
+## Tool 2: Add Collateral
 
-**If 40% drop:**
+1. **Borrow** → your vault → **Deposit** more of the same asset.
+2. Collateral only protects the vault for its own asset. Depositing ETH doesn't help a GOLDST vault.
 
-- New collateral: $18k
-- Debt stays: $15k
-- HF would be: 0.72 (liquidated)
+Collateral value needed to reach target Health Factor `h` after the same drop:
 
-**Buffer needed:**
-
-- $15k / 0.6 = $25k collateral needed
-- Have $18k after drop
-- Need: $7k buffer
-
-**Buffer needed: ~$7k (~23% of original collateral)**
+```
+Additional collateral value A = h × L × D − C × (1 − d)
+```
 
 ---
 
-## Automation Ideas (Advanced)
+## Tool 3: Hold a Buffer Outside the Vault
 
-**Set up automatic hedging:**
+Keep USDST (or the vault's collateral asset) in your wallet so you can run Tool 1 or Tool 2 quickly. Size it with the formulas above for the drop you want to survive.
 
-1. **Price-triggered repayments:**
-
-   - If ETHST < $2,700: Auto-repay 2k USDST
-   - If ETHST < $2,400: Auto-repay another 3k
-   - Requires keeper bots or limit orders
-
-2. **Dynamic collateral ratios:**
-
-   - Monitor volatility index
-   - Auto-rebalance to stable collateral when volatility spikes
-   - Requires custom scripts
-
-3. **Health factor triggers:**
-
-   - If HF < 1.5: Auto-add collateral from buffer
-   - Keeper bot watches on-chain
-   - Executes transactions when needed
-
-**Most users:** Manual monitoring is sufficient
+!!! note
+    Minting extra USDST from a vault just to hold it as a buffer doesn't protect that vault. It raises the vault's debt by the same amount and lowers its Health Factor. A buffer works best when it comes from funds that aren't already borrowed.
 
 ---
 
-## Red Flags: When to Hedge
+## Tool 4: Spread Collateral Across Vaults
 
-### Market Signals
+Because each asset has its own vault, a sharp drop in one asset only puts that asset's vault at risk.
 
-- [ ] VIX > 30 (high volatility)
-- [ ] ETHST drops > 10% in 24 hours
-- [ ] Liquidations spiking across DeFi
-- [ ] Macro uncertainty (Fed meetings, etc.)
-- [ ] Funding rates extremely negative/positive
+- The **Mint** planner on **Borrow** can split a mint across several vaults at a target Health Factor.
+- The planner's aggregate Health Factor can hide one weak vault. Always check each vault in the vault list.
+- Each vault needs to meet its own debt floor and pays its own stability fee.
+- Diversification doesn't help when the assets fall together.
 
-### Position Signals
-
-- [ ] Your HF drops below 1.5
-- [ ] Borrow rates suddenly spike
-- [ ] Can't sleep worrying about position
-- [ ] Position size is uncomfortable
-- [ ] Haven't checked in 3+ days
-
-**If 3+ boxes checked: Consider hedging or de-risking**
+To move existing collateral between vaults, see [Portfolio Rebalancing](portfolio-rebalancing.md).
 
 ---
 
-## Summary: Hedge Strategy Selection
+## Tool 5: Reduce Volatile Exposure
 
-| Your Situation | Recommended Strategy |
-|----------------|---------------------|
-| Beginner, worried | Gradual De-Risk (#4) |
-| Medium position | Safety Buffer (#2) |
-| Large position | Mixed Collateral (#1) |
-| Advanced trader | Delta-Neutral (#3) |
-| Market crashing | De-Risk immediately |
-| Bull market | Light hedge or none |
+- **Swap** part of a volatile holding into USDST on **Trade**.
+- **Metals:** **Fund** → **Buy Metals** mints GOLDST or SILVST at the oracle price, less a mint fee. Metal tokens have their own price risk; they aren't stablecoins.
+- **Liquidity positions:** withdraw from volatile pools if you don't want impermanent loss. A V3 position that goes out of range ends up holding just one of the two tokens. See [Provide Liquidity](../guides/liquidity.md).
 
-**Golden rule:** Hedge when you can't afford not to
+---
+
+## Monitoring Checklist
+
+With no in-app alerts, set your own routine:
+
+- [ ] Each vault's Health Factor on **Borrow** (the app highlights values below 1.5)
+- [ ] Oracle prices of your collateral assets
+- [ ] Stability fee per vault (it compounds into your debt)
+- [ ] USDST and voucher balance for transaction fees (0.01 USDST or one voucher per transaction, charged even if it reverts). Running out blocks you from repaying or depositing.
+- [ ] V3 positions: in range or out of range (**V3 Liquidity** → **My Positions**)
+
+---
+
+## Other Risks You Can't Hedge in the App
+
+- **Oracle risk:** vault health and liquidations use oracle prices, which can differ from pool prices on **Trade**.
+- **Smart contract risk:** contracts can have bugs; parameters and pause switches are controlled by the protocol's admins.
+- **Bridge risk:** assets bridged from other chains depend on the bridge. See [Bridge Guide](../guides/bridge.md).
+- **Liquidity risk:** thin pools mean high price impact when you need to exit.
 
 ---
 
 ## Next Steps
 
-- **[Portfolio Rebalancing](portfolio-rebalancing.md)** - Diversify risk
-- **[Exit Strategy](withdrawals.md)** - When hedges fail
-- **[Safety Guide](../safety.md)** - Comprehensive risk overview
+- **[Portfolio Rebalancing](portfolio-rebalancing.md)** - Move collateral between vaults
+- **[Leverage Long](leverage-long.md)** - Understand how leverage shortens your liquidation distance
+- **[Exit Strategy](withdrawals.md)** - Close positions and withdraw
+- **[Safety Guide](../safety.md)** - Security and risk overview
 
 ### Need Help?
 
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-

@@ -39,6 +39,12 @@ module.exports = {
       accounts,
       gasPrice: "auto",
     },
+    hyperEvm: {
+      url: process.env.HYPEREVM_RPC_URL || "https://rpc.hyperliquid.xyz/evm",
+      chainId: 999,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
     localhost: {
       url: "http://127.0.0.1:8545",
     },

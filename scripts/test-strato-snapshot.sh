@@ -33,16 +33,15 @@ assert_no_appledouble() {
   fi
 }
 
-# The kafka broker container runs as its baked-in appuser (uid 1000), not the
-# host user, so the restored kafka tree must be readable and writable by any
-# uid: files o+rw, dirs o+rwx (KRaft *.checkpoint files are written 0600 on the
-# source node and older archives carry that mode).
-assert_kafka_modes_relaxed() {
-  local kafka_dir="$1"
+# jlog writes its segments 0640 and topic dirs 0750 owned by whoever ran the
+# node, so the restored jlog tree must be relaxed to be readable and writable by
+# any uid: files o+rw, dirs o+rwx.
+assert_jlog_modes_relaxed() {
+  local jlog_dir="$1"
   local bad
-  bad="$({ find "$kafka_dir" -type f ! -perm -0006; find "$kafka_dir" -type d ! -perm -0007; })"
+  bad="$({ find "$jlog_dir" -type f ! -perm -0006; find "$jlog_dir" -type d ! -perm -0007; })"
   if [[ -n "$bad" ]]; then
-    echo "kafka payload entries not world-read/writable after restore:" >&2
+    echo "jlog payload entries not world-read/writable after restore:" >&2
     echo "$bad" >&2
     exit 1
   fi
@@ -53,17 +52,18 @@ make_fixture_snapshot() {
   mkdir -p "$staging/payload/ethereumH/state"
   mkdir -p "$staging/payload/postgres-dumps"
   mkdir -p "$staging/payload/redis"
-  mkdir -p "$staging/payload/kafka/kafka-logs/__cluster_metadata-0"
+  mkdir -p "$staging/payload/jlog/vmevents"
 
   echo "state-from-snapshot" > "$staging/payload/ethereumH/state/value"
   echo "eth dump fixture" > "$staging/payload/postgres-dumps/eth.dump"
   echo "cirrus dump fixture" > "$staging/payload/postgres-dumps/cirrus.dump"
   echo "redis-from-snapshot" > "$staging/payload/redis/appendonly.aof"
-  echo "kafka-from-snapshot" > "$staging/payload/kafka/log"
-  # KRaft metadata snapshots are written 0600 (Java createTempFile) on the
-  # source node; archives published before create normalized modes carry that.
-  echo "kraft-metadata-snapshot" > "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-  chmod 600 "$staging/payload/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
+  echo "jlog-from-snapshot" > "$staging/payload/jlog/vmevents/00000000"
+  echo "jlog-metastore" > "$staging/payload/jlog/vmevents/metastore"
+  # jlog writes subscriber checkpoints tight on the source node; archives
+  # published before create normalized modes carry that.
+  echo "jlog-checkpoint" > "$staging/payload/jlog/vmevents/cp.73747261746f"
+  chmod 600 "$staging/payload/jlog/vmevents/cp.73747261746f"
 
   cat > "$staging/SNAPSHOT.json" <<'JSON'
 {
@@ -89,7 +89,7 @@ make_fixture_snapshot() {
     "postgres-dumps/eth.dump",
     "postgres-dumps/cirrus.dump",
     "redis",
-    "kafka"
+    "jlog"
   ],
   "checksums": {
     "payloadSha256": "fixture"
@@ -160,9 +160,9 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot.t
 assert_file "$NODE/.ethereumH/ethconf.yaml"
 assert_file "$NODE/.ethereumH/state/value"
 assert_file "$NODE/redis/appendonly.aof"
-assert_file "$NODE/kafka/log"
-assert_file "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-assert_kafka_modes_relaxed "$NODE/kafka"
+assert_file "$NODE/jlog/vmevents/00000000"
+assert_file "$NODE/jlog/vmevents/cp.73747261746f"
+assert_jlog_modes_relaxed "$NODE/jlog"
 assert_file "$NODE/secrets/oauth_credentials.yaml"
 assert_file "$NODE/secrets/ssl/server.key"
 assert_file "$NODE/secrets/postgres_password"
@@ -223,14 +223,13 @@ JSON
 
 CREATED="$TMP/created.tar.gz"
 echo "appledouble" > "$NODE/.ethereumH/state/._value"
-echo "appledouble" > "$NODE/kafka/._log"
-# Re-tighten the checkpoint to how the broker leaves it on a live node, so the
-# create below has to normalize it (the restore above already relaxed it).
-chmod 600 "$NODE/kafka/kafka-logs/__cluster_metadata-0/00000000000000007271-0000000001.checkpoint"
-# Half-deleted segments (renamed '*.deleted' by the broker after the history
-# prune, awaiting the delete timer) must not ship in the payload.
-mkdir -p "$NODE/kafka/kafka-logs/vmevents-0"
-echo "pruned segment" > "$NODE/kafka/kafka-logs/vmevents-0/00000000000000000000.log.deleted"
+# LevelDB's informational LOG / LOG.old carry no state and must not be archived.
+echo "leveldb activity log" > "$NODE/.ethereumH/state/LOG"
+echo "older leveldb activity log" > "$NODE/.ethereumH/state/LOG.old"
+echo "appledouble" > "$NODE/jlog/vmevents/._00000000"
+# Re-tighten the checkpoint to how jlog leaves it on a live node, so the create
+# below has to normalize it (the restore above already relaxed it).
+chmod 600 "$NODE/jlog/vmevents/cp.73747261746f"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
   --network helium \
   --output "$CREATED" \
@@ -243,21 +242,22 @@ STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" create "$NODE" \
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" inspect "$CREATED" > "$TMP/created-inspect.out"
 assert_contains "$TMP/created-inspect.out" "apiIndexerTip: 100"
 assert_contains "$TMP/created-inspect.out" "cirrusTip: 100"
+if tar -tzf "$CREATED" | grep -E 'ethereumH/state/LOG(\.old)?$' > "$TMP/created-leveldb-log.out"; then
+  echo "created archive should not contain LevelDB LOG / LOG.old" >&2
+  cat "$TMP/created-leveldb-log.out" >&2
+  exit 1
+fi
+tar -tzf "$CREATED" | grep -q 'ethereumH/state/value$' || { echo "created archive is missing the state payload" >&2; exit 1; }
 if tar -tzf "$CREATED" | grep -E '(^|/)\._' > "$TMP/created-appledouble.out"; then
   echo "created archive should not contain AppleDouble metadata" >&2
   cat "$TMP/created-appledouble.out" >&2
   exit 1
 fi
-# The archive itself must record relaxed kafka modes, so even a manual
-# tar -xp restore yields files the broker's appuser (uid 1000) can use on
-# hosts whose uid differs.
-if tar -tvzf "$CREATED" | grep "__cluster_metadata-0/00000000000000007271-0000000001.checkpoint" | grep -qv "^-rw-rw-rw-"; then
-  echo "created archive should carry relaxed (0666) kafka checkpoint modes" >&2
-  tar -tvzf "$CREATED" | grep "checkpoint" >&2
-  exit 1
-fi
-if tar -tzf "$CREATED" | grep -q '\.deleted$'; then
-  echo "created archive should not contain half-deleted ('*.deleted') kafka segments" >&2
+# The archive itself must record relaxed jlog modes, so even a manual tar -xp
+# restore yields state the node's processes can use on hosts whose uid differs.
+if tar -tvzf "$CREATED" | grep "vmevents/cp.73747261746f" | grep -qv "^-rw-rw-rw-"; then
+  echo "created archive should carry relaxed (0666) jlog checkpoint modes" >&2
+  tar -tvzf "$CREATED" | grep "vmevents" >&2
   exit 1
 fi
 
@@ -400,6 +400,21 @@ if grep -q "Traceback" "$TMP/unreachable.err"; then
   exit 1
 fi
 
+# A v1 (kafka-era) payload has kafka/ where this build expects jlog/. Restore
+# must refuse it instead of leaving a node with empty streaming state.
+mkdir -p "$TMP/staging-v1"
+(cd "$TMP/staging" && tar -cf - .) | (cd "$TMP/staging-v1" && tar -xf -)
+rm -rf "$TMP/staging-v1/payload/jlog"
+mkdir -p "$TMP/staging-v1/payload/kafka/kafka-logs"
+echo "kafka-from-v1-snapshot" > "$TMP/staging-v1/payload/kafka/log"
+(cd "$TMP/staging-v1" && tar -czf "$TMP/snapshot-v1.tar.gz" .)
+if STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" restore "$NODE" --source "$TMP/snapshot-v1.tar.gz" --network helium --force \
+    > "$TMP/restore-v1.out" 2>&1; then
+  echo "restore should reject a kafka-era payload with no jlog/ state" >&2
+  exit 1
+fi
+assert_contains "$TMP/restore-v1.out" "payload has no jlog/ streaming state"
+
 PUBLISH="$TMP/published"
 STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" publish "$TMP/snapshot.tar.gz" --destination "$PUBLISH" --alias latest
 assert_file "$PUBLISH/snapshot.tar.gz"
@@ -409,13 +424,17 @@ assert_file "$PUBLISH/latest.tar.gz.sha256"
 assert_contains "$PUBLISH/latest.tar.gz.sha256" "latest.tar.gz"
 
 # Snapshot source resolution (offline): exercise the helpers that map
-# --snapshot[=ts] + --network + --bucket into S3 URIs.
+# --snapshot[=ts] + --network + --bucket into S3 URIs under the tool's own
+# snapshot version.
+TOOL_VERSION="$(sed -n 's/^SNAPSHOT_VERSION="\(.*\)"$/\1/p' "$TOOL" | head -1)"
+[[ -n "$TOOL_VERSION" ]] || { echo "could not read SNAPSHOT_VERSION from $TOOL" >&2; exit 1; }
 RESOLVE_HELPERS="$(sed -n '/^snapshot_bucket()/,/^fetch_source()/p' "$TOOL" | sed '$d')"
 resolve_uri() {
   STRATO_SNAPSHOT_BUCKET="${STRATO_SNAPSHOT_BUCKET:-}" bash -c '
     set -euo pipefail
     DEFAULT_SNAPSHOT_BUCKET="strato-snapshots"
     SNAPSHOT_ARCHIVE_EXT="tar.zst"
+    SNAPSHOT_VERSION="'"$TOOL_VERSION"'"
     die(){ echo "Error: $*" >&2; exit 1; }
     warn(){ :; }
     info(){ :; }
@@ -427,13 +446,13 @@ resolve_uri() {
   ' _ "$@"
 }
 
-[[ "$(resolve_uri "" true "" upquark "")" == "s3://strato-snapshots/upquark/latest.tar.zst" ]] \
+[[ "$(resolve_uri "" true "" upquark "")" == "s3://strato-snapshots/upquark/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "latest resolution wrong" >&2; exit 1; }
-[[ "$(resolve_uri "" true "20260601-13:05:00Z" helium "")" == "s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst" ]] \
+[[ "$(resolve_uri "" true "20260601-13:05:00Z" helium "")" == "s3://strato-snapshots/helium/$TOOL_VERSION/helium-20260601-130500Z.tar.zst" ]] \
   || { echo "timestamp resolution wrong" >&2; exit 1; }
-[[ "$(resolve_uri "" true "" helium "custom-bucket")" == "s3://custom-bucket/helium/latest.tar.zst" ]] \
+[[ "$(resolve_uri "" true "" helium "custom-bucket")" == "s3://custom-bucket/helium/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "bucket override resolution wrong" >&2; exit 1; }
-[[ "$(STRATO_SNAPSHOT_BUCKET=env-bucket resolve_uri "" true "" helium "")" == "s3://env-bucket/helium/latest.tar.zst" ]] \
+[[ "$(STRATO_SNAPSHOT_BUCKET=env-bucket resolve_uri "" true "" helium "")" == "s3://env-bucket/helium/$TOOL_VERSION/latest.tar.zst" ]] \
   || { echo "env bucket resolution wrong" >&2; exit 1; }
 [[ "$(resolve_uri "/tmp/explicit.tar" false "" helium "")" == "/tmp/explicit.tar" ]] \
   || { echo "explicit source passthrough wrong" >&2; exit 1; }
@@ -449,5 +468,223 @@ if resolve_uri "" false "" helium "" 2>/dev/null; then
   echo "missing source/snapshot should be rejected" >&2
   exit 1
 fi
+
+# pull: pre-download a published snapshot into the persistent download cache.
+# A fake curl serves https://<bucket>.s3.<region>.amazonaws.com/<key> from a
+# local directory standing in for the bucket. Covers download + checksum
+# verification, cache reuse on a second pull, network inference from a node dir
+# and from ~/.strato/default-node, the rejections, and that a later restore of
+# the same snapshot reuses the pulled archive instead of downloading again.
+CURL_FAKEBIN="$TMP/curl-fakebin"
+FAKE_S3_ROOT="$TMP/fake-s3"
+mkdir -p "$CURL_FAKEBIN" "$FAKE_S3_ROOT"
+cat > "$CURL_FAKEBIN/curl" <<'SH'
+#!/usr/bin/env bash
+# Fake curl for the pull tests. Understands -o <dest>, HEAD (an I in any flag
+# cluster) and -f semantics (exit 22 on a missing object). Logs every request
+# as "<url>" or "HEAD <url>".
+set -euo pipefail
+dest=""
+head="false"
+url=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o) dest="$2"; shift 2 ;;
+    -*)
+      if [[ "$1" == -[a-zA-Z]* && "$1" == *I* ]]; then head="true"; fi
+      shift ;;
+    *) url="$1"; shift ;;
+  esac
+done
+if [[ "$head" == "true" ]]; then
+  printf 'HEAD %s\n' "$url" >> "${FAKE_CURL_LOG:?}"
+else
+  printf '%s\n' "$url" >> "${FAKE_CURL_LOG:?}"
+fi
+key="${url#https://*.amazonaws.com/}"
+obj="${FAKE_S3_ROOT:?}/$key"
+[[ -f "$obj" ]] || exit 22
+if [[ "$head" == "true" ]]; then
+  printf 'HTTP/1.1 200 OK\r\nContent-Length: %s\r\n\r\n' "$(wc -c < "$obj" | tr -d ' ')"
+  exit 0
+fi
+if [[ -n "$dest" ]]; then cp "$obj" "$dest"; else cat "$obj"; fi
+SH
+chmod +x "$CURL_FAKEBIN/curl"
+
+# Number of archive downloads (non-HEAD requests) for a key in a fake-curl log.
+curl_downloads() {
+  grep -v '^HEAD ' "$1" | grep -c -- "/$2\$" || true
+}
+
+# Populate the fake bucket with the tool's own publish, then add the .tar.zst
+# keys --snapshot resolves to. pull only caches bytes (it never extracts), so
+# the gzip fixture can stand in for the zstd archives here.
+FAKE_BUCKET_DIR="$FAKE_S3_ROOT/helium/$TOOL_VERSION"
+STRATO_SNAPSHOT_OFFLINE_TEST=1 "$TOOL" publish "$TMP/snapshot.tar.gz" --destination "$FAKE_BUCKET_DIR"
+for zst_key in latest.tar.zst helium-20260601-130500Z.tar.zst; do
+  cp "$TMP/snapshot.tar.gz" "$FAKE_BUCKET_DIR/$zst_key"
+  sed "s/snapshot.tar.gz/$zst_key/" "$FAKE_BUCKET_DIR/snapshot.tar.gz.sha256" > "$FAKE_BUCKET_DIR/$zst_key.sha256"
+done
+
+PULL_DL="$TMP/pull-downloads"
+PULL_ENV=(STRATO_SNAPSHOT_OFFLINE_TEST=1 STRATO_SNAPSHOT_DOWNLOAD_DIR="$PULL_DL" PATH="$CURL_FAKEBIN:$PATH" FAKE_S3_ROOT="$FAKE_S3_ROOT")
+PULLED_LATEST="$PULL_DL/helium-$TOOL_VERSION-latest.tar.zst"
+
+# Seed the cache with what accumulates on a real host: a helium archive under
+# the old unversioned naming, a helium archive of another key, a leftover partial
+# download, and an archive of another network (which must survive).
+mkdir -p "$PULL_DL"
+echo "old v1 naming" > "$PULL_DL/helium-latest.tar.zst"
+echo "old key" > "$PULL_DL/helium-$TOOL_VERSION-helium-20200101-000000Z.tar.zst"
+echo "sha256 0 size 7 mtime 0" > "$PULL_DL/helium-$TOOL_VERSION-helium-20200101-000000Z.tar.zst.verified"
+echo "partial" > "$PULL_DL/helium-$TOOL_VERSION-latest.tar.zst.part"
+echo "other network" > "$PULL_DL/upquark-$TOOL_VERSION-latest.tar.zst"
+
+# Latest for an explicit --network: downloads, verifies, prints only the path.
+FAKE_CURL_LOG="$TMP/curl-pull-1.log" env "${PULL_ENV[@]}" "$TOOL" pull --network helium \
+  > "$TMP/pull-1.out" 2> "$TMP/pull-1.err"
+[[ "$(cat "$TMP/pull-1.out")" == "$PULLED_LATEST" ]] \
+  || { echo "pull should print the cached archive path on stdout, got: $(cat "$TMP/pull-1.out")" >&2; exit 1; }
+assert_file "$PULLED_LATEST"
+cmp -s "$PULLED_LATEST" "$TMP/snapshot.tar.gz" || { echo "pulled archive differs from the published one" >&2; exit 1; }
+[[ "$(curl_downloads "$TMP/curl-pull-1.log" "helium/$TOOL_VERSION/latest.tar.zst")" == "1" ]] \
+  || { echo "first pull should download latest.tar.zst exactly once" >&2; cat "$TMP/curl-pull-1.log" >&2; exit 1; }
+assert_contains "$TMP/pull-1.err" "Verified snapshot checksum"
+assert_contains "$TMP/pull-1.err" "Snapshot cached: $PULLED_LATEST"
+# Pruning: the other helium archives (and their leftovers) are gone, upquark stays.
+assert_contains "$TMP/pull-1.err" "Removing a stale cached archive of helium"
+for stale in "helium-latest.tar.zst" "helium-$TOOL_VERSION-helium-20200101-000000Z.tar.zst" \
+             "helium-$TOOL_VERSION-helium-20200101-000000Z.tar.zst.verified" "helium-$TOOL_VERSION-latest.tar.zst.part"; do
+  [[ ! -e "$PULL_DL/$stale" ]] || { echo "pull should prune stale cache entry $stale" >&2; exit 1; }
+done
+assert_file "$PULL_DL/upquark-$TOOL_VERSION-latest.tar.zst"
+assert_contains "$TMP/pull-1.err" "strato-up <node-dir> --network=helium --snapshot"
+
+# Second pull of the same snapshot: checksum still matches, no re-download.
+FAKE_CURL_LOG="$TMP/curl-pull-2.log" env "${PULL_ENV[@]}" "$TOOL" pull --network helium \
+  > "$TMP/pull-2.out" 2> "$TMP/pull-2.err"
+[[ "$(cat "$TMP/pull-2.out")" == "$PULLED_LATEST" ]] || { echo "second pull should print the same path" >&2; exit 1; }
+assert_contains "$TMP/pull-2.err" "reusing the cached archive"
+# The digest verified on the first pull is recorded beside the archive and
+# trusted while the file is unchanged, so the second pull re-reads nothing.
+assert_file "$PULLED_LATEST.verified"
+assert_contains "$PULLED_LATEST.verified" "^sha256 $(awk '{print $1}' "$FAKE_BUCKET_DIR/latest.tar.zst.sha256")\$"
+assert_contains "$TMP/pull-2.err" "recorded when it was last verified"
+if grep -q "Hashing it" "$TMP/pull-2.err"; then
+  echo "second pull should not re-hash an unchanged cached archive" >&2
+  exit 1
+fi
+[[ "$(curl_downloads "$TMP/curl-pull-2.log" "helium/$TOOL_VERSION/latest.tar.zst")" == "0" ]] \
+  || { echo "second pull should not re-download latest.tar.zst" >&2; cat "$TMP/curl-pull-2.log" >&2; exit 1; }
+[[ ! -e "$PULLED_LATEST.part" ]] || { echo "no partial download should remain after a successful pull" >&2; exit 1; }
+
+# --network inferred from a positional <node-dir> (the fixture node is helium).
+FAKE_CURL_LOG="$TMP/curl-pull-3.log" env "${PULL_ENV[@]}" "$TOOL" pull "$NODE" \
+  > "$TMP/pull-3.out" 2> "$TMP/pull-3.err"
+[[ "$(cat "$TMP/pull-3.out")" == "$PULLED_LATEST" ]] || { echo "pull <node-dir> should resolve the node's network" >&2; exit 1; }
+
+# --network inferred from the default node recorded by strato-setup.
+FAKE_HOME="$TMP/home"
+mkdir -p "$FAKE_HOME/.strato"
+printf '%s' "$NODE" > "$FAKE_HOME/.strato/default-node"
+HOME="$FAKE_HOME" FAKE_CURL_LOG="$TMP/curl-pull-4.log" env "${PULL_ENV[@]}" "$TOOL" pull \
+  > "$TMP/pull-4.out" 2> "$TMP/pull-4.err"
+[[ "$(cat "$TMP/pull-4.out")" == "$PULLED_LATEST" ]] || { echo "bare pull should use the default node's network" >&2; exit 1; }
+assert_contains "$TMP/pull-4.err" "default node: $NODE"
+
+# A cached archive whose mtime no longer matches its record is re-hashed (and,
+# still matching S3, reused); the record is refreshed.
+touch -t 202001010000 "$PULLED_LATEST"
+FAKE_CURL_LOG="$TMP/curl-pull-4b.log" env "${PULL_ENV[@]}" "$TOOL" pull --network helium \
+  > "$TMP/pull-4b.out" 2> "$TMP/pull-4b.err"
+assert_contains "$TMP/pull-4b.err" "Hashing it to compare with S3"
+assert_contains "$TMP/pull-4b.err" "reusing the cached archive"
+[[ "$(curl_downloads "$TMP/curl-pull-4b.log" "helium/$TOOL_VERSION/latest.tar.zst")" == "0" ]] \
+  || { echo "a re-hashed cached archive that matches S3 should not be re-downloaded" >&2; exit 1; }
+[[ "$(cached_mtime="$(awk '$1=="mtime"{print $2}' "$PULLED_LATEST.verified")"; stat -c %Y "$PULLED_LATEST" 2>/dev/null || stat -f %m "$PULLED_LATEST")" == "$(awk '$1=="mtime"{print $2}' "$PULLED_LATEST.verified")" ]] \
+  || { echo "the verification record should be refreshed after re-hashing" >&2; exit 1; }
+
+# A specific timestamp resolves to its own key and cache entry.
+FAKE_CURL_LOG="$TMP/curl-pull-5.log" env "${PULL_ENV[@]}" "$TOOL" pull --network helium --snapshot=20260601-13:05:00Z \
+  > "$TMP/pull-5.out" 2> "$TMP/pull-5.err"
+[[ "$(cat "$TMP/pull-5.out")" == "$PULL_DL/helium-$TOOL_VERSION-helium-20260601-130500Z.tar.zst" ]] \
+  || { echo "pull --snapshot=<ts> should cache the timestamped key, got: $(cat "$TMP/pull-5.out")" >&2; exit 1; }
+assert_contains "$TMP/pull-5.err" "strato-up <node-dir> --network=helium --snapshot=20260601-13:05:00Z"
+[[ ! -e "$PULLED_LATEST" ]] || { echo "downloading another helium key should prune the previous helium archive" >&2; exit 1; }
+assert_file "$PULL_DL/upquark-$TOOL_VERSION-latest.tar.zst"
+
+# Rejections: no way to determine the network; --network contradicting the
+# node's config; a local --source (nothing to pull); a node dir that is missing.
+if HOME="$TMP/home-empty" FAKE_CURL_LOG="$TMP/curl-pull-6.log" env "${PULL_ENV[@]}" "$TOOL" pull \
+    > "$TMP/pull-6.out" 2>&1; then
+  echo "pull without --network, <node-dir> or a default node should fail" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-6.out" "--network is required"
+if FAKE_CURL_LOG="$TMP/curl-pull-7.log" env "${PULL_ENV[@]}" "$TOOL" pull "$NODE" --network upquark \
+    > "$TMP/pull-7.out" 2>&1; then
+  echo "pull should reject --network that contradicts the node's configured network" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-7.out" "configured for network 'helium', not 'upquark'"
+if FAKE_CURL_LOG="$TMP/curl-pull-8.log" env "${PULL_ENV[@]}" "$TOOL" pull --source "$TMP/snapshot.tar.gz" \
+    > "$TMP/pull-8.out" 2>&1; then
+  echo "pull should reject a local --source" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-8.out" "s3:// sources only"
+if FAKE_CURL_LOG="$TMP/curl-pull-9.log" env "${PULL_ENV[@]}" "$TOOL" pull "$TMP/no-such-node" \
+    > "$TMP/pull-9.out" 2>&1; then
+  echo "pull should reject a missing <node-dir>" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-9.out" "node directory not found"
+[[ ! -e "$PULL_DL/helium-$TOOL_VERSION-snapshot.tar.gz" ]] || { echo "rejected pulls must not download" >&2; exit 1; }
+
+# The point of pull: an explicit s3 source pulled now is reused by a restore
+# later, with no archive download during the restore.
+GZ_URI="s3://strato-snapshots/helium/$TOOL_VERSION/snapshot.tar.gz"
+PULLED_GZ="$PULL_DL/helium-$TOOL_VERSION-snapshot.tar.gz"
+FAKE_CURL_LOG="$TMP/curl-pull-gz.log" env "${PULL_ENV[@]}" "$TOOL" pull --source "$GZ_URI" \
+  > "$TMP/pull-gz.out" 2> "$TMP/pull-gz.err"
+[[ "$(cat "$TMP/pull-gz.out")" == "$PULLED_GZ" ]] || { echo "pull --source should cache the explicit key" >&2; exit 1; }
+[[ "$(curl_downloads "$TMP/curl-pull-gz.log" "helium/$TOOL_VERSION/snapshot.tar.gz")" == "1" ]] \
+  || { echo "pull --source should download the archive once" >&2; exit 1; }
+assert_contains "$TMP/pull-gz.err" "A restore of --source $GZ_URI"
+echo "stale" > "$NODE/.ethereumH/state/value"
+FAKE_CURL_LOG="$TMP/curl-restore-gz.log" env "${PULL_ENV[@]}" "$TOOL" restore "$NODE" --source "$GZ_URI" --network helium --force \
+  > "$TMP/restore-gz.out" 2> "$TMP/restore-gz.err"
+assert_contains "$TMP/restore-gz.err" "reusing the cached archive"
+[[ "$(curl_downloads "$TMP/curl-restore-gz.log" "helium/$TOOL_VERSION/snapshot.tar.gz")" == "0" ]] \
+  || { echo "restore after pull should not download the archive again" >&2; cat "$TMP/curl-restore-gz.log" >&2; exit 1; }
+assert_contains "$NODE/.ethereumH/state/value" "state-from-snapshot"
+# The restore narrates each step.
+for step in "\[1/7\] Restore plan" "\[2/7\] Fetching the archive" "\[3/7\] Extracting" "\[4/7\] Checking" \
+            "\[5/7\] Replacing" "\[6/7\] Loading the public databases" "\[7/7\] Finalizing" "Snapshot restored into: $NODE"; do
+  assert_contains "$TMP/restore-gz.err" "$step"
+done
+
+# A missing object (no sidecar, download fails) leaves nothing behind and does
+# not prune the cache; a wrong published checksum discards the download.
+if FAKE_CURL_LOG="$TMP/curl-pull-missing.log" env "${PULL_ENV[@]}" "$TOOL" pull --source "s3://strato-snapshots/helium/$TOOL_VERSION/missing.tar.zst" \
+    > "$TMP/pull-missing.out" 2>&1; then
+  echo "pull of a missing object should fail" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-missing.out" "failed to download snapshot"
+[[ ! -e "$PULL_DL/helium-$TOOL_VERSION-missing.tar.zst" && ! -e "$PULL_DL/helium-$TOOL_VERSION-missing.tar.zst.part" ]] \
+  || { echo "a failed download must leave no archive or partial file" >&2; exit 1; }
+assert_file "$PULLED_GZ"
+cp "$TMP/snapshot.tar.gz" "$FAKE_BUCKET_DIR/badsum.tar.gz"
+echo "0000000000000000000000000000000000000000000000000000000000000000  badsum.tar.gz" > "$FAKE_BUCKET_DIR/badsum.tar.gz.sha256"
+if FAKE_CURL_LOG="$TMP/curl-pull-badsum.log" env "${PULL_ENV[@]}" "$TOOL" pull --source "s3://strato-snapshots/helium/$TOOL_VERSION/badsum.tar.gz" \
+    > "$TMP/pull-badsum.out" 2>&1; then
+  echo "pull with a checksum mismatch should fail" >&2
+  exit 1
+fi
+assert_contains "$TMP/pull-badsum.out" "checksum mismatch"
+[[ ! -e "$PULL_DL/helium-$TOOL_VERSION-badsum.tar.gz" && ! -e "$PULL_DL/helium-$TOOL_VERSION-badsum.tar.gz.part" ]] \
+  || { echo "a download with a checksum mismatch must be discarded" >&2; exit 1; }
 
 echo "strato-snapshot fixture tests passed"

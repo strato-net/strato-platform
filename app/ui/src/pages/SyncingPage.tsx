@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import type { NodeHealth } from "@/lib/nodeHealth";
 
 interface SyncingPageProps {
@@ -6,6 +7,8 @@ interface SyncingPageProps {
 }
 
 const SyncingPage = ({ nodeHealth }: SyncingPageProps) => {
+  usePageTitle("Syncing");
+
   const [dots, setDots] = useState("");
   const status = nodeHealth?.healthStatus || "SYNCING";
   const issues = nodeHealth?.healthIssues?.filter(Boolean) || [];

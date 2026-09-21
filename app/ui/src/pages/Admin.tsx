@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,8 @@ import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 import StakingAdminTab from '@/components/admin/StakingAdminTab';
 
 const Admin = () => {
+  usePageTitle("Admin");
+
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('tokens');
 

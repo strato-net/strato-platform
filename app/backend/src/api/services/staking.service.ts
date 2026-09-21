@@ -1,7 +1,7 @@
-import { cirrus, strato } from "../../utils/appApiHelper";
-import { isMissingTableError } from "../../utils/cirrusErrors";
+import { bloc, cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
+import { keccak256 } from "../../utils/keccak256";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
@@ -14,13 +14,24 @@ const BPS_DIVISOR = 10000n;
 const YEAR_SECONDS = 365n * 24n * 60n * 60n;
 const MAX_UINT256 = (1n << 256n) - 1n;
 
+// Two staking layouts are live at once:
+//   v1 - operator-keyed StratoStaking/ValidatorRegistry paying a funded reward schedule
+//        (mainnet). Read from Cirrus, as it always has been.
+//   v2 - validator-keyed contracts paid only by block rewards and proposer fees (helium,
+//        upgraded in place). Read from bloc state; see getStakingBlocState.
+export type StakingContractVersion = "v1" | "v2";
+
 // 0 = Missing, 1 = Registered (listed, not in the consensus set), 2 = Active (in the set), 3 = Kicked
 export type StratoOperatorStatus = 0 | 1 | 2 | 3;
 
 export interface StratoOperatorInfo {
+  // v2: the validator (consensus node) address, which keys every staking record.
+  // v1: the operator address.
   address: string;
   active: boolean;
   registryActive: boolean;
+  // The account that manages the record: self-bonds, sets commission, collects the
+  // operator's share. v1: same as address.
   operator: string;
   name: string;
   description: string;
@@ -44,6 +55,9 @@ export interface StratoOperatorInfo {
   userStake: string;
   pendingRewards: string;
   pendingFees: string;
+  // What the operator can claim from this record: STRATO and USDST.
+  operatorPendingRewards: string;
+  operatorPendingFees: string;
 }
 
 export interface StratoUnbondingRequestInfo {
@@ -57,9 +71,9 @@ export interface StratoUnbondingRequestInfo {
 export interface StratoStakingInfo {
   configured: boolean;
   deployed: boolean;
-  // False while the network still runs the pre-upgrade StratoStaking/ValidatorRegistry:
-  // the validator-set and proposer-fee state does not exist on chain yet, so everything
-  // derived from it reads as unset and the lifecycle calls that need it are refused.
+  contractVersion: StakingContractVersion;
+  // Kept for clients that predate contractVersion: true exactly when contractVersion is
+  // "v2", i.e. the validator-set / proposer-fee calls exist on chain.
   validatorSetDeployed: boolean;
   stakingAddress: string;
   validatorRegistryAddress: string;
@@ -75,6 +89,7 @@ export interface StratoStakingInfo {
   totalRewardableStake: string;
   totalRewardableStakeUsd: string;
   activeValidatorCount: string;
+  // v1 reward schedule; "0"/"" on v2, which has none.
   rewardReserve: string;
   rewardPeriodAmount: string;
   scheduledRewardRemaining: string;
@@ -92,6 +107,10 @@ export interface StratoStakingInfo {
   // validator set / consensus parameters
   minStake: string;
   minSelfBond: string;
+  // v2: until this time minStake is met by self-bond + delegated stake, afterwards by
+  // self-bond alone. "0" = never set (the combined rule applies).
+  selfBondGraceUntil: string;
+  selfBondRuleActive: boolean;
   proposerFeeBps: string;
   maxConsecutiveMisses: string;
   jailCooldown: string;
@@ -108,12 +127,17 @@ export interface StratoStakingInfo {
   trackedUsdst: string;
   unattributedFees: string;
   totalFeesCredited: string;
+  totalRewardsCredited: string;
   userTotalStake: string;
   userTotalStakeUsd: string;
   claimableRewards: string;
   claimableFees: string;
   totalEarned: string;
   isOperator: boolean;
+  // Records the requesting user operates (v1: [user] when the user is an operator).
+  operatedValidators: string[];
+  // Single-operator fields describe the first entry of operatedValidators; on v2
+  // operatorAddress is that record's key (the validator address).
   operatorAddress: string;
   operatorStatus: StratoOperatorStatus;
   operatorClaimableRewards: string;
@@ -127,31 +151,52 @@ export interface StratoStakingInfo {
 }
 
 export type StakeDelegationInput = {
-  operator: string;
+  validator: string;
   amount: string;
 };
 
 export type AddStratoOperatorInput = {
+  // v2 only, where it is required; v1 lists operators alone.
+  validator?: string;
   operator: string;
   commissionBps: string;
   name?: string;
   description?: string;
   metadataURI?: string;
   protocolValidatorId?: string;
-  validatorAddress: string;
 };
 
-export type OperatorProfileInput = {
-  commissionBps?: string;
+export type RegisterValidatorInput = {
+  validator: string;
+  commissionBps: string;
+  name?: string;
+  description?: string;
+  metadataURI?: string;
+  // r || s || v from the validator key over the authorization digest.
+  signature?: string;
+};
+
+export type ValidatorProfileInput = {
+  // v2 only, where it is required; v1 profiles are keyed by the caller.
+  validator?: string;
   name?: string;
   description?: string;
   metadataURI?: string;
   protocolValidatorId?: string;
-  validatorAddress?: string;
+};
+
+export type StratoAuthorizationDigest = {
+  registry: string;
+  validator: string;
+  operator: string;
+  nonce: string;
+  digest: string;
 };
 
 const normalizeAddress = (value: unknown): string =>
   String(value || "").toLowerCase().replace(/^0x/, "");
+
+const isNormalizedAddress = (value: string): boolean => /^[0-9a-f]{40}$/.test(value);
 
 const parseBigIntLike = (value: unknown): bigint => {
   if (value === null || value === undefined) return 0n;
@@ -178,6 +223,8 @@ const parseBoolLike = (value: unknown): boolean => {
   return false;
 };
 
+const uintString = (value: unknown): string => parseBigIntLike(value).toString();
+
 const badRequest = (message: string): Error => {
   const error = new Error(message);
   (error as any).statusCode = 400;
@@ -196,6 +243,7 @@ const stratoTokenAddress = (): string => normalizeAddress(constants.stratoToken)
 const emptyInfo = (): StratoStakingInfo => ({
   configured: Boolean(stakingAddress()),
   deployed: false,
+  contractVersion: "v1",
   validatorSetDeployed: false,
   stakingAddress: stakingAddress(),
   validatorRegistryAddress: validatorRegistryAddress(),
@@ -227,6 +275,8 @@ const emptyInfo = (): StratoStakingInfo => ({
   estimatedApy: "-",
   minStake: "0",
   minSelfBond: "0",
+  selfBondGraceUntil: "0",
+  selfBondRuleActive: false,
   proposerFeeBps: "0",
   maxConsecutiveMisses: "0",
   jailCooldown: "0",
@@ -243,12 +293,14 @@ const emptyInfo = (): StratoStakingInfo => ({
   trackedUsdst: "0",
   unattributedFees: "0",
   totalFeesCredited: "0",
+  totalRewardsCredited: "0",
   userTotalStake: "0",
   userTotalStakeUsd: "0",
   claimableRewards: "0",
   claimableFees: "0",
   totalEarned: "0",
   isOperator: false,
+  operatedValidators: [],
   operatorAddress: "",
   operatorStatus: 0,
   operatorClaimableRewards: "0",
@@ -285,8 +337,104 @@ const requireStratoTokenAddress = (): string => {
   return address;
 };
 
-// Contract state columns that exist on every deployed StratoStaking.
-const BASE_STATE_COLUMNS = [
+// ---- bloc state (v2) and version detection ----
+
+// Bloc returns a contract's whole state: every scalar and mapping (nested objects keyed by
+// lowercase hex address), plus each function's signature under its name. `?name=`
+// narrowing fails on this API, so the full snapshot is fetched and shared briefly; /info
+// is hot and the snapshot is one round trip however many users ask. Fields never written
+// (and zero struct members) are omitted, which parseBigIntLike/parseBoolLike read as
+// 0/false. Failures are never cached.
+const BLOC_STATE_TTL_MS = 10 * 1000;
+const blocStateCache = new Map<string, { expiresAt: number; state: Promise<Record<string, any>> }>();
+
+const getBlocState = (
+  accessToken: string,
+  contractName: string,
+  address: string,
+  fresh = false
+): Promise<Record<string, any>> => {
+  const cacheKey = `${contractName}:${address}`;
+  const cached = blocStateCache.get(cacheKey);
+  if (!fresh && cached && Date.now() < cached.expiresAt) return cached.state;
+
+  const state = bloc.get(accessToken, `/contracts/${contractName}/${address}/state`)
+    .then(({ data }: { data: unknown }) => {
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error(`Unexpected ${contractName} state response`);
+      }
+      return data as Record<string, any>;
+    });
+
+  const entry = { expiresAt: Date.now() + BLOC_STATE_TTL_MS, state };
+  blocStateCache.set(cacheKey, entry);
+  state.catch(() => {
+    if (blocStateCache.get(cacheKey) === entry) blocStateCache.delete(cacheKey);
+  });
+  return state;
+};
+
+const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
+  getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
+
+const isFunctionEntry = (value: unknown): boolean =>
+  typeof value === "string" && value.startsWith("function");
+
+// v2 is recognised by the creditBlockReward function in bloc state; v1 has no such call.
+// Cirrus cannot answer this: after an in-place logic upgrade it adds no scalar columns to
+// the base BlockApps-StratoStaking table, so that schema still describes whichever logic
+// was indexed first. The verdict is cached briefly so an upgrade is picked up without a
+// restart; while bloc is unreachable the last verdict stands, and null means none was
+// ever reached.
+const VERSION_TTL_MS = 60 * 1000;
+let versionVerdict: { address: string; version: StakingContractVersion; expiresAt: number } | null = null;
+
+const detectContractVersion = async (accessToken: string): Promise<StakingContractVersion | null> => {
+  const address = stakingAddress();
+  if (!address) return null;
+  if (versionVerdict?.address === address && Date.now() < versionVerdict.expiresAt) {
+    return versionVerdict.version;
+  }
+
+  try {
+    const state = await getStakingBlocState(accessToken);
+    const version: StakingContractVersion = isFunctionEntry(state.creditBlockReward) ? "v2" : "v1";
+    versionVerdict = { address, version, expiresAt: Date.now() + VERSION_TTL_MS };
+    return version;
+  } catch {
+    return versionVerdict?.address === address ? versionVerdict.version : null;
+  }
+};
+
+// Transactions are built against a specific ABI, so unlike reads they never guess.
+const requireContractVersion = async (accessToken: string): Promise<StakingContractVersion> => {
+  requireStakingAddress();
+  const version = await detectContractVersion(accessToken);
+  if (!version) {
+    const error = new Error("Unable to read the staking contract right now; please try again shortly.");
+    (error as any).statusCode = 503;
+    throw error;
+  }
+  return version;
+};
+
+const requireV2 = async (accessToken: string): Promise<void> => {
+  if ((await requireContractVersion(accessToken)) !== "v2") {
+    throw badRequest(
+      "Validator set management is unavailable: the validator-keyed staking contracts have not been deployed on this network yet."
+    );
+  }
+};
+
+const requireV1 = async (accessToken: string, feature: string): Promise<void> => {
+  if ((await requireContractVersion(accessToken)) === "v2") {
+    throw badRequest(`${feature} is not supported by this network's staking contract: validators are paid by block rewards, not a funded schedule.`);
+  }
+};
+
+// ---- v1 contract state (Cirrus) ----
+
+const V1_STATE_COLUMNS = [
   "address",
   "stratoToken",
   "unbondingSeconds::text",
@@ -312,78 +460,35 @@ const BASE_STATE_COLUMNS = [
   "globalStakeRewardPerTokenStored::text",
 ];
 
-// Columns added by the validator-set / proposer-fee staking upgrade. A network still
-// running the previous contract has none of them, and PostgREST fails the *whole*
-// select with 42703 (undefined_column) rather than omitting the unknown names — which
-// is why they are asked for separately and default to unset when the read is refused.
-const VALIDATOR_SET_STATE_COLUMNS = [
-  "usdstToken",
-  "governanceSyncEnabled",
-  "minStake::text",
-  "minSelfBond::text",
-  "proposerFeeBps::text",
-  "maxConsecutiveMisses::text",
-  "jailCooldown::text",
-  "maxActiveValidators::text",
-  "hardCapActiveValidators::text",
-  "evictionMarginBps::text",
-  "maxSetMutationsPerBlock::text",
-  "exitNoticeSeconds::text",
-  "unkickCooldown::text",
-  "maxOperatorStakeBps::text",
-  "joinsPaused",
-  "validatorCount::text",
-  "trackedUsdst::text",
-  "unattributedFees::text",
-  "totalFeesCredited::text",
-];
-
 type StakingContractState = {
+  version: StakingContractVersion;
   state: Record<string, any>;
-  validatorSetDeployed: boolean;
 };
 
-// Once the upgrade columns are known to be absent, skip the doomed select for a while
-// rather than paying two Cirrus round trips on every request; re-probe after the TTL
-// so the upgrade is picked up without restarting the API.
-const VALIDATOR_SET_PROBE_TTL_MS = 5 * 60 * 1000;
-let validatorSetColumnsMissingUntil = 0;
-
+// Reads fall back to the v1 view when the version is unknown (bloc down since startup),
+// which is what every network showed before v2 existed.
 const getContractState = async (accessToken: string): Promise<StakingContractState | null> => {
   const address = stakingAddress();
   if (!address) return null;
 
-  const read = async (includeValidatorSet: boolean): Promise<Record<string, any> | null> => {
-    const columns = includeValidatorSet
-      ? [...BASE_STATE_COLUMNS, ...VALIDATOR_SET_STATE_COLUMNS]
-      : BASE_STATE_COLUMNS;
-
-    const { data } = await cirrus.get(accessToken, `/${StratoStaking}`, {
-      params: {
-        address: `eq.${address}`,
-        select: columns.join(","),
-      },
-    });
-
-    return data?.[0] || null;
-  };
-
-  if (Date.now() >= validatorSetColumnsMissingUntil) {
+  const version = (await detectContractVersion(accessToken)) ?? "v1";
+  if (version === "v2") {
     try {
-      const state = await read(true);
-      validatorSetColumnsMissingUntil = 0;
-      return state ? { state, validatorSetDeployed: true } : null;
-    } catch (error) {
-      // Only a missing column means "not upgraded yet"; anything else is a real
-      // failure and must not be retried as a narrower read.
-      if (!isMissingTableError(error)) return null;
-      validatorSetColumnsMissingUntil = Date.now() + VALIDATOR_SET_PROBE_TTL_MS;
+      return { version, state: await getStakingBlocState(accessToken) };
+    } catch {
+      return null;
     }
   }
 
   try {
-    const state = await read(false);
-    return state ? { state, validatorSetDeployed: false } : null;
+    const { data } = await cirrus.get(accessToken, `/${StratoStaking}`, {
+      params: {
+        address: `eq.${address}`,
+        select: V1_STATE_COLUMNS.join(","),
+      },
+    });
+
+    return data?.[0] ? { version, state: data[0] } : null;
   } catch {
     return null;
   }
@@ -503,6 +608,8 @@ const getOperatorRows = async (accessToken: string): Promise<Array<{ key: string
   }
 };
 
+// Registry profiles, keyed by operator on v1 and by validator on v2. Only display fields
+// are read here (their meaning did not change), so Cirrus serves both layouts.
 const getValidatorProfiles = async (accessToken: string): Promise<Map<string, Record<string, any>>> => {
   const address = validatorRegistryAddress();
   const profiles = new Map<string, Record<string, any>>();
@@ -518,41 +625,14 @@ const getValidatorProfiles = async (accessToken: string): Promise<Map<string, Re
     });
 
     for (const row of data || []) {
-      const operator = normalizeAddress(row.key);
-      if (operator) profiles.set(operator, row.value || {});
+      const key = normalizeAddress(row.key);
+      if (key) profiles.set(key, row.value || {});
     }
   } catch {
     return profiles;
   }
 
   return profiles;
-};
-
-// Single-key mappings of the staking contract keyed by an address (operator or
-// validator): isValidator, jailedUntil, exitReadyTime, blocksProposed, ...
-const getAddressMap = async (accessToken: string, table: string): Promise<Map<string, string>> => {
-  const address = stakingAddress();
-  const values = new Map<string, string>();
-  if (!address) return values;
-
-  try {
-    const { data } = await cirrus.get(accessToken, `/${StratoStaking}-${table}`, {
-      params: {
-        address: `eq.${address}`,
-        select: "key,value::text",
-        limit: "500",
-      },
-    });
-
-    for (const row of data || []) {
-      const key = normalizeAddress(row.key);
-      if (key) values.set(key, String(row.value ?? ""));
-    }
-  } catch {
-    return values;
-  }
-
-  return values;
 };
 
 const getUserMap = async (
@@ -624,6 +704,184 @@ const getUnbondingRequests = async (
   }
 };
 
+// ---- v2 snapshot helpers ----
+
+// A bloc mapping (object keyed by address) as a Map with normalized keys.
+const addressKeyed = (mapping: unknown): Map<string, any> => {
+  const values = new Map<string, any>();
+  if (!mapping || typeof mapping !== "object" || Array.isArray(mapping)) return values;
+
+  for (const [key, value] of Object.entries(mapping as Record<string, any>)) {
+    const address = normalizeAddress(key);
+    if (address) values.set(address, value);
+  }
+  return values;
+};
+
+// The user's row of a user => validator => value mapping.
+const userRow = (mapping: unknown, user: string): Map<string, any> =>
+  user && mapping && typeof mapping === "object" ? addressKeyed((mapping as Record<string, any>)[user]) : new Map();
+
+// Records written before the upgrade carry no operator field: their key is their
+// operator (StratoStaking.operatorOf / ValidatorRegistry.operatorOf do the same).
+const recordOperator = (validator: string, record: Record<string, any>): string => {
+  const operator = normalizeAddress(record?.operator);
+  return isNormalizedAddress(operator) && !/^0+$/.test(operator) ? operator : validator;
+};
+
+const isSelfBondRuleActive = (state: Record<string, any>, now: bigint): boolean => {
+  const graceUntil = parseBigIntLike(state.selfBondGraceUntil);
+  return graceUntil > 0n && now >= graceUntil;
+};
+
+type V2ValidatorRecord = {
+  validator: string;
+  operator: string;
+  value: Record<string, any>;
+  active: boolean;
+  isValidator: boolean;
+  commissionBps: bigint;
+  selfBond: bigint;
+  delegatedStake: bigint;
+  totalStake: bigint;
+  jailedUntil: bigint;
+  exitReadyTime: bigint;
+  status: StratoOperatorStatus;
+  eligible: boolean;
+};
+
+// Every listed record with the lifecycle facts StratoStaking derives (status, eligible),
+// ordered by validator address like the v1 Cirrus read.
+const v2ValidatorRecords = (state: Record<string, any>): V2ValidatorRecord[] => {
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const minStake = parseBigIntLike(state.minStake);
+  const selfBondRuleActive = isSelfBondRuleActive(state, now);
+  const isValidatorMap = addressKeyed(state.isValidator);
+  const jailedUntilMap = addressKeyed(state.jailedUntil);
+  const exitReadyMap = addressKeyed(state.exitReadyTime);
+
+  return [...addressKeyed(state.operators).entries()]
+    .filter(([, value]) => value && typeof value === "object" && parseBoolLike(value.exists))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([validator, value]) => {
+      const active = parseBoolLike(value.active);
+      const isValidator = parseBoolLike(isValidatorMap.get(validator));
+      const selfBond = parseBigIntLike(value.selfBond);
+      const delegatedStake = parseBigIntLike(value.delegatedStake);
+      const totalStake = selfBond + delegatedStake;
+      const jailedUntil = parseBigIntLike(jailedUntilMap.get(validator));
+      const exitReadyTime = parseBigIntLike(exitReadyMap.get(validator));
+      // _meetsMinStake: combined stake until the self-bond grace ends, self-bond after.
+      const meetsMinStake = selfBondRuleActive ? selfBond >= minStake : totalStake >= minStake;
+
+      return {
+        validator,
+        operator: recordOperator(validator, value),
+        value,
+        active,
+        isValidator,
+        commissionBps: parseBigIntLike(value.commissionBps),
+        selfBond,
+        delegatedStake,
+        totalStake,
+        jailedUntil,
+        exitReadyTime,
+        status: !active ? 3 : isValidator ? 2 : 1,
+        eligible: active && meetsMinStake && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime),
+      };
+    });
+};
+
+const v2UnbondingRequests = (state: Record<string, any>, user: string): StratoUnbondingRequestInfo[] => {
+  const queue = user ? state.unbondingQueue?.[user] : undefined;
+  if (!queue || typeof queue !== "object") return [];
+
+  const now = Math.floor(Date.now() / 1000);
+  return Object.entries(queue as Record<string, any>)
+    .map(([id, raw]) => {
+      const value = raw || {};
+      const releaseTime = uintString(value.releaseTime);
+      const claimed = parseBoolLike(value.claimed);
+      return {
+        id: String(id),
+        amount: uintString(value.amount),
+        releaseTime,
+        claimed,
+        ready: !claimed && Number(releaseTime) <= now,
+      };
+    })
+    .sort((a, b) => Number(parseBigIntLike(a.id) - parseBigIntLike(b.id)));
+};
+
+// ---- v2 realized block-reward APY ----
+
+const REWARD_WINDOW_DAYS = 7n;
+const REWARD_WINDOW_SECONDS = 7 * 24 * 60 * 60;
+const RECENT_REWARDS_TTL_MS = 60 * 1000;
+let recentRewardsCache: { address: string; expiresAt: number; totals: Promise<Map<string, bigint>> } | null = null;
+
+// Cirrus keeps block_timestamp as text in this form ("2026-09-14 19:47:31 UTC"), so a gte
+// on the same form compares chronologically.
+const cirrusTimestamp = (epochSeconds: number): string =>
+  new Date(epochSeconds * 1000).toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+
+// STRATO block rewards credited per validator over the trailing window. Summed in Postgres
+// (otherwise one row per block), with ::text keeping 18-decimal totals exact through JSON.
+const getRecentBlockRewards = (accessToken: string): Promise<Map<string, bigint>> => {
+  const address = stakingAddress();
+  if (!address) return Promise.resolve(new Map());
+  if (recentRewardsCache?.address === address && Date.now() < recentRewardsCache.expiresAt) {
+    return recentRewardsCache.totals;
+  }
+
+  const since = Math.floor(Date.now() / 1000) - REWARD_WINDOW_SECONDS;
+  const totals = cirrus.get(accessToken, `/${constants.Event}`, {
+    params: {
+      address: `eq.${address}`,
+      event_name: "eq.BlockRewardCredited",
+      block_timestamp: `gte.${cirrusTimestamp(since)}`,
+      select: "validator:attributes->>validator,amount:attributes->>amount::numeric.sum()::text",
+    },
+  })
+    .then(({ data }: { data: any[] }) => {
+      const byValidator = new Map<string, bigint>();
+      for (const row of data || []) {
+        const validator = normalizeAddress(row.validator);
+        if (validator) byValidator.set(validator, (byValidator.get(validator) || 0n) + parseBigIntLike(row.amount));
+      }
+      return byValidator;
+    })
+    .catch(() => {
+      if (recentRewardsCache === entry) recentRewardsCache = null;
+      return new Map<string, bigint>();
+    });
+
+  const entry = { address, expiresAt: Date.now() + RECENT_REWARDS_TTL_MS, totals };
+  recentRewardsCache = entry;
+  return totals;
+};
+
+// What the trailing window's block rewards paid per unit of stake, net of commission,
+// annualised, in bps. Delegators receive amount * delegated/weight * (1 - commission),
+// i.e. amount * (1 - commission) / weight per unit.
+const realizedApyBps = (credited: bigint, stake: bigint, commissionBps: bigint): bigint => {
+  if (credited <= 0n || stake <= 0n) return 0n;
+  const netBps = BPS_DIVISOR - (commissionBps >= BPS_DIVISOR ? BPS_DIVISOR : commissionBps);
+  return (credited * 365n * netBps) / (REWARD_WINDOW_DAYS * stake);
+};
+
+// Commission as StratoStaking charges it: capped at maxCommissionBps.
+const effectiveCommissionBps = (state: Record<string, any>, commissionBps: bigint): bigint => {
+  const cap = parseBigIntLike(state.maxCommissionBps);
+  return commissionBps < cap ? commissionBps : cap;
+};
+
+const networkApyBps = (state: Record<string, any>, credited: Map<string, bigint>): bigint => {
+  let total = 0n;
+  for (const amount of credited.values()) total += amount;
+  return realizedApyBps(total, parseBigIntLike(state.totalRewardableStake), 0n);
+};
+
 // Total STRATO the user has locked in the staking contract: delegated stake,
 // operator self-bond, and unclaimed unbonding amounts. Consumed by the tokens
 // service so staked STRATO stays visible in portfolio balances.
@@ -635,6 +893,22 @@ export const getUserStakedStratoBalance = async (
   const user = normalizeAddress(userAddress);
   const tokenAddress = stratoTokenAddress();
   if (!address || !user || !tokenAddress) return { tokenAddress, amount: 0n };
+
+  // v2: self-bond belongs to the operator of each validator record, not to its key.
+  if ((await detectContractVersion(accessToken)) === "v2") {
+    const state = await getStakingBlocState(accessToken).catch(() => null);
+    if (state) {
+      let amount = 0n;
+      for (const stake of userRow(state.delegatedStake, user).values()) amount += parseBigIntLike(stake);
+      for (const record of v2ValidatorRecords(state)) {
+        if (record.operator === user) amount += record.selfBond;
+      }
+      for (const request of v2UnbondingRequests(state, user)) {
+        if (!request.claimed) amount += parseBigIntLike(request.amount);
+      }
+      return { tokenAddress, amount };
+    }
+  }
 
   const [delegations, operatorRows, unbondingRequests] = await Promise.all([
     getUserMap(accessToken, "delegatedStake", user),
@@ -656,6 +930,7 @@ export const getUserStakedStratoBalance = async (
 
 // Lifetime claimed rewards (delegator and operator), summed from Cirrus events.
 // Combined with current claimable rewards this gives total earned through staking.
+// Both layouts name the claimant `user` / `operator` in these events.
 const getLifetimeClaimedRewards = async (
   accessToken: string,
   userAddress?: string
@@ -682,6 +957,8 @@ const getLifetimeClaimedRewards = async (
     return 0n;
   }
 };
+
+// ---- v1 reward schedule projection ----
 
 const projectedRewardIndexes = (state: Record<string, any>): {
   baseIndex: bigint;
@@ -827,14 +1104,20 @@ const validatorApyBps = (
   return (grossBps * (BPS_DIVISOR - netCommissionBps)) / BPS_DIVISOR;
 };
 
-// Best available net APY across active validators — matches the "Best
-// Available APY" convention used on the Earn page. Consumed by the earn
-// service so the portfolio STRATO row can show combined native + rewards APY.
+// Network staking APY for the Earn page. v1: best available net schedule APY across
+// active operators. v2: realized trailing-week block rewards over the rewardable stake.
+// Consumed by the earn service so the portfolio STRATO row can show combined native +
+// rewards APY.
 export const getStratoStakingNetworkApy = async (accessToken: string): Promise<string | null> => {
   const contractState = await getContractState(accessToken);
   if (!contractState) return null;
 
-  const { state } = contractState;
+  const { state, version } = contractState;
+  if (version === "v2") {
+    const apyBps = networkApyBps(state, await getRecentBlockRewards(accessToken));
+    return apyBps > 0n ? formatBpsAsPercent(apyBps) : null;
+  }
+
   const currentIndexes = projectedRewardIndexes(state);
   const operatorRows = await getOperatorRows(accessToken);
 
@@ -856,14 +1139,20 @@ export const getStratoStakingInfo = async (
   const contractState = await getContractState(accessToken);
   if (!contractState) return emptyInfo();
 
-  const { state, validatorSetDeployed } = contractState;
+  return contractState.version === "v2"
+    ? getV2StakingInfo(accessToken, contractState.state, userAddress)
+    : getV1StakingInfo(accessToken, contractState.state, userAddress);
+};
+
+// v1: operator-keyed records, rewards projected from the funded schedule. The contract
+// has no validator-set, liveness or proposer-fee state, so those read as unset.
+const getV1StakingInfo = async (
+  accessToken: string,
+  state: Record<string, any>,
+  userAddress?: string
+): Promise<StratoStakingInfo> => {
   const tokenAddress = normalizeAddress(state.stratoToken) || stratoTokenAddress();
   const currentIndexes = projectedRewardIndexes(state);
-
-  // Mapping tables that only exist once the upgrade is deployed; asking for them on the
-  // older contract is a guaranteed 42P01, so they resolve empty without a round trip.
-  const noAddressMap = (): Promise<Map<string, string>> => Promise.resolve(new Map());
-  const noUserMap = (): Promise<Map<string, bigint>> => Promise.resolve(new Map());
 
   const [
     tokenInfo,
@@ -872,18 +1161,10 @@ export const getStratoStakingInfo = async (
     userDelegatedStake,
     userPendingRewards,
     userRewardPaid,
-    userPendingFees,
-    userFeePaid,
     unbondingRequests,
     validatorProfiles,
     lifetimeClaimedRewards,
     stratoPriceWad,
-    validatorFlags,
-    jailedUntilMap,
-    exitReadyMap,
-    blocksProposedMap,
-    missedProposalsMap,
-    consecutiveMissesMap,
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, userAddress),
@@ -891,27 +1172,14 @@ export const getStratoStakingInfo = async (
     getUserMap(accessToken, "delegatedStake", userAddress),
     getUserMap(accessToken, "pendingDelegatorRewards", userAddress),
     getUserMap(accessToken, "userRewardPerStakePaid", userAddress),
-    validatorSetDeployed ? getUserMap(accessToken, "pendingDelegatorFees", userAddress) : noUserMap(),
-    validatorSetDeployed ? getUserMap(accessToken, "userFeePerStakePaid", userAddress) : noUserMap(),
     getUnbondingRequests(accessToken, userAddress),
     getValidatorProfiles(accessToken),
     getLifetimeClaimedRewards(accessToken, userAddress),
     getStratoTokenPriceWad(accessToken),
-    validatorSetDeployed ? getAddressMap(accessToken, "isValidator") : noAddressMap(),
-    validatorSetDeployed ? getAddressMap(accessToken, "jailedUntil") : noAddressMap(),
-    validatorSetDeployed ? getAddressMap(accessToken, "exitReadyTime") : noAddressMap(),
-    validatorSetDeployed ? getAddressMap(accessToken, "blocksProposed") : noAddressMap(),
-    validatorSetDeployed ? getAddressMap(accessToken, "missedProposals") : noAddressMap(),
-    validatorSetDeployed ? getAddressMap(accessToken, "consecutiveMisses") : noAddressMap(),
   ] as const);
-
-  const now = BigInt(Math.floor(Date.now() / 1000));
-  const minStake = parseBigIntLike(state.minStake);
-  const minSelfBond = parseBigIntLike(state.minSelfBond);
 
   let userTotalStake = 0n;
   let claimableRewards = 0n;
-  let claimableFees = 0n;
   let userWeightedApyBps = 0n;
   let bestActiveApyBps = 0n;
   let isOperator = false;
@@ -924,7 +1192,7 @@ export const getStratoStakingInfo = async (
   let currentOperatorCommissionBps = 0n;
   const normalizedUserAddress = normalizeAddress(userAddress);
 
-  const validators = operatorRows.map((row) => {
+  const validators = operatorRows.map((row): StratoOperatorInfo => {
     const operatorAddress = normalizeAddress(row.key);
     const value = row.value || {};
     const profile = validatorProfiles.get(operatorAddress) || {};
@@ -940,29 +1208,14 @@ export const getStratoStakingInfo = async (
       ? (userStake * (projectedIndex - paid)) / WAD
       : 0n;
     const pendingRewards = pendingStored + projectedReward;
-    // Proposer fees (USDST) are pushed per block, so no time projection is needed.
-    const feeIndex = parseBigIntLike(value.feePerStakeStored);
-    const feePaid = userFeePaid.get(operatorAddress) || 0n;
-    const pendingFees = (userPendingFees.get(operatorAddress) || 0n)
-      + (userStake > 0n && feeIndex > feePaid ? (userStake * (feeIndex - feePaid)) / WAD : 0n);
     const apyBps = validatorApyBps(state, commissionBps, currentIndexes.stakeRewardRate);
     const operatorRewards = projectedOperatorRewards(value, currentIndexes);
+    const recordFees = parseBigIntLike(value.pendingSelfBondFees) + parseBigIntLike(value.pendingFeeCommission);
 
+    // No consensus-set bookkeeping on v1: an operator's `active` flag *is* its set
+    // membership, so deriving the status from it keeps the badges honest.
     const active = parseBoolLike(value.active);
-    // Before the upgrade there is no validatorAddress on the profile and no isValidator
-    // map on the staking contract: an operator's `active` flag *is* its consensus-set
-    // membership, so deriving the status from it keeps the badges honest meanwhile.
-    const validatorAddress = normalizeAddress(profile.validatorAddress);
-    const isValidator = validatorSetDeployed
-      ? parseBoolLike(validatorFlags.get(operatorAddress))
-      : active;
-    const jailedUntil = parseBigIntLike(jailedUntilMap.get(operatorAddress));
-    const exitReadyTime = parseBigIntLike(exitReadyMap.get(operatorAddress));
-    const status: StratoOperatorStatus = !active ? 3 : isValidator ? 2 : 1;
-    const eligible = active
-      && (!validatorSetDeployed || Boolean(validatorAddress))
-      && totalStake >= minStake && selfBond >= minSelfBond
-      && now >= jailedUntil && (exitReadyTime === 0n || now < exitReadyTime);
+    const status: StratoOperatorStatus = active ? 2 : 3;
 
     if (operatorAddress && operatorAddress === normalizedUserAddress) {
       isOperator = true;
@@ -971,7 +1224,7 @@ export const getStratoStakingInfo = async (
       operatorPendingBaseRewards = operatorRewards.base;
       operatorPendingCommission = operatorRewards.commission;
       operatorPendingSelfBondRewards = operatorRewards.selfBond;
-      operatorPendingFees = parseBigIntLike(value.pendingSelfBondFees) + parseBigIntLike(value.pendingFeeCommission);
+      operatorPendingFees = recordFees;
       currentOperatorCommissionBps = commissionBps;
     }
 
@@ -981,7 +1234,6 @@ export const getStratoStakingInfo = async (
 
     userTotalStake += userStake;
     claimableRewards += pendingRewards;
-    claimableFees += pendingFees;
     userWeightedApyBps += userStake * apyBps;
 
     return {
@@ -993,16 +1245,16 @@ export const getStratoStakingInfo = async (
       description: String(profile.description || ""),
       metadataURI: String(profile.metadataURI || ""),
       protocolValidatorId: String(profile.protocolValidatorId || ""),
-      validatorAddress,
+      validatorAddress: normalizeAddress(profile.validatorAddress),
       status,
-      isValidator,
-      eligible,
-      isWaiter: eligible && !isValidator,
-      jailedUntil: jailedUntil.toString(),
-      exitReadyTime: exitReadyTime.toString(),
-      blocksProposed: parseBigIntLike(blocksProposedMap.get(validatorAddress)).toString(),
-      missedProposals: parseBigIntLike(missedProposalsMap.get(validatorAddress)).toString(),
-      consecutiveMisses: parseBigIntLike(consecutiveMissesMap.get(validatorAddress)).toString(),
+      isValidator: active,
+      eligible: active,
+      isWaiter: false,
+      jailedUntil: "0",
+      exitReadyTime: "0",
+      blocksProposed: "0",
+      missedProposals: "0",
+      consecutiveMisses: "0",
       commissionBps: commissionBps.toString(),
       selfBond: selfBond.toString(),
       delegatedStake: delegatedStake.toString(),
@@ -1010,7 +1262,9 @@ export const getStratoStakingInfo = async (
       estimatedApy: formatBpsAsPercent(apyBps),
       userStake: userStake.toString(),
       pendingRewards: pendingRewards.toString(),
-      pendingFees: pendingFees.toString(),
+      pendingFees: "0",
+      operatorPendingRewards: (operatorRewards.base + operatorRewards.selfBond + operatorRewards.commission).toString(),
+      operatorPendingFees: recordFees.toString(),
     };
   });
 
@@ -1025,11 +1279,12 @@ export const getStratoStakingInfo = async (
   return {
     configured: true,
     deployed: true,
-    validatorSetDeployed,
+    contractVersion: "v1",
+    validatorSetDeployed: false,
     stakingAddress: stakingAddress(),
     validatorRegistryAddress: validatorRegistryAddress(),
     stratoTokenAddress: tokenAddress,
-    usdstTokenAddress: normalizeAddress(state.usdstToken),
+    usdstTokenAddress: "",
     ...tokenInfo,
     walletBalance,
     totalUserStake: String(state.totalUserStake || "0"),
@@ -1054,34 +1309,34 @@ export const getStratoStakingInfo = async (
     baseRewardRate: currentIndexes.baseRewardRate.toString(),
     stakeRewardRate: currentIndexes.stakeRewardRate.toString(),
     estimatedApy,
-    minStake: minStake.toString(),
-    minSelfBond: minSelfBond.toString(),
-    proposerFeeBps: String(state.proposerFeeBps || "0"),
-    maxConsecutiveMisses: String(state.maxConsecutiveMisses || "0"),
-    jailCooldown: String(state.jailCooldown || "0"),
-    maxActiveValidators: String(state.maxActiveValidators || "0"),
-    hardCapActiveValidators: String(state.hardCapActiveValidators || "0"),
-    evictionMarginBps: String(state.evictionMarginBps || "0"),
-    maxSetMutationsPerBlock: String(state.maxSetMutationsPerBlock || "0"),
-    exitNoticeSeconds: String(state.exitNoticeSeconds || "0"),
-    unkickCooldown: String(state.unkickCooldown || "0"),
-    maxOperatorStakeBps: String(state.maxOperatorStakeBps || "0"),
-    // The older contract has no permissionless join at all, so "paused" is the honest
-    // reading of an absent flag rather than the `false` a missing column would give.
-    joinsPaused: validatorSetDeployed ? parseBoolLike(state.joinsPaused) : true,
-    governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
-    // Pre-upgrade the contract keeps no separate set counter; every active operator is
-    // in the consensus set, which is exactly what activeOperatorCount counts.
-    validatorCount: validatorSetDeployed
-      ? String(state.validatorCount || "0")
-      : String(state.activeOperatorCount || "0"),
-    trackedUsdst: String(state.trackedUsdst || "0"),
-    unattributedFees: String(state.unattributedFees || "0"),
-    totalFeesCredited: String(state.totalFeesCredited || "0"),
+    minStake: "0",
+    minSelfBond: "0",
+    selfBondGraceUntil: "0",
+    selfBondRuleActive: false,
+    proposerFeeBps: "0",
+    maxConsecutiveMisses: "0",
+    jailCooldown: "0",
+    maxActiveValidators: "0",
+    hardCapActiveValidators: "0",
+    evictionMarginBps: "0",
+    maxSetMutationsPerBlock: "0",
+    exitNoticeSeconds: "0",
+    unkickCooldown: "0",
+    maxOperatorStakeBps: "0",
+    // v1 has no permissionless join at all, so "paused" is the honest reading.
+    joinsPaused: true,
+    governanceSyncEnabled: false,
+    // No separate set counter on v1; every active operator is in the consensus set,
+    // which is exactly what activeOperatorCount counts.
+    validatorCount: String(state.activeOperatorCount || "0"),
+    trackedUsdst: "0",
+    unattributedFees: "0",
+    totalFeesCredited: "0",
+    totalRewardsCredited: "0",
     userTotalStake: userTotalStake.toString(),
     userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
     claimableRewards: claimableRewards.toString(),
-    claimableFees: claimableFees.toString(),
+    claimableFees: "0",
     totalEarned: (
       lifetimeClaimedRewards +
       claimableRewards +
@@ -1090,6 +1345,7 @@ export const getStratoStakingInfo = async (
       operatorPendingSelfBondRewards
     ).toString(),
     isOperator,
+    operatedValidators: isOperator ? [connectedOperatorAddress] : [],
     operatorAddress: connectedOperatorAddress,
     operatorStatus,
     operatorClaimableRewards: (operatorPendingBaseRewards + operatorPendingCommission + operatorPendingSelfBondRewards).toString(),
@@ -1103,6 +1359,216 @@ export const getStratoStakingInfo = async (
   };
 };
 
+// v2: validator-keyed records from one bloc snapshot. Per-user checkpoints come from the
+// same snapshot as the indexes they are measured against, so a claim can never show as
+// still pending because Cirrus lagged on one side. Income is pushed per block (block
+// rewards, proposer fees), so nothing is projected over time; the frozen schedule indexes
+// are not projected either (records on helium are already level with them, and any
+// remainder is pendingBaseRewards).
+const getV2StakingInfo = async (
+  accessToken: string,
+  state: Record<string, any>,
+  userAddress?: string
+): Promise<StratoStakingInfo> => {
+  const tokenAddress = normalizeAddress(state.stratoToken) || stratoTokenAddress();
+  const user = normalizeAddress(userAddress);
+
+  const [
+    tokenInfo,
+    walletBalance,
+    validatorProfiles,
+    lifetimeClaimedRewards,
+    stratoPriceWad,
+    recentRewards,
+  ] = await Promise.all([
+    getTokenInfo(accessToken, tokenAddress),
+    getTokenBalance(accessToken, tokenAddress, user),
+    getValidatorProfiles(accessToken),
+    getLifetimeClaimedRewards(accessToken, user),
+    getStratoTokenPriceWad(accessToken),
+    getRecentBlockRewards(accessToken),
+  ] as const);
+
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const userStakes = userRow(state.delegatedStake, user);
+  const userPendingRewards = userRow(state.pendingDelegatorRewards, user);
+  const userRewardPaid = userRow(state.userRewardPerStakePaid, user);
+  const userPendingFees = userRow(state.pendingDelegatorFees, user);
+  const userFeePaid = userRow(state.userFeePerStakePaid, user);
+  const blocksProposedMap = addressKeyed(state.blocksProposed);
+  const missedProposalsMap = addressKeyed(state.missedProposals);
+  const consecutiveMissesMap = addressKeyed(state.consecutiveMisses);
+
+  let userTotalStake = 0n;
+  let claimableRewards = 0n;
+  let claimableFees = 0n;
+  let userWeightedApyBps = 0n;
+  let activeValidatorCount = 0n;
+  let operatorClaimableTotal = 0n;
+  const operated: Array<{ record: V2ValidatorRecord; rewards: bigint; fees: bigint }> = [];
+
+  const records = v2ValidatorRecords(state);
+  const validators = records.map((record): StratoOperatorInfo => {
+    const { validator, value } = record;
+    const profile = validatorProfiles.get(validator) || {};
+    const userStake = parseBigIntLike(userStakes.get(validator));
+
+    const rewardIndex = parseBigIntLike(value.delegatorRewardPerStakeStored);
+    const rewardPaid = parseBigIntLike(userRewardPaid.get(validator));
+    const pendingRewards = parseBigIntLike(userPendingRewards.get(validator))
+      + (userStake > 0n && rewardIndex > rewardPaid ? (userStake * (rewardIndex - rewardPaid)) / WAD : 0n);
+
+    const feeIndex = parseBigIntLike(value.feePerStakeStored);
+    const feePaid = parseBigIntLike(userFeePaid.get(validator));
+    const pendingFees = parseBigIntLike(userPendingFees.get(validator))
+      + (userStake > 0n && feeIndex > feePaid ? (userStake * (feeIndex - feePaid)) / WAD : 0n);
+
+    // claimOperatorRewards pays self-bond share + commission, after folding any retired
+    // schedule remainder (pendingBaseRewards) into the self-bond share.
+    const operatorPendingRewards = parseBigIntLike(value.pendingSelfBondRewards)
+      + parseBigIntLike(value.pendingCommission)
+      + parseBigIntLike(value.pendingBaseRewards);
+    const operatorPendingFees = parseBigIntLike(value.pendingSelfBondFees) + parseBigIntLike(value.pendingFeeCommission);
+
+    const apyBps = realizedApyBps(
+      recentRewards.get(validator) || 0n,
+      record.totalStake,
+      effectiveCommissionBps(state, record.commissionBps)
+    );
+
+    if (user && record.operator === user) {
+      operated.push({ record, rewards: operatorPendingRewards, fees: operatorPendingFees });
+      operatorClaimableTotal += operatorPendingRewards;
+    }
+    if (record.active) activeValidatorCount += 1n;
+
+    userTotalStake += userStake;
+    claimableRewards += pendingRewards;
+    claimableFees += pendingFees;
+    userWeightedApyBps += userStake * apyBps;
+
+    return {
+      address: validator,
+      active: record.active,
+      registryActive: parseBoolLike(profile.active),
+      operator: record.operator,
+      name: String(profile.name || ""),
+      description: String(profile.description || ""),
+      metadataURI: String(profile.metadataURI || ""),
+      protocolValidatorId: String(profile.protocolValidatorId || ""),
+      validatorAddress: validator,
+      status: record.status,
+      isValidator: record.isValidator,
+      eligible: record.eligible,
+      isWaiter: record.eligible && !record.isValidator,
+      jailedUntil: record.jailedUntil.toString(),
+      exitReadyTime: record.exitReadyTime.toString(),
+      blocksProposed: uintString(blocksProposedMap.get(validator)),
+      missedProposals: uintString(missedProposalsMap.get(validator)),
+      consecutiveMisses: uintString(consecutiveMissesMap.get(validator)),
+      commissionBps: record.commissionBps.toString(),
+      selfBond: record.selfBond.toString(),
+      delegatedStake: record.delegatedStake.toString(),
+      totalStake: record.totalStake.toString(),
+      estimatedApy: formatBpsAsPercent(apyBps),
+      userStake: userStake.toString(),
+      pendingRewards: pendingRewards.toString(),
+      pendingFees: pendingFees.toString(),
+      operatorPendingRewards: operatorPendingRewards.toString(),
+      operatorPendingFees: operatorPendingFees.toString(),
+    };
+  });
+
+  // Your actual (stake-weighted) APY once you're delegated; the network's realized APY
+  // until then.
+  const networkBps = networkApyBps(state, recentRewards);
+  const estimatedApy = userTotalStake > 0n
+    ? formatBpsAsPercent(userWeightedApyBps / userTotalStake)
+    : networkBps > 0n
+      ? formatBpsAsPercent(networkBps)
+      : "-";
+
+  const primary = operated[0];
+  const totalRewardableStake = parseBigIntLike(state.totalRewardableStake);
+
+  return {
+    configured: true,
+    deployed: true,
+    contractVersion: "v2",
+    validatorSetDeployed: true,
+    stakingAddress: stakingAddress(),
+    validatorRegistryAddress: validatorRegistryAddress(),
+    stratoTokenAddress: tokenAddress,
+    usdstTokenAddress: normalizeAddress(state.usdstToken),
+    ...tokenInfo,
+    walletBalance,
+    totalUserStake: uintString(state.totalUserStake),
+    totalSelfBond: uintString(state.totalSelfBond),
+    totalUnbonding: uintString(state.totalUnbonding),
+    totalRewardableStake: totalRewardableStake.toString(),
+    totalRewardableStakeUsd: stratoPriceWad > 0n ? ((totalRewardableStake * stratoPriceWad) / WAD).toString() : "0",
+    activeValidatorCount: activeValidatorCount.toString(),
+    rewardReserve: "0",
+    rewardPeriodAmount: "0",
+    scheduledRewardRemaining: "0",
+    baseRewardBps: "0",
+    maxCommissionBps: uintString(state.maxCommissionBps),
+    maxBatchSize: uintString(state.maxBatchSize),
+    unbondingSeconds: uintString(state.unbondingSeconds),
+    periodStart: "0",
+    periodFinish: "0",
+    rewardPeriodName: "",
+    rewardPeriodDescription: "",
+    baseRewardRate: "0",
+    stakeRewardRate: "0",
+    estimatedApy,
+    minStake: uintString(state.minStake),
+    minSelfBond: "0",
+    selfBondGraceUntil: uintString(state.selfBondGraceUntil),
+    selfBondRuleActive: isSelfBondRuleActive(state, now),
+    proposerFeeBps: uintString(state.proposerFeeBps),
+    maxConsecutiveMisses: uintString(state.maxConsecutiveMisses),
+    jailCooldown: uintString(state.jailCooldown),
+    maxActiveValidators: uintString(state.maxActiveValidators),
+    hardCapActiveValidators: uintString(state.hardCapActiveValidators),
+    evictionMarginBps: uintString(state.evictionMarginBps),
+    maxSetMutationsPerBlock: uintString(state.maxSetMutationsPerBlock),
+    exitNoticeSeconds: uintString(state.exitNoticeSeconds),
+    unkickCooldown: uintString(state.unkickCooldown),
+    maxOperatorStakeBps: uintString(state.maxOperatorStakeBps),
+    joinsPaused: parseBoolLike(state.joinsPaused),
+    governanceSyncEnabled: parseBoolLike(state.governanceSyncEnabled),
+    validatorCount: uintString(state.validatorCount),
+    trackedUsdst: uintString(state.trackedUsdst),
+    unattributedFees: uintString(state.unattributedFees),
+    totalFeesCredited: uintString(state.totalFeesCredited),
+    totalRewardsCredited: uintString(state.totalRewardsCredited),
+    userTotalStake: userTotalStake.toString(),
+    userTotalStakeUsd: stratoPriceWad > 0n ? ((userTotalStake * stratoPriceWad) / WAD).toString() : "0",
+    claimableRewards: claimableRewards.toString(),
+    claimableFees: claimableFees.toString(),
+    totalEarned: (lifetimeClaimedRewards + claimableRewards + operatorClaimableTotal).toString(),
+    isOperator: operated.length > 0,
+    operatedValidators: operated.map(({ record }) => record.validator),
+    operatorAddress: primary?.record.validator || "",
+    operatorStatus: primary?.record.status || 0,
+    operatorClaimableRewards: (primary?.rewards || 0n).toString(),
+    operatorClaimableFees: (primary?.fees || 0n).toString(),
+    operatorPendingBaseRewards: "0",
+    operatorPendingCommission: uintString(primary?.record.value.pendingCommission),
+    // The retired schedule's remainder settles into the self-bond share, so it is
+    // reported there and the parts still add up to operatorClaimableRewards.
+    operatorPendingSelfBondRewards: primary
+      ? (parseBigIntLike(primary.record.value.pendingSelfBondRewards) + parseBigIntLike(primary.record.value.pendingBaseRewards)).toString()
+      : "0",
+    currentOperatorCommissionBps: (primary?.record.commissionBps || 0n).toString(),
+    validators,
+    unbondingRequests: v2UnbondingRequests(state, user),
+  };
+};
+
+// ---- transactions ----
+
 const buildAndPost = async (
   accessToken: string,
   userAddress: string,
@@ -1112,6 +1578,26 @@ const buildAndPost = async (
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
+};
+
+const stakingCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({
+  contractName: extractContractName(StratoStaking),
+  contractAddress: requireStakingAddress(),
+  method,
+  args,
+});
+
+const registryCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({
+  contractName: extractContractName(ValidatorRegistry),
+  contractAddress: requireValidatorRegistryAddress(),
+  method,
+  args,
+});
+
+const requireValidatorArg = (validator: unknown): string => {
+  const address = normalizeAddress(validator);
+  if (!isNormalizedAddress(address)) throw badRequest("validator is required");
+  return address;
 };
 
 const batchSizeFromValue = (value: unknown): number => {
@@ -1125,19 +1611,6 @@ const batchSizeFromInfo = (info: StratoStakingInfo): number => batchSizeFromValu
 const getMaxBatchSize = async (accessToken: string): Promise<number> => {
   const contractState = await getContractState(accessToken);
   return batchSizeFromValue(contractState?.state?.maxBatchSize);
-};
-
-// Guard for the calls the validator-set / proposer-fee upgrade introduced. Against the
-// contract still deployed here they resolve to no method at all and revert inside the
-// VM, so refuse them up front with something a user can act on. An unreadable contract
-// state is not treated as "not upgraded": that would block staking on a Cirrus blip.
-const requireValidatorSetUpgrade = async (accessToken: string): Promise<void> => {
-  const contractState = await getContractState(accessToken);
-  if (contractState && !contractState.validatorSetDeployed) {
-    throw badRequest(
-      "Validator set management is unavailable: the staking contract upgrade has not been deployed on this network yet."
-    );
-  }
 };
 
 const assertWithinMaxBatchSize = (count: number, maxBatchSize: number, label: string): void => {
@@ -1157,10 +1630,10 @@ const chunkByMaxBatchSize = <T>(items: T[], maxBatchSize: number): T[][] => {
 const normalizeDelegations = (delegations: StakeDelegationInput[]): StakeDelegationInput[] => {
   const normalized = delegations
     .map((delegation) => ({
-      operator: normalizeAddress(delegation.operator),
+      validator: normalizeAddress(delegation.validator),
       amount: String(delegation.amount || "0"),
     }))
-    .filter((delegation) => delegation.operator && parseBigIntLike(delegation.amount) > 0n);
+    .filter((delegation) => delegation.validator && parseBigIntLike(delegation.amount) > 0n);
 
   if (!normalized.length) {
     throw new Error("At least one delegation is required");
@@ -1169,6 +1642,7 @@ const normalizeDelegations = (delegations: StakeDelegationInput[]): StakeDelegat
   return normalized;
 };
 
+// Stake targets are validators on v2 and operators on v1; the call shapes match.
 export const stakeStrato = async (
   accessToken: string,
   userAddress: string,
@@ -1176,6 +1650,7 @@ export const stakeStrato = async (
 ): Promise<{ status: string; hash: string }> => {
   const staking = requireStakingAddress();
   const token = requireStratoTokenAddress();
+  const version = await requireContractVersion(accessToken);
   const normalized = normalizeDelegations(delegations);
   const maxBatchSize = await getMaxBatchSize(accessToken);
   assertWithinMaxBatchSize(normalized.length, maxBatchSize, "Delegations");
@@ -1183,25 +1658,15 @@ export const stakeStrato = async (
   const totalAmount = normalized.reduce((sum, delegation) => sum + parseBigIntLike(delegation.amount), 0n);
   const allowance = await getTokenAllowance(accessToken, token, userAddress, staking);
 
+  const targets = normalized.map(({ validator }) => validator);
+  const amounts = normalized.map(({ amount }) => amount);
   const stakeTx: FunctionInput = normalized.length === 1
-    ? {
-        contractName: extractContractName(StratoStaking),
-        contractAddress: staking,
-        method: "stake",
-        args: {
-          operator: normalized[0].operator,
-          amount: normalized[0].amount,
-        },
-      }
-    : {
-        contractName: extractContractName(StratoStaking),
-        contractAddress: staking,
-        method: "stakeBatch",
-        args: {
-          stakeOperators: normalized.map(({ operator }) => operator),
-          amounts: normalized.map(({ amount }) => amount),
-        },
-      };
+    ? stakingCall("stake", version === "v2"
+        ? { validator: targets[0], amount: amounts[0] }
+        : { operator: targets[0], amount: amounts[0] })
+    : stakingCall("stakeBatch", version === "v2"
+        ? { validators: targets, amounts }
+        : { stakeOperators: targets, amounts });
 
   const txs: FunctionInput[] = [];
   if (allowance < totalAmount) {
@@ -1223,248 +1688,303 @@ export const stakeStrato = async (
 export const moveStratoStake = async (
   accessToken: string,
   userAddress: string,
-  fromOperator: string,
-  toOperator: string,
+  fromValidator: string,
+  toValidator: string,
   amount: string
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
+  const from = normalizeAddress(fromValidator);
+  const to = normalizeAddress(toValidator);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "moveStake",
-    args: {
-      fromOperator: normalizeAddress(fromOperator),
-      toOperator: normalizeAddress(toOperator),
-      amount,
-    },
-  });
+  return await buildAndPost(accessToken, userAddress, stakingCall("moveStake", version === "v2"
+    ? { fromValidator: from, toValidator: to, amount }
+    : { fromOperator: from, toOperator: to, amount }));
 };
 
 export const unstakeStrato = async (
   accessToken: string,
   userAddress: string,
-  operator: string,
+  validator: string,
   amount: string
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
+  const target = normalizeAddress(validator);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "unstake",
-    args: {
-      operator: normalizeAddress(operator),
-      amount,
-    },
-  });
+  return await buildAndPost(accessToken, userAddress, stakingCall("unstake", version === "v2"
+    ? { validator: target, amount }
+    : { operator: target, amount }));
+};
+
+// Resolve the records a delegator claim covers: the ones named, or every record with
+// something pending, chunked to maxBatchSize.
+const resolveClaimTargets = async (
+  accessToken: string,
+  userAddress: string,
+  targets: string[] | undefined,
+  claimAll: boolean,
+  pending: (validator: StratoOperatorInfo) => string,
+  label: string
+): Promise<string[][]> => {
+  let claimTargets = (targets || []).map(normalizeAddress).filter(Boolean);
+  let maxBatchSize = claimTargets.length || 1;
+
+  if (claimAll) {
+    const info = await getStratoStakingInfo(accessToken, userAddress);
+    maxBatchSize = batchSizeFromInfo(info);
+    claimTargets = info.validators
+      .filter((validator) => parseBigIntLike(pending(validator)) > 0n)
+      .map((validator) => validator.address);
+  } else if (claimTargets.length) {
+    maxBatchSize = await getMaxBatchSize(accessToken);
+    assertWithinMaxBatchSize(claimTargets.length, maxBatchSize, "Claim validators");
+  }
+
+  if (!claimTargets.length) {
+    throw new Error(`No validators selected for ${label} claim`);
+  }
+
+  return chunkByMaxBatchSize(claimTargets, maxBatchSize);
 };
 
 export const claimStratoRewards = async (
   accessToken: string,
   userAddress: string,
-  operators?: string[],
+  validators?: string[],
   claimAll = false
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
-  let claimOperators = (operators || []).map(normalizeAddress).filter(Boolean);
-  let maxBatchSize = claimOperators.length || 1;
+  requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
+  const batches = await resolveClaimTargets(
+    accessToken, userAddress, validators, claimAll, (validator) => validator.pendingRewards, "reward");
 
-  if (claimAll) {
-    const info = await getStratoStakingInfo(accessToken, userAddress);
-    maxBatchSize = batchSizeFromInfo(info);
-    claimOperators = info.validators
-      .filter((validator) => parseBigIntLike(validator.pendingRewards) > 0n)
-      .map((validator) => validator.address);
-  } else if (claimOperators.length) {
-    maxBatchSize = await getMaxBatchSize(accessToken);
-    assertWithinMaxBatchSize(claimOperators.length, maxBatchSize, "Claim operators");
-  }
-
-  if (!claimOperators.length) {
-    throw new Error("No operators selected for reward claim");
-  }
-
-  const batches = chunkByMaxBatchSize(claimOperators, maxBatchSize);
-  return await buildAndPost(accessToken, userAddress, batches.map((claimOperatorsBatch) => ({
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "claimRewards",
-    args: {
-      claimOperators: claimOperatorsBatch,
-    },
-  })));
+  return await buildAndPost(accessToken, userAddress, batches.map((batch) =>
+    stakingCall("claimRewards", version === "v2" ? { validators: batch } : { claimOperators: batch })));
 };
 
 export const claimStratoOperatorRewards = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "claimOperatorRewards",
-    args: {},
-  });
+  return await buildAndPost(accessToken, userAddress, version === "v2"
+    ? stakingCall("claimOperatorRewards", { validator: requireValidatorArg(validator) })
+    : stakingCall("claimOperatorRewards"));
 };
 
 // USDST proposer fees have their own claim path, separate from STRATO rewards.
 export const claimStratoFeeRewards = async (
   accessToken: string,
   userAddress: string,
-  operators?: string[],
+  validators?: string[],
   claimAll = false
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
-  await requireValidatorSetUpgrade(accessToken);
-  let claimOperators = (operators || []).map(normalizeAddress).filter(Boolean);
-  let maxBatchSize = claimOperators.length || 1;
+  requireStakingAddress();
+  await requireV2(accessToken);
+  const batches = await resolveClaimTargets(
+    accessToken, userAddress, validators, claimAll, (validator) => validator.pendingFees, "fee");
 
-  if (claimAll) {
-    const info = await getStratoStakingInfo(accessToken, userAddress);
-    maxBatchSize = batchSizeFromInfo(info);
-    claimOperators = info.validators
-      .filter((validator) => parseBigIntLike(validator.pendingFees) > 0n)
-      .map((validator) => validator.address);
-  } else if (claimOperators.length) {
-    maxBatchSize = await getMaxBatchSize(accessToken);
-    assertWithinMaxBatchSize(claimOperators.length, maxBatchSize, "Claim operators");
-  }
-
-  if (!claimOperators.length) {
-    throw new Error("No operators selected for fee claim");
-  }
-
-  const batches = chunkByMaxBatchSize(claimOperators, maxBatchSize);
-  return await buildAndPost(accessToken, userAddress, batches.map((claimOperatorsBatch) => ({
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "claimFeeRewards",
-    args: {
-      claimOperators: claimOperatorsBatch,
-    },
-  })));
+  return await buildAndPost(accessToken, userAddress, batches.map((batch) =>
+    stakingCall("claimFeeRewards", { validators: batch })));
 };
 
 export const claimStratoOperatorFeeRewards = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: requireStakingAddress(),
-    method: "claimOperatorFeeRewards",
-    args: {},
-  });
+  return await buildAndPost(accessToken, userAddress,
+    stakingCall("claimOperatorFeeRewards", { validator: requireValidatorArg(validator) }));
 };
 
 // ---- validator lifecycle (operator / permissionless) ----
 
-// List msg.sender as an operator; joining the consensus set is a separate tryActivate.
+// The registry's operator-authorization message: keccak256 over the packed encoding of the
+// prefix, registry, validator, operator and uint256 nonce, with no signed-message prefix
+// (ValidatorRegistry.authorizationDigest).
+const AUTHORIZATION_PREFIX = "STRATO validator operator authorization";
+
+const authorizationDigest = (registry: string, validator: string, operator: string, nonce: bigint): string => {
+  const packed = Buffer.concat([
+    Buffer.from(AUTHORIZATION_PREFIX, "utf8"),
+    Buffer.from(registry, "hex"),
+    Buffer.from(validator, "hex"),
+    Buffer.from(operator, "hex"),
+    Buffer.from(nonce.toString(16).padStart(64, "0"), "hex"),
+  ]);
+  return `0x${keccak256(packed).toString("hex")}`;
+};
+
+export const getStratoAuthorizationDigest = async (
+  accessToken: string,
+  validator: string,
+  operator: string
+): Promise<StratoAuthorizationDigest> => {
+  const registry = requireValidatorRegistryAddress();
+  const validatorAddress = requireValidatorArg(validator);
+  const operatorAddress = normalizeAddress(operator);
+  if (!isNormalizedAddress(operatorAddress)) throw badRequest("operator is required");
+  await requireV2(accessToken);
+
+  // Read fresh: every register/setOperator spends the nonce, and a digest over a spent
+  // nonce can never be accepted. Absent from state = never spent = 0.
+  const registryState = await getBlocState(accessToken, extractContractName(ValidatorRegistry), registry, true);
+  const nonce = parseBigIntLike(addressKeyed(registryState.authorizationNonce).get(validatorAddress));
+
+  return {
+    registry,
+    validator: validatorAddress,
+    operator: operatorAddress,
+    nonce: nonce.toString(),
+    digest: authorizationDigest(registry, validatorAddress, operatorAddress, nonce),
+  };
+};
+
+// r || s || v as 130 hex characters. r and s travel as decimal strings (uint256
+// parameters); v may be a recovery id (0/1) or 27/28, as the registry accepts both.
+const splitSignature = (signature: unknown): { v: string; r: string; s: string } | null => {
+  if (signature === undefined || signature === null || signature === "") return null;
+
+  const hex = String(signature).trim().replace(/^0x/i, "");
+  if (!/^[0-9a-fA-F]{130}$/.test(hex)) {
+    throw badRequest("signature must be 0x followed by 130 hex characters (r, s, v)");
+  }
+  const v = parseInt(hex.slice(128), 16);
+  if (![0, 1, 27, 28].includes(v)) {
+    throw badRequest("signature v must be 0, 1, 27 or 28");
+  }
+
+  return {
+    r: BigInt(`0x${hex.slice(0, 64)}`).toString(),
+    s: BigInt(`0x${hex.slice(64, 128)}`).toString(),
+    v: String(v),
+  };
+};
+
+// List a validator with msg.sender as its operator; joining the consensus set is a
+// separate tryActivate. Needs the validator key's consent unless the key itself sends it.
 export const registerStratoOperator = async (
   accessToken: string,
   userAddress: string,
-  input: OperatorProfileInput
+  input: RegisterValidatorInput
 ): Promise<{ status: string; hash: string }> => {
-  const validatorAddress = normalizeAddress(input.validatorAddress);
-  if (!validatorAddress) throw badRequest("validatorAddress is required");
+  const validator = requireValidatorArg(input.validator);
   if (input.commissionBps === undefined || input.commissionBps === "") throw badRequest("commissionBps is required");
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(ValidatorRegistry),
-    contractAddress: requireValidatorRegistryAddress(),
-    method: "register",
-    args: {
-      commissionBps: String(input.commissionBps),
-      name: String(input.name || ""),
-      description: String(input.description || ""),
-      metadataURI: String(input.metadataURI || ""),
-      protocolValidatorId: String(input.protocolValidatorId || ""),
-      validatorAddress,
-    },
-  });
+  const signature = splitSignature(input.signature);
+  if (!signature && validator !== normalizeAddress(userAddress)) {
+    throw badRequest(
+      "signature is required: the validator key must sign the operator authorization digest (GET /staking/authorization-digest)"
+    );
+  }
+
+  return await buildAndPost(accessToken, userAddress, registryCall("register", {
+    validator,
+    commissionBps: String(input.commissionBps),
+    name: String(input.name || ""),
+    description: String(input.description || ""),
+    metadataURI: String(input.metadataURI || ""),
+    // Ignored by the registry when the validator key is the sender.
+    v: signature?.v ?? "0",
+    r: signature?.r ?? "0",
+    s: signature?.s ?? "0",
+  }));
 };
 
 export const updateStratoOperatorProfile = async (
   accessToken: string,
   userAddress: string,
-  input: OperatorProfileInput
-): Promise<{ status: string; hash: string }> =>
-  buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(ValidatorRegistry),
-    contractAddress: requireValidatorRegistryAddress(),
-    method: "updateProfile",
-    args: {
-      operator: normalizeAddress(userAddress),
-      name: String(input.name || ""),
-      description: String(input.description || ""),
-      metadataURI: String(input.metadataURI || ""),
-      protocolValidatorId: String(input.protocolValidatorId || ""),
-    },
-  });
+  input: ValidatorProfileInput
+): Promise<{ status: string; hash: string }> => {
+  const version = await requireContractVersion(accessToken);
+  const profile = {
+    name: String(input.name || ""),
+    description: String(input.description || ""),
+    metadataURI: String(input.metadataURI || ""),
+    protocolValidatorId: String(input.protocolValidatorId || ""),
+  };
 
-const stakingCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({
-  contractName: extractContractName(StratoStaking),
-  contractAddress: requireStakingAddress(),
-  method,
-  args,
-});
+  return await buildAndPost(accessToken, userAddress, version === "v2"
+    ? registryCall("updateProfile", { validator: requireValidatorArg(input.validator), ...profile })
+    : registryCall("updateProfile", { operator: normalizeAddress(userAddress), ...profile }));
+};
 
-// Put an eligible operator (default: the caller) into the consensus set.
+// Put an eligible validator into the consensus set.
 export const activateStratoOperator = async (
   accessToken: string,
   userAddress: string,
-  operator?: string
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await buildAndPost(accessToken, userAddress, stakingCall("tryActivate", {
-    operator: normalizeAddress(operator) || normalizeAddress(userAddress),
+    validator: requireValidatorArg(validator),
   }));
 };
 
+// Fill free set slots from the waiters, best first. reconcileSet only considers the
+// candidates it is handed (at most maxBatchSize), so the backend does the indexing.
 export const reconcileStratoValidatorSet = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, stakingCall("reconcileSet"));
+  const state = await getStakingBlocState(accessToken, true);
+  const candidates = v2ValidatorRecords(state)
+    .filter((record) => record.eligible && !record.isValidator)
+    .sort((a, b) =>
+      a.totalStake !== b.totalStake
+        ? (b.totalStake > a.totalStake ? 1 : -1)
+        : (a.validator < b.validator ? -1 : 1))
+    .slice(0, batchSizeFromValue(state.maxBatchSize))
+    .map((record) => record.validator);
+
+  if (!candidates.length) {
+    throw badRequest("No eligible validators are waiting to join the set");
+  }
+
+  return await buildAndPost(accessToken, userAddress, stakingCall("reconcileSet", { candidates }));
 };
 
 export const syncStratoValidator = async (
   accessToken: string,
   userAddress: string,
-  operator?: string
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await buildAndPost(accessToken, userAddress, stakingCall("syncValidator", {
-    operator: normalizeAddress(operator) || normalizeAddress(userAddress),
+    validator: requireValidatorArg(validator),
   }));
 };
 
 export const requestStratoExit = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, stakingCall("requestExit"));
+  return await buildAndPost(accessToken, userAddress, stakingCall("requestExit", {
+    validator: requireValidatorArg(validator),
+  }));
 };
 
 export const cancelStratoExit = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  validator?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, stakingCall("cancelExit"));
+  return await buildAndPost(accessToken, userAddress, stakingCall("cancelExit", {
+    validator: requireValidatorArg(validator),
+  }));
 };
 
 export const withdrawStratoUnbonded = async (
@@ -1503,41 +2023,51 @@ export const withdrawStratoUnbonded = async (
   })));
 };
 
+// ---- operator stake and commission ----
+
+// v1 operator calls act on msg.sender's own record; v2 names the validator record.
 export const setStratoCommission = async (
   accessToken: string,
   userAddress: string,
+  validator: string | undefined,
   commissionBps: string
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "setCommissionBps",
-    args: {
-      newCommissionBps: commissionBps,
-    },
-  });
+  return await buildAndPost(accessToken, userAddress, version === "v2"
+    ? stakingCall("setCommissionBps", { validator: requireValidatorArg(validator), newCommissionBps: commissionBps })
+    : stakingCall("setCommissionBps", { newCommissionBps: commissionBps }));
 };
 
 export const setStratoOperatorCommission = async (
   accessToken: string,
   userAddress: string,
-  operator: string,
+  validator: string,
   commissionBps: string
-): Promise<{ status: string; hash: string }> =>
-  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setOperatorCommissionBps", [
-    normalizeAddress(operator),
-    commissionBps,
-  ]);
+): Promise<{ status: string; hash: string }> => {
+  const version = await requireContractVersion(accessToken);
+
+  return castVoteOnIssue(
+    accessToken,
+    userAddress,
+    requireStakingAddress(),
+    version === "v2" ? "setValidatorCommissionBps" : "setOperatorCommissionBps",
+    [normalizeAddress(validator), commissionBps]
+  );
+};
 
 export const selfBondStrato = async (
   accessToken: string,
   userAddress: string,
+  validator: string | undefined,
   amount: string
 ): Promise<{ status: string; hash: string }> => {
   const staking = requireStakingAddress();
   const token = requireStratoTokenAddress();
+  const version = await requireContractVersion(accessToken);
+  const bondTx = version === "v2"
+    ? stakingCall("selfBond", { validator: requireValidatorArg(validator), amount })
+    : stakingCall("selfBond", { amount });
 
   return await buildAndPost(accessToken, userAddress, [
     {
@@ -1549,28 +2079,21 @@ export const selfBondStrato = async (
         value: amount,
       },
     },
-    {
-      contractName: extractContractName(StratoStaking),
-      contractAddress: staking,
-      method: "selfBond",
-      args: { amount },
-    },
+    bondTx,
   ]);
 };
 
 export const unbondSelfStrato = async (
   accessToken: string,
   userAddress: string,
+  validator: string | undefined,
   amount: string
 ): Promise<{ status: string; hash: string }> => {
-  const staking = requireStakingAddress();
+  const version = await requireContractVersion(accessToken);
 
-  return await buildAndPost(accessToken, userAddress, {
-    contractName: extractContractName(StratoStaking),
-    contractAddress: staking,
-    method: "unbondSelf",
-    args: { amount },
-  });
+  return await buildAndPost(accessToken, userAddress, version === "v2"
+    ? stakingCall("unbondSelf", { validator: requireValidatorArg(validator), amount })
+    : stakingCall("unbondSelf", { amount }));
 };
 
 export const depositStratoRewards = async (
@@ -1580,6 +2103,7 @@ export const depositStratoRewards = async (
 ): Promise<{ status: string; hash: string }> => {
   const staking = requireStakingAddress();
   const token = requireStratoTokenAddress();
+  await requireV1(accessToken, "Reward deposits");
 
   return await buildAndPost(accessToken, userAddress, [
     {
@@ -1591,76 +2115,131 @@ export const depositStratoRewards = async (
         value: amount,
       },
     },
-    {
-      contractName: extractContractName(StratoStaking),
-      contractAddress: staking,
-      method: "depositRewards",
-      args: { amount },
-    },
+    stakingCall("depositRewards", { amount }),
   ]);
 };
 
+// ---- admin (owner votes) ----
+
+// v2 lists validator/operator pairs (addValidator); v1 lists operators (addOperator).
 export const addStratoOperator = async (
   accessToken: string,
   userAddress: string,
   input: AddStratoOperatorInput | AddStratoOperatorInput[]
 ): Promise<{ status: string; hash: string }> => {
-  const operators = (Array.isArray(input) ? input : [input]).map((item) => ({
+  const listings = (Array.isArray(input) ? input : [input]).map((item) => ({
+    validator: normalizeAddress(item.validator),
     operator: normalizeAddress(item.operator),
-    commissionBps: String(item.commissionBps),
+    commissionBps: String(item.commissionBps ?? ""),
     name: String(item.name || ""),
     description: String(item.description || ""),
     metadataURI: String(item.metadataURI || ""),
     protocolValidatorId: String(item.protocolValidatorId || ""),
-    validatorAddress: normalizeAddress(item.validatorAddress),
   }));
 
-  if (!operators.length || operators.some((item) => !item.operator || item.commissionBps === "")) {
-    throw new Error("At least one operator is required");
+  if (!listings.length || listings.some((item) => !item.operator || item.commissionBps === "")) {
+    throw badRequest("At least one operator is required");
   }
 
   const registry = requireValidatorRegistryAddress();
-  // addOperator/addOperators only take a validator address once the upgrade is deployed;
-  // passing it to the older registry would be an arity mismatch, not an ignored extra.
-  const contractState = await getContractState(accessToken);
-  const takesValidatorAddress = contractState?.validatorSetDeployed !== false;
+  const version = await requireContractVersion(accessToken);
 
-  if (operators.length === 1) {
-    const operator = operators[0];
+  if (version === "v2") {
+    if (listings.some((item) => !isNormalizedAddress(item.validator))) {
+      throw badRequest("validator is required for every listing");
+    }
+    if (listings.length === 1) {
+      const item = listings[0];
+      return castVoteOnIssue(accessToken, userAddress, registry, "addValidator", [
+        item.validator,
+        item.operator,
+        item.commissionBps,
+        item.name,
+        item.description,
+        item.metadataURI,
+        item.protocolValidatorId,
+      ]);
+    }
+    return castVoteOnIssue(accessToken, userAddress, registry, "addValidators", [
+      listings.map(({ validator }) => validator),
+      listings.map(({ operator }) => operator),
+      listings.map(({ commissionBps }) => commissionBps),
+      listings.map(({ name }) => name),
+      listings.map(({ description }) => description),
+      listings.map(({ metadataURI }) => metadataURI),
+      listings.map(({ protocolValidatorId }) => protocolValidatorId),
+    ]);
+  }
+
+  if (listings.length === 1) {
+    const item = listings[0];
     return castVoteOnIssue(accessToken, userAddress, registry, "addOperator", [
-      operator.operator,
-      operator.commissionBps,
-      operator.name,
-      operator.description,
-      operator.metadataURI,
-      operator.protocolValidatorId,
-      ...(takesValidatorAddress ? [operator.validatorAddress] : []),
+      item.operator,
+      item.commissionBps,
+      item.name,
+      item.description,
+      item.metadataURI,
+      item.protocolValidatorId,
     ]);
   }
 
   return castVoteOnIssue(accessToken, userAddress, registry, "addOperators", [
-    operators.map(({ operator }) => operator),
-    operators.map(({ commissionBps }) => commissionBps),
-    operators.map(({ name }) => name),
-    operators.map(({ description }) => description),
-    operators.map(({ metadataURI }) => metadataURI),
-    operators.map(({ protocolValidatorId }) => protocolValidatorId),
-    ...(takesValidatorAddress ? [operators.map(({ validatorAddress }) => validatorAddress)] : []),
+    listings.map(({ operator }) => operator),
+    listings.map(({ commissionBps }) => commissionBps),
+    listings.map(({ name }) => name),
+    listings.map(({ description }) => description),
+    listings.map(({ metadataURI }) => metadataURI),
+    listings.map(({ protocolValidatorId }) => protocolValidatorId),
   ]);
 };
 
-export const setStratoValidatorAddress = async (
+export const removeStratoOperator = async (
   accessToken: string,
   userAddress: string,
-  operator: string,
-  validatorAddress: string
+  validator: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  const version = await requireContractVersion(accessToken);
 
-  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setValidatorAddress", [
+  return castVoteOnIssue(
+    accessToken,
+    userAddress,
+    requireValidatorRegistryAddress(),
+    version === "v2" ? "removeValidator" : "removeOperator",
+    [normalizeAddress(validator)]
+  );
+};
+
+// Hand a validator to a new operator without the validator key's signature (the admins
+// vouch for it). Staking pays out and unbonds what the outgoing operator owns.
+export const setStratoValidatorOperator = async (
+  accessToken: string,
+  userAddress: string,
+  validator: string,
+  operator: string
+): Promise<{ status: string; hash: string }> => {
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "adminSetOperator", [
+    requireValidatorArg(validator),
     normalizeAddress(operator),
-    normalizeAddress(validatorAddress),
   ]);
+};
+
+// Only the retired operator-keyed V2 registry had setValidatorAddress. The V1 registry never
+// had it (a vote would fail on execution), and v2 records are keyed by validator, so there is
+// nothing separate to set.
+export const setStratoValidatorAddress = async (
+  accessToken: string,
+  _userAddress: string,
+  _operator: string,
+  _validatorAddress: string
+): Promise<{ status: string; hash: string }> => {
+  if ((await requireContractVersion(accessToken)) === "v2") {
+    throw badRequest(
+      "Validator records are keyed by validator address on this network; use PATCH /staking/admin/operators/operator to change a validator's operator."
+    );
+  }
+  throw badRequest("This network's validator registry has no validator address binding.");
 };
 
 export const setStratoEmergencyKicker = async (
@@ -1668,21 +2247,12 @@ export const setStratoEmergencyKicker = async (
   userAddress: string,
   kicker: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "setEmergencyKicker", [
     normalizeAddress(kicker),
   ]);
 };
-
-export const removeStratoOperator = async (
-  accessToken: string,
-  userAddress: string,
-  operator: string
-): Promise<{ status: string; hash: string }> =>
-  castVoteOnIssue(accessToken, userAddress, requireValidatorRegistryAddress(), "removeOperator", [
-    normalizeAddress(operator),
-  ]);
 
 export const startStratoRewardSchedule = async (
   accessToken: string,
@@ -1693,8 +2263,10 @@ export const startStratoRewardSchedule = async (
   baseRewardBps: string,
   name: string,
   description: string
-): Promise<{ status: string; hash: string }> =>
-  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "startRewardSchedule", [
+): Promise<{ status: string; hash: string }> => {
+  await requireV1(accessToken, "Reward schedules");
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "startRewardSchedule", [
     rewardAmount,
     startTime,
     duration,
@@ -1702,49 +2274,80 @@ export const startStratoRewardSchedule = async (
     name,
     description,
   ]);
+};
 
 export const stopStratoRewardSchedule = async (
   accessToken: string,
   userAddress: string
-): Promise<{ status: string; hash: string }> =>
-  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "stopRewardSchedule", []);
+): Promise<{ status: string; hash: string }> => {
+  await requireV1(accessToken, "Reward schedules");
 
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "stopRewardSchedule", []);
+};
+
+// v2 dropped baseRewardBps with the reward schedule.
 export const setStratoStakingParams = async (
   accessToken: string,
   userAddress: string,
   args: {
     unbondingSeconds: string;
-    baseRewardBps: string;
+    baseRewardBps?: string;
     maxCommissionBps: string;
     maxBatchSize: string;
   }
-): Promise<{ status: string; hash: string }> =>
-  castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setParams", [
+): Promise<{ status: string; hash: string }> => {
+  const version = await requireContractVersion(accessToken);
+  if (version === "v2") {
+    return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setParams", [
+      args.unbondingSeconds,
+      args.maxCommissionBps,
+      args.maxBatchSize,
+    ]);
+  }
+
+  if (args.baseRewardBps === undefined || args.baseRewardBps === "") {
+    throw badRequest("baseRewardBps is required");
+  }
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setParams", [
     args.unbondingSeconds,
     args.baseRewardBps,
     args.maxCommissionBps,
     args.maxBatchSize,
   ]);
+};
 
 export const setStratoValidatorParams = async (
   accessToken: string,
   userAddress: string,
   args: {
     minStake: string;
-    minSelfBond: string;
     proposerFeeBps: string;
     maxConsecutiveMisses: string;
     jailCooldown: string;
   }
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setValidatorParams", [
     args.minStake,
-    args.minSelfBond,
     args.proposerFeeBps,
     args.maxConsecutiveMisses,
     args.jailCooldown,
+  ]);
+};
+
+// End of the self-bond grace period (unix seconds). A time in the past applies the
+// self-bond rule immediately and drops under-bonded validators from the set.
+export const setStratoSelfBondGrace = async (
+  accessToken: string,
+  userAddress: string,
+  selfBondGraceUntil: string
+): Promise<{ status: string; hash: string }> => {
+  if (parseBigIntLike(selfBondGraceUntil) <= 0n) throw badRequest("selfBondGraceUntil must be positive");
+  await requireV2(accessToken);
+
+  return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSelfBondGraceUntil", [
+    selfBondGraceUntil,
   ]);
 };
 
@@ -1762,7 +2365,7 @@ export const setStratoSetParams = async (
     joinsPaused: boolean;
   }
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setSetParams", [
     args.maxActiveValidators,
@@ -1782,7 +2385,7 @@ export const setStratoGovernance = async (
   governance: string,
   syncEnabled: boolean
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "setGovernance", [
     normalizeAddress(governance) || normalizeAddress(constants.mercataGovernance),
@@ -1796,7 +2399,7 @@ export const recoverStratoUnattributedFees = async (
   to: string,
   amount: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, requireStakingAddress(), "recoverUnattributedFees", [
     normalizeAddress(to),
@@ -1805,13 +2408,13 @@ export const recoverStratoUnattributedFees = async (
 };
 
 // MercataGovernance (0x100): wire the staking contract and bound the validator set.
-// Governance grew its staking hooks in the same rollout, so it is gated on the same flag.
+// Governance grew its staking hooks in the same rollout, so it is gated on v2.
 export const setGovernanceStakingContract = async (
   accessToken: string,
   userAddress: string,
   stakingContract?: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, normalizeAddress(constants.mercataGovernance), "setStakingContract", [
     normalizeAddress(stakingContract) || requireStakingAddress(),
@@ -1823,7 +2426,7 @@ export const setGovernanceHardCap = async (
   userAddress: string,
   hardCap: string
 ): Promise<{ status: string; hash: string }> => {
-  await requireValidatorSetUpgrade(accessToken);
+  await requireV2(accessToken);
 
   return await castVoteOnIssue(accessToken, userAddress, normalizeAddress(constants.mercataGovernance), "setHardCapValidators", [
     hardCap,

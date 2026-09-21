@@ -390,6 +390,17 @@ consumeFromLatest topicName initAction f = do
   initAction
   runConsume (T.pack subscriber) topicName f
 
+-- | Stream batches from a topic under the shared, durable subscriber named by
+-- the 'ClientId'.
+--
+-- Every 'conduitBatchSource' (and 'consume') instance that uses the same
+-- 'ClientId' on the same topic shares ONE checkpoint, so concurrent instances
+-- compete for messages (work-queue semantics), and a batch is checkpointed
+-- before it is yielded downstream. This differs from the Kafka backend's
+-- 'conduitBatchSource', which gave every instance its own in-memory offset
+-- starting at the latest message (broadcast semantics). A caller that needs
+-- every instance to see every message must run a single source and fan the
+-- items out in process (see strato-p2p's "Blockchain.SeqEventNotify").
 conduitBatchSource :: (Binary a, MonadIO m) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do

@@ -189,24 +189,27 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
 
-    -- Make the streaming broker's data directories writable by the container's
-    -- built-in user. The apache/kafka image runs as its baked-in "appuser"
-    -- (uid 1000) and writes its data into the bind-mounted broker dir
-    -- (KAFKA_LOG_DIRS). strato-init creates that dir owned by the host login
-    -- user; when the host uid is not 1000 (e.g. some Oracle Cloud VMs) appuser
-    -- cannot write it and the broker only starts if forced to run as root.
-    -- A non-root strato-init cannot chown the dir to uid 1000, so we relax its
-    -- mode instead - the same approach already used for "logs" above. The
-    -- image's own config dir (/opt/kafka/config) is owned by uid 1000, so
-    -- running as appuser keeps that writable without any root privileges.
+    -- Make the streaming backend's data directories writable by whatever user
+    -- ends up writing them. On the default JLog backend that is the host user
+    -- running the strato processes (JLog is embedded, so its brokerVolumeDirs
+    -- is just ["jlog"] and there is no container at all) -- but a snapshot
+    -- restore can lay that tree down under a different uid than the one that
+    -- later runs the node, so relaxing the mode here keeps both able to read
+    -- and write it. strato-snapshot applies the same treatment to the jlog
+    -- payload it stages and restores.
     --
-    -- NOTE: this is scoped to the default Kafka backend, whose brokerVolumeDirs
-    -- is just ["kafka"] (a data dir). Other backends selected at build time have
-    -- different dirs: the Redpanda/kafka-hw backend runs as the host uid:gid
-    -- (bcNeedsUserGid = True), so its dirs are already owned correctly and do
-    -- NOT need this; in particular its config dir (redpanda/config) should not
-    -- be made world-writable. If that backend ever becomes the default, give it
-    -- a narrower treatment instead of relaxing every broker dir here.
+    -- The relaxation also covers container-based backends still selectable at
+    -- build time, which is where it originated: the apache/kafka image runs as
+    -- its baked-in "appuser" (uid 1000) and writes into the bind-mounted broker
+    -- dir, so on a host whose uid is not 1000 (e.g. some Oracle Cloud VMs)
+    -- appuser cannot write a dir strato-init created as the host login user,
+    -- and a non-root strato-init cannot chown it to uid 1000.
+    --
+    -- NOTE: this relaxes *every* dir a backend declares. That is right for a
+    -- pure data dir (jlog/, kafka/), but the Redpanda/kafka-hw backend runs as
+    -- the host uid:gid (bcNeedsUserGid = True) and declares a config dir
+    -- (redpanda/config) that should NOT be world-writable. If that backend ever
+    -- becomes the default, give it a narrower treatment instead.
     liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
 
     -- Copy SSL cert and key into the node's secrets/ssl/ directory

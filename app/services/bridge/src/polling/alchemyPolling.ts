@@ -62,6 +62,8 @@ import { fetchRouteSteps } from "../services/routeQuoteService";
 import { convertToStratoDecimals } from "../utils/utils";
 
 const AUTO_ROUTE_ACTION = "4";
+const DEFAULT_LOGS_SPAN = 800;
+const MAX_WINDOWS_PER_TICK = 30;
 const normalizeAddress = (value: string): string =>
   value.toLowerCase().replace(/^0x/, "");
 
@@ -69,6 +71,25 @@ const realtimeProviders = new Map<
   number,
   { provider: WebSocketProvider; routerKey: string }
 >();
+
+const getLogsSpan = (chainId: number): number =>
+  Number(process.env[`CHAIN_${chainId}_LOGS_SPAN`]) || DEFAULT_LOGS_SPAN;
+
+export const planLogWindows = (
+  fromBlock: number,
+  toBlock: number,
+  span: number,
+  cap: number,
+): Array<[number, number]> => {
+  const windows: Array<[number, number]> = [];
+  let from = fromBlock;
+  for (let i = 0; i < cap && from <= toBlock; i++) {
+    const to = Math.min(from + span - 1, toBlock);
+    windows.push([from, to]);
+    from = to + 1;
+  }
+  return windows;
+};
 
 export const getRoutedDepositAmount = async (
   deposit: DepositArgs | ActionDepositArgs,
@@ -175,19 +196,28 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   if (!isChainConfigured(externalChainId)) return;
 
   const currentBlock = await getCurrentBlockNumber(externalChainId);
-  const logs =
+  const windows =
     currentBlock > scanCursor
-      ? ((await getChainLogs(
-          externalChainId,
-          Math.max(
-            0,
-            scanCursor - getDepositReconciliationDepth() + 1,
-          ),
+      ? planLogWindows(
+          Math.max(0, scanCursor - getDepositReconciliationDepth() + 1),
           currentBlock,
-          depositRouters,
-          DEPOSIT_EVENT_SIGNATURES,
-        )) as RawDepositLog[])
+          getLogsSpan(externalChainId),
+          MAX_WINDOWS_PER_TICK,
+        )
       : [];
+  const logs: RawDepositLog[] = [];
+  for (const [fromBlock, toBlock] of windows) {
+    logs.push(
+      ...((await getChainLogs(
+        externalChainId,
+        fromBlock,
+        toBlock,
+        depositRouters,
+        DEPOSIT_EVENT_SIGNATURES,
+      )) as RawDepositLog[]),
+    );
+  }
+  const scanTarget = windows.at(-1)?.[1] ?? scanCursor;
 
   const classified = classifyDepositLogs(logs, externalChainId);
   for (const quarantined of classified.quarantinedLogs) {
@@ -410,7 +440,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   const oldestPendingBlock =
     await depositStateService.oldestPendingBlock(externalChainId);
   const cursorTarget = clampCursorToPending(
-    currentBlock,
+    scanTarget,
     oldestPendingBlock,
   );
   if (cursorTarget > lastProcessedBlock) {

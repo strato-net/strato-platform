@@ -51,18 +51,20 @@ const str = (v) => String(v == null ? '' : v).replace(/^"|"$/g, '');
       .then(r => r.data[0].blockData),
   ]);
 
-  // Validators are whatever the staking contract currently maps to an operator.
+  // Staking records are keyed by validator; a record written before validator keying has
+  // no operator field and is operated by its key.
   const validators = [];
-  for (const [k, operator] of Object.entries(stake)) {
-    const m = /^operatorOf\[([0-9a-fA-F]{40})\]$/.exec(k);
+  for (const k of Object.keys(stake)) {
+    const m = /^operators\[([0-9a-fA-F]{40})\]\.exists$/.exec(k);
     if (!m) continue;
     const v = m[1];
-    const o = (f) => stake[`operators[${operator}].${f}`];
+    const o = (f) => stake[`operators[${v}].${f}`];
+    const operator = o('operator') || v;
     validators.push({
       validator: v,
       operator,
-      name: str(reg[`operators[${v}].name`] || reg[`operators[${operator}].name`]),
-      description: str(reg[`operators[${v}].description`] || reg[`operators[${operator}].description`]),
+      name: str(reg[`operators[${v}].name`]),
+      description: str(reg[`operators[${v}].description`]),
       active: String(o('active')) === 'true',
       selfBond: str(o('selfBond') || '0'),
       delegatedStake: str(o('delegatedStake') || '0'),
@@ -72,7 +74,7 @@ const str = (v) => String(v == null ? '' : v).replace(/^"|"$/g, '');
       blocksProposed: str(stake[`blocksProposed[${v}]`] || '0'),
       missedProposals: str(stake[`missedProposals[${v}]`] || '0'),
       consecutiveMisses: str(stake[`consecutiveMisses[${v}]`] || '0'),
-      jailedUntil: str(stake[`jailedUntil[${operator}]`] || '0'),
+      jailedUntil: str(stake[`jailedUntil[${v}]`] || '0'),
       feesEarned: '0',
       credits: 0,
     });

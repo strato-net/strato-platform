@@ -32,11 +32,26 @@ pipeline {
           }
         }
         sh '''#!/bin/bash -le
+          # Find the previous deployment's node directory before bringing it down.
+          # strato-ps prints either "######## STRATO Status: <dir>" (running)
+          # or "STRATO is not running (<network> node at <dir>)" (stopped).
+          PREV_NODE_DIR=$(strato-ps 2>/dev/null | sed -n \
+            -e 's|^######## STRATO Status: ||p' \
+            -e 's|^STRATO is not running (.* node at \\(.*\\))$|\\1|p' \
+            | head -1) || true
+          echo "Previous node directory: ${PREV_NODE_DIR:-<none>}"
+
           strato-down || true
           pkill convoke || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
+          # Wipe the previous node directory, keeping logs/ and the generated configs, for debugging/reference
+          if [ -n "$PREV_NODE_DIR" ] && [ -d "$PREV_NODE_DIR" ]; then
+            sudo find "$PREV_NODE_DIR" -mindepth 1 -maxdepth 1 \
+              ! -name logs ! -name docker-compose.yml ! -name commands.txt \
+              -exec rm -rf {} + || true
+          fi
           # Clean up node data from previous builds
           sudo rm -rf mynode || true
         '''
@@ -130,9 +145,11 @@ pipeline {
                     docker compose -f docker-compose.highway.push.yml push 2>&1
                     docker compose -f docker-compose.bridge.push.yml push 2>&1
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-                    docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-                    docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
-                    docker compose -f docker-compose.bridge.push.ecr.yml push 2>&1
+                    # ECR repositories have immutable tags: skip tags that already exist instead of failing the build
+                    ./scripts/docker-push-ecr.sh \
+                      -f docker-compose.vault.push.ecr.yml \
+                      -f docker-compose.highway.push.ecr.yml \
+                      -f docker-compose.bridge.push.ecr.yml 2>&1
                   '''
                 }
                 
@@ -173,10 +190,7 @@ pipeline {
               def WORKDIR = pwd()
               catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                 sh """#!/bin/bash -lex
-                  # *V2.test.sol covers the staking V2 contracts, which are parked outside
-                  # BaseCodeCollection until the validator fleet is upgraded past the
-                  # staking fork. Drop the ! -name filter to switch them back on.
-                  find app/contracts/tests -name '*.test.sol' ! -name '*V2.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                  find app/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
                 """
               }
             }

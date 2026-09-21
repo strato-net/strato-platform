@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -16,9 +17,7 @@ const ActivityFeed = () => {
   const { isLoggedIn } = useUser();
   const [activeTab, setActiveTab] = useState(() => isLoggedIn ? "my-activity" : "all-activity");
 
-  useEffect(() => {
-    document.title = "Activity Feed | STRATO";
-  }, []);
+  usePageTitle("Activity Feed");
 
   const handleLogin = () => {
     requestWalletConnection();

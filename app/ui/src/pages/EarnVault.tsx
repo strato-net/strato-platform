@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { ArrowLeft } from "lucide-react";
@@ -95,8 +96,9 @@ const EarnVault = () => {
       .sort((a, b) => Number(BigInt(b.valueUsd || "0") - BigInt(a.valueUsd || "0")));
   }, [assets, totalEquity]);
 
+  usePageTitle("Earn Vault");
+
   useEffect(() => {
-    document.title = "STRATO Earn Vault | STRATO";
     window.scrollTo(0, 0);
   }, []);
 

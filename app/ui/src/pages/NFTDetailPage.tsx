@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
@@ -46,6 +47,8 @@ const NFTDetailPage = () => {
   const handleChanged = useCallback(() => {
     load();
   }, [load]);
+
+  usePageTitle(item ? `${item.collection.name} #${item.tokenId}` : "NFT");
 
   const Renderer = resolveNFTDetailRenderer(item?.kind);
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import pageHtml from "../strato-memecoin-partnership-onepager.html?raw";
 
 /**
@@ -8,6 +9,8 @@ import pageHtml from "../strato-memecoin-partnership-onepager.html?raw";
  * `frame-src`).
  */
 const CommunityRewardsOnePager = () => {
+  usePageTitle("Community Rewards");
+
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

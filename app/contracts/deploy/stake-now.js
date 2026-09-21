@@ -33,6 +33,6 @@ async function callAsync(tokenObj, callArgs) {
     args: { spender: STAKING, value: FORTY_K }, txParams: { gasPrice: 10, gasLimit: 1000000 } });
   console.log('approve: Success');
   await callAsync(tokenObj, { contract: { address: STAKING, name: 'StratoStaking' }, method: 'stakeBatch',
-    args: { stakeOperators: VALIDATORS, amounts: [TEN_K, TEN_K, TEN_K, TEN_K] }, txParams: { gasPrice: 10, gasLimit: 5000000 } });
+    args: { validators: VALIDATORS, amounts: [TEN_K, TEN_K, TEN_K, TEN_K] }, txParams: { gasPrice: 10, gasLimit: 5000000 } });
   console.log('stakeBatch: Success');
 })().catch(e => { console.error('FAILED:', e.message); process.exit(1); });

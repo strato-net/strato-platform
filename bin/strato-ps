@@ -44,19 +44,27 @@ echo "Network: $NETWORK"
 # Sync status
 if [[ "$CONVOKE_RUNNING" == "true" ]]; then
     BAROMETER=$(strato-barometer syncstats 2>/dev/null)
-    BLOCK=$(echo "$BAROMETER" | grep "bestBlockNumber:" | head -1 | awk '{print $2}')
-    WORLD_BLOCK=$(echo "$BAROMETER" | sed -n '/^World Best Block:/,/bestBlockNumber:/p' | grep "bestBlockNumber:" | awk '{print $2}')
+    # Positions come from the "Block Positions:" table (label: number description).
+    pos() { echo "$BAROMETER" | awk -v l="$1:" '$1 == l {print $2}'; }
+    SEQ_BLOCK=$(pos sequencer)
+    VM_BLOCK=$(pos vm)
+    IDX_BLOCK=$(pos indexed)
+    CIRRUS_BLOCK=$(pos cirrus)
+    WORLD_BLOCK=$(pos world)
     SYNCED=$(echo "$BAROMETER" | grep -A2 "^Sync Status:$" | tail -1)
-    if [[ -n "$BLOCK" && -n "$WORLD_BLOCK" ]]; then
-        if [[ "$SYNCED" == "True" ]]; then
-            echo "Sync: block $BLOCK (synced)"
-        else
-            PERCENT=$(awk "BEGIN {printf \"%.1f\", ($BLOCK / $WORLD_BLOCK) * 100}")
-            echo "Sync: block $BLOCK / $WORLD_BLOCK ($PERCENT% syncing)"
-        fi
-    elif [[ -n "$BLOCK" ]]; then
-        echo "Sync: block $BLOCK"
+    if [[ -n "$WORLD_BLOCK" && "$WORLD_BLOCK" != "-" && "$SYNCED" != "True" && "$IDX_BLOCK" != "-" ]]; then
+        PERCENT=$(awk "BEGIN {printf \"%.1f\", ($IDX_BLOCK / $WORLD_BLOCK) * 100}")
+        echo "Sync: syncing, $PERCENT% (indexed $IDX_BLOCK / world $WORLD_BLOCK)"
+    elif [[ "$SYNCED" == "True" ]]; then
+        echo "Sync: synced"
     fi
+    echo "Block positions:"
+    printf "  %-10s %-10s %s\n" \
+        "sequencer:" "$SEQ_BLOCK"    "(strato-sequencer, last committed)" \
+        "vm:"        "$VM_BLOCK"     "(vm-runner, last executed)" \
+        "indexed:"   "$IDX_BLOCK"    "(strato-indexer, committed to SQL/Redis)" \
+        "cirrus:"    "$CIRRUS_BLOCK" "(slipstream, indexed into Cirrus)" \
+        "world:"     "$WORLD_BLOCK"  "(highest peer-reported)"
 fi
 
 echo ""

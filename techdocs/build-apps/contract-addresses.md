@@ -1,384 +1,154 @@
-# Contract Reference
+# Contract Addresses
 
-Find deployed contracts and addresses for your STRATO deployment.
+Contracts created in the genesis block have the **same address on mainnet (upquark) and testnet (helium)**. Contracts deployed later have **different addresses on each network**.
 
-!!! note "About Endpoints"
-    All examples use `localhost` for local development.
-    
-    **For production, use public endpoints:**
-    - Mainnet: `https://app.strato.nexus`
-    - Testnet: `https://app.testnet.strato.nexus`
-    
-    **Contract addresses are the same across all deployments** (query from registries)
+Cirrus and the core API return addresses as 40 hex characters with no `0x`. Add the `0x` prefix when you use an address with JSON-RPC, viem, ethers or a wallet.
 
-!!! tip "Query Dynamically"
-    Contract addresses are **not hardcoded** in documentation. Always fetch them dynamically from Cirrus or registries to ensure accuracy.
+!!! note "Sources"
+    Genesis addresses are defined in `strato/core/strato-genesis` (`HeliumGenesisBlock.hs` and `Contracts/*.hs`). Per-network addresses are the defaults in `app/backend/src/config/config.ts`. Every address on this page was checked against both public networks through the core API and Cirrus.
+
+For chain IDs and endpoints, see [Networks](../platform/networks.md) or the [Quick Reference](quick-reference.md).
 
 ---
 
-## How to Get Contract Addresses
+## Platform contracts (genesis, both networks)
 
-### Method 1: Query Cirrus (Recommended)
+| Address | Contract | Purpose |
+|---|---|---|
+| `0000000000000000000000000000000000000100` | MercataGovernance | Validator set and consensus governance. This address is the proxy; the logic contract is at `…00ff`. |
+| `0000000000000000000000000000000000000720` | UserRegistry | Maps usernames to on-chain User wallet contracts |
+| `0000000000000000000000000000000000dec1de` | Decider | Charges the transaction fee |
+| `00000000000000000000000000000000dec1de02` | DeciderState | Fee logic. It burns one voucher, or else sends 0.01 USDST to the FeeCollector. |
 
-Use Cirrus to query all deployed contracts:
+## DeFi system contracts (genesis, both networks)
 
-```typescript
-import { cirrus } from './config';
+Most of these are `Proxy` contracts. Genesis placed their first implementations at matching `0x11xx` addresses (for example, LendingPool's is `…1105`), but the current implementation may be different. Always call the proxy address.
 
-// Get all contracts
-async function getAllContracts(accessToken: string) {
-  const response = await cirrus.get('/Contract', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      select: 'address,name',
-      limit: 100
-    }
-  });
-  
-  return response.data;
-}
+| Address | Contract | Notes |
+|---|---|---|
+| `0000000000000000000000000000000000001000` | Mercata | Genesis record of the core component addresses |
+| `0000000000000000000000000000000000001001` | RateStrategy | Lending interest rate model |
+| `0000000000000000000000000000000000001002` | PriceOracle | Default price oracle (used by lending and CDP) |
+| `0000000000000000000000000000000000001003` | CollateralVault | Holds lending collateral |
+| `0000000000000000000000000000000000001004` | LiquidityPool | Holds lending liquidity |
+| `0000000000000000000000000000000000001005` | LendingPool | Supply collateral, borrow, repay, liquidate |
+| `0000000000000000000000000000000000001006` | PoolConfigurator | Lending admin configuration |
+| `0000000000000000000000000000000000001007` | LendingRegistry | Points to the lending components |
+| `0000000000000000000000000000000000001008` | MercataBridge | Bridge deposits and withdrawals |
+| `000000000000000000000000000000000000100a` | PoolFactory | Creates swap pools and lists them |
+| `000000000000000000000000000000000000100b` | TokenFactory | Creates tokens and lists them |
+| `000000000000000000000000000000000000100c` | AdminRegistry | Admin and multisig governance of the DeFi contracts |
+| `000000000000000000000000000000000000100d` | FeeCollector | Receives transaction fees and protocol fees |
+| `000000000000000000000000000000000000100e` | Voucher (`VOUCHER`) | Fee vouchers |
+| `000000000000000000000000000000000000100f` | lendUSDST | Receipt token for lending liquidity |
+| `0000000000000000000000000000000000001011` | CDPEngine | Deposit collateral, mint and repay USDST |
+| `0000000000000000000000000000000000001012` | CDPRegistry | Points to the CDP components |
+| `0000000000000000000000000000000000001013` | CDPVault | Holds CDP collateral |
+| `0000000000000000000000000000000000001014` | CDPReserve | CDP reserve |
+| `0000000000000000000000000000000000001015` | SafetyModule | USDST safety module |
+| `0000000000000000000000000000000000001016` | safetyUSDST | SafetyModule share token |
+| `000000000000000000000000000000000000101f` | RewardsChef | Genesis rewards contract |
 
-// Get specific contract by name
-async function getContractByName(accessToken: string, name: string) {
-  const response = await cirrus.get('/Contract', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      name: `eq.${name}`,
-      select: 'address'
-    }
-  });
-  
-  return response.data[0]?.address;
-}
+### Genesis swap pools
 
-// Example usage
-const accessToken = await getAccessToken();
-const contracts = await getAllContracts(accessToken);
-console.log('Deployed contracts:', contracts);
-```
+| Pool | LP token | Pair |
+|---|---|---|
+| `0000000000000000000000000000000000001017` | `0000000000000000000000000000000000001018` | ETH / USDST |
+| `0000000000000000000000000000000000001019` | `000000000000000000000000000000000000101a` | WBTC / USDST |
+| `000000000000000000000000000000000000101b` | `000000000000000000000000000000000000101c` | GOLDST / USDST |
+| `000000000000000000000000000000000000101d` | `000000000000000000000000000000000000101e` | SILVST / USDST |
 
-### Method 2: Use Registries
+Other pools were created after genesis. List every pool with the [PoolFactory query](#list-all-swap-pools).
 
-Contract registries have **fixed addresses** and contain references to other contracts:
+## Genesis tokens (both networks)
 
-```typescript
-// Fixed registry addresses (same across all STRATO deployments)
-const REGISTRIES = {
-  LENDING_REGISTRY: '0000000000000000000000000000000000001007',
-  CDP_REGISTRY: '0000000000000000000000000000000000001012',
-  POOL_FACTORY: '000000000000000000000000000000000000100a',
-  TOKEN_FACTORY: '000000000000000000000000000000000000100b',
-  ADMIN_REGISTRY: '000000000000000000000000000000000000100c',
-  MERCATA_BRIDGE: '0000000000000000000000000000000000001008',
-  POOL_CONFIGURATOR: '0000000000000000000000000000000000001006',
-  VOUCHER: '000000000000000000000000000000000000100e',
-  REWARDS_CHEF: '000000000000000000000000000000000000101f',
-};
+All of these use 18 decimals.
 
-// Get lending contracts from registry
-async function getLendingContracts(accessToken: string) {
-  const response = await cirrus.get('/LendingRegistry', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      address: `eq.${REGISTRIES.LENDING_REGISTRY}`,
-      select: 'lendingPool,collateralVault,priceOracle,liquidityPool'
-    }
-  });
-  
-  return response.data[0];
-}
+| Address | `_symbol` | `_name` |
+|---|---|---|
+| `937efa7e3a77e20bbdbd7c0d32b6514f368c1010` | USDST | USDST |
+| `93fb7295859b2d70199e0a4883b7c320cf874e6c` | ETH | STRATO ETH |
+| `7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9` | WBTC | STRATO WBTC |
+| `cdc93d30182125e05eec985b631c7c61b3f63ff0` | GOLDST | GOLDST |
+| `2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94` | SILVST | SILVST |
 
-// Get CDP contracts from registry
-async function getCDPContracts(accessToken: string) {
-  const response = await cirrus.get('/CDPRegistry', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      address: `eq.${REGISTRIES.CDP_REGISTRY}`,
-      select: 'cdpEngine,cdpVault,usdst'
-    }
-  });
-  
-  return response.data[0];
-}
+!!! warning "Look up tokens by address, not symbol"
+    Symbols are not unique. For example, more than one token uses the symbol `GOLDST`. Bridged tokens such as ETH and WBTC have no "ST" suffix.
 
-// Example usage
-const lending = await getLendingContracts(accessToken);
-console.log('Lending Pool:', lending.lendingPool);
-console.log('Collateral Vault:', lending.collateralVault);
-console.log('Price Oracle:', lending.priceOracle);
+## Per-network contracts
 
-const cdp = await getCDPContracts(accessToken);
-console.log('CDP Engine:', cdp.cdpEngine);
-console.log('CDP Vault:', cdp.cdpVault);
-console.log('USDST Token:', cdp.usdst);
-```
+These contracts were deployed after genesis, so each network has its own address.
 
-### Method 3: Environment Variables
+| Contract | Mainnet (upquark) | Testnet (helium) |
+|---|---|---|
+| STRATO token | `2ca3e170e6714282da77815f7864b17f612f5f83` | `8ee9a3391e38176feebf5d43cb2c1d6c4f728b04` |
+| Rewards | `4a116cf8cb056036632aef08f7c0df27c720f1c0` | `170147f58738c9f46112a874030420b823901f3b` |
+| StratoStaking | `f30a022ce83bed7adeafc286c719388dcc3b3988` | `d6726e06c3c71a3bad80b5eb6925707a31729b81` |
+| ValidatorRegistry | `d190674c0923a4646746b298037507bb9fc1057f` | `bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd` |
+| StratoNativeBridge | `4d9e9c39180a75091b9c35bbb9064d67c7fdde5a` | `49f69252b00235030a4dcd4c7ef17a64ef346258` |
+| StratoNativeCustodyVault | `db967ac5c497e6a2bd6f89036d2b63851760318f` | `8cfe7b576f69260673e9a1a9517137f12a49ed93` |
+| PoolV3Factory | `5d630126d908b46bcf8d00bc15e591a459375809` | `e6b6f05a88e649e4102a801aade9a6bae02f352d` |
+| PositionManagerV3 | `ce5d96341ba4fede57d7721c5b0e41d283aa7435` | `1bc216225dd4e164ded916cb88a7c09804a881d1` |
+| VaultFactory | `55c77951e9cadc73af24ec18881d01fedff1f1f1` | `37b446ec53607a0cdae38c820b838baf240a8b74` |
+| SaveUSDSTVault | `22550671fcad04a213697ac7ae4f4366e96446ed` | `ceeb982f671b4ee2b4471e5b49f3126739537f15` |
+| DirectMintPSM | `b1efdc86eecfbedf83d0295671214fee451786f3` | `0b30adc5f2d90bada37afa699b75f485f04e7287` |
+| MetalForge | `1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113` | `c5ed981b816a626981a5747d125e0e7296b2c7c6` |
 
-For backend apps, store addresses in environment variables:
+---
+
+## Discover addresses on-chain
+
+Registries and factories are the source of truth. Cirrus allows anonymous `GET` reads, so none of these queries need a token. Replace the host with `app.testnet.strato.nexus` for testnet.
+
+### Lending components
 
 ```bash
-# .env
-LENDING_REGISTRY=0000000000000000000000000000000000001007
-CDP_REGISTRY=0000000000000000000000000000000000001012
-POOL_FACTORY=000000000000000000000000000000000000100a
-TOKEN_FACTORY=000000000000000000000000000000000000100b
-ADMIN_REGISTRY=000000000000000000000000000000000000100c
-MERCATA_BRIDGE=0000000000000000000000000000000000001008
-VOUCHER_CONTRACT_ADDRESS=000000000000000000000000000000000000100e
-REWARDS_CHEF=000000000000000000000000000000000000101f
+curl -s "https://app.strato.nexus/cirrus/search/BlockApps-LendingRegistry?address=eq.0000000000000000000000000000000000001007&select=lendingPool,collateralVault,liquidityPool,priceOracle"
 ```
 
-```typescript
-// src/config.ts
-export const CONTRACTS = {
-  LENDING_REGISTRY: process.env.LENDING_REGISTRY || '0000000000000000000000000000000000001007',
-  CDP_REGISTRY: process.env.CDP_REGISTRY || '0000000000000000000000000000000000001012',
-  // ... etc
-};
+```json
+[{"lendingPool":"0000000000000000000000000000000000001005","collateralVault":"0000000000000000000000000000000000001003","liquidityPool":"0000000000000000000000000000000000001004","priceOracle":"0000000000000000000000000000000000001002"}]
 ```
+
+### CDP components
+
+```bash
+curl -s "https://app.strato.nexus/cirrus/search/BlockApps-CDPRegistry?address=eq.0000000000000000000000000000000000001012&select=cdpEngine,cdpVault,cdpReserve,usdst,priceOracle,feeCollector,tokenFactory"
+```
+
+### List all swap pools
+
+```bash
+curl -s "https://app.strato.nexus/cirrus/search/BlockApps-PoolFactory-allPools?address=eq.000000000000000000000000000000000000100a&select=value"
+```
+
+### Find a token
+
+```bash
+curl -s "https://app.strato.nexus/cirrus/search/BlockApps-Token?_symbol=eq.USDST&select=address,_name,_symbol,customDecimals"
+```
+
+### Check what is deployed at an address
+
+```bash
+curl -s "https://app.strato.nexus/strato-api/eth/v1.2/account?address=0000000000000000000000000000000000001005"
+```
+
+The response includes `contractName` (for example `Proxy`, `Decider` or `UserRegistry`) and `codeHash`.
 
 ---
 
-## Contract Verification
+## Explore contracts
 
-All contracts are verified on the STRATO Management Dashboard (SMD). You can:
+- **Stratoscan** (block explorer): [stratoscan.strato.nexus](https://stratoscan.strato.nexus)
+- **STRATO Management Dashboard (SMD)**: `/smd/` on each app host, for example `https://app.testnet.strato.nexus/smd/`
 
-1. **View source code** - See contract implementation
-2. **Read contract** - Call view functions
-3. **Write contract** - Execute transactions
-4. **View events** - Monitor contract activity
+## Contract source
 
-**Access SMD (Block Explorer):**
+The DeFi contracts are in `app/contracts/concrete` (for example `Lending/LendingPool.sol`, `CDP/CDPEngine.sol`, `Bridge/MercataBridge.sol`, `Pools/Pool.sol`, `Tokens/Token.sol`). The platform contracts are in `strato/core/strato-genesis/resources`.
 
-```
-# Local development
-http://localhost:8080/smd/
+## Next steps
 
-# Production
-https://app.strato.nexus/smd/  (mainnet)
-https://app.testnet.strato.nexus/smd/  (testnet)
-
-# View specific contract
-http://localhost:8080/smd/address/0x.../contracts
-```
-
----
-
-## Complete Example: Get All Addresses
-
-```typescript
-import { cirrus } from './config';
-import { getAccessToken } from './auth';
-
-interface ContractAddresses {
-  // Core registries
-  lendingRegistry: string;
-  cdpRegistry: string;
-  poolFactory: string;
-  tokenFactory: string;
-  adminRegistry: string;
-  bridge: string;
-  
-  // Lending contracts
-  lendingPool?: string;
-  collateralVault?: string;
-  priceOracle?: string;
-  
-  // CDP contracts
-  cdpEngine?: string;
-  cdpVault?: string;
-  usdst?: string;
-  
-  // Tokens
-  tokens?: Array<{ address: string; name: string; symbol: string }>;
-}
-
-async function getAllContractAddresses(): Promise<ContractAddresses> {
-  const accessToken = await getAccessToken();
-  
-  // Fixed registry addresses
-  const REGISTRIES = {
-    lendingRegistry: '0000000000000000000000000000000000001007',
-    cdpRegistry: '0000000000000000000000000000000000001012',
-    poolFactory: '000000000000000000000000000000000000100a',
-    tokenFactory: '000000000000000000000000000000000000100b',
-    adminRegistry: '000000000000000000000000000000000000100c',
-    bridge: '0000000000000000000000000000000000001008',
-  };
-  
-  // Query lending contracts
-  const lendingResponse = await cirrus.get('/LendingRegistry', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      address: `eq.${REGISTRIES.lendingRegistry}`,
-      select: 'lendingPool,collateralVault,priceOracle'
-    }
-  });
-  
-  // Query CDP contracts
-  const cdpResponse = await cirrus.get('/CDPRegistry', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      address: `eq.${REGISTRIES.cdpRegistry}`,
-      select: 'cdpEngine,cdpVault,usdst'
-    }
-  });
-  
-  // Query all tokens
-  const tokensResponse = await cirrus.get('/Token', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      select: 'address,_name,_symbol',
-      limit: 100
-    }
-  });
-  
-  return {
-    ...REGISTRIES,
-    ...lendingResponse.data[0],
-    ...cdpResponse.data[0],
-    tokens: tokensResponse.data,
-  };
-}
-
-// Usage
-const addresses = await getAllContractAddresses();
-console.log('All contract addresses:', addresses);
-```
-
----
-
-## Network Configuration
-
-Configure STRATO network programmatically in your app:
-
-```typescript
-const STRATO_NETWORK = {
-  chainId: '0x...', // Get from your deployment
-  chainName: 'STRATO',
-  // For local dev:
-  rpcUrls: ['http://localhost:8080/strato-api/eth/v1.2'],
-  blockExplorerUrls: ['http://localhost:8080/smd'],
-  
-  // For production (replace with):
-  // rpcUrls: ['https://app.strato.nexus/strato-api/eth/v1.2'],  // mainnet
-  // blockExplorerUrls: ['https://app.strato.nexus/smd'],  // mainnet
-  nativeCurrency: {
-    name: 'USDST',
-    symbol: 'USDST',
-    decimals: 18
-  }
-};
-```
-
-!!! note "For Developers Only"
-    This configuration is for programmatic network setup in applications, not for manually adding STRATO to wallets.
-
----
-
-## Common Contract Patterns
-
-### Pattern: Get Token Address by Symbol
-
-```typescript
-async function getTokenBySymbol(accessToken: string, symbol: string) {
-  const response = await cirrus.get('/Token', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      _symbol: `eq.${symbol}`,
-      select: 'address,_name,_symbol'
-    }
-  });
-  
-  return response.data[0];
-}
-
-// Example
-const ethst = await getTokenBySymbol(accessToken, 'ETHST');
-console.log('ETHST address:', ethst.address);
-```
-
-### Pattern: Get All Pools
-
-```typescript
-async function getAllPools(accessToken: string) {
-  const POOL_FACTORY = '000000000000000000000000000000000000100a';
-  
-  const response = await cirrus.get('/Pool', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      select: 'address,_token0,_token1,_reserve0,_reserve1',
-      limit: 100
-    }
-  });
-  
-  return response.data;
-}
-```
-
-### Pattern: Get User Collateral
-
-```typescript
-async function getUserCollateral(
-  accessToken: string,
-  collateralVaultAddress: string,
-  userAddress: string
-) {
-  const response = await cirrus.get('/CollateralVault-userCollaterals', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      address: `eq.${collateralVaultAddress}`,
-      key: `eq.${userAddress}`,
-      select: 'key2,value::text'
-    }
-  });
-  
-  return response.data;
-}
-```
-
----
-
-## Security Best Practices
-
-### Always Verify
-
-- ✅ Block explorer (SMD): 
-  - Local: `http://localhost:8080/smd/`
-  - Mainnet: `https://app.strato.nexus/smd/`
-  - Testnet: `https://app.testnet.strato.nexus/smd/`
-- ✅ Query Cirrus for contract code
-- ✅ Check contract name matches expected
-
-### Never Trust
-
-- ❌ Hardcoded addresses from unknown sources
-- ❌ Addresses from untrusted APIs
-- ❌ Addresses without verification
-
-### Verify on SMD (Block Explorer)
-
-Before using any contract:
-
-1. Check it's verified on SMD: `{your-strato-url}/smd/`
-2. Read the source code
-3. Confirm it matches expected functionality
-
----
-
-## Reference Implementation
-
-The **app backend** shows how to manage contract addresses:
-
-- **Config** - `app/backend/src/config/config.ts` - Environment variables
-- **Constants** - `app/backend/src/config/constants.ts` - Contract definitions
-- **Helpers** - `app/backend/src/api/helpers/` - Registry queries
-
----
-
-## Next Steps
-
-- **[Quick Start](quickstart.md)** - Build your first transaction
-- **[API Integration](integration.md)** - Complete integration guide
-- **[Quick Reference](quick-reference.md)** - Code snippets
+- [Integration Guide](integration.md): call these contracts
+- [Cirrus reference](../reference/cirrus.md): query syntax and table naming
+- [Quick Reference](quick-reference.md)

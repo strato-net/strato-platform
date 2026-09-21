@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -38,8 +39,9 @@ const Rewards = () => {
   const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
   const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
+  usePageTitle("Rewards");
+
   useEffect(() => {
-    document.title = "Rewards | STRATO";
     // Only fetch inactive tokens if logged in
     if (isLoggedIn && inactiveTokens.length === 0) {
       getInactiveTokens(true);

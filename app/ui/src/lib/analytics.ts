@@ -60,6 +60,7 @@ export type ApiAction =
   | 'stake_commission'
   | 'stake_activate'
   | 'stake_register'
+  | 'stake_profile'
   | 'stake_exit'
   | 'stake_exit_cancel'
   | 'stake_claim_fees'
@@ -200,6 +201,7 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /staking/commission': 'stake_commission',
   'POST /staking/activate': 'stake_activate',
   'POST /staking/register': 'stake_register',
+  'POST /staking/profile': 'stake_profile',
   'POST /staking/exit': 'stake_exit',
   'POST /staking/exit/cancel': 'stake_exit_cancel',
   'POST /staking/claim-fees': 'stake_claim_fees',

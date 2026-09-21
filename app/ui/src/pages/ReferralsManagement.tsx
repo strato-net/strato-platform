@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -163,9 +164,7 @@ const ReferralsManagement = () => {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [allTokens, setAllTokens] = useState<any[]>([]);
 
-  useEffect(() => {
-    document.title = "My Referrals | STRATO";
-  }, []);
+  usePageTitle("My Referrals");
 
   // Fetch all tokens for display
   useEffect(() => {

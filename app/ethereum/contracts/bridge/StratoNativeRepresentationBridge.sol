@@ -33,6 +33,8 @@ contract StratoNativeRepresentationBridge is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
     bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
+    // Grant this role only to the custody Safe.
+    bytes32 public constant MINT_EXECUTOR_ROLE = keccak256("MINT_EXECUTOR_ROLE");
     bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
         "NativeMintAttestation(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline)"
     );
@@ -158,13 +160,14 @@ contract StratoNativeRepresentationBridge is
         _grantRole(PAUSER_ROLE, admin);
         _grantRole(UNPAUSER_ROLE, admin);
         _grantRole(ATTESTATION_ADMIN_ROLE, admin);
+        _grantRole(MINT_EXECUTOR_ROLE, admin);
         maxAttestationValiditySeconds = 7 days;
     }
 
     function mintRepresentationWithAttestation(
         NativeMintAttestation calldata attestation,
         bytes[] calldata signatures
-    ) external whenNotPaused whenMintsNotPaused {
+    ) external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused {
         bytes32 mintId = _validateMintAttestation(attestation);
         _verifyAttestationSignatures(attestationDigest(attestation), signatures);
 
@@ -443,6 +446,6 @@ contract StratoNativeRepresentationBridge is
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
-        return "1.0.0";
+        return "1.1.0";
     }
 }

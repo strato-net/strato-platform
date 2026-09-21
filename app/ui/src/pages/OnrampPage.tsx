@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { loadStripeOnramp } from "@stripe/crypto";
 import { useTheme } from "next-themes";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -30,6 +31,8 @@ type SessionStatus =
 
 
 const OnrampPage = () => {
+  usePageTitle("Buy Crypto");
+
   const { isLoggedIn } = useUser();
   const { isTestnet } = useNetwork();
   const { resolvedTheme } = useTheme();

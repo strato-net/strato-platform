@@ -11,13 +11,22 @@ contract record MockStaking {
     uint public proposerFeeBps;
     uint public processed;
     bool public revertOnProcess;
+    bool public refuseRewards;
     address public stratoToken;
+    mapping(address => uint) public record rewarded;
     function setProposerFeeBps(uint bps) public { proposerFeeBps = bps; }
     function setStratoToken(address t) public { stratoToken = t; }
     function setRevertOnProcess(bool r) public { revertOnProcess = r; }
+    function setRefuseRewards(bool r) public { refuseRewards = r; }
     function processBlock() external {
         require(!revertOnProcess, "MockStaking: boom");
         processed += 1;
+    }
+    // Pulls the reward like StratoStaking.creditBlockReward.
+    function creditBlockReward(address validator, uint amount) external {
+        require(!refuseRewards, "MockStaking: validator not listed");
+        require(Token(stratoToken).transferFrom(msg.sender, address(this), amount), "MockStaking: pull failed");
+        rewarded[validator] += amount;
     }
 }
 
@@ -141,12 +150,14 @@ contract Describe_FeeRouter {
         return strato;
     }
 
-    function it_pays_the_proposer_a_flat_block_reward() public {
+    function it_routes_a_flat_block_reward_through_staking_for_the_proposer() public {
         Token strato = _fundedRouter();
         strato.mint(address(router), 1e18);
 
         router.payBlockRewards();
-        require(strato.balanceOf(PROPOSER) == 1e16, "proposer paid 0.01 STRATO");
+        require(staking.rewarded(PROPOSER) == 1e16, "staking credited the proposer 0.01 STRATO");
+        require(strato.balanceOf(address(staking)) == 1e16, "the reward moved into staking");
+        require(strato.balanceOf(PROPOSER) == 0, "nothing paid to the node address directly");
         require(strato.balanceOf(address(router)) == 1e18 - 1e16, "paid out of the router's balance");
     }
 
@@ -160,11 +171,11 @@ contract Describe_FeeRouter {
         router.payBlockRewards();
         router.payBlockRewards();
         router.payBlockRewards();
-        require(strato.balanceOf(PROPOSER) == 1e16, "repeat calls in one block pay nothing");
+        require(staking.rewarded(PROPOSER) == 1e16, "repeat calls in one block pay nothing");
 
         fastForward(1, 1);
         router.payBlockRewards();
-        require(strato.balanceOf(PROPOSER) == 2e16, "the next block pays again");
+        require(staking.rewarded(PROPOSER) == 2e16, "the next block pays again");
     }
 
     // A router that has run dry must not take the chain down with it.
@@ -172,8 +183,21 @@ contract Describe_FeeRouter {
         Token strato = _fundedRouter();
 
         router.payBlockRewards();
-        require(strato.balanceOf(PROPOSER) == 0, "nothing paid");
+        require(staking.rewarded(PROPOSER) == 0, "nothing paid");
         require(router.lastRewardedBlock() == block.number, "still latched, so it is not retried");
+    }
+
+    // A proposer staking will not credit (not listed, delisted) is not paid, and the
+    // reward stays with the router rather than leaking anywhere.
+    function it_keeps_the_reward_when_staking_declines() public {
+        Token strato = _fundedRouter();
+        strato.mint(address(router), 1e18);
+        staking.setRefuseRewards(true);
+
+        router.payBlockRewards();
+        require(strato.balanceOf(address(router)) == 1e18, "router keeps the reward");
+        require(strato.balanceOf(address(staking)) == 0, "staking pulled nothing");
+        require(router.lastRewardedBlock() == block.number, "latched");
     }
 
     function it_falls_back_when_governance_cannot_name_staking() public {

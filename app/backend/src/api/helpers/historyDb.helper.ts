@@ -179,7 +179,11 @@ const USER_MAPPING_COLLECTIONS = [
   'vaults',
   'delegatedStake',    // StratoStaking: user's delegated stake per operator
   'unbondingQueue',    // StratoStaking: user's unclaimed unbonding requests
-  'operators',         // StratoStaking: operator self-bond (if user is an operator)
+  // StratoStaking: operator self-bond, matched by record key == user. Exact on v1 and for
+  // v2 records written before the validator-keyed upgrade (their key is their operator);
+  // a v2 record whose operator differs from its validator key is not attributed to the
+  // operator here (current balances handle it, see getUserStakedStratoBalance).
+  'operators',
 ];
 
 // Collections fetched in pass 2, filtered to relevant tokens only.

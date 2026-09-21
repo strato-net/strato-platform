@@ -18,12 +18,16 @@ import Network.Wai.Handler.Warp
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
+import ResponseDispatcher (startResponseDispatcher)
 
 startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
   let port = 8545
   runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+  -- One consumer of the response topic for the whole process; request
+  -- handlers register for their reply by id (see ResponseDispatcher).
+  startResponseDispatcher
   putStrLn $ "Listening on port " ++ show port
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
   runSettings (setPort port $ setTimeout 150 defaultSettings) app

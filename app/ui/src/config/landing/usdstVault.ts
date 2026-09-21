@@ -5,7 +5,7 @@ import type { ProductLandingConfig } from "./types";
 
 export const usdstVault: ProductLandingConfig = {
   slug: "usdst-vault",
-  documentTitle: "USDST Savings Vault | Earn More With USDST | STRATO",
+  documentTitle: "STRATO | USDST Savings Vault | Earn More With USDST",
   accent: "blue",
   appPath: "/dashboard/earn-save",
 

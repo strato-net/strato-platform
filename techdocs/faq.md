@@ -1,6 +1,6 @@
 # Frequently Asked Questions
 
-Common questions about STRATO DeFi.
+Common questions about STRATO.
 
 ---
 
@@ -8,42 +8,28 @@ Common questions about STRATO DeFi.
 
 ### What is STRATO?
 
-STRATO is a blockchain platform for decentralized finance (DeFi) that enables borrowing, swapping, liquidity provision, and earning rewards with lower fees and faster transactions than Ethereum mainnet.
+STRATO is a Layer-1 blockchain for real-world-asset-backed DeFi. You can mint and borrow the USDST stablecoin against collateral, swap, provide liquidity, stake, and earn rewards. Mainnet is [app.strato.nexus](https://app.strato.nexus), and testnet is [app.testnet.strato.nexus](https://app.testnet.strato.nexus).
 
 ### How is STRATO different from Ethereum?
 
-- **Faster**: 1-2 second transaction finality vs. 12+ seconds on Ethereum
-- **Cheaper**: Transactions typically < $0.10 vs. $5-50+ on Ethereum
-- **Compatible**: Full Solidity/EVM compatibility - same tools and contracts work
-- **Developer-friendly**: OAuth authentication, REST APIs, built-in indexing (Cirrus)
+- **Smart contracts**: STRATO runs **SolidVM**, a Solidity dialect. It does not execute EVM bytecode. See [SolidVM](solidvm/index.md).
+- **Ethereum-compatible interfaces**: the node accepts Ethereum-format signed transactions and serves Ethereum-style JSON-RPC, so standard wallets can sign for STRATO.
+- **Consensus**: PBFT-style consensus with a stake-weighted proposer. Blocks are final once committed. See [Consensus & Staking](platform/consensus.md).
+- **Fees**: a flat 0.01 USDST (or one voucher) per transaction, with no gas price.
+- **Built-in indexing and sign-in**: contract state is indexed by Cirrus, and users can sign in with an OpenID Connect account whose key is held by Vault.
 
 ### What are the fees on STRATO?
 
-- **Transaction fees**: 
-  - First 10 transactions: **FREE** (using vouchers from bridge-in)
-  - After vouchers: 0.01 USDST (~$0.01) per transaction
-- **Ethereum gas fees**: When bridging from Ethereum (varies by network congestion, typically $15-30)
-- **Protocol fees**: Small percentage on swaps, borrows, etc. (goes to protocol treasury)
+- **Transaction fee**: 1 voucher if you have one, otherwise **0.01 USDST** per transaction. The fee is charged even if the transaction reverts. App actions that send several transactions (for example approve plus supply) pay once per transaction.
+- **Protocol fees**: set on-chain per feature. Examples: swap fees (default 0.3% on standard pools), borrow interest, and CDP stability fees.
+- **Source-chain gas**: bridging in from another chain costs that chain's gas.
 
 ### What are transaction vouchers?
 
-Transaction vouchers are free transaction fee credits automatically given when you bridge assets to STRATO.
+Prepaid fee credits. One voucher pays one transaction fee in place of 0.01 USDST, and vouchers are used automatically first.
 
-**Key details:**
-- **10 vouchers** per bridge-in (every time)
-- Each voucher covers **1 transaction fee**
-- Used automatically (no action needed)
-- After vouchers run out: 0.01 USDST per transaction
-
-**How to get more:**
-- Bridge assets again (any amount, any time)
-- Each bridge-in gives you 10 more vouchers
-
-**Example:**
-```
-Bridge 0.5 ETH → Get 10 vouchers → 10 free transactions
-Bridge 100 USDC → Get 10 more vouchers → 10 more free transactions
-```
+- The bridge service credits **25 vouchers** for each confirmed bridge deposit
+- Vouchers cannot be transferred
 
 ---
 
@@ -51,142 +37,100 @@ Bridge 100 USDC → Get 10 more vouchers → 10 more free transactions
 
 ### How do I create an account?
 
-See the **[Quick Start Guide](quick-start.md)** for step-by-step instructions. You can sign up with email or connect with your Web3 wallet (MetaMask, etc.).
+Click **Connect Wallet** in the app, then either:
+
+- choose **STRATO Wallet** to sign in, or create an account, on the STRATO sign-in page (your key is held by Vault), or
+- connect a self-custody wallet
+
+See the **[Quick Start Guide](quick-start.md)**.
 
 ### What wallet should I use?
 
-**Recommended**: MetaMask (most popular and tested)
+The app's Connect Wallet dialog offers:
 
-**Also supported**:
-
-- WalletConnect-compatible wallets
-- Coinbase Wallet
-- Trust Wallet
+- **STRATO Wallet**: sign in with a STRATO account; no seed phrase
+- **MetaMask**
+- **Coinbase Wallet**
+- **WalletConnect**-compatible wallets
 
 ### How do I bridge assets to STRATO?
 
-1. Go to **Deposits** (sidebar) → **Bridge In** tab (for deposits) OR **Withdrawals** (sidebar) for withdrawals
-2. Connect wallet to Ethereum network
-3. Select asset and amount
-4. Approve and confirm (requires ETH for gas)
-5. Wait 5-15 minutes for bridge completion
+1. Open **Fund** in the sidebar and choose **Bridge**
+2. Pick the source network and asset
+3. Enter the amount and confirm in your wallet (you pay source-chain gas)
+4. The bridge service confirms the deposit and credits your STRATO address
 
-See **[Bridge Guide](guides/bridge.md)** for detailed instructions.
+To move assets out, use **Bridge Out**. Withdrawals are not instant and depend on available bridge liquidity. See the **[Bridge Guide](guides/bridge.md)**.
+
+### Which chains and assets can I bridge?
+
+Supported chains and assets are configured on-chain in the bridge contract, and the Fund page shows the current list. At the time of writing:
+
+- **Mainnet**: Ethereum, Base, Linea, Robinhood Chain, and HyperEVM
+- **Testnet**: Ethereum Sepolia, Base Sepolia, Robinhood Chain Testnet, and HyperEVM
+
+Bridged assets include ETH, WBTC, wstETH, rETH, USDC, USDT, PAXG, and XAUt.
 
 ### Why do I need USDST?
 
-USDST is STRATO's native token used for:
-
-- **Gas fees**: All transactions require small USDST for fees (< $0.10 typically)
-- **Stable value**: USD-pegged stablecoin for stable collateral and trading
-- **DeFi operations**: Can be borrowed, minted, swapped, or used as collateral
+Transaction fees are paid in USDST when you have no vouchers. USDST is also the stablecoin you mint, borrow, swap, and supply across the protocol.
 
 ---
 
-## Borrowing & Lending
+## Borrowing
 
-### What's the difference between Borrowing (Lending Pool) and CDP?
+### How do I borrow on STRATO?
 
-| Feature | Lending Pool | CDP |
-|---------|-------------|-----|
-| **Action** | Borrow USDST | Mint USDST |
-| **Source** | Borrowed from pool | Created from nothing |
-| **Interest** | Variable borrow rate | Fixed stability fee (typically lower) |
-| **Best for** | Short-term, flexible | Long-term, capital efficient |
-| **Collateral** | Stored in CollateralVault | Stored in CDPVault |
+The app's **Borrow** page mints USDST against collateral held in **CDP vaults**, one vault per collateral asset. Minting has no lender on the other side: you pay a per-asset **stability fee** that accrues continuously. See **[Borrow USDST](guides/borrow.md)** and **[Mint USDST (CDP)](guides/mint-cdp.md)**.
 
-**Important:** Lending and CDP use **separate collateral vaults**. You cannot use the same collateral for both systems simultaneously.
+STRATO also has a `LendingPool` contract, but the app does not currently offer lending-pool borrowing.
 
-See **[Core Concepts](concepts.md)** for detailed comparison.
-
-### What is Health Factor?
-
-Health Factor shows how safe your lending position is:
-
-```
-Health Factor = (Collateral Value × Liquidation Threshold) / Borrowed Amount
-```
-
-- **> 2.0**: Very safe (recommended)
-- **1.5 - 2.0**: Safe with buffer
-- **1.0 - 1.5**: Moderate risk
-- **< 1.0**: LIQUIDATION occurs
-
-**Example**: You deposit $10,000 ETH (80% liquidation threshold), borrow $5,000 USDST
-- Health Factor = ($10,000 × 0.8) / $5,000 = 1.6
-- Safe, but watch ETHST price
-
-### What is Collateralization Ratio (CDP)?
-
-CR is the CDP equivalent of Health Factor:
+### What is Collateralization Ratio (CR)?
 
 ```
 CR = (Collateral Value / Minted USDST) × 100%
 ```
 
-- **200%+**: Very safe
-- **150-200%**: Moderate risk
-- **< 150%**: Often liquidated (varies by asset)
+Each collateral asset has a **liquidation ratio** (below it the vault can be liquidated) and a **minimum CR** that minting and withdrawals must respect. Both are set on-chain per asset.
+
+### What is Health Factor?
+
+```
+Health Factor = CR / Liquidation Ratio
+```
+
+- **≥ 1.5**: shown normally in the vault list
+- **1.0 - 1.5**: highlighted as a warning
+- **< 1.0**: can be liquidated
+
+**Example** (illustrative): 1 ETH at $3,000 with 1,500 USDST minted and a 150% liquidation ratio has CR 200% and a health factor of about 1.33.
 
 ### When will I be liquidated?
 
-**Lending Pool**: When Health Factor < 1.0
+When a vault's CR falls below its asset's liquidation ratio, which is the same as its health factor falling below 1.0.
 
-**CDP**: When CR < Liquidation Ratio (e.g., < 150% for ETH)
-
-To avoid liquidation:
-
-- Maintain high health factor (2.0+) or CR (200%+)
-- Add more collateral if prices drop
-- Repay/burn some debt
-- Set price alerts
-
-See **[Safety Guide](safety.md)** for risk management strategies.
+To avoid liquidation, keep a buffer, add collateral or repay debt when prices fall, and watch the liquidation alerts on the Portfolio page. See the **[Safety Guide](safety.md)**.
 
 ### How do I calculate my liquidation price?
 
-**For a lending position:**
+For one vault:
 
 ```
-Liquidation Price = (Borrowed Amount) / (Collateral Amount × Liquidation Threshold)
+Liquidation Price = (Minted USDST × Liquidation Ratio) / Collateral Amount
 ```
 
-**Example**: 1 ETH collateral, $2,400 borrowed, 80% liquidation threshold
-- Liquidation Price = $2,400 / (1 × 0.8) = $3,000
-- If ETHST drops to $3,000, you'll be liquidated
-
-**Use the app's calculator** for accurate real-time calculations with multiple assets.
+**Example** (illustrative): 1 ETH collateral, 1,500 USDST minted, 150% liquidation ratio gives (1,500 × 1.5) / 1 = $2,250.
 
 ### What happens during liquidation?
 
-1. Your Health Factor drops < 1.0 (or CR < minimum)
-2. A liquidator repays part/all of your debt
-3. Liquidator takes your collateral + bonus (5-10%)
-4. You keep the borrowed/minted USDST
-5. Net result: You lose collateral value beyond your debt
+1. The vault's health factor drops below 1.0
+2. Any user can repay part of the vault's debt, up to the asset's close factor (**Advanced → Liquidations** lists eligible vaults)
+3. The liquidator receives collateral worth the repaid USDST plus the asset's liquidation penalty, at the oracle price
+4. You keep the USDST you minted and lose the seized collateral
 
-**Always monitor positions and add collateral before liquidation occurs!**
+### Do my vaults protect each other?
 
-### If I have a 1.07 Health Factor in Lending, what's my CDP ratio?
-
-**These are independent systems** with separate collateral vaults.
-
-If you have:
-
-- Lending HF = 1.07 with 10 ETH in CollateralVault
-- This tells you nothing about your CDP position
-
-Your CDP ratio depends on:
-
-- How much collateral you deposited into **CDPVault** (separate deposit)
-- How much USDST you minted from CDP
-
-**Example comparing equivalent positions:**
-
-- **Lending**: 10 ETHST deposited → Borrow $18,750 → HF = 1.07
-- **CDP equivalent**: 10 ETHST deposited → Mint $18,750 → CR = 160%
-
-But these would require **separate 10 ETHST deposits** (20 ETHST total) since the vaults are separate.
+No. Vaults are **isolated per asset**. Collateral in your ETH vault does not back debt in your WBTC vault, and each vault is liquidated on its own.
 
 ---
 
@@ -194,45 +138,31 @@ But these would require **separate 10 ETHST deposits** (20 ETHST total) since th
 
 ### What is impermanent loss?
 
-Impermanent loss occurs when you provide liquidity and token prices diverge from when you deposited.
+The shortfall versus simply holding, caused by price divergence while your tokens are in a pool.
 
-**Example**:
+**Example** (standard constant-product pool, illustrative):
 
-- Deposit 1 ETHST ($3,000) + 3,000 USDST
+- Deposit 1 ETH ($3,000) + 3,000 USDST
 - ETH doubles to $6,000
-- Pool auto-rebalances: you now have 0.707 ETH + 4,242 USDC
-- Pool value: $8,485
-- If you just held: $9,000
-- **Impermanent loss: $515**
+- Your pool share becomes ≈0.707 ETH + ≈4,243 USDST ≈ $8,485
+- Holding would be worth $9,000
+- **Impermanent loss ≈ $515**
 
-**But**: Trading fees may offset this loss over time.
-
-See **[Core Concepts](concepts.md#impermanent-loss-liquidity-provision)** for details.
+Swap fees can offset this over time. See **[Core Concepts](concepts.md#impermanent-loss-liquidity-provision)**.
 
 ### How are swap fees calculated?
 
-- **Trading fee**: Small percentage (typically 0.3%) on swap amount
-- **Goes to**: Liquidity providers (you if you provide liquidity)
-- **Protocol fee**: Small portion to STRATO treasury
+Standard pools charge a fee on the input amount. The default is **0.3%**: 70% of the fee stays in the pool for liquidity providers, and the rest goes to the protocol fee collector. Individual pools, stable pools, and V3 (concentrated-liquidity) pools can have different fee settings.
 
 ### How do I provide liquidity?
 
-See **[Liquidity Guide](guides/liquidity.md)** for step-by-step instructions.
+See the **[Liquidity Guide](guides/liquidity.md)**.
 
 ### What is slippage?
 
-Slippage is the difference between expected and actual trade price.
+The difference between the quoted and executed trade price. It grows with trade size relative to pool depth, and with price movement before execution.
 
-**Causes**:
-
-- Pool size too small for your trade
-- Price moves during execution
-- Network congestion
-
-**Settings**:
-
-- **Low (0.1-0.5%)**: Safer, may fail in volatile markets
-- **High (1-5%)**: More tolerant, risk of worse price
+Your slippage tolerance sets a minimum output. If execution would fall below it, the transaction reverts (and still pays its fee).
 
 ---
 
@@ -240,67 +170,78 @@ Slippage is the difference between expected and actual trade price.
 
 ### How do I earn Reward Points?
 
-Earn Reward Points by:
+By taking part in activities configured in the Rewards contract. Examples are providing liquidity, supplying to lending, and one-time actions such as swaps. Each activity has its own emission rate.
 
-- Supplying collateral to lending pool
-- Borrowing USDST
-- Providing liquidity to swap pools
-- Minting USDST via CDP
-- Completing swaps
-
-See **[Rewards Guide](guides/rewards.md)** for details.
+See the **[Rewards Guide](guides/rewards.md)**.
 
 ### When are rewards distributed?
 
-Rewards accrue continuously and can be claimed at any time. Check the **Rewards** section in the app to see your pending rewards.
+Rewards accrue continuously and can be claimed at any time from the **Rewards** page.
 
-### What can I do with Reward Points?
+### What are Reward Points?
 
-- **Trade**: Swap for other tokens
-- **Hold**: Store value
-- **Governance**: Vote on protocol changes (coming soon)
-- **Earn more**: Provide Reward Point liquidity
+Reward Points are paid in the `CATA` token, a standard token on STRATO that you hold in your account after claiming.
 
 ---
 
-## Technical
+## Developers
 
-### What are the RPC endpoints?
+### What are the API and RPC endpoints?
 
-**Mainnet**:
-```
-https://app.strato.nexus/strato-api/eth/v1.2
-```
+| Interface | Mainnet | Testnet |
+|---|---|---|
+| **JSON-RPC** | `https://app.strato.nexus/rpc` or `https://noderpc.strato.nexus/rpc` | `https://app.testnet.strato.nexus/rpc` |
+| **Core REST API** | `https://app.strato.nexus/strato-api/eth/v1.2` | `https://app.testnet.strato.nexus/strato-api/eth/v1.2` |
+| **Cirrus (indexed data)** | `https://app.strato.nexus/cirrus/search` | `https://app.testnet.strato.nexus/cirrus/search` |
+| **App API** | `https://app.strato.nexus/api` | `https://app.testnet.strato.nexus/api` |
 
-**Testnet**:
-```
-https://app.testnet.strato.nexus/strato-api/eth/v1.2
-```
+Chain IDs: mainnet `123354377739506` (`0x7030addddcf2`), testnet `195049586845898` (`0xb165855668ca`).
+
+See [JSON-RPC](reference/json-rpc.md), [Core Platform API](reference/strato-node-api.md), [Cirrus](reference/cirrus.md), and [API Overview](reference/api.md).
+
+### Can I use Ethereum tools like MetaMask, ethers, or viem?
+
+For signing and reading, yes. The node accepts Ethereum-format signed transactions (for example `eth_sendRawTransaction`) and serves standard JSON-RPC methods such as `eth_chainId`, `eth_call`, `eth_getBalance`, and `eth_getLogs`.
+
+Contracts, however, run on **SolidVM**, not the EVM, so EVM bytecode is not executed. See [SolidVM](solidvm/index.md) and [Transactions & Fees](platform/transactions-and-fees.md).
+
+### How do I write smart contracts for STRATO?
+
+In SolidVM's Solidity dialect. Start with [SolidVM](solidvm/index.md).
+
+### How do I query contract state and events?
+
+Use **Cirrus**, which indexes contract state and events and serves them read-only at `/cirrus/search`. See [Cirrus](reference/cirrus.md).
 
 ### Where can I find smart contract addresses?
 
-Check the **[Available Tokens](concepts.md#available-tokens)** section or view in the app's settings/info section.
+See **[Contract Addresses](build-apps/contract-addresses.md)**.
 
 ### How do I integrate STRATO into my app?
 
-See the **[Developer Integration Guide](build-apps/integration.md)** for:
+See the **[Developer Integration Guide](build-apps/integration.md)** and the **[API Reference](reference/api.md)**.
 
-- Authentication setup
-- API documentation
-- Code examples
-- Smart contract integration
+---
 
-### Is there an API?
-
-Yes! See **[API Reference](reference/api.md)** for full documentation.
+## Node Operators
 
 ### Can I run my own STRATO node?
 
-Yes, for local development. See:
+Yes. Nodes are built from source and started with `strato-up`. Mainnet (upquark) is the default, and `--network=helium` joins testnet. See **[Run a Node](node/index.md)**.
 
-- [Setup Guide](contribute/setup.md) - Local development installation
-- [Architecture](contribute/architecture.md) - Understanding STRATO components
-- Contact STRATO team for validator participation
+### What hardware do I need?
+
+We recommend 4 vCPU, 16 GB RAM, and 100 GB+ of SSD storage. Validators are not supported below 8 GB RAM. See [Requirements](node/requirements.md).
+
+### How do I sync quickly?
+
+Start the node with `--snapshot` to restore a recent snapshot instead of replaying the chain from genesis. See [Operations](node/operations.md).
+
+### How do I become a validator?
+
+Register as an operator, bond at least the on-chain minimum stake (self-bond plus delegations), then activate to join the validator set. The **Stake** page in the app walks through these steps. Stake-weighted consensus is active on testnet. On mainnet it activates at block 1,000,000; see [Fork heights](platform/networks.md#fork-heights). Your validator address is your node's consensus key.
+
+See [Consensus & Staking](platform/consensus.md).
 
 ---
 
@@ -308,54 +249,31 @@ Yes, for local development. See:
 
 ### Transaction failed - what do I do?
 
-**Common causes and fixes**:
-
-1. **Insufficient USDST for gas**
-   - Get more USDST for fees
-   - Keep 10-20 USDST in wallet
-
-2. **Wrong network**
-   - Switch to STRATO network in wallet
-   - Verify RPC endpoint is correct
-
-3. **Slippage too low**
-   - Increase slippage tolerance
-   - Try again during less volatile period
-
-4. **Nonce error**
-   - Reset account in wallet settings
-   - Clear pending transactions
+1. **No voucher and less than 0.01 USDST**: the fee can't be paid, so the transaction is rejected. Get USDST or bridge in.
+2. **Contract revert** (for example, slippage or a health-factor check): read the error, adjust, and retry. Reverted transactions still pay their fee.
+3. **Wrong network** (external wallets): switch your wallet to the STRATO network.
+4. **Nonce mismatch**: wait for pending transactions to confirm, then retry.
 
 ### My balance isn't showing
 
-**Fixes**:
-
-- Refresh page
-- Verify correct network selected
-- Check if transaction confirmed on block explorer
-- Wait a few seconds for indexing
-- Try disconnecting and reconnecting wallet
+- Refresh the page and wait a few seconds for indexing
+- Check that you are on the right network (mainnet or testnet)
+- Check that you are connected with the same account or wallet you used before
+- Look up the transaction on the explorer ([stratoscan.strato.nexus](https://stratoscan.strato.nexus))
 
 ### Wallet won't connect
 
-**Fixes**:
-
-- Unlock wallet
-- Disable conflicting browser extensions
-- Try different browser
-- Clear browser cache
-- Update wallet extension
+- Unlock your wallet and refresh the page
+- Disable conflicting browser extensions or try another browser
+- For the STRATO Wallet option, complete the sign-in page so it returns you to the app
 
 ### Bridge is taking too long
 
-**Normal**: 5-15 minutes for Ethereum → STRATO
+- Confirm the source-chain transaction is confirmed
+- Check the transaction status on the **Fund** page
+- Contact support with the source-chain transaction hash
 
-**If delayed (> 30 min)**:
-
-- Check Ethereum transaction confirmed
-- Verify sufficient gas was paid
-- Contact support with transaction hash
-- Monitor bridge status page
+Withdrawals (**Bridge Out**) are not instant and depend on available bridge liquidity.
 
 ### How do I contact support?
 
@@ -369,34 +287,22 @@ Yes, for local development. See:
 
 ### How do I keep my assets safe?
 
-See the complete **[Safety & Best Practices](safety.md)** guide.
+See the **[Safety & Best Practices](safety.md)** guide.
 
-**Key points**:
-
-- Never share seed phrase or private keys
-- Use hardware wallet for large amounts
-- Verify URLs before connecting
+- Never share a seed phrase, private key, or password
+- Verify the app URL before signing in or connecting
+- Use a hardware wallet for large amounts with an external wallet
 - Start with small test amounts
-- Maintain high health factor/CR
-- Set price alerts
+- Keep a buffer on your health factor or CR
 
-### What if I lose my seed phrase?
+### What if I lose my seed phrase or password?
 
-**If using wallet-based signup**: Your seed phrase is your ONLY way to recover funds. Without it, funds are permanently lost. This is a fundamental property of blockchain - no one can recover your wallet.
-
-**If using email/password**: You can reset your password, but you still need your wallet seed phrase to access on-chain assets.
-
-**Prevention**: Write seed phrase on paper, store in multiple secure locations (fireproof safe, safety deposit box, etc.).
-
+- **External wallet (MetaMask, etc.)**: your seed phrase is the only way to recover the wallet. Without it, funds in that wallet cannot be recovered.
+- **STRATO account**: there is no seed phrase. Your key is held by Vault and tied to your sign-in account, so contact [support](https://support.blockapps.net) if you lose access.
 
 ### Can transactions be reversed?
 
-No. Blockchain transactions are permanent and cannot be reversed. Always:
-
-- Double-check addresses
-- Verify transaction details
-- Start with small test amounts
-- Review before confirming
+No. Committed transactions are final. Always double-check addresses and amounts, and start with small test amounts.
 
 ---
 
@@ -406,4 +312,3 @@ No. Blockchain transactions are permanent and cannot be reversed. Always:
 - **Read Core Concepts**: [Core Concepts Guide](concepts.md)
 - **Get Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Join Community**: [t.me/strato_net](https://t.me/strato_net)
-
