@@ -112,4 +112,5 @@ tests:
       - merkle-patricia-db
       - solid-vm-model
       - strato-model
+      - time
       - vector

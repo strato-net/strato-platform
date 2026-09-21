@@ -391,8 +391,15 @@ blockstanbulSend' msg = do
         dt <- unBlockPeriod <$> Mod.access (Mod.Proxy @BlockPeriod)
         let tNext = addUTCTime dt tLast
         now <- liftIO getCurrentTime
-        when (now < tNext) $
-          liftIO . threadDelay . round $ 1e6 * diffUTCTime tNext now
+        -- Pace block delivery to the block period, but never wait longer than
+        -- one period. The header timestamp is whatever the proposer wrote, so
+        -- an unbounded wait would let a single far-future stamp stall the VM on
+        -- every node for as long as the stamp is ahead (and overflow 'round'
+        -- into Int for absurd values). The block is already committed at this
+        -- point; this is local scheduling, not consensus.
+        let waitFor = min dt (diffUTCTime tNext now)
+        when (waitFor > 0) $
+          liftIO . threadDelay . round $ 1e6 * waitFor
         ctx <- getBlockstanbulContext
         Mod.put (Mod.Proxy @BestSequencedBlock) $
           BestSequencedBlock

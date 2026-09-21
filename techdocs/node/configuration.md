@@ -57,6 +57,7 @@ These flags are handled by `strato-up` itself and are not passed to `strato-setu
 |---|---|---|
 | `--blockstanbul_block_period_ms` | `1000` | Minimum delay between block creations. |
 | `--blockstanbul_round_period_s` | `3600` | Seconds without progress before a forced PBFT round change. This is only a backstop, because a missed proposal is detected within seconds. |
+| `--blockstanbul_max_timestamp_drift_s` | `15` | Seconds a proposed block's timestamp may run ahead of this node's clock before the node refuses to vote for it. Local policy, not consensus; see [Consensus](../platform/consensus.md#block-timestamps). |
 | `--stakingActivationBlock` | `-1` | Block from which stake-weighted proposer selection applies. `-1` means the network default. Every node of a network must agree, so don't override it on a public network. |
 | `--svmTrace` | `false` | Verbose SolidVM logging. |
 | `--sqlDiff` | `true` | Write account state and storage to the SQL database. |
@@ -74,7 +75,7 @@ Main sections:
 
 | Section | Contains |
 |---|---|
-| `networkConfig` | `network`, `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, and the staking activation settings |
+| `networkConfig` | `network`, `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, `maxTimestampDriftS`, and the staking activation settings |
 | `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |

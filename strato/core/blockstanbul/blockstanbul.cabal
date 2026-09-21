@@ -50,6 +50,7 @@ library
     , solid-vm-model
     , strato-model
     , text
+    , time
     , transformers
     , vault-monad
   default-language: Haskell2010

@@ -4,23 +4,30 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 --import BlockApps.Logging
-import Blockchain.BlockChain (compactDiffs)
+--import Blockchain.BlockChain (compactDiffs)
+import Blockchain.Data.Block (Block (..))
+import Blockchain.Data.BlockHeader (BlockHeader (..))
+import Blockchain.Data.BlockSummary (blockHeaderToBSum)
+import Blockchain.Data.ProposalFacts (noProposalFacts)
+import Blockchain.Event (BlockDelta (..), BlockVerificationFailureDetails (..))
+import Blockchain.Verifier (checkTimestampMonotonic)
 --import qualified Blockchain.Blockstanbul.BenchmarkLib as BML
 --import Blockchain.DB.CodeDB
 --import Blockchain.Data.AddressStateDB
 --import qualified Blockchain.Data.Block as BDB
 --import Blockchain.Data.ExecResults
-import Blockchain.Database.MerklePatricia as MP
+--import Blockchain.Database.MerklePatricia as MP
 --import Blockchain.EVM
 --import qualified Blockchain.EVM.MutableStack as MS
 --import Blockchain.EVM.Opcodes
 --import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.ExtendedWord
+--import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 --import Blockchain.VMContext
 import Blockchain.VMOptions ()
 import Blockchain.Wiring ()
 import Control.Monad
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 --import qualified Control.Monad.Change.Alter as A
 --import Control.Monad.IO.Class
 --import qualified Data.ByteString as B
@@ -137,6 +144,8 @@ spec = do
                   ]
               )
 -}
+{- TODO: compactDiffs was removed from Blockchain.BlockChain in 08f1b46787, so
+   this suite has not compiled since. Kept for reference like the blocks above.
   describe "BatchedDiffs" $ do
     let toRoot = MP.StateRoot . word256ToBytes
         base = toRoot 0
@@ -166,6 +175,21 @@ spec = do
                      (toRoot 10, toRoot 20, unsafeCreateKeccak256FromWord256 20, 20),
                      (toRoot 20, toRoot 30, unsafeCreateKeccak256FromWord256 30, 30)
                    ]
+-}
+
+  describe "checkTimestampMonotonic" $ do
+    let t = posixSecondsToUTCTime
+        hdr n ts = BlockHeaderV2 zeroHash "" "" "" "" n ts "" [] [] [] Nothing []
+        parent = blockHeaderToBSum 1 noProposalFacts (hdr 10 (t 1000)) 0
+        child ts = Block (hdr 11 ts) [] []
+
+    it "accepts a child stamped at or after its parent" $ do
+      checkTimestampMonotonic (child (t 1000)) parent `shouldBe` Nothing
+      checkTimestampMonotonic (child (t 1001)) parent `shouldBe` Nothing
+
+    it "rejects a child stamped before its parent" $
+      checkTimestampMonotonic (child (t 999)) parent
+        `shouldBe` Just (TimestampBeforeParent (BlockDelta (t 999) (t 1000)))
 
 {-
   describe "Mutable Stack" $ do

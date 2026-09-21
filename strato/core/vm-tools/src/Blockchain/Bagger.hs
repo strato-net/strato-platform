@@ -697,6 +697,13 @@ buildNextBlockHeader ::
 buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time vd sd =
   let parentNum = number parentHeader
       blockNum = parentNum + 1
+      -- Never stamp a child before its parent. The parent's proposer may have
+      -- run a little ahead of our clock, and verifiers reject a backwards stamp
+      -- (checkTimestampMonotonic).
+      -- Both the header the block's transactions execute against and the
+      -- sealed header are built here, so block.timestamp during execution and
+      -- in the proposed header agree.
+      time' = max time (timestamp parentHeader)
       (newV, remV) = fromDelta vd
       (curValidators, curStakes) = case parentHeader of
         BlockHeader{} -> (S.toList $ getValidatorSet parentHeader, [])
@@ -713,7 +720,7 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time v
             receiptsRoot = rcptRoot,
             logsBloom = bloom,
             number = parentNum + 1,
-            timestamp = time,
+            timestamp = time',
             extraData = extra,
             currentValidators = curValidators,
             newValidators = newV,
@@ -731,7 +738,7 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs receipts bloom time v
             receiptsRoot = rcptRoot,
             logsBloom = bloom,
             number = parentNum + 1,
-            timestamp = time,
+            timestamp = time',
             extraData = extra,
             currentValidators = curValidators,
             newValidators = newV,

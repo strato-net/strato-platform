@@ -42,6 +42,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import Prometheus
 import System.Exit
 import Text.Format
@@ -117,6 +118,35 @@ assertChainConsistency seqNo wantParent blk = do
     $ "Rejecting block; parent hash " ++ format gotParent ++ " is not required "
       ++ format (fromMaybe (error "assertChainConsistency") wantParent)
   Right ()
+
+-- | Refuse to vote for a proposal whose header timestamp runs more than
+-- @maxDrift@ ahead of this node's clock. @block.timestamp@ is whatever the
+-- proposer wrote, so without this a single validator could warp every
+-- time-dependent contract forward by stamping a far-future block.
+--
+-- Vote-time only: it must never run on a committed block, or replay and sync
+-- would depend on the local clock and nodes would diverge on old history.
+-- That is why it is here and not in the VM's verifyBlock, and why it needs no
+-- fork height. It is also independent of staking: it composes with
+-- 'checkProposalHeader' rather than living inside it, whose first guard is a
+-- no-op before staking activates. Pure so it can be tested; the caller
+-- supplies the clock.
+--
+-- There is no lower bound. A stamp before the parent's is rejected
+-- deterministically by the VM during the pre-prepare replay
+-- (checkTimestampMonotonic), and a bound against the local clock would fire on
+-- nodes whose own clock is behind. A rejected proposal triggers an immediate
+-- round change, so a false positive costs one round, not roundPeriodS.
+checkProposalTimestamp :: NominalDiffTime -> UTCTime -> Block -> Either T.Text ()
+checkProposalTimestamp maxDrift now pp
+  | drift <= maxDrift = Right ()
+  | otherwise =
+      Left . T.pack $
+        "Rejecting proposal; header timestamp " ++ show stamp ++ " is " ++ show drift
+          ++ " ahead of the local clock (max " ++ show maxDrift ++ ")"
+  where
+    stamp = timestamp (blockBlockData pp)
+    drift = diffUTCTime stamp now
 
 hasSameHash :: (StateMachineM m) => Keccak256 -> m Bool
 hasSameHash di = uses proposal $ maybe False ((== di) . blockHash)
@@ -419,7 +449,10 @@ eventLoop ctx = execStateC ctx $
               | otherwise -> do
                 wantParent <- use lastParent
                 curCtx <- get
-                case assertChainConsistency (_sequence v) wantParent pp >> checkProposalHeader curCtx v' pp of
+                now <- liftIO getCurrentTime
+                case assertChainConsistency (_sequence v) wantParent pp
+                       >> checkProposalTimestamp (_maxTimestampDrift curCtx) now pp
+                       >> checkProposalHeader curCtx v' pp of
                   Left err -> do
                     $logWarnS "blockstanbul/ppl" $ "Rejecting proposal: " <> err
                     $logInfoS "blockstanbul/roundchange" "chain inconsistency"
