@@ -173,7 +173,7 @@ const YIELD_VAULTS = [
     iconColor: "text-indigo-600 dark:text-indigo-400",
   },
   {
-    key: "hype-carry",
+    key: "hype-yield",
     name: "HYPE Yield Vault",
     subtitle: "Earn HYPE yield and Reward Points",
     asset: "WHYPE",

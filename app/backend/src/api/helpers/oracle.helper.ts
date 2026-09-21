@@ -339,7 +339,7 @@ const addYieldVaultTokenPrices = async (
 ): Promise<void> => {
   const vaultAddrs = [
     config.ethCarryVault,
-    config.hypeCarryVault,
+    config.hypeYieldVault,
     config.wbtcCarryVault,
     config.usdcYieldVault,
     config.goldstYieldVault,
@@ -376,7 +376,7 @@ export const getCarryVaultUsdPriceMap = async (
   const out = new Map<string, string>();
   const vaultAddrs = [
     config.ethCarryVault,
-    config.hypeCarryVault,
+    config.hypeYieldVault,
     config.wbtcCarryVault,
     config.usdcYieldVault,
     config.goldstYieldVault,

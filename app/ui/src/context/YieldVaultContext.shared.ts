@@ -95,7 +95,7 @@ export type YieldVaultContextType = {
 
 export const VAULT_KEYS = [
   "eth-carry",
-  "hype-carry",
+  "hype-yield",
   "wbtc-carry",
   "usdc-yield",
   "goldst-yield",

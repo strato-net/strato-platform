@@ -194,7 +194,7 @@ export const defaultEthCarryVaultFor: Record<string, string> = {
   "33056204878082667": "a94905d8bd117e9bfbe57aadffd7abbea760e028", // Upquark mainnet
 };
 
-export const defaultHypeCarryVaultFor: Record<string, string> = {
+export const defaultHypeYieldVaultFor: Record<string, string> = {
   "114784819836269": "52042da4c65e8226472b4869019a0aee6d920e21", // Helium testnet
   "33056204878082667": "", // Upquark mainnet: populate after deployment
 };
@@ -246,7 +246,7 @@ export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
-export let hypeCarryVault: string = '';
+export let hypeYieldVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
 export let stratoNativeBridge: string = '';
@@ -396,7 +396,7 @@ export function setVaultConfig(networkId: string) {
 
 export function setCarryVaultConfig(networkId: string) {
   ethCarryVault = process.env.ETH_CARRY_VAULT || defaultEthCarryVaultFor[networkId] || "";
-  hypeCarryVault = process.env.HYPE_CARRY_VAULT || defaultHypeCarryVaultFor[networkId] || "";
+  hypeYieldVault = process.env.HYPE_YIELD_VAULT || defaultHypeYieldVaultFor[networkId] || "";
   wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
 }
 
@@ -469,7 +469,7 @@ export async function getInternalAddresses() {
     saveUsdstVault,
     usdcYieldVault,
     ethCarryVault,
-    hypeCarryVault,
+    hypeYieldVault,
     wbtcCarryVault,
     goldstYieldVault,
     silvstYieldVault
