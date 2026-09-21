@@ -39,7 +39,6 @@ module Blockchain.VMContext
     blockSummaryDB,
     redisPool,
     sqldb,
-    memStateDB,
     memHashDB,
     memCodeDB,
     memBlockSummaryDB,
@@ -123,6 +122,7 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.NodeDB
 import Control.Monad.Composable.Streaming (StreamEnv (..), StreamM, createStreamEnv, runStreamMUsingEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
@@ -185,10 +185,9 @@ data ContextDBs = ContextDBs
 
 makeLenses ''ContextDBs
 
--- | Map-backed versions of the four persistent stores.
+-- | Map-backed versions of the persistent stores other than trie nodes.
 data MemContextDBs = MemContextDBs
-  { _memStateDB :: M.Map MP.StateRoot MP.NodeData,
-    _memHashDB :: M.Map N.NibbleString N.NibbleString,
+  { _memHashDB :: M.Map N.NibbleString N.NibbleString,
     _memCodeDB :: M.Map Keccak256 DBCode,
     _memBlockSummaryDB :: M.Map Keccak256 BlockSummary
   }
@@ -197,7 +196,7 @@ data MemContextDBs = MemContextDBs
 makeLenses ''MemContextDBs
 
 instance Default MemContextDBs where
-  def = MemContextDBs M.empty M.empty M.empty M.empty
+  def = MemContextDBs M.empty M.empty M.empty
 
 -- | Where the stores live. 'Sandbox' reads through to the persistent stores
 -- on a miss and keeps every write in the overlay (eth_call, tracing).
@@ -278,14 +277,20 @@ data Context = Context
 makeLenses ''Context
 
 -- | The node's monad: the 'Context' record of 'IORef's and handles composed
--- with the streaming and logging monads, as one flat @Env -> IO@ layer.
-type ContextRow = '[Context, IORef StreamEnv, Logger]
+-- with the node store, streaming and logging monads, as one flat @Env -> IO@ layer.
+type ContextRow = '[Context, NodeDB, IORef StreamEnv, Logger]
 
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv (IORef StreamEnv), MonadMonitor)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv NodeDB, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
 runContextIO :: Context -> ContextM a -> StreamM '[Logger] a
-runContextIO ctx (ContextM m) = provide ctx m
+runContextIO ctx (ContextM m) = nodeDBFor (_backend ctx) >>= \db -> runNodeDBM db (provide ctx m)
+
+-- | Trie nodes live in LevelDB when there is one, otherwise in a map for the run.
+nodeDBFor :: MonadIO m => Backend -> m NodeDB
+nodeDBFor (Memory _) = mapNodeDB <$> liftIO (newIORef M.empty)
+nodeDBFor (Persistent d) = pure $ levelDBNodeDB (MP.unStateDB $ _stateDB d)
+nodeDBFor (Sandbox _ d) = pure $ levelDBNodeDB (MP.unStateDB $ _stateDB d)
 
 -- | Build the context inside 'ContextM' (the SQL pool wants the logger),
 -- then run the body under it. The builder runs under an inert in-memory
@@ -528,7 +533,8 @@ evalSandboxedContextM f = do
     Persistent d -> Sandbox <$> newIORef def <*> pure d
     Sandbox o d -> Sandbox <$> (newIORef =<< readIORef o) <*> pure d
     Memory o -> Memory <$> (newIORef =<< readIORef o)
-  ContextM $ localEnv @Context (const ctx {_backend = sandboxed, _state = st}) (unContextM f)
+  nodes <- newIORef M.empty
+  ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @NodeDB (overlayNodeDB nodes) $ unContextM f
 
 -- | Fetch Merkle-Patricia nodes missing locally from peers for the body's duration.
 withFetchMissingNodes :: ContextM a -> ContextM a

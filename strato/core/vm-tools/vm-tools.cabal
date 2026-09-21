@@ -75,6 +75,7 @@ library
     , monad-alter
     , mtl
     , nibblestring
+    , nodedb-monad
     , ordered-containers
     , persistent-sqlite
     , prometheus-client

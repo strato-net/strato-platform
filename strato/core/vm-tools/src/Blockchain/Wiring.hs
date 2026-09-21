@@ -192,12 +192,12 @@ instance HasMemAddressStateDB ContextM where
 
 instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   lookup _ k = do
-    mnd <- readStore memStateDB (\d -> MP.genericLookupDB (pure . MP.unStateDB $ _stateDB d) k) k
+    mnd <- ContextM $ A.lookup (A.Proxy @MP.NodeData) k
     case mnd of
       Nothing -> accessEnv >>= \ctx -> if _fetchMissingNodes ctx then fetchMPNode k else pure Nothing
       _ -> pure mnd
-  insert _ k v = writeStore memStateDB (\d -> MP.genericInsertDB (pure . MP.unStateDB $ _stateDB d) k v) k (Just v)
-  delete _ k = writeStore memStateDB (\d -> MP.genericDeleteDB (pure . MP.unStateDB $ _stateDB d) k) k Nothing
+  insert _ k v = ContextM $ A.insert (A.Proxy @MP.NodeData) k v
+  delete _ k = ContextM $ A.delete (A.Proxy @MP.NodeData) k
 
 -- | Ask peers for a node missing locally and wait (up to 10s) for the reply
 -- on the VM's own task topic; used only while diagnosing a state-root mismatch.
