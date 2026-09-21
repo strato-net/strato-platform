@@ -52,6 +52,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Default
 import Data.Foldable (foldrM)
+import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -104,12 +105,25 @@ runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 -- Apply/catchup touches far more than 10 contracts (DEC1DE, USDST, voucher,
--- oracles, user code). A 10-entry LRU evicts and re-typechecks on the hot path.
+-- oracles, user code), so the LRU holds well over 10 entries.
 -- Keyed by (code hash, legacy operator precedence): the same source parses to
 -- a different AST on either side of the operator-precedence fork.
+maxCacheSize :: Integer
+maxCacheSize = 128
+
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (M.Map (Keccak256, Bool) CodeCollection)
-unsafeCodeCacheIORef = unsafePerformIO $ newIORef M.empty
+unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) CodeCollection)
+unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
+
+codeCacheLookup :: MonadIO m => (Keccak256, Bool) -> m (Maybe CodeCollection)
+codeCacheLookup k = liftIO $ do
+  cache <- readIORef unsafeCodeCacheIORef
+  case LRU.lookup k cache of
+    (cache', Just cc) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just cc)
+    (_, Nothing) -> pure Nothing
+
+codeCacheInsert :: MonadIO m => (Keccak256, Bool) -> CodeCollection -> m ()
+codeCacheInsert k cc = liftIO $ modifyIORef' unsafeCodeCacheIORef (LRU.insert k cc)
 
 -- | Parse-time switches. The VM derives them from the block being executed;
 -- everything else (APIs, tooling, tests) uses 'defaultParseOptions'.
@@ -292,8 +306,8 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
       cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup cacheKey codeCache of
+  mcc <- codeCacheLookup cacheKey
+  case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
       return (hsh, cc)
@@ -307,7 +321,7 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert cacheKey cc)
+      codeCacheInsert cacheKey cc
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -335,15 +349,15 @@ codeCollectionFromHashWith ::
   m CodeCollection
 codeCollectionFromHashWith opts isRunningTests typeCheck hsh = do
   let cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup cacheKey codeCache of
+  mcc <- codeCacheLookup cacheKey
+  case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
       return cc
     Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCacheWith opts isRunningTests True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert cacheKey cc)
+      codeCacheInsert cacheKey cc
       return cc
 
 codeCollectionFromHashNoCacheWith ::
