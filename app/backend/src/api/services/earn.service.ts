@@ -19,19 +19,13 @@ import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } fro
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getStratoStakingNetworkApy } from "./staking.service";
 import { getPools as getV3Pools } from "./poolV3.service";
+import { V3_POOL_APY_MIN_TVL_USD } from "../../config/poolV3Constants";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { ApySource, TokenApyEntry, PoolV3 } from "@strato/shared-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const { Pool, DECIMALS, Token, ZERO_ADDRESS, DAY_MS, BPS_DIVISOR } = constants;
-
-/**
- * V3 pools below this TVL are left out of the token APY feed. A pool's `apy` annualizes
- * a single day of fees, so a near-empty pool with one swap posts a headline number that
- * would win the Native max for both of its tokens.
- */
-const V3_POOL_APY_MIN_TVL_USD = 1_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
