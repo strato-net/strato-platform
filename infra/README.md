@@ -43,12 +43,41 @@ environments/tiered.sh api-tier diff --no-change-set
 environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoor
 ```
 
-The environment runs two core cells so that one can be rebuilt without an
-outage: `cell-a` (us-east-1a) is the writer and hosts Grafana, `cell-b`
-(us-east-1b) is a follower restored from the published snapshot with the
-shared databases left alone. The API tier still reads one cell (`kafkaHost`,
-`prometheusHost` are cell-a's): the second cell is a warm spare for the chain
-state, not yet a failover target.
+The environment runs two core cells so that either can be lost or rebuilt
+without an outage: `cell-a` (us-east-1a) and `cell-b` (us-east-1b), each a
+full follower of the chain with its own Kafka, sharing the Aurora cluster.
+
+- **Writes to Aurora** belong to whichever cell holds the writer lease. Both
+  run `strato-lease-watch` (`autoPromote`), which takes the lease after about
+  a minute of silence from its holder; every claim is counted in CloudWatch
+  (`STRATO/Cell` `WriterLeaseClaimed`). A restarted cell logs "standby" at
+  startup even while it holds the lease: read the lease
+  (`strato-promote --status`), not that line. So "writer" in
+  `environments/tiered.sh` only says which cell claims the lease when both
+  start cold; the lease has moved between the cells since, and either may
+  hold it.
+- **Transactions from the API tier** go to `StratoCell-tiered-Frontend`, an
+  internal load balancer on the cells' Kafka port, sticky by source address
+  and health-checked on each cell's sequencer. The API tier only produces,
+  so it does not matter which cell a task lands on. Every cell must advertise
+  the load balancer's name (`kafkaExternalHost`): the API's Kafka client
+  reconnects to the advertised address, so a cell advertising itself would
+  keep being chosen after it died. The client does not retry: when a cell
+  fails, submits from the tasks pinned to it return 500 until the health
+  check ejects it (10 s interval, 2 failures, so about 20 s), then succeed.
+  The client also connects lazily, on the first submit, so on a quiet
+  deployment the load balancer's flow metrics are zero: that is idleness,
+  not a broken path. To test the path, make a Kafka metadata request through
+  the load balancer from inside the VPC and check that the broker it names
+  is the load balancer.
+
+Rolling the load balancer out, or adding a cell to it: deploy `core-frontend`;
+record its `DnsName` as `CORE_NLB` in `environments/tiered.sh`; on each cell,
+standby first, apply the new advertised name (`strato-setup --regenerate
+--kafkaExternalHost=<name>` and a restart, since cloud-init does not run
+again); then deploy `api-tier`. A cell that already advertises the name sends
+even clients that dial it directly through the load balancer, so the API tier
+can be switched last.
 
 `tiered` is account 406773134706, us-east-1, serving
 https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean

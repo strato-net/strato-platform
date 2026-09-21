@@ -111,6 +111,8 @@ submits transactions to this cell.
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
 | `snapshotBucket` | `strato-snapshots` | bucket for published snapshots; granted read when set |
 | `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
+| `kafkaExternalHost` | the host's private DNS name | the name the broker advertises on 9094; the environment load balancer's name when the cell is behind one (`-c frontend=true`) |
+| `autoPromote` | `false` | watch the writer lease and take it after `autoPromoteAfter` (3) consecutive stale observations, about a minute of silence; each claim is counted in CloudWatch (`STRATO/Cell` `WriterLeaseClaimed`). Not for a validator's standby |
 | `legacyLaunchTemplateName` | `false` | keep the launch template's old shared name; only for a cell created before the names were made unique, where renaming would replace the instance |
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
@@ -131,6 +133,29 @@ submits transactions to this cell.
 - Replacing the instance (a new instance type, a new AMI) keeps the data
   volume only if it is detached and reattached by hand; the stack does not
   do that for you. A follower can instead be rebuilt from a snapshot.
+
+## When the first boot fails
+
+`/var/log/strato-cell-bootstrap.log` says where. The script stops at the first
+error, and a failure in the setup or restore step leaves the host without its
+systemd unit. Running `/opt/strato/bootstrap/cell-bootstrap.sh` again as root
+is safe: setup and restore run only while the node directory does not exist,
+so a second run carries on from the step after them.
+
+`stratoImage` is one image of a release, and the node's compose file asks for
+the others (prometheus, nginx, app-nginx) under the same version prefix, which
+is the platform's git hash. A strato image rebuilt alone has a prefix the other
+images were never pushed under, and `docker compose up` fails on a missing
+tag: push or copy the full set before pointing a cell at it.
+
+The same trap is in `strato-setup --regenerate`: it rewrites
+`docker-compose.yml` with the version prefix of the binaries now on the host.
+On a cell whose binaries were updated in place, the regenerated file asks for
+image tags that host never pulled, `docker compose up` fails, convoke aborts,
+and the node stays down **while systemd reports `strato-cell` active**. After
+any `--regenerate` on such a cell, pull and tag the images (step 4c of the
+bootstrap) before restarting, and check the processes afterwards
+(`strato-ps`), not the unit.
 
 ## Deleting a cell stack
 
