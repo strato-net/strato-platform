@@ -52,7 +52,10 @@ full follower of the chain with its own Kafka, sharing the Aurora cluster.
   a minute of silence from its holder; every claim is counted in CloudWatch
   (`STRATO/Cell` `WriterLeaseClaimed`). A restarted cell logs "standby" at
   startup even while it holds the lease: read the lease
-  (`strato-promote --status`), not that line.
+  (`strato-promote --status`), not that line. So "writer" in
+  `environments/tiered.sh` only says which cell claims the lease when both
+  start cold; the lease has moved between the cells since, and either may
+  hold it.
 - **Transactions from the API tier** go to `StratoCell-tiered-Frontend`, an
   internal load balancer on the cells' Kafka port, sticky by source address
   and health-checked on each cell's sequencer. The API tier only produces,
@@ -62,6 +65,11 @@ full follower of the chain with its own Kafka, sharing the Aurora cluster.
   keep being chosen after it died. The client does not retry: when a cell
   fails, submits from the tasks pinned to it return 500 until the health
   check ejects it (10 s interval, 2 failures, so about 20 s), then succeed.
+  The client also connects lazily, on the first submit, so on a quiet
+  deployment the load balancer's flow metrics are zero: that is idleness,
+  not a broken path. To test the path, make a Kafka metadata request through
+  the load balancer from inside the VPC and check that the broker it names
+  is the load balancer.
 
 Rolling the load balancer out, or adding a cell to it: deploy `core-frontend`;
 record its `DnsName` as `CORE_NLB` in `environments/tiered.sh`; on each cell,

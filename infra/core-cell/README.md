@@ -148,6 +148,15 @@ is the platform's git hash. A strato image rebuilt alone has a prefix the other
 images were never pushed under, and `docker compose up` fails on a missing
 tag: push or copy the full set before pointing a cell at it.
 
+The same trap is in `strato-setup --regenerate`: it rewrites
+`docker-compose.yml` with the version prefix of the binaries now on the host.
+On a cell whose binaries were updated in place, the regenerated file asks for
+image tags that host never pulled, `docker compose up` fails, convoke aborts,
+and the node stays down **while systemd reports `strato-cell` active**. After
+any `--regenerate` on such a cell, pull and tag the images (step 4c of the
+bootstrap) before restarting, and check the processes afterwards
+(`strato-ps`), not the unit.
+
 ## Deleting a cell stack
 
 The Host stack has termination protection on, which also blocks deleting one
