@@ -75,37 +75,6 @@ All of these use 18 decimals.
 !!! warning "Look up tokens by address, not symbol"
     Symbols are not unique. For example, more than one token uses the symbol `GOLDST`. Bridged tokens such as ETH and WBTC have no "ST" suffix.
 
-## Price feed sentinel addresses (both networks)
-
-`PriceOracle` keys prices by address, but a feed does not need a deployed token: `setAssetPrice` only
-requires a non-zero address. Feeds for assets that have no STRATO token are therefore keyed on reserved
-low addresses. Nothing is deployed at these addresses -- they are map keys, not contracts.
-
-| Address | Feed | Notes |
-|---|---|---|
-| `0000000000000000000000000000000000000002` | DOGE | Dogecoin spot in USD. Dogecoin is a native UTXO L1, so it has no ERC-20, no bridge route and no STRATO token. |
-
-New sentinels are allocated sequentially; record each one here and in the oracle service's config
-before use, so two assets can never claim the same key.
-
-Read one exactly like any other asset. Prices are 1e18-scaled USD:
-
-```solidity
-uint256 dogeUsd = PriceOracle(0x0000000000000000000000000000000000001002)
-    .getAssetPrice(address(2));
-```
-
-Or off-chain, through Cirrus:
-
-```bash
-curl -s "https://app.strato.nexus/cirrus/search/BlockApps-PriceOracle-prices?address=eq.0000000000000000000000000000000000001002&key=eq.0000000000000000000000000000000000000002&select=key,value::text"
-```
-
-!!! warning "A sentinel is a price key, not a token"
-    These addresses hold no balance, no supply and no `transfer`. Use them to read a price only. Never
-    list one as a swap-pool asset or as lending or CDP collateral -- there is nothing to custody or
-    liquidate behind it.
-
 ## Per-network contracts
 
 These contracts were deployed after genesis, so each network has its own address.
