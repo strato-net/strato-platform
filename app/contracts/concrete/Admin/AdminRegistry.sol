@@ -174,11 +174,11 @@ contract record AdminRegistry is Ownable {
     }
 
     function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
+        require(_admin != address(0), "Invalid admin address");
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
-        require(index > 0, "Caller is not an admin");
-        address swap = admins[admins.length - 1];
+        require(index > 0, "Account to replace is not an admin");
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
