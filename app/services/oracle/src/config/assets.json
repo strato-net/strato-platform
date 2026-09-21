@@ -107,6 +107,10 @@
           "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
           "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
         },
+        "DOGE": {
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
+        },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
           "submit": false,
@@ -329,7 +333,8 @@
             "WHYPE",
             "KHYPE",
             "NVDA",
-            "SPY"
+            "SPY",
+            "DOGE"
           ]
         },
         "Metals.dev": {
@@ -382,7 +387,8 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -402,7 +408,8 @@
             "WEETH": "wrapped-eeth",
             "WHYPE": "wrapped-hype",
             "KHYPE": "kinetic-staked-hype",
-            "LIT": "lighter"
+            "LIT": "lighter",
+            "DOGE": "dogecoin"
           }
         },
         "CoinAPI": {
@@ -424,7 +431,8 @@
             "SPYX",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "DOGE"
           ],
           "symbolMapping": {
             "WHYPE": "HYPE"
@@ -452,7 +460,8 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -472,7 +481,8 @@
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
-            "LIT": "coingecko:lighter"
+            "LIT": "coingecko:lighter",
+            "DOGE": "coingecko:dogecoin"
           }
         },
         "DexScreener": {
@@ -512,7 +522,8 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "TSLAX"
+            "TSLAX",
+            "DOGE"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -520,7 +531,8 @@
             "SPY": "SPY",
             "SPYX": "SPY",
             "NVDA": "NVDA",
-            "TSLAX": "TSLA"
+            "TSLAX": "TSLA",
+            "DOGE": "DOGE/USD"
           }
         },
         "OANDA": {
@@ -655,6 +667,10 @@
           "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
           "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2."
         },
+        "DOGE": {
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
+        },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
           "submit": false,
@@ -877,7 +893,8 @@
             "WHYPE",
             "KHYPE",
             "NVDA",
-            "SPY"
+            "SPY",
+            "DOGE"
           ]
         },
         "Metals.dev": {
@@ -930,7 +947,8 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -950,7 +968,8 @@
             "WEETH": "wrapped-eeth",
             "WHYPE": "wrapped-hype",
             "KHYPE": "kinetic-staked-hype",
-            "LIT": "lighter"
+            "LIT": "lighter",
+            "DOGE": "dogecoin"
           }
         },
         "CoinAPI": {
@@ -972,7 +991,8 @@
             "SPYX",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "DOGE"
           ],
           "symbolMapping": {
             "WHYPE": "HYPE"
@@ -1000,7 +1020,8 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -1020,7 +1041,8 @@
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
-            "LIT": "coingecko:lighter"
+            "LIT": "coingecko:lighter",
+            "DOGE": "coingecko:dogecoin"
           }
         },
         "DexScreener": {
@@ -1060,7 +1082,8 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "TSLAX"
+            "TSLAX",
+            "DOGE"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -1068,7 +1091,8 @@
             "SPY": "SPY",
             "SPYX": "SPY",
             "NVDA": "NVDA",
-            "TSLAX": "TSLA"
+            "TSLAX": "TSLA",
+            "DOGE": "DOGE/USD"
           }
         },
         "OANDA": {
