@@ -108,8 +108,8 @@
           "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
         },
         "DOGE": {
-          "targetAssetAddress": "0000000000000000000000000000000000000002",
-          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed keyed on sentinel address 0x..02. Consumers read it via PriceOracle.getAssetPrice(0x0000000000000000000000000000000000000002)."
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
         },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
@@ -668,8 +668,8 @@
           "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2."
         },
         "DOGE": {
-          "targetAssetAddress": "0000000000000000000000000000000000000002",
-          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed keyed on sentinel address 0x..02. Consumers read it via PriceOracle.getAssetPrice(0x0000000000000000000000000000000000000002)."
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
         },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
