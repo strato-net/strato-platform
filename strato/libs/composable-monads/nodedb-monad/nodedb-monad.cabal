@@ -12,14 +12,19 @@ build-type:     Simple
 library
   exposed-modules:
       Control.Monad.Composable.NodeDB
+      Control.Monad.Composable.NodeDB.Cached
   other-modules:
       Paths_nodedb_monad
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , bytestring
     , composable-monads-base
     , containers
+    , data-default
+    , ethereum-rlp
+    , kv-cache
     , leveldb-haskell
     , merkle-patricia-db
     , monad-alter

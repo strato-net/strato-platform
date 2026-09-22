@@ -31,6 +31,7 @@ library:
   - bytestring
   - common-log
   - composable-monads-base
+  - nodedb-monad
   - conduit
   - containers
   - cross-monitoring

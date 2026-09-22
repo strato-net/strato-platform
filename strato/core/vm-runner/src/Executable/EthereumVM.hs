@@ -52,6 +52,7 @@ import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Control.Monad
 import Control.Monad.Change.Alter ()
+import Control.Monad.Composable.NodeDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
 import Data.Foldable hiding (fold)
 import Data.List
@@ -86,6 +87,9 @@ ethereumVM = do
 
       let !vmInEventBatch = foldr insertInBatch newInBatch seqEvents
       failures <- handleVmTasks vmInEventBatch
+      -- Trie writes held back over this input batch are made durable before
+      -- runConsume advances the input checkpoint.
+      flushNodeDB
 
       loopTimeit "compactContextM" $ compactContextM
 

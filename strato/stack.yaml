@@ -6,6 +6,7 @@ packages:
 - libs/groth16-rapidsnark
 - libs/strato-auth
 - libs/strato-vault-client
+- libs/kv-cache
 
 - api/bloc/bloc2
 - api/bloc/bloc2api

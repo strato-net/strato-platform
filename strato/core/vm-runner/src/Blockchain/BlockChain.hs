@@ -79,6 +79,7 @@ import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, Rever
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
+import Control.Monad.Composable.NodeDB (discardNodeDB, tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
@@ -235,6 +236,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
         verifyBlockResult <- verifyBlock (outputBlockToBlock b) (trrs, postRewardSR) bSum
         case verifyBlockResult of
           failures@(_:_) -> do
+            discardNodeDB
             P.incCounter vmBlocksInvalid
             -- Identify the block that failed, not its parent. 'bSum' summarizes
             -- the *parent* (setParentStateRoot looks it up by parentHash), so
@@ -244,6 +246,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             -- wrong sends whoever is debugging to the wrong block.
             pure $ map (BlockVerificationFailure (number bd) obh) failures
           _ -> do
+            tickNodeDB
             P.incCounter vmBlocksValid
             P.incCounter vmBlocksMined
             P.incCounter vmBlocksProcessed

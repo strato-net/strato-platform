@@ -8,8 +8,12 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+  - bytestring
   - composable-monads-base
   - containers
+  - data-default
+  - ethereum-rlp
+  - kv-cache
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter

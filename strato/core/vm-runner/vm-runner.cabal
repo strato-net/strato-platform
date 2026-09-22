@@ -55,6 +55,7 @@ library
     , lens
     , merkle-patricia-db
     , monad-alter
+    , nodedb-monad
     , ordered-containers
     , prometheus-client
     , seqevents

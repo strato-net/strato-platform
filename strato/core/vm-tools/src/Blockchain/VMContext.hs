@@ -123,6 +123,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.NodeDB
+import Control.Monad.Composable.NodeDB.Cached (cachedNodeDB)
 import Control.Monad.Composable.Streaming (StreamEnv (..), StreamM, createStreamEnv, runStreamMUsingEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
@@ -284,13 +285,20 @@ newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv NodeDB, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
 runContextIO :: Context -> ContextM a -> StreamM '[Logger] a
-runContextIO ctx (ContextM m) = nodeDBFor (_backend ctx) >>= \db -> runNodeDBM db (provide ctx m)
+runContextIO ctx (ContextM m) = do
+  db <- nodeDBFor (_backend ctx)
+  a <- runNodeDBM db (provide ctx m)
+  liftIO (flushNodes db)
+  pure a
 
--- | Trie nodes live in LevelDB when there is one, otherwise in a map for the run.
+-- | Trie nodes live in LevelDB when there is one, behind a cache of 20k parsed
+-- nodes (tens of MB) that writes through every 256 blocks and when the run
+-- ends; a long-running loop must 'flushNodeDB' before acknowledging input.
+-- Otherwise they live in a map for the run.
 nodeDBFor :: MonadIO m => Backend -> m NodeDB
 nodeDBFor (Memory _) = mapNodeDB <$> liftIO (newIORef M.empty)
-nodeDBFor (Persistent d) = pure $ levelDBNodeDB (MP.unStateDB $ _stateDB d)
-nodeDBFor (Sandbox _ d) = pure $ levelDBNodeDB (MP.unStateDB $ _stateDB d)
+nodeDBFor (Persistent d) = liftIO $ cachedNodeDB 20000 256 (levelDBBytes . MP.unStateDB $ _stateDB d)
+nodeDBFor (Sandbox _ d) = pure $ nodeDB (levelDBBytes . MP.unStateDB $ _stateDB d)
 
 -- | Build the context inside 'ContextM' (the SQL pool wants the logger),
 -- then run the body under it. The builder runs under an inert in-memory
