@@ -29,12 +29,11 @@ const formatShares = (value: string): string => {
 };
 
 interface VaultUserPositionProps {
-  onDeposit: () => void;
   onWithdraw: () => void;
   guestMode?: boolean;
 }
 
-const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUserPositionProps) => {
+const VaultUserPosition = ({ onWithdraw, guestMode = false }: VaultUserPositionProps) => {
   const { vaultState } = useVaultContext();
   const {
     userShares,
@@ -55,7 +54,7 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-center py-4">
-            Sign in to view your vault position and manage deposits or withdrawals.
+            Sign in to view your vault position and withdraw.
           </p>
         </CardContent>
       </Card>
@@ -93,17 +92,9 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
       <CardContent className="space-y-6">
         {!hasPosition ? (
           <div className="text-center py-4">
-            <p className="text-muted-foreground mb-4">
-              You don't have any vault shares yet. Deposit tokens to start earning.
+            <p className="text-muted-foreground">
+              You don't hold any vault shares. This vault is no longer accepting deposits.
             </p>
-            {paused && (
-              <p className="text-sm text-orange-600 dark:text-orange-400 mb-2">
-                Vault is paused. Deposits are disabled.
-              </p>
-            )}
-            <Button onClick={onDeposit} disabled={paused}>
-              Make Your First Deposit
-            </Button>
           </div>
         ) : (
           <>
@@ -121,28 +112,22 @@ const VaultUserPosition = ({ onDeposit, onWithdraw, guestMode = false }: VaultUs
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
+              <p className="text-sm text-muted-foreground text-center">
+                This vault is no longer accepting deposits. You can withdraw your position at any time.
+              </p>
               {paused && (
                 <p className="text-sm text-orange-600 dark:text-orange-400 text-center">
-                  Vault is paused. Deposits and withdrawals are disabled.
+                  Vault is paused. Withdrawals are disabled.
                 </p>
               )}
-              <div className="flex gap-4">
-                <Button
-                  onClick={onDeposit}
-                  disabled={paused}
-                  className="flex-1"
-                >
-                  Deposit
-                </Button>
-                <Button
-                  onClick={onWithdraw}
-                  disabled={paused || !hasPosition}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Withdraw
-                </Button>
-              </div>
+              <Button
+                onClick={onWithdraw}
+                disabled={paused || !hasPosition}
+                variant="outline"
+                className="w-full"
+              >
+                Withdraw
+              </Button>
             </div>
           </>
         )}

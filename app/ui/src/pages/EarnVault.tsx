@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { formatUnits } from "ethers";
 import { ArrowLeft } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import VaultDepositModal from "@/components/vault/VaultDepositModal";
 import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Button } from "@/components/ui/button";
@@ -62,13 +61,11 @@ const formatApy = (value: string): { text: string; positive: boolean } => {
 };
 
 const EarnVault = () => {
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   const { refreshVault, vaultState } = useVaultContext();
   const { isLoggedIn } = useUser();
   const navigate = useNavigate();
-  const location = useLocation();
   const guestMode = !isLoggedIn;
 
   const {
@@ -102,22 +99,6 @@ const EarnVault = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const openModal = params.get("open");
-    if (openModal !== "deposit") return;
-
-    if (isLoggedIn) {
-      setIsDepositModalOpen(true);
-    }
-
-    navigate("/dashboard/earn-vault", { replace: true });
-  }, [location.search, isLoggedIn, navigate]);
-
-  const handleDepositSuccess = () => {
-    refreshVault(false);
-  };
-
   const handleWithdrawSuccess = () => {
     refreshVault(false);
   };
@@ -136,7 +117,7 @@ const EarnVault = () => {
 
         <main className="pb-16 md:pb-6">
           {guestMode && (
-            <GuestSignInBanner message="Sign in to deposit or withdraw from the vault" />
+            <GuestSignInBanner message="Sign in to withdraw from the vault" />
           )}
 
           <div className="w-full">
@@ -277,14 +258,11 @@ const EarnVault = () => {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <Button
-                      onClick={() => setIsDepositModalOpen(true)}
-                      disabled={guestMode}
-                      className="w-full"
-                    >
-                      Deposit
-                    </Button>
+                  <p className="text-sm text-muted-foreground">
+                    This vault is no longer accepting deposits. Existing holders can withdraw at any time.
+                  </p>
+
+                  <div className="pt-1">
                     <Button
                       onClick={() => setIsWithdrawModalOpen(true)}
                       disabled={guestMode}
@@ -304,18 +282,11 @@ const EarnVault = () => {
       <MobileBottomNav />
 
       {!guestMode && (
-        <>
-          <VaultDepositModal
-            isOpen={isDepositModalOpen}
-            onClose={() => setIsDepositModalOpen(false)}
-            onSuccess={handleDepositSuccess}
-          />
-          <VaultWithdrawModal
-            isOpen={isWithdrawModalOpen}
-            onClose={() => setIsWithdrawModalOpen(false)}
-            onSuccess={handleWithdrawSuccess}
-          />
-        </>
+        <VaultWithdrawModal
+          isOpen={isWithdrawModalOpen}
+          onClose={() => setIsWithdrawModalOpen(false)}
+          onSuccess={handleWithdrawSuccess}
+        />
       )}
     </div>
   );
