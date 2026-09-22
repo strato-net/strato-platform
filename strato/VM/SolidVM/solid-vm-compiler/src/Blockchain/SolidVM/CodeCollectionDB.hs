@@ -73,7 +73,6 @@ import SolidVM.Solidity.StaticAnalysis.Optimizer as O
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as TypeChecker
 import System.IO.Unsafe
-import Text.Parsec (runParser)
 import Text.Parsec.Error
 
 data CompilationError
@@ -156,7 +155,7 @@ parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
 parseSource = parseSourceWith defaultParseOptions
 
 parseSourceWith :: ParseOptions -> T.Text -> T.Text -> Either CompilationError [SourceUnit]
-parseSourceWith opts fileName src = bimap PEx unsourceUnits $ runParser solidityFile (parserStateFor opts) (T.unpack fileName) (T.unpack src)
+parseSourceWith opts fileName src = bimap PEx unsourceUnits $ runWithReference solidityFile (parserStateFor opts) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)

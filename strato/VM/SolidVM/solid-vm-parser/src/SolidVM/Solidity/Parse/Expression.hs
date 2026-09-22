@@ -24,7 +24,7 @@ intTerm = parens intTerm <|> fmap fromIntegral integer
 
 -- | All the operations, with their associativities and corresponding
 -- Haskell operations
-intTable :: (Integral a) => OperatorTable String u Identity a
+intTable :: (Integral a) => OperatorTable String ParserState Identity a
 intTable =
   [ [prefix "-" negate, prefix "+" id],
     [binary "**" (^) AssocRight],
