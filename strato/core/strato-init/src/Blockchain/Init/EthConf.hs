@@ -101,7 +101,16 @@ waitOnVault env request = do
         if flags_generateKey
           then do
             putStrLn "nodekey does not exist - I'm going to create one"
-            waitOnVault env $ runWithAuth env (postKey Nothing)
+            created <- runWithAuth env (postKey Nothing)
+            case created of
+              Right val -> return val
+              Left err -> do
+                -- Look the key up again instead of re-posting: a postKey whose
+                -- response was lost (e.g. retried after a 504) fails with
+                -- "already exists" even though the key was created.
+                putStrLn $ "creating nodekey failed: " ++ show err
+                threadDelay 2000000
+                waitOnVault env request
           else do
             putStrLn "nodekey does not exist - I'm going to wait until you insert it manually"
             threadDelay 5000000
