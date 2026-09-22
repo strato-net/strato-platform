@@ -64,13 +64,16 @@ const VaultSunsetBanner = ({ className = "", actionLabel = "Withdraw now", onAct
   const deadlineText = `${formatDeadline(deadline)} (${formatDeadlineTime(deadline)})`;
   const daysLeft = calendarDay(deadline) - calendarDay(now);
 
+  const autoWithdrawNote =
+    "After that, any remaining position will be withdrawn for you automatically. No funds will be lost.";
+
   let message: string;
   if (now > deadline) {
-    message = `The Diversified Vault is being retired. The withdrawal window ended ${formatDeadline(deadline)}. Withdraw any remaining position now.`;
+    message = `The Diversified Vault has been retired. Any remaining position is being withdrawn for you automatically, and no funds will be lost. You can still withdraw it yourself now.`;
   } else if (daysLeft <= 0) {
-    message = `The Diversified Vault is being retired. Today is the last day to withdraw your position, until ${formatDeadlineTime(deadline)}. Deposits are already closed.`;
+    message = `The Diversified Vault is being retired and deposits are closed. Today is the last day to withdraw your position yourself, until ${formatDeadlineTime(deadline)}. ${autoWithdrawNote}`;
   } else {
-    message = `The Diversified Vault is being retired. You have ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left to withdraw your position, until ${deadlineText}. Deposits are already closed.`;
+    message = `The Diversified Vault is being retired and deposits are closed. You have ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left to withdraw your position yourself, until ${deadlineText}. ${autoWithdrawNote}`;
   }
 
   const handleAction = () => {
