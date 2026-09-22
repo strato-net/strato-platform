@@ -17,7 +17,9 @@ where
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Foldable (foldl')
 import Data.Hashable (Hashable)
-import qualified Data.HashMap.Strict as HM
+-- Lazy on purpose: 'insertMany' takes undecoded values from a flush, and most
+-- are never read back. The strict map decoded every one of them (−5% sync).
+import qualified Data.HashMap.Lazy as HM
 import Data.IORef
 import Prelude hiding (lookup)
 

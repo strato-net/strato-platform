@@ -52,6 +52,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Default
 import Data.Foldable (foldrM)
+import GHC.Compact (Compact, compact, getCompact)
 import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import Data.Map (Map)
@@ -108,22 +109,25 @@ runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . un
 -- oracles, user code), so the LRU holds well over 10 entries.
 -- Keyed by (code hash, legacy operator precedence): the same source parses to
 -- a different AST on either side of the operator-precedence fork.
+-- Each entry lives in its own compact region: the GC neither traces nor copies it.
 maxCacheSize :: Integer
 maxCacheSize = 128
 
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) CodeCollection)
+unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) (Compact CodeCollection))
 unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
 
 codeCacheLookup :: MonadIO m => (Keccak256, Bool) -> m (Maybe CodeCollection)
 codeCacheLookup k = liftIO $ do
   cache <- readIORef unsafeCodeCacheIORef
   case LRU.lookup k cache of
-    (cache', Just cc) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just cc)
+    (cache', Just c) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just (getCompact c))
     (_, Nothing) -> pure Nothing
 
 codeCacheInsert :: MonadIO m => (Keccak256, Bool) -> CodeCollection -> m ()
-codeCacheInsert k cc = liftIO $ modifyIORef' unsafeCodeCacheIORef (LRU.insert k cc)
+codeCacheInsert k cc = liftIO $ do
+  c <- compact cc
+  modifyIORef' unsafeCodeCacheIORef (LRU.insert k c)
 
 -- | Parse-time switches. The VM derives them from the block being executed;
 -- everything else (APIs, tooling, tests) uses 'defaultParseOptions'.
