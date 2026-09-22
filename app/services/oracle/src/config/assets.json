@@ -104,8 +104,8 @@
           "comment": "Kinetiq Staked HYPE on Upquark"
         },
         "LIT": {
-          "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
-          "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
+          "targetAssetAddress": "dd5f3b263bb28fcfc09e6dd4c034c8bb316d0701",
+          "comment": "Strato Lighter (LIT)"
         },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
