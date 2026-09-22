@@ -124,14 +124,14 @@ const VaultUserPosition = ({ onWithdraw, onWithdrawAll, guestMode = false }: Vau
               <div className="flex gap-4">
                 <Button
                   onClick={onWithdrawAll}
-                  disabled={paused || !hasPosition}
+                  disabled={paused}
                   className="flex-1"
                 >
                   Withdraw All
                 </Button>
                 <Button
                   onClick={onWithdraw}
-                  disabled={paused || !hasPosition}
+                  disabled={paused}
                   variant="outline"
                   className="flex-1"
                 >

@@ -81,11 +81,6 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess, defaultMode = "usd" }:
   const isWithdrawAll = inputMode === "all";
   const hasShares = BigInt(userShares || "0") > BigInt(0);
 
-  // Open in the mode the caller asked for (e.g. "Withdraw All" button)
-  useEffect(() => {
-    if (isOpen) setInputMode(defaultMode);
-  }, [isOpen, defaultMode]);
-
   // Calculate max withdrawable based on user's position AND vault's withdrawable equity
   const maxWithdrawableUsd = useMemo(() => {
     const userValueBigInt = BigInt(userValueUsd || "0");
@@ -225,6 +220,9 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess, defaultMode = "usd" }:
     setUsdAmount("");
     setPercentAmount("");
     setBasket([]);
+    // Callers pass key={mode} so a different entry point remounts the modal;
+    // this covers reopening from the same entry point after a tab switch.
+    setInputMode(defaultMode);
     onClose();
   };
 

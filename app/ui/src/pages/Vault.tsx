@@ -54,6 +54,7 @@ const Vault = () => {
 
       {!guestMode && (
         <VaultWithdrawModal
+          key={withdrawMode}
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           onSuccess={handleWithdrawSuccess}

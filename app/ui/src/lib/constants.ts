@@ -26,9 +26,12 @@ export const WAD = 10n ** 18n;
 
 /**
  * Last moment users can withdraw from the Diversified Vault before it is
- * deprecated. Drives the countdown in VaultSunsetBanner. End of day, UTC.
+ * deprecated: end of day September 30, 2026, US Eastern (EDT, UTC-4).
+ * Drives the countdown in VaultSunsetBanner; dates are rendered in
+ * VAULT_WITHDRAWAL_TIME_ZONE so every user sees the same calendar day.
  */
-export const VAULT_WITHDRAWAL_DEADLINE = "2026-09-29T23:59:59Z";
+export const VAULT_WITHDRAWAL_DEADLINE = "2026-09-30T23:59:59-04:00";
+export const VAULT_WITHDRAWAL_TIME_ZONE = "America/New_York";
 
 // ============================================
 // Feature Flags

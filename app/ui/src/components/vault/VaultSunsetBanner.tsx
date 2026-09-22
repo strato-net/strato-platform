@@ -3,15 +3,38 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useVaultContext } from "@/context/VaultContext";
 import { useUser } from "@/context/UserContext";
-import { VAULT_WITHDRAWAL_DEADLINE } from "@/lib/constants";
+import { VAULT_WITHDRAWAL_DEADLINE, VAULT_WITHDRAWAL_TIME_ZONE } from "@/lib/constants";
 
 const VAULT_PATH = "/dashboard/advanced?tab=vault";
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const formatDeadline = (date: Date): string =>
-  date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  date.toLocaleDateString("en-US", {
+    timeZone: VAULT_WITHDRAWAL_TIME_ZONE,
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
-const daysUntil = (date: Date): number => Math.ceil((date.getTime() - Date.now()) / MS_PER_DAY);
+const formatDeadlineTime = (date: Date): string =>
+  date.toLocaleTimeString("en-US", {
+    timeZone: VAULT_WITHDRAWAL_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+/** Calendar day index of `date` in the deadline's time zone, so day math ignores the time of day. */
+const calendarDay = (date: Date): number => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: VAULT_WITHDRAWAL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  return Date.UTC(get("year"), get("month") - 1, get("day")) / MS_PER_DAY;
+};
 
 interface VaultSunsetBannerProps {
   className?: string;
@@ -36,14 +59,19 @@ const VaultSunsetBanner = ({ className = "", actionLabel = "Withdraw now", onAct
   if (!isLoggedIn || loadingUser) return null;
   if (BigInt(userShares || "0") === BigInt(0)) return null;
 
+  const now = new Date();
   const deadline = new Date(VAULT_WITHDRAWAL_DEADLINE);
-  const days = daysUntil(deadline);
-  const deadlineText = formatDeadline(deadline);
+  const deadlineText = `${formatDeadline(deadline)} (${formatDeadlineTime(deadline)})`;
+  const daysLeft = calendarDay(deadline) - calendarDay(now);
 
-  const message =
-    days > 0
-      ? `The Diversified Vault is being retired. You have ${days} ${days === 1 ? "day" : "days"} left to withdraw your position, until ${deadlineText}. Deposits are already closed.`
-      : `The Diversified Vault is being retired. The withdrawal window ended ${deadlineText}. Withdraw any remaining position now.`;
+  let message: string;
+  if (now > deadline) {
+    message = `The Diversified Vault is being retired. The withdrawal window ended ${formatDeadline(deadline)}. Withdraw any remaining position now.`;
+  } else if (daysLeft <= 0) {
+    message = `The Diversified Vault is being retired. Today is the last day to withdraw your position, until ${formatDeadlineTime(deadline)}. Deposits are already closed.`;
+  } else {
+    message = `The Diversified Vault is being retired. You have ${daysLeft} ${daysLeft === 1 ? "day" : "days"} left to withdraw your position, until ${deadlineText}. Deposits are already closed.`;
+  }
 
   const handleAction = () => {
     if (onAction) {
