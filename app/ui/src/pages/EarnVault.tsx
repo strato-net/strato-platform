@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
-import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
+import VaultWithdrawModal, { WithdrawMode } from "@/components/vault/VaultWithdrawModal";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,6 +62,12 @@ const formatApy = (value: string): { text: string; positive: boolean } => {
 
 const EarnVault = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawMode, setWithdrawMode] = useState<WithdrawMode>("usd");
+
+  const openWithdraw = (mode: WithdrawMode) => {
+    setWithdrawMode(mode);
+    setIsWithdrawModalOpen(true);
+  };
 
   const { refreshVault, vaultState } = useVaultContext();
   const { isLoggedIn } = useUser();
@@ -77,7 +83,10 @@ const EarnVault = () => {
     userValueUsd,
     loading,
     loadingUser,
+    paused,
   } = vaultState;
+
+  const hasPosition = BigInt(userShares || "0") > 0n;
 
   const allocationRows = useMemo(() => {
     const totalEquityBN = BigInt(totalEquity || "0");
@@ -262,14 +271,21 @@ const EarnVault = () => {
                     This vault is no longer accepting deposits. Existing holders can withdraw at any time.
                   </p>
 
-                  <div className="pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <Button
-                      onClick={() => setIsWithdrawModalOpen(true)}
-                      disabled={guestMode}
+                      onClick={() => openWithdraw("all")}
+                      disabled={guestMode || paused || !hasPosition}
+                      className="w-full"
+                    >
+                      Withdraw All
+                    </Button>
+                    <Button
+                      onClick={() => openWithdraw("usd")}
+                      disabled={guestMode || paused || !hasPosition}
                       variant="outline"
                       className="w-full"
                     >
-                      Withdraw
+                      Withdraw Amount
                     </Button>
                   </div>
                 </section>
@@ -286,6 +302,7 @@ const EarnVault = () => {
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           onSuccess={handleWithdrawSuccess}
+          defaultMode={withdrawMode}
         />
       )}
     </div>

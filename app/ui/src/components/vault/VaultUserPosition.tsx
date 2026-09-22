@@ -30,10 +30,11 @@ const formatShares = (value: string): string => {
 
 interface VaultUserPositionProps {
   onWithdraw: () => void;
+  onWithdrawAll: () => void;
   guestMode?: boolean;
 }
 
-const VaultUserPosition = ({ onWithdraw, guestMode = false }: VaultUserPositionProps) => {
+const VaultUserPosition = ({ onWithdraw, onWithdrawAll, guestMode = false }: VaultUserPositionProps) => {
   const { vaultState } = useVaultContext();
   const {
     userShares,
@@ -120,14 +121,23 @@ const VaultUserPosition = ({ onWithdraw, guestMode = false }: VaultUserPositionP
                   Vault is paused. Withdrawals are disabled.
                 </p>
               )}
-              <Button
-                onClick={onWithdraw}
-                disabled={paused || !hasPosition}
-                variant="outline"
-                className="w-full"
-              >
-                Withdraw
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  onClick={onWithdrawAll}
+                  disabled={paused || !hasPosition}
+                  className="flex-1"
+                >
+                  Withdraw All
+                </Button>
+                <Button
+                  onClick={onWithdraw}
+                  disabled={paused || !hasPosition}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Withdraw Amount
+                </Button>
+              </div>
             </div>
           </>
         )}

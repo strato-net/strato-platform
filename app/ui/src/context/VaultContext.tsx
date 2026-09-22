@@ -95,6 +95,7 @@ type VaultContextType = {
   refreshTransactions: (showLoading?: boolean) => Promise<void>;
   refreshUserActivity: (showLoading?: boolean) => Promise<void>;
   withdraw: (args: { amountUsd: string }) => Promise<{ basket: Array<{ token: string; amount: string }> }>;
+  withdrawShares: (args: { shares: string }) => Promise<{ status: string; hash: string }>;
 
   // Admin functions
   adminPause: () => Promise<void>;
@@ -267,6 +268,11 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     return res.data;
   };
 
+  const withdrawShares = async (args: { shares: string }) => {
+    const res = await api.post("/vault/withdraw-shares", args);
+    return res.data;
+  };
+
   // Admin functions
   const adminPause = async () => {
     await api.post("/vault/admin/pause");
@@ -330,6 +336,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       refreshTransactions: fetchTransactions,
       refreshUserActivity: fetchUserActivity,
       withdraw,
+      withdrawShares,
       adminPause,
       adminUnpause,
       adminSetMinReserve,

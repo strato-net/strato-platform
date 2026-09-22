@@ -3,13 +3,19 @@ import VaultOverview from "@/components/vault/VaultOverview";
 import VaultTransactions from "@/components/vault/VaultTransactions";
 import VaultUserActivity from "@/components/vault/VaultUserActivity";
 import VaultUserPosition from "@/components/vault/VaultUserPosition";
-import VaultWithdrawModal from "@/components/vault/VaultWithdrawModal";
+import VaultWithdrawModal, { WithdrawMode } from "@/components/vault/VaultWithdrawModal";
 import { useVaultContext } from "@/context/VaultContext";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const Vault = () => {
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawMode, setWithdrawMode] = useState<WithdrawMode>("usd");
+
+  const openWithdraw = (mode: WithdrawMode) => {
+    setWithdrawMode(mode);
+    setIsWithdrawModalOpen(true);
+  };
 
   const { refreshVault } = useVaultContext();
   const { isLoggedIn } = useUser();
@@ -29,7 +35,8 @@ const Vault = () => {
         <VaultOverview />
 
         <VaultUserPosition
-          onWithdraw={() => setIsWithdrawModalOpen(true)}
+          onWithdraw={() => openWithdraw("usd")}
+          onWithdrawAll={() => openWithdraw("all")}
           guestMode={guestMode}
         />
 
@@ -44,6 +51,7 @@ const Vault = () => {
           isOpen={isWithdrawModalOpen}
           onClose={() => setIsWithdrawModalOpen(false)}
           onSuccess={handleWithdrawSuccess}
+          defaultMode={withdrawMode}
         />
       )}
     </>
