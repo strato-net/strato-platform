@@ -51,6 +51,7 @@ import Control.Monad.Composable.Streaming
 import Control.Monad.Trans.Reader (ReaderT, runReaderT, asks)
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
 import Data.String (fromString)
@@ -212,12 +213,17 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do
   putStrLn "About to bootstrap index events"
-  res <-
+  rejections <-
     UEC.runStreamMConfigured "strato-api-indexer" $
     IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
 
-  print res
-  putStrLn "bootstrapIndex genesis seed successful!"
+  -- Index-event production is best-effort everywhere else, but the genesis
+  -- RanBlock is the indexer's starting point: without it every later block
+  -- indexes against a chain the indexer never saw begin. Nothing downstream
+  -- can repair that on its own, so refuse to report success.
+  if null rejections
+    then putStrLn "bootstrapIndex genesis seed successful!"
+    else error $ "Could not seed the indexer with the genesis block: " ++ intercalate "; " rejections
 
 seedDatabases ::
   ( MonadIO m,
