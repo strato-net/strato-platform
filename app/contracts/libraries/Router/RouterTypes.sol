@@ -21,4 +21,28 @@ library RouterTypes {
         bool direction;
         uint256 factoryPoolIndex;
     }
+
+    struct RouteStepData {
+        uint256 action;
+        address target;
+        address tokenIn;
+        address tokenOut;
+        uint256 minAmountOut;
+        uint256 parameter1;
+        uint256 parameter2;
+        bool direction;
+        uint256 factoryPoolIndex;
+    }
+
+    function toStepData(RouteStep step) internal returns (RouteStepData data) {
+        data.action = uint256(step.action);
+        data.target = step.target;
+        data.tokenIn = step.tokenIn;
+        data.tokenOut = step.tokenOut;
+        data.minAmountOut = step.minAmountOut;
+        data.parameter1 = step.parameter1;
+        data.parameter2 = step.parameter2;
+        data.direction = step.direction;
+        data.factoryPoolIndex = step.factoryPoolIndex;
+    }
 }

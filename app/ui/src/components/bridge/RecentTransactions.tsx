@@ -9,6 +9,8 @@ import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
+import type { BridgeToken } from '@strato/shared-types';
+import type { NetworkSummary } from '@/lib/bridge/types';
 
 type RecentTx = {
   _type: 'deposit' | 'withdrawal' | 'metal' | 'route';
@@ -129,15 +131,26 @@ interface RecentTransactionsProps {
   metalRefreshKey?: number;
   includeRoutes?: boolean;
   routeRefreshKey?: number;
+  networkOptions?: NetworkSummary[];
+  routeTokens?: BridgeToken[];
 }
 
-const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0, includeRoutes = false, routeRefreshKey = 0 }: RecentTransactionsProps) => {
+const RecentTransactions = ({
+  fundingMode = "bridge",
+  metalRefreshKey = 0,
+  includeRoutes = false,
+  routeRefreshKey = 0,
+  networkOptions,
+  routeTokens,
+}: RecentTransactionsProps) => {
   const { isLoggedIn } = useUser();
   const {
     fetchDepositTransactions, fetchWithdrawTransactions,
-    availableNetworks, depositRefreshKey, withdrawalRefreshKey,
-    bridgeableTokens,
+    availableNetworks: bridgeNetworks, depositRefreshKey, withdrawalRefreshKey,
+    bridgeableTokens: sharedBridgeTokens,
   } = useBridgeContext();
+  const availableNetworks = networkOptions ?? bridgeNetworks;
+  const bridgeableTokens = routeTokens ?? sharedBridgeTokens;
 
   const rebaseFactorMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -268,7 +281,11 @@ const RecentTransactions = ({ fundingMode = "bridge", metalRefreshKey = 0, inclu
 
   const activeTxs = isBridge ? bridgeTxs : metal.transactions;
   const activeLoading = isBridge ? bridgeLoading : metal.loading;
-  const viewAllLink = isBridge ? "/bridge-transactions?from=deposits" : "/metal-transactions?from=deposits";
+  const viewAllLink = includeRoutes
+    ? "/dashboard/activity"
+    : isBridge
+      ? "/bridge-transactions?from=deposits"
+      : "/metal-transactions?from=deposits";
   const linkClass = `text-sm font-semibold ${isLoggedIn ? "text-blue-500 hover:text-blue-700" : "text-muted-foreground pointer-events-none opacity-50"}`;
 
   const emptyState = !isBridge ? (

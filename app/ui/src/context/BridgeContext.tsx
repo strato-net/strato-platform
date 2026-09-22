@@ -30,7 +30,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
   const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
   const tokenCacheRef = useRef<Map<string, BridgeToken[]>>(new Map());
-  const tokenRequestRef = useRef(0);
   const [depositActions, setDepositActions] = useState<DepositAction[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
@@ -55,16 +54,11 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   // ========== NETWORK & TOKEN FUNCTIONS ==========
   const fetchTokensForChain = useCallback(
     async (chainId: string, forceRefresh = false) => {
-      const requestId = ++tokenRequestRef.current;
-      if (!forceRefresh) {
-        setBridgeableTokens([]);
-        setSelectedToken(null);
-      }
       try {
         const cached = tokenCacheRef.current.get(chainId);
         if (cached && !forceRefresh) {
           setBridgeableTokens(cached);
-          setSelectedToken(cached[0] ?? null);
+          if (cached.length > 0 && !selectedToken) setSelectedToken(cached[0]);
           return;
         }
         const { data } = await api.get<BridgeToken[]>(
@@ -72,21 +66,20 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         );
         const tokens = Array.isArray(data) ? data : [];
         tokenCacheRef.current.set(chainId, tokens);
-        if (requestId !== tokenRequestRef.current) return;
         setBridgeableTokens(tokens);
 
         if (forceRefresh) {
           setSelectedToken((current) =>
             tokens.find((token) => token.id === current?.id) || current
           );
-        } else {
-          setSelectedToken(tokens[0] ?? null);
+        } else if (tokens.length > 0 && !selectedToken) {
+          setSelectedToken(tokens[0]);
         }
       } catch (e) {
-        if (requestId === tokenRequestRef.current) setBridgeableTokens([]);
+        setBridgeableTokens([]);
       }
     },
-    [],
+    [selectedToken],
   );
 
   const loadNetworksAndTokens = useCallback(async () => {
@@ -201,7 +194,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         if (!match) continue;
 
         setSelectedNetwork(network.chainName);
-        ++tokenRequestRef.current;
         setBridgeableTokens(tokens);
         setSelectedToken(match);
         return true;

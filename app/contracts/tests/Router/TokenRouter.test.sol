@@ -15,6 +15,22 @@ import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/YieldVault/YieldVault.sol";
 
+contract OneWayPoolFactory is PoolFactory {
+    constructor(address initialOwner) PoolFactory(initialOwner) {}
+
+    function clearPair(address tokenIn, address tokenOut) public {
+        pools[tokenIn][tokenOut] = address(0);
+    }
+}
+
+contract OneWayPoolV3Factory is PoolV3Factory {
+    constructor(address initialOwner) PoolV3Factory(initialOwner) {}
+
+    function clearPair(address tokenIn, address tokenOut, uint256 fee) public {
+        pools[tokenIn][tokenOut][fee] = address(0);
+    }
+}
+
 contract Describe_TokenRouter is Authorizable {
     using RouterTypes for *;
 
@@ -24,13 +40,13 @@ contract Describe_TokenRouter is Authorizable {
     TokenFactory tokenFactory;
     AdminRegistry adminRegistry;
     FeeCollector feeCollector;
-    PoolFactory poolFactory;
+    OneWayPoolFactory poolFactory;
     TokenRouter router;
     DirectMintPSM psm;
     MetalForge forge;
     SaveUSDSTVault saveVault;
     PriceOracle oracle;
-    PoolV3Factory v3Factory;
+    OneWayPoolV3Factory v3Factory;
     Pool v2Pool;
     StablePool stablePool;
     PoolV3 v3Pool;
@@ -54,7 +70,7 @@ contract Describe_TokenRouter is Authorizable {
         adminRegistry.initialize([address(this)]);
         tokenFactory = new TokenFactory(address(adminRegistry));
         feeCollector = new FeeCollector(address(this));
-        poolFactory = new PoolFactory(address(this));
+        poolFactory = new OneWayPoolFactory(address(this));
         poolFactory.initialize(
             address(tokenFactory),
             address(adminRegistry),
@@ -77,7 +93,7 @@ contract Describe_TokenRouter is Authorizable {
         v3A = _createToken("V3 A", "V3A");
         v3B = _createToken("V3 B", "V3B");
 
-        v3Factory = new PoolV3Factory(address(this));
+        v3Factory = new OneWayPoolV3Factory(address(this));
         v3Factory.initialize(
             address(tokenFactory),
             address(feeCollector)
@@ -285,6 +301,65 @@ contract Describe_TokenRouter is Authorizable {
         require(amountOut > 0, "No V2 output");
     }
 
+    function it_routes_v2_when_only_the_reverse_factory_pair_exists() {
+        _createV2Pool();
+        poolFactory.clearPair(
+            address(tokenB),
+            address(tokenA)
+        );
+
+        RouteStep[] steps = new RouteStep[](1);
+        steps[0] = _swapStep(
+            RouteAction.SWAP_V2,
+            address(v2Pool),
+            address(tokenB),
+            address(tokenA),
+            0,
+            0,
+            false
+        );
+
+        Token(address(tokenB)).approve(address(router), 100e18);
+        uint256 amountOut = router.executeRoute(
+            address(tokenB),
+            address(tokenA),
+            100e18,
+            address(this),
+            steps,
+            block.timestamp + 300,
+            1
+        );
+        require(amountOut > 0, "No reverse-pair V2 output");
+    }
+
+    function it_uses_caller_action_ordinals_when_step_enum_is_empty() {
+        _createV2Pool();
+        RouteStepData[] steps = new RouteStepData[](1);
+        steps[0] = RouterTypes.toStepData(
+            _swapStep(
+                RouteAction.SWAP_V2,
+                address(v2Pool),
+                address(tokenA),
+                address(tokenB),
+                0,
+                0,
+                true
+            )
+        );
+
+        Token(address(tokenA)).approve(address(router), 100e18);
+        uint256 amountOut = router.executeRouteWithActions(
+            address(tokenA),
+            address(tokenB),
+            100e18,
+            address(this),
+            steps,
+            block.timestamp + 300,
+            1
+        );
+        require(amountOut > 0, "No ordinal-action V2 output");
+    }
+
     function it_routes_through_stable_pool() {
         _createStablePool();
         RouteStep[] steps = new RouteStep[](1);
@@ -311,6 +386,34 @@ contract Describe_TokenRouter is Authorizable {
         require(amountOut > 0, "No stable output");
     }
 
+    function it_routes_stable_when_only_the_reverse_factory_pair_exists() {
+        _createStablePool();
+        poolFactory.clearPair(address(stableA), address(stableB));
+
+        RouteStep[] steps = new RouteStep[](1);
+        steps[0] = _swapStep(
+            RouteAction.SWAP_STABLE,
+            address(stablePool),
+            address(stableA),
+            address(stableB),
+            0,
+            1,
+            false
+        );
+
+        Token(address(stableA)).approve(address(router), 100e18);
+        uint256 amountOut = router.executeRoute(
+            address(stableA),
+            address(stableB),
+            100e18,
+            address(this),
+            steps,
+            block.timestamp + 300,
+            1
+        );
+        require(amountOut > 0, "No reverse-pair stable output");
+    }
+
     function it_routes_through_v3_pool() {
         _createV3Pool();
         RouteStep[] steps = new RouteStep[](1);
@@ -335,6 +438,34 @@ contract Describe_TokenRouter is Authorizable {
             1
         );
         require(amountOut > 0, "No V3 output");
+    }
+
+    function it_routes_v3_when_only_the_reverse_factory_pair_exists() {
+        _createV3Pool();
+        v3Factory.clearPair(address(v3A), address(v3B), 3000);
+
+        RouteStep[] steps = new RouteStep[](1);
+        steps[0] = _swapStep(
+            RouteAction.SWAP_V3,
+            address(v3Pool),
+            address(v3A),
+            address(v3B),
+            4295128740,
+            0,
+            true
+        );
+
+        Token(address(v3A)).approve(address(router), 10e18);
+        uint256 amountOut = router.executeRoute(
+            address(v3A),
+            address(v3B),
+            10e18,
+            address(this),
+            steps,
+            block.timestamp + 300,
+            1
+        );
+        require(amountOut > 0, "No reverse-pair V3 output");
     }
 
     function it_routes_into_an_approved_yield_vault() {

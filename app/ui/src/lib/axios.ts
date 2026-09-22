@@ -366,8 +366,12 @@ api.interceptors.response.use(
       }
     }
     
-    // For 401 errors, redirect to login (session expired)
+    // Anonymous requests can legitimately receive 401s from protected endpoints.
+    // Only an active STRATO session can expire.
     if (error.response?.status === 401) {
+      if (!_appAuthenticated) {
+        return Promise.reject(error);
+      }
       toast({
         title: "Session Expired",
         description: "Reauthenticating the user...",

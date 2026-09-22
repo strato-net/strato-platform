@@ -125,6 +125,50 @@ contract record TokenRouter is Ownable {
         uint256 deadline,
         uint256 minFinalOut
     ) external whenNotPaused nonReentrant returns (uint256 amountOut) {
+        RouteStepData[] data = new RouteStepData[](steps.length);
+        for (uint256 i = 0; i < steps.length; i++) {
+            data[i] = RouterTypes.toStepData(steps[i]);
+        }
+        return _executeRoute(
+            tokenIn,
+            expectedTokenOut,
+            amountIn,
+            recipient,
+            data,
+            deadline,
+            minFinalOut
+        );
+    }
+
+    function executeRouteWithActions(
+        address tokenIn,
+        address expectedTokenOut,
+        uint256 amountIn,
+        address recipient,
+        RouteStepData[] steps,
+        uint256 deadline,
+        uint256 minFinalOut
+    ) external whenNotPaused nonReentrant returns (uint256 amountOut) {
+        return _executeRoute(
+            tokenIn,
+            expectedTokenOut,
+            amountIn,
+            recipient,
+            steps,
+            deadline,
+            minFinalOut
+        );
+    }
+
+    function _executeRoute(
+        address tokenIn,
+        address expectedTokenOut,
+        uint256 amountIn,
+        address recipient,
+        RouteStepData[] steps,
+        uint256 deadline,
+        uint256 minFinalOut
+    ) internal returns (uint256 amountOut) {
         require(initialized, "TR: not initialized");
         require(tokenIn != address(0), "TR: zero input token");
         require(expectedTokenOut != address(0), "TR: zero output token");
@@ -141,7 +185,7 @@ contract record TokenRouter is Ownable {
 
         address currentToken = tokenIn;
         for (uint256 i = 0; i < steps.length; i++) {
-            RouteStep step = steps[i];
+            RouteStepData step = steps[i];
             require(step.action != RouteAction.NONE, "TR: invalid action");
             require(step.target != address(0), "TR: zero target");
             require(step.tokenIn == currentToken, "TR: route discontinuity");
@@ -154,7 +198,7 @@ contract record TokenRouter is Ownable {
 
             emit RouteStepExecuted(
                 i,
-                uint256(step.action),
+                step.action,
                 step.target,
                 step.tokenIn,
                 step.tokenOut,
@@ -173,8 +217,18 @@ contract record TokenRouter is Ownable {
         emit RouteExecuted(msg.sender, recipient, tokenIn, amountIn, currentToken, amountOut);
     }
 
+    function _factoryHasPool(
+        address tokenIn,
+        address tokenOut,
+        address target
+    ) internal returns (bool) {
+        return
+            (poolFactory.pools(tokenIn, tokenOut) == target) ||
+            (poolFactory.pools(tokenOut, tokenIn) == target);
+    }
+
     function _executeStep(
-        RouteStep step,
+        RouteStepData step,
         uint256 amountIn,
         uint256 deadline
     ) internal returns (uint256 amountOut) {
@@ -226,18 +280,18 @@ contract record TokenRouter is Ownable {
         require(amountOut >= step.minAmountOut, "TR: step slippage");
     }
 
-    function _validateStep(RouteStep step) internal {
+    function _validateStep(RouteStepData step) internal {
         if (step.action == RouteAction.SWAP_V2) {
             Pool pool = Pool(step.target);
             require(address(pool.poolFactory()) == address(poolFactory), "TR: invalid v2 factory");
-            require(poolFactory.pools(step.tokenIn, step.tokenOut) == step.target, "TR: unregistered v2 pool");
+            require(_factoryHasPool(step.tokenIn, step.tokenOut, step.target), "TR: unregistered v2 pool");
             address expectedIn = step.direction ? address(pool.tokenA()) : address(pool.tokenB());
             address expectedOut = step.direction ? address(pool.tokenB()) : address(pool.tokenA());
             require(step.tokenIn == expectedIn && step.tokenOut == expectedOut, "TR: invalid v2 pair");
         } else if (step.action == RouteAction.SWAP_STABLE) {
             StablePool pool = StablePool(step.target);
             require(pool.getPoolFactory() == address(poolFactory), "TR: invalid stable factory");
-            if (poolFactory.pools(step.tokenIn, step.tokenOut) != step.target) {
+            if (!_factoryHasPool(step.tokenIn, step.tokenOut, step.target)) {
                 require(poolFactory.allPools(step.factoryPoolIndex) == step.target, "TR: unregistered stable pool");
             }
             require(step.parameter1 < pool.getNumCoins() && step.parameter2 < pool.getNumCoins(), "TR: invalid coin index");
@@ -250,7 +304,8 @@ contract record TokenRouter is Ownable {
             PoolV3 pool = PoolV3(step.target);
             require(address(pool.poolV3Factory()) == address(poolV3Factory), "TR: invalid v3 factory");
             require(
-                poolV3Factory.pools(step.tokenIn, step.tokenOut, pool.fee()) == step.target,
+                (poolV3Factory.pools(step.tokenIn, step.tokenOut, pool.fee()) == step.target) ||
+                    (poolV3Factory.pools(step.tokenOut, step.tokenIn, pool.fee()) == step.target),
                 "TR: unregistered v3 pool"
             );
             address expectedIn = step.direction ? address(pool.token0()) : address(pool.token1());

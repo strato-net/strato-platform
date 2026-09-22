@@ -1240,6 +1240,65 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
     }
 
+    function it_executes_auto_route_for_the_native_external_token() {
+        bridge.setBridgeOperator(address(this));
+        bridge.setRoute(
+            address(0),
+            externalChainId,
+            address(stratoToken),
+            true,
+            true,
+            18,
+            "Native",
+            "NATIVE",
+            1000e18,
+            100e18
+        );
+        bridge.setDepositAction(
+            address(0),
+            externalChainId,
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            true
+        );
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            address(0),
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            10e18
+        );
+        bridge.settleDepositWithRoute(
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            address(0),
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            address(saveVault),
+            10e18,
+            _saveRoute(10e18)
+        );
+
+        require(
+            saveVault.balanceOf(address(user)) == 10e18,
+            "Native AUTO_ROUTE should deliver final tokens"
+        );
+        require(
+            stratoToken.balanceOf(address(user)) == 0,
+            "Native AUTO_ROUTE should not fall back"
+        );
+    }
+
     function it_falls_back_when_auto_route_misses_the_minimum() {
         bridge.setBridgeOperator(address(this));
         _attestDeposit(

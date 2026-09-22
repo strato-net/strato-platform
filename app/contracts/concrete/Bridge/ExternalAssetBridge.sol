@@ -17,6 +17,8 @@ contract record ExternalAssetBridge is Ownable {
     using RouterTypes for *;
     using StringUtils for string;
 
+    error DepositActionExecutionFailed(string reason);
+
     event Initialized(
         address tokenFactory,
         address bridgeOperator,
@@ -131,6 +133,15 @@ contract record ExternalAssetBridge is Ownable {
         address actionToken,
         address fallbackToken,
         uint256 fallbackAmount
+    );
+    event DepositActionFailed(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        string externalTxHash,
+        uint256 action,
+        address actionToken,
+        string reason
     );
     event WithdrawalRequested(
         uint256 withdrawalId,
@@ -261,6 +272,7 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => mapping(address => mapping(uint256 => bytes32))) public record depositReviewApprovals;
 
     mapping(address => MintPolicy) public record mintPolicies;
+    mapping(uint256 => mapping(address => bool)) public record nativeAutoRouteEnabled;
     event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
 
     function setMintPolicy(address token, uint256 capacity, uint256 refillRate) external onlyOwner {
@@ -554,6 +566,9 @@ contract record ExternalAssetBridge is Ownable {
             externalToken
         ][externalChainId][stratoToken];
         config.autoRoute = enabled;
+        if (externalToken == address(0)) {
+            nativeAutoRouteEnabled[externalChainId][stratoToken] = enabled;
+        }
         emit DepositActionAvailabilityUpdated(
             externalToken,
             externalChainId,
@@ -972,27 +987,27 @@ contract record ExternalAssetBridge is Ownable {
                     depositRouter,
                     depositId
                 );
-            } catch {
-                _mintDepositFallback(
+            } catch DepositActionExecutionFailed(reason) {
+                _handleDepositActionFailure(
                     depositInfo,
                     externalChainId,
                     depositRouter,
                     depositId,
-                    depositInfo.externalTxHash,
-                    intent
+                    intent,
+                    reason
                 );
             }
         } else if (
             intent.action !=
             uint256(DepositAction.NONE)
         ) {
-            _mintDepositFallback(
+            _handleDepositActionFailure(
                 depositInfo,
                 externalChainId,
                 depositRouter,
                 depositId,
-                depositInfo.externalTxHash,
-                intent
+                intent,
+                "EAB: auto-route disabled"
             );
         } else {
             _mintFunds(
@@ -1707,56 +1722,101 @@ contract record ExternalAssetBridge is Ownable {
         DepositActionIntent intent = depositActions[
             externalChainId
         ][depositRouter][depositId];
-        require(
-            intent.action == uint256(DepositAction.AUTO_ROUTE),
-            "EAB: invalid action"
-        );
-        require(tokenRouter != address(0), "EAB: token router not set");
+        if (intent.action != uint256(DepositAction.AUTO_ROUTE)) {
+            revert DepositActionExecutionFailed("EAB: invalid action");
+        }
+        if (tokenRouter == address(0)) {
+            revert DepositActionExecutionFailed(
+                "EAB: token router not set"
+            );
+        }
         uint256 stepCount = depositRouteStepCounts[externalChainId][
             depositRouter
         ][depositId];
-        require(
-            stepCount > 0 && stepCount <= MAX_ROUTE_STEPS,
-            "EAB: route missing"
-        );
-        RouteStep[] steps = new RouteStep[](stepCount);
+        if (stepCount == 0 || stepCount > MAX_ROUTE_STEPS) {
+            revert DepositActionExecutionFailed("EAB: route missing");
+        }
+        RouteStepData[] data = new RouteStepData[](stepCount);
         for (uint256 i = 0; i < stepCount; i++) {
-            steps[i] = depositRouteSteps[externalChainId][depositRouter][
-                depositId
-            ][i];
+            data[i] = RouterTypes.toStepData(
+                depositRouteSteps[externalChainId][depositRouter][
+                    depositId
+                ][i]
+            );
         }
         uint256 sourceAmount = _mintFunds(
             depositInfo.stratoToken,
             address(this),
             depositInfo.stratoTokenAmount
         );
-        require(
-            IERC20(depositInfo.stratoToken).approve(
+        if (
+            !IERC20(depositInfo.stratoToken).approve(
                 tokenRouter,
                 sourceAmount
-            ),
-            "EAB: router approval failed"
-        );
-        uint256 finalAmount = TokenRouter(tokenRouter).executeRoute(
+            )
+        ) {
+            revert DepositActionExecutionFailed(
+                "EAB: router approval failed"
+            );
+        }
+        try TokenRouter(tokenRouter).executeRouteWithActions(
             depositInfo.stratoToken,
             intent.actionToken,
             sourceAmount,
             depositInfo.stratoRecipient,
-            steps,
+            data,
             block.timestamp + ROUTE_EXECUTION_DEADLINE,
             intent.minFinalOut
-        );
-        require(finalAmount >= intent.minFinalOut, "EAB: route under minimum");
-        emit AutoRouted(
+        ) returns (uint256 finalAmount) {
+            if (finalAmount < intent.minFinalOut) {
+                revert DepositActionExecutionFailed(
+                    "EAB: route under minimum"
+                );
+            }
+            emit AutoRouted(
+                externalChainId,
+                depositRouter,
+                depositId,
+                depositInfo.externalTxHash,
+                depositInfo.stratoRecipient,
+                depositInfo.stratoToken,
+                sourceAmount,
+                intent.actionToken,
+                finalAmount
+            );
+        } catch Error(string memory reason) {
+            revert DepositActionExecutionFailed(reason);
+        } catch {
+            revert DepositActionExecutionFailed(
+                "Unknown token router error"
+            );
+        }
+    }
+
+    function _handleDepositActionFailure(
+        DepositInfo depositInfo,
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        DepositActionIntent intent,
+        string reason
+    ) internal {
+        emit DepositActionFailed(
             externalChainId,
             depositRouter,
             depositId,
             depositInfo.externalTxHash,
-            depositInfo.stratoRecipient,
-            depositInfo.stratoToken,
-            sourceAmount,
+            intent.action,
             intent.actionToken,
-            finalAmount
+            reason
+        );
+        _mintDepositFallback(
+            depositInfo,
+            externalChainId,
+            depositRouter,
+            depositId,
+            depositInfo.externalTxHash,
+            intent
         );
     }
 
@@ -1791,6 +1851,13 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalChainId,
         uint256 action
     ) internal returns (bool) {
+        if (depositInfo.externalToken == address(0)) {
+            return
+                action == uint256(DepositAction.AUTO_ROUTE) &&
+                nativeAutoRouteEnabled[externalChainId][
+                    depositInfo.stratoToken
+                ];
+        }
         DepositActionConfig config = depositActionConfigs[
             depositInfo.externalToken
         ][externalChainId][depositInfo.stratoToken];

@@ -12,7 +12,6 @@ import {
 } from "@strato/shared-types";
 import { assertAutoRouteQuote } from "@/lib/bridge/utils";
 import { NetworkSummary } from "@/lib/bridge/types";
-import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import {
   checkPermit2Approval,
@@ -47,7 +46,6 @@ export function useAutoRouteDeposit() {
     isAppAuthenticated,
     stratoAddress,
   } = useUser();
-  const { triggerDepositRefresh } = useBridgeContext();
 
   const execute = async ({
     route,
@@ -293,7 +291,6 @@ export function useAutoRouteDeposit() {
           description: `Your transaction succeeded: ${txHash}. Do not submit it again.`,
         });
       }
-      triggerDepositRefresh();
       return txHash;
     } finally {
       submitting.current = false;

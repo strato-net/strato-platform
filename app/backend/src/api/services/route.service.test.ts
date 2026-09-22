@@ -139,20 +139,21 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   const quote = () => getRouteQuote("token", "a", "d", 100n);
   const first = await Promise.all([quote(), quote()]);
   assert.equal(discoveryCalls, 1, "concurrent requests share discovery");
-  assert.equal(first[0].amountOut, "800");
+  assert.equal(first[0].amountOut, "400");
+  assert.equal(first[0].steps.length, 2, "shorter executable routes take priority");
   assert.equal(calls.filter((key) => key === "a:b:100").length, 2, "shared prefix quoted once per request");
   assert.ok(calls.includes("c:d:200"));
   assert.ok(calls.includes("c:d:400"), "same edge with different amounts is quoted separately");
   multiplier = 3n;
   calls.length = 0;
-  assert.equal((await quote()).amountOut, "2700", "new requests use fresh amounts");
+  assert.equal((await quote()).amountOut, "900", "new requests use fresh amounts");
   assert.equal(discoveryCalls, 1);
   assert.equal(calls.filter((key) => key === "a:b:100").length, 1);
   assert.ok(calls.includes("c:d:900"), "different input amounts get different quotes");
   failQuote = true;
   await assert.rejects(quote(), /No executable route/, "cached topology does not bypass live quote failure");
   failQuote = false;
-  assert.equal((await quote()).amountOut, "2700", "failed quotes do not persist across requests");
+  assert.equal((await quote()).amountOut, "900", "failed quotes do not persist across requests");
 
   now += ROUTE_TOPOLOGY_TTL_MS;
   failDiscovery = true;

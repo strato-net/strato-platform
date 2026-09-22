@@ -753,6 +753,9 @@ export const getRouteQuote = async (
     )
     .reduce<RouteStepQuote[] | null>((current, steps) => {
       if (!current) return steps;
+      if (steps.length !== current.length) {
+        return steps.length < current.length ? steps : current;
+      }
       return BigInt(steps[steps.length - 1].amountOut) >
         BigInt(current[current.length - 1].amountOut)
         ? steps

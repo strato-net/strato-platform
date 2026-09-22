@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBalance, useReadContract } from "wagmi";
 import { ERC20_ABI } from "@/lib/bridge/constants";
-import { ArrowDownUp } from "lucide-react";
+import { ArrowDownUp, Globe2, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import {
+  TradeBridgeCatalog,
   useRouteAssets,
 } from "@/hooks/trade/useTradeTokens";
 import { useRouteQuote } from "@/hooks/trade/useRouteQuote";
@@ -24,18 +24,21 @@ import { useTokenContext } from "@/context/TokenContext";
 import { SWAP_FEE, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
-import PairSwapHistory from "./PairSwapHistory";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
 
 const RouterWidget = ({
   guestMode = false,
   onTransactionSubmitted,
+  onPairChange,
   userRewards,
+  bridgeCatalog,
 }: {
   guestMode?: boolean;
   onTransactionSubmitted?: () => void;
+  onPairChange?: (tokenIn?: string, tokenOut?: string) => void;
   userRewards?: UserRewardsData | null;
+  bridgeCatalog: TradeBridgeCatalog;
 }) => {
   const { toast } = useToast();
   const { isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
@@ -46,8 +49,7 @@ const RouterWidget = ({
     bridgeableTokens,
     selectedNetwork,
     setSelectedNetwork,
-    loadNetworksAndTokens,
-  } = useBridgeContext();
+  } = bridgeCatalog;
   const routeAssetsQuery = useRouteAssets();
   const routeAssets = useMemo(
     () => [
@@ -92,10 +94,6 @@ const RouterWidget = ({
   const [amountError, setAmountError] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
 
-  useEffect(() => {
-    void loadNetworksAndTokens();
-  }, [loadNetworksAndTokens]);
-
   const tokenIn =
     routeSources.find((token) => token.address === tokenInAddress) ??
     routeSources[0];
@@ -111,6 +109,14 @@ const RouterWidget = ({
   const externalRoute =
     externalRoutes.find((route) => route.id === externalRouteId) ??
     externalRoutes[0];
+
+  useEffect(() => {
+    onPairChange?.(
+      sourceMode === "strato" ? tokenIn?.address : undefined,
+      sourceMode === "strato" ? tokenOut?.address : undefined
+    );
+  }, [onPairChange, sourceMode, tokenIn?.address, tokenOut?.address]);
+
   const inputDecimals =
     sourceMode === "external"
       ? Number(externalRoute?.externalDecimals ?? 18)
@@ -153,6 +159,7 @@ const RouterWidget = ({
     BigInt(amountWei) > externalBalance ? "Insufficient external token balance" : "";
   const availableFees = BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0");
   const feeError =
+    !guestMode &&
     sourceMode === "strato" &&
     !loadingUsdstBalance &&
     availableFees < routeFeeWei
@@ -281,29 +288,33 @@ const RouterWidget = ({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 rounded-xl border border-border/60 bg-muted/60 p-1.5">
         <Button
           type="button"
           variant={sourceMode === "strato" ? "default" : "ghost"}
+          className="h-11 gap-2 rounded-lg"
           onClick={() => {
             setSourceMode("strato");
             setAmount("");
             setAmountError("");
           }}
         >
-          STRATO
+          <Layers3 className="h-4 w-4" />
+          Trade on STRATO
         </Button>
         <Button
           type="button"
           variant={sourceMode === "external" ? "default" : "ghost"}
+          className="h-11 gap-2 rounded-lg"
           onClick={() => {
             setSourceMode("external");
             setAmount("");
             setAmountError("");
           }}
         >
-          External network
+          <Globe2 className="h-4 w-4" />
+          Deposit from external
         </Button>
       </div>
 
@@ -317,13 +328,13 @@ const RouterWidget = ({
             copiedDescription="External wallet address copied to clipboard"
           />
           <select
-            className="h-10 w-full rounded-md border border-input bg-background px-3"
+            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-medium"
             value={network?.chainName ?? ""}
             onChange={(event) => {
               setExternalRouteId("");
               setAmount("");
               setAmountError("");
-              void setSelectedNetwork(event.target.value);
+              setSelectedNetwork(event.target.value);
             }}
           >
             {availableNetworks.map((item) => (
@@ -335,11 +346,13 @@ const RouterWidget = ({
         </div>
       )}
 
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <label className="mb-2 block text-sm font-semibold">From</label>
-        <div className="flex gap-2">
+      <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 transition-colors focus-within:border-primary/40 focus-within:bg-muted/50">
+        <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          You pay
+        </label>
+        <div className="flex items-center gap-3">
           <input
-            className="min-w-0 flex-1 bg-transparent text-2xl outline-none"
+            className="min-w-0 flex-1 bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
             inputMode="decimal"
             placeholder="0"
             value={amount}
@@ -356,7 +369,7 @@ const RouterWidget = ({
             }
           />
           <select
-            className="rounded-md border border-input bg-background px-2"
+            className="h-11 max-w-[45%] rounded-full border border-input bg-background px-3 text-sm font-semibold"
             value={
               sourceMode === "external"
                 ? externalRoute?.id ?? ""
@@ -418,14 +431,18 @@ const RouterWidget = ({
         )}
       </div>
 
-      <div className="flex justify-center">
-        <ArrowDownUp className="h-5 w-5 text-muted-foreground" />
+      <div className="relative z-10 -my-7 flex justify-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-md">
+          <ArrowDownUp className="h-4 w-4" />
+        </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-muted/50 p-4">
-        <label className="mb-2 block text-sm font-semibold">To</label>
-        <div className="flex gap-2">
-          <div className="min-w-0 flex-1 text-2xl">
+      <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
+        <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          You receive
+        </label>
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">
             {quote
               ? formatAmount(
                   formatUnits(
@@ -436,7 +453,7 @@ const RouterWidget = ({
               : "0"}
           </div>
           <select
-            className="rounded-md border border-input bg-background px-2"
+            className="h-11 max-w-[45%] rounded-full border border-input bg-background px-3 text-sm font-semibold"
             value={tokenOut?.address ?? ""}
             onChange={(event) => setTokenOutAddress(event.target.value)}
           >
@@ -455,10 +472,10 @@ const RouterWidget = ({
         </div>
       </div>
 
-      <label className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Slippage</span>
+      <label className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-3 py-2.5 text-sm">
+        <span className="text-muted-foreground">Slippage tolerance</span>
         <select
-          className="rounded-md border border-input bg-background px-2 py-1"
+          className="rounded-md border-0 bg-muted px-2 py-1 font-medium outline-none"
           value={slippageBps}
           onChange={(event) => setSlippageBps(Number(event.target.value))}
         >
@@ -500,16 +517,23 @@ const RouterWidget = ({
           </p>
         )}
       {quoteError && amountWei !== "0" && (
-        <p className="text-sm text-destructive">
+        <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
           {(quoteError as Error).message}
         </p>
       )}
       {(amountError || feeError || externalBalanceError) && (
-        <p className="text-sm text-destructive">{amountError || feeError || externalBalanceError}</p>
+        <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+          {amountError || feeError || externalBalanceError}
+        </p>
+      )}
+      {!amount && !guestMode && (
+        <p className="text-center text-xs text-muted-foreground">
+          Enter an amount to preview the route and minimum received.
+        </p>
       )}
 
       <Button
-        className="w-full"
+        className="h-12 w-full rounded-xl text-sm font-semibold shadow-sm"
         disabled={
           guestMode ||
           pending ||
@@ -533,12 +557,6 @@ const RouterWidget = ({
               ? "Deposit & Trade"
               : "Trade"}
       </Button>
-      {sourceMode === "strato" && (
-        <PairSwapHistory
-          tokenIn={tokenIn?.address}
-          tokenOut={tokenOut?.address}
-        />
-      )}
     </div>
   );
 };

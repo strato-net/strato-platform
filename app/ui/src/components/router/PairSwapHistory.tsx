@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Copy, Loader2 } from "lucide-react";
+import { ChartNoAxesCombined, Copy, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -48,9 +49,14 @@ const PairSwapHistory = ({ tokenIn, tokenOut }: PairSwapHistoryProps) => {
   };
 
   return (
-    <div className="mt-6 space-y-3 border-t pt-6">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Pair Swap History</h3>
+    <Card className="overflow-hidden border-border/70 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/60 px-4 py-4 md:px-6">
+        <div>
+          <CardTitle className="text-base">Pair History</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Market-wide swaps for the selected STRATO pair.
+          </p>
+        </div>
         {userAddress && (
           <Button
             variant={myTradesOnly ? "default" : "outline"}
@@ -61,8 +67,9 @@ const PairSwapHistory = ({ tokenIn, tokenOut }: PairSwapHistoryProps) => {
             {myTradesOnly ? "Showing My Trades" : "Show My Trades"}
           </Button>
         )}
-      </div>
-      <div className="overflow-x-auto rounded-lg border">
+      </CardHeader>
+      <CardContent className="space-y-3 p-4 md:p-6">
+        <div className="overflow-x-auto rounded-xl border border-border/70">
         <Table>
           <TableHeader>
             <TableRow>
@@ -114,8 +121,13 @@ const PairSwapHistory = ({ tokenIn, tokenOut }: PairSwapHistoryProps) => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                  No swap history found for this pair
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  <ChartNoAxesCombined className="mx-auto mb-2 h-7 w-7 opacity-30" />
+                  <span className="text-sm">
+                    {tokenIn && tokenOut
+                      ? "No swap history found for this pair"
+                      : "Choose Trade on STRATO to view pair history"}
+                  </span>
                 </TableCell>
               </TableRow>
             )}
@@ -146,7 +158,8 @@ const PairSwapHistory = ({ tokenIn, tokenOut }: PairSwapHistoryProps) => {
           </div>
         </div>
       )}
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
