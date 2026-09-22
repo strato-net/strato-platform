@@ -19,13 +19,17 @@ import { api } from "@/lib/axios";
 import WithdrawBasketPreview, { BasketItem } from "./WithdrawBasketPreview";
 import { Alert, AlertDescription } from "../ui/alert";
 
+export type WithdrawMode = "all" | "usd" | "percent";
+
 interface VaultWithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** Mode the modal opens in. "all" burns every share via withdrawShares. */
+  defaultMode?: WithdrawMode;
 }
 
-type InputMode = "usd" | "percent";
+type InputMode = WithdrawMode;
 
 const formatUsd = (value: string): string => {
   try {
@@ -51,15 +55,15 @@ const formatShares = (value: string): string => {
   }
 };
 
-const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalProps) => {
-  const [inputMode, setInputMode] = useState<InputMode>("usd");
+const VaultWithdrawModal = ({ isOpen, onClose, onSuccess, defaultMode = "usd" }: VaultWithdrawModalProps) => {
+  const [inputMode, setInputMode] = useState<InputMode>(defaultMode);
   const [usdAmount, setUsdAmount] = useState<string>("");
   const [percentAmount, setPercentAmount] = useState<string>("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [basket, setBasket] = useState<BasketItem[]>([]);
 
-  const { vaultState, withdraw, refreshVault } = useVaultContext();
+  const { vaultState, withdraw, withdrawShares, refreshVault } = useVaultContext();
   const { toast } = useToast();
   const { userRewards } = useRewardsUserInfo();
 
@@ -74,6 +78,9 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
     shareTokenSymbol,
   } = vaultState;
 
+  const isWithdrawAll = inputMode === "all";
+  const hasShares = BigInt(userShares || "0") > BigInt(0);
+
   // Calculate max withdrawable based on user's position AND vault's withdrawable equity
   const maxWithdrawableUsd = useMemo(() => {
     const userValueBigInt = BigInt(userValueUsd || "0");
@@ -85,6 +92,10 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
   // Calculate actual USD amount based on input mode
   const actualUsdAmount = useMemo(() => {
+    if (inputMode === "all") {
+      // Estimate only — withdrawShares computes the exact payout on-chain
+      return hasShares ? userValueUsd || "0" : "0";
+    }
     if (inputMode === "usd") {
       if (!usdAmount || parseFloat(usdAmount) <= 0) return "0";
       try {
@@ -103,10 +114,12 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
         return "0";
       }
     }
-  }, [inputMode, usdAmount, percentAmount, userValueUsd]);
+  }, [inputMode, usdAmount, percentAmount, userValueUsd, hasShares]);
 
   // Calculate shares to burn
   const sharesToBurn = useMemo(() => {
+    if (inputMode === "all") return userShares || "0";
+
     const amountBigInt = BigInt(actualUsdAmount || "0");
     const totalSharesBigInt = BigInt(totalShares || "1");
     const totalEquityBigInt = BigInt(totalEquity || "1");
@@ -115,11 +128,20 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
     const shares = (amountBigInt * totalSharesBigInt) / totalEquityBigInt;
     return shares.toString();
-  }, [actualUsdAmount, totalShares, totalEquity]);
+  }, [inputMode, userShares, actualUsdAmount, totalShares, totalEquity]);
 
   // Validation
   const validationError = useMemo(() => {
     const amount = BigInt(actualUsdAmount || "0");
+
+    if (inputMode === "all") {
+      if (!hasShares) return "You don't have any vault shares to withdraw";
+      if (amount > BigInt(withdrawableEquity || "0")) {
+        return "The vault doesn't have enough withdrawable liquidity for a full withdrawal right now. Try a partial amount instead.";
+      }
+      return null;
+    }
+
     if (amount === BigInt(0)) return null;
 
     const maxAmount = BigInt(maxWithdrawableUsd || "0");
@@ -128,7 +150,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
     }
 
     return null;
-  }, [actualUsdAmount, maxWithdrawableUsd]);
+  }, [inputMode, hasShares, actualUsdAmount, maxWithdrawableUsd, withdrawableEquity]);
 
   // Fetch basket preview when amount changes
   useEffect(() => {
@@ -198,6 +220,9 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
     setUsdAmount("");
     setPercentAmount("");
     setBasket([]);
+    // Callers pass key={mode} so a different entry point remounts the modal;
+    // this covers reopening from the same entry point after a tab switch.
+    setInputMode(defaultMode);
     onClose();
   };
 
@@ -215,11 +240,18 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
     setWithdrawLoading(true);
     try {
-      await withdraw({ amountUsd: actualUsdAmount });
+      if (isWithdrawAll) {
+        // Burn the exact share balance so no dust is left behind
+        await withdrawShares({ shares: userShares });
+      } else {
+        await withdraw({ amountUsd: actualUsdAmount });
+      }
 
       toast({
         title: "Withdrawal Successful",
-        description: `Successfully withdrew $${formatUsd(actualUsdAmount)} from the vault`,
+        description: isWithdrawAll
+          ? `Successfully withdrew your full position (≈ $${formatUsd(actualUsdAmount)}) from the vault`
+          : `Successfully withdrew $${formatUsd(actualUsdAmount)} from the vault`,
         variant: "success",
       });
 
@@ -267,13 +299,29 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
 
           {/* Input Mode Toggle */}
           <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as InputMode)}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all">Withdraw All</TabsTrigger>
               <TabsTrigger value="usd">USD Amount</TabsTrigger>
               <TabsTrigger value="percent">% of Position</TabsTrigger>
             </TabsList>
           </Tabs>
 
+          {/* Withdraw All summary */}
+          {isWithdrawAll && (
+            <div className="rounded-lg border p-3 space-y-1">
+              <p className="text-sm font-medium">Withdraw your full position</p>
+              <p className="text-sm text-muted-foreground">
+                Burns all {formatShares(userShares)} {shareTokenSymbol} for ≈ ${formatUsd(userValueUsd)} in
+                underlying tokens. The exact amount is computed on-chain when the transaction executes.
+              </p>
+              {validationError && (
+                <p className="text-destructive text-sm pt-1">{validationError}</p>
+              )}
+            </div>
+          )}
+
           {/* Amount Input */}
+          {!isWithdrawAll && (
           <div className="space-y-2">
             <div className="rounded-lg border p-3">
               <div className="flex items-center gap-2">
@@ -327,6 +375,7 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
               )}
             </div>
           </div>
+          )}
 
           {/* Warning for skipped tokens */}
           {
@@ -391,6 +440,8 @@ const VaultWithdrawModal = ({ isOpen, onClose, onSuccess }: VaultWithdrawModalPr
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : paused ? (
               "Vault is Paused"
+            ) : isWithdrawAll ? (
+              "Withdraw Everything"
             ) : (
               "Confirm Withdrawal"
             )}
