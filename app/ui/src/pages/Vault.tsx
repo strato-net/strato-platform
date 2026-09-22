@@ -4,6 +4,7 @@ import VaultTransactions from "@/components/vault/VaultTransactions";
 import VaultUserActivity from "@/components/vault/VaultUserActivity";
 import VaultUserPosition from "@/components/vault/VaultUserPosition";
 import VaultWithdrawModal, { WithdrawMode } from "@/components/vault/VaultWithdrawModal";
+import VaultSunsetBanner from "@/components/vault/VaultSunsetBanner";
 import { useVaultContext } from "@/context/VaultContext";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
@@ -30,6 +31,11 @@ const Vault = () => {
       {guestMode && (
         <GuestSignInBanner message="Sign in to withdraw from the vault" />
       )}
+
+      <VaultSunsetBanner
+        actionLabel="Withdraw All"
+        onAction={() => openWithdraw("all")}
+      />
 
       <div className="space-y-8">
         <VaultOverview />

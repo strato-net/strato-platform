@@ -21,6 +21,16 @@ export const DECIMAL = 18
 export const WAD = 10n ** 18n;
 
 // ============================================
+// Diversified Vault sunset
+// ============================================
+
+/**
+ * Last moment users can withdraw from the Diversified Vault before it is
+ * deprecated. Drives the countdown in VaultSunsetBanner. End of day, UTC.
+ */
+export const VAULT_WITHDRAWAL_DEADLINE = "2026-09-29T23:59:59Z";
+
+// ============================================
 // Feature Flags
 // ============================================
 

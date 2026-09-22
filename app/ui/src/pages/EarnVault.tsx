@@ -7,6 +7,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import VaultWithdrawModal, { WithdrawMode } from "@/components/vault/VaultWithdrawModal";
+import VaultSunsetBanner from "@/components/vault/VaultSunsetBanner";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -132,6 +133,12 @@ const EarnVault = () => {
           <div className="w-full">
             <Card className="bg-card border-0 rounded-none">
               <CardContent className="p-4 md:p-6 space-y-8">
+                <VaultSunsetBanner
+                  className="mb-0"
+                  actionLabel="Withdraw All"
+                  onAction={() => openWithdraw("all")}
+                />
+
                 <button
                   className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   onClick={() => navigate(-1)}
