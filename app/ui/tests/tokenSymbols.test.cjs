@@ -94,7 +94,7 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
       if (id === '@/lib/metalActivity') return metadataModule;
       if (id === '@/utils/numberUtils') return numberUtils;
       if (id === '@/hooks/use-mobile') return { useIsMobile: () => false };
-      if (id === '@/lib/activityFeed') return { activityFeedApi: { getActivities: async () => ({ events: [...routes.map(event => ({ event_name: 'RouteExecuted', ...event })), ...metals.map(event => ({ event_name: 'MetalMinted', ...event }))] }) } };
+      if (id === '@/lib/activityFeed') return { activityFeedApi: { getActivities: async (pairs) => ({ events: [...routes.map(event => ({ event_name: 'RouteExecuted', ...event })), ...metals.map(event => ({ event_name: 'MetalMinted', ...event }))].filter(event => pairs.some(pair => pair.event_name === event.event_name)) }) } };
       return {};
     },
   });
@@ -168,16 +168,13 @@ test('fallback warning uses bridged-token decimals, including zero and missing r
   }));
 });
 
-test('unified activity includes direct metal purchases beside routed trades with their own decimals', async () => {
+test('unified activity shows routed trades only; metal purchases stay on the Buy Metals page', async () => {
   const rows = await recentRows({ unified: true,
     routes: [{ block_timestamp: '2026-09-23T12:00:00Z', attributes: { tokenIn: input, tokenOut: output, amountIn: '1000000', amountOut: '100' } }],
     metals: [{ block_timestamp: '2026-09-23T13:00:00Z', attributes: { payToken: input, metalToken: output, payAmount: '1250000', metalAmount: '250' } }],
   });
-  assert.equal(rows.length, 2);
-  assert.equal(rows[0].label, 'Metal Mint');
-  assert.equal(rows[0].fromAmount, '1.25');
-  assert.equal(rows[0].toAmount, '2.50');
-  assert.equal(rows[1].label, 'Routed Trade');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].label, 'Routed Trade');
 });
 
 test('metal effective price includes mint spread and rejects unusable oracle prices', () => {
