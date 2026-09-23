@@ -22,7 +22,7 @@ import SolidVM.Solidity.Parse.Fast.Monad
 import SolidVM.Solidity.Parse.ParserTypes
 
 solidityFile :: P File
-solidityFile = File <$> manyTill sourceUnit eof
+solidityFile = File <$> manyWhile (\t -> tKind t /= TEOF) sourceUnit
 
 sourceUnit :: P SourceUnit
 sourceUnit = sourceUnit' <?> "pragma, import or declaration"
@@ -37,21 +37,22 @@ sourceUnit' = do
     "using" -> FLUsing <$> usingDeclaration True
     "function" -> freeFunction
     "struct" -> do
-      ~(a, (name, fields)) <- withPosition structFields
+      (a, (name, fields)) <- withPosition structFields
       pure (FLStruct (T.pack name) (mkStruct a fields))
     "enum" -> do
-      ~(a, (name, fields)) <- withPosition enumFields
+      (a, (name, fields)) <- withPosition enumFields
       pure (FLEnum (T.pack name) (mkEnum a fields))
     "error" -> do
-      ~(a, (name, args)) <- withPosition errorArgs
+      (a, (name, args)) <- withPosition errorArgs
       semi
       pure (FLError (T.pack name) (mkError a args))
-    _ -> solidityContract <|> constant
+    w | w `elem` ["contract", "interface", "abstract", "library"] -> solidityContract
+    _ -> constant
 
 -- | @pragma name anything;@
 pragma :: P SourceUnit
 pragma = do
-  ~(a, (name, rest)) <- withPosition $ do
+  (a, (name, rest)) <- withPosition $ do
     reserved "pragma"
     name <- identifier
     rest <- rawUntilSemi
@@ -61,7 +62,7 @@ pragma = do
 -- | @type Name is anything;@
 alias :: P SourceUnit
 alias = do
-  ~(a, (name, rest)) <- withPosition $ do
+  (a, (name, rest)) <- withPosition $ do
     reserved "type"
     name <- identifier
     reserved "is"
@@ -91,20 +92,21 @@ rawUntilSemi = do
 -- @import {a, b as c} from "path";@
 fileImport :: P SourceUnit
 fileImport = do
-  ~(a, imp) <- withPosition $ do
+  (a, imp) <- withPosition $ do
     reserved "import"
-    braced <|> plain
+    t <- peek
+    if isSym "{" t then braced else plain
   semi
   pure (Import a imp)
   where
     plain = do
-      ~(a, (e, qualifier)) <- withPosition ((,) <$> expression <*> optionMaybe (reserved "as" *> stringLiteral))
+      (a, (e, qualifier)) <- withPosition ((,) <$> expression <*> afterWord "as" stringLiteral)
       pure (maybe (Simple e a) (\q -> Qualified e (T.pack q) a) qualifier)
     braced = do
-      ~(a, (items, e)) <- withPosition ((,) <$> braces (commaSep1 item) <*> (reserved "from" *> expression))
+      (a, (items, e)) <- withPosition ((,) <$> braces (commaSep1 item) <*> (reserved "from" *> expression))
       pure (Braced items e a)
     item = do
-      ~(a, (name, as)) <- withPosition ((,) <$> identifier <*> optionMaybe (reserved "as" *> identifier))
+      (a, (name, as)) <- withPosition ((,) <$> identifier <*> afterWord "as" identifier)
       pure (maybe (Named (T.pack name) a) (\n -> Aliased (T.pack name) (T.pack n) a) as)
 
 -- | A free function is always internal.

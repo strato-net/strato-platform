@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -6,10 +7,12 @@
 module SolidVM.Solidity.Parse.Fast.Statement
   ( statement,
     statements,
+    blockOrSemi,
   )
 where
 
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
@@ -21,7 +24,13 @@ import SolidVM.Solidity.Parse.Fast.Types
 
 -- | A block: statements between braces.
 statements :: P [Statement]
-statements = sym "{" *> manyTill statement (sym "}")
+statements = sym "{" *> manyTillSym statement "}"
+
+-- | A block, or @;@ for none.
+blockOrSemi :: P (Maybe [Statement])
+blockOrSemi = do
+  t <- peek
+  if isSym "{" t then Just <$> statements else Nothing <$ semi
 
 statement :: P Statement
 statement = statement' <?> "statement"
@@ -48,25 +57,29 @@ statement' = do
       _ -> simple
     _ -> simple
   where
-    simple = variableDefinitionStatement <|> expressionStatement
+    simple = do
+      definition <- startsDefinition
+      if definition then variableDefinitionStatement else expressionStatement
 
 -- | A block or a single statement.
 body :: P [Statement]
-body = statements <|> ((: []) <$> statement)
+body = do
+  t <- peek
+  if isSym "{" t then statements else (: []) <$> statement
 
 ifStatement :: P Statement
 ifStatement = do
-  ~(a, (c, t, e)) <- withPosition $ do
+  (a, (c, t, e)) <- withPosition $ do
     reserved "if"
     c <- parens expression
     t <- body
-    e <- optionMaybe (reserved "else" *> body)
+    e <- afterWord "else" body
     pure (c, t, e)
   pure (IfStatement c t e a)
 
 whileStatement :: P Statement
 whileStatement = do
-  ~(a, (c, s)) <- withPosition $ do
+  (a, (c, s)) <- withPosition $ do
     reserved "while"
     c <- parens expression
     s <- body
@@ -75,7 +88,7 @@ whileStatement = do
 
 doWhileStatement :: P Statement
 doWhileStatement = do
-  ~(a, (s, c)) <- withPosition $ do
+  (a, (s, c)) <- withPosition $ do
     reserved "do"
     s <- body
     reserved "while"
@@ -86,14 +99,16 @@ doWhileStatement = do
 
 forStatement :: P Statement
 forStatement = do
-  ~(a, (initial, cond, step, s)) <- withPosition $ do
+  (a, (initial, cond, step, s)) <- withPosition $ do
     reserved "for"
     (initial, cond, step) <- parens $ do
-      initial <- optionMaybe (try variableDefinition <|> (ExpressionStatement <$> expression))
+      initial <- optionalIf (not . isSym ";") $ do
+        definition <- startsDefinition
+        if definition then variableDefinition else ExpressionStatement <$> expression
       semi
-      cond <- optionMaybe expression
+      cond <- optionalIf (not . isSym ";") expression
       semi
-      step <- optionMaybe expression
+      step <- optionalIf (not . isSym ")") expression
       pure (initial, cond, step)
     s <- statements
     pure (initial, cond, step, s)
@@ -101,13 +116,13 @@ forStatement = do
 
 returnStatement :: P Statement
 returnStatement = do
-  ~(a, e) <- withPosition (reserved "return" *> optionMaybe expression)
+  (a, e) <- withPosition (reserved "return" *> optionalIf (not . isSym ";") expression)
   semi
   pure (Return e a)
 
 emitStatement :: P Statement
 emitStatement = do
-  ~(a, (name, args)) <- withPosition $ do
+  (a, (name, args)) <- withPosition $ do
     reserved "emit"
     name <- identifier
     args <- parens (commaSep expression)
@@ -117,28 +132,30 @@ emitStatement = do
 
 throwStatement :: P Statement
 throwStatement = do
-  ~(a, e) <- withPosition (reserved "throw" *> expression <* semi)
+  (a, e) <- withPosition (reserved "throw" *> expression <* semi)
   pure (Throw e a)
 
 -- | @revert(args);@ or @revert Error(args);@; arguments may be named.
 revertStatement :: P Statement
 revertStatement = do
-  ~(a, (name, args)) <- withPosition $ do
+  (a, (name, args)) <- withPosition $ do
     reserved "revert"
-    name <- optionMaybe identifier
-    args <- parens (braces (commaSep (identifier *> sym ":" *> expression)) <|> commaSep expression)
+    name <- optionalIdentifier
+    args <- parens $ do
+      t <- peek
+      if isSym "{" t then braces (commaSep (identifier *> sym ":" *> expression)) else commaSep expression
     pure (name, args)
   semi
   pure (RevertStatement name args a)
 
 uncheckedStatement :: P Statement
 uncheckedStatement = do
-  ~(a, s) <- withPosition (reserved "unchecked" *> statements)
+  (a, s) <- withPosition (reserved "unchecked" *> statements)
   pure (UncheckedStatement s a)
 
 expressionStatement :: P Statement
 expressionStatement = do
-  ~(a, e) <- withPosition expression
+  (a, e) <- withPosition expression
   semi
   pure (SimpleStatement (ExpressionStatement e) a)
 
@@ -146,23 +163,72 @@ expressionStatement = do
 -- Variable definitions
 
 variableDefinitionStatement :: P Statement
-variableDefinitionStatement = try $ do
-  ~(a, d) <- withPosition variableDefinition
+variableDefinitionStatement = do
+  (a, d) <- withPosition variableDefinition
   semi
   pure (SimpleStatement d a)
+
+-- | Whether a variable definition, rather than an expression, starts here:
+-- @var@, or a type followed by a name, or a tuple whose first entry is one.
+-- Decided by looking at the tokens, so neither is ever parsed twice.
+startsDefinition :: P Bool
+startsDefinition = do
+  t <- peek
+  if
+    | isWord "var" t -> pure True
+    | isSym "(" t -> firstEntry 1
+    | otherwise -> typedName 0
+  where
+    -- the first tuple entry that is not blank
+    firstEntry n = do
+      t <- peekAt n
+      if isSym "," t then firstEntry (n + 1) else typedName n
+    -- a type at token n, then a name; @new T@ is never a type
+    typedName n = do
+      t <- peekAt n
+      t1 <- peekAt (n + 1)
+      if
+        | tKind t /= TWord || isWord "new" t -> pure False
+        | isWord "mapping" t -> pure True
+        | Just _ <- builtin (tText t) -> afterDims (if isWord "payable" t1 then n + 2 else n + 1)
+        | not (isIdentifier t) -> pure False
+        | isSym "." t1 -> afterDims (n + 3)
+        | otherwise -> afterDims (n + 1)
+    -- past the [..] dimensions from token n: a name?
+    afterDims n = do
+      t <- peekAt n
+      if isSym "[" t then closing (n + 1) (1 :: Int) >>= afterDims else pure (isName t)
+    -- the token after the ] that closes depth brackets, scanning from token n
+    closing n depth = do
+      t <- peekAt n
+      if
+        | tKind t == TEOF -> pure n
+        | isSym "[" t -> closing (n + 1) (depth + 1)
+        | isSym "]" t -> if depth == 1 then pure (n + 1) else closing (n + 1) (depth - 1)
+        | otherwise -> closing (n + 1) depth
+    isName t = isIdentifier t || isWord "memory" t || isWord "storage" t || isWord "calldata" t
 
 -- | @var x@, @var (x, y)@, @T x@ or @(T x, U y)@, each with an optional
 -- initializer.
 variableDefinition :: P SimpleStatement
 variableDefinition = do
+  t <- peek
   entries <-
-    (reserved "var" *> (parens (commaSep1 (option BlankEntry (entry (pure Nothing)))) <|> ((: []) <$> entry (pure Nothing))))
-      <|> parens (commaSep1 (option BlankEntry (entry (Just <$> simpleTypeExpression))))
-      <|> ((: []) <$> entry (Just <$> simpleTypeExpression))
-  VariableDefinition entries <$> optionMaybe (sym "=" *> expression)
+    if
+      | isWord "var" t -> do
+          skip
+          t' <- peek
+          if isSym "(" t' then tupleOf (entry (pure Nothing)) else (: []) <$> entry (pure Nothing)
+      | isSym "(" t -> tupleOf (entry (Just <$> simpleTypeExpression))
+      | otherwise -> (: []) <$> entry (Just <$> simpleTypeExpression)
+  VariableDefinition entries <$> afterSym "=" expression
   where
+    tupleOf e = parens (commaSep1 (blankOr e))
+    blankOr e = do
+      t <- peek
+      if isSym "," t || isSym ")" t then pure BlankEntry else e
     entry typ = do
-      ~(a, (t, loc, name)) <- withPosition $ do
+      (a, (t, loc, name)) <- withPosition $ do
         t <- typ
         loc <- location
         name <- stringToLabel <$> identifier
@@ -170,7 +236,7 @@ variableDefinition = do
       pure (VarDefEntry t loc name a)
 
 location :: P (Maybe Location)
-location = optionMaybe . next $ \t -> case tText t of
+location = optionalNext $ \t -> case tText t of
   "memory" | tKind t == TWord -> Just Memory
   "storage" | tKind t == TWord -> Just Storage
   "calldata" | tKind t == TWord -> Just Calldata
@@ -182,19 +248,20 @@ location = optionMaybe . next $ \t -> case tText t of
 tryStatement :: P Statement
 tryStatement = do
   reserved "try"
-  solidityTryCatch <|> legacyTryCatch
+  t <- peek
+  if isSym "{" t then legacyTryCatch else solidityTryCatch
 
 -- | @try expr [returns (...)] { ... } catch [Error|Panic] [(params)] { ... }...@
 solidityTryCatch :: P Statement
 solidityTryCatch = do
-  ~(a, (e, returns, success, catches)) <- withPosition $ do
+  (a, (e, returns, success, catches)) <- withPosition $ do
     e <- expression
-    returns <- optionMaybe (reserved "returns" *> catchParams)
+    returns <- afterWord "returns" catchParams
     success <- statements
-    catches <- many1 $ do
+    catches <- many1While (isWord "catch") $ do
       reserved "catch"
-      kind <- optionMaybe identifier
-      params <- optionMaybe catchParams
+      kind <- optionalIdentifier
+      params <- optionalIf (isSym "(") catchParams
       (name, param) <- catchClause kind params
       s <- statements
       pure (name, (param, s))
@@ -219,19 +286,19 @@ catchParams :: P [(String, SVMType.Type)]
 catchParams = parens $
   commaSep $ do
     t <- simpleTypeExpression
-    optional (reserved "indexed" <|> reserved "storage" <|> reserved "memory" <|> reserved "calldata")
-    name <- option "" identifier
+    _ <- optionalIf (\k -> any (`isWord` k) ["indexed", "storage", "memory", "calldata"]) skip
+    name <- fromMaybe "" <$> optionalIdentifier
     pure (name, t)
 
 -- | @try { ... } catch [name] [(params)] { ... }...@
 legacyTryCatch :: P Statement
 legacyTryCatch = do
-  ~(a, (s, catches)) <- withPosition $ do
+  (a, (s, catches)) <- withPosition $ do
     s <- statements
-    catches <- many1 $ do
+    catches <- many1While (isWord "catch") $ do
       reserved "catch"
-      err <- option "" identifier
-      params <- optionMaybe (parens (commaSep identifier))
+      err <- fromMaybe "" <$> optionalIdentifier
+      params <- optionalIf (isSym "(") (parens (commaSep identifier))
       ss <- statements
       pure (err, (params, ss))
     pure (s, catches)
@@ -243,7 +310,7 @@ legacyTryCatch = do
 -- | The one supported form: @assembly { dst := mload(add(src, 32)) }@.
 inlineAssembly :: P Statement
 inlineAssembly = do
-  ~(a, e) <- withPosition $
+  (a, e) <- withPosition $
     braces $ do
       dst <- identifier
       sym ":="

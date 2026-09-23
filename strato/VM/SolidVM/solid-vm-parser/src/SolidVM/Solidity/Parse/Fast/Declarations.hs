@@ -44,19 +44,20 @@ import qualified SolidVM.Solidity.Xabi as Xabi
 
 solidityContract :: P SourceUnit
 solidityContract = do
-  ~(a, (kind, name, parents)) <- withPosition $ do
-    kind <-
-      (SolidVM.ContractType <$ reserved "contract")
-        <|> (SolidVM.InterfaceType <$ reserved "interface")
-        <|> (SolidVM.AbstractType <$ (reserved "abstract" *> reserved "contract"))
-        <|> (SolidVM.LibraryType <$ reserved "library")
-    optional (reserved "record")
+  (a, (kind, name, parents)) <- withPosition $ do
+    t <- peek
+    kind <- case tText t of
+      "interface" -> SolidVM.InterfaceType <$ skip
+      "abstract" -> SolidVM.AbstractType <$ (skip *> reserved "contract")
+      "library" -> SolidVM.LibraryType <$ skip
+      _ -> SolidVM.ContractType <$ reserved "contract"
+    _ <- optionalWord "record"
     name <- identifier
     modifySt (\s -> s {contractName = name})
     -- constructor arguments given to a parent here are not kept
-    parents <- option [] $ reserved "is" *> commaSep1 (dotted <* optional (parens (commaSep expression)))
+    parents <- fromMaybe [] <$> afterWord "is" (commaSep1 (dotted <* optionalIf (isSym "(") (parens (commaSep expression))))
     pure (kind, name, parents)
-  declarations <- sym "{" *> manyTill (declaration False) (sym "}")
+  declarations <- sym "{" *> manyTillSym (declaration False) "}"
   constructor <- case [c | (_, ConstructorDeclaration c) <- declarations] of
     [] -> pure Nothing
     [c] -> pure (Just c)
@@ -82,7 +83,7 @@ solidityContract = do
         SolidVM._contractContext = a
       }
   where
-    dotted = T.unpack . T.intercalate "." . map T.pack <$> sepBy1 identifier (sym ".")
+    dotted = T.unpack . T.intercalate "." . map T.pack <$> sepBy1Sym identifier "."
     -- a function may be redefined only with different parameter types
     overload fs (name, new) = case Map.lookup name fs of
       Nothing -> pure (Map.insert name new fs)
@@ -119,13 +120,15 @@ structFields :: P (String, [(String, SVMType.Type)])
 structFields = do
   reserved "struct"
   name <- identifier
-  fields <- braces $
-    many1 $ do
-      t <- simpleTypeExpression
-      field <- identifier
-      semi
-      pure (field, t)
+  sym "{"
+  fields <- (:) <$> field <*> manyTillSym field "}"
   pure (name, fields)
+  where
+    field = do
+      t <- simpleTypeExpression
+      name <- identifier
+      semi
+      pure (name, t)
 
 mkStruct :: SourceAnnotation () -> [(String, SVMType.Type)] -> SolidVM.Def
 mkStruct a fields =
@@ -137,7 +140,7 @@ mkStruct a fields =
 
 structDeclaration :: P (String, Declaration)
 structDeclaration = do
-  ~(a, (name, fields)) <- withPosition structFields
+  (a, (name, fields)) <- withPosition structFields
   pure (name, StructDeclaration (mkStruct a fields))
 
 enumFields :: P (String, [String])
@@ -152,7 +155,7 @@ mkEnum a fields = SolidVM.Enum {SolidVM.names = map stringToLabel fields, SolidV
 
 enumDeclaration :: P (String, Declaration)
 enumDeclaration = do
-  ~(a, (name, fields)) <- withPosition enumFields
+  (a, (name, fields)) <- withPosition enumFields
   pure (name, EnumDeclaration (mkEnum a fields))
 
 errorArgs :: P (String, [(Text, SVMType.Type)])
@@ -176,19 +179,20 @@ mkError a args =
 
 errorDeclaration :: P (String, Declaration)
 errorDeclaration = do
-  ~(a, (name, args)) <- withPosition errorArgs
+  (a, (name, args)) <- withPosition errorArgs
   semi
   pure (name, ErrorDeclaration (mkError a args))
 
 -- | @using L for T;@ or @using L for *;@; @global@ only at file level.
 usingDeclaration :: Bool -> P Xabi.Using
 usingDeclaration free = do
-  ~(a, (lib, typ, global)) <- withPosition $ do
+  (a, (lib, typ, global)) <- withPosition $ do
     reserved "using"
     lib <- identifier
     reserved "for"
-    typ <- (Nothing <$ sym "*") <|> (Just <$> simpleTypeExpression)
-    global <- isJust <$> optionMaybe (reserved "global")
+    t <- peek
+    typ <- if isSym "*" t then Nothing <$ skip else Just <$> simpleTypeExpression
+    global <- optionalWord "global"
     when (global && not free) $ failWith "using ... global is only allowed at file level"
     semi
     pure (lib, typ, global)
@@ -203,11 +207,11 @@ data Keyword = KConstant | KPublic | KPrivate | KInternal | KImmutable | KRecord
 -- | @T [keywords] name [= value];@
 stateVariable :: P (String, Declaration)
 stateVariable = do
-  ~(a, (t, keywords, name, value)) <- withPosition $ do
+  (a, (t, keywords, name, value)) <- withPosition $ do
     t <- simpleTypeExpression
-    keywords <- many keyword
+    keywords <- manyNext keyword
     name <- identifier
-    value <- optionMaybe (sym "=" *> expression)
+    value <- afterSym "=" expression
     pure (t, keywords, name, value)
   semi
   visibility <- case nub (filter (`elem` [KPublic, KPrivate, KInternal]) keywords) of
@@ -222,7 +226,7 @@ stateVariable = do
       Nothing -> failWith ("constant " ++ name ++ " must be initialized")
     else pure (name, VariableDeclaration (SolidVM.VariableDecl t visibility value a (KImmutable `elem` keywords)))
   where
-    keyword = next $ \t -> case tText t of
+    keyword t = case tText t of
       "constant" | tKind t == TWord -> Just KConstant
       "immutable" | tKind t == TWord -> Just KImmutable
       "public" | tKind t == TWord -> Just KPublic
@@ -239,12 +243,13 @@ stateVariable = do
 -- its constructor.
 functionDeclaration :: Bool -> P (String, Declaration)
 functionDeclaration free = do
-  ~(a, (name, func)) <- withPosition $ do
-    name <-
-      (reserved "function" *> option "fallback" identifier)
-        <|> (reserved "constructor" *> (contractName <$> getSt))
-        <|> ("receive" <$ reserved "receive")
-        <|> ("fallback" <$ reserved "fallback")
+  (a, (name, func)) <- withPosition $ do
+    t <- peek
+    name <- case tText t of
+      "constructor" -> skip *> (contractName <$> getSt)
+      "receive" -> "receive" <$ skip
+      "fallback" -> "fallback" <$ skip
+      _ -> reserved "function" *> (fromMaybe "fallback" <$> optionalIdentifier)
     func <- functionBody free
     pure (name, func)
   contract <- contractName <$> getSt
@@ -264,7 +269,7 @@ functionBody free = do
     _ -> pure ()
   (returns, visibility, mutability, virtual, overrides, modifiers) <- functionModifiers
   end <- getPos
-  contents <- (Just <$> statements) <|> (Nothing <$ semi)
+  contents <- blockOrSemi
   when (free && (virtual || isJust overrides)) $ failWith "free functions cannot be virtual or override"
   let indexed xs = zipWith (\(name, (loc, t)) i -> (if T.null name then Nothing else Just (textToLabel name), SolidVM.IndexedType i t loc)) xs [0 ..]
   pure
@@ -288,13 +293,13 @@ parameters :: P [(Text, (Bool, Maybe Location, SVMType.Type))]
 parameters = parens $
   commaSep $ do
     t <- simpleTypeExpression
-    (indexed, loc) <- option (False, Nothing) . next $ \k -> case tText k of
+    (indexed, loc) <- fromMaybe (False, Nothing) <$> optionalNext (\k -> case tText k of
       "indexed" | tKind k == TWord -> Just (True, Nothing)
       "storage" | tKind k == TWord -> Just (False, Just Storage)
       "memory" | tKind k == TWord -> Just (False, Just Memory)
       "calldata" | tKind k == TWord -> Just (False, Just Calldata)
-      _ -> Nothing
-    name <- option "" identifier
+      _ -> Nothing)
+    name <- fromMaybe "" <$> optionalIdentifier
     pure (T.pack name, (indexed, loc, t))
 
 data Modifier
@@ -316,7 +321,7 @@ functionModifiers ::
       [(SolidString, [SolidVM.Expression])]
     )
 functionModifiers = do
-  mods <- many $ do
+  mods <- manyWhile (\t -> tKind t == TWord) $ do
     t <- peek
     case tText t of
       "returns" -> ReturnsMod . map (\(name, (_, loc, t')) -> (name, (loc, t'))) <$> (reserved "returns" *> parameters)
@@ -329,8 +334,8 @@ functionModifiers = do
       "view" -> MutabilityMod SolidVM.View <$ reserved "view"
       "payable" -> MutabilityMod SolidVM.Payable <$ reserved "payable"
       "virtual" -> VirtualMod <$ reserved "virtual"
-      "override" -> OverrideMod <$> (reserved "override" *> option [] (parens (commaSep identifier)))
-      _ -> CallMod <$> ((,) <$> (stringToLabel <$> identifier) <*> option [] (parens (commaSep expression)))
+      "override" -> OverrideMod . fromMaybe [] <$> (reserved "override" *> optionalIf (isSym "(") (parens (commaSep identifier)))
+      _ -> CallMod <$> ((,) <$> (stringToLabel <$> identifier) <*> (fromMaybe [] <$> optionalIf (isSym "(") (parens (commaSep expression))))
   pure
     ( concat [v | ReturnsMod v <- mods],
       listToMaybe [v | VisibilityMod v <- mods],
@@ -342,11 +347,11 @@ functionModifiers = do
 
 eventDeclaration :: P (String, Declaration)
 eventDeclaration = do
-  ~(a, (name, logs, anonymous)) <- withPosition $ do
+  (a, (name, logs, anonymous)) <- withPosition $ do
     reserved "event"
     name <- identifier
     logs <- parameters
-    anonymous <- option False (True <$ reserved "anonymous")
+    anonymous <- optionalWord "anonymous"
     pure (name, logs, anonymous)
   semi
   pure
@@ -361,11 +366,11 @@ eventDeclaration = do
 
 modifierDeclaration :: P (String, Declaration)
 modifierDeclaration = do
-  ~(a, (name, args, contents)) <- withPosition $ do
+  (a, (name, args, contents)) <- withPosition $ do
     reserved "modifier"
     name <- identifier
-    args <- option [] parameters
-    contents <- (Just <$> statements) <|> (Nothing <$ semi)
+    args <- fromMaybe [] <$> optionalIf (isSym "(") parameters
+    contents <- blockOrSemi
     pure (name, args, contents)
   let named (n, (_, loc, t)) i = (if T.null n then T.pack ('#' : show i) else n, SolidVM.IndexedType i t loc)
   pure

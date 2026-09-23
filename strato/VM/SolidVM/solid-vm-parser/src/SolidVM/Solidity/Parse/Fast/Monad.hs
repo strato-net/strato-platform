@@ -1,42 +1,47 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UnboxedSums #-}
 {-# LANGUAGE UnboxedTuples #-}
 
 -- |
 -- Module: Fast.Monad
--- Description: The parser monad over the token vector
+-- Description: The parser monad over the token arrays
 --
--- 'P' reads 'Token's by index. '<|>' takes the second alternative only when
--- the first failed without consuming a token, and 'try' turns a consuming
--- failure into a non-consuming one. A failure remembers the furthest token
--- any rule failed at, which is where the error is reported, and what was
--- expected there or why it was rejected.
+-- 'P' reads 'Token's by index and never backtracks: a rule that may or may
+-- not apply is chosen by looking at the next token, so a successful parse
+-- never fails a rule. A failure remembers the furthest token any rule failed
+-- at, which is where the error is reported, and what was expected there or
+-- why it was rejected.
 module SolidVM.Solidity.Parse.Fast.Monad
   ( P,
     St (..),
     Err (..),
     runP,
-    (<|>),
     (<?>),
-    try,
     empty,
     failWith,
-    choice,
-    many,
-    many1,
-    manyTill,
-    option,
-    optionMaybe,
-    optional,
-    sepBy,
-    sepBy1,
-    between,
-    chainl1,
     eof,
     peek,
     peekAt,
     next,
+    skip,
+    optionalIf,
+    optionalNext,
+    optionalSym,
+    optionalWord,
+    optionalIdentifier,
+    afterSym,
+    afterWord,
+    manyWhile,
+    many1While,
+    manyNext,
+    manyTillSym,
+    sepBy1Sym,
+    isSym,
+    isWord,
+    isIdentifier,
     skipToByte,
     source,
     sourceSlice,
@@ -57,22 +62,23 @@ module SolidVM.Solidity.Parse.Fast.Monad
     commaSep,
     commaSep1,
     integer,
+    natural,
+    negative,
+    negated,
     stringLiteral,
   )
 where
 
-import qualified Data.Set as Set
+import Data.Maybe (isJust)
 import Data.Source (SourceAnnotation (..), SourcePosition (..))
 import Data.Text (Text)
 import Data.Text.Internal (Text (..))
-import qualified Data.Text as T
-import qualified Data.Vector as V
-import GHC.Exts (Int (I#), Int#, isTrue#, (+#), (==#), (>#))
+import GHC.Exts (Int (I#), Int#, isTrue#, (+#), (==#))
 import SolidVM.Solidity.Parse.Fast.Lexer
 import SolidVM.Solidity.Parse.ParserTypes (ParserState)
 
 data St = St
-  { stToks :: !(V.Vector Token),
+  { stToks :: !Tokens,
     stSrc :: !Text,
     stName :: String,
     stUser :: !ParserState
@@ -85,7 +91,8 @@ data Err = Expecting [Text] | Because String
 -- | Results are unboxed: success carries the value, the next token index and
 -- the state; failure the index the failing rule started reading at (past the
 -- enclosing rule's start exactly when it consumed a token), the furthest
--- index any rule failed at, and the 'Err' for that index.
+-- index any rule failed at, and the 'Err' for that index. Values are
+-- evaluated as they are returned, so a rule never leaves a thunk behind.
 type Res# a = (# (# a, Int#, St #) | (# Int#, Int#, Err #) #)
 
 newtype P a = P {unP :: St -> Int# -> Res# a}
@@ -99,30 +106,24 @@ runP (P p) st = case p st 0# of
 noErr :: Err
 noErr = Expecting []
 
--- | The deeper of two failures; at the same token, everything both expected.
-merge :: Int# -> Err -> Int# -> Err -> (# Int#, Err #)
-merge far e far' e'
-  | isTrue# (far' ># far) = (# far', e' #)
-  | isTrue# (far ># far') = (# far, e #)
-  | otherwise = (# far, both e e' #)
-  where
-    both (Expecting a) (Expecting b) = Expecting (a ++ b)
-    both r@(Because _) _ = r
-    both _ r = r
-{-# INLINE merge #-}
+-- | Everything two failures at the same token expected.
+both :: Err -> Err -> Err
+both (Expecting a) (Expecting b) = Expecting (a ++ b)
+both r@(Because _) _ = r
+both _ r = r
 
 instance Functor P where
   fmap f (P p) = P $ \st i -> case p st i of
-    (# (# a, j, st' #) | #) -> (# (# f a, j, st' #) | #)
+    (# (# a, j, st' #) | #) -> let !b = f a in (# (# b, j, st' #) | #)
     (# | e #) -> (# | e #)
   {-# INLINE fmap #-}
 
 instance Applicative P where
-  pure a = P $ \st i -> (# (# a, i, st #) | #)
+  pure !a = P $ \st i -> (# (# a, i, st #) | #)
   {-# INLINE pure #-}
   P pf <*> P pa = P $ \st i -> case pf st i of
     (# (# f, j, st' #) | #) -> case pa st' j of
-      (# (# a, k, st'' #) | #) -> (# (# f a, k, st'' #) | #)
+      (# (# a, k, st'' #) | #) -> let !b = f a in (# (# b, k, st'' #) | #)
       (# | e #) -> (# | e #)
     (# | e #) -> (# | e #)
   {-# INLINE (<*>) #-}
@@ -145,18 +146,6 @@ instance Monad P where
   (>>) = (*>)
   {-# INLINE (>>) #-}
 
-infixr 1 <|>
-
-(<|>) :: P a -> P a -> P a
-P p <|> P q = P $ \st i -> case p st i of
-  (# | (# s, far, e #) #)
-    | isTrue# (s ==# i) -> case q st i of
-        (# | (# s', far', e' #) #) -> case merge far e far' e' of
-          (# far'', e'' #) -> (# | (# s', far'', e'' #) #)
-        r -> r
-  r -> r
-{-# INLINE (<|>) #-}
-
 infix 0 <?>
 
 -- | Names what a rule expects; used when it fails at its first token, since
@@ -167,12 +156,7 @@ P p <?> name = P $ \st i -> case p st i of
   r -> r
 {-# INLINE (<?>) #-}
 
-try :: P a -> P a
-try (P p) = P $ \st i -> case p st i of
-  (# | (# _, far, e #) #) -> (# | (# i, far, e #) #)
-  r -> r
-{-# INLINE try #-}
-
+-- | Fails at the current token; the enclosing rule's label names what was expected.
 empty :: P a
 empty = P $ \_ i -> (# | (# i, i, noErr #) #)
 {-# INLINE empty #-}
@@ -181,74 +165,106 @@ empty = P $ \_ i -> (# | (# i, i, noErr #) #)
 failWith :: String -> P a
 failWith why = P $ \_ i -> (# | (# i, i, Because why #) #)
 
-choice :: [P a] -> P a
-choice = foldr (<|>) empty
+------------------------------------------------------------------------------
+-- Lookahead: a rule that may or may not apply is run only when the next
+-- token says it does.
 
-many :: P a -> P [a]
-many (P p) = P $ \st0 i0 ->
-  let go acc st i = case p st i of
-        (# (# a, j, st' #) | #)
-          | isTrue# (j ># i) -> go (a : acc) st' j
-          | otherwise -> (# (# reverse (a : acc), j, st' #) | #)
-        (# | (# s, far, e #) #)
-          | isTrue# (s ==# i) -> (# (# reverse acc, i, st #) | #)
-          | otherwise -> (# | (# s, far, e #) #)
-   in go [] st0 i0
+-- | Consumes the current token, whatever it is.
+skip :: P ()
+skip = P $ \st i -> (# (# (), i +# 1#, st #) | #)
+{-# INLINE skip #-}
 
--- | @p@ repeatedly until @end@; where neither applies the failure names both.
-manyTill :: P a -> P end -> P [a]
-manyTill (P p) (P end) = P $ \st0 i0 ->
-  let go acc st i = case end st i of
-        (# (# _, j, st' #) | #) -> (# (# reverse acc, j, st' #) | #)
-        (# | (# s, far, e #) #)
-          | isTrue# (s ==# i) -> case p st i of
-              (# (# a, j, st' #) | #)
-                | isTrue# (j ># i) -> go (a : acc) st' j
-                | otherwise -> (# (# reverse (a : acc), j, st' #) | #)
-              (# | (# s', far', e' #) #)
-                | isTrue# (s' ==# i) -> case merge far e far' e' of
-                    (# far'', e'' #) -> (# | (# i, far'', e'' #) #)
-                | otherwise -> (# | (# s', far', e' #) #)
-          | otherwise -> (# | (# s, far, e #) #)
-   in go [] st0 i0
+-- | @p@, if the current token satisfies @f@.
+optionalIf :: (Token -> Bool) -> P a -> P (Maybe a)
+optionalIf f (P p) = P $ \st i ->
+  if f (tokAt st i)
+    then case p st i of
+      (# (# a, j, st' #) | #) -> (# (# Just a, j, st' #) | #)
+      (# | e #) -> (# | e #)
+    else (# (# Nothing, i, st #) | #)
+{-# INLINE optionalIf #-}
 
-many1 :: P a -> P [a]
-many1 p = do
-  x <- p
-  xs <- many p
-  pure (x : xs)
+-- | The current token, consumed, if @f@ accepts it.
+optionalNext :: (Token -> Maybe a) -> P (Maybe a)
+optionalNext f = P $ \st i -> case f (tokAt st i) of
+  Just a -> (# (# Just a, i +# 1#, st #) | #)
+  Nothing -> (# (# Nothing, i, st #) | #)
+{-# INLINE optionalNext #-}
 
-option :: a -> P a -> P a
-option x p = p <|> pure x
-{-# INLINE option #-}
+-- | Whether the current token is @s@ / the word @w@; consumed if so.
+optionalSym, optionalWord :: Text -> P Bool
+optionalSym s = isJust <$> optionalIf (isSym s) skip
+optionalWord w = isJust <$> optionalIf (isWord w) skip
+{-# INLINE optionalSym #-}
+{-# INLINE optionalWord #-}
 
-optionMaybe :: P a -> P (Maybe a)
-optionMaybe p = option Nothing (Just <$> p)
-{-# INLINE optionMaybe #-}
+-- | @s p@ / @w p@, if @s@ / @w@ is next.
+afterSym, afterWord :: Text -> P a -> P (Maybe a)
+afterSym s p = optionalIf (isSym s) (skip *> p)
+afterWord w p = optionalIf (isWord w) (skip *> p)
+{-# INLINE afterSym #-}
+{-# INLINE afterWord #-}
 
-optional :: P a -> P ()
-optional p = (() <$ p) <|> pure ()
+-- | An identifier, if one is next.
+optionalIdentifier :: P (Maybe String)
+optionalIdentifier = optionalIf isIdentifier identifier
 
-sepBy :: P a -> P sep -> P [a]
-sepBy p sep = sepBy1 p sep <|> pure []
+-- | @p@ while the current token satisfies @f@.
+manyWhile :: (Token -> Bool) -> P a -> P [a]
+manyWhile f (P p) = P $ \st0 i0 ->
+  let go st i
+        | f (tokAt st i) = case p st i of
+            (# (# a, j, st' #) | #) -> case go st' j of
+              (# (# as, k, st'' #) | #) -> (# (# a : as, k, st'' #) | #)
+              (# | e #) -> (# | e #)
+            (# | e #) -> (# | e #)
+        | otherwise = (# (# [], i, st #) | #)
+   in go st0 i0
+{-# INLINE manyWhile #-}
 
-sepBy1 :: P a -> P sep -> P [a]
-sepBy1 p sep = do
-  x <- p
-  xs <- many (sep >> p)
-  pure (x : xs)
+-- | @p@, then @p@ while the current token satisfies @f@.
+many1While :: (Token -> Bool) -> P a -> P [a]
+many1While f p = (:) <$> p <*> manyWhile f p
+{-# INLINE many1While #-}
 
-between :: P open -> P close -> P a -> P a
-between o c p = o *> p <* c
-{-# INLINE between #-}
+-- | Tokens while @f@ accepts them.
+manyNext :: (Token -> Maybe a) -> P [a]
+manyNext f = manyWhile (isJust . f) (next f)
 
-chainl1 :: P a -> P (a -> a -> a) -> P a
-chainl1 p op = p >>= rest
-  where
-    rest x = (do f <- op; y <- p; rest (f x y)) <|> pure x
+-- | @p@ until the punctuation @s@, which is consumed. Failing at the first
+-- token of a @p@, the error names @s@ too.
+manyTillSym :: P a -> Text -> P [a]
+manyTillSym (P p) s = P $ \st0 i0 ->
+  let go st i
+        | isSym s (tokAt st i) = (# (# [], i +# 1#, st #) | #)
+        | otherwise = case p st i of
+            (# (# a, j, st' #) | #) -> case go st' j of
+              (# (# as, k, st'' #) | #) -> (# (# a : as, k, st'' #) | #)
+              (# | e #) -> (# | e #)
+            (# | (# s', far, e #) #)
+              | isTrue# (far ==# i) -> (# | (# s', far, both e (Expecting [quoted s]) #) #)
+              | otherwise -> (# | (# s', far, e #) #)
+   in go st0 i0
+{-# INLINE manyTillSym #-}
+
+-- | @p@ separated by the punctuation @s@, one or more times.
+sepBy1Sym :: P a -> Text -> P [a]
+sepBy1Sym p s = (:) <$> p <*> manyWhile (isSym s) (skip *> p)
+{-# INLINE sepBy1Sym #-}
+
+isSym, isWord :: Text -> Token -> Bool
+isSym s t = (tKind t == TOp || tKind t == TPunct) && tText t == s
+isWord w t = tKind t == TWord && tText t == w
+{-# INLINE isSym #-}
+{-# INLINE isWord #-}
+
+-- | A word that is not a keyword.
+isIdentifier :: Token -> Bool
+isIdentifier t = tKind t == TWord && not (tReserved t)
+{-# INLINE isIdentifier #-}
 
 tokAt :: St -> Int# -> Token
-tokAt st i = V.unsafeIndex (stToks st) (I# i)
+tokAt st i = tokenAt (stToks st) (I# i)
 {-# INLINE tokAt #-}
 
 -- | The current token, without consuming it.
@@ -260,8 +276,8 @@ peek = P $ \st i -> (# (# tokAt st i, i, st #) | #)
 peekAt :: Int -> P Token
 peekAt n = P $ \st i ->
   let ts = stToks st
-      j = min (I# i + n) (V.length ts - 1)
-   in (# (# V.unsafeIndex ts j, i, st #) | #)
+      j = min (I# i + n) (tokCount ts - 1)
+   in (# (# tokenAt ts j, i, st #) | #)
 {-# INLINE peekAt #-}
 
 -- | Consumes the current token if @f@ accepts it. Fails without consuming
@@ -285,10 +301,9 @@ eof = P $ \st i -> case tKind (tokAt st i) of
 -- | Consumes the tokens starting before byte @b@ of the source.
 skipToByte :: Int -> P ()
 skipToByte b = P $ \st i ->
-  let ts = stToks st
-      go :: Int# -> Res# ()
+  let go :: Int# -> Res# ()
       go j =
-        let t = V.unsafeIndex ts (I# j)
+        let t = tokAt st j
          in if tByte t < b && tKind t /= TEOF then go (j +# 1#) else (# (# (), j, st #) | #)
    in go i
 
@@ -301,25 +316,25 @@ sourceSlice :: Int -> Int -> P Text
 sourceSlice from to = P $ \st i -> let Text arr _ _ = stSrc st in (# (# Text arr from (to - from), i, st #) | #)
 
 getPos :: P SourcePosition
-getPos = P $ \st i ->
-  let t = tokAt st i
-   in (# (# SourcePosition (stName st) (tLine t) (tCol t), i, st #) | #)
+getPos = P $ \st i -> case tokAt st i of
+  Token {tLine = l, tCol = c} -> (# (# SourcePosition (stName st) l c, i, st #) | #)
 {-# INLINE getPos #-}
 
 -- | The result of a rule with the positions of the first token it read and
 -- of the token after the last.
 withPosition :: P b -> P (SourceAnnotation (), b)
 withPosition (P p) = P $ \st i -> case p st i of
-  (# (# x, j, st' #) | #) ->
-    let s = tokAt st i
-        e = tokAt st' j
-        name = stName st
-     in (# (# (SourceAnnotation (SourcePosition name (tLine s) (tCol s)) (SourcePosition name (tLine e) (tCol e)) (), x), j, st' #) | #)
+  (# (# x, j, st' #) | #) -> case tokAt st i of
+    Token {tLine = sl, tCol = sc} -> case tokAt st' j of
+      Token {tLine = el, tCol = ec} ->
+        let name = stName st
+         in (# (# (SourceAnnotation (SourcePosition name sl sc) (SourcePosition name el ec) (), x), j, st' #) | #)
   (# | e #) -> (# | e #)
 {-# INLINE withPosition #-}
 
 position :: P a -> P (SourceAnnotation ())
-position = fmap fst . withPosition
+position p = fst <$> withPosition p
+{-# INLINE position #-}
 
 getSt :: P ParserState
 getSt = P $ \st i -> (# (# stUser st, i, st #) | #)
@@ -335,14 +350,13 @@ reserved :: Text -> P ()
 reserved w = next (\t -> if tKind t == TWord && tText t == w then Just () else Nothing) <?> quoted w
 {-# INLINE reserved #-}
 
--- | A word that is not a keyword.
 identifier :: P String
-identifier = next (\t -> if tKind t == TWord && not (Set.member (tText t) reservedNames) then Just (T.unpack (tText t)) else Nothing) <?> "identifier"
+identifier = next (\t -> case tValue' t of Word _ s False -> Just s; _ -> Nothing) <?> "identifier"
 {-# INLINE identifier #-}
 
 -- | Any word, keyword or not.
 anyWord :: P String
-anyWord = next (\t -> if tKind t == TWord then Just (T.unpack (tText t)) else Nothing) <?> "identifier"
+anyWord = next (\t -> case tValue' t of Word _ s _ -> Just s; _ -> Nothing) <?> "identifier"
 
 -- | The operator or punctuation @s@.
 sym :: Text -> P ()
@@ -350,23 +364,48 @@ sym s = next (\t -> if (tKind t == TOp || tKind t == TPunct) && tText t == s the
 {-# INLINE sym #-}
 
 quoted :: Text -> Text
-quoted s = T.concat ["\"", s, "\""]
+quoted s = "\"" <> s <> "\""
 
 parens, braces, brackets :: P a -> P a
-parens = between (sym "(") (sym ")")
-braces = between (sym "{") (sym "}")
-brackets = between (sym "[") (sym "]")
+parens p = sym "(" *> p <* sym ")"
+braces p = sym "{" *> p <* sym "}"
+brackets p = sym "[" *> p <* sym "]"
+{-# INLINE parens #-}
+{-# INLINE braces #-}
+{-# INLINE brackets #-}
 
 semi, comma :: P ()
 semi = sym ";"
 comma = sym ","
 
+-- | Comma-separated @p@: none when the list's closing bracket is next.
 commaSep, commaSep1 :: P a -> P [a]
-commaSep p = sepBy p comma
-commaSep1 p = sepBy1 p comma
+commaSep p = do
+  t <- peek
+  if tKind t == TPunct && (tText t == ")" || tText t == "]" || tText t == "}") then pure [] else commaSep1 p
+commaSep1 p = sepBy1Sym p ","
+{-# INLINE commaSep #-}
+{-# INLINE commaSep1 #-}
 
+-- | A number, after the optional @-@ or @+@ that parsec's @integer@ accepts.
 integer :: P Integer
-integer = next (\t -> if tKind t == TNumber then Just (tValue t) else Nothing) <?> "number"
+integer = negated <$> negative <*> natural
+
+-- | Whether a @-@ precedes the number; a @+@ is accepted and skipped.
+negative :: P Bool
+negative = do
+  t <- peek
+  if
+    | isSym "-" t -> True <$ skip
+    | isSym "+" t -> False <$ skip
+    | otherwise -> pure False
+
+-- | Negate a number written with a @-@.
+negated :: Num a => Bool -> a -> a
+negated neg = if neg then negate else id
+
+natural :: P Integer
+natural = next (\t -> case tValue' t of Number n -> Just n; _ -> Nothing) <?> "number"
 
 stringLiteral :: P String
-stringLiteral = next (\t -> if tKind t == TString then Just (tStr t) else Nothing) <?> "string"
+stringLiteral = next (\t -> case tValue' t of Str s | tKind t == TString -> Just s; _ -> Nothing) <?> "string"

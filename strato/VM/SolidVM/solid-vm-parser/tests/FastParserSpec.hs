@@ -319,7 +319,7 @@ spec = do
         ecases =
           [ ("contract C { uint x = ; }", "\"f.sol\" (line 1, column 23): unexpected \";\" expecting expression"),
             ("contract C { function f() public { x = 1 } }", "\"f.sol\" (line 1, column 42): unexpected \"}\" expecting \";\""),
-            ("contract C { function f() public { if (x) } }", "\"f.sol\" (line 1, column 43): unexpected \"}\" expecting \"{\" or statement"),
+            ("contract C { function f() public { if (x) } }", "\"f.sol\" (line 1, column 43): unexpected \"}\" expecting statement"),
             ("contract C { mapping(uint => ) m; }", "\"f.sol\" (line 1, column 30): unexpected \")\" expecting type"),
             ("contract C { function f() public { x.; } }", "\"f.sol\" (line 1, column 38): unexpected \";\" expecting identifier"),
             ("contract C {\n\tfunction f() public {\n\t\treturn 1 +;\n\t}\n}", "\"f.sol\" (line 3, column 27): unexpected \";\" expecting expression"),

@@ -14,7 +14,6 @@ where
 
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Vector as V
 import SolidVM.Model.CodeCollection.Statement (Expression)
 import SolidVM.Model.SolidString (SolidString)
 import qualified SolidVM.Model.Type as SVMType
@@ -25,6 +24,7 @@ import SolidVM.Solidity.Parse.Fast.Lexer
 import SolidVM.Solidity.Parse.Fast.Monad
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Fast.Types
+import Data.Maybe (fromMaybe)
 import Text.Parsec.Error (Message (..), ParseError, addErrorMessage, newErrorMessage)
 import Text.Parsec.Pos (newPos)
 
@@ -43,7 +43,7 @@ parseArg = runRule (literal <* eof)
 -- | @name(type, ...)@ naming an external call's target; the name defaults to
 -- @fallback@.
 parseExternalCallArgs :: ParserState -> String -> Text -> Either ParseError (SolidString, [SVMType.Type])
-parseExternalCallArgs = runRule ((,) <$> option "fallback" identifier <*> parens (commaSep simpleType))
+parseExternalCallArgs = runRule ((,) <$> (fromMaybe "fallback" <$> optionalIdentifier) <*> parens (commaSep simpleType))
 
 -- | Runs a rule over the tokens of a text. On failure the error is at the
 -- furthest token any rule failed at: what stood there, what could have, or
@@ -52,7 +52,7 @@ runRule :: P a -> ParserState -> String -> Text -> Either ParseError a
 runRule rule st name src = case runP rule (St toks src name st) of
   Right (a, _) -> Right a
   Left (i, err) ->
-    let t = toks V.! i
+    let t = tokenAt toks i
         pos = newPos name (tLine t) (tCol t)
         unexpected = case tKind t of
           TEOF -> SysUnExpect ""

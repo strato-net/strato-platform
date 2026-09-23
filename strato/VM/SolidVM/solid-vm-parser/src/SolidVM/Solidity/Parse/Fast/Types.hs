@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -6,6 +7,7 @@
 module SolidVM.Solidity.Parse.Fast.Types
   ( simpleTypeExpression,
     simpleType,
+    builtin,
   )
 where
 
@@ -26,8 +28,9 @@ simpleTypeExpression = simpleTypeExpression' <?> "type"
 
 simpleTypeExpression' :: P SVMType.Type
 simpleTypeExpression' = do
-  base <- simpleType <|> mappingType
-  sizes <- many (brackets (optionMaybe intExpr))
+  t <- peek
+  base <- if isWord "mapping" t then mappingType else simpleType
+  sizes <- manyWhile (isSym "[") (sym "[" *> optionalIf (not . isSym "]") intExpr <* sym "]")
   pure (foldl SVMType.Array base sizes)
 
 -- | A builtin type or a user-defined name (@Name@ or @Contract.Name@).
@@ -36,29 +39,40 @@ simpleType = do
   t <- peek
   case builtin (tText t) of
     Just ty | tKind t == TWord -> do
-      _ <- anyWord
+      skip
       if ty == SVMType.Address False
-        then option ty (SVMType.Address True <$ reserved "payable")
+        then do
+          payable <- optionalWord "payable"
+          pure (if payable then SVMType.Address True else ty)
         else pure ty
     _ -> userType
 
+-- | Dispatches on the first letter, so most identifiers are rejected at once.
 builtin :: Text -> Maybe SVMType.Type
-builtin w = case w of
-  "bool" -> Just SVMType.Bool
-  "address" -> Just (SVMType.Address False)
-  "string" -> Just (SVMType.String (Just True))
-  "byte" -> Just (SVMType.Bytes Nothing (Just 1))
-  "bytes" -> Just (SVMType.Bytes (Just True) Nothing)
-  "decimal" -> Just SVMType.Decimal
-  "variadic" -> Just SVMType.Variadic
-  "uint" -> Just (SVMType.Int (Just False) Nothing)
-  "int" -> Just (SVMType.Int (Just True) Nothing)
-  _
-    | Just n <- sized "uint", n `elem` [8, 16 .. 256] -> Just (SVMType.Int (Just False) (Just (n `quot` 8)))
-    | Just n <- sized "int", n `elem` [8, 16 .. 256] -> Just (SVMType.Int (Just True) (Just (n `quot` 8)))
-    | Just n <- sized "bytes", n >= 1 && n <= 32 -> Just (SVMType.Bytes Nothing (Just n))
-    | otherwise -> Nothing
+builtin w
+  | T.null w = Nothing
+  | otherwise = case T.head w of
+    'b' -> case w of
+      "bool" -> Just SVMType.Bool
+      "byte" -> Just (SVMType.Bytes Nothing (Just 1))
+      "bytes" -> Just (SVMType.Bytes (Just True) Nothing)
+      _ | Just n <- sized "bytes", n >= 1 && n <= 32 -> Just (SVMType.Bytes Nothing (Just n))
+      _ -> Nothing
+    'a' | w == "address" -> Just (SVMType.Address False)
+    's' | w == "string" -> Just (SVMType.String (Just True))
+    'd' | w == "decimal" -> Just SVMType.Decimal
+    'v' | w == "variadic" -> Just SVMType.Variadic
+    'u' -> case w of
+      "uint" -> Just (SVMType.Int (Just False) Nothing)
+      _ | Just n <- sized "uint", bits n -> Just (SVMType.Int (Just False) (Just (n `quot` 8)))
+      _ -> Nothing
+    'i' -> case w of
+      "int" -> Just (SVMType.Int (Just True) Nothing)
+      _ | Just n <- sized "int", bits n -> Just (SVMType.Int (Just True) (Just (n `quot` 8)))
+      _ -> Nothing
+    _ -> Nothing
   where
+    bits n = n >= 8 && n <= 256 && n `rem` 8 == 0
     sized :: Text -> Maybe Int32
     sized base = do
       digits <- T.stripPrefix base w
@@ -69,7 +83,7 @@ builtin w = case w of
 userType :: P SVMType.Type
 userType = do
   name <- identifier
-  member <- optionMaybe (sym "." *> identifier)
+  member <- afterSym "." identifier
   case member of
     Just m -> pure (SVMType.UnknownLabel (name ++ "." ++ m))
     Nothing -> do
@@ -83,23 +97,55 @@ mappingType = do
   reserved "mapping"
   parens $ do
     dom <- simpleTypeExpression
-    keyName <- optionMaybe identifier
+    keyName <- optionalIdentifier
     sym "=>"
     cod <- simpleTypeExpression
-    valName <- optionMaybe identifier
+    valName <- optionalIdentifier
     pure (SVMType.Mapping (Just True) dom cod keyName valName)
 
 -- | An array dimension: @+ - * / % **@ and parentheses over number literals.
+-- Division by zero and a negative exponent are rejected here rather than
+-- left in the tree.
 intExpr :: P Word
 intExpr = fromInteger <$> sums
   where
-    sums = chainl1 products (((+) <$ sym "+") <|> ((-) <$ sym "-"))
-    products = chainl1 powers (((*) <$ sym "*") <|> (div <$ sym "/") <|> (mod <$ sym "%"))
+    sums = products >>= more
+      where
+        more x = do
+          t <- peek
+          if
+            | isSym "+" t -> skip *> products >>= more . (x +)
+            | isSym "-" t -> skip *> products >>= more . (x -)
+            | otherwise -> pure x
+    products = powers >>= more
+      where
+        more x = do
+          t <- peek
+          if
+            | isSym "*" t -> skip *> powers >>= more . (x *)
+            | isSym "/" t -> skip *> (powers >>= nonZero) >>= more . div x
+            | isSym "%" t -> skip *> (powers >>= nonZero) >>= more . mod x
+            | otherwise -> pure x
+        nonZero 0 = failWith "division by zero in an array size"
+        nonZero y = pure y
     powers = do
       x <- signed
-      (sym "**" >> (x ^) <$> powers) <|> pure x
-    signed = (sym "-" >> negate <$> atom) <|> (sym "+" >> atom) <|> atom
-    atom = parens sums <|> integer
+      t <- peek
+      if isSym "**" t
+        then do
+          skip
+          y <- powers
+          if y < 0 then failWith "negative exponent in an array size" else pure (x ^ y)
+        else pure x
+    signed = do
+      t <- peek
+      if
+        | isSym "-" t -> skip *> (negate <$> atom)
+        | isSym "+" t -> skip *> atom
+        | otherwise -> atom
+    atom = do
+      t <- peek
+      if isSym "(" t then parens sums else integer
 
 userTypeHelper' :: Maybe String -> SVMType.Type
 userTypeHelper' (Just "bool") = SVMType.Bool

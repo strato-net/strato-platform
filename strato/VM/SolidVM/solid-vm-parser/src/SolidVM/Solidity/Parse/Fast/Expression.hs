@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -111,66 +112,63 @@ solidityTable, legacyTable :: Table
 solidityTable = mkTable solidityLevels
 legacyTable = mkTable legacyLevels
 
--- | The operator or keyword operator at the current position, if any.
-peekOp :: P (Maybe Text)
-peekOp = do
-  t <- peek
-  pure $ case tKind t of
-    TOp -> Just (tText t)
-    TWord | tText t == "delete" -> Just (tText t)
-    _ -> Nothing
-
 -- | Precedence climbing: an operand, then operators of decreasing binding
--- power, each read once.
+-- power, each read once. The token after an operand is passed along with it,
+-- since the rule that read the operand has already looked at it.
 climb :: Table -> P Expression
 climb tbl = do
-  (x, op) <- unary
-  fst <$> binaries tbl (tblTop tbl) x op
+  (x, t) <- unary
+  fst <$> binaries tbl (tblTop tbl) x t
 
--- | An operand with its calls, postfix and prefix operators, and the
--- operator following it. NOINLINE: inlined into each other, 'unary' and
--- 'binaries' compile to code five times slower.
+-- | An operand with its calls, postfix and prefix operators, and the token
+-- following it. NOINLINE: inlined into each other, 'unary' and 'binaries'
+-- compile to code five times slower.
 {-# NOINLINE unary #-}
-unary :: P (Expression, Maybe Text)
+unary :: P (Expression, Token)
 unary = do
-  op <- peekOp
-  pre <- case op of
-    Just o | o `elem` prefixOps -> Just <$> withPosition (o <$ next (const (Just ())))
-    _ -> pure Nothing
+  t <- peek
+  pre <-
+    if (tKind t == TOp || isWord "delete" t) && tText t `elem` prefixOps
+      then let !o = tStr t in Just <$> withPosition (o <$ skip)
+      else pure Nothing
   x0 <- operand
-  x1 <- maybe x0 ($ x0) <$> optionMaybe callChain
-  op1 <- peekOp
-  (x2, op2) <- postfix "++" PlusPlus x1 op1
-  (x3, op3) <- postfix "--" MinusMinus x2 op2
-  pure (maybe x3 (\(a, o) -> Unitary a (T.unpack o) x3) pre, op3)
+  x1 <- callChain x0
+  t1 <- peek
+  (x2, t2) <- postfix "++" PlusPlus x1 t1
+  (x3, t3) <- postfix "--" MinusMinus x2 t2
+  let !x4 = maybe x3 (\(a, o) -> Unitary a o x3) pre
+  pure (x4, t3)
   where
-    postfix o k x op
-      | op == Just o = do
-          a <- position (sym o)
-          (,) (k a x) <$> peekOp
-      | otherwise = pure (x, op)
+    postfix o k x t
+      | isSym o t = do
+          a <- position skip
+          (,) (k a x) <$> peek
+      | otherwise = pure (x, t)
 
 -- | Applies the operators of level at most @bound@ following @x@.
 {-# NOINLINE binaries #-}
-binaries :: Table -> Int -> Expression -> Maybe Text -> P (Expression, Maybe Text)
+binaries :: Table -> Int -> Expression -> Token -> P (Expression, Token)
 binaries tbl bound = go
   where
-    go x (Just o)
-      | o == "?",
+    go x t
+      | tKind t == TOp,
+        tText t == "?",
         tblTern tbl <= bound = do
           f <- ternary
-          peekOp >>= go (f x)
-      | Just (lvl, rassoc) <- Map.lookup o (tblOps tbl),
+          peek >>= go (f x)
+      | tKind t == TOp,
+        Just (lvl, rassoc) <- Map.lookup (tText t) (tblOps tbl),
         lvl <= bound = do
-          a <- position (sym o)
-          (y0, op0) <- unary
-          (y, op) <- binaries tbl (if rassoc then lvl else lvl - 1) y0 op0
-          go (Binary a (T.unpack o) x y) op
-    go x op = pure (x, op)
+          a <- position skip
+          (y0, t0) <- unary
+          (y, t') <- binaries tbl (if rassoc then lvl else lvl - 1) y0 t0
+          let !o = tStr t
+          go (Binary a o x y) t'
+      | otherwise = pure (x, t)
 
 ternary :: P (Expression -> Expression)
 ternary = do
-  ~(a, (e1, e2)) <- withPosition $ do
+  (a, (e1, e2)) <- withPosition $ do
     sym "?"
     e1 <- expression
     sym ":"
@@ -184,50 +182,49 @@ ternary = do
 operand :: P Expression
 operand = primaryExpression <?> "expression"
 
--- | Calls, member accesses and indexings following an operand; dispatched
--- on the next token rather than tried in turn.
-callChain :: P (Expression -> Expression)
-callChain = chainl1 call (pure (flip (.)))
-  where
-    call = do
-      t <- peek
-      case tText t of
-        "(" -> functionCall
-        "." -> memberAccess
-        "[" -> arrayIndex
-        _ -> empty
+-- | The calls, member accesses and indexings following an operand, each
+-- chosen by the token that starts it.
+callChain :: Expression -> P Expression
+callChain x = do
+  t <- peek
+  case tText t of
+    "(" -> functionCall x >>= callChain
+    "." -> memberAccess x >>= callChain
+    "[" -> arrayIndex x >>= callChain
+    _ -> pure x
 
-functionCall :: P (Expression -> Expression)
-functionCall = do
-  ~(a, args) <- withPosition . parens $ do
+functionCall :: Expression -> P Expression
+functionCall f = do
+  (a, args) <- withPosition . parens $ do
     t <- peek
-    if tText t == "{" then namedArgs else commaSep expression
-  pure (flip (FunctionCall a) args)
+    if isSym "{" t then namedArgs else commaSep expression
+  pure (FunctionCall a f args)
 
 -- | @{name: value, ...}@; the names are dropped.
 namedArgs :: P [Expression]
 namedArgs = braces $ commaSep (identifier *> sym ":" *> expression)
 
-memberAccess :: P (Expression -> Expression)
-memberAccess = do
-  ~(a, name) <- withPosition (sym "." *> anyWord)
-  pure (flip (MemberAccess a) (stringToLabel name))
+memberAccess :: Expression -> P Expression
+memberAccess x = do
+  (a, name) <- withPosition (sym "." *> anyWord)
+  pure (MemberAccess a x (stringToLabel name))
 
-arrayIndex :: P (Expression -> Expression)
-arrayIndex = do
-  ~(a, idxs) <- withPosition (many1 (brackets (optionMaybe expression)))
-  pure (\x -> foldl' (IndexAccess a) x idxs)
+-- | @x[i][j]@: one annotation for the whole group.
+arrayIndex :: Expression -> P Expression
+arrayIndex x = do
+  (a, idxs) <- withPosition (many1While (isSym "[") (sym "[" *> optionalIf (not . isSym "]") expression <* sym "]"))
+  pure (foldl' (IndexAccess a) x idxs)
 
 tuple :: P Expression
 tuple = do
-  ~(a, exps) <- withPosition (parens (commaSep1 (optionMaybe expression)))
+  (a, exps) <- withPosition (parens (commaSep1 (optionalIf (\t -> not (isSym "," t || isSym ")" t)) expression)))
   pure $ case exps of
     [Just e] -> e
     _ -> TupleExpression a exps
 
 array :: P Expression
 array = do
-  ~(a, exps) <- withPosition (brackets (commaSep expression))
+  (a, exps) <- withPosition (brackets (commaSep expression))
   pure (ArrayExpression a exps)
 
 -- | Keywords that are also expressions: builtin objects and type conversions.
@@ -246,8 +243,8 @@ primaryExpression = do
         t1 <- peekAt 1
         if tKind t1 == TString then hexLiteral else variable
       _ -> variable
-    TDecimal -> decimalLiteral
-    TNumber -> numberLiteral
+    TDecimal -> numberLiteral
+    TNumber -> expressionNumber
     TString -> uncurry StringLiteral <$> withPosition stringLiteral
     TOp | tText t == "<" -> uncurry AddressLiteral <$> withPosition accountLiteral
     TPunct | tText t == "(" -> tuple
@@ -257,10 +254,9 @@ primaryExpression = do
 variable :: P Expression
 variable = uncurry Variable <$> withPosition (stringToLabel <$> name)
   where
-    name = next $ \t ->
-      if tKind t == TWord && (Set.member (tText t) keywordVariables || not (Set.member (tText t) reservedNames))
-        then Just (T.unpack (tText t))
-        else Nothing
+    name = next $ \t -> case tValue' t of
+      Word w s keyword | not keyword || Set.member w keywordVariables -> Just s
+      _ -> Nothing
 
 boolLiteral :: Bool -> P Expression
 boolLiteral b = uncurry BoolLiteral <$> withPosition (b <$ anyWord)
@@ -270,25 +266,36 @@ newExpression = do
   (a, (t, salt)) <- withPosition $ do
     reserved "new"
     t <- simpleTypeExpression
-    salt <- optionMaybe (braces (reserved "salt" *> sym ":" *> expression))
+    salt <- afterSym "{" (reserved "salt" *> sym ":" *> expression <* sym "}")
     pure (t, salt)
   pure (NewExpression a t salt)
 
-decimalLiteral :: P Expression
-decimalLiteral = do
-  ~(a, d) <- withPosition $ next $ \t -> if tKind t == TDecimal then Just (decimalOf t) else Nothing
-  pure (DecimalLiteral a (WrappedDecimal d))
+-- | A number in an expression, the one place an exponent is accepted: @1e3@.
+expressionNumber :: P Expression
+expressionNumber = do
+  (a, (n, u)) <- withPosition ((,) <$> number <*> optionalNext numberUnit)
+  pure (NumberLiteral a n u)
+  where
+    number = next (\t -> case tValue' t of Number n -> Just n; Scientific n -> Just n; _ -> Nothing)
 
-decimalOf :: Token -> Decimal
-decimalOf t = read (show (tValue t) ++ "." ++ tStr t)
-
+-- | A number, with an optional unit, or a decimal, after the optional sign
+-- parsec's @integer@ accepts.
 numberLiteral :: P Expression
 numberLiteral = do
-  ~(a, (val, unit)) <- withPosition ((,) <$> integer <*> optionMaybe numberUnit)
-  pure (NumberLiteral a val unit)
+  (a, e) <- withPosition $ do
+    neg <- negative
+    t <- peek
+    case tKind t of
+      TDecimal -> DecimalLiteral () (WrappedDecimal (decimalOf neg t)) <$ skip
+      _ -> (\n u -> NumberLiteral () (negated neg n) u) <$> natural <*> optionalNext numberUnit
+  pure (a <$ e)
 
-numberUnit :: P NumberUnit
-numberUnit = next $ \t -> case tText t of
+-- | The decimal of a 'TDecimal' token, negated when written with a @-@.
+decimalOf :: Bool -> Token -> Decimal
+decimalOf neg t = negated neg (read (show (tValue t) ++ "." ++ tStr t))
+
+numberUnit :: Token -> Maybe NumberUnit
+numberUnit t = case tText t of
   "wei" | tKind t == TWord -> Just Wei
   "szabo" | tKind t == TWord -> Just Szabo
   "finney" | tKind t == TWord -> Just Finney
@@ -298,11 +305,11 @@ numberUnit = next $ \t -> case tText t of
 -- | @hex"00ff"@: an even number of hex digits between quotes.
 hexLiteral :: P Expression
 hexLiteral = do
-  ~(a, digits) <- withPosition $ do
+  (a, digits) <- withPosition $ do
     reserved "hex"
     digits <- T.unpack . T.init . T.tail . tText <$> peek
     hexDigits digits
-    digits <$ next (const (Just ()))
+    digits <$ skip
   pure (HexaLiteral a digits)
 
 hexDigits :: String -> P ()
@@ -340,9 +347,10 @@ literal' = do
   t <- peek
   case tKind t of
     TNumber -> numberLiteral
-    TDecimal -> decimalLiteral
+    TDecimal -> numberLiteral
+    TOp | tText t == "-" || tText t == "+" -> numberLiteral
     TString -> do
-      ~(a, s) <- withPosition stringLiteral
+      (a, s) <- withPosition stringLiteral
       pure $ maybe (StringLiteral a s) (AddressLiteral a) (readMaybe s)
     TWord -> case tText t of
       "true" -> boolLiteral True
@@ -360,43 +368,77 @@ castNames = Set.fromList ["string", "address", "uint", "int", "bool", "decimal",
 
 castLiteral :: P Expression
 castLiteral = do
-  ~(a, e) <- withPosition $ do
+  (a, e) <- withPosition $ do
     name <- anyWord
     parens $ case name of
       "string" -> StringLiteral () <$> stringLiteral
       "address" -> AddressLiteral () <$> addressContent
       "uint" -> number
       "int" -> number
-      "bool" -> BoolLiteral () <$> ((True <$ reserved "true") <|> (False <$ reserved "false"))
+      "bool" -> BoolLiteral () <$> (next boolOf <?> "true or false")
       "decimal" -> DecimalLiteral () . WrappedDecimal <$> decimalContent
       "bytes" -> HexaLiteral () <$> bytesContent
       _ -> empty
   pure (a <$ e)
   where
-    number = do
-      negative <- option False (True <$ sym "-")
-      n <- integer
-      pure (NumberLiteral () (if negative then negate n else n) Nothing)
-    -- a string, or the text of a number token: hex digits, with or without 0x
+    number = (\n -> NumberLiteral () n Nothing) <$> integer
+    boolOf t = case tText t of
+      "true" | tKind t == TWord -> Just True
+      "false" | tKind t == TWord -> Just False
+      _ -> Nothing
+    -- a string, or hex digits with or without 0x, read from the source since
+    -- they need not form one token
     addressContent = do
-      s <- stringLiteral <|> next (\t -> if tKind t == TNumber then Just (T.unpack (stripHex (tText t))) else Nothing)
-      maybe (failWith (show s ++ " is not an address")) pure (readMaybe s)
-    stripHex s = fromMaybe s (T.stripPrefix "0x" s)
-    decimalContent =
-      next (\t -> if tKind t == TDecimal then Just (decimalOf t) else Nothing)
-        <|> (stringLiteral >>= \s -> maybe (failWith (show s ++ " is not a decimal")) pure (readMaybe s))
-        <|> (fromInteger <$> integer)
+      t <- peek
+      if tKind t == TString
+        then stringLiteral >>= address
+        else do
+          Text arr off len <- source
+          let raw = Text arr (tByte t) (off + len - tByte t)
+              body = fromMaybe raw (T.stripPrefix "0x" raw)
+              digits = T.takeWhile isHexDigit body
+          if T.null digits
+            then empty <?> "address"
+            else do
+              skipToByte (tByte t + lengthWord8 raw - lengthWord8 body + lengthWord8 digits)
+              address (T.unpack digits)
+    address s = maybe (failWith (show s ++ " is not an address")) pure (readMaybe s)
+    decimalContent = do
+      t <- peek
+      case tKind t of
+        TString -> do
+          s <- stringLiteral
+          maybe (failWith (show s ++ " is not a decimal")) pure (readMaybe s)
+        _ -> do
+          neg <- negative
+          t' <- peek
+          case tKind t' of
+            TDecimal -> decimalOf neg t' <$ skip
+            TNumber -> fromInteger . negated neg <$> natural
+            _ -> empty <?> "decimal"
     bytesContent = do
       s <- stringLiteral
       hexDigits s
       pure s
 
--- | @{key: literal, ...}@; a key is a word or a string.
+-- | @{key: literal, ...}@; a key is the source text up to the colon, kept as
+-- parsec shows it: escaped, with its trailing spaces.
 objectLiteral :: P Expression
 objectLiteral = do
-  ~(a, kvs) <- withPosition $ braces $ commaSep $ do
-    k <- anyWord <|> stringLiteral
+  (a, kvs) <- withPosition $ braces $ commaSep $ do
+    k <- rawKey
     sym ":"
     v <- literal
     pure (stringToLabel k, v)
   pure (ObjectLiteral a (Map.fromList kvs))
+  where
+    rawKey = do
+      t <- peek
+      Text arr off len <- source
+      let raw = Text arr (tByte t) (off + len - tByte t)
+          key = T.takeWhile (/= ':') raw
+      if T.null key || lengthWord8 key == lengthWord8 raw
+        then empty <?> "key"
+        else do
+          skipToByte (tByte t + lengthWord8 key)
+          pure (init (drop 1 (show (T.unpack key))))
