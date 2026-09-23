@@ -380,6 +380,46 @@ contract Describe_TokenRouter is Authorizable {
         require(amountOut > 0, "No reverse-pair V2 output");
     }
 
+    function it_routes_registered_v2_pool_missing_from_pair_mapping_and_rejects_wrong_index() {
+        _createStablePool();
+        _createV2Pool();
+        poolFactory.clearPair(address(tokenA), address(tokenB));
+        poolFactory.clearPair(address(tokenB), address(tokenA));
+
+        RouteStep[] steps = new RouteStep[](1);
+        steps[0] = _swapStep(
+            RouteAction.SWAP_V2,
+            address(v2Pool),
+            address(tokenA),
+            address(tokenB),
+            0,
+            0,
+            true
+        );
+        Token(address(tokenA)).approve(address(router), 100e18);
+        uint256 beforeBalance = tokenA.balanceOf(address(this));
+        bool reverted = false;
+        try router.executeRoute(address(tokenA), address(tokenB), 100e18, address(this), steps, block.timestamp + 300, 1) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Wrong factory index must reject the pool");
+        require(tokenA.balanceOf(address(this)) == beforeBalance, "Rejected route must preserve input");
+
+        RouteStep registeredStep;
+        registeredStep.action = RouteAction.SWAP_V2;
+        registeredStep.target = address(v2Pool);
+        registeredStep.tokenIn = address(tokenA);
+        registeredStep.tokenOut = address(tokenB);
+        registeredStep.minAmountOut = 1;
+        registeredStep.direction = true;
+        registeredStep.factoryPoolIndex = 1;
+        RouteStep[] registeredSteps = new RouteStep[](1);
+        registeredSteps[0] = registeredStep;
+        uint256 amountOut = router.executeRoute(address(tokenA), address(tokenB), 100e18, address(this), registeredSteps, block.timestamp + 300, 1);
+        require(amountOut > 0, "Registered V2 pool must remain routable");
+    }
+
     function it_uses_caller_action_ordinals_when_step_enum_is_empty() {
         _createV2Pool();
         RouteStepData[] steps = new RouteStepData[](1);

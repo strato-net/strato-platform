@@ -329,3 +329,22 @@ Reviewed deposits quote from the STRATO amount already recorded by EAB; unrecord
 Configure a positive DepositRouter token minimum before enabling rebasing routes. Choose a minimum that produces at least one STRATO base unit at the largest supported rebase factor; merely setting the minimum to one external base unit may still round to zero. The rollout generator rejects zero minima for rebasing routes. No existing on-chain token limits are changed by this check.
 
 EAB `DepositCompleted` now includes `depositRouter` and `depositId`; update any consumers using positional event schemas when upgrading. EAB route outcomes use `AutoRouted`, `DepositActionFallback`, and `DepositActionFailed`; per-step outcomes use TokenRouter's `RouteStepExecuted`. `CANCELLED` remains a reserved status number for compatibility; recorded cancellations leave withdrawals READY until the attested refund completes. Deterministic AUTO_ROUTE failures may still settle through the operator's source-token fallback path.
+
+
+### Native deposit routing rollout
+
+Native representations can be redeemed and traded in one flow. `requestRedemptionWithRoute` burns the representation and emits one `RedemptionRequestedWithRoute` event binding the recipient, output token, and minimum output. Plain `requestRedemption` remains supported. Both share the same redemption ID counter.
+
+The bridge service verifies every intent field against the external receipt, then requests fresh steps from the backend's existing TokenRouter quote service. Route selection may change; the committed output token and minimum cannot. STRATO unlocks the source asset from custody and executes the route. Routing failures roll back all route effects and transfer the original source asset to the recipient, emitting `DepositActionFailed` and `DepositActionFallback`. Custody failures revert settlement. The minimum output protects successful trades only, not the source-token fallback. A transport failure fetching the quote is retried rather than treated as a fallback.
+
+Upgrade order:
+
+1. Upgrade `StratoNativeBridge` on STRATO; configure `setTokenRouter(newTokenRouter)` with the same router used by the backend. Auto-routing defaults to disabled for every STRATO-token/external-chain pair. Explicitly opt in each intended route with owner-only `setAutoRouteEnabled(stratoToken, externalChainId, true)`. `configure-native-route.js --token-router <address> --auto-route-enabled true` supports this configuration alongside a native route; omitting `--auto-route-enabled` preserves its existing permission.
+2. Deploy this bridge service **before** enabling routed external redemptions. It must poll both native redemption event signatures. Keep the existing native block cursor; if routed events were already emitted while an old service was running, replay from before the first such event.
+3. Configure `STRATO_NATIVE_BRIDGE` in the rewards poller and deploy it. Router-attributed rewards fail closed until both bridge addresses are valid; native bridge callers are excluded just like EAB callers. Native rewards still require their intended on-chain activity configuration.
+4. Upgrade each external `StratoNativeRepresentationBridge` proxy to version **1.2.0**. No new external storage is added.
+5. Deploy backend and UI together. Native composite quotes require external bridge version 1.2+, matching STRATO `tokenRouter` wiring, and `autoRouteEnabled[stratoToken][externalChainId] == true`. Native inputs then use the same internal route graph as STRATO trades; direct native redemptions bypass routing and do not require auto-route permission.
+
+Disabling auto-routing blocks new routed quotes and is checked again during on-chain execution. Already-sent routed redemptions remain recordable and settle through the source-token fallback when permission is disabled, including if disabled after recording. This follows EAB behavior and avoids stranding externally burned representations. The toggle does not change withdrawal permissions.
+
+Do not enable routed redemptions until steps 1–3 are complete. No deployment or governance action is performed by the source changes themselves.

@@ -106,7 +106,7 @@ export const getTokenMetadata = async (accessToken: string, tokenAddresses: stri
   const saveUsdstVault = constants.saveUsdstVault?.toLowerCase().replace(/^0x/, "");
   const [tokenResponse, saveUsdstResponse] = await Promise.all([
     cirrus.get(accessToken, `/${Token}`, {
-      params: { select: `address,_name,_symbol,status,images:${Token}-images(value)`, address: `in.(${normalizedAddresses.join(",")})` }
+      params: { select: `address,_name,_symbol,status,customDecimals,images:${Token}-images(value)`, address: `in.(${normalizedAddresses.join(",")})` }
     }),
     saveUsdstVault && normalizedAddresses.includes(saveUsdstVault)
       ? cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
@@ -122,7 +122,7 @@ export const getTokenMetadata = async (accessToken: string, tokenAddresses: stri
   const metadata = new Map(
     (tokenResponse.data || []).map((token: any) => [
       token.address.toLowerCase().replace(/^0x/, ""),
-      { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value }
+      { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value, decimals: token.customDecimals ?? 18 }
     ])
   );
 

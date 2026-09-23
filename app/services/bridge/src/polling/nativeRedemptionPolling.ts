@@ -1,4 +1,4 @@
-import { config, getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE } from "../config";
+import { config, getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "../config";
 import { getCurrentBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
 import { getEnabledChains } from "../services/cirrusService";
 import { recordNativeDepositBatch } from "../services/bridgeService";
@@ -6,39 +6,7 @@ import { nativeBlockTrackingService } from "../services/nativeBlockTrackingServi
 import { NativeDepositArgs } from "../types";
 import { logError, logInfo } from "../utils/logger";
 
-const decodeIndexedAddress = (topic: string): string => `0x${topic.slice(26)}`.toLowerCase();
-
-const decodeNativeRedemptionData = (
-  data: string,
-): { amount: string; redemptionId: string } => {
-  if (!data.startsWith("0x") || data.length < 130) {
-    throw new Error(`Invalid log data: ${data}`);
-  }
-
-  return {
-    amount: BigInt(`0x${data.slice(2, 66)}`).toString(),
-    redemptionId: BigInt(`0x${data.slice(66, 130)}`).toString(),
-  };
-};
-
-const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | null => {
-  if (!log.transactionHash || log.topics.length < 4) {
-    return null;
-  }
-
-  const { amount, redemptionId } = decodeNativeRedemptionData(log.data);
-
-  return {
-    externalChainId: chainId,
-    externalBridge: log.address.toLowerCase(),
-    externalRedemptionId: redemptionId,
-    externalSender: decodeIndexedAddress(log.topics[2]),
-    representationToken: decodeIndexedAddress(log.topics[1]),
-    externalTxHash: log.transactionHash,
-    stratoRecipient: decodeIndexedAddress(log.topics[3]),
-    stratoTokenAmount: amount,
-  };
-};
+import { parseNativeDepositLog } from "../utils/nativeRedemption";
 
 const pollChainNativeRedemptions = async (chainId: number) => {
   const nativeRepresentationBridge = getNativeRepresentationBridgeAddress(chainId);
@@ -61,7 +29,7 @@ const pollChainNativeRedemptions = async (chainId: number) => {
     lastProcessedBlock + 1,
     currentBlock,
     nativeRepresentationBridge,
-    NATIVE_REDEMPTION_EVENT_SIGNATURE,
+    [NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE],
   );
 
   const deposits = logs

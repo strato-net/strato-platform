@@ -7,7 +7,7 @@ import {
 import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
@@ -184,7 +184,7 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  const finalizeResult = await execute({
+  await execute({
     contractName: "StratoNativeBridge",
     contractAddress: config.nativeBridge.address!,
     method: "finalizeWithdrawal",
@@ -194,9 +194,6 @@ const syncManualNativeMintProposal = async (
       nativeMintProposalHash: proposalReference,
     },
   });
-  if (finalizeResult.status !== "Success") {
-    return true;
-  }
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
   return true;
 };
@@ -488,11 +485,11 @@ export const recordNativeDepositBatch = async (
   }
 
   try {
-    const result = await execute(
+    await execute(
       depositArgs.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
-        method: "recordDeposit",
+        method: deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n ? "recordDepositWithRoute" : "recordDeposit",
         args: {
           externalChainId: deposit.externalChainId,
           externalBridge: deposit.externalBridge,
@@ -502,15 +499,10 @@ export const recordNativeDepositBatch = async (
           representationToken: deposit.representationToken,
           stratoRecipient: deposit.stratoRecipient,
           stratoTokenAmount: deposit.stratoTokenAmount,
+          ...(deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n ? { actionToken: deposit.actionToken, minFinalOut: deposit.minFinalOut } : {}),
         },
       }))
     );
-
-    if (result.status !== "Success") {
-      throw new Error(
-        `Native deposit record still ${result.status}; will retry`,
-      );
-    }
 
     logInfo(
       "BridgeService",
@@ -544,26 +536,35 @@ export const confirmNativeDepositBatch = async (
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    const result = await execute(
-      deposits.map((deposit) => ({
+    const calls: FunctionInput[] = [];
+    for (const deposit of deposits) {
+      const routed = !!deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n;
+      let steps: Awaited<ReturnType<typeof fetchRouteSteps>> = [];
+      if (routed) {
+        if (!deposit.stratoToken || !deposit.stratoTokenAmount || !deposit.minFinalOut) {
+          throw new Error("Native routed deposit intent is incomplete");
+        }
+        try {
+          steps = await fetchRouteSteps({ tokenIn: deposit.stratoToken, tokenOut: deposit.actionToken!,
+            amountIn: deposit.stratoTokenAmount, minFinalOut: deposit.minFinalOut });
+        } catch (error) {
+          if (isTransportRouteError(error)) throw error;
+          logInfo("BridgeService", `Native deposit ${deposit.depositId} will use source-token fallback: ${(error as Error).message}`);
+        }
+      }
+      calls.push({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
-        method: "confirmDeposit",
+        method: routed ? "confirmDepositWithRoute" : "confirmDeposit",
         args: {
           externalChainId: deposit.externalChainId,
           externalBridge: deposit.externalBridge,
           externalRedemptionId: deposit.externalRedemptionId,
+          ...(routed ? { steps } : {}),
         },
-      }))
-    );
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Native deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} native deposits`,
-      );
-      return;
+      });
     }
+    await execute(calls);
 
     logInfo(
       "BridgeService",
@@ -661,7 +662,7 @@ export const processExternalWithdrawal = async (
     String(withdrawal.bridgeStatus) === "1" ||
     (String(withdrawal.bridgeStatus) === "2" && manualReviewApproved)
   ) {
-    const readyResult = await execute({
+    await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method: "markWithdrawalReady",
@@ -672,11 +673,6 @@ export const processExternalWithdrawal = async (
         signerSetVersion: authorization.signerSetVersion,
       },
     });
-    if (readyResult.status !== "Success") {
-      throw new Error(
-        `Withdrawal ${withdrawal.withdrawalId} remains ${readyResult.status}`,
-      );
-    }
   }
 
   let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
@@ -699,7 +695,7 @@ export const processExternalWithdrawal = async (
             transactionHash: reservationState.reservationTxHash!,
           };
     reservationId = reservation.reservationId;
-    const reservationResult = await execute({
+    await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method: "recordWithdrawalReservation",
@@ -709,11 +705,6 @@ export const processExternalWithdrawal = async (
         reservationTxHash: reservation.transactionHash,
       },
     });
-    if (reservationResult.status !== "Success") {
-      throw new Error(
-        `Withdrawal reservation ${reservationId} remains ${reservationResult.status}`,
-      );
-    }
     if (reservationState.status === 0) {
       reservationState = { ...reservationState, status: 1 };
     }
@@ -734,7 +725,7 @@ export const processExternalWithdrawal = async (
       authorization,
       reservationId,
     );
-    const cancellationResult = await execute({
+    await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
       method: "recordWithdrawalCancellation",
@@ -744,11 +735,6 @@ export const processExternalWithdrawal = async (
         cancellationTxHash,
       },
     });
-    if (cancellationResult.status !== "Success") {
-      throw new Error(
-        `Withdrawal cancellation ${reservationId} remains ${cancellationResult.status}`,
-      );
-    }
     logInfo(
       "BridgeService",
       `Cancelled expired external withdrawal ${withdrawal.withdrawalId}; governance refund is now available`,
@@ -763,7 +749,7 @@ export const processExternalWithdrawal = async (
     reservationId,
     releaseTxHash,
   );
-  const finalizeResult = await executeAsRelayer({
+  await executeAsRelayer({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
     method: "finalizeWithdrawal",
@@ -773,11 +759,6 @@ export const processExternalWithdrawal = async (
       externalTxHash: releaseTxHash,
     },
   });
-  if (finalizeResult.status !== "Success") {
-    throw new Error(
-      `Withdrawal ${withdrawal.withdrawalId} finalization remains ${finalizeResult.status}`,
-    );
-  }
 
   logInfo(
     "BridgeService",
@@ -801,7 +782,7 @@ export const queueExternalWithdrawalReview = async (
     config.externalAssetBridge.address!,
   );
   const proposal = await proposeWithdrawalReview(review);
-  const result = await execute({
+  await execute({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
     method: "recordWithdrawalReview",
@@ -812,11 +793,6 @@ export const queueExternalWithdrawalReview = async (
       proposalHash: proposal.proposalHash,
     },
   });
-  if (result.status !== "Success") {
-    throw new Error(
-      `Withdrawal ${withdrawal.withdrawalId} review remains ${result.status}`,
-    );
-  }
 };
 
 export const processPendingExternalWithdrawalReview = async (
@@ -1102,7 +1078,7 @@ export const finalizeNativeWithdrawalBatch = async (
         externalTxHash,
       );
 
-      const result = await execute({
+      await execute({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
         method: "finalizeWithdrawal",
@@ -1112,14 +1088,6 @@ export const finalizeNativeWithdrawalBatch = async (
           nativeMintProposalHash: "",
         },
       });
-
-      if (result.status !== "Success") {
-        logInfo(
-          "BridgeService",
-          `Native withdrawal ${withdrawal.withdrawalId} destination mint succeeded but STRATO finalize is still ${result.status}`,
-        );
-        continue;
-      }
 
       pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
       successful += 1;

@@ -6,6 +6,11 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { QueryClient, QueryObserver, keepPreviousData } = require('@tanstack/react-query');
 
+const bridgeConstants = {};
+const bridgeConstantsSource = ts.createSourceFile('constants.ts', fs.readFileSync(path.join(__dirname, '../src/lib/bridge/constants.ts'), 'utf8'), ts.ScriptTarget.Latest, true);
+const scopeDeclaration = bridgeConstantsSource.statements.find(node => ts.isVariableStatement(node) && node.declarationList.declarations.some(declaration => declaration.name.getText(bridgeConstantsSource) === 'BRIDGE_SCOPES'));
+runSource(scopeDeclaration.getText(bridgeConstantsSource), { exports: bridgeConstants });
+
 for (const [name, inputs] of [
   ['useRouteQuote', { tokenIn: 'in', tokenOut: 'out', amountWei: '1', slippageBps: 50 }],
   ['useCompositeRouteQuote', { externalChainId: '1', externalToken: 'external',
@@ -118,7 +123,7 @@ test('rechecks quote expiry after the Permit2 signing prompt and before deposit 
       isExternalEvmWalletConnected: true, isAppAuthenticated: true, stratoAddress: address('6') }) };
     if (id === '@/context/BridgeContext') return { useBridgeContext: () => ({ triggerDepositRefresh: () => {} }) };
     if (id === '@/lib/bridge/contractService') return contractService;
-    if (id === '@/lib/bridge/constants') return { resolveViemChain: async () => ({ id: 1 }) };
+    if (id === '@/lib/bridge/constants') return { ...bridgeConstants, resolveViemChain: async () => ({ id: 1 }) };
     if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote: (q, b) => assertAutoRouteQuote(q, b, now) };
     if (id === '@/utils/numberUtils') return { safeParseUnits: () => 100n, ensureHexPrefix: (value) => `0x${value.replace(/^0x/, '')}` };
     throw new Error(`Unexpected import ${id}`);
@@ -165,12 +170,25 @@ runSource(utilsSource.statements.filter(node => ts.isFunctionDeclaration(node) &
   ['normalizeError', 'getFriendlyMessage'].includes(node.name?.text)).map(node => node.getText(utilsSource)).join('\n'),
   { exports: friendlyExports });
 
-function depositHarness({ native = true, approval = false, outcome = 'success', storageUnavailable = false, rejected = false, approvalExpires = false,
+test('STRATO pool registration errors remain actionable for API and wallet failures', () => {
+  const message = 'solidity require failed: TR: unregistered v2 pool';
+  const normalized = friendlyExports.normalizeError({
+    message: 'Request failed with status code 400',
+    response: { status: 400, data: { error: { message } } },
+  });
+  assert.equal(normalized.message, message);
+  assert.match(normalized.userMessage, /selected pool is not recognized/);
+  assert.equal(friendlyExports.getFriendlyMessage(message), normalized.userMessage);
+  const serverError = friendlyExports.normalizeError({ response: { status: 500, data: { error: { message } } } });
+  assert.equal(serverError.userMessage, 'Something went wrong. Please try again later.');
+});
+
+function depositHarness({ native = true, redemption = false, routedRedemption = false, approval = false, outcome = 'success', storageUnavailable = false, rejected = false, approvalExpires = false,
   appAuthenticated = true, code, codeError = false, changeIdentityAt, mutateIdentity } = {}) {
   let now = Date.now();
   let stored = JSON.stringify([{ externalTxHash: 'other', externalChainId: 1 }]);
   const records = () => JSON.parse(stored);
-  const writes = [], toasts = [], pendingStates = [], stages = [];
+  const writes = [], writeParams = [], toasts = [], pendingStates = [], stages = [];
   const codeChecks = [];
   const refs = [];
   let refIndex = 0;
@@ -186,7 +204,7 @@ function depositHarness({ native = true, approval = false, outcome = 'success', 
   let refreshed = 0, cleared = 0;
   const localStorage = {
     getItem: () => { if (storageUnavailable) throw new Error('Storage disabled'); return stored; },
-    setItem: (key, value) => { stored = value; },
+    setItem: (key, value) => { assert.equal(key, bridgeConstants.BRIDGE_SCOPES.trade.pendingDepositsKey); stored = value; },
   };
   const receiptExports = {};
   runSource(receiptFunction.getText(receiptSource), { exports: receiptExports, getClient: async () => ({
@@ -222,18 +240,21 @@ function depositHarness({ native = true, approval = false, outcome = 'success', 
         useWriteContract: () => ({ writeContractAsync: async (params) => {
           if (rejected) throw new Error('User rejected request');
           writes.push(params.functionName);
+          writeParams.push(params);
           return params.functionName === 'approve' ? approvalHash : depositHash;
         } }),
-        useSignTypedData: () => ({ signTypedDataAsync: async () => { stage('signature'); return '0xsignature'; } }),
+        useSignTypedData: () => ({ signTypedDataAsync: async () => { assert.equal(redemption, false); stage('signature'); return '0xsignature'; } }),
       };
       if (id === '@/context/UserContext') return { useUser: () => ({ ...user }) };
       if (id === '@/lib/bridge/contractService') return {
         ...guardExports,
-        validateRouterContract: async () => { stage('validation'); return { isValid: true }; }, checkPermit2Approval: async () => ({ isApproved: !approval }),
+        validateRouterContract: async () => { assert.equal(redemption, false); stage('validation'); return { isValid: true }; }, checkPermit2Approval: async () => ({ isApproved: !approval }),
+        checkTokenApproval: async params => { assert.equal(params.spender, address('8')); return { isApproved: !approval }; },
+        simulateNativeRedemption: async params => { assert.equal(params.bridge, address('8')); assert.equal(params.amount, 100n); stage('simulation'); },
         getPermit2Nonce: () => 1n, getPermit2Domain: () => ({}), getPermit2Types: () => ({}),
         createPermit2Message: (input) => input, simulateDeposit: async () => { stage('simulation'); }, ...receiptExports,
       };
-      if (id === '@/lib/bridge/constants') return { resolveViemChain: async () => ({ id: 1 }) };
+      if (id === '@/lib/bridge/constants') return { ...bridgeConstants, resolveViemChain: async () => ({ id: 1 }) };
       if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote };
       if (id === '@/utils/numberUtils') return { safeParseUnits: () => 100n, ensureHexPrefix: (value) => `0x${value.replace(/^0x/, '')}` };
       throw new Error(`Unexpected import ${id}`);
@@ -246,18 +267,24 @@ function depositHarness({ native = true, approval = false, outcome = 'success', 
   const quote = structuredClone(composite);
   quote.deadline = Math.floor(Date.now() / 1000) + 600;
   if (native) quote.bridge.externalToken = address('0');
+  if (redemption) {
+    if (!routedRedemption) Object.assign(quote, { tokenOut: address('2'), amountOut: '100', minFinalOut: '100' });
+    Object.assign(quote.bridge, { routeType: 'native', externalBridge: address('8'), externalToken: address('1') });
+    if (!routedRedemption) quote.depositAction = { action: 0, actionToken: address('2'), minFinalOut: '100' };
+  }
   const handlerExports = {};
   runSource(`exports.handleTrade = ${tradeHandler}`, {
     exports: handlerExports, ...confirmedTrade(quote), quote, quoteLoading: false, pending: false,
     ...friendlyExports, amountError: '', feeError: '',
-    tokenOut: { _symbol: 'OUT', address: address('3') }, amountWei: '100', externalBalanceError: false,
-    sourceMode: 'external', externalRoute: { externalSymbol: 'USDC', externalToken: quote.bridge.externalToken, stratoToken: address('2'), externalDecimals: '2' },
-    network: { chainId: '1', depositRouter: address('7') }, compositeQuote: { data: quote },
+    tokenOut: { _symbol: 'OUT', address: quote.tokenOut }, amountWei: '100', externalBalanceError: false,
+    sourceMode: 'external', externalRoute: { externalSymbol: 'USDC', externalToken: quote.bridge.externalToken, stratoToken: address('2'), externalDecimals: '2',
+      ...(redemption ? { routeType: 'native', externalBridge: address('8') } : {}) },
+    network: { chainId: '1', depositRouter: redemption ? undefined : address('7') }, compositeQuote: { data: quote },
     autoRouteDeposit: renderHook(), amount: '1', slippageBps: 50, toast: (value) => toasts.push(value),
     onTransactionSubmitted: () => { refreshed++; }, balanceEnabled: false,
     setAmount: (value) => { assert.equal(value, ''); cleared++; },
   });
-  return { handleTrade: handlerExports.handleTrade, records, writes, toasts, pendingStates, stages, codeChecks,
+  return { handleTrade: handlerExports.handleTrade, records, writes, writeParams, toasts, pendingStates, stages, codeChecks,
     refreshed: () => refreshed, cleared: () => cleared };
 }
 
@@ -518,7 +545,7 @@ test('native deposit reserves estimated gas before wallet submission', async () 
 });
 
 for (const alreadyShown of [false, true]) {
-  test(`failed STRATO trade refreshes fee balances and ${alreadyShown ? 'avoids duplicate' : 'shows friendly'} toast`, async () => {
+  test(`failed STRATO trade refreshes fee balances and leaves feedback to progress dialog (toastShown=${alreadyShown})`, async () => {
     let refreshed = 0, tokensRefreshed = 0, earningsRefreshed = 0;
     const toasts = [], exports = {};
     runSource(`exports.handleTrade = ${tradeHandler}`, {
@@ -534,8 +561,7 @@ for (const alreadyShown of [false, true]) {
     assert.equal(refreshed, 1);
     assert.equal(tokensRefreshed, 1);
     assert.equal(earningsRefreshed, 1);
-    assert.equal(toasts.length, alreadyShown ? 0 : 1);
-    if (!alreadyShown) assert.doesNotMatch(toasts[0].description, /backend internals/);
+    assert.equal(toasts.length, 0);
   });
 }
 
@@ -548,7 +574,7 @@ test('route asset dropdown deduplicates prefixed and differently cased bridge to
   visit(widgetSource);
   const exports = {};
   runSource(`exports.assets = ${initializer}`, { exports, useMemo: fn => fn(),
-    bridgeableTokens: [{ routeType: 'standard', depositsEnabled: true, stratoToken: `0x${'AB'.repeat(20)}` }],
+    bridgeableTokens: [{ routeType: 'standard', enabled: true, depositsEnabled: true, stratoToken: `0x${'AB'.repeat(20)}` }],
     routeAssetsQuery: { data: [{ address: 'ab'.repeat(20), _symbol: 'REAL', customDecimals: 6 }] } });
   assert.equal(exports.assets.length, 1);
   assert.equal(exports.assets[0].customDecimals, 6);
@@ -655,6 +681,113 @@ for (const reason of ['no confirmation', 'expired', 'selection changed']) {
   });
 }
 
+test('STRATO execution reports wallet steps and retains terminal results without replaying the trade', async () => {
+  const source = fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useRouteExecute.ts'), 'utf8');
+  for (const outcome of ['wallet success', 'account success', 'pending', 'rejected', 'reverted', 'failure response', 'confirmation unavailable']) {
+    const states = [], exports = {};
+    let finish, calls = 0, invalidations = 0;
+    runSource(source, { exports, require: id => {
+      if (id === 'react') return { useState: () => [null, value => states.push(value)] };
+      if (id === '@/lib/bridge/utils') return friendlyExports;
+      if (id === '@tanstack/react-query') return {
+        useQueryClient: () => ({ invalidateQueries: () => { invalidations++; } }),
+        useMutation: options => ({ isPending: false, mutateAsync: async params => {
+          try { return await options.mutationFn(params); } finally { options.onSettled(); }
+        } }),
+      };
+      if (id === '@/lib/axios') return { api: { post: async (url, params, options) => {
+        calls++;
+        assert.equal(url, '/trade/route');
+        assert.equal(params.minFinalOut, '99');
+        await new Promise(resolve => { finish = resolve; });
+        if (outcome === 'account success') return { data: { status: 'Success', hash: 'account-hash' } };
+        const emit = options.walletTxProgress;
+        emit({ index: 0, total: 2, status: 'signing', functionName: 'approve', hash: 'unsigned-approval' });
+        assert.equal(states.at(-1).transactions[0].submittedHash, undefined);
+        if (outcome === 'rejected') {
+          emit({ index: 0, total: 2, status: 'failed' });
+          throw new Error('User rejected');
+        }
+        emit({ index: 0, total: 2, status: 'submitted', hash: 'approval-hash' });
+        emit({ index: 1, total: 2, status: 'signing', functionName: 'executeRoute' });
+        emit({ index: 1, total: 2, status: 'submitted', hash: 'trade-hash' });
+        emit({ index: 1, total: 2, status: 'confirming', hash: 'trade-hash' });
+        assert.equal(states.at(-1).transactions[1].functionName, 'executeRoute');
+        if (outcome === 'confirmation unavailable') throw new Error('network unavailable');
+        if (outcome === 'failure response') return { data: { status: 'Failure', hash: 'trade-hash' } };
+        if (outcome === 'reverted') {
+          emit({ index: 1, total: 2, status: 'failed', hash: 'trade-hash' });
+          throw new Error('solidity require failed: TR: unregistered v2 pool');
+        }
+        if (outcome === 'wallet success') {
+          emit({ index: 0, total: 2, status: 'completed', hash: 'approval-hash' });
+          emit({ index: 1, total: 2, status: 'completed', hash: 'trade-hash' });
+        }
+        return { data: { status: outcome === 'pending' ? 'Pending' : 'Success', hash: 'approval-hash' } };
+      } } };
+      throw new Error(`Unexpected import ${id}`);
+    } });
+    const hook = exports.useRouteExecute();
+    const promise = hook.mutateAsync({ minFinalOut: '99' });
+    assert.equal(states.at(-1).status, 'pending', 'progress starts before the API responds');
+    finish();
+    if (['rejected', 'reverted', 'failure response', 'confirmation unavailable'].includes(outcome)) await assert.rejects(promise);
+    else await promise;
+    const result = states.at(-1);
+    assert.equal(result.status, outcome.includes('success') ? 'success' : ['pending', 'confirmation unavailable'].includes(outcome) ? 'unconfirmed' : 'error');
+    if (outcome === 'wallet success') assert.equal(result.hash, 'trade-hash');
+    if (outcome === 'rejected') assert.match(result.message, /cancelled/);
+    if (outcome === 'reverted') {
+      assert.match(result.message, /pool is not recognized/);
+      assert.equal(result.transactions[1].submittedHash, 'trade-hash');
+    }
+    if (result.status === 'unconfirmed') assert.match(result.message, /Do not resubmit/);
+    assert.equal(invalidations, 1);
+    assert.equal(calls, 1);
+    hook.closeProgress();
+    assert.equal(states.at(-1), null, 'only closing clears the terminal result');
+  }
+});
+
+test('STRATO progress dialog displays steps and blocks dismissal until execution finishes', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const components = {};
+  let openChange, closed = 0;
+  const wrapper = ({ children }) => React.createElement('div', null, children);
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteProgressDialog.tsx'), 'utf8'), {
+    exports: components, require: id => {
+      if (id === 'react/jsx-runtime') return require(id);
+      if (id === 'lucide-react') return { Loader2: wrapper };
+      if (id === '@/components/ui/button') return { Button: props => React.createElement('button', props) };
+      if (id === '@/components/ui/dialog') return {
+        ...Object.fromEntries(['DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper])),
+        Dialog: ({ children, onOpenChange }) => { openChange = onOpenChange; return React.createElement('div', null, children); },
+      };
+      throw new Error(`Unexpected import ${id}`);
+    },
+  });
+  const progress = { status: 'pending', message: 'Confirm the transaction in your wallet.', transactions: [
+    { index: 0, total: 2, functionName: 'approve', status: 'submitted', submittedHash: 'approval-hash' },
+    { index: 1, total: 2, functionName: 'executeRoute', status: 'signing', hash: 'unsigned-trade' },
+  ] };
+  const render = () => renderToStaticMarkup(React.createElement(components.default, { progress, onClose: () => { closed++; } }));
+  const html = render();
+  for (const text of ['Trade in progress', 'Token approval', 'Step 2 of 2: Trade', 'Confirm in your wallet', 'approval-hash', 'disabled']) assert.ok(html.includes(text), text);
+  assert.doesNotMatch(html, /unsigned-trade/);
+  openChange(false);
+  assert.equal(closed, 0);
+  progress.status = 'error';
+  progress.message = 'Transaction cancelled.';
+  assert.match(render(), /Trade not completed/);
+  openChange(false);
+  assert.equal(closed, 1);
+  progress.status = 'success';
+  assert.match(render(), /Trade complete/);
+  progress.status = 'unconfirmed';
+  assert.match(render(), /Trade awaiting confirmation/);
+});
+
 test('confirmation renders exact decimal amounts, fees, route and a distinct fallback outcome', () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
@@ -706,7 +839,7 @@ test('external deposit limits gate initial loading, failures, disabled tokens an
   const evaluate = (depositConfig, amountWei = '1000000', overrides = {}) => {
     const exports = {};
     runSource(`exports.ready = ${declarations.depositConfigReady}; exports.error = ${declarations.minDepositError};`, {
-      exports, depositConfig, amountWei, sourceMode: 'external', network: { depositRouter: address('1') }, balanceChainId: 1,
+      exports, depositConfig, amountWei, sourceMode: 'external', nativeRedemption: false, network: { depositRouter: address('1') }, balanceChainId: 1,
       inputDecimals: 6, externalRoute: { externalSymbol: 'USDC' }, formatUnits: require('ethers').formatUnits, ...overrides,
     });
     return exports;
@@ -720,6 +853,8 @@ test('external deposit limits gate initial loading, failures, disabled tokens an
   assert.equal(evaluate(allowed, '0').error, '');
   assert.equal(evaluate({ isError: true }, '1', { sourceMode: 'strato' }).error, '');
   assert.match(evaluate(allowed, '1', { balanceChainId: undefined }).error, /unavailable/);
+  assert.deepEqual(evaluate({ isError: true }, '1', { nativeRedemption: true, network: {}, externalRoute: { externalBridge: address('8') } }),
+    { ready: true, error: '' }, 'native redemption bypasses DepositRouter limits');
 });
 
 test('deposit-limit query follows chain, router and token without retaining prior limits', async () => {
@@ -843,4 +978,178 @@ test('quote summary distinguishes first load, changed inputs and background refr
   assert.match(html, /0.6172835 GOLDST/);
   assert.match(html, /0.02 USDST/);
   assert.doesNotMatch(render(undefined, true), /1.2 GOLDST/);
+});
+
+test('native redemption approves its own bridge only when needed and records the pinned recipient', async () => {
+  for (const approval of [true, false]) {
+    for (const appAuthenticated of [true, false]) {
+      const harness = depositHarness({ redemption: true, approval, appAuthenticated });
+      await harness.handleTrade();
+      assert.deepEqual(harness.writes, approval ? ['approve', 'requestRedemption'] : ['requestRedemption']);
+      const redemption = harness.writeParams.at(-1);
+      assert.equal(redemption.address, `0x${address('8')}`);
+      assert.equal(redemption.args[0], `0x${address('1')}`);
+      assert.equal(redemption.args[1], 100n);
+      assert.equal(redemption.args[2], `0x${address(appAuthenticated ? '6' : '5')}`);
+      if (approval) assert.deepEqual(Array.from(harness.writeParams[0].args), [`0x${address('8')}`, 100n]);
+      assert.equal(harness.records()[1].type, 'bridge');
+      assert.equal(harness.records()[1].routeType, 'native');
+      assert.equal(harness.records()[1].DepositInfo.stratoTokenAmount, '100');
+      assert.equal(harness.records()[1].DepositInfo.stratoRecipient, appAuthenticated ? address('6') : `0x${address('5')}`);
+      assert.equal(harness.stages.find(stage => stage?.label === 'Confirm deposit in your wallet').total, approval ? 2 : 1);
+    }
+  }
+});
+
+test('native redemption timeouts retain pending deposits and reverts remove them', async () => {
+  for (const outcome of ['timeout', 'rpc-error', 'reverted']) {
+    const harness = depositHarness({ redemption: true, outcome });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, ['requestRedemption']);
+    assert.equal(harness.records().length, outcome === 'reverted' ? 1 : 2);
+    assert.equal(harness.toasts[0].title, outcome === 'reverted' ? 'Transaction failed' : 'Deposit still pending');
+    if (outcome !== 'reverted') assert.match(harness.toasts[0].description, /do not resubmit/);
+    const approval = depositHarness({ redemption: true, approval: true, outcome });
+    await approval.handleTrade();
+    assert.deepEqual(approval.writes, ['approve']);
+    assert.equal(approval.records().length, 1);
+  }
+});
+
+test('native redemption stops after approval if the recipient changes or the quote expires', async () => {
+  for (const options of [{ approvalExpires: true }, { changeIdentityAt: 'approval', mutateIdentity: user => { user.isAppAuthenticated = false; } }]) {
+    const harness = depositHarness({ redemption: true, approval: true, ...options });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, ['approve']);
+    assert.equal(harness.records().length, 1);
+    assert.match(harness.toasts[0].description, options.approvalExpires ? /approval succeeded and is reusable/ : /session changed/);
+  }
+  const harness = depositHarness({ redemption: true, appAuthenticated: false, code: '0x60806040' });
+  await harness.handleTrade();
+  assert.deepEqual(harness.writes, []);
+});
+
+test('native quotes bind the representation bridge, output and redemption amount', () => {
+  const quote = structuredClone(composite);
+  Object.assign(quote, { tokenOut: address('2'), amountOut: '100', minFinalOut: '100' });
+  Object.assign(quote.bridge, { routeType: 'native', externalBridge: address('8') });
+  quote.depositAction = { action: 0, actionToken: address('2'), minFinalOut: '100' };
+  const expected = { ...binding, routeType: 'native', externalBridge: address('8'), tokenOut: address('2') };
+  assert.doesNotThrow(() => assertAutoRouteQuote(quote, expected, 1000));
+  for (const mutation of [q => { q.bridge.externalBridge = address('9'); }, q => { q.bridge.routeType = 'standard'; },
+    q => { q.bridge.bridgedAmount = '99'; }, q => { q.steps = [{}]; }, q => { q.tokenOut = address('4'); }]) {
+    const changed = structuredClone(quote);
+    mutation(changed);
+    assert.throws(() => assertAutoRouteQuote(changed, expected, 1000));
+  }
+});
+
+test('native tokens appear without swap pools and allow a selected routed destination', () => {
+  const expressions = {};
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ['routeAssets', 'externalRoutes', 'tokenOut'].includes(node.name.getText(widgetSource))) {
+      expressions[node.name.getText(widgetSource)] = node.initializer.getText(widgetSource);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const native = { routeType: 'native', enabled: true, externalBridge: address('8'), stratoToken: `0x${address('a')}`, stratoTokenDecimals: 2 };
+  const exports = {};
+  runSource(`const routeAssets = ${expressions.routeAssets}; exports.assets = routeAssets;
+    exports.external = ${expressions.externalRoutes}; exports.output = ${expressions.tokenOut};`, {
+    exports, useMemo: fn => fn(), ...routeHelpers, routeAssetsQuery: { data: [] }, nativeRedemption: true, externalRoute: native,
+    resolvingPool: false, selection: { tokenOut: { address: address('b') } },
+    bridgeableTokens: [native, { ...native, depositsPaused: true }, { ...native, depositsDisabled: true }, { ...native, enabled: false }, { ...native, externalBridge: '' }],
+  });
+  assert.equal(exports.assets.length, 1);
+  assert.equal(exports.assets[0].customDecimals, 2);
+  assert.equal(exports.external.length, 1);
+  assert.equal(exports.output.address, address('b'));
+});
+
+test('Fund and Trade providers keep catalog caches and history endpoints separate', async () => {
+  const providers = {}, calls = [];
+  runSource(fs.readFileSync(path.join(__dirname, '../src/context/BridgeContext.tsx'), 'utf8'), {
+    exports: providers, AbortController, URLSearchParams, require: id => {
+      if (id === 'react/jsx-runtime') return require(id);
+      if (id === 'react') return {
+        createContext: () => ({ Provider: () => null }), useState: value => [value, () => {}],
+        useRef: value => ({ current: value }), useCallback: fn => fn,
+      };
+      if (id === '@/lib/bridge/constants') return bridgeConstants;
+      if (id === '@/lib/axios') return { api: { get: async url => {
+        calls.push(url);
+        if (url.endsWith('/networkConfigs')) return { data: [{ externalChainId: 1, chainInfo: { enabled: true, chainName: 'Ethereum', depositRouter: url.startsWith('/trade') ? 'new-router' : 'legacy-router' } }] };
+        return { data: [] };
+      } } };
+      return {};
+    },
+  });
+  const fund = providers.BridgeProvider({ children: null }).props.value;
+  const trade = providers.BridgeProvider({ children: null, scope: 'trade' }).props.value;
+  await fund.loadNetworksAndTokens();
+  await trade.loadNetworksAndTokens();
+  await fund.loadNetworksAndTokens();
+  await trade.loadNetworksAndTokens();
+  assert.equal(calls.filter(url => url === '/bridge/bridgeableTokens/1').length, 1);
+  assert.equal(calls.filter(url => url === '/trade/bridge/bridgeableTokens/1').length, 1);
+  await fund.fetchDepositTransactions();
+  await trade.fetchDepositTransactions();
+  await fund.fetchWithdrawTransactions();
+  await trade.fetchWithdrawTransactions();
+  assert.deepEqual(calls.slice(-4), ['/bridge/transactions/deposit?', '/trade/bridge/transactions/deposit?', '/bridge/transactions/withdrawal?', '/trade/bridge/transactions/withdrawal?']);
+  assert.equal(fund.pendingDepositsKey, 'pendingDeposits');
+  assert.equal(trade.pendingDepositsKey, 'tradePendingDeposits');
+});
+
+test('Trade catalog uses only its own endpoints and query keys', async () => {
+  const hooks = {}, queries = [], requests = [];
+  runSource(fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useTradeTokens.ts'), 'utf8'), {
+    exports: hooks, require: id => {
+      if (id === 'react') return { useMemo: fn => fn(), useState: value => [value, () => {}] };
+      if (id === '@/lib/bridge/constants') return bridgeConstants;
+      if (id === '@tanstack/react-query') return { useQuery: query => {
+        queries.push(query);
+        return { data: queries.length === 1 ? [{ chainId: '1', chainName: 'Ethereum' }] : [] };
+      } };
+      if (id === '@/lib/axios') return { api: { get: async url => { requests.push(url); return { data: [] }; } } };
+      return {};
+    },
+  });
+  hooks.useTradeBridgeCatalog();
+  for (const query of queries) {
+    assert.equal(query.queryKey[0], 'trade');
+    await query.queryFn({});
+  }
+  assert.deepEqual(requests, ['/trade/bridge/networkConfigs', '/trade/bridge/bridgeableTokens/1']);
+});
+
+test('pending deposit history migrates old Trade submissions without leaking between pages', () => {
+  const storage = new Map([['pendingDeposits', JSON.stringify([
+    { externalChainId: 1, externalTxHash: 'fund' },
+    { externalChainId: 1, externalTxHash: 'trade', depositRouter: 'router' },
+    { externalChainId: 1, externalTxHash: 'native', routeType: 'native' },
+  ])]]);
+  const exports = {};
+  const declaration = utilsSource.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'mergePendingDeposits');
+  runSource(declaration.getText(utilsSource), { exports, ...bridgeConstants,
+    localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+  });
+  const fund = exports.mergePendingDeposits([]).remaining;
+  assert.deepEqual(Array.from(fund, p => p.externalTxHash), ['fund']);
+  const trade = exports.mergePendingDeposits([{ externalTxHash: 'trade' }], 'tradePendingDeposits').remaining;
+  assert.deepEqual(Array.from(trade, p => p.externalTxHash), ['native']);
+  assert.equal(JSON.parse(storage.get('pendingDeposits'))[0].externalTxHash, 'fund');
+  assert.equal(exports.mergePendingDeposits([]).remaining.length, 1);
+});
+
+
+test('native routed deposits submit the pinned output and minimum to the representation bridge', async () => {
+  const harness = depositHarness({ redemption: true, routedRedemption: true, approval: true });
+  await harness.handleTrade();
+  assert.deepEqual(harness.writes, ['approve', 'requestRedemptionWithRoute']);
+  const request = harness.writeParams.at(-1);
+  assert.equal(request.address, `0x${address('8')}`);
+  assert.deepEqual(Array.from(request.args), [`0x${address('1')}`, 100n, `0x${address('6')}`, `0x${composite.tokenOut}`, BigInt(composite.minFinalOut)]);
+  assert.equal(harness.records()[1].type, 'route');
 });

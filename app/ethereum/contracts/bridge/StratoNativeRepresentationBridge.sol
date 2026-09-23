@@ -84,6 +84,16 @@ contract StratoNativeRepresentationBridge is
         address indexed stratoRecipient,
         uint96 redemptionId
     );
+    event RedemptionRequestedWithRoute(
+        address indexed representationToken,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoRecipient,
+        uint96 redemptionId,
+        address actionToken,
+        uint256 minFinalOut
+    );
+
     event TokenMappingRegistered(
         address indexed stratoToken,
         address indexed representationToken,
@@ -275,6 +285,27 @@ contract StratoNativeRepresentationBridge is
         uint256 amount,
         address stratoRecipient
     ) external whenNotPaused whenRedemptionsNotPaused nonReentrant {
+        _burnForRedemption(representationToken, amount, stratoRecipient);
+        emit RedemptionRequested(representationToken, amount, msg.sender, stratoRecipient, redemptionId);
+    }
+
+    function requestRedemptionWithRoute(
+        address representationToken,
+        uint256 amount,
+        address stratoRecipient,
+        address actionToken,
+        uint256 minFinalOut
+    ) external whenNotPaused whenRedemptionsNotPaused nonReentrant {
+        if (actionToken == address(0)) revert InvalidAddress();
+        if (minFinalOut == 0) revert ZeroAmount();
+        _burnForRedemption(representationToken, amount, stratoRecipient);
+        emit RedemptionRequestedWithRoute(
+            representationToken, amount, msg.sender, stratoRecipient,
+            redemptionId, actionToken, minFinalOut
+        );
+    }
+
+    function _burnForRedemption(address representationToken, uint256 amount, address stratoRecipient) internal {
         if (representationToken == address(0)) revert InvalidAddress();
         if (stratoRecipient == address(0)) revert InvalidAddress();
         if (amount == 0) revert ZeroAmount();
@@ -284,18 +315,7 @@ contract StratoNativeRepresentationBridge is
 
         IERC20(representationToken).safeTransferFrom(msg.sender, address(this), amount);
         StratoNativeRepresentationToken(representationToken).burn(amount);
-
-        unchecked {
-            ++redemptionId;
-        }
-
-        emit RedemptionRequested(
-            representationToken,
-            amount,
-            msg.sender,
-            stratoRecipient,
-            redemptionId
-        );
+        ++redemptionId;
     }
 
     function registerTokenMapping(
@@ -446,6 +466,6 @@ contract StratoNativeRepresentationBridge is
     function _authorizeUpgrade(address) internal override onlyRole(UPGRADER_ROLE) {}
 
     function version() external pure returns (string memory) {
-        return "1.1.0";
+        return "1.2.0";
     }
 }

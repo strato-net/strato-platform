@@ -18,10 +18,12 @@ import {
 } from "@/lib/bridge/types";
 import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 import { normBridgeAddr } from "@/lib/bridgeLinks";
+import { BRIDGE_SCOPES } from "@/lib/bridge/constants";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
-export const BridgeProvider = ({ children }: { children: ReactNode }) => {
+export const BridgeProvider = ({ children, scope = "fund" }: { children: ReactNode; scope?: keyof typeof BRIDGE_SCOPES }) => {
+  const { apiBase, pendingDepositsKey } = BRIDGE_SCOPES[scope];
   // ========== STATE ==========
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         const { data } = await api.get<BridgeToken[]>(
-          `/bridge/bridgeableTokens/${chainId}`,
+          `${apiBase}/bridgeableTokens/${chainId}`,
         );
         const tokens = Array.isArray(data) ? data : [];
         tokenCacheRef.current.set(chainId, tokens);
@@ -79,7 +81,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setBridgeableTokens([]);
       }
     },
-    [selectedToken],
+    [selectedToken, apiBase],
   );
 
   const loadNetworksAndTokens = useCallback(async () => {
@@ -88,7 +90,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       const { data } = await api.get<NetworkConfig[]>(
-        `/bridge/networkConfigs`,
+        `${apiBase}/networkConfigs`,
       );
 
       const networks: NetworkSummary[] = (data || [])
@@ -105,7 +107,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setNetworksLoaded(true);
 
       // Fetch deposit actions (earn/forge) in parallel with first chain tokens
-      api.get<DepositAction[]>("/bridge/depositActions")
+      api.get<DepositAction[]>(`${apiBase}/depositActions`)
         .then(({ data }) => setDepositActions(data || []))
         .catch(() => setDepositActions([]));
 
@@ -123,7 +125,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [fetchTokensForChain, loading, networksLoaded, selectedNetwork]);
+  }, [fetchTokensForChain, loading, networksLoaded, selectedNetwork, apiBase]);
 
   const handleSetSelectedNetwork = useCallback(
     async (networkName: string) => {
@@ -154,7 +156,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       let networks = availableNetworks;
       if (!networksLoaded || networks.length === 0) {
         try {
-          const { data } = await api.get<NetworkConfig[]>(`/bridge/networkConfigs`);
+          const { data } = await api.get<NetworkConfig[]>(`${apiBase}/networkConfigs`);
           networks = (data || [])
             .filter((cfg) => cfg?.chainInfo?.enabled)
             .map((cfg) => ({
@@ -167,7 +169,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           setAvailableNetworks(networks);
           setNetworksLoaded(true);
           api
-            .get<DepositAction[]>("/bridge/depositActions")
+            .get<DepositAction[]>(`${apiBase}/depositActions`)
             .then(({ data }) => setDepositActions(data || []))
             .catch(() => setDepositActions([]));
         } catch (error) {
@@ -181,7 +183,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         if (!tokens) {
           try {
             const { data } = await api.get<BridgeToken[]>(
-              `/bridge/bridgeableTokens/${network.chainId}`,
+              `${apiBase}/bridgeableTokens/${network.chainId}`,
             );
             tokens = Array.isArray(data) ? data : [];
             tokenCacheRef.current.set(network.chainId, tokens);
@@ -201,7 +203,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
       return false;
     },
-    [availableNetworks, bridgeableTokens, networksLoaded],
+    [availableNetworks, bridgeableTokens, networksLoaded, apiBase],
   );
 
   // ========== BALANCE FUNCTIONS ==========
@@ -310,7 +312,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         const { data } = await api.get<WithdrawalSummaryResponse>(
-          '/bridge/withdrawalSummary',
+          `${apiBase}/withdrawalSummary`,
           { signal: withdrawalSummaryAbortControllerRef.current.signal }
         );
         
@@ -327,7 +329,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     },
-    []
+    [apiBase]
   );
 
   const requestWithdrawal = useCallback(
@@ -338,8 +340,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       try {
         const endpoint = params.routeType === "native"
-          ? "/bridge/requestNativeWithdrawal"
-          : "/bridge/requestWithdrawal";
+          ? `${apiBase}/requestNativeWithdrawal`
+          : `${apiBase}/requestWithdrawal`;
         const { data } = await api.post<TransactionResponse>(
           endpoint,
           params,
@@ -353,7 +355,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     },
-    [fetchTokensForChain],
+    [fetchTokensForChain, apiBase],
   );
 
   // ========== TRANSACTION FUNCTIONS ==========
@@ -372,7 +374,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const params = new URLSearchParams(paramsObj);
-        const response = await api.get(`/bridge/transactions/deposit?${params}`);
+        const response = await api.get(`${apiBase}/transactions/deposit?${params}`);
         const responseData = response.data;
 
         return {
@@ -388,7 +390,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     },
-    []
+    [apiBase]
   );
 
   const fetchWithdrawTransactions = useCallback(
@@ -406,7 +408,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const params = new URLSearchParams(paramsObj);
-        const response = await api.get(`/bridge/transactions/withdrawal?${params}`);
+        const response = await api.get(`${apiBase}/transactions/withdrawal?${params}`);
         const responseData = response.data;
 
         return {
@@ -422,7 +424,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setLoading(false);
       }
     },
-    []
+    [apiBase]
   );
 
   // Note: Balance polling is handled inside the useBalance hook (15s interval per token)
@@ -431,6 +433,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   return (
     <BridgeContext.Provider
       value={{
+        pendingDepositsKey,
         loading,
         error,
         availableNetworks,

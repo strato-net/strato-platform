@@ -6,6 +6,9 @@ import { StratoPaths } from "../../config/constants";
 class RpcController {
   private static readonly READ_ONLY_RPC_METHODS = new Set([
     "eth_call",
+    "eth_estimateGas",
+    "eth_gasPrice",
+    "eth_maxPriorityFeePerGas",
     "eth_getBalance",
     "eth_blockNumber",
     "eth_chainId",

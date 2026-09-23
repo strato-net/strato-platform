@@ -20,7 +20,20 @@ import type {
   CompositeRouteQuoteResponse,
 } from '@strato/shared-types';
 
+import type { WalletTxProgressEvent } from '@/lib/axios';
+
 export * from '@strato/shared-types';
+export interface RouteTransactionProgress extends WalletTxProgressEvent {
+  submittedHash?: string;
+}
+
+export interface RouteExecutionProgress {
+  status: 'pending' | 'success' | 'error' | 'unconfirmed';
+  message: string;
+  transactions: RouteTransactionProgress[];
+  hash?: string;
+}
+
 export interface RouteConfirmation {
   selectionKey: string;
   quote: RouteQuoteResponse | CompositeRouteQuoteResponse;

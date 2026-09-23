@@ -1,31 +1,11 @@
 import { getTransactionReceiptsBatch } from "./rpcService";
-import { getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE } from "../config";
+import { getNativeRepresentationBridgeAddress, ZERO_ADDRESS } from "../config";
 import { NativeDepositInfo } from "../types";
+import { parseNativeDepositLog } from "../utils/nativeRedemption";
 import { logError } from "../utils/logger";
 
 const normalizeAddress = (value: string) =>
   value.toLowerCase().replace(/^0x/, "");
-
-const decodeNativeRedemptionData = (
-  data: string,
-): { amount: bigint; redemptionId: bigint } => {
-  if (!data.startsWith("0x") || data.length < 130) {
-    throw new Error(`Invalid log data: ${data}`);
-  }
-
-  return {
-    amount: BigInt(`0x${data.slice(2, 66)}`),
-    redemptionId: BigInt(`0x${data.slice(66, 130)}`),
-  };
-};
-
-const decodeIndexedAddress = (topic: string): string => {
-  if (!topic.startsWith("0x") || topic.length !== 66) {
-    throw new Error(`Invalid topic: ${topic}`);
-  }
-
-  return `0x${topic.slice(26)}`.toLowerCase();
-};
 
 export const verifyNativeRedemptionsBatch = async (
   deposits: NativeDepositInfo[],
@@ -66,34 +46,19 @@ export const verifyNativeRedemptionsBatch = async (
           continue;
         }
 
-        const matchingLog = receipt.logs.find((log) => {
-          if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) {
-            return false;
-          }
-
-          return (
-            log.topics.length >= 4 &&
-            log.topics[0].toLowerCase() === NATIVE_REDEMPTION_EVENT_SIGNATURE.toLowerCase()
-          );
+        const verified = receipt.logs.some((log) => {
+          if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) return false;
+          const event = parseNativeDepositLog(externalChainId, { ...log, transactionHash: deposit.externalTxHash });
+          return event !== null &&
+            normalizeAddress(event.externalBridge) === normalizeAddress(deposit.externalBridge) &&
+            normalizeAddress(event.representationToken) === normalizeAddress(deposit.representationToken) &&
+            normalizeAddress(event.externalSender) === normalizeAddress(deposit.externalSender) &&
+            normalizeAddress(event.stratoRecipient) === normalizeAddress(deposit.stratoRecipient) &&
+            BigInt(event.stratoTokenAmount) === BigInt(deposit.stratoTokenAmount) &&
+            BigInt(event.externalRedemptionId) === BigInt(deposit.externalRedemptionId) &&
+            normalizeAddress(event.actionToken!) === normalizeAddress(deposit.actionToken || ZERO_ADDRESS) &&
+            BigInt(event.minFinalOut!) === BigInt(deposit.minFinalOut || "0");
         });
-
-        if (!matchingLog) {
-          results.set(deposit.depositId, false);
-          continue;
-        }
-
-        const representationToken = normalizeAddress(decodeIndexedAddress(matchingLog.topics[1]));
-        const externalSender = normalizeAddress(decodeIndexedAddress(matchingLog.topics[2]));
-        const stratoRecipient = normalizeAddress(decodeIndexedAddress(matchingLog.topics[3]));
-        const { amount, redemptionId } = decodeNativeRedemptionData(matchingLog.data);
-
-        const verified =
-          normalizeAddress(matchingLog.address) === normalizeAddress(deposit.externalBridge) &&
-          representationToken === normalizeAddress(deposit.representationToken) &&
-          externalSender === normalizeAddress(deposit.externalSender) &&
-          stratoRecipient === normalizeAddress(deposit.stratoRecipient) &&
-          amount === BigInt(deposit.stratoTokenAmount) &&
-          redemptionId === BigInt(deposit.externalRedemptionId);
 
         results.set(deposit.depositId, verified);
       } catch (error) {

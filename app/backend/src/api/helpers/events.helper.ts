@@ -20,23 +20,24 @@ export const applyDepositActionOutcomes = (
     group.sort((a, b) => BigInt(a.event_index) < BigInt(b.event_index) ? -1 : 1);
     let pending: any;
     for (const event of group) {
-      if (event.event_name !== "DepositCompleted") {
+      if (event.event_name !== "DepositCompleted" && event.event_name !== "NativeDepositCompleted") {
         pending = event;
         continue;
       }
       const source = event.attributes || {};
       const outcome = pending?.attributes;
-      if (outcome && source.externalChainId != null && source.externalTxHash && source.stratoRecipient &&
-          source.externalChainId === outcome.externalChainId &&
-          source.externalTxHash === outcome.externalTxHash &&
-          source.stratoRecipient === outcome.recipient) {
+      if (outcome && source.externalTxHash && source.externalTxHash === outcome.externalTxHash &&
+          (event.event_name === "NativeDepositCompleted"
+            ? source.depositId && source.depositId === outcome.depositId
+            : source.externalChainId != null && source.stratoRecipient &&
+              source.externalChainId === outcome.externalChainId && source.stratoRecipient === outcome.recipient)) {
         outcomes.set(eventKey(event), pending);
       }
       pending = undefined;
     }
   }
   for (const event of events) {
-    if (event.event_name !== "DepositCompleted") continue;
+    if (event.event_name !== "DepositCompleted" && event.event_name !== "NativeDepositCompleted") continue;
     const outcome = outcomes.get(eventKey(event));
     if (!outcome) continue;
     const attributes = outcome.attributes;

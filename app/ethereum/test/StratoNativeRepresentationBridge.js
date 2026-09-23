@@ -306,6 +306,34 @@ describe("StratoNativeRepresentationBridge", function () {
     expect(await bridge.redemptionId()).to.equal(1n);
   });
 
+  it("burns a routed redemption and commits the recipient, output and minimum in one event", async function () {
+    await mintWithAttestation();
+    await token.connect(user).approve(await bridge.getAddress(), 100n);
+    const output = ethers.Wallet.createRandom().address;
+    await expect(bridge.connect(user).requestRedemptionWithRoute(await token.getAddress(), 100n, stratoRecipient.address, output, 95n))
+      .to.emit(bridge, "RedemptionRequestedWithRoute")
+      .withArgs(await token.getAddress(), 100n, user.address, stratoRecipient.address, 1n, output, 95n)
+      .and.not.to.emit(bridge, "RedemptionRequested");
+    expect(await token.balanceOf(user.address)).to.equal(150n);
+    expect(await token.totalSupply()).to.equal(150n);
+    expect(await bridge.version()).to.equal("1.2.0");
+  });
+
+  it("rejects invalid routed intent without burning and shares IDs with plain redemptions", async function () {
+    await mintWithAttestation();
+    await token.connect(user).approve(await bridge.getAddress(), 250n);
+    const output = ethers.Wallet.createRandom().address;
+    await expect(bridge.connect(user).requestRedemptionWithRoute(await token.getAddress(), 100n, stratoRecipient.address, ethers.ZeroAddress, 95n))
+      .to.be.revertedWithCustomError(bridge, "InvalidAddress");
+    await expect(bridge.connect(user).requestRedemptionWithRoute(await token.getAddress(), 100n, stratoRecipient.address, output, 0n))
+      .to.be.revertedWithCustomError(bridge, "ZeroAmount");
+    expect(await token.balanceOf(user.address)).to.equal(250n);
+    await bridge.connect(user).requestRedemption(await token.getAddress(), 100n, stratoRecipient.address);
+    await expect(bridge.connect(user).requestRedemptionWithRoute(await token.getAddress(), 100n, stratoRecipient.address, output, 95n))
+      .to.emit(bridge, "RedemptionRequestedWithRoute")
+      .withArgs(await token.getAddress(), 100n, user.address, stratoRecipient.address, 2n, output, 95n);
+  });
+
   it("allows redemption transfers to the bridge while peer transfers are disabled", async function () {
     await mintWithAttestation({ amount: 100n });
     await token.connect(user).approve(await bridge.getAddress(), 100n);

@@ -1,8 +1,9 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
-import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
-import type { CompositeRouteQuoteResponse } from "@strato/shared-types";
-import { AutoRouteQuoteBinding, BridgeError } from "./types";
+import { WAD } from "@/lib/constants";
+import { BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
+import type { BridgeToken, CompositeRouteQuoteResponse } from "@strato/shared-types";
+import { AutoRouteQuoteBinding, BridgeError, WithdrawalPreview } from "./types";
 
 export const ExternalBridgeStatus = {
   NONE: 0,
@@ -44,6 +45,18 @@ export function normalizeError(error: any): BridgeError {
       data: error.data,
       message: error.message,
       userMessage: getFriendlyMessage(error.shortMessage, error.data),
+    };
+  }
+
+  if (error?.response) {
+    const data = error.response.data;
+    const message = data?.error?.message || data?.error || data?.message;
+    return {
+      code: "API_ERROR",
+      message: typeof message === "string" ? message : errorMessage,
+      userMessage: error.response.status < 500 && typeof message === "string"
+        ? getFriendlyMessage(message)
+        : "Something went wrong. Please try again later.",
     };
   }
 
@@ -101,6 +114,7 @@ export function normalizeError(error: any): BridgeError {
  * Maps error codes to user-friendly messages
  */
 export function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
+  if (errorName.includes("TR: unregistered")) return "The selected pool is not recognized by the trade router. Please contact support.";
   if (errorName.startsWith("Quote expired after approval")) return "Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.";
   if (errorName.startsWith("Quote expired")) return "Quote expired; request a new quote.";
   if (errorName.includes("No executable route") || errorName.includes("No route found")) return "No route is available for this amount. Try a different amount or token.";
@@ -250,13 +264,25 @@ export const handleCopyToClipboard = async (text: string): Promise<void> => {
   }
 };
 
-export function mergePendingDeposits(apiDeposits: any[]): {
+export function mergePendingDeposits(apiDeposits: any[], storageKey: string = BRIDGE_SCOPES.fund.pendingDepositsKey): {
   remaining: any[];
 } {
-  const pendingRaw = JSON.parse(localStorage.getItem('pendingDeposits') || '[]');
+  // Move pending Trade-New submissions recorded before the storage split.
+  const fundPending = JSON.parse(localStorage.getItem(BRIDGE_SCOPES.fund.pendingDepositsKey) || '[]');
+  const isTradeDeposit = (deposit: any) => !!deposit.depositRouter || deposit.routeType === "native" || deposit.type === "route";
+  const tradePending = fundPending.filter(isTradeDeposit);
+  if (tradePending.length) {
+    const existing = JSON.parse(localStorage.getItem(BRIDGE_SCOPES.trade.pendingDepositsKey) || '[]');
+    const known = new Set(existing.map((deposit: any) => `${deposit.externalChainId}:${deposit.externalTxHash}`));
+    localStorage.setItem(BRIDGE_SCOPES.trade.pendingDepositsKey, JSON.stringify([
+      ...existing, ...tradePending.filter((deposit: any) => !known.has(`${deposit.externalChainId}:${deposit.externalTxHash}`)),
+    ]));
+    localStorage.setItem(BRIDGE_SCOPES.fund.pendingDepositsKey, JSON.stringify(fundPending.filter((deposit: any) => !isTradeDeposit(deposit))));
+  }
+  const pendingRaw = JSON.parse(localStorage.getItem(storageKey) || '[]');
   const apiTxHashes = new Set(apiDeposits.map((tx: any) => tx?.externalTxHash));
   const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
-  localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
+  localStorage.setItem(storageKey, JSON.stringify(remaining));
   return { remaining };
 }
 
@@ -271,6 +297,13 @@ export function assertAutoRouteQuote(
     return normalized;
   };
   if (!Number.isSafeInteger(quote.deadline) || quote.deadline <= now) throw new Error("Quote expired; request a new quote");
+  if (binding.routeType && quote.bridge.routeType !== binding.routeType) throw new Error("Quote bridge type changed");
+  if (binding.routeType === "native" && (!binding.externalBridge || !quote.bridge.externalBridge ||
+      BigInt(`0x${address(binding.externalBridge)}`) === 0n ||
+      address(binding.externalBridge) !== address(quote.bridge.externalBridge) ||
+      BigInt(quote.bridge.bridgedAmount) !== binding.externalAmount)) {
+    throw new Error("Invalid native redemption quote");
+  }
   if (BigInt(quote.bridge.externalChainId) !== BigInt(binding.externalChainId) ||
       address(quote.bridge.externalToken) !== address(binding.externalToken) ||
       address(quote.bridge.targetStratoToken) !== address(binding.targetStratoToken) ||
@@ -287,7 +320,48 @@ export function assertAutoRouteQuote(
   if (minimum <= 0n || minimum !== BigInt(quote.minFinalOut) || minimum > output ||
       minimum < output * BigInt(10000 - binding.slippageBps) / 10000n) throw new Error("Invalid quote minimum output");
   const plain = address(binding.targetStratoToken) === address(binding.tokenOut);
-  if (quote.depositAction.action !== (plain ? 0 : 4) || (plain && (output !== BigInt(quote.amountIn) || minimum !== output))) {
+  if (quote.depositAction.action !== (plain ? 0 : 4) || (plain && (quote.steps.length !== 0 || output !== BigInt(quote.amountIn) || minimum !== output))) {
     throw new Error("Quote action does not match the selected output token");
   }
+}
+
+export function isWithdrawalRouteAvailable(route: BridgeToken): boolean {
+  return route.enabled && (route.routeType === "native"
+    ? !!route.externalBridge && !route.withdrawalsPaused && !route.withdrawalsDisabled
+    : route.withdrawalsEnabled === true);
+}
+
+export function getWithdrawalPreview(route: BridgeToken, amount: bigint): WithdrawalPreview {
+  if (!isWithdrawalRouteAvailable(route)) throw new Error("Withdrawals are unavailable for this asset.");
+  if (amount <= 0n) throw new Error("Enter an amount greater than zero.");
+  const native = route.routeType === "native";
+  let externalAmount = amount, escrowAmount = amount;
+  if (!native) {
+    const decimals = Number(route.externalDecimals);
+    if (!/^\d+$/.test(String(route.externalDecimals)) || !Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
+      throw new Error("External token decimals are unavailable.");
+    }
+    const scale = 10n ** BigInt(18 - decimals);
+    if (route.rebaseRequired) {
+      const factor = BigInt(route.rebaseFactor || "0");
+      if (factor <= 0n) throw new Error("The asset conversion rate is unavailable. Try again shortly.");
+      const scaledWad = scale * WAD;
+      externalAmount = amount * factor / scaledWad;
+      escrowAmount = (externalAmount * scaledWad + factor - 1n) / factor;
+    } else {
+      externalAmount = amount / scale;
+      escrowAmount = externalAmount * scale;
+    }
+  }
+  if (externalAmount <= 0n) throw new Error("Amount is below the external token's minimum unit.");
+  const cap = BigInt(route.maxPerWithdrawal || "0");
+  if (cap > 0n && (native ? amount : externalAmount) > cap) throw new Error("Amount exceeds the per-withdrawal limit.");
+  if (native && BigInt(route.maxOutstandingWithdrawal || "0") > 0n && amount > BigInt(route.remainingOutstandingWithdrawal || "0")) {
+    throw new Error("Amount exceeds the remaining bridge capacity.");
+  }
+  const threshold = BigInt((native ? route.instantWithdrawalThreshold : route.manualReviewThreshold) || "0");
+  return {
+    externalAmount: externalAmount.toString(), escrowAmount: escrowAmount.toString(),
+    manualReview: native ? threshold === 0n || amount > threshold : threshold > 0n && externalAmount > threshold,
+  };
 }

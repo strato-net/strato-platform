@@ -17,6 +17,8 @@ type RecentTx = {
   block_timestamp?: string;
   externalChainId?: number | string;
   externalSymbol?: string;
+  externalAmount?: string;
+  externalDecimals?: number;
   stratoTokenSymbol?: string;
   amount?: string;
   status?: string;
@@ -108,6 +110,7 @@ const mapWithdrawal = (tx: Record<string, unknown>): RecentTx => {
     externalChainId: (info?.externalChainId ?? tx.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
+    externalAmount: info?.externalTokenAmount as string, externalDecimals: tx.externalDecimals as number | undefined,
     stratoToken: (info?.stratoToken ?? tx.stratoToken) as string,
   };
 };
@@ -156,6 +159,7 @@ const RecentTransactions = ({
     fetchDepositTransactions, fetchWithdrawTransactions,
     availableNetworks: bridgeNetworks, depositRefreshKey, withdrawalRefreshKey,
     bridgeableTokens: sharedBridgeTokens,
+    pendingDepositsKey,
   } = useBridgeContext();
   const availableNetworks = networkOptions ?? bridgeNetworks;
   const bridgeableTokens = routeTokens ?? sharedBridgeTokens;
@@ -197,7 +201,7 @@ const RecentTransactions = ({
         : Promise.resolve({ events: [], total: 0 }),
     ]).then(async ([depositResult, withdrawalResult, routeResult]) => {
       const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
-      const { remaining } = mergePendingDeposits(apiDeposits);
+      const { remaining } = mergePendingDeposits(apiDeposits, pendingDepositsKey);
       const routeEvents = routeResult.events || [];
       const all = [
         ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
@@ -227,7 +231,7 @@ const RecentTransactions = ({
       setBridgeLoading(false);
       bridgeLoadedRef.current = true;
     }).catch(() => { setBridgeTxs([]); setBridgeLoading(false); bridgeLoadedRef.current = true; });
-  }, [isLoggedIn, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey]);
+  }, [isLoggedIn, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey, pendingDepositsKey]);
 
   if (fundingMode === "metals" && isLoggedIn && lastMetalRefreshKey !== metalRefreshKey) {
     setLastMetalRefreshKey(metalRefreshKey);
@@ -269,7 +273,8 @@ const RecentTransactions = ({
         const status = getStatusLabel(tx.status);
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
         const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);
-        const externalAmt = rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
+        const externalAmt = isW && tx.externalAmount && Number.isInteger(tx.externalDecimals)
+          ? formatBalance(tx.externalAmount, undefined, tx.externalDecimals, 2, 4) : rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
 
         return <TxRow key={key}
           icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
@@ -316,7 +321,7 @@ const RecentTransactions = ({
       <CardContent className="p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/70">
           <CardTitle className="text-base">
-            {isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
+            {includeRoutes ? "Recent Activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
           </CardTitle>
           <Link to={viewAllLink} className={linkClass}>
             View All {"\u2192"}

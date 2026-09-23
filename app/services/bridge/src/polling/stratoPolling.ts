@@ -170,6 +170,10 @@ export const startNativeDepositInitiatedPolling = (): void => {
         depositId: deposit.depositId,
         stratoRecipient: deposit.stratoRecipient,
         verified: verificationResults.get(deposit.depositId) === true,
+        actionToken: deposit.actionToken,
+        minFinalOut: deposit.minFinalOut,
+        stratoToken: deposit.stratoToken,
+        stratoTokenAmount: deposit.stratoTokenAmount,
       }));
 
       const { verifiedDeposits, failedDeposits } = results.reduce(
@@ -188,10 +192,12 @@ export const startNativeDepositInitiatedPolling = (): void => {
       );
 
       if (verifiedDeposits.length > 0) {
-        for (const batch of chunk(verifiedDeposits, POLLING_BATCH_SIZE)) {
-          await confirmNativeDepositBatch(
-            batch as NonEmptyArray<ConfirmNativeDepositArgs>,
-          );
+        for (const deposit of verifiedDeposits) {
+          try {
+            await confirmNativeDepositBatch([deposit]);
+          } catch (error) {
+            logError("StratoPolling", error as Error, { operation: "confirmNativeDeposit", depositId: deposit.depositId });
+          }
         }
       }
 

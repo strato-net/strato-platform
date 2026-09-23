@@ -72,7 +72,7 @@ async function activityHarness(t: any, configuredBridge = `0x${'ab'.repeat(20).t
   ];
   const queries: any[] = [];
   t.mock.method(cirrus, 'get', async (_token: string, _path: string, { params }: any) => {
-    if (params.event_name === 'in.(AutoRouted,DepositActionFallback,DepositCompleted)') {
+    if (params.event_name === 'in.(AutoRouted,DepositActionFallback,DepositCompleted,NativeDepositCompleted)') {
       return { data: [
         { ...event(0, 'AutoRouted', { finalToken: 'metal', finalAmount: '250' }), address: bridge },
         completion,
@@ -141,4 +141,22 @@ test('an unconfigured external bridge does not produce an empty-address exclusio
   const result = await getActivitiesByTypes('token', [pair('TokenRouter', 'RouteExecuted')], 'user', 10, 0);
   assert.equal(result.total, 3);
   assert.ok(queries.every((query) => query.and === undefined));
+});
+
+
+test("native activity enrichment binds routed and fallback outcomes to their deposit IDs", () => {
+  const routed = event(1, "NativeDepositCompleted", { depositId: "native1" });
+  const fallback = event(3, "NativeDepositCompleted", { depositId: "native2" });
+  const plain = event(4, "NativeDepositCompleted", { depositId: "native3" });
+  applyDepositActionOutcomes([routed, fallback, plain], [
+    event(0, "AutoRouted", { depositId: "native1", finalToken: "gold", finalAmount: "7" }), routed,
+    event(2, "DepositActionFallback", { depositId: "native2", fallbackToken: "source", fallbackAmount: "100" }), fallback, plain,
+  ]);
+  assert.equal(routed.depositOutcome, "route");
+  assert.equal(routed.finalToken, "gold");
+  assert.equal(fallback.depositOutcome, "fallback");
+  assert.equal(plain.depositOutcome, undefined);
+  const mismatch = event(6, "NativeDepositCompleted", { depositId: "native4" });
+  applyDepositActionOutcomes([mismatch], [event(5, "AutoRouted", { depositId: "wrong" }), mismatch]);
+  assert.equal(mismatch.depositOutcome, undefined);
 });

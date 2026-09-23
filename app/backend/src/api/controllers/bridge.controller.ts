@@ -19,8 +19,9 @@ import {
   WithdrawalSummaryResponse
 } from "@strato/shared-types";
 import { isUserAdmin } from "../services/user.service";
+import type { BridgeProtocol } from "../../types/types";
 
-class BridgeController {
+const createBridgeController = (protocol: BridgeProtocol) => class BridgeController {
   static async requestWithdrawal(
     req: Request,
     res: Response,
@@ -35,9 +36,10 @@ class BridgeController {
         ? await requestNativeWithdrawalService(
             accessToken,
             { ...params, routeType: "native" },
-            userAddress as string
+            userAddress as string,
+            protocol
           )
-        : await requestWithdrawal(accessToken, params, userAddress as string);
+        : await requestWithdrawal(accessToken, params, userAddress as string, protocol);
 
       res.json({
         success: true,
@@ -63,7 +65,8 @@ class BridgeController {
           ...(body as WithdrawalRequestParams),
           routeType: "native",
         },
-        userAddress as string
+        userAddress as string,
+        protocol
       );
 
       res.json({
@@ -82,7 +85,7 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const result = await getDepositActions(accessToken);
+      const result = await getDepositActions(accessToken, protocol);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -103,7 +106,7 @@ class BridgeController {
         return;
       }
       
-      const bridgeRoutes: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
+      const bridgeRoutes: BridgeToken[] = await getBridgeableTokens(accessToken, chainId, protocol);
       const enabledBridgeRoutes = bridgeRoutes.filter((route) => route.enabled);
       res.json(enabledBridgeRoutes);
     } catch (error: any) {
@@ -118,7 +121,7 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const result: NetworkConfig[] = await getNetworkConfigs(accessToken);
+      const result: NetworkConfig[] = await getNetworkConfigs(accessToken, protocol);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -143,7 +146,7 @@ class BridgeController {
       
       const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
       
-      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams);
+      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams, protocol);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -157,12 +160,13 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
-      const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string);
+      const result: WithdrawalSummaryResponse = await getWithdrawalSummary(accessToken, userAddress as string, protocol);
       res.json(result);
     } catch (error: any) {
       next(error);
     }
   }
-}
+};
 
-export default BridgeController;
+export const TradeBridgeController = createBridgeController("external");
+export default createBridgeController("legacy");

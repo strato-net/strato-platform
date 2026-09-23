@@ -27,6 +27,22 @@ export type NetworkSummary = {
   depositRouter: string;
 };
 
+export type TradeBridgeCatalog = {
+  availableNetworks: NetworkSummary[];
+  bridgeableTokens: BridgeToken[];
+  selectedNetwork: string | null;
+  setSelectedNetwork: (networkName: string) => void;
+  loading: boolean;
+};
+
+export interface WithdrawalWidgetProps {
+  catalog: TradeBridgeCatalog;
+  active: boolean;
+  feeBalancesReady: boolean;
+  onPendingChange: (pending: boolean) => void;
+  onSubmitted?: () => void;
+}
+
 export type AutoRouteDepositResult = {
   txHash: `0x${string}`;
   status: "pending" | "confirmed";
@@ -34,6 +50,7 @@ export type AutoRouteDepositResult = {
 };
 
 export type BridgeContextType = {
+  pendingDepositsKey: string;
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
@@ -143,6 +160,20 @@ export interface Permit2Params {
   chainId: string;
 }
 
+export interface TokenApprovalParams extends Permit2Params {
+  spender: string;
+}
+
+export interface NativeRedemptionParams {
+  actionIntent?: { actionToken: string; minFinalOut: bigint };
+  bridge: string;
+  token: string;
+  amount: bigint;
+  recipient: string;
+  account: string;
+  chainId: string;
+}
+
 export interface Permit2Domain {
   name: string;
   chainId: number;
@@ -201,6 +232,8 @@ export interface BridgeContext {
 }
 
 export interface AutoRouteQuoteBinding {
+  routeType?: "standard" | "native";
+  externalBridge?: string;
   externalChainId: string;
   externalToken: string;
   targetStratoToken: string;
@@ -214,4 +247,18 @@ export interface AutoRouteDepositStage {
   label: string;
   step?: number;
   total?: number;
+}
+
+export interface WithdrawalPreview {
+  externalAmount: string;
+  escrowAmount: string;
+  manualReview: boolean;
+}
+
+export interface WithdrawalConfirmation {
+  selectionKey: string;
+  route: BridgeToken;
+  networkName: string;
+  recipient: string;
+  preview: WithdrawalPreview;
 }

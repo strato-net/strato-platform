@@ -7,6 +7,7 @@ import {
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
   EIP7702_DELEGATION_CODE_PATTERN,
+  STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -16,7 +17,9 @@ import {
   Permit2ApprovalResult,
   Permit2Params,
   Permit2Domain,
-  Permit2Types
+  Permit2Types,
+  TokenApprovalParams,
+  NativeRedemptionParams
 } from './types';
 
 const PROXIED_CHAIN_IDS = new Set([
@@ -111,12 +114,17 @@ export function createPermit2Message({
     };
   }
 
-export async function checkPermit2Approval({
+export async function checkPermit2Approval(params: Permit2Params): Promise<Permit2ApprovalResult> {
+  return checkTokenApproval({ ...params, spender: PERMIT2_ADDRESS });
+}
+
+export async function checkTokenApproval({
     token,
     owner,
     amount,
-    chainId
-  }: Permit2Params): Promise<Permit2ApprovalResult> {
+    chainId,
+    spender
+  }: TokenApprovalParams): Promise<Permit2ApprovalResult> {
   const client = await getClient(chainId);
     
     const allowance = await client.readContract({
@@ -125,7 +133,7 @@ export async function checkPermit2Approval({
       functionName: "allowance",
       args: [
       formatAddress(owner),
-        PERMIT2_ADDRESS as `0x${string}`
+        formatAddress(spender)
       ]
     });
     
@@ -134,6 +142,22 @@ export async function checkPermit2Approval({
       currentAllowance: allowance
     };
   }
+
+export async function simulateNativeRedemption({ bridge, token, amount, recipient, account, chainId, actionIntent }: NativeRedemptionParams): Promise<void> {
+  const client = await getClient(chainId);
+  await client.simulateContract({
+    address: formatAddress(bridge),
+    abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
+    ...(actionIntent ? {
+      functionName: "requestRedemptionWithRoute" as const,
+      args: [formatAddress(token), amount, formatAddress(recipient), formatAddress(actionIntent.actionToken), actionIntent.minFinalOut] as const,
+    } : {
+      functionName: "requestRedemption" as const,
+      args: [formatAddress(token), amount, formatAddress(recipient)] as const,
+    }),
+    account: formatAddress(account),
+  });
+}
 
 export async function getTokenConfig({ 
     tokenAddress, 

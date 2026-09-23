@@ -149,7 +149,8 @@ export enum BridgeDepositAction {
 
 export interface BridgeRouteLegQuote {
   bridgeRouteId: string;
-  routeType: "standard";
+  routeType: "standard" | "native";
+  externalBridge?: string;
   externalChainId: string;
   externalToken: string;
   externalSymbol: string;

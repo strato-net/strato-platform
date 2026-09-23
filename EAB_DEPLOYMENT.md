@@ -9,6 +9,13 @@ ExternalBridgeVault `1.0.0`. DepositRouter `3.2.0`.
 For an existing MercataBridge network, also follow [EAB_CUTOVER.md](EAB_CUTOVER.md)
 for intake cutoff, pending transactions, custody, application rollout, and rollback.
 
+This branch also changes native bridge routing and the unified Trade page. If
+native routing is in scope, complete [Native routing release gate](#native-routing-release-gate)
+before exposing it to users. The EAB rollout CLI does **not** configure or verify
+StratoNativeBridge, its external representation bridges, or their route permissions.
+Complete [Application release and Fund/Trade cutover](#application-release-and-fundtrade-cutover)
+for the UI/backend release even when native routing is out of scope.
+
 Wait for each AdminRegistry issue or Safe transaction to execute. Stop on
 failure. Run the command `status` prints; do not invent flags.
 
@@ -82,6 +89,9 @@ Amounts are raw token units. Verifier confirmations ≥ Runtime confirmations.
 - Bridge operator and three settlement attestors (operator is not an attestor)
 - STRATO dependencies and, after step 2, TokenRouter and EAB proxy addresses
 - Routes, deposit/withdrawal/rebase flags (`autoRouteEnabled=false`)
+- If native routing is included: existing native bridge/custody and external
+  representation proxy addresses, current implementations, token/chain pairs to
+  opt in, native operator, polling checkpoints, and separate native canary amounts
 - Min deposit, max auto deposit, max withdrawal, auto withdrawal, manual-review
   threshold, bucket capacity, refill, mint capacity/refill
 - Confirmations, verifier threshold, authorization validity (1–1800s, match
@@ -425,6 +435,12 @@ Gate: three `/health` responses with matching chain/vault/index/signer/attestor,
 policy digest, shared baseline hash, `verificationRpcHostCount >= 2`; Runtime
 `status: true`.
 
+For a runtime also processing native traffic, preserve its native configuration
+and persistent cursor when rendering the EAB templates. Add the native settings
+listed in the native release gate through infra's secret-manager configuration;
+they are not supplied by the EAB bundle. Deploy the matching native-capable bridge
+image before upgrading external representation bridges to expose routed redemptions.
+
 ## 7. STRATO governance
 
 Owners: Coordinator and administrators
@@ -441,6 +457,10 @@ or indexing, nobody votes again.
 
 This path does not call `EAB.setPause`. Route flags come from the reviewed
 policy.
+
+Native owner calls are separate AdminRegistry issues, outside the CLI's 12 stages.
+Complete their governance and record live execution evidence as described below;
+an EAB `DONE` status does not prove native routing is configured.
 
 ## 8. Activate and canary
 
@@ -501,10 +521,13 @@ Deposit of raw external `X`:
 3. STRATO user up by `S`. Verifier threshold met; one mint; retries do not mint
    again.
 
-AUTO_ROUTE activation requires separate native-token and ERC-20 canaries
+EAB AUTO_ROUTE activation requires separate native-gas-token and ERC-20 canaries
 (ETH and USDC on Sepolia). Use the
 deployed app, bridge, and verifiers; retain the external and STRATO transaction
 hashes and balance changes for each test:
+
+Here “native-gas-token” means ETH through EAB/DepositRouter. These tests do not
+cover STRATO-native representation redemptions, which have a separate gate below.
 
 | Test | Required result |
 |---|---|
@@ -533,6 +556,174 @@ Unit tests and read-only quotes do not replace these deployed-API canaries.
 Do not mark an unexecuted or fallback-only AUTO_ROUTE test as passed.
 
 Pause on any mismatch.
+
+## Native routing release gate
+
+Owners: Coordinator, STRATO administrators, external Safe owners, Infra.
+
+Keep the existing EAB manifest/bundle workflow unchanged. Native actions below
+are **manual release requirements**, not generated rollout calls. Store their
+reviewed token/chain inventory, issue IDs, Safe transactions, implementation
+addresses, image digests, and canary evidence alongside the EAB release evidence.
+Do not edit the frozen bundle or interpret its approval hash as approving these
+additional native actions. The live AdminRegistry/Safe thresholds still apply.
+
+### 1. Upgrade and wire STRATO
+
+Inventory pending native withdrawals/redemptions and save polling checkpoints
+before changing implementations or services. Keep user intake closed for the
+upgrade window. Preserve the existing native bridge and custody proxies and
+locked balances; do not reinitialize them or migrate custody for this routing change.
+For a fresh native deployment, first complete the base setup in
+[NATIVE_BRIDGE_DEPLOYMENT.md](NATIVE_BRIDGE_DEPLOYMENT.md).
+
+From `app/contracts`, upgrade the native bridge using the same two AdminRegistry
+gates as step 2. Additional administrators vote the printed issues; do not launch
+another upgrade command to cast a vote.
+
+```bash
+npm run upgrade -- --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> --contract-name StratoNativeBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
+```
+
+Verify the live proxy points to the recorded implementation. This change adds
+native routing and `autoRouteEnabled`; it does not require a custody-vault or
+representation-token upgrade by itself.
+
+Through the AdminRegistry governance flow, execute on the **native bridge proxy**:
+
+```text
+setTokenRouter(newTokenRouter = <TOKEN_ROUTER_PROXY>)
+```
+
+Use the same initialized TokenRouter as the backend/EAB. Confirm its pool factories,
+PSM, forge, savings vault, and any approved YieldVaults match the intended outputs.
+Keep native auto-routing disabled until the service and external upgrades below
+are ready. Permission defaults to false for every `(stratoToken, externalChainId)`.
+Existing deployments of an earlier routed implementation also need explicit opt-in.
+
+### 2. Deploy the matching runtime and rewards poller
+
+Infra deploys a bridge image that processes **both** `RedemptionRequested` and
+`RedemptionRequestedWithRoute`, verifies the pinned output/minimum, and calls
+`recordDepositWithRoute` / `confirmDepositWithRoute` for routed intents. Keep its
+existing native block cursor. If an older runtime missed routed events, reconcile
+and replay from before the first missed event; do not simply advance the cursor.
+
+| Component | Required native/routing configuration |
+| --- | --- |
+| Backend | Verified `STRATO_NATIVE_BRIDGE`, `STRATO_NATIVE_CUSTODY_VAULT`, and `TOKEN_ROUTER`, or the corresponding verified network defaults in `config.ts`. |
+| Bridge runtime | `STRATO_NATIVE_BRIDGE_ADDRESS`, `TOKEN_ROUTER`, reachable `STRATO_APP_API_URL`; preserve native operator credentials and per-chain RPC/verification/confirmation settings. |
+| Native external chain | Preserve `CHAIN_<ID>_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`, existing native signing keys/threshold and gas funding used by withdrawals. These are not new routed-deposit keys. |
+| Rewards poller | Nonzero `TOKEN_ROUTER`, `EXTERNAL_ASSET_BRIDGE_ADDRESS`, and `STRATO_NATIVE_BRIDGE`. Missing bridge identities suppress router attribution; missing router configuration blocks startup. |
+
+Pass settings into the actual containers, not only Compose `.env`. Keep secrets
+with Infra. Native deposit verification runs in the bridge service; the three
+standalone EAB verifier health checks do not certify native receipt verification.
+No new EAB verifier policy entry or signer is required solely for native routing.
+
+### 3. Upgrade the external representation bridge
+
+Only after the matching runtime is running, upgrade each in-scope
+`StratoNativeRepresentationBridge` proxy to implementation version **1.2.0**.
+For supported Sepolia/mainnet deployment aliases, from `app/ethereum`:
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationBridge npm run deployImpl:<sepolia-or-mainnet>
+```
+
+Record/verify the implementation, then have the external Safe execute
+`upgradeToAndCall(<NEW_IMPLEMENTATION_ADDRESS>, 0x)` on the existing bridge proxy.
+Version 1.1 → 1.2 adds no external storage or initializer. For an older baseline,
+first follow the mint-executor-role/domain requirements in
+[NATIVE_BRIDGE_DEPLOYMENT.md](NATIVE_BRIDGE_DEPLOYMENT.md#sepolia-deploy-new-implementations-for-upgrades).
+Verify proxy `version()` is `1.2.0`; preserve token mappings, route activation,
+roles, attestation policy, and redemption counter.
+
+### 4. Enable reviewed native routes and verify the application
+
+Stage the matching backend/UI with public intake closed. For each approved native
+token/chain pair, execute this owner call through AdminRegistry governance:
+
+```text
+setAutoRouteEnabled(stratoToken = <STRATO_NATIVE_TOKEN>, externalChainId = <CHAIN_ID>, enabled = true)
+```
+
+The route must exist and be enabled, token deposits must not be disabled, and the
+router must be initialized. Confirm the resulting indexed
+`autoRouteEnabled[stratoToken][externalChainId] == true` and its
+`AutoRouteAvailabilityUpdated` event. Other token/chain pairs remain disabled.
+
+`configure-native-route.js` supports `--token-router <address>` and
+`--auto-route-enabled true|false` alongside its required route arguments. It
+directly calls owner methods and also rewrites route configuration; it is not a
+substitute for AdminRegistry quorum on a governance-owned proxy. Omitting the
+auto-route flag preserves the current permission. For an existing governed route,
+prefer the specific owner calls above over rewriting the whole route.
+
+Before public release verify:
+
+- External mapping/route is active and redemptions are unpaused; STRATO asset is
+  enabled, deposits are unpaused, and token deposits are not disabled.
+- Native bridge `tokenRouter` equals backend `TOKEN_ROUTER`; the custody bridge
+  linkage and locked backing remain correct.
+- `/api/config` succeeds on the app hostname. `/api/trade/bridge/bridgeableTokens/<CHAIN_ID>`
+  returns the intended native route. The unified page can quote a reachable output
+  with a positive minimum through the real backend.
+- With auto-routing disabled, routed composite quotes are rejected but a plain
+  same-token redemption remains quotable. Withdrawals retain their own permissions.
+
+### 5. Native canaries and rollback
+
+Use small approved amounts and real deployed services. Record external burn and
+STRATO settlement hashes, native deposit identity `(chain, external bridge,
+redemption ID)`, events, and recipient/custody balance changes.
+
+| Native test | Required result |
+| --- | --- |
+| Plain redemption, auto-routing disabled | Original native asset delivered once; custody reduced by the corresponding amount. |
+| Routed redemption, permission enabled | Pinned recipient receives the requested output at or above `minFinalOut`; one `AutoRouted` outcome. |
+| Disabled permission / revoke after recording | Controlled testnet case: original source token delivered through `DepositActionFailed` and `DepositActionFallback`; no routed output or stranded custody. |
+| Route cannot meet minimum | Controlled testnet case: same source-token fallback, with route effects rolled back. |
+| Retry / reviewed recovery | Same deposit settles once; no duplicate unlock. Review preserves output/minimum intent. |
+| Native bridge-out regression | Existing approved same-asset withdrawal reaches its external counterpart once. Auto-route permission does not enable withdrawals. |
+
+Completion alone does not prove routing succeeded. Inspect `AutoRouted` versus
+fallback events. Quote transport failures should retry; custody failures must
+leave settlement uncompleted. Do not open native routed intake on fallback-only
+evidence.
+
+To stop auto-routing, execute `setAutoRouteEnabled(token, chain, false)` through
+governance. New routed quotes stop; already-sent routed redemptions remain
+recordable and settle to their source-token fallback. Keep the matching runtime
+and routed-intent-capable contracts until all in-flight redemptions are reconciled.
+Do not roll back to an image that ignores routed events or reset the cursor to
+skip them. Disabling a whole deposit route can block recovery of already-burned
+representations; use the auto-route permission when only routing must stop.
+
+## Application release and Fund/Trade cutover
+
+This branch keeps the legacy pages isolated during acceptance:
+
+- Fund uses `/bridge/*` and MercataBridge for its standard bridge path.
+- Unified Trade uses `/trade/bridge/*` for EAB and native routes. Its three modes
+  are On STRATO, From another network, and To another network. Bridge-out is
+  same-asset for native and non-native routes.
+- Personal Recent Activity spans those three modes; the pair/network-wide swap
+  history section has been removed from the unified page.
+
+Deploy UI/backend together after contract/runtime readiness. Exercise all three
+modes with STRATO login and MetaMask-only login, confirmations/progress, balances,
+fees, history, and native/non-native assets. Include supported metals/yield outputs
+and disabled-permission behavior. Capture real transactions; unit tests are not
+acceptance evidence.
+
+Do **not** retire Fund/old Trade just because the new image is deployed. Their
+redirects, old-link parameter translation, internal-link retargeting, and navigation
+collapse remain a separate final cutover after acceptance. While legacy pages are
+reachable, they can still initiate legacy requests: gate that intake before the
+drain/custody steps in [EAB_CUTOVER.md](EAB_CUTOVER.md). A backend rollout alone
+does not redirect their requests to EAB. Preserve legacy history and the workers
+needed to reconcile pre-cutoff transactions.
 
 ## Existing EAB: remove the unused settlement proof argument
 
@@ -586,6 +777,9 @@ npm run upgrade -- --proxy-address <EXTERNAL_ASSET_BRIDGE_PROXY> --contract-name
   and an assigned refill owner; successful canaries include on-chain attestation
   and relayer transaction hashes.
 - Required canaries reconcile (deposit always; withdrawal only if enabled).
+- If native routing is in scope, its separate governance, configuration, and
+  canary evidence is complete; EAB CLI verification alone is insufficient.
+- Unified-page acceptance is recorded before any Fund/old Trade retirement.
 - Temporary credentials and allowlists removed.
 - Retain bundle hash, tooling revision, addresses, policy hashes, issue IDs,
   transactions, image digests, and canary evidence.

@@ -294,7 +294,9 @@ contract record TokenRouter is Ownable {
         if (step.action == RouteAction.SWAP_V2) {
             Pool pool = Pool(step.target);
             require(address(pool.poolFactory()) == address(poolFactory), "TR: invalid v2 factory");
-            require(_factoryHasPool(step.tokenIn, step.tokenOut, step.target), "TR: unregistered v2 pool");
+            if (!_factoryHasPool(step.tokenIn, step.tokenOut, step.target)) {
+                require(poolFactory.allPools(step.factoryPoolIndex) == step.target, "TR: unregistered v2 pool");
+            }
             address expectedIn = step.direction ? address(pool.tokenA()) : address(pool.tokenB());
             address expectedOut = step.direction ? address(pool.tokenB()) : address(pool.tokenA());
             require(step.tokenIn == expectedIn && step.tokenOut == expectedOut, "TR: invalid v2 pair");

@@ -6,7 +6,9 @@ import type { BridgeToken, NetworkConfig } from "@strato/shared-types";
 import { useUser } from "@/context/UserContext";
 import { getTokenConfig } from "@/lib/bridge/contractService";
 import { metalForgeService } from "@/services/metalForgeService";
-import type { NetworkSummary } from "@/lib/bridge/types";
+import type { NetworkSummary, TradeBridgeCatalog } from "@/lib/bridge/types";
+export type { TradeBridgeCatalog } from "@/lib/bridge/types";
+import { BRIDGE_SCOPES } from "@/lib/bridge/constants";
 
 const TRADE_NETWORK_NAMES: Record<string, string> = {
   "1": "Ethereum Mainnet",
@@ -59,20 +61,12 @@ export function useRoutePoolTokens(poolAddress?: string) {
   });
 }
 
-export type TradeBridgeCatalog = {
-  availableNetworks: NetworkSummary[];
-  bridgeableTokens: BridgeToken[];
-  selectedNetwork: string | null;
-  setSelectedNetwork: (networkName: string) => void;
-  loading: boolean;
-};
-
 export function useTradeBridgeCatalog(): TradeBridgeCatalog {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const networksQuery = useQuery({
     queryKey: ["trade", "external", "networks"],
     queryFn: async ({ signal }) => {
-      const { data } = await api.get<NetworkConfig[]>("/bridge/networkConfigs", {
+      const { data } = await api.get<NetworkConfig[]>(`${BRIDGE_SCOPES.trade.apiBase}/networkConfigs`, {
         signal,
       });
       return (data || [])
@@ -98,7 +92,7 @@ export function useTradeBridgeCatalog(): TradeBridgeCatalog {
     queryKey: ["trade", "external", "tokens", activeNetwork?.chainId],
     queryFn: async ({ signal }) => {
       const { data } = await api.get<BridgeToken[]>(
-        `/bridge/bridgeableTokens/${activeNetwork!.chainId}`,
+        `${BRIDGE_SCOPES.trade.apiBase}/bridgeableTokens/${activeNetwork!.chainId}`,
         { signal }
       );
       return Array.isArray(data) ? data : [];

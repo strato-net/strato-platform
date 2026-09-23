@@ -476,3 +476,131 @@ test("withdrawal listing enriches only the requested page", async (t) => {
   assert.equal(page.totalCount, 3);
   assert.deepEqual(page.data.map((row: any) => row.id), [2]);
 });
+
+test("Fund and Trade network catalogs query their own bridge contracts", async (t) => {
+  const calls: any[] = [];
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    calls.push({ table, params });
+    return { data: [{ externalChainId: "1", ChainInfo: { enabled: true, chainName: table.includes("Mercata") ? "Ethereum" : "ethereum", depositRouter: "1".repeat(40) } }] };
+  });
+  const legacy = await getNetworkConfigs("token", "legacy");
+  const external = await getNetworkConfigs("token", "external");
+  assert.equal(legacy[0].chainInfo.chainName, "Ethereum");
+  assert.equal(external[0].chainInfo.chainName, "ethereum");
+  assert.equal(calls[0].table, `/${constants.MercataBridge}-chains`);
+  assert.equal(calls[0].params.address, `eq.${constants.mercataBridge}`);
+  assert.equal(calls[1].table, `/${constants.ExternalAssetBridge}-chains`);
+  assert.equal(calls[1].params.address, `eq.${constants.externalAssetBridge}`);
+});
+
+test("legacy catalogs restore default route flags without reading EAB mappings", async (t) => {
+  const service = await import("./bridge.service");
+  const metadata = await import("../helpers/cirrusHelpers");
+  const oracle = await import("./oracle.service");
+  const token = "1".repeat(40), alternate = "2".repeat(40), externalToken = "3".repeat(40);
+  t.mock.method(metadata, "getTokenMetadata", async () => new Map([
+    [token, { name: "Wrapped", symbol: "WRAP", status: "2" }],
+    [alternate, { name: "Minted", symbol: "MINT", status: "2" }],
+  ]) as any);
+  t.mock.method(oracle, "getRebaseFactors", async () => new Map());
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    assert.ok(!table.includes("ExternalAssetBridge"), table);
+    if (table === "/mapping") {
+      assert.equal(params.address, `eq.${constants.mercataBridge}`);
+      assert.equal(params["key->>key2"], "eq.1");
+      return { data: [
+        { collection_name: "assets", externalToken, externalChainId: "1", mappingValue: { stratoToken: token, enabled: true, externalDecimals: "18" } },
+        { collection_name: "assetRouteEnabled", externalToken, externalChainId: "1", targetStratoToken: alternate, mappingValue: true },
+      ] };
+    }
+    return { data: [] };
+  });
+  const routes = await service.getBridgeableTokens("token", "1", "legacy");
+  assert.equal(routes.length, 2);
+  assert.equal(routes.find(r => r.stratoToken === `0x${token}`)?.isDefaultRoute, true);
+  assert.equal(routes.find(r => r.stratoToken === `0x${alternate}`)?.isDefaultRoute, false);
+});
+
+test("legacy actions use save/forge flags and ordinals while Trade uses AUTO_ROUTE", () => {
+  const usd = constants.USDST;
+  const vault = "2".repeat(40), metal = "3".repeat(40);
+  const source = route("source", "1", usd);
+  const key = [source.externalToken.replace(/^0x/, ""), "1", usd.replace(/^0x/, "")].join(":");
+  const common: any = {
+    routes: [source], actionChainIds: new Set(["1"]), psmState: null,
+    saveState: { vaultAddress: vault, assetAddress: usd, paused: false, shareSymbol: "saveUSDST", projectedExchangeRate: "1000000000000000000" },
+    forgeConfigs: { payTokens: [{ address: usd }], metals: [{ address: metal, isEnabled: true, price: "1", totalMinted: "0", mintCap: "100", feeBps: "0" }] },
+    bridgeActionConfig: { saveUsdstVault: vault },
+    bridgeActionRoutes: new Map([[key, { autoSave: true, autoForge: true, autoRoute: false }]]),
+  };
+  assert.deepEqual(buildDepositActionCatalog({ ...common, protocol: "legacy" }).map(a => a.action), [3, 2]);
+  assert.deepEqual(buildDepositActionCatalog({ ...common, protocol: "external" }), []);
+  common.bridgeActionRoutes.set(key, { autoSave: false, autoForge: false, autoRoute: true });
+  assert.deepEqual(buildDepositActionCatalog({ ...common, protocol: "legacy" }), []);
+  assert.deepEqual(buildDepositActionCatalog({ ...common, protocol: "external" }).map(a => a.action), [4, 4]);
+  common.bridgeActionRoutes.set(key, { autoSave: true, autoForge: false });
+  assert.deepEqual(buildDepositActionCatalog({ ...common, protocol: "legacy", bridgeActionConfig: {} }), []);
+});
+
+test("withdrawal approval and submission stay on the selected bridge", async (t) => {
+  const service = await import("./bridge.service");
+  const txBuilder = await import("../../utils/txBuilder");
+  const txHelper = await import("../../utils/txHelper");
+  let calls: any[] = [];
+  t.mock.method(txBuilder, "buildFunctionTx", async (functions: any) => { calls = functions; return {} as any; });
+  t.mock.method(txHelper, "postAndWaitForTx", async () => ({ status: "Success", hash: "test" }) as any);
+  const params = { externalChainId: "1", externalRecipient: "1".repeat(40), externalToken: "2".repeat(40), stratoToken: "3".repeat(40), stratoTokenAmount: "100" };
+  for (const protocol of ["legacy", "external"] as const) {
+    await service.requestWithdrawal("token", params, "4".repeat(40), protocol);
+    const expected = protocol === "legacy" ? constants.mercataBridge : constants.externalAssetBridge;
+    assert.equal(calls[0].args.spender, expected);
+    assert.equal(calls[1].contractAddress, expected);
+    assert.equal(calls[1].contractName, protocol === "legacy" ? "MercataBridge" : "ExternalAssetBridge");
+  }
+});
+
+test("scoped history excludes the other bridge, including event and token enrichment", async (t) => {
+  const service = await import("./bridge.service");
+  let source: "legacy" | "external" = "legacy";
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    const excluded = source === "legacy" ? "ExternalAssetBridge" : "MercataBridge";
+    assert.ok(!table.includes(excluded), table);
+    if (table === `/${constants.Event}`) {
+      assert.equal(params.address, `in.(${[source === "legacy" ? constants.mercataBridge : constants.externalAssetBridge, constants.stratoNativeBridge].filter(Boolean).join(",")})`);
+    }
+    if (table.endsWith("-deposits") && !table.includes("Native")) {
+      if (params.select === "count()") return { data: [{ count: 1 }] };
+      return { data: [{ externalChainId: "1", externalTxHash: "hash", depositRouter: "router", depositId: "1",
+        DepositInfo: { externalToken: "1".repeat(40), stratoToken: "2".repeat(40), bridgeStatus: "3", ...(source === "external" ? { status: "4" } : {}) } }] };
+    }
+    return { data: [] };
+  });
+  for (source of ["legacy", "external"] as const) {
+    const history = await service.getBridgeTransactions("token", "deposit", "user", { limit: "5" }, source);
+    assert.equal(history.totalCount, 1);
+    assert.equal(history.data.length, 1);
+    assert.equal((history.data[0] as any).bridgeSource, source);
+    assert.equal((history.data[0] as any).DepositInfo.bridgeStatus, "4", "both displays retain Completed semantics");
+  }
+});
+
+
+test("native deposit history keeps separate routed outcomes for redemptions sharing an external transaction", async (t) => {
+  const { enrichTransactionData } = await import("../helpers/bridge.helper");
+  const nativeBridge = "9".repeat(40);
+  t.mock.getter(constants, "stratoNativeBridge", () => nativeBridge);
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    if (table !== `/${constants.Event}`) return { data: [] };
+    assert.ok(params.address.includes(nativeBridge));
+    return { data: [
+      { address: nativeBridge, event_name: "AutoRouted", attributes: { depositId: "first", externalTxHash: "shared", finalToken: "4".repeat(40), finalAmount: "99" } },
+      { address: nativeBridge, event_name: "DepositActionFallback", attributes: { depositId: "second", externalTxHash: "shared", fallbackToken: "2".repeat(40), fallbackAmount: "100" } },
+    ] };
+  });
+  const result = await enrichTransactionData("token", ["first", "second", "plain"].map(depositId => ({
+    depositId, bridgeSource: "native", externalTxHash: "shared", externalChainId: "1",
+    DepositInfo: { stratoToken: "2".repeat(40), representationToken: "3".repeat(40), bridgeStatus: "4" },
+  })), "deposit", "external");
+  assert.deepEqual(result.map(row => row.depositOutcome), ["route", "fallback", "bridge"]);
+  assert.deepEqual(result.slice(0, 2).map(row => row.finalAmount), ["99", "100"]);
+});

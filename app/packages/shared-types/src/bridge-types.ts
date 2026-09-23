@@ -29,9 +29,11 @@ export interface NetworkConfig {
 export interface BridgeToken {
   id: string;
   routeType: BridgeRouteType;
+  isDefaultRoute?: boolean;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
+  stratoTokenDecimals?: number;
   externalChainId: string;       // Matches AssetInfo.externalChainId
   externalBridge?: string;       // Native-only representation bridge address
   externalName: string;          // Matches AssetInfo.externalName
@@ -52,6 +54,7 @@ export interface BridgeToken {
   outstandingWithdrawal?: string; // Native-only; amount currently locked in custody
   remainingOutstandingWithdrawal?: string; // Native-only; available aggregate capacity
   stratoTokenImage?: string;     // First image URL from TokenFactory images
+  rebaseRequired?: boolean;
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
 
@@ -139,6 +142,7 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
+  externalDecimals?: number;
   // Deposit action outcome
   depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
   finalToken?: string;

@@ -1,4 +1,7 @@
 // ---------------- Oauth Types ----------------
+export type BridgeProtocol = "legacy" | "external";
+export type BridgeHistorySource = BridgeProtocol | "all";
+
 export interface TokenCache {
   serviceToken?: string;
   expiresAt?: number;

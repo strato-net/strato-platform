@@ -144,6 +144,8 @@ export interface NativeDepositArgs {
   externalTxHash: string;
   stratoRecipient: string;
   stratoTokenAmount: string;
+  actionToken?: string;
+  minFinalOut?: string;
 }
 
 export interface ConfirmNativeDepositArgs {
@@ -153,6 +155,10 @@ export interface ConfirmNativeDepositArgs {
   depositId: string;
   stratoRecipient: string;
   verified: boolean;
+  actionToken?: string;
+  minFinalOut?: string;
+  stratoToken?: string;
+  stratoTokenAmount?: string;
 }
 
 export interface DepositInfo {
@@ -187,6 +193,8 @@ export interface NativeDepositInfo {
   stratoToken: string;
   stratoTokenAmount: string;
   timestamp: string;
+  actionToken?: string;
+  minFinalOut?: string;
 }
 
 

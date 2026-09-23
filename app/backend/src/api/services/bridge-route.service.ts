@@ -80,9 +80,10 @@ export const getCompositeBridgeRouteQuote = async (
   const routes = await getBridgeableTokens(accessToken, externalChainId);
   const route = routes.find(
     (candidate) =>
-      candidate.routeType === "standard" &&
       candidate.enabled &&
-      candidate.depositsEnabled === true &&
+      (candidate.routeType === "native"
+        ? !candidate.depositsPaused && !candidate.depositsDisabled && !!candidate.externalBridge
+        : candidate.depositsEnabled === true) &&
       normalizeAddress(candidate.externalToken) ===
         normalizeAddress(externalToken) &&
       normalizeAddress(candidate.stratoToken) ===
@@ -93,7 +94,8 @@ export const getCompositeBridgeRouteQuote = async (
     throw new Error("Unsupported external token decimals");
   }
 
-  const requiresRebase = await isRouteRebaseRequired(
+  const nativeRedemption = route.routeType === "native";
+  const requiresRebase = !nativeRedemption && await isRouteRebaseRequired(
     accessToken,
     route.externalToken,
     externalChainId,
@@ -102,7 +104,7 @@ export const getCompositeBridgeRouteQuote = async (
   if (requiresRebase && !route.rebaseFactor) {
     throw new Error("Rebase factor unavailable for required bridge route");
   }
-  const bridgedAmount = convertExternalToStratoAmount(
+  const bridgedAmount = nativeRedemption ? amount : convertExternalToStratoAmount(
     amount,
     Number(route.externalDecimals),
     requiresRebase ? route.rebaseFactor : undefined
@@ -113,7 +115,8 @@ export const getCompositeBridgeRouteQuote = async (
 
   const bridge = {
     bridgeRouteId: route.id,
-    routeType: "standard" as const,
+    routeType: route.routeType,
+    ...(nativeRedemption ? { externalBridge: route.externalBridge } : {}),
     externalChainId,
     externalToken: route.externalToken,
     externalSymbol: route.externalSymbol,
@@ -144,34 +147,57 @@ export const getCompositeBridgeRouteQuote = async (
     };
   }
 
-  const [autoRouteEnabled, networks] = await Promise.all([
-    isAutoRouteEnabled(
-      accessToken,
-      route.externalToken,
-      externalChainId,
-      route.stratoToken
-    ),
-    getNetworkConfigs(accessToken),
-  ]);
-  if (!autoRouteEnabled) {
-    throw new Error("Automatic routing is not enabled for this bridge route");
-  }
-
-  const network = networks.find(
-    (candidate) => String(candidate.externalChainId) === externalChainId
-  );
-  const version = network?.chainInfo.depositRouter
-    ? await getDepositRouterVersion(
+  if (nativeRedemption) {
+    const [version, { data }, { data: permissions }] = await Promise.all([
+      getDepositRouterVersion(externalChainId, route.externalBridge!),
+      cirrus.get(accessToken, `/${constants.StratoNativeBridge}`, {
+        params: { address: `eq.${constants.stratoNativeBridge}`, select: "tokenRouter", limit: "1" },
+      }),
+      cirrus.get(accessToken, `/${constants.StratoNativeBridge}-autoRouteEnabled`, {
+        params: { address: `eq.${constants.stratoNativeBridge}`, key: `eq.${normalizeAddress(route.stratoToken)}`,
+          key2: `eq.${externalChainId}`, select: "value", limit: "1" },
+      }),
+    ]);
+    if (String(permissions?.[0]?.value).toLowerCase() !== "true") {
+      throw new Error("Automatic routing is disabled for this native bridge route");
+    }
+    const [major, minor] = (version || "").split(".").map(Number);
+    if (!(major > 1 || (major === 1 && minor >= 2)) ||
+        !data?.[0]?.tokenRouter || !constants.tokenRouter ||
+        normalizeAddress(data[0].tokenRouter) === ZERO_ADDRESS ||
+        normalizeAddress(data[0].tokenRouter) !== normalizeAddress(constants.tokenRouter)) {
+      throw new Error("The native bridge is not configured for automatic routing");
+    }
+  } else {
+    const [autoRouteEnabled, networks] = await Promise.all([
+      isAutoRouteEnabled(
+        accessToken,
+        route.externalToken,
         externalChainId,
-        network.chainInfo.depositRouter
-      )
-    : null;
-  const nativeDeposit =
-    normalizeAddress(route.externalToken) === ZERO_ADDRESS;
-  if (!supportsAutoRouteRouter(version, nativeDeposit)) {
-    throw new Error(
-      "The selected bridge router does not support automatic routing"
+        route.stratoToken
+      ),
+      getNetworkConfigs(accessToken),
+    ]);
+    if (!autoRouteEnabled) {
+      throw new Error("Automatic routing is not enabled for this bridge route");
+    }
+
+    const network = networks.find(
+      (candidate) => String(candidate.externalChainId) === externalChainId
     );
+    const version = network?.chainInfo.depositRouter
+      ? await getDepositRouterVersion(
+          externalChainId,
+          network.chainInfo.depositRouter
+        )
+      : null;
+    const nativeDeposit =
+      normalizeAddress(route.externalToken) === ZERO_ADDRESS;
+    if (!supportsAutoRouteRouter(version, nativeDeposit)) {
+      throw new Error(
+        "The selected bridge router does not support automatic routing"
+      );
+    }
   }
 
   const internalQuote = await getRouteQuote(

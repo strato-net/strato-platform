@@ -1,9 +1,18 @@
 import { Router } from "express";
 import authHandler from "../middleware/authHandler";
 import TradeController from "../controllers/trade.controller";
+import { TradeBridgeController } from "../controllers/bridge.controller";
 
 const router = Router();
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
+
+router.get("/bridge/networkConfigs", authHandler.authorizeRequest(true), TradeBridgeController.getNetworkConfigs);
+router.get("/bridge/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), TradeBridgeController.getBridgeableTokens);
+router.get("/bridge/depositActions", authHandler.authorizeRequest(), TradeBridgeController.getDepositActions);
+router.get("/bridge/transactions/:type", authHandler.authorizeRequest(), TradeBridgeController.getTransactions);
+router.get("/bridge/withdrawalSummary", authHandler.authorizeRequest(), TradeBridgeController.getWithdrawalSummary);
+router.post("/bridge/requestWithdrawal", walletAuth, TradeBridgeController.requestWithdrawal);
+router.post("/bridge/requestNativeWithdrawal", walletAuth, TradeBridgeController.requestNativeWithdrawal);
 
 /**
  * @openapi

@@ -14,16 +14,18 @@ settlement after activation is not part of this plan. Legacy history remains rea
 
 | Area | Current implementation | Cutover consequence |
 | --- | --- | --- |
-| New standard withdrawals | Backend approves EAB and calls its `requestWithdrawal`. | Deploying the new backend switches new requests; there is no UI bridge selector. |
+| New standard withdrawals | Unified Trade's `/trade/bridge/*` path approves EAB; legacy Fund's `/bridge/*` path remains on MercataBridge. | Deploying the new backend does not switch legacy pages. Gate old intake explicitly before draining and retiring it. |
 | Legacy withdrawals | Service queries MercataBridge at `BRIDGE_ADDRESS`, proposes Safe transactions, then finalizes or aborts. | Keep the old contract address, custody, Safe access, and settlement worker available until drained. |
 | Deposits | New service discovers chains/routers from EAB and processes EAB deposits. | It does not replace the old MercataBridge deposit processor. Drain old deposits before retiring that processor. |
-| History | Backend merges EAB, MercataBridge, and native records; tags legacy rows `bridgeSource: "legacy"` and normalizes statuses. | Preserve old contract queries. UI currently does not display the source tag. |
+| History | History is scoped by API path; legacy records remain on the legacy path and native records remain supported. | Preserve old contract queries and status links when retiring old entry points; the unified feed is not a replacement for every legacy record. |
 | Backend startup | Requires configured EAB and TokenRouter, matching router linkage, and an initialized router. | Publish verified network defaults before deploying the new image; node `/health` alone is insufficient. |
 | Pausing MercataBridge | Deposit confirmation, withdrawal confirmation, and withdrawal finalization require the respective side to be open. Legacy polling also filters `withdrawalsPaused=false`. | A global pause is not an intake-only stop. Pausing too early strands settlement. |
 | External custody | EAB deployment uses a new vault; existing procedure specifies no liquidity migration. | Old Safe funds do not automatically become EAB withdrawal liquidity. |
 
 Native bridge traffic is a separate path. Preserve its configuration and include
-it in regression checks; do not redirect it as part of this cutover.
+it in regression checks; do not redirect it as part of this cutover. Enabling
+native routed redemptions additionally requires the
+[native routing release gate](EAB_DEPLOYMENT.md#native-routing-release-gate).
 
 ## 1. Agree the cutover boundary
 
@@ -160,7 +162,11 @@ The syncing screen can also mean backend configuration failure; inspect backend
 logs instead of resetting a healthy node.
 
 Stage the matching UI/backend pair for canary validation. New standard
-withdrawals now target EAB. Open public access only after step 6 passes.
+withdrawals from the unified page target EAB; legacy pages remain on MercataBridge
+until their intake is gated. Open public access only after step 6 passes and the
+[application acceptance gate](EAB_DEPLOYMENT.md#application-release-and-fundtrade-cutover)
+is complete. Retire Fund/old Trade only after acceptance, with redirects, parameter
+translation, internal links, and navigation updated in the final cutover.
 Check external deposit transactions target the reviewed new router and intended
 vault. Remove stale deposit destinations from instructions, bookmarks under your
 control, partner integrations, and cached app configuration. Old approvals do
@@ -171,9 +177,9 @@ Keep AUTO_ROUTE disabled unless separately approved and tested. If Save, Forge,
 swap, or vault destinations are offered, verify the action-4 route and fallback
 behavior rather than assuming old AUTO_SAVE/AUTO_FORGE settings carry over.
 
-Preserve combined transaction history and legacy status links. A bridge-source
-label is optional for history; users do not need to choose a bridge because all
-new standard requests use EAB after this cutover.
+Preserve legacy transaction history and status links. After old intake is gated
+and links/redirects are switched, new standard requests use EAB; legacy history
+must remain reachable through its scoped API.
 
 ## 6. Acceptance evidence
 

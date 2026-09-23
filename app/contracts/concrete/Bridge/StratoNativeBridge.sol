@@ -5,6 +5,8 @@ import "../Admin/AdminRegistry.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./StratoNativeCustodyVault.sol";
+import "../Router/TokenRouter.sol";
+import "../../libraries/Router/RouterTypes.sol";
 
 /**
  * @title StratoNativeBridge
@@ -13,6 +15,7 @@ import "./StratoNativeCustodyVault.sol";
  */
 contract record StratoNativeBridge is Ownable {
     using BridgeTypes for *;
+    using RouterTypes for *;
     using StringUtils for string;
 
     struct NativeAssetConfig {
@@ -47,6 +50,8 @@ contract record StratoNativeBridge is Ownable {
         address stratoToken;
         uint256 stratoTokenAmount;
         uint256 timestamp;
+        address actionToken;
+        uint256 minFinalOut;
     }
 
     struct NativeWithdrawalInfo {
@@ -156,6 +161,44 @@ contract record StratoNativeBridge is Ownable {
     mapping(string => NativeDepositInfo) public record deposits;
     mapping(uint256 => NativeWithdrawalInfo) public record withdrawals;
     mapping(address => NativeTokenBridgeConfig) public record tokenBridgeConfigs;
+
+    address public tokenRouter;
+    bool private depositLocked;
+    uint256 public constant MAX_ROUTE_STEPS = 6;
+    uint256 public constant ROUTE_EXECUTION_DEADLINE = 300;
+    mapping(address => mapping(uint256 => bool)) public record autoRouteEnabled;
+
+    event TokenRouterUpdated(address tokenRouter);
+    event AutoRouteAvailabilityUpdated(address stratoToken, uint256 externalChainId, bool enabled);
+    event AutoRouted(string depositId, string externalTxHash, address stratoRecipient, address sourceToken, uint256 sourceAmount, address finalToken, uint256 finalAmount);
+    event DepositActionFailed(string depositId, string externalTxHash, address actionToken, string reason);
+    event DepositActionFallback(string depositId, string externalTxHash, address fallbackToken, uint256 fallbackAmount);
+
+    modifier nonReentrantDeposit() {
+        require(!depositLocked, "SNB: reentrant deposit");
+        depositLocked = true;
+        _;
+        depositLocked = false;
+    }
+
+    function setTokenRouter(address newTokenRouter) external onlyOwner {
+        require(newTokenRouter != address(0), "SNB: zero router");
+        tokenRouter = newTokenRouter;
+        emit TokenRouterUpdated(newTokenRouter);
+    }
+
+    function setAutoRouteEnabled(address stratoToken, uint256 externalChainId, bool enabled) external onlyOwner {
+        NativeAssetConfig asset = assets[stratoToken][externalChainId];
+        require(asset.stratoToken != address(0), "SNB: asset missing");
+        if (enabled) {
+            require(asset.enabled, "SNB: asset disabled");
+            require(!tokenBridgeConfigs[stratoToken].depositsDisabled, "SNB: token deposits disabled");
+            require(tokenRouter != address(0), "SNB: router not set");
+            require(TokenRouter(tokenRouter).initialized(), "SNB: router not initialized");
+        }
+        autoRouteEnabled[stratoToken][externalChainId] = enabled;
+        emit AutoRouteAvailabilityUpdated(stratoToken, externalChainId, enabled);
+    }
 
     modifier whenDepositsOpen() {
         require(!depositsPaused, "SNB: deposits paused");
@@ -603,7 +646,7 @@ contract record StratoNativeBridge is Ownable {
         address representationToken,
         address stratoRecipient,
         uint256 stratoTokenAmount
-    ) external onlyBridgeOperator whenDepositsOpen {
+    ) public onlyBridgeOperator whenDepositsOpen {
         require(externalChainId > 0, "SNB: invalid external chain id");
         require(externalBridge != address(0), "SNB: invalid external bridge");
         require(externalRedemptionId > 0, "SNB: invalid redemption id");
@@ -644,7 +687,9 @@ contract record StratoNativeBridge is Ownable {
             stratoRecipient,
             stratoToken,
             stratoTokenAmount,
-            block.timestamp
+            block.timestamp,
+            address(0),
+            0
         );
 
         emit NativeDepositInitiated(
@@ -658,6 +703,26 @@ contract record StratoNativeBridge is Ownable {
             stratoToken,
             stratoTokenAmount
         );
+    }
+
+    function recordDepositWithRoute(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        address externalSender,
+        string externalTxHash,
+        address representationToken,
+        address stratoRecipient,
+        uint256 stratoTokenAmount,
+        address actionToken,
+        uint256 minFinalOut
+    ) external onlyBridgeOperator whenDepositsOpen {
+        require(actionToken != address(0) && minFinalOut > 0, "SNB: invalid route intent");
+        recordDeposit(externalChainId, externalBridge, externalRedemptionId, externalSender,
+            externalTxHash, representationToken, stratoRecipient, stratoTokenAmount);
+        NativeDepositInfo d = deposits[getDepositId(externalChainId, externalBridge, externalRedemptionId)];
+        d.actionToken = actionToken;
+        d.minFinalOut = minFinalOut;
     }
 
     function reviewDeposit(
@@ -688,41 +753,81 @@ contract record StratoNativeBridge is Ownable {
         uint256 externalChainId,
         address externalBridge,
         uint256 externalRedemptionId
-    ) external onlyBridgeOperator whenDepositsOpen {
-        require(custodyVault != address(0), "SNB: vault not set");
-
-        string depositId = getDepositId(
-            externalChainId,
-            externalBridge,
-            externalRedemptionId
-        );
-        NativeDepositInfo d = deposits[depositId];
-        require(
-            d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW,
-            "SNB: bad state"
-        );
-
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        NativeDepositInfo d = deposits[getDepositId(externalChainId, externalBridge, externalRedemptionId)];
+        require(d.actionToken == address(0), "SNB: routed confirmation required");
+        _requireConfirmable(d);
         uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
-            d.stratoToken,
-            d.stratoRecipient,
-            d.stratoTokenAmount
+            d.stratoToken, d.stratoRecipient, d.stratoTokenAmount
         );
-        require(actualUnlockedAmount > 0, "SNB: no tokens unlocked");
+        _completeDeposit(d, actualUnlockedAmount);
+    }
 
+    function confirmDepositWithRoute(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId,
+        RouteStep[] steps
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        NativeDepositInfo d = deposits[getDepositId(externalChainId, externalBridge, externalRedemptionId)];
+        _requireConfirmable(d);
+        require(d.actionToken != address(0) && d.minFinalOut > 0, "SNB: no route intent");
+        // Custody failures must revert settlement; only routing failures may fall back.
+        uint256 sourceAmount = StratoNativeCustodyVault(custodyVault).unlock(
+            d.stratoToken, address(this), d.stratoTokenAmount
+        );
+        require(sourceAmount > 0, "SNB: no tokens unlocked");
+        d.bridgeStatus = BridgeStatus.COMPLETED;
+        try _executeDepositRoute(d, sourceAmount, steps) returns (uint256 finalAmount) {
+            emit AutoRouted(d.depositId, d.externalTxHash, d.stratoRecipient,
+                d.stratoToken, sourceAmount, d.actionToken, finalAmount);
+        } catch Error(string reason) {
+            _routeFallback(d, sourceAmount, reason);
+        } catch {
+            _routeFallback(d, sourceAmount, "Unknown token router error");
+        }
+        _completeDeposit(d, sourceAmount);
+    }
+
+    function _executeDepositRoute(NativeDepositInfo d, uint256 sourceAmount, RouteStep[] steps) internal returns (uint256) {
+        require(autoRouteEnabled[d.stratoToken][d.externalChainId], "SNB: auto route disabled");
+        require(tokenRouter != address(0), "SNB: router not set");
+        require(steps.length > 0 && steps.length <= MAX_ROUTE_STEPS, "SNB: route unavailable");
+        require(IERC20(d.stratoToken).approve(tokenRouter, sourceAmount), "SNB: approval failed");
+        RouteStepData[] data = new RouteStepData[](steps.length);
+        for (uint256 i = 0; i < steps.length; i++) {
+            data[i] = RouterTypes.toStepData(steps[i]);
+        }
+        uint256 finalAmount = TokenRouter(tokenRouter).executeRouteWithActions(
+            d.stratoToken, d.actionToken, sourceAmount, d.stratoRecipient, data,
+            block.timestamp + ROUTE_EXECUTION_DEADLINE, d.minFinalOut
+        );
+        require(finalAmount >= d.minFinalOut, "SNB: route under minimum");
+        require(IERC20(d.stratoToken).approve(tokenRouter, 0), "SNB: approval cleanup failed");
+        return finalAmount;
+    }
+
+    function _routeFallback(NativeDepositInfo d, uint256 amount, string reason) internal {
+        emit DepositActionFailed(d.depositId, d.externalTxHash, d.actionToken, reason);
+        uint256 beforeBalance = IERC20(d.stratoToken).balanceOf(d.stratoRecipient);
+        require(IERC20(d.stratoToken).transfer(d.stratoRecipient, amount), "SNB: fallback transfer failed");
+        uint256 received = IERC20(d.stratoToken).balanceOf(d.stratoRecipient) - beforeBalance;
+        require(received > 0, "SNB: empty fallback");
+        emit DepositActionFallback(d.depositId, d.externalTxHash, d.stratoToken, received);
+    }
+
+    function _requireConfirmable(NativeDepositInfo d) internal {
+        require(custodyVault != address(0), "SNB: vault not set");
+        require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+    }
+
+    function _completeDeposit(NativeDepositInfo d, uint256 amount) internal {
+        require(amount > 0, "SNB: no tokens unlocked");
         d.bridgeStatus = BridgeStatus.COMPLETED;
         d.timestamp = block.timestamp;
-
-        emit NativeDepositCompleted(
-            depositId,
-            externalChainId,
-            externalBridge,
-            externalRedemptionId,
-            d.externalSender,
-            d.externalTxHash,
-            d.stratoRecipient,
-            d.stratoToken,
-            actualUnlockedAmount
-        );
+        emit NativeDepositCompleted(d.depositId, d.externalChainId, d.externalBridge,
+            d.externalRedemptionId, d.externalSender, d.externalTxHash, d.stratoRecipient,
+            d.stratoToken, amount);
     }
 
     function abortDeposit(

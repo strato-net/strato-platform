@@ -1,6 +1,14 @@
 import { MAX_UINT256 } from "../../config/constants";
 import { VaultDepositState } from "../../types/types";
 
+export const getVaultSharePrice = (assetPrice: string, state: VaultDepositState): string => {
+  const price = BigInt(assetPrice);
+  const supply = BigInt(state.totalShares);
+  const assets = BigInt(state.pricingAssets);
+  if (price <= 0n || supply < 0n || assets < 0n) return "0";
+  return (supply === 0n ? price : (assets * price) / supply).toString();
+};
+
 export const previewVaultDeposit = (amount: bigint, state: VaultDepositState): bigint => {
   const supply = BigInt(state.totalShares);
   const assets = BigInt(state.pricingAssets);

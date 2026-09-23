@@ -16,19 +16,23 @@ import { useUser } from "@/context/UserContext";
 import {
   assertExternalWalletRecipient,
   checkPermit2Approval,
+  checkTokenApproval,
   createPermit2Message,
   getPermit2Domain,
   getPermit2Nonce,
   getPermit2Types,
   simulateDeposit,
+  simulateNativeRedemption,
   validateRouterContract,
   waitForTransaction,
 } from "@/lib/bridge/contractService";
 import {
   DEPOSIT_ROUTER_ABI,
+  BRIDGE_SCOPES,
   ERC20_ABI,
   NATIVE_TOKEN_ADDRESS,
   PERMIT2_ADDRESS,
+  STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
   resolveViemChain,
 } from "@/lib/bridge/constants";
 import { ensureHexPrefix, safeParseUnits } from "@/utils/numberUtils";
@@ -85,6 +89,7 @@ export function useAutoRouteDeposit() {
       if (!recipient) throw new Error("STRATO recipient is unavailable");
       let approvalConfirmed = false;
       const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
+      const nativeRedemption = route.routeType === "native";
       const assertCurrentQuote = () => {
         const current = currentIdentity.current;
         if (current.recipient?.toLowerCase() !== recipient.toLowerCase() ||
@@ -98,6 +103,7 @@ export function useAutoRouteDeposit() {
           throw new Error("Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.");
         }
         assertAutoRouteQuote(quote, {
+          routeType: route.routeType, externalBridge: route.externalBridge,
           externalChainId: network.chainId, externalToken: route.externalToken,
           targetStratoToken: route.stratoToken, externalAmount: amountWei,
           externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
@@ -116,7 +122,7 @@ export function useAutoRouteDeposit() {
       ) {
         throw new Error("Connected external wallet address does not match");
       }
-      if (!network.depositRouter) {
+      if (!(nativeRedemption ? route.externalBridge : network.depositRouter)) {
         throw new Error("Deposit router is unavailable");
       }
       const expectedChainId = Number(network.chainId);
@@ -133,7 +139,7 @@ export function useAutoRouteDeposit() {
       }
 
       const isNative = BigInt(route.externalToken || "0") === 0n;
-      const validation = await validateRouterContract({
+      const validation = nativeRedemption ? { isValid: true } : await validateRouterContract({
         depositRouterAddress: network.depositRouter,
         amount,
         decimals: route.externalDecimals,
@@ -160,7 +166,48 @@ export function useAutoRouteDeposit() {
             };
       let totalSteps = 1;
       let txHash: `0x${string}`;
-      if (isNative) {
+      if (nativeRedemption) {
+        const approval = await checkTokenApproval({
+          token: route.externalToken, owner: externalEvmWalletAddress, amount: amountWei,
+          chainId: network.chainId, spender: route.externalBridge!,
+        });
+        totalSteps = approval.isApproved ? 1 : 2;
+        if (!approval.isApproved) {
+          assertCurrentQuote();
+          setStage({ step: 1, total: totalSteps, label: `Approve ${route.externalSymbol} in your wallet` });
+          const approvalHash = await writeContractAsync({
+            address: ensureHexPrefix(route.externalToken), abi: ERC20_ABI, functionName: "approve",
+            args: [ensureHexPrefix(route.externalBridge!), amountWei], chain, account: account.address,
+          });
+          setStage({ step: 1, total: totalSteps, label: "Waiting for approval confirmation…" });
+          let approved: boolean;
+          try {
+            approved = await waitForTransaction(approvalHash, network.chainId);
+          } catch {
+            return { txHash: approvalHash, status: "pending", type: "approval" };
+          }
+          if (!approved) throw new Error("Native token approval reverted");
+          approvalConfirmed = true;
+        }
+        assertCurrentQuote();
+        await simulateNativeRedemption({
+          bridge: route.externalBridge!, token: route.externalToken, amount: amountWei,
+          recipient, account: externalEvmWalletAddress, chainId: network.chainId, actionIntent,
+        });
+        assertCurrentQuote();
+        setStage({ step: totalSteps, total: totalSteps, label: "Confirm deposit in your wallet" });
+        txHash = await writeContractAsync({
+          address: ensureHexPrefix(route.externalBridge!), abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
+          ...(actionIntent ? {
+            functionName: "requestRedemptionWithRoute" as const,
+            args: [ensureHexPrefix(route.externalToken), amountWei, ensureHexPrefix(recipient), ensureHexPrefix(actionIntent.actionToken), actionIntent.minFinalOut] as const,
+          } : {
+            functionName: "requestRedemption" as const,
+            args: [ensureHexPrefix(route.externalToken), amountWei, ensureHexPrefix(recipient)] as const,
+          }),
+          chain, account: account.address,
+        });
+      } else if (isNative) {
         await simulateDeposit({
           depositRouter: network.depositRouter,
           isNative: true,
@@ -302,12 +349,12 @@ export function useAutoRouteDeposit() {
       }
       try {
         const pending = JSON.parse(
-          localStorage.getItem("pendingDeposits") || "[]"
+          localStorage.getItem(BRIDGE_SCOPES.trade.pendingDepositsKey) || "[]"
         );
         pending.push({
           externalChainId: Number(network.chainId),
           externalTxHash: txHash,
-          depositRouter: network.depositRouter,
+          ...(nativeRedemption ? { routeType: "native" } : { depositRouter: network.depositRouter }),
           type: actionIntent ? "route" : "bridge",
           finalToken: outputAddress,
           finalTokenSymbol: outputSymbol,
@@ -324,7 +371,7 @@ export function useAutoRouteDeposit() {
           externalName: route.externalName,
           externalSymbol: route.externalSymbol,
         });
-        localStorage.setItem("pendingDeposits", JSON.stringify(pending));
+        localStorage.setItem(BRIDGE_SCOPES.trade.pendingDepositsKey, JSON.stringify(pending));
       } catch {
         toast({
           title: "Deposit submitted; local history unavailable",
@@ -342,8 +389,8 @@ export function useAutoRouteDeposit() {
       }
       if (!confirmed) {
         try {
-          const pending = JSON.parse(localStorage.getItem("pendingDeposits") || "[]");
-          localStorage.setItem("pendingDeposits", JSON.stringify(pending.filter(
+          const pending = JSON.parse(localStorage.getItem(BRIDGE_SCOPES.trade.pendingDepositsKey) || "[]");
+          localStorage.setItem(BRIDGE_SCOPES.trade.pendingDepositsKey, JSON.stringify(pending.filter(
             (deposit) => deposit.externalTxHash !== txHash ||
               deposit.externalChainId !== Number(network.chainId)
           )));

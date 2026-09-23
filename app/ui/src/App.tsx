@@ -290,7 +290,9 @@ const App = () => {
                                                   path="/dashboard/unified-trade"
                                                   element={
                                                     <GuestAccessibleRoute>
-                                                      <UnifiedTrade />
+                                                      <BridgeProvider scope="trade">
+                                                        <UnifiedTrade />
+                                                      </BridgeProvider>
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

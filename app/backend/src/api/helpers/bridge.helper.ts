@@ -2,6 +2,7 @@ import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
 import { BridgeToken } from "@strato/shared-types";
+import type { BridgeHistorySource } from "../../types/types";
 
 // ============================================================================
 // TYPES
@@ -46,6 +47,7 @@ export type BridgeAssetInfo = {
 };
 
 export type BridgeableAssetRoute = {
+  isDefaultRoute?: boolean;
   id: string;
   externalToken: string;
   externalChainId: string;
@@ -215,17 +217,17 @@ async function fetchStorageTokenSymbols(accessToken: string, addresses: Set<stri
   ]));
 }
 
-async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Promise<Map<string, { externalName: string; externalSymbol: string }>> {
+async function fetchExternalMeta(accessToken: string, tokens: Set<string>, source: BridgeHistorySource): Promise<Map<string, { externalName: string; externalSymbol: string; externalDecimals?: number }>> {
   if (!tokens.size) return new Map();
   const [standardResponse, legacyResponse, nativeResponse] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.ExternalAssetBridge}-routes`, {
+    source !== "legacy" ? cirrus.get(accessToken, `/${constants.ExternalAssetBridge}-routes`, {
       params: {
         address: `eq.${constants.externalAssetBridge}`,
         key: `in.(${[...tokens].join(",")})`,
         select: "key,key2,value",
       }
-    }),
-    constants.mercataBridge
+    }) : Promise.resolve({ data: [] }),
+    source !== "external" && constants.mercataBridge
       ? cirrus.get(accessToken, `/${constants.MercataBridge}-assets`, {
           params: {
             address: `eq.${constants.mercataBridge}`,
@@ -244,7 +246,7 @@ async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Prom
         })
       : Promise.resolve({ data: [] }),
   ]);
-  const map = new Map<string, { externalName: string; externalSymbol: string }>();
+  const map = new Map<string, { externalName: string; externalSymbol: string; externalDecimals?: number }>();
   for (const a of standardResponse.data || []) {
     const key = getBridgePairKey(
       normalizeBridgeAddress(a.key),
@@ -254,6 +256,8 @@ async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Prom
       map.set(key, {
         externalName: a.value?.externalName || "-",
         externalSymbol: a.value?.externalSymbol || "-",
+        externalDecimals: /^\d+$/.test(String(a.value?.externalDecimals)) && Number(a.value.externalDecimals) <= 18
+          ? Number(a.value.externalDecimals) : undefined,
       });
     }
   }
@@ -281,6 +285,7 @@ async function fetchExternalMeta(accessToken: string, tokens: Set<string>): Prom
       map.set(key, {
         externalName: typeof raw.externalName === "string" ? raw.externalName : "-",
         externalSymbol: typeof raw.externalSymbol === "string" ? raw.externalSymbol : "-",
+        externalDecimals: 18,
       });
     }
   }
@@ -308,14 +313,16 @@ export function getDepositOutcomeIdentity(
   return String(externalTxHash || "").toLowerCase();
 }
 
-async function fetchDepositEvents(accessToken: string, txHashes: string[]): Promise<Map<string, any>> {
+async function fetchDepositEvents(accessToken: string, txHashes: string[], source: BridgeHistorySource): Promise<Map<string, any>> {
   if (!txHashes.length) return new Map();
   const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
       select: "address,event_name,attributes",
-      address: constants.mercataBridge
-        ? `in.(${constants.externalAssetBridge},${constants.mercataBridge})`
-        : `eq.${constants.externalAssetBridge}`,
+      address: `in.(${[
+        ...(source !== "external" ? [constants.mercataBridge] : []),
+        ...(source !== "legacy" ? [constants.externalAssetBridge] : []),
+        constants.stratoNativeBridge,
+      ].filter(Boolean).join(",")})`,
       event_name:
         "in.(AutoForged,AutoSaved,AutoForgedViaPSM,AutoSavedUSDST,AutoRouted,DepositActionFallback)",
       "attributes->>externalTxHash": `in.(${txHashes.join(",")})`,
@@ -326,7 +333,8 @@ async function fetchDepositEvents(accessToken: string, txHashes: string[]): Prom
     const attributes = e.attributes || {};
     const isExternalAssetBridge =
       normalizeAddr(e.address) === normalizeAddr(constants.externalAssetBridge);
-    const key = getDepositOutcomeIdentity(
+    const key = normalizeAddr(e.address) === normalizeAddr(constants.stratoNativeBridge || "")
+      ? `native:${attributes.depositId}` : getDepositOutcomeIdentity(
       isExternalAssetBridge ? attributes.externalChainId : undefined,
       isExternalAssetBridge ? attributes.depositRouter : undefined,
       isExternalAssetBridge ? attributes.depositId : undefined,
@@ -361,7 +369,7 @@ async function fetchWithdrawalReviews(
 
 function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMap: Map<string, { name: string; symbol: string }>) {
   const evt = eventMap.get(
-    getDepositOutcomeIdentity(
+    enriched.bridgeSource === "native" ? `native:${enriched.depositId}` : getDepositOutcomeIdentity(
       enriched.bridgeSource === "external" ? enriched.externalChainId : undefined,
       enriched.bridgeSource === "external" ? enriched.depositRouter : undefined,
       enriched.bridgeSource === "external" ? enriched.depositId : undefined,
@@ -403,7 +411,8 @@ function applyDepositOutcome(enriched: any, eventMap: Map<string, any>, stratoMa
 export async function enrichTransactionData(
   accessToken: string,
   results: any[],
-  type: 'withdrawal' | 'deposit'
+  type: 'withdrawal' | 'deposit',
+  source: BridgeHistorySource = "all"
 ) {
   if (!results.length) return results;
 
@@ -411,8 +420,8 @@ export async function enrichTransactionData(
 
   const [stratoMap, externalMap, eventMap, reviewMap] = await Promise.all([
     fetchTokenSymbols(accessToken, stratoTokens),
-    fetchExternalMeta(accessToken, externalTokens),
-    type === "deposit" ? fetchDepositEvents(accessToken, txHashes) : Promise.resolve(new Map<string, any>()),
+    fetchExternalMeta(accessToken, externalTokens, source),
+    type === "deposit" ? fetchDepositEvents(accessToken, txHashes, source) : Promise.resolve(new Map<string, any>()),
     type === "withdrawal"
       ? fetchWithdrawalReviews(accessToken, results)
       : Promise.resolve(new Map<string, any>()),
@@ -463,6 +472,7 @@ export async function enrichTransactionData(
       stratoTokenName: strMeta?.name || "-",
       stratoTokenSymbol: strMeta?.symbol || "-",
       externalName: extMeta?.externalName || "-",
+      externalDecimals: extMeta?.externalDecimals,
       externalSymbol: extMeta?.externalSymbol || "-",
     };
 
@@ -478,7 +488,7 @@ export async function enrichTransactionData(
 
 export function enrichAssetsWithTokenData(
   assets: BridgeableAssetRoute[],
-  tokenMap: Map<string, { name?: string; symbol?: string; image?: string }>
+  tokenMap: Map<string, { name?: string; symbol?: string; image?: string; decimals?: number }>
 ): BridgeToken[] {
   return assets.map((route) => {
     const tokenKey = stripHex(route.AssetInfo.stratoToken);
@@ -487,7 +497,9 @@ export function enrichAssetsWithTokenData(
       ...route.AssetInfo,
       stratoTokenName: meta?.name ?? "",
       stratoTokenSymbol: meta?.symbol ?? "",
+      stratoTokenDecimals: meta?.decimals ?? 18,
       stratoTokenImage: meta?.image,
+      ...(route.isDefaultRoute !== undefined ? { isDefaultRoute: route.isDefaultRoute } : {}),
       id: route.id,
     };
   });
@@ -592,7 +604,7 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
 
     routes.push({
       id: `${externalToken}-${externalChainId}-${defaultToken}`,
-      externalToken, externalChainId,
+      externalToken, externalChainId, isDefaultRoute: true,
       AssetInfo: { ...asset, enabled: asset.enabled || explicitTokens.has(defaultToken) },
     });
 
@@ -600,7 +612,7 @@ export function parseBridgeRouteMappings(mappings: BridgeMappingRow[]): Bridgeab
       if (stratoToken === defaultToken) continue;
       routes.push({
         id: `${externalToken}-${externalChainId}-${stratoToken}`,
-        externalToken, externalChainId,
+        externalToken, externalChainId, isDefaultRoute: false,
         AssetInfo: { ...asset, stratoToken, enabled: true },
       });
     }

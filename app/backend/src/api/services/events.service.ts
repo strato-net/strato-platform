@@ -15,8 +15,8 @@ const enrichRoutedDepositEvents = async (
   const routedDepositTxHashes = events
     .filter(
       (event) =>
-        event.contract_name === "ExternalAssetBridge" &&
-        event.event_name === "DepositCompleted" &&
+        ((event.contract_name === "ExternalAssetBridge" && event.event_name === "DepositCompleted") ||
+         (event.contract_name === "StratoNativeBridge" && event.event_name === "NativeDepositCompleted")) &&
         event.transaction_hash
     )
     .map((event) => event.transaction_hash);
@@ -27,8 +27,8 @@ const enrichRoutedDepositEvents = async (
     `/${constants.Event}`,
     {
       params: {
-        address: `eq.${constants.externalAssetBridge}`,
-        event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted)",
+        address: `in.(${[constants.externalAssetBridge, constants.stratoNativeBridge].filter(Boolean).join(",")})`,
+        event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted,NativeDepositCompleted)",
         transaction_hash: `in.(${[
           ...new Set(routedDepositTxHashes),
         ].join(",")})`,
@@ -256,12 +256,13 @@ export const getActivitiesByTypes = async (
     pairs: ActivityTypePair[],
     params: Record<string, string>
   ) => {
-    if (constants.externalAssetBridge && pairs.some((pair) =>
+    if ((constants.externalAssetBridge || constants.stratoNativeBridge) && pairs.some((pair) =>
       pair.contract_name === "TokenRouter" && pair.event_name === "RouteExecuted"
     )) {
-      const bridge = constants.externalAssetBridge.toLowerCase().replace(/^0x/, "");
+      const bridges = [constants.externalAssetBridge, constants.stratoNativeBridge].filter(Boolean)
+        .map(address => address.toLowerCase().replace(/^0x/, ""));
       // Bridge routes are represented by the enriched DepositCompleted activity.
-      params.and = `(or(event_name.neq.RouteExecuted,attributes->>caller.neq.${bridge}))`;
+      params.and = `(${bridges.map(bridge => `or(event_name.neq.RouteExecuted,attributes->>caller.neq.${bridge})`).join(",")})`;
     }
     if (internalAddrList) {
       for (const pair of pairs) {

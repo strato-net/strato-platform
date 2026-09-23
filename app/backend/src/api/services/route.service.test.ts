@@ -52,6 +52,25 @@ test("finds direct routes before longer alternatives", () => {
   assert.equal(routes[0].length, 1);
 });
 
+test("factory pool index lookup uses JSON address values and preserves index zero", async (t) => {
+  const { fetchFactoryPoolIndex } = await import("./route.service");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const { constants } = await import("../../config/constants");
+  const pool = "ab".repeat(20);
+  let rows: Array<{ key: number; value: string }> = [{ key: 0, value: pool }];
+  t.mock.method(cirrus, "get", async (_token: string, path: string, options: any) => {
+    assert.equal(path, `/${constants.PoolFactory}-allPools`);
+    assert.equal(options.params.address, `eq.${constants.poolFactory}`);
+    assert.equal(options.params.value, `eq."${pool}"`);
+    return { data: rows };
+  });
+  assert.equal(await fetchFactoryPoolIndex("token", `0x${pool.toUpperCase()}`), "0");
+  rows = [{ key: 10, value: pool }];
+  assert.equal(await fetchFactoryPoolIndex("token", pool), "10");
+  rows = [];
+  await assert.rejects(fetchFactoryPoolIndex("token", pool), /Pool factory index could not be resolved/);
+});
+
 test("pool deep links resolve token addresses across pool types without loading analytics", async (t) => {
   const { getRoutePoolTokens } = await import("./route.service");
   const swapping = await import("../helpers/swapping.helper");
@@ -158,6 +177,7 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
   t.mock.method(save, "getSaveUsdstActionState", async () => null);
   t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.PoolFactory}-allPools`) return { data: [{ key: 10 }] };
     if (path === `/${constants.Pool}`) {
       discoveryCalls++;
       if (failDiscovery) throw new Error("discovery unavailable");
@@ -191,6 +211,7 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   assert.equal(discoveryCalls, 1, "concurrent requests share discovery");
   assert.equal(first[0].amountOut, "800");
   assert.equal(first[0].steps.length, 3, "materially better output justifies extra steps");
+  assert.ok(first[0].steps.every(step => step.factoryPoolIndex === "10"), "V2 steps carry their registry index");
   assert.equal(calls.filter((key) => key === "a:b:100").length, 2, "shared prefix quoted once per request");
   assert.ok(calls.includes("c:d:200"));
   assert.ok(calls.includes("c:d:400"), "same edge with different amounts is quoted separately");
@@ -242,6 +263,7 @@ test("selects the shortest route within the output tolerance of the global best"
   t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
   t.mock.method(save, "getSaveUsdstActionState", async () => null);
   t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.PoolFactory}-allPools`) return { data: [{ key: 10 }] };
     if (path === `/${constants.Pool}`) return { data: pairs.map(([a, b]) => ({
       address: a + b, tokenA: { address: a, status: "2" },
       tokenB: { address: b, status: "2" }, tokenABalance: "100", tokenBBalance: "100",
@@ -610,6 +632,69 @@ test("anonymous route assets omit the balances relationship", async (t) => {
   await getRouteAssets("user-token", "4".repeat(40));
   assert.equal(selections.at(-1).select.includes("balances:"), true);
   assert.equal(selections.at(-1)["balances.key"], `eq.${"4".repeat(40)}`);
+});
+
+test("route assets price vault shares from projected backing for guests and signed-in users", async (t) => {
+  const { getRouteAssets } = await import("./route.service");
+  const { constants } = await import("../../config/constants");
+  const config = await import("../../config/config");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const swapping = await import("../helpers/swapping.helper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const savings = await import("./saveUsdst.service");
+  const vaults = await import("./yieldVault.service");
+  const oracle = await import("./oracle.service");
+  const snapshot = { ...config };
+  t.after(() => Object.assign(config, snapshot));
+  Object.assign(config, { networkId: "vault-price-test", tokenRouter: "1".repeat(40) });
+  const gold = "a".repeat(40), vault = "b".repeat(40);
+  let indexed = true, missingPrice = false, oracleFailure = false;
+  let decimals = 18, totalShares = "100000000000000000000", pricingAssets = "125000000000000000000";
+  t.mock.method(swapping, "fetchMultiTokenStablePools", async () => []);
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: true }));
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
+  t.mock.method(savings, "getSaveUsdstActionState", async () => null);
+  t.mock.method(vaults, "listVaultDefs", () => [{ key: "goldst-yield", address: vault }] as any);
+  t.mock.method(vaults, "getYieldVaultActionState", async () => ({
+    vaultAddress: vault, assetAddress: gold, name: "GOLDST Yield Vault", shareSymbol: "yieldGOLDST",
+    decimals, totalShares, projectedActiveAssets: pricingAssets, paused: false,
+  }));
+  t.mock.method(oracle, "getOraclePrices", async () => {
+    if (oracleFailure) throw new Error("oracle unavailable");
+    return new Map(missingPrice ? [] : [[`0x${gold.toUpperCase()}`, "4000000000000000000000"]]);
+  });
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.TokenRouter}-approvedYieldVaults`) return { data: [{ key: vault }] };
+    if (path === `/${constants.Token}` && indexed) return { data: [{
+      address: vault, _name: "GOLDST Yield Vault", _symbol: "yieldGOLDST", customDecimals: decimals,
+      balances: [{ balance: "200" }], images: [{ value: "vault.png" }],
+    }] };
+    return { data: [] };
+  });
+  const read = async (user?: string) => (await getRouteAssets("token", user)).find(token => token.address === vault)!;
+  for (const user of [undefined, "c".repeat(40)]) {
+    const token = await read(user);
+    assert.equal(token.price, "5000000000000000000000", "1.25 GOLDST per share at $4,000 gives $5,000");
+    assert.equal(token.images[0].value, "vault.png", "pricing preserves existing token metadata");
+  }
+  indexed = false;
+  assert.equal((await read()).price, "5000000000000000000000", "synthetic vault assets also receive a price");
+  for (decimals of [0, 2, 6, 18]) {
+    totalShares = (100n * 10n ** BigInt(decimals)).toString();
+    pricingAssets = (125n * 10n ** BigInt(decimals)).toString();
+    assert.equal((await read()).price, "5000000000000000000000");
+  }
+  totalShares = "0";
+  pricingAssets = "0";
+  assert.equal((await read()).price, "4000000000000000000000", "empty vaults start at one underlying unit per share");
+  totalShares = "100";
+  assert.equal((await read()).price, "0", "no backing cannot produce a positive price");
+  pricingAssets = "125";
+  missingPrice = true;
+  assert.equal((await read()).price, "0", "missing oracle data remains unavailable");
+  oracleFailure = true;
+  assert.equal((await read()).price, "0", "cosmetic price failure does not hide route assets");
 });
 
 test("startup rejects router dependencies that disagree with backend quote configuration", async (t) => {

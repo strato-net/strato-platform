@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { BridgeProtocol, BridgeHistorySource } from "../../types/types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/appApiHelper";
@@ -205,23 +206,26 @@ export const requestWithdrawal = async (
     stratoToken,
     stratoTokenAmount,
   }: WithdrawalRequestParams,
-  userAddress: string
+  userAddress: string,
+  protocol: BridgeProtocol = "external"
 ): Promise<TransactionResponse> => {
   if (routeType === "native") {
     throw new Error("Use the native bridge withdrawal route for native requests");
   }
 
+  const bridgeAddress = protocol === "legacy" ? constants.mercataBridge : constants.externalAssetBridge;
+  const bridgeContract = protocol === "legacy" ? constants.MercataBridge : ExternalAssetBridge;
   const tx = await buildFunctionTx(
     [
       {
         contractName: extractContractName(Token),
         contractAddress: stratoToken,
         method: "approve",
-        args: { spender: constants.externalAssetBridge, value: stratoTokenAmount },
+        args: { spender: bridgeAddress, value: stratoTokenAmount },
       },
       {
-        contractName: extractContractName(ExternalAssetBridge),
-        contractAddress: constants.externalAssetBridge,
+        contractName: extractContractName(bridgeContract),
+        contractAddress: bridgeAddress,
         method: "requestWithdrawal",
         args: {
           externalChainId,
@@ -281,7 +285,8 @@ export const requestNativeWithdrawal = async (
     stratoToken,
     stratoTokenAmount,
   }: WithdrawalRequestParams,
-  userAddress: string
+  userAddress: string,
+  protocol: BridgeProtocol = "external"
 ): Promise<TransactionResponse> => {
   if (!constants.stratoNativeBridge) {
     throw new Error("STRATO_NATIVE_BRIDGE is not configured");
@@ -290,7 +295,7 @@ export const requestNativeWithdrawal = async (
     throw new Error("STRATO_NATIVE_CUSTODY_VAULT is not configured");
   }
 
-  const nativeRoute = (await getBridgeableTokens(accessToken, externalChainId)).find(
+  const nativeRoute = (await getBridgeableTokens(accessToken, externalChainId, protocol)).find(
     (token) =>
       token.routeType === "native"
       && token.stratoToken.toLowerCase().replace(/^0x/, "")
@@ -334,7 +339,8 @@ export const getBridgeTransactions = async (
   accessToken: string,
   type: 'withdrawal' | 'deposit',
   userAddress: string | undefined,
-  rawParams: Record<string, string | undefined> = {}
+  rawParams: Record<string, string | undefined> = {},
+  source: BridgeHistorySource = "all"
 ): Promise<BridgeTransactionResponse> => {
   const config = QUERY_CONFIGS[type];
   const isDeposit = type === "deposit";
@@ -359,13 +365,13 @@ export const getBridgeTransactions = async (
   const legacyConfig = LEGACY_QUERY_CONFIGS[type];
 
   const [standardResponse, legacyResponse, nativeResponse, nativeCountResponse] = await Promise.all([
-    executeParallelQueries(
+    source !== "legacy" ? executeParallelQueries(
       accessToken,
       config,
       dataParams,
       { ...queryParams, select: config.countField }
-    ),
-    constants.mercataBridge
+    ) : Promise.resolve({ results: [], totalCount: 0 }),
+    source !== "external" && constants.mercataBridge
       ? executeParallelQueries(
           accessToken,
           legacyConfig,
@@ -419,16 +425,21 @@ export const getBridgeTransactions = async (
   }
 
   const page = isDeposit ? allResults : applyPagination(allResults, rawParams);
-  const enrichedData = await enrichTransactionData(accessToken, page, type);
+  const enrichedData = await enrichTransactionData(accessToken, page, type, source);
   return { data: enrichedData, totalCount };
 };
 
-export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
-  const standardParams: Record<string, string> = {
+export const getBridgeableTokens = async (accessToken: string, chainId?: string, protocol: BridgeProtocol = "external"): Promise<BridgeToken[]> => {
+  const legacy = protocol === "legacy";
+  const standardParams: Record<string, string> = legacy ? {
+    select: "collection_name,externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,mappingValue:value",
+    collection_name: "in.(assets,assetRouteEnabled)",
+    address: `eq.${constants.mercataBridge}`,
+  } : {
     select: "externalToken:key,externalChainId:key2,targetStratoToken:key3,mappingValue:value",
     address: `eq.${constants.externalAssetBridge}`
   };
-  if (chainId) standardParams.key2 = `eq.${chainId}`;
+  if (chainId) standardParams[legacy ? "key->>key2" : "key2"] = `eq.${chainId}`;
 
   const nativeParams: Record<string, string> = {
     address: `eq.${constants.stratoNativeBridge}`,
@@ -444,7 +455,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
     nativeLockedBalanceResponse,
     routeRebaseResponse,
   ] = await Promise.all([
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-routes`, { params: standardParams }),
+    cirrus.get(accessToken, legacy ? "/mapping" : `/${ExternalAssetBridge}-routes`, { params: standardParams }),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, `/${StratoNativeBridge}-assets`, { params: nativeParams })
       : Promise.resolve({ data: [] }),
@@ -473,7 +484,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
           }
         })
       : Promise.resolve({ data: [] }),
-    cirrus.get(
+    legacy ? Promise.resolve({ data: [] }) : cirrus.get(
       accessToken,
       `/${ExternalAssetBridge}-routeRebaseRequired`,
       {
@@ -536,7 +547,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
   for (const token of tokens) {
     const factor = rebaseFactorMap.get(token.stratoToken.toLowerCase().replace(/^0x/, ''));
     const requiresRebase =
-      token.routeType === "native" ||
+      legacy || token.routeType === "native" ||
       rebasingRoutes.has(
         depositActionRouteKey(
           token.externalToken,
@@ -544,17 +555,19 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string)
           token.stratoToken
         )
       );
+    if (!legacy && token.routeType === "standard") token.rebaseRequired = requiresRebase;
     if (requiresRebase && factor) token.rebaseFactor = factor;
   }
   return tokens;
 };
 
-export const getNetworkConfigs = async (accessToken: string): Promise<NetworkConfig[]> => { 
-  const { data } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-chains`, {
+export const getNetworkConfigs = async (accessToken: string, protocol: BridgeProtocol = "external"): Promise<NetworkConfig[]> => {
+  const legacy = protocol === "legacy";
+  const { data } = await cirrus.get(accessToken, `/${legacy ? constants.MercataBridge : ExternalAssetBridge}-chains`, {
     params: {
       select: "externalChainId:key,ChainInfo:value",
       "value->>enabled": "eq.true",
-      address: `eq.${constants.externalAssetBridge}`
+      address: `eq.${legacy ? constants.mercataBridge : constants.externalAssetBridge}`
     }
   });
   return data.map((c: any) => {
@@ -566,9 +579,10 @@ export const getNetworkConfigs = async (accessToken: string): Promise<NetworkCon
 
 export const getWithdrawalSummary = async (
   accessToken: string,
-  userAddress: string
+  userAddress: string,
+  source: BridgeHistorySource = "all"
 ): Promise<WithdrawalSummaryResponse> => {
-  const routes = await getBridgeableTokens(accessToken);
+  const routes = await getBridgeableTokens(accessToken, undefined, source === "legacy" ? "legacy" : "external");
   const stratoTokens = [...new Set(routes.map((route) => normalizeAddress(route.stratoToken)).filter(Boolean))];
   const thirtyDaysAgoUTC = toUTCTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
   const saveUsdstVaultAddress = normalizeAddress(constants.saveUsdstVault);
@@ -605,23 +619,23 @@ export const getWithdrawalSummary = async (
         })
       : Promise.resolve({ data: [] }),
     getCompletePriceMap(accessToken),
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
+    source !== "legacy" ? cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
         address: `eq.${constants.externalAssetBridge}`,
         "value->>stratoSender": `eq.${userAddress}`,
         "value->>status": "in.(1,2,3)"
       }
-    }),
-    cirrus.get(accessToken, `/${constants.MercataBridge}-withdrawals`, {
+    }) : Promise.resolve({ data: [] }),
+    source !== "external" ? cirrus.get(accessToken, `/${constants.MercataBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
         address: `eq.${constants.mercataBridge}`,
         "value->>stratoSender": `eq.${userAddress}`,
         "value->>bridgeStatus": "in.(1,2)"
       }
-    }),
-    cirrus.get(accessToken, `/${constants.MercataBridge}-withdrawals`, {
+    }) : Promise.resolve({ data: [] }),
+    source !== "external" ? cirrus.get(accessToken, `/${constants.MercataBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
         address: `eq.${constants.mercataBridge}`,
@@ -629,8 +643,8 @@ export const getWithdrawalSummary = async (
         "value->>bridgeStatus": "eq.3",
         block_timestamp: `gte.${thirtyDaysAgoUTC}`
       }
-    }),
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
+    }) : Promise.resolve({ data: [] }),
+    source !== "legacy" ? cirrus.get(accessToken, `/${ExternalAssetBridge}-withdrawals`, {
       params: {
         select: "value->>stratoToken,value->>stratoTokenAmount",
         address: `eq.${constants.externalAssetBridge}`,
@@ -638,7 +652,7 @@ export const getWithdrawalSummary = async (
         "value->>status": "eq.4",
         block_timestamp: `gte.${thirtyDaysAgoUTC}`
       }
-    }),
+    }) : Promise.resolve({ data: [] }),
     constants.stratoNativeBridge
       ? cirrus.get(accessToken, nativeWithdrawalsTable, {
           params: {
@@ -822,6 +836,8 @@ export const buildDepositActionCatalog = ({
   saveState,
   forgeConfigs,
   bridgeActionRoutes,
+  protocol = "external",
+  bridgeActionConfig,
 }: {
   routes: BridgeToken[];
   actionChainIds: Set<string>;
@@ -829,6 +845,8 @@ export const buildDepositActionCatalog = ({
   saveState: SaveUsdstActionState | null;
   forgeConfigs: MetalForgeConfig;
   bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean; autoRoute?: boolean }>;
+  protocol?: BridgeProtocol;
+  bridgeActionConfig?: { directMintPsm?: string; saveUsdstVault?: string };
 }): DepositAction[] => {
   if (!actionChainIds.size) return [];
 
@@ -836,7 +854,8 @@ export const buildDepositActionCatalog = ({
   const psmReady = Boolean(
     psmState &&
     !psmState.mintPaused &&
-    psmState.mintableToken === usdst
+    psmState.mintableToken === usdst &&
+    (protocol !== "legacy" || normalizeCatalogAddress(bridgeActionConfig?.directMintPsm) === normalizeCatalogAddress(constants.directMintPsm))
   );
   const sources = new Map<string, {
     address: string;
@@ -860,7 +879,7 @@ export const buildDepositActionCatalog = ({
     const actionConfig = bridgeActionRoutes.get(
       depositActionRouteKey(route.externalToken, chainId, route.stratoToken)
     );
-    if (!actionConfig?.autoRoute) continue;
+    if (!actionConfig || (protocol === "legacy" ? !actionConfig.autoForge && !actionConfig.autoSave : !actionConfig.autoRoute)) continue;
 
     const source = sources.get(address) || {
       address: route.stratoToken,
@@ -868,8 +887,8 @@ export const buildDepositActionCatalog = ({
       saveChainIds: new Set<string>(),
       psmFeeBps: address === usdst ? "0" : mintConfig!.feeBps,
     };
-    source.forgeChainIds.add(chainId);
-    source.saveChainIds.add(chainId);
+    if (protocol !== "legacy" || actionConfig.autoForge) source.forgeChainIds.add(chainId);
+    if (protocol !== "legacy" || actionConfig.autoSave) source.saveChainIds.add(chainId);
     sources.set(address, source);
   }
 
@@ -877,7 +896,8 @@ export const buildDepositActionCatalog = ({
   const saveEnabled = Boolean(
     saveState &&
     !saveState.paused &&
-    normalizeCatalogAddress(saveState.assetAddress) === usdst
+    normalizeCatalogAddress(saveState.assetAddress) === usdst &&
+    (protocol !== "legacy" || normalizeCatalogAddress(bridgeActionConfig?.saveUsdstVault) === normalizeCatalogAddress(saveState.vaultAddress))
   );
   const forgeEnabled = forgeConfigs.payTokens.some(
     ({ address }) => normalizeCatalogAddress(address) === usdst
@@ -901,7 +921,7 @@ export const buildDepositActionCatalog = ({
     if (saveEnabled && saveState && source.saveChainIds.size) {
       actions.push({
         id: `save-${source.address}`,
-        action: 4,
+        action: protocol === "legacy" ? 3 : 4,
         stratoToken: saveState.vaultAddress,
         stratoTokenName: "Save USDST",
         stratoTokenSymbol: saveState.shareSymbol,
@@ -914,7 +934,7 @@ export const buildDepositActionCatalog = ({
     for (const metal of source.forgeChainIds.size ? enabledMetals : []) {
       actions.push({
         id: `forge-${source.address}-${metal.address}`,
-        action: 4,
+        action: protocol === "legacy" ? 2 : 4,
         stratoToken: metal.address,
         stratoTokenName: metal.name,
         stratoTokenSymbol: metal.symbol,
@@ -930,7 +950,8 @@ export const buildDepositActionCatalog = ({
   return actions;
 };
 
-export const getDepositActions = async (accessToken: string): Promise<DepositAction[]> => {
+export const getDepositActions = async (accessToken: string, protocol: BridgeProtocol = "external"): Promise<DepositAction[]> => {
+  const legacy = protocol === "legacy";
   const [
     routes,
     networks,
@@ -938,18 +959,30 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     saveState,
     forgeConfigs,
     bridgeActionRouteRows,
+    bridgeActionConfig,
   ] = await Promise.all([
-    getBridgeableTokens(accessToken),
-    getNetworkConfigs(accessToken),
+    getBridgeableTokens(accessToken, undefined, protocol),
+    getNetworkConfigs(accessToken, protocol),
     constants.directMintPsm ? getPsmMintState(accessToken) : Promise.resolve(null),
     constants.saveUsdstVault ? getSaveUsdstActionState(accessToken) : Promise.resolve(null),
     constants.metalForge ? getMetalForgeConfigs(accessToken) : Promise.resolve({ metals: [], payTokens: [] }),
-    cirrus.get(accessToken, `/${ExternalAssetBridge}-depositActionConfigs`, {
-      params: {
+    cirrus.get(accessToken, legacy ? "/mapping" : `/${ExternalAssetBridge}-depositActionConfigs`, {
+      params: legacy ? {
+        address: `eq.${constants.mercataBridge}`,
+        collection_name: "eq.depositActionConfigs",
+        select: "externalToken:key->>key,externalChainId:key->>key2,targetStratoToken:key->>key3,value",
+      } : {
         address: `eq.${constants.externalAssetBridge}`,
         select: "externalToken:key,externalChainId:key2,targetStratoToken:key3,value",
       },
     }).then(({ data }) => data || []),
+    legacy ? cirrus.get(accessToken, "/storage", {
+      params: {
+        address: `eq.${constants.mercataBridge}`,
+        select: "data->>directMintPsm,data->>saveUsdstVault",
+        limit: "1",
+      },
+    }).then(({ data }) => data?.[0] || {}) : Promise.resolve(undefined),
   ]);
 
   const bridgeActionRoutes = new Map<string, { autoForge: boolean; autoSave: boolean; autoRoute: boolean }>(
@@ -978,5 +1011,7 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     saveState,
     forgeConfigs,
     bridgeActionRoutes,
+    protocol,
+    bridgeActionConfig,
   });
 };

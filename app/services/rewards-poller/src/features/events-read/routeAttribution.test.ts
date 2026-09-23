@@ -6,6 +6,7 @@ const route = {
   attributedUser: "0x1111111111111111111111111111111111111111",
   tokenRouter: "1111111111111111111111111111111111111111",
   externalAssetBridge: "2222222222222222222222222222222222222222",
+  nativeBridge: "4".repeat(40),
 };
 
 test("attributes underlying route activity to a direct caller", () => {
@@ -60,4 +61,17 @@ test("keeps non-routed activity attribution when bridge configuration is invalid
 
 test("fails closed when the routed caller is unavailable", () => {
   assert.equal(resolveRoutedActivityUser(route), null);
+});
+
+
+test("skips native bridge routes rather than rewarding the bridge contract", () => {
+  assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: "4".repeat(40), routedCaller: `0x${"4".repeat(40)}` }), null);
+  assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: "4".repeat(40), routedCaller: "3".repeat(40) }), "3".repeat(40));
+});
+
+
+test("fails closed for routed rewards until native bridge attribution is configured", () => {
+  for (const nativeBridge of [undefined, "", "0".repeat(40), "malformed"]) {
+    assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge, routedCaller: "4".repeat(40) }), null);
+  }
 });

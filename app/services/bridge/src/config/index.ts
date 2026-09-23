@@ -31,6 +31,10 @@ export const DEPOSIT_EVENT_SIGNATURES = [
 export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
   "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
 
+export const NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE = id(
+  "RedemptionRequestedWithRoute(address,uint256,address,address,uint96,address,uint256)",
+);
+
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =
   "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";

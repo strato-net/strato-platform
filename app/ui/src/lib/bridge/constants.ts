@@ -3,6 +3,11 @@ import { defineChain } from 'viem/utils';
 import { ChainHints } from './types';
 
 // Core Constants
+export const BRIDGE_SCOPES = {
+  fund: { apiBase: "/bridge", pendingDepositsKey: "pendingDeposits" },
+  trade: { apiBase: "/trade/bridge", pendingDepositsKey: "tradePendingDeposits" },
+} as const;
+
 export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const;
 export const EIP7702_DELEGATION_CODE_PATTERN = /^0xef0100[0-9a-f]{40}$/i;
@@ -199,6 +204,19 @@ export const DEPOSIT_ROUTER_ABI = [
 ] as const;
 
 export const STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI = [
+  {
+    inputs: [
+      { name: 'representationToken', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoRecipient', type: 'address' },
+      { name: 'actionToken', type: 'address' },
+      { name: 'minFinalOut', type: 'uint256' }
+    ],
+    name: 'requestRedemptionWithRoute',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
   {
     inputs: [
       { name: 'representationToken', type: 'address' },

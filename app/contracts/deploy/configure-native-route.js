@@ -12,6 +12,8 @@
  *     --max-per-withdrawal <amount> \
  *     [--instant-withdrawal-threshold <amount>] \
  *     --strato-token <addr> \
+ *     [--token-router <addr>] \
+ *     [--auto-route-enabled <true|false>] \
  *     [--enabled <true|false>] \
  *     [--deposits-disabled <true|false> \
  *      --withdrawals-disabled <true|false> \
@@ -123,13 +125,18 @@ async function main() {
     'max-per-withdrawal',
     'strato-token',
   ];
+  const tokenRouter = args['token-router'];
+  const autoRouteEnabled = parseBoolean(args['auto-route-enabled'], undefined);
+  if (tokenRouter && (!/^(0x)?[0-9a-f]{40}$/i.test(tokenRouter) || BigInt(`0x${tokenRouter.replace(/^0x/i, "")}`) === 0n)) {
+    throw new Error("token-router must be a nonzero address");
+  }
   const missing = required.filter((key) => !args[key]);
 
   if (missing.length > 0) {
     console.error(`Missing required arguments: ${missing.map((key) => `--${key}`).join(', ')}`);
     console.error('\nUsage:');
     console.error(
-      '  node configure-native-route.js --bridge-address <addr> --external-chain-id <id> --external-bridge <addr> --representation-token <addr> --external-name <name> --external-symbol <symbol> --max-per-withdrawal <amount> --strato-token <addr> [--enabled <true|false>] [--deposits-disabled <true|false> --withdrawals-disabled <true|false> --max-outstanding-withdrawal <amount>]'
+      '  node configure-native-route.js --bridge-address <addr> --external-chain-id <id> --external-bridge <addr> --representation-token <addr> --external-name <name> --external-symbol <symbol> --max-per-withdrawal <amount> --strato-token <addr> [--token-router <addr>] [--auto-route-enabled <true|false>] [--enabled <true|false>] [--deposits-disabled <true|false> --withdrawals-disabled <true|false> --max-outstanding-withdrawal <amount>]'
     );
     process.exit(1);
   }
@@ -191,7 +198,7 @@ async function main() {
   }
 
   console.log('Native route configuration plan:');
-  console.log(JSON.stringify({ bridgeAddress, callArgs, tokenConfigArgs }, null, 2));
+  console.log(JSON.stringify({ bridgeAddress, callArgs, tokenConfigArgs, tokenRouter, autoRouteEnabled }, null, 2));
   console.log('');
 
   console.log(`Calling StratoNativeBridge(${bridgeAddress}).setAsset(...)`);
@@ -214,6 +221,18 @@ async function main() {
       tokenConfigArgs
     );
     logCallResult('Token bridge configuration', tokenConfigResult);
+  }
+
+  if (tokenRouter) {
+    const routerResult = await callContract(tokenObj, bridgeAddress, 'StratoNativeBridge',
+      'setTokenRouter', { newTokenRouter: tokenRouter });
+    logCallResult('Token router configuration', routerResult);
+  }
+
+  if (autoRouteEnabled !== undefined) {
+    const actionResult = await callContract(tokenObj, bridgeAddress, 'StratoNativeBridge',
+      'setAutoRouteEnabled', { stratoToken: callArgs.stratoToken, externalChainId: callArgs.externalChainId, enabled: autoRouteEnabled });
+    logCallResult('Auto-route configuration', actionResult);
   }
 
   console.log('\nNative route configuration complete.');

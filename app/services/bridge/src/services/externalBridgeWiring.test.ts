@@ -260,6 +260,58 @@ test("atomically settles non-native deposits on ExternalAssetBridge", async () =
   });
 });
 
+test("execute resolves only when every posted transaction succeeds", async () => {
+  const { postAndWaitForTx } = await import("../utils/stratoHelper");
+  const mixedBatch = [
+    { hash: "aa", status: "Success" },
+    { hash: "bb", status: "Pending" },
+  ];
+
+  // Immediate resolve=true success on the first transaction alone must not
+  // short-circuit; the second transaction is polled to completion.
+  let polls = 0;
+  const settled = await postAndWaitForTx(
+    async () => mixedBatch,
+    0,
+    { post: async () => { polls++; return [
+      { hash: "aa", status: "Success" },
+      { hash: "bb", status: "Success" },
+    ]; } } as any,
+  );
+  assert.deepEqual(settled, { status: "Success", hash: "aa" });
+  assert.ok(polls >= 1, "second transaction must be polled to completion");
+
+  // A wait that runs out with a Pending transaction is an error, not a result.
+  await assert.rejects(
+    postAndWaitForTx(async () => mixedBatch, 0, { post: async () => mixedBatch } as any),
+    /bb did not succeed within 0ms \(status Pending\)/,
+  );
+
+  // A failure anywhere in the immediate batch rejects with its message.
+  await assert.rejects(
+    postAndWaitForTx(
+      async () => [
+        { hash: "aa", status: "Success" },
+        { hash: "bb", status: "Failure", error: "EAB: mint failed" },
+      ],
+      0,
+      { post: async () => assert.fail("must not poll a failed batch") } as any,
+    ),
+    /EAB: mint failed/,
+  );
+
+  // An all-success immediate result resolves without polling.
+  const immediate = await postAndWaitForTx(
+    async () => [
+      { hash: "aa", status: "Success" },
+      { hash: "bb", status: "Success" },
+    ],
+    0,
+    { post: async () => assert.fail("must not poll a settled batch") } as any,
+  );
+  assert.deepEqual(immediate, { status: "Success", hash: "aa" });
+});
+
 test("treats a duplicate identity as settled only when Cirrus confirms completion", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
   const { cirrus } = await import("../utils/api");

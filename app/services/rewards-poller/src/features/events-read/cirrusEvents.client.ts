@@ -137,6 +137,7 @@ const queryRegularEvents = async (
         routedCaller: routedCallers.get(item.transaction_hash),
         tokenRouter: tokenRouterAddress,
         externalAssetBridge: config.externalAssetBridge.address,
+        nativeBridge: config.nativeBridge.address,
       });
       if (!user) {
         logDebug("RouteAttribution", "Skipped router-attributed activity: bridge configuration or routed caller is unavailable, or the caller is the bridge", { transactionHash: item.transaction_hash });

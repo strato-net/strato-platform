@@ -3,7 +3,6 @@ import {
   strato,
   relayerBloc,
   relayerStrato,
-  extractErrorMessage,
 } from "./api";
 import { config } from "../config";
 import { logError, logInfo } from "./logger";
@@ -94,32 +93,28 @@ export const until = async <T>(
 
 /**
  * Evaluate immediate status from resolve=true response
- * Returns TxResponse if definitive result, undefined if polling needed
+ * Returns TxResponse only when every transaction succeeded,
+ * throws when any failed, undefined if polling needed
  */
 const getImmediateResult = (
   response: any[],
 ): TxResponse | undefined => {
-  const first = response[0];
-  const status = first?.status;
-
-  switch (status) {
-    case "Success":
-      return { status: "Success", hash: first.hash };
-    case "Failed":
-    case "Failure": {
-      const msg = getTxFailureMessage(first);
-      logError("StratoHelper", new Error(extractErrorMessage(msg)), {
-        operation: "immediateTransactionFailure",
-        result: getTxFailureDetails(first),
-      });
-      throw new Error(extractErrorMessage(msg));
-    }
-    case "Pending":
-    case undefined:
-    default:
-      // Pending, undefined, or unknown status: fall back to polling
-      return undefined;
+  const failed = response.find(
+    (r) => r?.status === "Failed" || r?.status === "Failure",
+  );
+  if (failed) {
+    const msg = getTxFailureMessage(failed);
+    logError("StratoHelper", new Error(msg), {
+      operation: "immediateTransactionFailure",
+      result: getTxFailureDetails(failed),
+    });
+    throw new Error(msg);
   }
+  if (response.every((r) => r?.status === "Success")) {
+    return { status: "Success", hash: response[0].hash };
+  }
+  // Any Pending, undefined, or unknown status: fall back to polling
+  return undefined;
 };
 
 /**
@@ -153,12 +148,12 @@ export const postAndWaitForTx = async (
       const failed = res.find((r) => r?.status === "Failure");
       if (failed) {
         const msg = getTxFailureMessage(failed);
-        logError("StratoHelper", new Error(extractErrorMessage(msg)), {
+        logError("StratoHelper", new Error(msg), {
           operation: "polledTransactionFailure",
           result: getTxFailureDetails(failed),
           txHashes,
         });
-        throw new Error(extractErrorMessage(msg));
+        throw new Error(msg);
       }
       return res.every((r) => r?.status !== "Pending");
     },
@@ -166,10 +161,19 @@ export const postAndWaitForTx = async (
     { timeout },
   );
 
-  return {
-    status: results[0].status as TxResponse["status"],
-    hash: results[0].hash,
-  };
+  // Resolve only when every posted transaction succeeded; a timeout leaves
+  // Pending results and must surface as an error so callers retry.
+  const unresolved =
+    results.length < txHashes.length
+      ? { hash: txHashes[results.length], status: "missing" }
+      : results.find((r) => r?.status !== "Success");
+  if (unresolved) {
+    throw new Error(
+      `Transaction ${unresolved.hash} did not succeed within ${timeout}ms (status ${unresolved.status || "unknown"})`,
+    );
+  }
+
+  return { status: "Success", hash: results[0].hash };
 };
 
 /**

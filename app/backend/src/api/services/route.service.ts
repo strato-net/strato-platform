@@ -20,7 +20,8 @@ import {
   fetchPoolCoins,
   fetchPoolTokenAddresses,
 } from "../helpers/swapping.helper";
-import { previewVaultDeposit } from "../helpers/vault.helper";
+import { getVaultSharePrice, previewVaultDeposit } from "../helpers/vault.helper";
+import { getOraclePrices } from "./oracle.service";
 import { getConfigs } from "./metalForge.service";
 import { getPoolTokenPairs } from "./poolV3.service";
 import { getPsmMintState } from "./psm.service";
@@ -365,22 +366,26 @@ export const getRouteAssets = async (
   const sourceAddresses = new Set(edges.map(({ tokenIn }) => tokenIn));
   if (addresses.length === 0) return [];
 
-  const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
-    params: {
-      address: `in.(${addresses.join(",")})`,
-      status: "eq.2",
-      select: [
-        "address",
-        "_name",
-        "_symbol",
-        "_totalSupply::text",
-        "customDecimals",
-        `images:${constants.Token}-images(value)`,
-        ...(userAddress ? [`balances:${constants.Token}-_balances(user:key,balance:value::text)`] : []),
-      ].join(","),
-      ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
-    },
-  });
+  const [{ data }, oraclePrices] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.Token}`, {
+      params: {
+        address: `in.(${addresses.join(",")})`,
+        status: "eq.2",
+        select: [
+          "address",
+          "_name",
+          "_symbol",
+          "_totalSupply::text",
+          "customDecimals",
+          `images:${constants.Token}-images(value)`,
+          ...(userAddress ? [`balances:${constants.Token}-_balances(user:key,balance:value::text)`] : []),
+        ].join(","),
+        ...(userAddress ? { "balances.key": `eq.${userAddress}` } : {}),
+      },
+    }),
+    getOraclePrices(accessToken).catch(() => new Map<string, string>()),
+  ]);
+  const prices = new Map([...oraclePrices].map(([address, price]) => [normalizeAddress(address), price]));
   const assets = new Map<string, SwapToken>(
     (data || []).map((token: any) => [
       normalizeAddress(token.address),
@@ -388,7 +393,7 @@ export const getRouteAssets = async (
         ...token,
         address: normalizeAddress(token.address),
         balance: token.balances?.[0]?.balance || "0",
-        price: "0",
+        price: prices.get(normalizeAddress(token.address)) || "0",
         poolBalance: "0",
         images: token.images || [],
         routableSource: sourceAddresses.has(normalizeAddress(token.address)),
@@ -396,7 +401,15 @@ export const getRouteAssets = async (
     ])
   );
   for (const edge of edges) {
-    if (!edge.outputSymbol || assets.has(edge.tokenOut)) continue;
+    if (!edge.outputSymbol) continue;
+    const price = edge.vaultDeposit
+      ? getVaultSharePrice(prices.get(edge.tokenIn) || "0", edge.vaultDeposit)
+      : prices.get(edge.tokenOut) || edge.priceOut || "0";
+    const existing = assets.get(edge.tokenOut);
+    if (existing) {
+      existing.price = price;
+      continue;
+    }
     assets.set(edge.tokenOut, {
       address: edge.tokenOut,
       _name: edge.outputName || edge.outputSymbol,
@@ -404,7 +417,7 @@ export const getRouteAssets = async (
       customDecimals: edge.outputDecimals ?? 18,
       _totalSupply: "0",
       balance: "0",
-      price: edge.priceOut || "0",
+      price,
       poolBalance: "0",
       images: [],
       routableSource: sourceAddresses.has(edge.tokenOut),
@@ -517,7 +530,7 @@ export const fetchFactoryPoolIndex = async (
     {
       params: {
         address: `eq.${constants.poolFactory}`,
-        value: `eq.${target}`,
+        value: `eq.${JSON.stringify(target)}`,
         select: "key,value",
         limit: "1",
       },
@@ -525,7 +538,7 @@ export const fetchFactoryPoolIndex = async (
   );
   const row = data?.[0];
   if (row?.key === undefined || row?.key === null) {
-    throw new Error("Stable pool factory index could not be resolved");
+    throw new Error("Pool factory index could not be resolved");
   }
   return String(row.key);
 };
@@ -550,7 +563,10 @@ const buildSwapStep = async (
   let direction = false;
   if (quote.poolType === "stable") {
     action = RouteAction.SWAP_STABLE;
-    const coins = await fetchPoolCoins(accessToken, quote.poolAddress);
+    const [coins, poolIndex] = await Promise.all([
+      fetchPoolCoins(accessToken, quote.poolAddress),
+      fetchFactoryPoolIndex(accessToken, quote.poolAddress),
+    ]);
     const i = coins.find(
       ({ tokenAddress }) =>
         normalizeAddress(tokenAddress) === normalizeAddress(quote.tokenIn)
@@ -564,12 +580,7 @@ const buildSwapStep = async (
     }
     parameter1 = String(i);
     parameter2 = String(j);
-    if (coins.length > 2) {
-      factoryPoolIndex = await fetchFactoryPoolIndex(
-        accessToken,
-        quote.poolAddress
-      );
-    }
+    factoryPoolIndex = poolIndex;
   } else if (quote.poolType === "v3") {
     action = RouteAction.SWAP_V3;
     const pair = (
@@ -580,11 +591,12 @@ const buildSwapStep = async (
       pair.token0 === normalizeAddress(quote.tokenIn);
   } else {
     action = RouteAction.SWAP_V2;
-    const pair = await fetchPoolTokenAddresses(
-      accessToken,
-      quote.poolAddress
-    );
+    const [pair, poolIndex] = await Promise.all([
+      fetchPoolTokenAddresses(accessToken, quote.poolAddress),
+      fetchFactoryPoolIndex(accessToken, quote.poolAddress),
+    ]);
     if (!pair) throw new Error("V2 pool pair could not be resolved");
+    factoryPoolIndex = poolIndex;
     direction =
       normalizeAddress(pair.tokenA) === normalizeAddress(quote.tokenIn);
   }
