@@ -38,8 +38,9 @@ export interface TxResult {
   message?: string;
 }
 
+// execute() only resolves once every posted transaction succeeded; anything else throws
 export interface TxResponse {
-  status: "Success" | "Failure" | "Pending";
+  status: "Success";
   hash: string;
 }
 
@@ -69,6 +70,9 @@ export interface SafeTransactionResult {
 
 // Clear types for Safe transaction data
 export interface SafeTransactionData {
+  withdrawalId: string;
+  // Tags the payout with its withdrawal on the Safe Transaction Service
+  origin: string;
   safeAddress: string;
   safeTransactionData: any;
   safeTxHash: string;
@@ -118,6 +122,18 @@ export interface ActionDepositArgs extends DepositArgs {
   action: string;
   actionToken: string;
   minFinalOut: string;
+}
+
+// One DepositRouted / DepositRoutedWithAction / DepositRoutedWithFee event, ready to record on STRATO.
+// A "fee" deposit carries the schedule it committed to on its origin chain; the others carry zeros.
+export interface WindowDeposit extends ActionDepositArgs, FeeTerms {
+  kind: "standard" | "action" | "fee";
+  depositId: string; // router-assigned, sequential per router
+  // STRATO deposit key: the tx hash, or `${txHash}#${depositId}` when the tx emitted several deposits
+  depositKey: string;
+  sharesTransaction: boolean;
+  blockNumber: number;
+  logIndex: number;
 }
 
 export interface ConfirmDepositArgs {
@@ -170,7 +186,7 @@ export interface ConfirmNativeDepositArgs {
 }
 
 export interface DepositInfo {
-  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  bridgeStatus: string; // 0 NONE, 1 INITIATED, 2 PENDING_REVIEW, 3 COMPLETED, 4 ABORTED, 5 SWEPT, 6 QUARANTINED, 7 ANNOUNCED
   externalSender: string;
   externalToken: string;
   requestedAt: string;

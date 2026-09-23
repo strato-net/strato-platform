@@ -136,6 +136,7 @@ contract Describe_BridgeFastPath is Authorizable {
         adminRegistry.addWhitelist(bridgeAddress, "deposit", address(relayer));
         adminRegistry.addWhitelist(bridgeAddress, "depositWithFee", address(relayer));
         adminRegistry.addWhitelist(bridgeAddress, "depositBatchWithFee", address(relayer));
+        adminRegistry.addWhitelist(bridgeAddress, "recordDepositWindow", address(relayer));
         adminRegistry.addWhitelist(bridgeAddress, "confirmDeposit", address(relayer));
         adminRegistry.addWhitelist(bridgeAddress, "reviewDeposit", address(relayer));
         adminRegistry.addWhitelist(bridgeAddress, "abortDeposit", address(relayer));
@@ -271,6 +272,100 @@ contract Describe_BridgeFastPath is Authorizable {
             externalChainId, externalSender, externalToken, amount,
             txHash, recipient, bridgedTokenAddress, maxFee, requestedAt
         );
+    }
+
+
+    /// @dev One deposit through the window entry point, as the relayer records it
+    ///      when BRIDGE_RECORD_DEPOSIT_WINDOW is on. requestedAt 0 marks a plain deposit.
+    function _recordWindowDeposit(uint256 depositId, uint256 amount, uint256 maxFee, uint256 requestedAt) internal {
+        uint256[] memory ids = [depositId];
+        address[] memory senders = [externalSender];
+        address[] memory tokens = [externalToken];
+        uint256[] memory amounts = [amount];
+        string[] memory hashes = [txHash];
+        address[] memory recipients = [recipient];
+        address[] memory targets = [bridgedTokenAddress];
+        uint256[] memory zeros = [uint256(0)];
+        address[] memory noTokens = [address(0)];
+        uint256[] memory maxFees = [maxFee];
+        uint256[] memory requestedAts = [requestedAt];
+        relayer.do(
+            bridgeAddress, "recordDepositWindow",
+            externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets,
+            zeros, noTokens, zeros, maxFees, requestedAts
+        );
+    }
+
+    function it_fastpath_window_commits_the_fee_schedule() {
+        _recordWindowDeposit(1, 100e18, 3e18, block.timestamp);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.INITIATED, "a fee-bearing window deposit is recorded like any other");
+        (bool committed, uint256 maxFee, uint256 requestedAt, uint256 halfLife) =
+            bridge.depositFeeTerms(externalChainId, txHash);
+        require(committed, "the window commits the schedule");
+        require(maxFee == 3e18 && halfLife == HALF_LIFE, "with the offered fee and the configured half-life");
+        require(requestedAt == block.timestamp, "starting at the origin timestamp");
+
+        // A solver can fill against it exactly as against a depositWithFee record
+        solverA.do(bridgedTokenAddress, "approve", bridgeAddress, 100e18);
+        solverA.do(
+            bridgeAddress, "fillDeposit",
+            externalChainId, txHash, recipient, bridgedTokenAddress, 100e18, 3e18, false, 0
+        );
+    }
+
+    function it_fastpath_window_leaves_a_plain_deposit_without_a_schedule() {
+        _recordWindowDeposit(1, 100e18, 0, 0);
+        (bool committed,,,) = bridge.depositFeeTerms(externalChainId, txHash);
+        require(!committed, "requestedAt 0 means no schedule, like deposit()");
+    }
+
+    /// @notice One deposit's unhonourable fee must not hold back the window.
+    function it_fastpath_window_quarantines_a_fee_above_the_ceiling() {
+        _recordWindowDeposit(1, 100e18, 6e18, block.timestamp);
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.QUARANTINED, "quarantined rather than reverting the window");
+        require(
+            bridge.depositQuarantineReasons(externalChainId, txHash) == "fee too large",
+            "with the reason recorded"
+        );
+        (bool committed,,,) = bridge.depositFeeTerms(externalChainId, txHash);
+        require(!committed, "and no schedule");
+    }
+
+    function it_fastpath_window_adopts_a_matching_announcement() {
+        announcer.do(bondTokenAddress, "approve", bridgeAddress, 10e18);
+        announcer.do(
+            bridgeAddress, "announceDeposit",
+            externalChainId, externalSender, externalToken, 100e18,
+            txHash, recipient, bridgedTokenAddress, 3e18, block.timestamp
+        );
+        uint256 announcerBefore = IERC20(bondTokenAddress).balanceOf(address(announcer));
+
+        _recordWindowDeposit(1, 100e18, 3e18, block.timestamp);
+
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.INITIATED, "the relayer's window record takes over");
+        require(
+            IERC20(bondTokenAddress).balanceOf(address(announcer)) == announcerBefore + 10e18,
+            "and a matching announcement gets its bond back"
+        );
+        require(bridge.depositIdsByKey(externalChainId, txHash) == 1, "the router id is adopted too");
+    }
+
+    function it_fastpath_window_supersedes_a_mismatched_announcement() {
+        announcer.do(bondTokenAddress, "approve", bridgeAddress, 10e18);
+        announcer.do(
+            bridgeAddress, "announceDeposit",
+            externalChainId, externalSender, externalToken, 100e18,
+            txHash, address(0xBEEF), bridgedTokenAddress, 3e18, block.timestamp
+        );
+        _recordWindowDeposit(1, 100e18, 0, 0);
+
+        (BridgeStatus status,,,, address stratoRecipient,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.INITIATED && stratoRecipient == recipient, "the relayer's record wins");
+        require(bridge.bondedBalance(bondTokenAddress) == 10e18, "the mismatched bond stays held, not slashed");
     }
 
     function it_fastpath_deposit_fill_pays_recipient_and_redirects_mint() {

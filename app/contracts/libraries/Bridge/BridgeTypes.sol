@@ -12,6 +12,8 @@ library BridgeTypes {
         COMPLETED,    // flow fully executed
         ABORTED,      // user/relayer reclaimed escrow
         SWEPT,        // withdrawal: governance cancelled it and moved the escrow to a triage wallet
+        QUARANTINED,  // deposit: received in custody but not mintable as requested; governance
+                      // resolves it with rerouteDeposit or abortDeposit
         ANNOUNCED     // deposit: posted permissionlessly against a bond, NOT yet observed
                       //   by the relayer. Solvers may fill against it; nothing can be
                       //   minted or unlocked from it until the relayer's own record
@@ -19,7 +21,7 @@ library BridgeTypes {
     }
 
     struct DepositInfo {
-        BridgeStatus bridgeStatus; // NONE / INITIATED / COMPLETED / ABORTED
+        BridgeStatus bridgeStatus; // NONE / INITIATED / PENDING_REVIEW / COMPLETED / ABORTED / QUARANTINED
         address externalSender;    // External chain sender
         address externalToken;     // External token deposited
         uint256 requestedAt;       // timestamp of the deposit request

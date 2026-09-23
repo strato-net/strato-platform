@@ -101,11 +101,27 @@
         },
         "KHYPE": {
           "targetAssetAddress": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Upquark"
         },
         "LIT": {
-          "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
-          "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
+          "targetAssetAddress": "dd5f3b263bb28fcfc09e6dd4c034c8bb316d0701",
+          "comment": "Strato Lighter (LIT)"
+        },
+        "DOGE": {
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
+        },
+        "BOOE": {
+          "targetAssetAddress": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
+          "comment": "Book of Ethereum (BOOE). Ethereum 0x289ff00235d2b98b0145ff5d4435d3e92f9540a6. Same STRATO token address on Upquark and Helium."
         },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
@@ -282,6 +298,10 @@
             "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
           },
           "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
+        },
+        "BRENT": {
+          "targetAssetAddress": "4252454e54000000000000000000000000000000",
+          "comment": "Brent crude, USD per barrel, ICE front-month. Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. CommodityPriceAPI/Commodities-API/OANDA quote front-month futures and agree within ~1%; TwelveData XBR/USD is spot and runs ~3-4% below in contango. It is kept as a fourth source so any single provider can fail without stalling the feed - three futures sources keep the median futures-anchored - but it can push the source-divergence warning over 5% when the curve steepens."
         }
       },
       "sources": {
@@ -329,7 +349,8 @@
             "WHYPE",
             "KHYPE",
             "NVDA",
-            "SPY"
+            "SPY",
+            "DOGE"
           ]
         },
         "Metals.dev": {
@@ -382,7 +403,9 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE",
+            "BOOE"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -402,7 +425,9 @@
             "WEETH": "wrapped-eeth",
             "WHYPE": "wrapped-hype",
             "KHYPE": "kinetic-staked-hype",
-            "LIT": "lighter"
+            "LIT": "lighter",
+            "DOGE": "dogecoin",
+            "BOOE": "book-of-ethereum"
           }
         },
         "CoinAPI": {
@@ -424,7 +449,8 @@
             "SPYX",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "DOGE"
           ],
           "symbolMapping": {
             "WHYPE": "HYPE"
@@ -452,7 +478,9 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE",
+            "BOOE"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -472,7 +500,9 @@
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
-            "LIT": "coingecko:lighter"
+            "LIT": "coingecko:lighter",
+            "DOGE": "coingecko:dogecoin",
+            "BOOE": "coingecko:book-of-ethereum"
           }
         },
         "DexScreener": {
@@ -481,11 +511,24 @@
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
-            "LIT"
+            "LIT",
+            "BOOE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
-            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2"
+            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+          }
+        },
+        "DIA": {
+          "url": "https://api.diadata.org/v1/assetQuotation/Ethereum/${SYMBOLS}",
+          "parse": "Price",
+          "comment": "Free, no API key. DIA runs its own on-chain scrapers, so it is the only BOOE source that is not either a CoinGecko-family aggregator or a direct pool-spot read. The endpoint takes ONE token address in the path and returns a bare {Symbol,Price,...} object, so this source can hold only a single asset -- a second entry would build 'addr1,addr2' and 404. symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "BOOE"
+          ],
+          "symbolMapping": {
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
           }
         },
         "CommodityPriceAPI": {
@@ -497,8 +540,14 @@
           "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
           "assets": [
             "XAU",
-            "XAG"
-          ]
+            "XAG",
+            "BRENT"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU",
+            "XAG": "XAG",
+            "BRENT": "BRENTOIL-FUT"
+          }
         },
         "TwelveData": {
           "url": "https://api.twelvedata.com/price",
@@ -512,7 +561,9 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "TSLAX"
+            "TSLAX",
+            "DOGE",
+            "BRENT"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -520,7 +571,9 @@
             "SPY": "SPY",
             "SPYX": "SPY",
             "NVDA": "NVDA",
-            "TSLAX": "TSLA"
+            "TSLAX": "TSLA",
+            "DOGE": "DOGE/USD",
+            "BRENT": "XBR/USD"
           }
         },
         "OANDA": {
@@ -533,11 +586,13 @@
           "comment": "Practice API. Use api-fxtrade.oanda.com for live",
           "assets": [
             "XAU",
-            "XAG"
+            "XAG",
+            "BRENT"
           ],
           "symbolMapping": {
             "XAU": "XAU_USD",
-            "XAG": "XAG_USD"
+            "XAG": "XAG_USD",
+            "BRENT": "BCO_USD"
           }
         },
         "constant": {
@@ -545,6 +600,19 @@
           "assets": [
             "USDST"
           ]
+        },
+        "Commodities-API": {
+          "url": "https://commodities-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "data.rates.{symbol}",
+          "apiKeyEnvVar": "COMMODITIES_API_KEY",
+          "comment": "Returns rates relative to base USD; the parser inverts (1/rate) to get USD per barrel.",
+          "assets": [
+            "BRENT"
+          ],
+          "symbolMapping": {
+            "BRENT": "BRENTOIL"
+          }
         }
       }
     },
@@ -649,11 +717,27 @@
         },
         "KHYPE": {
           "targetAssetAddress": "d885844fd502040326e59d3cd9273bfd3cb78748",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Helium"
         },
         "LIT": {
           "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
           "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2."
+        },
+        "DOGE": {
+          "targetAssetAddress": "444f474500000000000000000000000000000000",
+          "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
+        },
+        "BOOE": {
+          "targetAssetAddress": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
+          "comment": "Book of Ethereum (BOOE). Ethereum 0x289ff00235d2b98b0145ff5d4435d3e92f9540a6. Same STRATO token address on Upquark and Helium."
         },
         "SPYX": {
           "targetAssetAddress": "00000000000000000000000000000000deadbeef",
@@ -830,6 +914,10 @@
             "factorApiKeyEnvVar": "ALCHEMY_API_KEY"
           },
           "comment": "xStock: price = TSLA price * getCurrentMultiplier() on Ethereum / 1e18"
+        },
+        "BRENT": {
+          "targetAssetAddress": "4252454e54000000000000000000000000000000",
+          "comment": "Brent crude, USD per barrel, ICE front-month. Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. CommodityPriceAPI/Commodities-API/OANDA quote front-month futures and agree within ~1%; TwelveData XBR/USD is spot and runs ~3-4% below in contango. It is kept as a fourth source so any single provider can fail without stalling the feed - three futures sources keep the median futures-anchored - but it can push the source-divergence warning over 5% when the curve steepens."
         }
       },
       "sources": {
@@ -877,7 +965,8 @@
             "WHYPE",
             "KHYPE",
             "NVDA",
-            "SPY"
+            "SPY",
+            "DOGE"
           ]
         },
         "Metals.dev": {
@@ -930,7 +1019,9 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE",
+            "BOOE"
           ],
           "symbolMapping": {
             "ETH": "ethereum",
@@ -950,7 +1041,9 @@
             "WEETH": "wrapped-eeth",
             "WHYPE": "wrapped-hype",
             "KHYPE": "kinetic-staked-hype",
-            "LIT": "lighter"
+            "LIT": "lighter",
+            "DOGE": "dogecoin",
+            "BOOE": "book-of-ethereum"
           }
         },
         "CoinAPI": {
@@ -972,7 +1065,8 @@
             "SPYX",
             "WEETH",
             "WHYPE",
-            "KHYPE"
+            "KHYPE",
+            "DOGE"
           ],
           "symbolMapping": {
             "WHYPE": "HYPE"
@@ -1000,7 +1094,9 @@
             "WEETH",
             "WHYPE",
             "KHYPE",
-            "LIT"
+            "LIT",
+            "DOGE",
+            "BOOE"
           ],
           "symbolMapping": {
             "ETH": "coingecko:ethereum",
@@ -1020,7 +1116,9 @@
             "WEETH": "coingecko:wrapped-eeth",
             "WHYPE": "hyperliquid:0x5555555555555555555555555555555555555555",
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
-            "LIT": "coingecko:lighter"
+            "LIT": "coingecko:lighter",
+            "DOGE": "coingecko:dogecoin",
+            "BOOE": "coingecko:book-of-ethereum"
           }
         },
         "DexScreener": {
@@ -1029,11 +1127,24 @@
           "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
-            "LIT"
+            "LIT",
+            "BOOE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
-            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2"
+            "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+          }
+        },
+        "DIA": {
+          "url": "https://api.diadata.org/v1/assetQuotation/Ethereum/${SYMBOLS}",
+          "parse": "Price",
+          "comment": "Free, no API key. DIA runs its own on-chain scrapers, so it is the only BOOE source that is not either a CoinGecko-family aggregator or a direct pool-spot read. The endpoint takes ONE token address in the path and returns a bare {Symbol,Price,...} object, so this source can hold only a single asset -- a second entry would build 'addr1,addr2' and 404. symbolMapping is the ERC-20 contract address.",
+          "assets": [
+            "BOOE"
+          ],
+          "symbolMapping": {
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
           }
         },
         "CommodityPriceAPI": {
@@ -1045,8 +1156,14 @@
           "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
           "assets": [
             "XAU",
-            "XAG"
-          ]
+            "XAG",
+            "BRENT"
+          ],
+          "symbolMapping": {
+            "XAU": "XAU",
+            "XAG": "XAG",
+            "BRENT": "BRENTOIL-FUT"
+          }
         },
         "TwelveData": {
           "url": "https://api.twelvedata.com/price",
@@ -1060,7 +1177,9 @@
             "SPY",
             "SPYX",
             "NVDA",
-            "TSLAX"
+            "TSLAX",
+            "DOGE",
+            "BRENT"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -1068,7 +1187,9 @@
             "SPY": "SPY",
             "SPYX": "SPY",
             "NVDA": "NVDA",
-            "TSLAX": "TSLA"
+            "TSLAX": "TSLA",
+            "DOGE": "DOGE/USD",
+            "BRENT": "XBR/USD"
           }
         },
         "OANDA": {
@@ -1081,11 +1202,13 @@
           "comment": "Practice API. Use api-fxtrade.oanda.com for live",
           "assets": [
             "XAU",
-            "XAG"
+            "XAG",
+            "BRENT"
           ],
           "symbolMapping": {
             "XAU": "XAU_USD",
-            "XAG": "XAG_USD"
+            "XAG": "XAG_USD",
+            "BRENT": "BCO_USD"
           }
         },
         "constant": {
@@ -1093,6 +1216,19 @@
           "assets": [
             "USDST"
           ]
+        },
+        "Commodities-API": {
+          "url": "https://commodities-api.com/api/latest",
+          "params": "access_key,base=USD,symbols",
+          "parse": "data.rates.{symbol}",
+          "apiKeyEnvVar": "COMMODITIES_API_KEY",
+          "comment": "Returns rates relative to base USD; the parser inverts (1/rate) to get USD per barrel.",
+          "assets": [
+            "BRENT"
+          ],
+          "symbolMapping": {
+            "BRENT": "BRENTOIL"
+          }
         }
       }
     }

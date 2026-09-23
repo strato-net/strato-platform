@@ -116,6 +116,14 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when a deposit requires manual review
     event DepositPendingReview(uint256 srcChainId, string srcTxHash);
 
+    /// @notice Emitted when a relayer-reported deposit cannot be minted as requested
+    /// @dev The deposit is stored as QUARANTINED so the obligation stays on-chain; governance
+    ///      resolves it with rerouteDeposit or abortDeposit
+    event DepositQuarantined(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address targetStratoToken, uint256 externalTokenAmount, uint256 depositId, string reason);
+
+    /// @notice Emitted when governance points a quarantined deposit at a different STRATO token
+    event DepositRerouted(uint256 externalChainId, string externalTxHash, address oldStratoToken, address newStratoToken, uint256 oldStratoTokenAmount, uint256 newStratoTokenAmount);
+
     /// @notice Emitted when a withdrawal is aborted and funds are refunded
     /// @notice An aborted withdrawal's escrow went to the solver holding its claim,
     ///         because that solver had already paid the recipient externally.
@@ -460,6 +468,21 @@ contract record MercataBridge is Ownable {
 
     /// @notice Deposit-keyed action intent recorded atomically by the relayer
     mapping(uint256 => mapping(string => DepositActionIntent)) public record depositActions;
+
+    /// @notice Deposit key recorded for each source-router deposit id
+    /// @dev Key: (externalChainId, depositRouter, depositId) -> deposit key. Routers number deposits
+    ///      sequentially, so a gap in this table is a deposit that has not been recorded yet
+    mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositKeysById;
+
+    /// @notice Source-router deposit id for each deposit key recorded by recordDepositWindow
+    mapping(uint256 => mapping(string => uint256)) public record depositIdsByKey;
+
+    /// @notice External-token amount the relayer reported (after any rebase adjustment) for each
+    ///         deposit recorded by recordDepositWindow; kept so a quarantined deposit can be resolved
+    mapping(uint256 => mapping(string => uint256)) public record depositExternalAmounts;
+
+    /// @notice Why recordDepositWindow quarantined a deposit; empty for deposits recorded normally
+    mapping(uint256 => mapping(string => string)) public record depositQuarantineReasons;
 
     /// @notice Registry of withdrawal requests by withdrawal ID
     /// @dev Maps withdrawal ID to withdrawal information
@@ -948,17 +971,91 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
+    function _isRouteEnabled(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken
+    ) internal view returns (bool) {
+        AssetInfo a = assets[externalToken][externalChainId];
+        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
+        bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
+        return isDefaultRoute || isExplicitRoute;
+    }
+
     function _requireRouteEnabled(
         address externalToken,
         uint256 externalChainId,
         address targetStratoToken
     ) internal view {
         require(targetStratoToken != address(0), "MB: invalid target token");
-        AssetInfo a = assets[externalToken][externalChainId];
-        require(a.stratoToken != address(0), "MB: asset missing");
-        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
-        bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
-        require(isDefaultRoute || isExplicitRoute, "MB: route not enabled");
+        require(assets[externalToken][externalChainId].stratoToken != address(0), "MB: asset missing");
+        require(_isRouteEnabled(externalToken, externalChainId, targetStratoToken), "MB: route not enabled");
+    }
+
+    /// @dev Why a deposit cannot be minted as requested, or "" when it can
+    function _depositQuarantineReason(
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        address stratoRecipient,
+        address targetStratoToken
+    ) internal returns (string) {
+        if (externalSender == address(0)) return "invalid external sender";
+        if (externalTokenAmount == 0) return "invalid external token amount";
+        if (stratoRecipient == address(0)) return "invalid strato recipient";
+        if (targetStratoToken == address(0)) return "invalid target token";
+        if (assets[externalToken][externalChainId].stratoToken == address(0)) return "asset missing";
+        if (!_isRouteEnabled(externalToken, externalChainId, targetStratoToken)) return "route not enabled";
+        bool active = false;
+        try {
+            active = TokenFactory(tokenFactory).isTokenActive(targetStratoToken);
+        } catch {
+        }
+        if (!active) return "inactive token";
+        return "";
+    }
+
+    /// @dev Splits a deposit key "<txHash>#<depositId>" into its parts; a key without '#' carries no id
+    function _splitDepositKey(string key) internal pure returns (string, bool, uint256) {
+        bytes b = bytes(key);
+        for (uint256 i = 0; i < b.length; i++) {
+            if (b[i] == 0x23) {
+                require(i > 0 && i + 1 < b.length, "MB: invalid deposit key");
+                uint256 id = 0;
+                for (uint256 j = i + 1; j < b.length; j++) {
+                    require(b[j] >= 0x30 && b[j] <= 0x39, "MB: invalid deposit key");
+                    id = id * 10 + (b[j] - 0x30);
+                }
+                require(id > 0, "MB: invalid deposit key");
+                bytes hashPart = new bytes(i);
+                for (uint256 k = 0; k < i; k++) {
+                    hashPart[k] = b[k];
+                }
+                return (string(hashPart), true, id);
+            }
+        }
+        return (key, false, 0);
+    }
+
+    /// @dev Canonical deposit key: the normalized source tx hash, followed by "#<depositId>" when
+    ///      one source transaction emitted more than one deposit
+    function _joinDepositKey(string hashPart, bool hasId, uint256 id) internal pure returns (string) {
+        string normalized = hashPart.normalizeHex();
+        if (!hasId) return normalized;
+        return normalized + "#" + string(id);
+    }
+
+    function _normalizeDepositKey(string key) internal pure returns (string) {
+        (string hashPart, bool hasId, uint256 id) = _splitDepositKey(key);
+        return _joinDepositKey(hashPart, hasId, id);
+    }
+
+    /// @dev Canonical key for a deposit reported together with its router deposit id
+    function _depositKey(string externalTxHash, uint256 depositId) internal pure returns (string) {
+        (string hashPart, bool hasId, uint256 id) = _splitDepositKey(externalTxHash);
+        require(!hasId || id == depositId, "MB: deposit key id mismatch");
+        return _joinDepositKey(hashPart, hasId, id);
     }
 
     function _isDepositActionEnabled(
@@ -1405,6 +1502,189 @@ contract record MercataBridge is Ownable {
     }
 
     /**
+     * @dev Records every deposit the relayer found in one source-chain block window and advances
+     *      that chain's lastProcessedBlock in the same transaction
+     * @notice The checkpoint can never get ahead of the deposits it covers: both land together or not at all
+     * @notice Idempotent: a deposit already recorded under the same router deposit id is skipped, and
+     *         the checkpoint only moves forward, so replaying a window is safe
+     * @notice A deposit that cannot be minted as requested (disabled route, unknown asset, inactive token,
+     *         zero recipient) is recorded as QUARANTINED instead of reverting the whole window
+     * @notice externalTxHashes[i] is the source transaction hash, or "<hash>#<depositId>" when that
+     *         source transaction emitted more than one deposit
+     * @param externalChainId The source chain of every deposit in the window
+     * @param lastProcessedBlock The last source block the window covers; a value at or below the
+     *        current checkpoint leaves it unchanged
+     * @notice A deposit a stranger ANNOUNCED against a bond is adopted exactly as {deposit} adopts it:
+     *         the relayer's record replaces the announcement and the bond is returned or left reclaimable
+     * @notice A fee-bearing deposit (DepositRoutedWithFee) has requestedAts[i] != 0 and its schedule is
+     *         committed with the record, as {depositWithFee} does; a fee the bridge cannot honour
+     *         quarantines the deposit rather than reverting the window
+     * @param depositIds Router deposit ids (DepositRouted.depositId)
+     * @param actions Post-deposit action per deposit; 0 for a plain deposit
+     * @param maxFees Solver fee ceiling in EXTERNAL units per deposit; 0 for none
+     * @param requestedAts Origin-chain timestamp per deposit; 0 marks a deposit with no fee schedule
+     */
+    function recordDepositWindow(
+        uint256 externalChainId,
+        uint256 lastProcessedBlock,
+        uint256[] depositIds,
+        address[] externalSenders,
+        address[] externalTokens,
+        uint256[] externalTokenAmounts,
+        string[] externalTxHashes,
+        address[] stratoRecipients,
+        address[] targetStratoTokens,
+        uint256[] actions,
+        address[] actionTokens,
+        uint256[] minFinalOuts,
+        uint256[] maxFees,
+        uint256[] requestedAts
+    ) external onlyOwner whenDepositsOpen {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        ChainInfo chainInfo = chains[externalChainId];
+        require(chainInfo.enabled, "MB: chain not enabled");
+        uint256 n = depositIds.length;
+        require(
+            n == externalSenders.length &&
+            n == externalTokens.length &&
+            n == externalTokenAmounts.length &&
+            n == externalTxHashes.length &&
+            n == stratoRecipients.length &&
+            n == targetStratoTokens.length &&
+            n == actions.length &&
+            n == actionTokens.length &&
+            n == minFinalOuts.length &&
+            n == maxFees.length &&
+            n == requestedAts.length,
+            "MB: len"
+        );
+        for (uint256 i = 0; i < n; i++) {
+            _recordWindowDeposit(
+                externalChainId,
+                chainInfo.depositRouter,
+                depositIds[i],
+                externalSenders[i],
+                externalTokens[i],
+                externalTokenAmounts[i],
+                externalTxHashes[i],
+                stratoRecipients[i],
+                targetStratoTokens[i],
+                actions[i],
+                actionTokens[i],
+                minFinalOuts[i],
+                maxFees[i],
+                requestedAts[i]
+            );
+        }
+        if (lastProcessedBlock > chainInfo.lastProcessedBlock) {
+            chainInfo.lastProcessedBlock = lastProcessedBlock;
+            emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+        }
+    }
+
+    function _recordWindowDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut,
+        uint256 maxFee,
+        uint256 requestedAt
+    ) internal {
+        require(depositId > 0, "MB: invalid deposit id");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        string key = _depositKey(externalTxHash, depositId);
+        string keyForId = depositKeysById[externalChainId][depositRouter][depositId];
+
+        BridgeStatus existingStatus = deposits[externalChainId][key].bridgeStatus;
+        if (existingStatus == BridgeStatus.ANNOUNCED) {
+            // A stranger's unverified claim about this deposit. The relayer's
+            // record always wins; see {_recordDeposit} for why a mismatch is
+            // superseded rather than slashed.
+            require(bytes(keyForId).length == 0, "MB: deposit id reused");
+            _resolveAnnouncementOnAdoption(
+                externalChainId,
+                key,
+                externalSender,
+                externalToken,
+                stratoRecipient,
+                targetStratoToken
+            );
+        } else if (existingStatus != BridgeStatus.NONE) {
+            uint256 recordedId = depositIdsByKey[externalChainId][key];
+            if (recordedId == 0) {
+                // Recorded by an entry point that did not track ids: adopt the id this window reports
+                require(bytes(keyForId).length == 0 || keyForId == key, "MB: deposit id reused");
+                depositKeysById[externalChainId][depositRouter][depositId] = key;
+                depositIdsByKey[externalChainId][key] = depositId;
+                return;
+            }
+            require(recordedId == depositId, "MB: deposit id mismatch");
+            return;
+        }
+        require(bytes(keyForId).length == 0, "MB: deposit id reused");
+
+        depositKeysById[externalChainId][depositRouter][depositId] = key;
+        depositIdsByKey[externalChainId][key] = depositId;
+        depositExternalAmounts[externalChainId][key] = externalTokenAmount;
+
+        AssetInfo a = assets[externalToken][externalChainId];
+        uint256 stratoTokenAmount = 0;
+        if (a.stratoToken != address(0)) {
+            // Example: 1e6 USDC * 10^(18-6) = 1e18 USDCST tokens
+            stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        }
+
+        string reason = _depositQuarantineReason(
+            externalChainId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            stratoRecipient,
+            targetStratoToken
+        );
+        if (reason.length == 0 && maxFee > 0) {
+            // The same checks {_commitDepositFeeTerms} enforces, as a quarantine
+            // reason instead of a revert: one deposit's unhonourable fee must not
+            // hold back the rest of the window
+            uint256 maxFeeStrato = maxFee * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+            if (!BridgeFees.isFeeCapAllowed(maxFeeStrato, stratoTokenAmount, maxFeeBps)) {
+                reason = "fee too large";
+            } else if (!BridgeFees.isHalfLifeAllowed(feeHalfLifeSeconds)) {
+                reason = "fee half-life not configured";
+            }
+        }
+        if (reason.length == 0) {
+            deposits[externalChainId][key] = DepositInfo(
+                BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, targetStratoToken, stratoTokenAmount, block.timestamp
+            );
+            emit DepositInitiated(externalChainId, externalSender, key, stratoRecipient, targetStratoToken, stratoTokenAmount);
+            // Only a fee-bearing deposit carries an origin timestamp (or a fee);
+            // a plain one gets no schedule at all, exactly as {deposit} leaves none
+            if (maxFee != 0 || requestedAt != 0) {
+                _commitDepositFeeTerms(externalChainId, key, externalToken, maxFee, requestedAt);
+            }
+        } else {
+            deposits[externalChainId][key] = DepositInfo(
+                BridgeStatus.QUARANTINED, externalSender, externalToken, block.timestamp, stratoRecipient, targetStratoToken, stratoTokenAmount, block.timestamp
+            );
+            depositQuarantineReasons[externalChainId][key] = reason;
+            emit DepositQuarantined(externalChainId, externalSender, key, stratoRecipient, targetStratoToken, externalTokenAmount, depositId, reason);
+        }
+
+        if (action != 0) {
+            depositActions[externalChainId][key] = DepositActionIntent(action, actionToken, minFinalOut);
+        }
+    }
+
+    /**
      * @dev Legacy lending-era action request retained for storage and ABI compatibility
      * @notice New confirmation logic intentionally ignores this sideband request
      * @param user The address requesting the action (must match the deposit recipient to be honored)
@@ -1421,7 +1701,7 @@ contract record MercataBridge is Ownable {
         require(action != uint(DepositAction.NONE), "MB: invalid action");
         DepositAction _action = DepositAction(action);
 
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
 
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus != BridgeStatus.COMPLETED, "MB: Already completed");
         depositActionRequests[user][externalChainId][normalizedTxHash] = DepositActionRequest(_action, targetToken);
@@ -1446,7 +1726,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
@@ -1533,7 +1813,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
@@ -1563,10 +1843,11 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * @dev Aborts a deposit that was marked for manual review
+     * @dev Aborts a deposit that was marked for manual review or quarantined
      * @notice Step-2.3 of the deposit flow - cancel a deposit that was marked for review
-     * @notice Only deposits in PENDING_REVIEW status can be aborted
-     * @notice Only the owner can abort deposits, preventing token minting
+     * @notice Only deposits in PENDING_REVIEW or QUARANTINED status can be aborted
+     * @notice Only the owner can abort deposits, preventing token minting; any refund of the
+     *         custodied funds happens on the external chain
      * @param externalChainId The external chain identifier where the deposit occurred
      * @param externalTxHash The transaction hash on the external chain
      */
@@ -1579,9 +1860,9 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW || d.bridgeStatus == BridgeStatus.QUARANTINED, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.ABORTED;
         d.timestamp = block.timestamp;
@@ -1616,6 +1897,37 @@ contract record MercataBridge is Ownable {
         for (uint256 i = 0; i < n; i++) {
             abortDeposit(externalChainIds[i], externalTxHashes[i]);
         }
+    }
+
+    /**
+     * @dev Points a quarantined deposit at a STRATO token it can be minted as and returns it to INITIATED
+     * @notice Governance resolution for a quarantined deposit, e.g. one that requested a retired route.
+     *         Rerouting to the original token is how a deposit is released once its route is live again
+     * @notice The relayer re-verifies the source transfer before confirming, so newStratoTokenAmount must
+     *         equal what the source transfer converts to for the new token or the deposit returns to review
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The deposit key: the source tx hash, or "<hash>#<depositId>"
+     * @param newTargetStratoToken The STRATO token to mint instead; its route must be enabled
+     * @param newStratoTokenAmount The amount of newTargetStratoToken to mint
+     */
+    function rerouteDeposit(
+        uint256 externalChainId, string externalTxHash, address newTargetStratoToken, uint256 newStratoTokenAmount
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(newStratoTokenAmount > 0, "MB: invalid strato token amount");
+        string key = _normalizeDepositKey(externalTxHash);
+        DepositInfo d = deposits[externalChainId][key];
+        require(d.bridgeStatus == BridgeStatus.QUARANTINED, "MB: bad state");
+        require(d.stratoRecipient != address(0), "MB: invalid strato recipient");
+        _requireRouteEnabled(d.externalToken, externalChainId, newTargetStratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(newTargetStratoToken), "MB: inactive token");
+
+        emit DepositRerouted(externalChainId, key, d.stratoToken, newTargetStratoToken, d.stratoTokenAmount, newStratoTokenAmount);
+        d.stratoToken = newTargetStratoToken;
+        d.stratoTokenAmount = newStratoTokenAmount;
+        d.bridgeStatus = BridgeStatus.INITIATED;
+        d.timestamp = block.timestamp;
+        depositQuarantineReasons[externalChainId][key] = "";
     }
 
     // ───────────── Withdrawal flow functions ─────────────

@@ -18,6 +18,7 @@ import { logError, logInfo } from "./logger";
 import { getRebaseFactors } from "../services/cirrusService";
 import { WithdrawalInfo, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
+import { buildWithdrawalOrigin } from "./withdrawalOrigin";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -258,10 +259,11 @@ export function isNonceConflict(err: any): boolean {
   );
 }
 
+// Returns the safeTxHashes the Safe transaction service accepted
 export async function proposeTransactions(
   transactions: SafeTransactionData[],
   chainId: number,
-): Promise<void> {
+): Promise<string[]> {
   const { apiKit } = await initializeSafeForChain(chainId);
 
   // Initialize hot wallet protocol kit once if any hot transactions exist
@@ -272,11 +274,11 @@ export async function proposeTransactions(
     hotProtocolKit = hotSafe.protocolKit;
   }
 
-  let successful = 0;
+  const proposed: string[] = [];
   let failed = 0;
 
   for (const txData of transactions) {
-    const { isHot, ...tx } = txData;
+    const { isHot, withdrawalId, ...tx } = txData;
     try {
       await retry(
         () => apiKit.proposeTransaction(tx),
@@ -302,7 +304,7 @@ export async function proposeTransactions(
         }
       }
 
-      successful++;
+      proposed.push(tx.safeTxHash);
     } catch (error) {
       logError("SafeService", error as Error, {
         operation: "proposeTransaction",
@@ -314,7 +316,8 @@ export async function proposeTransactions(
     }
   }
 
-  logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${successful} successful, ${failed} failed out of ${transactions.length} total`);
+  logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${proposed.length} successful, ${failed} failed out of ${transactions.length} total`);
+  return proposed;
 }
 
 export async function initializeSafeForChain(chainId: number, safeAddress?: string) {
@@ -482,6 +485,8 @@ export async function createWithdrawalProposals(
     );
 
     transactionProposals.push({
+      withdrawalId: String(withdrawal.withdrawalId),
+      origin: buildWithdrawalOrigin(config.bridge.address!, String(withdrawal.withdrawalId)),
       safeAddress: toAddress,
       safeTransactionData: safeTransaction.data,
       safeTxHash,

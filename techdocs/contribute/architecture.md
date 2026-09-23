@@ -19,7 +19,6 @@ How the `strato-platform` monorepo is organized and how its parts fit together a
 | `bin/` | Node lifecycle scripts: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-snapshot`, `strato-patch-app`, `strato-user-add`, `strato-logrotate` |
 | `pipelines/` | Jenkins pipelines |
 | `scripts/` | Repository scripts, including the `pre-commit` hook |
-| `strato-wallet/` | Browser wallet extension |
 | `strato-vscode/` | VS Code extension |
 | `design-documents/`, `load-testing/` | Design notes and load tests |
 | `techdocs/` + `mkdocs.yml` | This documentation site |

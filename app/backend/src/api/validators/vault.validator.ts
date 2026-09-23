@@ -26,6 +26,17 @@ export function validateWithdrawArgs(args: any) {
   }
 }
 
+export function validateWithdrawSharesArgs(args: any) {
+  const schema = Joi.object({
+    shares: numericStringField("shares"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Vault Withdraw Shares Argument Validation Error: " + error.message);
+  }
+}
+
 // Admin Validators
 
 export function validateSetMinReserveArgs(args: any) {

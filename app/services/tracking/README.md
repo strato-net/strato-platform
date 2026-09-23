@@ -18,8 +18,8 @@ source of truth.
 | `GET /dashboard` | OIDC (SPA login) | The dashboard app (tracking-ui container) |
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
-| `GET /tracking-api/metrics/daily` | JWT + allowlist | Daily snapshot: today's (UTC) opens/engaged, wallets/bridged, bridged-in USD + transfers, on-chain actions — each against the same elapsed window yesterday — plus a 24-bucket opens-by-hour histogram and the busiest links |
-| `GET /tracking-api/metrics/daily/breakdown` | JWT + allowlist | The rows behind the four snapshot tiles over the same UTC-today window: opens (link, geo, referrer, engagement, wallet), wallets (first open, link used, bridged amount, actions taken), bridge-ins (per-wallet amount, asset, source chain) and on-chain actions (grouped by type, then per wallet/link) |
+| `GET /tracking-api/metrics/daily?period=` | JWT + allowlist | Snapshot over `today` (default), `yesterday`, `7d` or `30d` (whole UTC days): opens/engaged, wallets/bridged, bridged-in USD + transfers, on-chain actions — each against the window of the same length before it — plus a 24-bucket opens-by-hour histogram and the busiest links |
+| `GET /tracking-api/metrics/daily/breakdown?period=` | JWT + allowlist | The rows behind the four snapshot tiles over the same window (same `period`): opens (link, geo, referrer, engagement, wallet), wallets (new/returning, first open, time-to-connect, visits/engaged visits, link used, referrer, bridged amount, actions taken), bridge-ins (per-wallet amount, asset, source chain) and on-chain actions (grouped by type, then per wallet/link) |
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
 | `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points with per-visit timestamps and wallet identity, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
@@ -94,32 +94,43 @@ never counted under two links. Bridge completion events carry both
 wallet. Link-level metrics count attributed events only; the per-wallet
 drill-down shows full history.
 
-## Daily snapshot
+## Snapshot panel
 
 The dashboard's top panel is one aggregation endpoint (`/tracking-api/metrics/daily`)
-over the **UTC day**, matching the per-day history buckets. Session figures
-(opens, engaged, hour buckets, busiest links, "N of M links active") are SQL
-rollups over `tracking_sessions`; wallet and chain figures reuse the cached
-attribution snapshot, so nothing is counted twice and the attribution rules
-are identical to the links table. Each headline metric carries the value from
-the **same elapsed window yesterday** (yesterday 00:00 UTC → yesterday at
-today's time of day) so a half-finished day isn't compared against a whole
-one; with no baseline the change is reported as `null` ("new"). Today's chain
-window runs to the end of the UTC day because block timestamps can sit
-slightly ahead of the service's clock. Bridged-in USD counts priced tokens
+over **whole UTC days**, matching the per-day history buckets. A segmented
+control in the panel header picks the window — `today` (default), `yesterday`,
+`7d` or `30d` (trailing, ending today) — and drives the tiles *and* the open
+breakdown from one piece of state, so both always describe the same window;
+`period` is a query parameter on both metrics endpoints (omitted = `today`, an
+unknown value is a 400). Session figures (opens, engaged, hour buckets,
+busiest links, "N of M links active") are SQL rollups over
+`tracking_sessions`; wallet and chain figures reuse the cached attribution
+snapshot, so nothing is counted twice and the attribution rules are identical
+to the links table. Each headline metric carries the value of the **window of
+the same length immediately before it**, and while the current window is still
+running only its **same elapsed slice** counts (today 00:00→now vs yesterday
+00:00→the same time of day) so a half-finished day isn't compared against a
+whole one; with no baseline the change is reported as `null` ("new"). A window
+that includes today runs to the end of the UTC day because block timestamps
+can sit slightly ahead of the service's clock. Over a multi-day window
+`opensByHour` becomes hour-of-day totals. Bridged-in USD counts priced tokens
 only and sets `bridgeValuePartial` when some token had no oracle price (the
 dashboard renders "$128.4K+").
 
 Each of the four tiles is a disclosure button: opening one fetches
-`/tracking-api/metrics/daily/breakdown` (once, for all four) and shows the rows
-that number is made of — per-visit opens, per-wallet behaviour (first open,
-link used, amount bridged, actions taken by category), per-transfer bridge-ins
-with their source chain, and on-chain actions grouped by action type before the
-event list. The breakdown reuses the same UTC-today window and the same
-attribution snapshot as the tiles, so a table can never disagree with the
-number above it; each section reports `total` (the tile), the newest `shown`
-rows and `truncated` when the list was capped — it is a drill-down, not an
-export.
+`/tracking-api/metrics/daily/breakdown?period=<the selected window>` (once,
+for all four) and shows the rows that number is made of — per-visit opens,
+per-wallet behaviour, per-transfer bridge-ins with their source chain, and
+on-chain actions grouped by action type before the event list. The wallet
+table is the behavioural one: new vs returning (first tracked connection ever,
+not window-bound), first open and how long the visit took to convert
+(time-to-connect), how many visits in the window that wallet connected in and
+how many of them reached the app, the first-touch link, referrer and location,
+the connector, the amount and assets bridged, and the actions taken by
+category. The breakdown reuses the same window and the same attribution
+snapshot as the tiles, so a table can never disagree with the number above it;
+each section reports `total` (the tile), the newest `shown` rows and
+`truncated` when the list was capped — it is a drill-down, not an export.
 
 ## Links table
 

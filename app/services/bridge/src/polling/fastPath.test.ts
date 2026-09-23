@@ -22,7 +22,7 @@ for (const envVar of [
 }
 process.env[`CHAIN_${CHAIN_ID}_RPC_URL`] = "http://localhost:1/unused";
 
-import { classifyDepositLogs, RawDepositLog } from "../services/depositEventService";
+import { extractWindowDeposits, RawDepositLog } from "../services/depositEventService";
 import {
   NATIVE_REDEMPTION_EVENTS_ABI,
   parseNativeDepositLog,
@@ -90,13 +90,11 @@ test("a fee-bearing deposit carries its origin timestamp through unchanged", () 
     21600n,
   ]);
 
-  const classified = classifyDepositLogs([log as RawDepositLog], CHAIN_ID);
+  const deposits = extractWindowDeposits([log as RawDepositLog], CHAIN_ID);
+  assert.equal(deposits.length, 1);
 
-  assert.equal(classified.standardDeposits.length, 0);
-  assert.equal(classified.actionDeposits.length, 0);
-  assert.equal(classified.feeDeposits.length, 1);
-
-  const deposit = classified.feeDeposits[0];
+  const deposit = deposits[0];
+  assert.equal(deposit.kind, "fee");
   assert.equal(deposit.requestedAt, requestedAt.toString());
   assert.equal(deposit.maxFee, (3n * 10n ** 16n).toString());
   assert.equal(deposit.feeHalfLife, "21600");
@@ -116,9 +114,12 @@ test("a fee-free deposit is still classified as standard", () => {
     1n,
   ]);
 
-  const classified = classifyDepositLogs([log as RawDepositLog], CHAIN_ID);
-  assert.equal(classified.standardDeposits.length, 1);
-  assert.equal(classified.feeDeposits.length, 0);
+  const deposits = extractWindowDeposits([log as RawDepositLog], CHAIN_ID);
+  assert.equal(deposits.length, 1);
+  assert.equal(deposits[0].kind, "standard");
+  // A plain deposit carries no schedule: requestedAt 0 tells STRATO not to write one
+  assert.equal(deposits[0].maxFee, "0");
+  assert.equal(deposits[0].requestedAt, "0");
 });
 
 // -------------------------------------------------------------- redemptions

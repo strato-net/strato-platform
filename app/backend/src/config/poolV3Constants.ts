@@ -121,6 +121,39 @@ export const POOL_V3_SWAP_HISTORY_SELECT_FIELDS = [
   "amount1::text",
 ] as const;
 
+/**
+ * Swap event rows for the 24h fee-APY window. `liquidity` is the pool's in-range
+ * liquidity when the swap executed — the base the fee was earned over — so trailing
+ * fee income can be attributed to liquidity units rather than divided by today's TVL.
+ * Text casts are mandatory: the event table returns big uints as JSON numbers.
+ */
+export const POOL_V3_SWAP_24H_SELECT_FIELDS = ["address", "amount0::text", "amount1::text", "liquidity::text"] as const;
+
+/**
+ * Storage-history rows for the fee-APY window's time-weighted TVL. `history@storage` is
+ * the generic per-contract snapshot table: `data` holds every storage field as text
+ * (unset = ""), and [valid_from, valid_to) is the interval the snapshot was live
+ * (valid_to = "infinity" for the current row).
+ */
+export const POOL_V3_TVL_HISTORY_SELECT_FIELDS = [
+  "address",
+  "valid_from",
+  "valid_to",
+  "token0Balance:data->>token0Balance",
+  "token1Balance:data->>token1Balance",
+] as const;
+
+// ============================================================================
+// DISPLAY THRESHOLDS
+// ============================================================================
+
+/**
+ * V3 pools below this TVL report a fee APY of 0 (pool listing, positions, and the Earn
+ * token-APY feed). The APY annualizes a single day of fees, so a near-empty pool with one
+ * swap posts a headline number that means nothing and would win the Earn "Native" max.
+ */
+export const V3_POOL_APY_MIN_TVL_USD = 1_000;
+
 // ============================================================================
 // PROTOCOL CONSTANTS (canonical Uniswap V3 values)
 // ============================================================================
