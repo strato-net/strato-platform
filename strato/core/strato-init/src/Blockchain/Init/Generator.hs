@@ -82,8 +82,11 @@ createGenesisInfo network =
     _ -> HELIUM.genesisBlock
 
 -- | Processes convoke may restart on their own when they exit. Everything
--- else takes the whole directory down, as before: p2p, the sequencer and
+-- else takes the whole directory down, as before: the sequencer and
 -- vm-runner share consensus state that a lone restart cannot recover.
+-- strato-p2p is restartable: its state is the peer store and the
+-- connections it rebuilds from it, and it exits on purpose when the SQLite
+-- peer store is wedged (see 'Blockchain.DB.SQLDB.guardPeerStore').
 restartable :: String -> String
 restartable = ("@restart " ++)
 
@@ -129,7 +132,7 @@ createCommandsFile role = do
     let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
     return $
       [ restartable "ethereum-discover +RTS -T -RTS"
-      , "strato-p2p +RTS -T -RTS"
+      , restartable "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
       , restartable ("strato-indexer" ++ (if flags_writer then "" else " --writer=false"))

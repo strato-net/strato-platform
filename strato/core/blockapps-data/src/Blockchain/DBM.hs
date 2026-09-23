@@ -13,6 +13,7 @@ where
 import BlockApps.Logging (runNoLoggingT)
 import Blockchain.DB.SQLDB
 import Blockchain.EthConf
+import Control.Monad (when)
 import Control.Monad.IO.Unlift
 
 data DebugMode = Log | Fail deriving (Eq)
@@ -40,4 +41,10 @@ openDBs = do
         Just conf -> do
           liftIO $ ensureDatabaseExists conf
           runNoLoggingT $ createPeerStorePool 20
+  -- The 'HasPeerDB' instance reaches the peer store through the global
+  -- pool. On SQLite that must be this same pool: a second pool of
+  -- connections to the same file only adds writers contending for the
+  -- one write lock, and its own five-connection queue for callers to
+  -- pile up in when a write is stuck.
+  when peerStoreIsSqlite $ liftIO $ setGlobalSQLPool peers
   return DBs {sqlDB' = eth, peerDB' = peers}

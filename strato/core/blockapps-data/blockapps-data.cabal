@@ -91,6 +91,7 @@ library
     , text
     , time
     , transformers
+    , unix
     , unliftio
     , unliftio-core
   default-language: Haskell2010

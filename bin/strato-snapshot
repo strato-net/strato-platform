@@ -119,6 +119,22 @@ warn() {
   echo "Warning: $*" >&2
 }
 
+# Refuse to start an extraction that cannot fit. A snapshot is tens of GB and
+# the work directory is not always on the roomy volume: the default follows the
+# working directory, and the fallback below lands on whatever holds TMPDIR,
+# which on a cell is the 38 GB root disk rather than the data drive. Filling a
+# root filesystem takes journald, docker and sshd down with it, so this dies
+# early and names the override instead.
+require_free_space() {
+  local dir="$1" needed_kb="$2" what="$3" avail_kb
+  avail_kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2 {print $4}')"
+  [[ -n "$avail_kb" ]] || return 0  # unknown filesystem: do not block the run
+  if (( avail_kb < needed_kb )); then
+    die "not enough room in $dir for $what: $((needed_kb / 1048576)) GiB needed, $((avail_kb / 1048576)) GiB free.
+Set STRATO_SNAPSHOT_WORKDIR to a directory on a volume with space (a cell's data drive, not /tmp)."
+  fi
+}
+
 # After die() and warn(), both of which it uses: the work directory may be
 # unwritable (fatal) or merely not where we expected (a warning).
 init_workdir
@@ -2082,6 +2098,11 @@ cmd_restore() {
   archive="$(fetch_source "$source")"
   extracted="$(mktemp_dir)"
   manifest="$extracted/SNAPSHOT.json"
+  # The payload expands well past the archive: a 15 GB helium archive carries a
+  # 17 GB .ethereumH alone. Three times the archive is the working rule.
+  local archive_kb
+  archive_kb="$(du -k "$archive" 2>/dev/null | awk '{print $1}')"
+  [[ -n "$archive_kb" ]] && require_free_space "$extracted" "$((archive_kb * 3))" "the extracted snapshot"
   info "Extracting snapshot archive (this can take a while for large snapshots)..."
   extract_archive "$archive" "$extracted"
   [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
