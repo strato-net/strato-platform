@@ -101,11 +101,19 @@
         },
         "KHYPE": {
           "targetAssetAddress": "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Upquark"
         },
         "LIT": {
-          "targetAssetAddress": "6e5a349800dd27dc87bba8cc66e217b86ecf9038",
-          "comment": "Lighter (LIT). Ethereum 0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2. Helium STRATO token used until mainnet token exists."
+          "targetAssetAddress": "dd5f3b263bb28fcfc09e6dd4c034c8bb316d0701",
+          "comment": "Strato Lighter (LIT)"
         },
         "DOGE": {
           "targetAssetAddress": "444f474500000000000000000000000000000000",
@@ -688,6 +696,14 @@
         },
         "KHYPE": {
           "targetAssetAddress": "d885844fd502040326e59d3cd9273bfd3cb78748",
+          "exchangeRate": {
+            "rateUrl": "https://rpc.hyperliquid.xyz/evm",
+            "rateMethod": "POST",
+            "rateBody": "{\"id\":1,\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"0x9209648Ec9D448EF57116B73A2f081835643dc7A\",\"data\":\"0x759bc2fc0000000000000000000000000000000000000000000000000de0b6b3a7640000\"},\"latest\"]}",
+            "rateParse": "result",
+            "ratePrecision": "1000000000000000000",
+            "comment": "Kinetiq StakingAccountant: kHYPEToHYPE(1e18) returns KHYPE/HYPE rate in WAD"
+          },
           "comment": "Kinetiq Staked HYPE on Helium"
         },
         "LIT": {
