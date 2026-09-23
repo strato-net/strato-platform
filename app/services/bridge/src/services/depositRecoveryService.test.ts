@@ -72,6 +72,7 @@ test("reconstructs recorded reviews after cache loss without authorizing settlem
   let sourceCompleted = false;
   (cirrus as any).get = async (table: string, { params }: any) => {
     assert.equal(params.key, "eq.1");
+    if (params.offset) return [];
     if (table.endsWith("-deposits")) {
       if (params["value->>status"] === "eq.4") return sourceCompleted ? [{ key2: router, key3: "2" }] : [];
       assert.equal(params["value->>status"], "eq.2");

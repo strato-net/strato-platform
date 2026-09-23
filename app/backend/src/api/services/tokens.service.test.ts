@@ -137,17 +137,19 @@ test("logs saveUSDST balance query failures before falling back", async (t) => {
   });
 });
 
-test("fetches only indexed symbols for requested tokens and vault shares", async (t) => {
+test("fetches indexed symbols and decimals for requested tokens and vault shares", async (t) => {
   const addresses = ["1".repeat(40), "2".repeat(40)];
   const paths: string[] = [];
   t.mock.method(cirrus, "get", async (_token: string, path: string, request?: any) => {
     paths.push(path);
-    assert.deepEqual(request.params, { address: `in.(${addresses.join(",")})`, select: "address,_symbol" });
-    return { status: 200, data: [{ address: addresses[0], _symbol: path }] };
+    const decimalsField = path === `/${constants.Token}` ? "customDecimals" : "customDecimals:_underlyingDecimals";
+    assert.deepEqual(request.params, { address: `in.(${addresses.join(",")})`, select: `address,_symbol,${decimalsField}` });
+    return { status: 200, data: [{ address: addresses[0], _symbol: path, customDecimals: 6 }] };
   });
   const rows = await getTokenSymbols("access-token", addresses);
   assert.deepEqual(paths.sort(), [constants.Token, constants.SaveUSDSTVault, constants.YieldVault].map((table) => `/${table}`).sort());
   assert.equal(rows.length, 3);
+  assert.ok(rows.every((row) => row.customDecimals === 6));
   assert.deepEqual(await getTokenSymbols("access-token", []), []);
   assert.equal(paths.length, 3);
 });

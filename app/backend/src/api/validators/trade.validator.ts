@@ -65,7 +65,7 @@ export function validateRouteQuoteArgs(args: any) {
     tokenIn: validateAddressField("tokenIn").required(),
     tokenOut: validateAddressField("tokenOut").required(),
     amount: uintStringField("amount"),
-    slippageBps: Joi.number().integer().min(0).max(9999).optional(),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
   });
   const { error } = schema.validate(args);
   if (error) {
@@ -85,7 +85,7 @@ export function validateCompositeRouteQuoteArgs(args: any) {
     targetStratoToken: validateAddressField("targetStratoToken").required(),
     tokenOut: validateAddressField("tokenOut").required(),
     amount: uintStringField("amount"),
-    slippageBps: Joi.number().integer().min(0).max(9999).optional(),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
   });
   const { error } = schema.validate(args);
   if (error) {
@@ -101,7 +101,7 @@ export function validateRouteExecuteArgs(args: any) {
     tokenOut: validateAddressField("tokenOut").required(),
     amountIn: uintStringField("amountIn"),
     minFinalOut: uintStringField("minFinalOut"),
-    slippageBps: Joi.number().integer().min(0).max(9999).optional(),
+    slippageBps: Joi.number().integer().min(1).max(9999).optional(),
     recipient: validateAddressField("recipient").optional(),
   });
   const { error } = schema.validate(args);

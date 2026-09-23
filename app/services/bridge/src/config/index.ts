@@ -6,6 +6,11 @@ export const STRATO_DECIMALS = 18;
 export const WAD = 10n ** 18n;
 export const VERIFIER_REQUEST_TIMEOUT_MS = 60_000;
 export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
+// HyperEVM caps JSON-RPC batches at 20 calls per HTTP request
+export const RPC_BATCH_LIMIT = 20;
+export const TRACE_RPC_PROBE_BLOCKS = 20;
+export const CIRRUS_PAGE_SIZE = 200;
+export const CIRRUS_FILTER_BATCH_SIZE = 20;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
@@ -86,7 +91,7 @@ const config = {
     mintCount: 25,
   },
   polling: {
-    bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)
+    bridgeInInterval: 1 * 60 * 1000, // 1 minute
     bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
     withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
     ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
@@ -152,14 +157,16 @@ export const getDepositConfirmationPolicy = (
 ): number => {
   const value =
     process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`] ||
-    process.env.DEPOSIT_CONFIRMATIONS ||
-    "0";
+    process.env.DEPOSIT_CONFIRMATIONS;
   const confirmations = Number(value);
-  if (!Number.isSafeInteger(confirmations) || confirmations < 0) {
+  if (!Number.isSafeInteger(confirmations) || confirmations <= 0) {
     throw new Error(`Invalid deposit confirmation policy for chain ${chainId}`);
   }
   return confirmations;
 };
+
+export const DEPOSIT_WS_RECONNECT_BASE_MS = 1_000;
+export const DEPOSIT_WS_RECONNECT_MAX_MS = 60_000;
 
 export const getDepositReconciliationDepth = (): number =>
   Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);

@@ -91,37 +91,15 @@ contract record ExternalAssetBridge is Ownable {
         string externalTxHash,
         address stratoRecipient,
         address stratoToken,
-        uint256 stratoTokenAmount
+        uint256 stratoTokenAmount,
+        address depositRouter,
+        uint256 depositId
     );
     event DepositAborted(uint256 externalChainId, string externalTxHash);
     event DepositReuseAuthorized(
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId
-    );
-    event AutoSavedUSDST(
-        uint256 externalChainId,
-        address depositRouter,
-        uint256 depositId,
-        string externalTxHash,
-        address recipient,
-        address sourceToken,
-        uint256 sourceAmount,
-        uint256 usdstAmount,
-        address saveToken,
-        uint256 shares
-    );
-    event AutoForgedViaPSM(
-        uint256 externalChainId,
-        address depositRouter,
-        uint256 depositId,
-        string externalTxHash,
-        address recipient,
-        address sourceToken,
-        uint256 sourceAmount,
-        uint256 usdstAmount,
-        address metalToken,
-        uint256 metalAmount
     );
     event DepositActionFallback(
         uint256 externalChainId,
@@ -273,6 +251,7 @@ contract record ExternalAssetBridge is Ownable {
 
     mapping(address => MintPolicy) public record mintPolicies;
     mapping(uint256 => mapping(address => bool)) public record nativeAutoRouteEnabled;
+    string public lastDepositActionFailureReason;
     event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
 
     function setMintPolicy(address token, uint256 capacity, uint256 refillRate) external onlyOwner {
@@ -394,6 +373,7 @@ contract record ExternalAssetBridge is Ownable {
         require(vault != address(0), "EAB: zero vault");
         require(depositRouter != address(0), "EAB: zero router");
         require(externalChainId > 0, "EAB: invalid chain id");
+        require(lastProcessedBlock >= chains[externalChainId].lastProcessedBlock, "EAB: block rollback");
 
         chains[externalChainId] = ChainInfo(
             chainName,
@@ -1035,7 +1015,9 @@ contract record ExternalAssetBridge is Ownable {
             depositInfo.externalTxHash,
             depositInfo.stratoRecipient,
             depositInfo.stratoToken,
-            depositInfo.stratoTokenAmount
+            depositInfo.stratoTokenAmount,
+            depositRouter,
+            depositId
         );
     }
 
@@ -1271,7 +1253,7 @@ contract record ExternalAssetBridge is Ownable {
 
     function expireWithdrawalReview(
         uint256 withdrawalId
-    ) external onlyBridgeOperator {
+    ) external {
         WithdrawalInfo withdrawal = withdrawals[withdrawalId];
         WithdrawalManualReview review = withdrawalManualReviews[withdrawalId];
         require(
@@ -1279,7 +1261,7 @@ contract record ExternalAssetBridge is Ownable {
                 block.timestamp > review.approvalDeadline,
             "EAB: review active"
         );
-        delete withdrawalManualReviews[withdrawalId];
+        withdrawalManualReviews[withdrawalId] = WithdrawalManualReview("", 0, "");
         withdrawal.status = Status.INITIATED;
         withdrawal.timestamp = block.timestamp;
         emit WithdrawalReviewExpired(withdrawalId);
@@ -1422,7 +1404,7 @@ contract record ExternalAssetBridge is Ownable {
     function attestWithdrawalRefund(uint256 withdrawalId, bytes32 expectedDigest) external {
         WithdrawalInfo withdrawal = withdrawals[withdrawalId];
         require(
-            withdrawal.status == Status.READY || withdrawal.status == Status.CANCELLED,
+            withdrawal.status == Status.READY,
             "EAB: not refundable"
         );
         require(block.timestamp > withdrawal.authorizationDeadline, "EAB: authorization active");
@@ -1453,13 +1435,11 @@ contract record ExternalAssetBridge is Ownable {
         WithdrawalInfo withdrawal = withdrawals[
             withdrawalId
         ];
-        bool cancelled =
-            withdrawal.status == Status.CANCELLED;
         bool expiredReady =
             withdrawal.status == Status.READY &&
             block.timestamp > withdrawal.authorizationDeadline;
         require(
-            cancelled || expiredReady,
+            expiredReady,
             "EAB: not refundable"
         );
 
@@ -1744,11 +1724,20 @@ contract record ExternalAssetBridge is Ownable {
                 ][i]
             );
         }
-        uint256 sourceAmount = _mintFunds(
+        uint256 sourceAmount;
+        try _mintFunds(
             depositInfo.stratoToken,
             address(this),
             depositInfo.stratoTokenAmount
-        );
+        ) returns (uint256 minted) {
+            sourceAmount = minted;
+        } catch Error(string memory mintReason) {
+            revert DepositActionExecutionFailed(mintReason);
+        } catch {
+            revert DepositActionExecutionFailed(
+                "Unknown token router error"
+            );
+        }
         if (
             !IERC20(depositInfo.stratoToken).approve(
                 tokenRouter,
@@ -1801,6 +1790,7 @@ contract record ExternalAssetBridge is Ownable {
         DepositActionIntent intent,
         string reason
     ) internal {
+        lastDepositActionFailureReason = reason;
         emit DepositActionFailed(
             externalChainId,
             depositRouter,

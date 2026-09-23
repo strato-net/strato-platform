@@ -1,6 +1,6 @@
 import { cirrus } from "../utils/api";
 import { ensureHexPrefix } from "../utils/utils";
-import { config } from "../config";
+import { config, CIRRUS_PAGE_SIZE, CIRRUS_FILTER_BATCH_SIZE } from "../config";
 import { logInfo } from "../utils/logger";
 import {
   ChainInfo,
@@ -27,6 +27,40 @@ const MERCATA_BRIDGE_URL = "BlockApps-MercataBridge";
 const EXTERNAL_ASSET_BRIDGE_URL = "BlockApps-ExternalAssetBridge";
 const NATIVE_BRIDGE_URL = "BlockApps-StratoNativeBridge";
 const ORACLE_URL = "BlockApps-PriceOracle";
+
+async function getPaginatedRows(
+  url: string,
+  options: { params: Record<string, string | number> },
+): Promise<any[]> {
+  const result: any[] = [];
+  for (let offset = 0; ; ) {
+    const rows = await cirrus.get(url, {
+      params: { ...options.params, limit: CIRRUS_PAGE_SIZE, offset },
+    });
+    if (!Array.isArray(rows)) throw new Error(`Invalid Cirrus response for ${url}`);
+    if (!rows.length) return result;
+    result.push(...rows);
+    // A server row cap may return fewer rows than the requested limit.
+    offset += rows.length;
+  }
+}
+
+async function getRowsByIds(
+  url: string,
+  ids: string[],
+  options: { params: Record<string, string | number> },
+  column = "key",
+): Promise<any[]> {
+  const unique = [...new Set(ids)];
+  const result: any[] = [];
+  for (let offset = 0; offset < unique.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
+    const batch = unique.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
+    result.push(...await getPaginatedRows(url, {
+      params: { ...options.params, [column]: `in.(${batch.join(",")})` },
+    }));
+  }
+  return result;
+}
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
@@ -92,13 +126,13 @@ export const getAssetInfo = async (
   externalTokenAddress: NonEmptyArray<string>,
   externalChainId?: number
 ): Promise<Map<string, AssetInfo>> => {
-  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-routes`, {
+  const data = await getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-routes`, externalTokenAddress.map((address) => toCirrusAddress(address)!), {
     params: {
-      key: `in.(${externalTokenAddress.map(toCirrusAddress).join(",")})`,
       ...(externalChainId ? { key2: `eq.${externalChainId}` } : {}),
       "value->>depositsEnabled": "eq.true",
       address: `eq.${externalAssetBridgeAddress}`,
       select: "key,key2,key3,value",
+      order: "key.asc,key2.asc,key3.asc",
     },
   });
 
@@ -149,13 +183,13 @@ export const getEnabledNativeChainIds = async (): Promise<number[]> => {
 export const getWithdrawalsByStatus = async (
   status: string
 ): Promise<WithdrawalInfo[]> => {
-  const data = await cirrus.get(
+  const data = await getPaginatedRows(
     `/${MERCATA_BRIDGE_URL}-withdrawals?select=*,bridge:${MERCATA_BRIDGE_URL}!inner(withdrawalsPaused)`,
     {
       params: {
         "value->>bridgeStatus": `eq.${status}`,
         address: `eq.${bridgeAddress}`,
-        order: "value->>requestedAt.asc",
+        order: "value->>requestedAt.asc,key.asc",
         "bridge.withdrawalsPaused": "eq.false",
       },
     }
@@ -173,13 +207,13 @@ export const getExternalWithdrawalsByStatus = async (
   status: string,
 ): Promise<WithdrawalInfo[]> => {
   const [data, enabledChains] = await Promise.all([
-    cirrus.get(
+    getPaginatedRows(
       `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawals?select=*,bridge:${EXTERNAL_ASSET_BRIDGE_URL}!inner(withdrawalsPaused)`,
       {
         params: {
           "value->>status": `eq.${status}`,
           address: `eq.${externalAssetBridgeAddress}`,
-          order: "value->>requestedAt.asc",
+          order: "value->>requestedAt.asc,key.asc",
           "bridge.withdrawalsPaused": "eq.false",
         },
       },
@@ -197,23 +231,25 @@ export const getExternalWithdrawalsByStatus = async (
   if (!eligible.length) return [];
   const withdrawalIds = eligible.map((item) => item.key);
   const [authorizationData, reviewData] = await Promise.all([
-    cirrus.get(
+    getRowsByIds(
       `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
+      withdrawalIds,
       {
         params: {
-          key: `in.(${withdrawalIds.join(",")})`,
           address: `eq.${externalAssetBridgeAddress}`,
           select: "key,value",
+          order: "key.asc",
         },
       },
     ),
-    cirrus.get(
+    getRowsByIds(
       `/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
+      withdrawalIds,
       {
         params: {
-          key: `in.(${withdrawalIds.join(",")})`,
           address: `eq.${externalAssetBridgeAddress}`,
           select: "key,value",
+          order: "key.asc",
         },
       },
     ),
@@ -253,13 +289,13 @@ export const getNativeWithdrawalsByStatus = async (
 ): Promise<NativeWithdrawalInfo[]> => {
   if (!nativeBridgeAddress) return [];
 
-  const data = await cirrus.get(
+  const data = await getPaginatedRows(
     `/${NATIVE_BRIDGE_URL}-withdrawals?select=*`,
     {
       params: {
         "value->>bridgeStatus": `eq.${status}`,
         address: `eq.${nativeBridgeAddress}`,
-        order: "value->>requestedAt.asc",
+        order: "value->>requestedAt.asc,key.asc",
       },
     }
   );
@@ -276,13 +312,13 @@ export const getNativeWithdrawalsByStatus = async (
 export const getDepositsByStatus = async (
   status: string
 ): Promise<DepositInfo[]> => {
-  const data = await cirrus.get(
+  const data = await getPaginatedRows(
     `/${EXTERNAL_ASSET_BRIDGE_URL}-deposits?select=*,bridge:${EXTERNAL_ASSET_BRIDGE_URL}!inner(depositsPaused)`,
     {
       params: {
         "value->>status": `eq.${status}`,
         address: `eq.${externalAssetBridgeAddress}`,
-        order: "value->>timestamp.asc",
+        order: "value->>timestamp.asc,key.asc,key2.asc,key3.asc",
         "bridge.depositsPaused": "eq.false",
       },
     }
@@ -406,13 +442,13 @@ export const getNativeDepositsByStatus = async (
 ): Promise<NativeDepositInfo[]> => {
   if (!nativeBridgeAddress) return [];
 
-  const data = await cirrus.get(
+  const data = await getPaginatedRows(
     `/${NATIVE_BRIDGE_URL}-deposits?select=*`,
     {
       params: {
         "value->>bridgeStatus": `eq.${status}`,
         address: `eq.${nativeBridgeAddress}`,
-        order: "value->>timestamp.asc",
+        order: "value->>timestamp.asc,key.asc",
       },
     }
   );
@@ -458,11 +494,11 @@ export const getRebaseFactors = async (
   const normalized = stratoTokenAddresses.map(a => a.toLowerCase().replace(/^0x/, ""));
   if (!normalized.length || !oracleAddress) return new Map();
 
-  const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
+  const data = await getRowsByIds(`/${ORACLE_URL}-rebaseFactors`, normalized, {
     params: {
-      key: `in.(${normalized.join(",")})`,
       address: `eq.${oracleAddress}`,
       select: "key,value::text",
+      order: "key.asc",
     },
   }).catch(() => []);
 
@@ -585,11 +621,11 @@ export const getExternalBridgeRebaseFactors = async (
   if (!bridgeOracle || /^0+$/.test(bridgeOracle)) {
     throw new Error("ExternalAssetBridge price oracle is not configured");
   }
-  const data = await cirrus.get(`/${ORACLE_URL}-rebaseFactors`, {
+  const data = await getRowsByIds(`/${ORACLE_URL}-rebaseFactors`, normalized, {
     params: {
-      key: `in.(${normalized.join(",")})`,
       address: `eq.${bridgeOracle}`,
       select: "key,value::text",
+      order: "key.asc",
     },
   });
   const result = new Map<string, bigint>();
@@ -610,13 +646,13 @@ export const getSafeTxHashFromEvents = async (
     string | null
   >;
 
-  const data = await cirrus.get(`/${MERCATA_BRIDGE_URL}-WithdrawalPending`, {
+  const data = await getRowsByIds(`/${MERCATA_BRIDGE_URL}-WithdrawalPending`, ids, {
     params: {
       address: `eq.${bridgeAddress}`,
-      withdrawalId: `in.(${ids.join(",")})`,
       select: "withdrawalId,custodyTxHash",
+      order: "withdrawalId.asc,block_timestamp.asc,custodyTxHash.asc",
     },
-  });
+  }, "withdrawalId");
 
   for (const item of Array.isArray(data) ? data : []) {
     const withdrawalId = item?.withdrawalId;
@@ -633,30 +669,25 @@ export const getRecordedDepositReviews = async (
   identity?: { depositRouter: string; depositId: string },
 ): Promise<RecordedDepositReview[]> => {
   const result: RecordedDepositReview[] = [];
-  const limit = 200;
-  for (let offset = 0; ; offset += limit) {
-    const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, {
-      params: {
-        address: `eq.${externalAssetBridgeAddress}`,
-        key: `eq.${externalChainId}`,
-        ...(identity ? { key2: `eq.${toCirrusAddress(identity.depositRouter)}`, key3: `eq.${identity.depositId}` } : {}),
-        "value->>status": "eq.2",
-        select: "key2,key3,value",
-        order: "key2.asc,key3.asc",
-        limit,
-        offset,
-      },
-    });
-    if (!Array.isArray(rows)) throw new Error("Deposit review response is invalid");
-    if (!rows.length) break;
-    const intents = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositActions`, {
+  const deposits = await getPaginatedRows(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, {
+    params: {
+      address: `eq.${externalAssetBridgeAddress}`,
+      key: `eq.${externalChainId}`,
+      ...(identity ? { key2: `eq.${toCirrusAddress(identity.depositRouter)}`, key3: `eq.${identity.depositId}` } : {}),
+      "value->>status": "eq.2",
+      select: "key2,key3,value",
+      order: "key2.asc,key3.asc",
+    },
+  });
+  for (let offset = 0; offset < deposits.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
+    const rows = deposits.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
+    const intents = await getPaginatedRows(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositActions`, {
       params: {
         address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
         or: `(${rows.map((row) => `and(key2.eq.${row.key2},key3.eq.${row.key3})`).join(",")})`,
-        select: "key2,key3,value", limit,
+        select: "key2,key3,value", order: "key2.asc,key3.asc",
       },
     });
-    if (!Array.isArray(intents)) throw new Error("Deposit action response is invalid");
     const actions = new Map(intents.map((row) => [`${row.key2}:${row.key3}`, row.value]));
     for (const row of rows) {
       const action = actions.get(`${row.key2}:${row.key3}`);
@@ -670,7 +701,6 @@ export const getRecordedDepositReviews = async (
         minFinalOut: String(action?.minFinalOut || "0"),
       });
     }
-    if (rows.length < limit || identity) break;
   }
   return result;
 };
@@ -680,11 +710,11 @@ export const getIndexedDepositSettlements = async (
   deposits: Pick<DepositArgs, "depositRouter" | "depositId">[],
 ): Promise<Pick<DepositArgs, "depositRouter" | "depositId">[]> => {
   const result: Pick<DepositArgs, "depositRouter" | "depositId">[] = [];
-  for (let offset = 0; offset < deposits.length; offset += 100) {
-    const batch = deposits.slice(offset, offset + 100);
-    const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, { params: {
+  for (let offset = 0; offset < deposits.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
+    const batch = deposits.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
+    const rows = await getPaginatedRows(`/${EXTERNAL_ASSET_BRIDGE_URL}-deposits`, { params: {
       address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
-      "value->>status": "eq.4", select: "key2,key3", limit: batch.length,
+      "value->>status": "eq.4", select: "key2,key3", order: "key2.asc,key3.asc",
       or: `(${batch.map(({ depositRouter, depositId }) => `and(key2.eq.${toCirrusAddress(depositRouter)},key3.eq.${depositId})`).join(",")})`,
     } });
     result.push(...rows.map((row: any) => ({ depositRouter: row.key2, depositId: String(row.key3) })));

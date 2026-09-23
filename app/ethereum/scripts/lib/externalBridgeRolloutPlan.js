@@ -387,6 +387,9 @@ function buildSynchronizedRollout({
   for (const route of inventory) {
     const token = tokenPolicy(policy, route.externalToken);
     const routeSettings = routePolicy(policy, route);
+    if (routeSettings.rebaseRequired && BigInt(token.minDepositAmount) === 0n) {
+      throw new Error(`Rebasing route ${routeKey(route.externalToken, route.stratoToken)} requires a positive minDepositAmount to reject rebase dust`);
+    }
     if (routeSettings.withdrawalsEnabled && !token.enabled) {
       throw new Error(
         `Withdrawal route ${routeKey(

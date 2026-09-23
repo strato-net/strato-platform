@@ -117,9 +117,9 @@ Expired reservations are cancelled on the original destination vault and recorde
 
 #### Optional
 - `CHAIN_${chainId}_WS_RPC_URL` - WebSocket RPC used for immediate deposit detection
-- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent verification RPCs; configure at least one in addition to the primary. Startup requires two distinct HTTPS provider hosts and matching chain IDs. Receipts and native ETH traces must agree across every configured provider; all must support `trace_transaction` for native ETH deposits.
+- `CHAIN_${chainId}_VERIFICATION_RPC_URLS` - Independent verification RPCs; configure at least one in addition to the primary. Startup requires two distinct HTTPS provider hosts, matching chain IDs, and a successful `trace_transaction` probe for a real mined transaction on each endpoint (searching up to 20 recent blocks). An unsupported method, unavailable trace, or absence of a probe transaction fails startup. Receipts and native ETH traces must agree across every configured provider; all must support `trace_transaction` for native ETH deposits.
 - `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` - Per-chain confirmation count (an explicit positive value is required in every environment)
-- `DEPOSIT_MISSING_RECEIPT_GRACE_MS` - Time a missing/lagging receipt remains retryable before review (defaults to `300000`)
+- `DEPOSIT_MISSING_RECEIPT_GRACE_MS` - Elapsed time from deposit detection before unavailable receipt or native trace evidence is sent to review (defaults to `300000`). Trace errors/disagreements are isolated by transaction; healthy transactions continue, and no deposit is settled without matching evidence from every configured RPC.
 - `DEPOSIT_SETTLEMENT_RETRY_GRACE_MS` - Time a verified deposit settlement may retry before terminal quarantine/review (defaults to `900000`)
 - `DEPOSIT_REVIEW_RECORD_RETRY_MS` - Minimum interval between STRATO review-recording attempts (defaults to `60000`; persisted reviews retry independently of log reconciliation)
 - `DEPOSIT_WEBHOOK_TOKEN` - Required in every environment for deposit webhook authentication
@@ -321,3 +321,11 @@ Reviewed deposits require AdminRegistry approval of `approveReviewedDeposit(chai
 Any withdrawal verifier's `409 manual_review` response causes Safe review instead of proceeding with other signatures. Policy files are checked against their recomputed baseline hash. Each verifier compares receipts, traces, contract reads and network identity across all configured RPCs, uses the slowest head for confirmations, and fails closed on disagreements or outages.
 
 New routes require 18-decimal STRATO representation tokens. Route governance grants only the required `mint`/`burn` permissions. Unpause the token before processing withdrawal refunds; token pause intentionally blocks escrow transfers. Authorization validity must match on STRATO and the vault (1–1800 seconds); the abort delay is capped at 172800 seconds. READY cannot use a future `notBefore`.
+
+### Routed-deposit accounting and rollout notes
+
+Reviewed deposits quote from the STRATO amount already recorded by EAB; unrecorded deposits quote from the verified external amount using EAB's current scaling and rebase formula. Do not recompute a reviewed deposit using a newer oracle factor. Changes to EAB's conversion formula require updating the pre-settlement calculation and its parity tests before enabling the new contract version.
+
+Configure a positive DepositRouter token minimum before enabling rebasing routes. Choose a minimum that produces at least one STRATO base unit at the largest supported rebase factor; merely setting the minimum to one external base unit may still round to zero. The rollout generator rejects zero minima for rebasing routes. No existing on-chain token limits are changed by this check.
+
+EAB `DepositCompleted` now includes `depositRouter` and `depositId`; update any consumers using positional event schemas when upgrading. EAB route outcomes use `AutoRouted`, `DepositActionFallback`, and `DepositActionFailed`; per-step outcomes use TokenRouter's `RouteStepExecuted`. `CANCELLED` remains a reserved status number for compatibility; recorded cancellations leave withdrawals READY until the attested refund completes. Deterministic AUTO_ROUTE failures may still settle through the operator's source-token fallback path.

@@ -1,5 +1,6 @@
 import { api } from '@/lib/axios';
 import type { Event } from '@strato/shared-types';
+import type { TokenDisplayMetadata } from '@/lib/bridge/types';
 
 export const METAL_ACTIVITY_PAIR = [
   { contract_name: "MetalForge", event_name: "MetalMinted" }
@@ -11,28 +12,31 @@ export interface MetalTx {
   paySymbol: string;
   metalAmount: string;
   metalSymbol: string;
+  payDecimals: number;
+  metalDecimals: number;
 }
 
-export async function resolveTokenSymbols(addresses: string[]): Promise<Map<string, string>> {
-  const map = new Map<string, string>();
+export async function resolveTokenMetadata(addresses: string[]): Promise<Map<string, TokenDisplayMetadata>> {
+  const map = new Map<string, TokenDisplayMetadata>();
   const normalized = [...new Set(addresses.filter(Boolean).map((address) => address.toLowerCase().replace(/^0x/, "")))];
   const results = await Promise.all(Array.from({ length: Math.ceil(normalized.length / 100) }, async (_, index) => {
     try {
       const { data } = await api.get("/tokens/symbols", {
         params: { addresses: normalized.slice(index * 100, (index + 1) * 100).join(",") },
       });
-      return data as Array<{ address: string; _symbol: string }>;
+      return data as Array<TokenDisplayMetadata & { address: string }>;
     } catch { return []; }
   }));
   for (const token of results.flat()) {
     if (!token._symbol) continue;
     const address = token.address.toLowerCase().replace(/^0x/, "");
-    map.set(address, token._symbol);
-    map.set(`0x${address}`, token._symbol);
+    const metadata = { _symbol: token._symbol, customDecimals: Number(token.customDecimals ?? 18) };
+    map.set(address, metadata);
+    map.set(`0x${address}`, metadata);
   }
   for (const address of addresses.filter(Boolean)) {
-    const symbol = map.get(address.toLowerCase());
-    if (symbol) map.set(address, symbol);
+    const metadata = map.get(address.toLowerCase());
+    if (metadata) map.set(address, metadata);
   }
   return map;
 }
@@ -47,15 +51,19 @@ export function collectMetalTokenAddrs(events: Event[]): Set<string> {
   return addrs;
 }
 
-export function mapEventsToMetalTxs(events: Event[], symbolMap: Map<string, string>): MetalTx[] {
+export function mapEventsToMetalTxs(events: Event[], metadataMap: Map<string, TokenDisplayMetadata>): MetalTx[] {
   return events.map((e) => {
     const a = e.attributes || {};
+    const payToken = metadataMap.get(a.payToken) || metadataMap.get(a.payToken?.toLowerCase());
+    const metalToken = metadataMap.get(a.metalToken) || metadataMap.get(a.metalToken?.toLowerCase());
     return {
       block_timestamp: e.block_timestamp || "",
       payAmount: a.payAmount || "0",
-      paySymbol: symbolMap.get(a.payToken) || symbolMap.get(a.payToken?.toLowerCase()) || "-",
+      paySymbol: payToken?._symbol || "-",
+      payDecimals: payToken?.customDecimals ?? 18,
       metalAmount: a.metalAmount || "0",
-      metalSymbol: symbolMap.get(a.metalToken) || symbolMap.get(a.metalToken?.toLowerCase()) || "-",
+      metalSymbol: metalToken?._symbol || "-",
+      metalDecimals: metalToken?.customDecimals ?? 18,
     };
   });
 }

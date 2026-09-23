@@ -471,7 +471,7 @@ export async function initNetworkConfig() {
     cirrus.get(accessToken, "/BlockApps-TokenRouter", {
       params: {
         address: `eq.${normalizedTokenRouter}`,
-        select: "initialized",
+        select: "initialized,poolFactory,poolV3Factory,directMintPsm,metalForge,saveUsdstVault",
         limit: 1,
       },
     }),
@@ -487,6 +487,11 @@ export async function initNetworkConfig() {
     String(routerRows?.[0]?.initialized) !== "true"
   ) {
     throw new Error("Configured TokenRouter is not initialized");
+  }
+  for (const [field, expected] of Object.entries({ poolFactory, poolV3Factory, directMintPsm, metalForge, saveUsdstVault })) {
+    if (!expected || routerRows[0][field]?.toLowerCase().replace(/^0x/, "") !== expected.toLowerCase().replace(/^0x/, "")) {
+      throw new Error(`TokenRouter.${field} does not match backend configuration`);
+    }
   }
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);

@@ -606,3 +606,20 @@ test("rejects leftover template chains before building governance configuration"
     assert.throws(() => buildSynchronizedRollout(input), /exactly one selected chain/);
   }
 });
+
+test("rebasing routes require a positive deposit minimum", () => {
+  const unsafe = structuredClone(policy);
+  unsafe.tokens[tokenKey].minDepositAmount = "0";
+  Object.values(unsafe.routes)[0].rebaseRequired = true;
+  assert.throws(() => buildSynchronizedRollout({ depositPlan, bridgeTemplate, vaultTemplate,
+    policy: unsafe, chainId: 11155111 }), /positive minDepositAmount/);
+});
+
+test("deprecated generator explains how to use the new settings format", () => {
+  const result = spawnSync(process.execPath, [path.resolve(__dirname, "../scripts/generateExternalBridgeRollout.js"),
+    "--mode", "prepare", "--settings", path.resolve(__dirname, "../externalBridgeRollout.settings.example.json"),
+    "--output-dir", os.tmpdir()], { encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /deprecated generator accepts legacy settings/);
+  assert.match(result.stderr, /scripts\/externalBridgeRollout.js/);
+});

@@ -6,7 +6,7 @@ import {
   PositionActivityRoutes,
   PositionEventSource,
 } from "../../shared/types";
-import { logInfo } from "../../infra/observability/logger";
+import { logDebug, logInfo } from "../../infra/observability/logger";
 import { config } from "../../infra/config/runtimeConfig";
 import { blockTrackingService } from "../../infra/state/blockTracking.repo";
 import {
@@ -138,7 +138,10 @@ const queryRegularEvents = async (
         tokenRouter: tokenRouterAddress,
         externalAssetBridge: config.externalAssetBridge.address,
       });
-      if (!user) return null;
+      if (!user) {
+        logDebug("RouteAttribution", "Skipped router-attributed activity: bridge configuration or routed caller is unavailable, or the caller is the bridge", { transactionHash: item.transaction_hash });
+        return null;
+      }
 
       return {
         address: item.address,

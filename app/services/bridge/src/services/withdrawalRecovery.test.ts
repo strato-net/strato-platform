@@ -96,7 +96,8 @@ async function worker() {
     process.exit(73); // Payment committed, but the executor never receives its receipt.
   };
   (api.eth as any).get = async () => ({ networkID: "9001" });
-  (api.cirrus as any).get = async (url: string) => {
+  (api.cirrus as any).get = async (url: string, { params }: any) => {
+    if (params.offset) return [];
     url = url.split("?")[0];
     if (url.endsWith("-withdrawals")) return state.completed ? [] : [{ key: "7", value: {
       status: "3", externalChainId: 1, externalToken: address("3"), externalRecipient: address("4"),

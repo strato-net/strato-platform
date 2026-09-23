@@ -28,13 +28,36 @@ test("skips ExternalAssetBridge routes to avoid duplicate rewards", () => {
   );
 });
 
-test("fails closed when the bridge address is unavailable", () => {
+test("fails closed when the bridge address is missing, zero, or malformed", () => {
+  for (const externalAssetBridge of [
+    undefined, "", " ", "0".repeat(40), `0x${"0".repeat(40)}`, `0X${"0".repeat(40)}`,
+    "2".repeat(39), "2".repeat(41), "g".repeat(40), ` ${route.externalAssetBridge}`,
+  ]) {
+    for (const routedCaller of [route.externalAssetBridge, "3".repeat(40)]) {
+      assert.equal(resolveRoutedActivityUser({ ...route, routedCaller, externalAssetBridge }), null);
+    }
+  }
+});
+
+test("recognizes nonzero bridge addresses with mixed case and optional prefixes", () => {
+  const bridge = "abcdef".repeat(6) + "abcd";
+  for (const externalAssetBridge of [bridge, `0x${bridge.toUpperCase()}`, `0X${bridge}`]) {
+    assert.equal(resolveRoutedActivityUser({ ...route, externalAssetBridge, routedCaller: bridge }), null);
+    assert.equal(resolveRoutedActivityUser({ ...route, externalAssetBridge, routedCaller: "3".repeat(40) }), "3".repeat(40));
+  }
+});
+
+test("keeps non-routed activity attribution when bridge configuration is invalid", () => {
   assert.equal(
     resolveRoutedActivityUser({
       ...route,
-      routedCaller: "3333333333333333333333333333333333333333",
-      externalAssetBridge: undefined,
+      attributedUser: "3".repeat(40),
+      externalAssetBridge: "0".repeat(40),
     }),
-    null
+    "3".repeat(40)
   );
+});
+
+test("fails closed when the routed caller is unavailable", () => {
+  assert.equal(resolveRoutedActivityUser(route), null);
 });

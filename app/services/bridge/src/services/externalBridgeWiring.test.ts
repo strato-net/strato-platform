@@ -47,6 +47,7 @@ test("normalizes Cirrus asset and deposit identity filters for ETH and mixed-cas
   const eth = "0".repeat(40), usdc = "a".repeat(40), target = "b".repeat(40);
   t.mock.method(cirrus, "get", async (table: string, { params }: any) => {
     if (table.endsWith("-routes")) {
+      if (params.offset) return [];
       assert.equal(params.key, `in.(${eth},${usdc})`);
       assert.equal(params.key2, "eq.11155111");
       assert.equal(params["value->>depositsEnabled"], "eq.true");
@@ -90,6 +91,7 @@ test("AUTO_ROUTE retries missing Cirrus metadata then submits a named-enum route
     action: "4", actionToken: `0x${output}`, minFinalOut: "90" };
   let metadataAvailable = false, reviewedMetadataAvailable = true, quotedOut = "95";
   t.mock.method(api.cirrus, "get", async (table: string, { params }: any) => {
+    if (params.offset) return [];
     if (table.endsWith("-chains")) return [{ key: 11155111, value: { enabled: true, depositRouter: router, vault: output, lastProcessedBlock: "15" } }];
     if (table.endsWith("-depositRouters")) return [];
     if (table.endsWith("-routeRebaseRequired")) return [];
@@ -399,8 +401,9 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
   const { cirrus } = await import("../utils/api");
   const requestedUrls: string[] = [];
   let externalDecimals = 18;
-  (cirrus as any).get = async (url: string) => {
+  (cirrus as any).get = async (url: string, { params }: any) => {
     requestedUrls.push(url);
+    if (params.offset) return [];
     if (url.includes("-deposits")) {
       return [{
         key: "1",
@@ -814,7 +817,8 @@ test("expires stale Safe reviews before release authorization", async () => {
 
 test("restores ready withdrawal authorization state from Cirrus", async () => {
   const { cirrus } = await import("../utils/api");
-  (cirrus as any).get = async (url: string) => {
+  (cirrus as any).get = async (url: string, { params }: any) => {
+    if (params.offset) return [];
     if (url.includes("-withdrawals")) {
       return [{
         key: "7",
@@ -1036,6 +1040,7 @@ test("isolates disabled-chain withdrawals and resumes them when re-enabled", asy
   let enrichmentCalls = 0;
   (cirrus as any).get = async (url: string, { params }: any) => {
     if (url.includes("-withdrawals?")) {
+      if (params.offset) return [];
       return [1, 2].map((chainId) => ({
         key: String(chainId),
         value: { externalChainId: chainId, status: params["value->>status"].slice(3) },

@@ -16,6 +16,7 @@ contract DepositRouter is
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
+    uint8 private constant AUTO_ROUTE = 4;
 
     // ============ Custom Errors ============
     error UseDepositETH();
@@ -306,7 +307,7 @@ contract DepositRouter is
     }
 
     function _validateActionIntent(ActionIntent memory intent) internal pure {
-        if (intent.action != 4) revert InvalidAction();
+        if (intent.action != AUTO_ROUTE) revert InvalidAction();
         if (intent.actionToken == address(0)) revert InvalidAddress();
         if (intent.minFinalOut == 0) revert ZeroAmount();
     }

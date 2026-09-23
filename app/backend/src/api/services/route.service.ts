@@ -7,7 +7,7 @@ import {
   TransactionResponse,
   TradeQuote,
 } from "@strato/shared-types";
-import { constants, ROUTE_TOPOLOGY_TTL_MS, MAX_UINT256 } from "../../config/constants";
+import { constants, ROUTE_TOPOLOGY_TTL_MS, ROUTE_OUTPUT_TOLERANCE_BPS, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
 import { FunctionInput, RouteEdge, RouteTopologyCache, StratoRouteStep } from "../../types/types";
 import { cirrus } from "../../utils/appApiHelper";
@@ -26,7 +26,7 @@ import { getPoolTokenPairs } from "./poolV3.service";
 import { getPsmMintState } from "./psm.service";
 import { getSaveUsdstActionState } from "./saveUsdst.service";
 import { getTradeQuotes, TRADE_DEADLINE_SECONDS } from "./trade.service";
-import { getYieldVaultInfo, listVaultDefs } from "./yieldVault.service";
+import { getYieldVaultActionState, listVaultDefs } from "./yieldVault.service";
 
 const BPS = 10_000n;
 const WAD = 10n ** 18n;
@@ -64,10 +64,10 @@ export const applyRouteSlippage = (
 ): bigint => {
   if (
     !Number.isInteger(slippageBps) ||
-    slippageBps < 0 ||
+    slippageBps < 1 ||
     slippageBps >= Number(BPS)
   ) {
-    throw new Error("slippageBps must be an integer between 0 and 9999");
+    throw new Error("slippageBps must be an integer between 1 and 9999");
   }
   return (amount * (BPS - BigInt(slippageBps))) / BPS;
 };
@@ -315,10 +315,10 @@ const getYieldVaultEdges = async (
     ({ address }) => address && approved.has(normalizeAddress(address))
   );
   const infos = await Promise.all(
-    definitions.map(({ key }) => getYieldVaultInfo(accessToken, key))
+    definitions.map(({ key }) => getYieldVaultActionState(key))
   );
   return infos
-    .filter((info) => info.deployed && !info.paused && info.assetAddress)
+    .filter((info): info is NonNullable<typeof info> => info !== null && !info.paused)
     .map((info) => ({
       kind: "YIELD_VAULT_DEPOSIT" as const,
       tokenIn: normalizeAddress(info.assetAddress),
@@ -652,7 +652,8 @@ const quoteEdge = async (
     if (priceIn <= 0n || priceOut <= 0n) {
       throw new Error("Forge oracle price is unavailable");
     }
-    amountOut = (principal * priceIn) / priceOut;
+    const fundsUSD = (principal * priceIn) / WAD;
+    amountOut = (fundsUSD * WAD) / priceOut;
     if (
       BigInt(edge.totalMinted || "0") + amountOut >
       BigInt(edge.mintCap || "0")
@@ -700,6 +701,7 @@ const quotePath = async (
   quotes: Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>
 ): Promise<RouteStepQuote[]> => {
   const steps: RouteStepQuote[] = [];
+  const usedPools = new Set<string>();
   let currentAmount = amountIn;
   for (const edge of path) {
     let edgeQuotes = quotes.get(edge);
@@ -713,6 +715,12 @@ const quotePath = async (
       edgeQuotes.set(currentAmount, pending);
     }
     const step = await pending;
+    if (edge.kind === "SWAP") {
+      const pool = normalizeAddress(step.target);
+      // Independent hop quotes do not reflect earlier swaps in the same pool.
+      if (usedPools.has(pool)) throw new Error("Route cannot reuse a swap pool");
+      usedPools.add(pool);
+    }
     steps.push(step);
     currentAmount = BigInt(step.amountOut);
   }
@@ -747,11 +755,18 @@ export const getRouteQuote = async (
       quotePath(accessToken, path, amountIn, slippageBps, quotes).catch(() => null)
     )
   );
-  const best = quoted
-    .filter(
-      (steps): steps is RouteStepQuote[] => Boolean(steps?.length)
-    )
+  const executable = quoted.filter(
+    (steps): steps is RouteStepQuote[] => Boolean(steps?.length)
+  );
+  const bestOutput = executable.reduce((highest, steps) => {
+    const output = BigInt(steps[steps.length - 1].amountOut);
+    return output > highest ? output : highest;
+  }, 0n);
+  const best = executable
     .reduce<RouteStepQuote[] | null>((current, steps) => {
+      // Compare against the global best without rounding the tolerance boundary.
+      if (BigInt(steps[steps.length - 1].amountOut) * BPS <
+          bestOutput * (BPS - ROUTE_OUTPUT_TOLERANCE_BPS)) return current;
       if (!current) return steps;
       if (steps.length !== current.length) {
         return steps.length < current.length ? steps : current;

@@ -12,6 +12,8 @@ export const MAX_UINT256 = (1n << 256n) - 1n;
 export const ANONYMOUS_QUOTE_TTL_MS = 1_000;
 export const ANONYMOUS_QUOTE_CACHE_SIZE = 128;
 export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
+// Maximum output sacrificed for fewer route steps; 0 selects strictly by output.
+export const ROUTE_OUTPUT_TOLERANCE_BPS = 5n;
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",

@@ -31,6 +31,27 @@ contract OneWayPoolV3Factory is PoolV3Factory {
     }
 }
 
+contract RouterRescueCaller {
+    function rescue(TokenRouter router, address token, address recipient, uint256 amount) public {
+        router.rescueTokens(token, recipient, amount);
+    }
+}
+
+contract ReentrantRescueToken {
+    TokenRouter router;
+    bool public blocked;
+    bool attempted;
+    constructor(TokenRouter target) { router = target; }
+    function rescue() public { router.rescueTokens(address(this), address(0x1234), 1); }
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        if (!attempted) {
+            attempted = true;
+            try router.rescueTokens(address(this), recipient, amount) {} catch { blocked = true; }
+        }
+        return true;
+    }
+}
+
 contract Describe_TokenRouter is Authorizable {
     using RouterTypes for *;
 
@@ -273,6 +294,33 @@ contract Describe_TokenRouter is Authorizable {
             BIG,
             block.timestamp + 3600
         );
+    }
+
+    function it_only_rescues_stranded_tokens_for_the_owner_while_paused() {
+        tokenA.transfer(address(router), 100);
+        bool reverted = false;
+        try router.rescueTokens(address(tokenA), address(this), 100) {} catch { reverted = true; }
+        require(reverted, "Active router must not allow rescue");
+        router.setPaused(true);
+        RouterRescueCaller caller = new RouterRescueCaller();
+        reverted = false;
+        try caller.rescue(router, address(tokenA), address(this), 100) {} catch { reverted = true; }
+        require(reverted, "Only owner may rescue");
+        reverted = false;
+        try router.rescueTokens(address(tokenA), address(0), 100) {} catch { reverted = true; }
+        require(reverted, "Rescue must reject zero recipient");
+        uint256 before = tokenA.balanceOf(address(this));
+        router.rescueTokens(address(tokenA), address(this), 100);
+        require(tokenA.balanceOf(address(router)) == 0, "Rescue must transfer stranded tokens");
+        require(tokenA.balanceOf(address(this)) == before + 100, "Rescue recipient must receive tokens");
+    }
+
+    function it_blocks_rescue_reentrancy_even_when_the_token_is_the_owner() {
+        router.setPaused(true);
+        ReentrantRescueToken token = new ReentrantRescueToken(router);
+        router.transferOwnership(address(token));
+        token.rescue();
+        require(token.blocked(), "Rescue must block reentrant owner calls");
     }
 
     function it_routes_through_v2_pool() {

@@ -100,7 +100,10 @@ export function normalizeError(error: any): BridgeError {
 /**
  * Maps error codes to user-friendly messages
  */
-function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
+export function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
+  if (errorName.startsWith("Quote expired after approval")) return "Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.";
+  if (errorName.startsWith("Quote expired")) return "Quote expired; request a new quote.";
+  if (errorName.includes("No executable route") || errorName.includes("No route found")) return "No route is available for this amount. Try a different amount or token.";
   switch (errorName) {
     case "TokenNotAllowed":
       return "This token is not currently supported for bridging.";
@@ -121,6 +124,7 @@ function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
     case "USER_REJECTED":
       return "Transaction cancelled by user";
     case "execution reverted":
+    case "External bridge transaction reverted":
       return "Transaction reverted. Please check your inputs and try again.";
     case "insufficient funds":
       return "Insufficient funds for gas fees. Please add more ETH to your wallet.";
@@ -268,7 +272,7 @@ export function assertAutoRouteQuote(
   if (binding.externalAmount <= 0n || BigInt(quote.bridge.externalAmount) !== binding.externalAmount ||
       Number(quote.bridge.externalDecimals) !== binding.externalDecimals ||
       BigInt(quote.amountIn) !== BigInt(quote.bridge.bridgedAmount) || BigInt(quote.amountIn) <= 0n) throw new Error("Quote does not match the deposit amount");
-  if (!Number.isInteger(binding.slippageBps) || binding.slippageBps < 0 || binding.slippageBps >= 10000 ||
+  if (!Number.isInteger(binding.slippageBps) || binding.slippageBps < 1 || binding.slippageBps >= 10000 ||
       quote.slippageBps !== binding.slippageBps) throw new Error("Quote slippage does not match");
   const minimum = BigInt(quote.depositAction.minFinalOut);
   const output = BigInt(quote.amountOut);

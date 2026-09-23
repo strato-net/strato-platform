@@ -24,7 +24,7 @@ export const fetchRouteSteps = async ({
       tokenIn,
       tokenOut,
       amount: amountIn,
-      slippageBps: 0,
+      slippageBps: 1,
     },
   });
   return getExecutableRouteSteps(quote, tokenIn, tokenOut, minFinalOut);

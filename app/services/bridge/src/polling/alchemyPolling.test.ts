@@ -515,3 +515,123 @@ test("keeps JSON-RPC batches within the 20-call submission limit", async () => {
     assert.equal(receipts.get(txHash)?.transactionHash, txHash),
   );
 });
+
+test("records an expired trace failure for review and settles the next deposit in the same pass", async (t) => {
+  const rpc = await import("../services/rpcService");
+  const cirrus = await import("../services/cirrusService");
+  const recovery = await import("../services/depositRecoveryService");
+  const verification = await import("../services/verificationService");
+  const bridge = await import("../services/bridgeService");
+  const { depositStateService: state } = await import("../services/depositStateService");
+  const { blockTrackingService: blocks } = await import("../services/blockTrackingService");
+  const { getMissingReceiptGraceMs } = await import("../config");
+  const { reconcileExternalDeposits } = await import("./alchemyPolling");
+  const deposits = classifyDepositLogs([
+    makeLog("DepositRouted", `0x${"aa".repeat(32)}`, 1),
+    makeLog("DepositRouted", `0x${"bb".repeat(32)}`, 2),
+  ], CHAIN_ID).standardDeposits;
+  deposits[0].externalToken = "0x0000000000000000000000000000000000000000";
+  const [untraceable, healthy] = deposits;
+  const error = new Error("Trace RPC disagreement");
+  const effects: string[] = [];
+  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[CHAIN_ID, {
+    externalChainId: CHAIN_ID, depositRouter: untraceable.depositRouter,
+    lastProcessedBlock: 15, enabled: true, chainName: "test", custody: recipient,
+  }]]));
+  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
+  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 15);
+  t.mock.method(blocks, "updateLastProcessedBlockEverywhere", async () => undefined);
+  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
+  t.mock.method(rpc, "getChainLogs", async () => []);
+  t.mock.method(state, "listReviews", async () => []);
+  t.mock.method(state, "list", async () => deposits.map((deposit) => ({ deposit, status: "pending" as const })));
+  t.mock.method(state, "oldestPendingBlock", async () => undefined);
+  t.mock.method(state, "pruneSettled", async () => undefined);
+  t.mock.method(verification, "verifyDetectedDepositsBatch", async () => new Map([
+    [verification.depositIdentity(untraceable), { state: "missing" as const, error }],
+    [verification.depositIdentity(healthy), { state: "verified" as const }],
+  ]));
+  t.mock.method(state, "markReceiptMissing", async (deposit, graceMs, reason) => {
+    assert.equal(deposit, untraceable);
+    assert.equal(graceMs, getMissingReceiptGraceMs());
+    assert.equal(reason, `External trace remained unavailable: ${error.message}`);
+    return { deposit, status: "review" as const, reviewReason: reason };
+  });
+  t.mock.method(state, "markReviewAttempted", async () => undefined);
+  t.mock.method(state, "markReviewRecorded", async () => undefined);
+  t.mock.method(state, "markSettled", async (deposit) => { assert.equal(deposit, healthy); });
+  t.mock.method(bridge, "recordDepositForReview", async (deposit) => {
+    assert.equal(deposit, untraceable);
+    effects.push("review");
+    return null;
+  });
+  t.mock.method(bridge, "settleDeposit", async (deposit) => {
+    assert.equal(deposit, healthy);
+    effects.push("settle");
+    return null;
+  });
+  await reconcileExternalDeposits(CHAIN_ID);
+  assert.deepEqual(effects, ["review", "settle"]);
+});
+
+test("confirmation policy fails closed after runtime environment changes", async (t) => {
+  const { getDepositConfirmationPolicy } = await import("../config");
+  const keys = ["CHAIN_999999_DEPOSIT_CONFIRMATIONS", "DEPOSIT_CONFIRMATIONS"];
+  const prior = keys.map(key => process.env[key]);
+  t.after(() => keys.forEach((key, i) => { if (prior[i] === undefined) delete process.env[key]; else process.env[key] = prior[i]; }));
+  delete process.env.DEPOSIT_CONFIRMATIONS;
+  for (const value of [undefined, "0", "-1", "1.5", "bad"]) {
+    if (value === undefined) delete process.env[keys[0]]; else process.env[keys[0]] = value;
+    assert.throws(() => getDepositConfirmationPolicy(999999), /Invalid deposit confirmation/);
+  }
+  process.env[keys[0]] = "12";
+  assert.equal(getDepositConfirmationPolicy(999999), 12);
+  delete process.env[keys[0]];
+  process.env.DEPOSIT_CONFIRMATIONS = "8";
+  assert.equal(getDepositConfirmationPolicy(999999), 8);
+});
+
+test("WebSocket reconnect backs off and periodic polls cannot bypass the delay", async () => {
+  const fs = await import("node:fs");
+  const vm = await import("node:vm");
+  const ts = await import("typescript");
+  const source = fs.readFileSync("src/polling/alchemyPolling.ts", "utf8");
+  const start = source.indexOf("const syncRealtimeSubscription =");
+  const end = source.indexOf("export const reconcileExternalDeposits", start);
+  const code = source.slice(start, end).replace("const syncRealtimeSubscription =", "exports.sync =");
+  let now = 0;
+  const providers: any[] = [], timers: { fn: () => void; delay: number }[] = [];
+  const exports: any = {};
+  class Provider {
+    handlers: Record<string, () => void> = {};
+    websocket = { on: (name: string, fn: () => void) => { this.handlers[name] = fn; } };
+    constructor() { providers.push(this); }
+    async destroy() {}
+    async on() {}
+  }
+  const context: any = { exports, WebSocketProvider: Provider, Date: { now: () => now },
+    getChainWsRpcUrl: () => "wss://test", realtimeProviders: new Map(), realtimeRetries: new Map(),
+    DEPOSIT_WS_RECONNECT_BASE_MS: 1000, DEPOSIT_WS_RECONNECT_MAX_MS: 60000,
+    DEPOSIT_EVENT_SIGNATURES: [], logInfo: () => {}, logError: () => {},
+    setTimeout: (fn: () => void, delay: number) => timers.push({ fn, delay }) };
+  vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+  context.syncRealtimeSubscription = exports.sync;
+  const chain = { externalChainId: 1, depositRouter: "router" };
+  exports.sync(chain);
+  for (const expected of [1000, 2000, 4000, 8000, 16000, 32000, 60000, 60000]) {
+    providers.at(-1).handlers.close();
+    providers.at(-1).handlers.error();
+    assert.equal(timers.length, 1, "close/error must schedule only one retry");
+    const timer = timers.shift()!;
+    assert.equal(timer.delay, expected);
+    const count = providers.length;
+    exports.sync(chain);
+    assert.equal(providers.length, count);
+    now += expected;
+    timer.fn();
+    assert.equal(providers.length, count + 1);
+  }
+  now += 60000;
+  providers.at(-1).handlers.close();
+  assert.equal(timers[0].delay, 1000, "a stable connection resets the backoff");
+});

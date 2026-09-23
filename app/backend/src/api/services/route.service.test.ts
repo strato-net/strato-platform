@@ -15,8 +15,32 @@ const swap = (tokenIn: string, tokenOut: string) => ({
 
 test("applies route slippage in basis points", () => {
   assert.equal(applyRouteSlippage(1_000_000n, 50), 995_000n);
-  assert.equal(applyRouteSlippage(1_000_000n, 0), 1_000_000n);
-  assert.throws(() => applyRouteSlippage(1n, 10_000), /slippageBps/);
+  assert.equal(applyRouteSlippage(1_000_000n, 1), 999_900n);
+  for (const invalid of [0, -1, 0.5, 10_000, NaN]) {
+    assert.throws(() => applyRouteSlippage(1n, invalid), /slippageBps/);
+  }
+});
+
+test("route API validation requires at least one basis point of slippage", async () => {
+  const { validateRouteQuoteArgs, validateCompositeRouteQuoteArgs, validateRouteExecuteArgs } =
+    await import("../validators/trade.validator");
+  const tokens = { tokenIn: "1".repeat(40), tokenOut: "2".repeat(40) };
+  const cases: Array<[(args: any) => void, object]> = [
+    [validateRouteQuoteArgs, { ...tokens, amount: "100" }],
+    [validateRouteExecuteArgs, { ...tokens, amountIn: "100", minFinalOut: "99" }],
+    [validateCompositeRouteQuoteArgs, { externalChainId: "1", externalToken: tokens.tokenIn,
+      targetStratoToken: "3".repeat(40), tokenOut: tokens.tokenOut, amount: "100" }],
+  ];
+  for (const [validate, args] of cases) {
+    for (const slippageBps of [0, -1, 0.5, 10000]) {
+      assert.throws(() => validate({ ...args, slippageBps }), /slippageBps/);
+    }
+    for (const slippageBps of [undefined, 1, 50, 9999]) {
+      assert.doesNotThrow(() => validate({ ...args, slippageBps }));
+    }
+  }
+  const { getRouteQuote } = await import("./route.service");
+  await assert.rejects(getRouteQuote("token", tokens.tokenIn, tokens.tokenOut, 100n, 0), /slippageBps/);
 });
 
 test("finds direct routes before longer alternatives", () => {
@@ -139,21 +163,21 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   const quote = () => getRouteQuote("token", "a", "d", 100n);
   const first = await Promise.all([quote(), quote()]);
   assert.equal(discoveryCalls, 1, "concurrent requests share discovery");
-  assert.equal(first[0].amountOut, "400");
-  assert.equal(first[0].steps.length, 2, "shorter executable routes take priority");
+  assert.equal(first[0].amountOut, "800");
+  assert.equal(first[0].steps.length, 3, "materially better output justifies extra steps");
   assert.equal(calls.filter((key) => key === "a:b:100").length, 2, "shared prefix quoted once per request");
   assert.ok(calls.includes("c:d:200"));
   assert.ok(calls.includes("c:d:400"), "same edge with different amounts is quoted separately");
   multiplier = 3n;
   calls.length = 0;
-  assert.equal((await quote()).amountOut, "900", "new requests use fresh amounts");
+  assert.equal((await quote()).amountOut, "2700", "new requests use fresh amounts");
   assert.equal(discoveryCalls, 1);
   assert.equal(calls.filter((key) => key === "a:b:100").length, 1);
   assert.ok(calls.includes("c:d:900"), "different input amounts get different quotes");
   failQuote = true;
   await assert.rejects(quote(), /No executable route/, "cached topology does not bypass live quote failure");
   failQuote = false;
-  assert.equal((await quote()).amountOut, "900", "failed quotes do not persist across requests");
+  assert.equal((await quote()).amountOut, "2700", "failed quotes do not persist across requests");
 
   now += ROUTE_TOPOLOGY_TTL_MS;
   failDiscovery = true;
@@ -166,6 +190,187 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   (config as any).networkId = "different-network";
   await quote();
   assert.equal(discoveryCalls, 4, "network changes invalidate topology");
+});
+
+test("selects the shortest route within the output tolerance of the global best", async (t) => {
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const settings = await import("../../config/constants");
+  const { constants } = settings;
+  const config = await import("../../config/config");
+  const trade = await import("./trade.service");
+  const swapping = await import("../helpers/swapping.helper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const save = await import("./saveUsdst.service");
+  const { getRouteQuote } = await import("./route.service");
+  const originalNetwork = config.networkId;
+  const originalTolerance = settings.ROUTE_OUTPUT_TOLERANCE_BPS;
+  (config as any).networkId = "route-output-tolerance-test";
+  t.after(() => {
+    (config as any).networkId = originalNetwork;
+    (settings as any).ROUTE_OUTPUT_TOLERANCE_BPS = originalTolerance;
+  });
+  const pairs = [["a", "d"], ["a", "b"], ["b", "d"], ["a", "c"], ["c", "d"], ["b", "c"]];
+  t.mock.method(swapping, "fetchMultiTokenStablePools", async () => []);
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: true }));
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
+  t.mock.method(save, "getSaveUsdstActionState", async () => null);
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.Pool}`) return { data: pairs.map(([a, b]) => ({
+      address: a + b, tokenA: { address: a, status: "2" },
+      tokenB: { address: b, status: "2" }, tokenABalance: "100", tokenBBalance: "100",
+      isPaused: false, isDisabled: false,
+    })) };
+    if (path === `/${constants.Token}`) {
+      return { data: ["a", "b", "c", "d"].map((address) => ({ address, status: "2" })) };
+    }
+    return { data: [] };
+  });
+  t.mock.method(swapping, "fetchPoolTokenAddresses", async (_token: string, pool: string) => ({
+    tokenA: pool[0], tokenB: pool[1],
+  }));
+  let outputs: string[];
+  t.mock.method(trade, "getTradeQuotes", async (_token: string, tokenIn: string, tokenOut: string, amount: bigint) => {
+    const pair = tokenIn + tokenOut;
+    const amountOut = pair === "ad" ? outputs[0] : pair === "bd" ? outputs[1]
+      : pair === "cd" ? outputs[amount === 300n ? 3 : 2]
+      : pair === "bc" ? "300" : pair === "ab" || pair === "ac" ? "200" : null;
+    if (amountOut === null) throw new Error("No executable pool");
+    return {
+      bestPoolAddress: pair,
+      quotes: [{ poolAddress: pair, poolType: "v2", tokenIn, tokenOut,
+        amountIn: String(amount), amountOut, feeAmount: "0", feeBps: 0,
+        priceImpact: 0, poolLabel: "test" }],
+    };
+  });
+  for (const [name, amounts, targets] of [
+    ["marginal gain", ["100000", "100040", "90000", "90000"], ["ad"]],
+    ["material gain", ["100000", "101000", "90000", "90000"], ["ab", "bd"]],
+    ["exact boundary", ["99950", "100000", "90000", "90000"], ["ad"]],
+    ["one unit outside boundary", ["99949", "100000", "90000", "90000"], ["ab", "bd"]],
+    ["equal hops prefer output", ["90000", "99980", "100000", "90000"], ["ac", "cd"]],
+    ["equal output prefers shorter", ["100000", "100000", "100000", "100000"], ["ad"]],
+    ["tolerance cannot compound across candidates", ["99900", "99950", "90000", "100000"], ["ab", "bd"]],
+    ["small amounts do not round into tolerance", ["1998", "1999", "1900", "1900"], ["ab", "bd"]],
+    ["large amounts retain integer precision", ["999499999999999999999999", "1000000000000000000000000", "90000", "90000"], ["ab", "bd"]],
+  ] as const) {
+    await t.test(name, async () => {
+      outputs = [...amounts];
+      const quote = await getRouteQuote("token", "a", "d", 100n, 50);
+      assert.deepEqual(quote.steps.map(({ target }) => target), targets);
+      assert.equal(quote.amountOut, quote.steps[quote.steps.length - 1].amountOut);
+      assert.equal(quote.minFinalOut, applyRouteSlippage(BigInt(quote.amountOut), 50).toString());
+    });
+  }
+  (settings as any).ROUTE_OUTPUT_TOLERANCE_BPS = 0n;
+  outputs = ["100000", "100001", "90000", "90000"];
+  const strict = await getRouteQuote("token", "a", "d", 100n);
+  assert.deepEqual(strict.steps.map(({ target }) => target), ["ab", "bd"]);
+});
+
+test("excludes repeated-pool paths while retaining direct and distinct-pool routes", async (t) => {
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const { constants } = await import("../../config/constants");
+  const config = await import("../../config/config");
+  const trade = await import("./trade.service");
+  const swapping = await import("../helpers/swapping.helper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const save = await import("./saveUsdst.service");
+  const { getRouteQuote } = await import("./route.service");
+  const originalNetwork = config.networkId;
+  (config as any).networkId = "pool-reuse-test";
+  t.after(() => { (config as any).networkId = originalNetwork; });
+  const coins = ["a", "b", "c", "d"].map((tokenAddress, coinIndex) => ({ tokenAddress, coinIndex }));
+  t.mock.method(swapping, "fetchMultiTokenStablePools", async () => [{
+    address: "abcd", coins, tokenBalances: new Map(coins.map(({ tokenAddress }) => [tokenAddress, "10000"])),
+    isPaused: false, isDisabled: false,
+  }] as any);
+  t.mock.method(swapping, "fetchPoolCoins", async () => coins);
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: true }));
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
+  t.mock.method(save, "getSaveUsdstActionState", async () => null);
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.Token}`) {
+      return { data: coins.map(({ tokenAddress }) => ({ address: tokenAddress, status: "2" })) };
+    }
+    if (path === `/${constants.PoolFactory}-allPools`) return { data: [{ key: "1" }] };
+    return { data: [] };
+  });
+  const available = new Map<string, { pool: string; output: string }>([
+    ["a:d", { pool: "abcd", output: "100" }],
+    ["a:b", { pool: "0xABCD", output: "400" }],
+    ["b:d", { pool: "abcd", output: "800" }],
+    ["a:c", { pool: "1111", output: "90" }],
+    ["c:d", { pool: "2222", output: "80" }],
+  ]);
+  t.mock.method(trade, "getTradeQuotes", async (_token: string, tokenIn: string, tokenOut: string, amount: bigint) => {
+    const result = available.get(`${tokenIn}:${tokenOut}`);
+    if (!result) throw new Error("No executable pool");
+    return {
+      bestPoolAddress: result.pool,
+      quotes: [{ poolAddress: result.pool, poolType: "stable", tokenIn, tokenOut,
+        amountIn: String(amount), amountOut: result.output, feeAmount: "0", feeBps: 0,
+        priceImpact: 0, poolLabel: "test" }],
+    };
+  });
+  const quote = () => getRouteQuote("token", "a", "d", 100n);
+  const direct = await quote();
+  assert.equal(direct.steps.length, 1);
+  assert.equal(direct.amountOut, "100");
+  available.delete("a:d");
+  const alternative = await quote();
+  assert.deepEqual(alternative.steps.map(({ target }) => target), ["1111", "2222"]);
+  assert.equal(alternative.amountOut, "80", "rejects the optimistic 800-output repeated-pool route");
+  available.delete("a:c");
+  await assert.rejects(quote(), /No executable route/);
+  available.delete("b:d");
+  available.set("b:c", { pool: "1111", output: "300" });
+  available.set("c:d", { pool: "abcd", output: "600" });
+  await assert.rejects(quote(), /No executable route/, "also rejects non-adjacent pool reuse");
+  available.set("c:d", { pool: "2222", output: "250" });
+  const distinct = await quote();
+  assert.deepEqual(distinct.steps.map(({ target }) => target), ["abcd", "1111", "2222"]);
+  assert.equal(distinct.amountOut, "250");
+});
+
+test("forge quotes match both contract divisions and the resulting mint cap", async (t) => {
+  const config = await import("../../config/config");
+  const { constants, MAX_UINT256 } = await import("../../config/constants");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const swapping = await import("../helpers/swapping.helper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const save = await import("./saveUsdst.service");
+  const { getRouteQuote } = await import("./route.service");
+  const originalNetwork = config.networkId;
+  const originalForge = config.metalForge;
+  (config as any).networkId = "forge-rounding-test";
+  (config as any).metalForge = "forge";
+  t.after(() => { (config as any).networkId = originalNetwork; (config as any).metalForge = originalForge; });
+  t.mock.method(cirrus, "get", async () => ({ data: [] }));
+  t.mock.method(swapping, "fetchMultiTokenStablePools", async () => []);
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: true }));
+  t.mock.method(save, "getSaveUsdstActionState", async () => null);
+  const metal = { address: "metal", isEnabled: true, feeBps: "25", mintCap: String(MAX_UINT256),
+    totalMinted: "0", price: "500000000000000000", name: "Metal", symbol: "METAL" };
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [metal], payTokens: [
+    { address: "pay", price: "1500000000000000000" },
+    { address: constants.USDST, price: "0" },
+  ] }) as any);
+  const quote = () => getRouteQuote("token", "pay", "metal", 10002n, 1);
+  const result = await quote();
+  assert.equal(result.steps[0].feeAmount, "25");
+  assert.equal(result.amountOut, "29930", "single-floor arithmetic would overquote by one wei");
+  assert.equal(result.minFinalOut, "29927");
+  assert.equal(result.steps[0].minAmountOut, "29927");
+  metal.mintCap = "29930";
+  assert.equal((await quote()).amountOut, "29930", "exact cap remains executable");
+  metal.totalMinted = "1";
+  await assert.rejects(quote(), /No executable route/);
+  metal.totalMinted = "0";
+  const usdst = await getRouteQuote("token", constants.USDST, "metal", 10002n, 1);
+  assert.equal(usdst.amountOut, "19954", "USDST principal is already denominated in USD");
 });
 
 test("vault previews use full precision and reject deposits execution would reject", async () => {
@@ -215,11 +420,12 @@ test("both vault routes quote from accounting totals and respect deposit availab
     projectedExchangeRate: "1",
   }) : null);
   t.mock.method(yieldVault, "listVaultDefs", () => [{ key: "yield", address: "yield" }] as any);
-  t.mock.method(yieldVault, "getYieldVaultInfo", async () => ({
+  t.mock.method(yieldVault, "getYieldVaultInfo", async () => { throw new Error("Quotes must not load vault analytics"); });
+  t.mock.method(yieldVault, "getYieldVaultActionState", async () => deployed ? ({
     totalShares: totals.totalShares, projectedActiveAssets: totals.pricingAssets,
     vaultAddress: "yield", assetAddress: "asset", shareSymbol: "YIELD", decimals: 18,
-    deployed, paused, projectedExchangeRate: "1",
-  }) as any);
+    paused,
+  }) as any : null);
   for (const target of ["save", "yield"]) {
     const quote = await getRouteQuote("token", "asset", target, 100000000000000000000n);
     assert.equal(quote.amountOut, String(100000000000000000000n * BigInt(totals.totalShares) / BigInt(totals.pricingAssets)));
@@ -236,6 +442,83 @@ test("both vault routes quote from accounting totals and respect deposit availab
   maximum = String(MAX_UINT256);
   totals.pricingAssets = "0";
   for (const target of ["save", "yield"]) await assert.rejects(getRouteQuote("token", "asset", target, 100n), /No executable route/);
+});
+
+test("yield vault quotes fetch only live accounting and funded accrual", async (t) => {
+  const config = await import("../../config/config");
+  const { constants } = await import("../../config/constants");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const auth = await import("../../utils/authHelper");
+  const { getYieldVaultActionState } = await import("./yieldVault.service");
+  const original = config.ethCarryVault;
+  (config as any).ethCarryVault = "vault";
+  t.after(() => { (config as any).ethCarryVault = original; });
+  t.mock.method(auth, "getServiceToken", async () => "service-token");
+  t.mock.method(Date, "now", () => 1_000_000);
+  const state = {
+    _asset: "asset", _totalSupply: "1000", _symbol: "YIELD", _paused: "false",
+    vaultInitialized: "true", deployedAssets: "300", totalClaimableAssets: "100",
+    _underlyingDecimals: 6,
+  };
+  const storage = {
+    accrualInitialized: "false", accrualBaseAssets: "1000",
+    perSecondSavingsRate: "1100000000000000000000000000", lastAccrual: "999",
+    rewardDistributor: "distributor",
+  };
+  let idleBalance = "200";
+  let rewardBalance = "60";
+  let allowance = "40";
+  let deployed = true;
+  let calls = 0;
+  t.mock.method(cirrus, "get", async (token: string, path: string, options: any) => {
+    calls++;
+    assert.equal(token, "service-token");
+    if (path === `/${constants.YieldVault}`) return { data: deployed ? [state] : [] };
+    if (path === "/storage") return { data: [storage] };
+    if (path === `/${constants.Token}-_balances`) {
+      assert.equal(options.params.address, "eq.asset");
+      return { data: [{ value: options.params.key === "eq.vault" ? idleBalance : rewardBalance }] };
+    }
+    if (path === `/${constants.Token}-_allowances`) {
+      assert.equal(options.params.key, "eq.distributor");
+      assert.equal(options.params.key2, "eq.vault");
+      return { data: [{ value: allowance }] };
+    }
+    assert.fail(`Unexpected analytics query: ${path}`);
+  });
+  assert.deepEqual(await getYieldVaultActionState("eth-carry"), {
+    vaultAddress: "vault", assetAddress: "asset", shareSymbol: "YIELD", name: "ETH Yield Vault",
+    decimals: 6, totalShares: "1000", projectedActiveAssets: "400", paused: false,
+  });
+  assert.equal(calls, 3);
+  storage.accrualInitialized = "true";
+  calls = 0;
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.projectedActiveAssets, "440");
+  assert.equal(calls, 5);
+  allowance = "200";
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.projectedActiveAssets, "460");
+  rewardBalance = "200";
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.projectedActiveAssets, "500");
+  idleBalance = "300";
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.projectedActiveAssets, "600");
+  state._paused = "true";
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.paused, true);
+  state._underlyingDecimals = 0;
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.decimals, 0);
+  state.totalClaimableAssets = "10000";
+  assert.equal((await getYieldVaultActionState("eth-carry"))?.projectedActiveAssets, "0");
+  state.vaultInitialized = "false";
+  assert.equal(await getYieldVaultActionState("eth-carry"), null);
+  state.vaultInitialized = "true";
+  state._asset = "";
+  assert.equal(await getYieldVaultActionState("eth-carry"), null);
+  deployed = false;
+  assert.equal(await getYieldVaultActionState("eth-carry"), null);
+  calls = 0;
+  assert.equal(await getYieldVaultActionState("unknown"), null);
+  (config as any).ethCarryVault = "";
+  assert.equal(await getYieldVaultActionState("eth-carry"), null);
+  assert.equal(calls, 0);
 });
 
 test("Save USDST deposit state checks initialization and invalid empty-supply accounting", async (t) => {
@@ -301,4 +584,27 @@ test("anonymous route assets omit the balances relationship", async (t) => {
   await getRouteAssets("user-token", "4".repeat(40));
   assert.equal(selections.at(-1).select.includes("balances:"), true);
   assert.equal(selections.at(-1)["balances.key"], `eq.${"4".repeat(40)}`);
+});
+
+test("startup rejects router dependencies that disagree with backend quote configuration", async (t) => {
+  const config = await import("../../config/config");
+  const auth = await import("../../utils/authHelper");
+  const { eth, cirrus } = await import("../../utils/appApiHelper");
+  const snapshot = { ...config };
+  t.after(() => Object.assign(config, snapshot));
+  t.mock.method(auth, "getServiceToken", async () => "service-token");
+  t.mock.method(eth, "get", async () => ({ data: { networkID: "114784819836269", networkName: "test" } }));
+  let mismatch = "";
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === "/BlockApps-ExternalAssetBridge") return { data: [{ tokenRouter: config.tokenRouter }] };
+    const row: Record<string, unknown> = { initialized: true };
+    for (const field of ["poolFactory", "poolV3Factory", "directMintPsm", "metalForge", "saveUsdstVault"] as const) {
+      row[field] = field === mismatch ? "0".repeat(40) : `0x${config[field].toUpperCase().replace(/^0X/, "")}`;
+    }
+    return { data: [row] };
+  });
+  await config.initNetworkConfig();
+  for (mismatch of ["poolFactory", "poolV3Factory", "directMintPsm", "metalForge", "saveUsdstVault"]) {
+    await assert.rejects(config.initNetworkConfig(), new RegExp(`TokenRouter.${mismatch}`));
+  }
 });

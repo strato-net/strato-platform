@@ -256,6 +256,13 @@ export const getActivitiesByTypes = async (
     pairs: ActivityTypePair[],
     params: Record<string, string>
   ) => {
+    if (constants.externalAssetBridge && pairs.some((pair) =>
+      pair.contract_name === "TokenRouter" && pair.event_name === "RouteExecuted"
+    )) {
+      const bridge = constants.externalAssetBridge.toLowerCase().replace(/^0x/, "");
+      // Bridge routes are represented by the enriched DepositCompleted activity.
+      params.and = `(or(event_name.neq.RouteExecuted,attributes->>caller.neq.${bridge}))`;
+    }
     if (internalAddrList) {
       for (const pair of pairs) {
         const attrs = pair.filterConfig?.excludeProtocolAddresses;

@@ -362,6 +362,7 @@ api.interceptors.response.use(
           description: "Please refresh the page and try again.",
           variant: "destructive",
         });
+        (error as any).toastShown = true;
         return Promise.reject(error);
       }
     }
@@ -376,6 +377,7 @@ api.interceptors.response.use(
         title: "Session Expired",
         description: "Reauthenticating the user...",
       });
+      (error as any).toastShown = true;
       setTimeout(() => {
         redirectToLogin();
       }, 1500);
@@ -383,6 +385,9 @@ api.interceptors.response.use(
     }
     
     // Show toast for all other API errors
+    if (["/trade/route", "/trade/route/quote", "/trade/bridge-route/quote"].some(path => url.split("?")[0].endsWith(path))) {
+      return Promise.reject(error);
+    }
     const errorMessage = extractApiErrorMessage(error);
     const errorTitle = getErrorTitle(url);
     toast({

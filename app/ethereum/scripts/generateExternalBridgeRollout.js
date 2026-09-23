@@ -83,6 +83,9 @@ const resolveFrom = (directory, file) =>
 function loadSettingsInputs(settingsPath) {
   const absoluteSettingsPath = path.resolve(settingsPath);
   const settings = readJson(absoluteSettingsPath, "rollout settings");
+  if (settings.dependencies && !settings.bridgeTemplate) {
+    throw new Error("This deprecated generator accepts legacy settings with bridgeTemplate only. Use scripts/externalBridgeRollout.js for settings containing dependencies (including the shipped example).");
+  }
   const settingsDirectory = path.dirname(absoluteSettingsPath);
   for (const required of ["externalDeployment", "depositPlan", "bridgeTemplate"]) {
     if (!settings[required]) {

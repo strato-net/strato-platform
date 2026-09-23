@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useBalance, useReadContract } from "wagmi";
+import { maxUint256 } from "viem";
 import { ERC20_ABI } from "@/lib/bridge/constants";
 import { ArrowDownUp, Globe2, Layers3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
+import { getFriendlyMessage, normalizeError } from "@/lib/bridge/utils";
 
 const RouterWidget = ({
   guestMode = false,
@@ -42,7 +44,7 @@ const RouterWidget = ({
 }) => {
   const { toast } = useToast();
   const { isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance } =
+  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
     useTokenContext();
   const {
     availableNetworks,
@@ -74,7 +76,10 @@ const RouterWidget = ({
                 : [],
             })),
           ...(routeAssetsQuery.data ?? []),
-        ].map((token) => [token.address, token])
+        ].map((token) => {
+          const address = token.address.toLowerCase().replace(/^0x/, "");
+          return [address, { ...token, address }];
+        })
       ).values(),
     ],
     [routeAssetsQuery.data, bridgeableTokens]
@@ -109,6 +114,9 @@ const RouterWidget = ({
   const externalRoute =
     externalRoutes.find((route) => route.id === externalRouteId) ??
     externalRoutes[0];
+  const bridgedToken = routeAssetsQuery.data?.find((token) =>
+    ensureHexPrefix(token.address)?.toLowerCase() === ensureHexPrefix(externalRoute?.stratoToken)?.toLowerCase()
+  );
 
   useEffect(() => {
     onPairChange?.(
@@ -156,7 +164,8 @@ const RouterWidget = ({
   }, [amount, inputDecimals]);
   const routeFeeWei = safeParseUnits(SWAP_FEE);
   const externalBalanceError = sourceMode === "external" && externalBalance !== undefined &&
-    BigInt(amountWei) > externalBalance ? "Insufficient external token balance" : "";
+    (BigInt(amountWei) > externalBalance || (isNativeInput && BigInt(amountWei) > 0n && BigInt(amountWei) === externalBalance))
+      ? isNativeInput ? "Leave enough native currency to cover gas fees" : "Insufficient external token balance" : "";
   const availableFees = BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0");
   const feeError =
     !guestMode &&
@@ -238,11 +247,11 @@ const RouterWidget = ({
   }, [sourceMode, quote, userRewards, tokens]);
 
   const handleTrade = async () => {
-    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0" || externalBalanceError) return;
+    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0" || amountError || feeError || externalBalanceError) return;
     try {
       if (sourceMode === "external") {
         if (!externalRoute || !network || !compositeQuote.data) return;
-        await autoRouteDeposit.execute({
+        const result = await autoRouteDeposit.execute({
           route: externalRoute,
           network,
           amount,
@@ -251,24 +260,38 @@ const RouterWidget = ({
           outputAddress: tokenOut.address,
           slippageBps,
         });
-        toast({
-          title: "Deposit submitted",
-          description:
-            compositeQuote.data.depositAction.action ===
-            4
-              ? `Your deposit will settle into ${tokenOut._symbol}, or fall back to ${externalRoute.stratoTokenSymbol} if the minimum cannot be met.`
-              : `Your deposit will settle as ${externalRoute.stratoTokenSymbol}.`,
-          variant: "success",
-        });
+        if (result.status === "pending") {
+          toast({
+            title: result.type === "approval" ? "Approval still pending" : "Deposit still pending",
+            description: `Confirmation is unavailable — do not resubmit. ${result.type === "approval" ? "No deposit has been sent. " : ""}Transaction: ${result.txHash}`,
+            duration: Infinity,
+            className: "[overflow-wrap:anywhere]",
+          });
+          if (result.type === "approval") return;
+        } else {
+          toast({
+            title: "Deposit submitted",
+            description:
+              compositeQuote.data.depositAction.action ===
+              4
+                ? `Your deposit will settle into ${tokenOut._symbol}, or fall back to ${externalRoute.stratoTokenSymbol} if the minimum cannot be met.`
+                : `Your deposit will settle as ${externalRoute.stratoTokenSymbol}.`,
+            variant: "success",
+          });
+        }
       } else {
         if (!tokenIn || !isLoggedIn) return;
-        await routeExecute.mutateAsync({
-          tokenIn: tokenIn.address,
-          tokenOut: tokenOut.address,
-          amountIn: amountWei,
-          minFinalOut: quote.minFinalOut,
-          slippageBps,
-        });
+        try {
+          await routeExecute.mutateAsync({
+            tokenIn: tokenIn.address,
+            tokenOut: tokenOut.address,
+            amountIn: amountWei,
+            minFinalOut: quote.minFinalOut,
+            slippageBps,
+          });
+        } finally {
+          void fetchUsdstBalance();
+        }
         toast({
           title: "Trade submitted",
           description: `Trading ${amount} ${tokenIn._symbol} for ${tokenOut._symbol}.`,
@@ -279,9 +302,11 @@ const RouterWidget = ({
       if (balanceEnabled) void externalBalanceQuery.refetch();
       setAmount("");
     } catch (error) {
+      if ((error as { toastShown?: boolean })?.toastShown) return;
+      const normalized = normalizeError(error);
       toast({
         title: "Transaction failed",
-        description: (error as Error).message,
+        description: normalized.code === "UNKNOWN_ERROR" ? getFriendlyMessage(normalized.message) : normalized.userMessage,
         variant: "destructive",
       });
     }
@@ -365,7 +390,14 @@ const RouterWidget = ({
                     maxSpendableWei,
                     inputDecimals
                   )
-                : setAmount(event.target.value)
+                : handleAmountInputChange(
+                    event.target.value,
+                    setAmount,
+                    setAmountError,
+                    externalBalance?.toString() ?? maxUint256.toString(),
+                    inputDecimals,
+                    "Insufficient external token balance"
+                  )
             }
           />
           <select
@@ -511,14 +543,14 @@ const RouterWidget = ({
             If the STRATO route is unavailable or cannot meet your minimum,
             you will receive{" "}
             {formatAmount(
-              formatUnits(compositeQuote.data.bridge.bridgedAmount, 18)
+              formatUnits(compositeQuote.data.bridge.bridgedAmount, bridgedToken?.customDecimals ?? 18)
             )}{" "}
             {externalRoute.stratoTokenSymbol} instead.
           </p>
         )}
       {quoteError && amountWei !== "0" && (
         <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-          {(quoteError as Error).message}
+          {getFriendlyMessage((quoteError as Error).message)}
         </p>
       )}
       {(amountError || feeError || externalBalanceError) && (

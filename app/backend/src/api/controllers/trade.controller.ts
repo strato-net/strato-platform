@@ -1,4 +1,4 @@
-import { cachedAnonymousQuote } from "../services/anonymousQuoteCache.service";
+import { cachedAnonymousQuote, quoteCacheKey } from "../services/anonymousQuoteCache.service";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -65,7 +65,7 @@ class TradeController {
       const { accessToken, query } = req;
       validateTradeQuoteArgs(query);
       const response = await cachedAnonymousQuote(
-        "getTradeQuotes:" + JSON.stringify([query.tokenIn, query.tokenOut, query.amount, query.type]),
+        quoteCacheKey("getTradeQuotes", [query.tokenIn, query.tokenOut, query.amount, query.type]),
         req.address as string | undefined,
         () => getTradeQuotes(
           accessToken,
@@ -97,7 +97,7 @@ class TradeController {
       const { accessToken, query } = req;
       validateRouteQuoteArgs(query);
       const result = await cachedAnonymousQuote(
-        "getRouteQuote:" + JSON.stringify([query.tokenIn, query.tokenOut, query.amount, query.slippageBps]),
+        quoteCacheKey("getRouteQuote", [query.tokenIn, query.tokenOut, query.amount, query.slippageBps]),
         req.address as string | undefined,
         () => getRouteQuote(
           accessToken,
@@ -130,7 +130,7 @@ class TradeController {
       const { accessToken, query } = req;
       validateCompositeRouteQuoteArgs(query);
       const result = await cachedAnonymousQuote(
-        "getCompositeBridgeRouteQuote:" + JSON.stringify([query.externalChainId, query.externalToken, query.targetStratoToken, query.tokenOut, query.amount, query.slippageBps]),
+        quoteCacheKey("getCompositeBridgeRouteQuote", [query.externalChainId, query.externalToken, query.targetStratoToken, query.tokenOut, query.amount, query.slippageBps]),
         req.address as string | undefined,
         () => getCompositeBridgeRouteQuote(
           accessToken,

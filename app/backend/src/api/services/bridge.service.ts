@@ -418,8 +418,9 @@ export const getBridgeTransactions = async (
     return { data: [], totalCount };
   }
 
-  const enrichedData = await enrichTransactionData(accessToken, allResults, type);
-  return { data: isDeposit ? enrichedData : applyPagination(enrichedData, rawParams), totalCount };
+  const page = isDeposit ? allResults : applyPagination(allResults, rawParams);
+  const enrichedData = await enrichTransactionData(accessToken, page, type);
+  return { data: enrichedData, totalCount };
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId?: string): Promise<BridgeToken[]> => {
@@ -820,7 +821,6 @@ export const buildDepositActionCatalog = ({
   psmState,
   saveState,
   forgeConfigs,
-  bridgeActionConfig,
   bridgeActionRoutes,
 }: {
   routes: BridgeToken[];
@@ -828,7 +828,6 @@ export const buildDepositActionCatalog = ({
   psmState: PsmMintState | null;
   saveState: SaveUsdstActionState | null;
   forgeConfigs: MetalForgeConfig;
-  bridgeActionConfig: { directMintPsm?: string; saveUsdstVault?: string };
   bridgeActionRoutes: Map<string, { autoForge: boolean; autoSave: boolean; autoRoute?: boolean }>;
 }): DepositAction[] => {
   if (!actionChainIds.size) return [];
@@ -938,7 +937,6 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     psmState,
     saveState,
     forgeConfigs,
-    bridgeActionConfig,
     bridgeActionRouteRows,
   ] = await Promise.all([
     getBridgeableTokens(accessToken),
@@ -946,13 +944,6 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     constants.directMintPsm ? getPsmMintState(accessToken) : Promise.resolve(null),
     constants.saveUsdstVault ? getSaveUsdstActionState(accessToken) : Promise.resolve(null),
     constants.metalForge ? getMetalForgeConfigs(accessToken) : Promise.resolve({ metals: [], payTokens: [] }),
-    cirrus.get(accessToken, "/storage", {
-      params: {
-        address: `eq.${constants.externalAssetBridge}`,
-        select: "data->>directMintPsm,data->>saveUsdstVault",
-        limit: "1",
-      },
-    }).then(({ data }) => data?.[0] || {}),
     cirrus.get(accessToken, `/${ExternalAssetBridge}-depositActionConfigs`, {
       params: {
         address: `eq.${constants.externalAssetBridge}`,
@@ -986,7 +977,6 @@ export const getDepositActions = async (accessToken: string): Promise<DepositAct
     psmState,
     saveState,
     forgeConfigs,
-    bridgeActionConfig,
     bridgeActionRoutes,
   });
 };

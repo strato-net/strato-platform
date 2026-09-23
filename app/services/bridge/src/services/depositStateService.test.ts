@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { DepositArgs } from "../types";
 
-test("persists deposit state atomically and orders reads after pending writes", async () => {
+test("persists deposit state atomically and orders reads after pending writes", async (t) => {
   const previousDirectory = process.cwd();
   const directory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "deposit-state-")));
   process.chdir(directory);
@@ -66,6 +66,51 @@ test("persists deposit state atomically and orders reads after pending writes", 
     assert.equal((await restarted.getByIdentity(1, "router", "1")).status, "settled", "Keep tombstone until indexed completion");
     await restarted.restoreRecordedReview(deposit);
     assert.equal((await restarted.listReviews(1)).length, 0, "Lagging Cirrus review must not resurrect settled state");
+
+    await t.test("conflicting rescans preserve settled deposits before and after indexing", async () => {
+      const settledDeposit = { ...deposit, depositId: "5" };
+      await restarted.upsert(settledDeposit);
+      await restarted.markSettled(settledDeposit);
+      for (const indexed of [false, true]) {
+        if (indexed) await restarted.markIndexedSettlements(1, [settledDeposit]);
+        const original = await restarted.getByIdentity(1, "router", "5");
+        for (const externalBlockHash of [deposit.externalBlockHash, "different-block"]) {
+          const result = await restarted.upsert({
+            ...settledDeposit, externalBlockHash, observedExternalTokenAmount: "999",
+            externalTxHash: "conflicting-tx", detectedAt: 999,
+          });
+          assert.deepEqual(result, original);
+          assert.deepEqual(JSON.parse(await fs.readFile(statePath, "utf8"))["1:router:5"], original);
+        }
+      }
+      assert.equal((await restarted.listReviews(1)).length, 0);
+    });
+
+    await t.test("unsettled conflicts still enter review and pending reorg replacements remain retryable", async () => {
+      const conflicting = { ...deposit, depositId: "2", observedExternalTokenAmount: "999" };
+      assert.equal((await restarted.upsert(conflicting)).status, "review");
+      const replacement = { ...deposit, depositId: "3", externalBlockHash: "replacement-block", observedExternalTokenAmount: "999" };
+      const result = await restarted.upsert(replacement);
+      assert.equal(result.status, "pending");
+      assert.deepEqual(result.deposit, replacement);
+    });
+
+    let now = 10_000;
+    t.mock.method(Date, "now", () => now);
+    const traceDeposit = { ...deposit, depositId: "4", detectedAt: now };
+    await restarted.upsert(traceDeposit);
+    const reason = "External trace remained unavailable: RPC providers disagree";
+    now += 999;
+    assert.equal((await restarted.markReceiptMissing(traceDeposit, 1000, reason)).status, "pending");
+    now++;
+    const reviewed = await restarted.markReceiptMissing(traceDeposit, 1000, reason);
+    assert.equal(reviewed.status, "review");
+    assert.equal(reviewed.reviewReason, reason);
+    const persisted = JSON.parse(await fs.readFile(statePath, "utf8"))["1:router:4"];
+    assert.equal(persisted.status, "review");
+    assert.equal(persisted.reviewReason, reason);
+    await restarted.markReviewRecorded(traceDeposit);
+    assert.equal((await restarted.getByIdentity(1, "router", "4")).reviewRecordedOnchain, true);
   } finally {
     fs.rename = originalRename;
     process.chdir(previousDirectory);

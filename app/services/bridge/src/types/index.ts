@@ -1,6 +1,8 @@
 import type { ProposeTransactionProps } from "@safe-global/api-kit";
 import type { RouteStep } from "@strato/shared-types";
 
+export type TransactionTraceResult = any[] | Error;
+
 // ---------------- Utility Types ----------------
 export type NonEmptyArray<T> = [T, ...T[]];
 

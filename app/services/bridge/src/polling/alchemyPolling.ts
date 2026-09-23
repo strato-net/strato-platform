@@ -2,6 +2,8 @@ import { reconcileRecordedDepositReviews } from "../services/depositRecoveryServ
 import {
   config,
   DEPOSIT_EVENT_SIGNATURES,
+  DEPOSIT_WS_RECONNECT_BASE_MS,
+  DEPOSIT_WS_RECONNECT_MAX_MS,
   getDepositReconciliationDepth,
   getChainWsRpcUrl,
   getMissingReceiptGraceMs,
@@ -71,6 +73,7 @@ const realtimeProviders = new Map<
   number,
   { provider: WebSocketProvider; routerKey: string }
 >();
+const realtimeRetries = new Map<number, { delay: number; retryAt: number }>();
 
 const getLogsSpan = (chainId: number): number =>
   Number(process.env[`CHAIN_${chainId}_LOGS_SPAN`]) || DEFAULT_LOGS_SPAN;
@@ -318,6 +321,9 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       const updated = await depositStateService.markReceiptMissing(
         deposit,
         getMissingReceiptGraceMs(),
+        verification.state === "missing" && verification.error
+          ? `External trace remained unavailable: ${verification.error.message}`
+          : undefined,
       );
       if (updated && shouldRecordReview(updated, reviewRetryMs)) {
         await recordReviewOnce(deposit, "recordMissingDepositForReview");
@@ -477,6 +483,7 @@ const pollChainForDeposits = async (chainInfo: ChainInfo): Promise<void> => {
 };
 
 const syncRealtimeSubscription = (chainInfo: ChainInfo): void => {
+  if ((realtimeRetries.get(chainInfo.externalChainId)?.retryAt || 0) > Date.now()) return;
   const wsUrl = getChainWsRpcUrl(chainInfo.externalChainId);
   if (!wsUrl) return;
   const routers = chainInfo.depositRouters?.length
@@ -491,21 +498,25 @@ const syncRealtimeSubscription = (chainInfo: ChainInfo): void => {
   }
 
   const provider = new WebSocketProvider(wsUrl);
+  const connectedAt = Date.now();
   realtimeProviders.set(chainInfo.externalChainId, { provider, routerKey });
   let disconnected = false;
   const handleDisconnect = () => {
     if (disconnected) return;
     disconnected = true;
     const active = realtimeProviders.get(chainInfo.externalChainId);
-    if (active?.provider === provider) {
-      realtimeProviders.delete(chainInfo.externalChainId);
-    }
+    if (active?.provider !== provider) return;
+    realtimeProviders.delete(chainInfo.externalChainId);
     void provider.destroy().catch(() => undefined);
     logError(
       "AlchemySubscription",
       new Error(`Deposit WebSocket disconnected on chain ${chainInfo.externalChainId}`),
     );
-    setTimeout(() => syncRealtimeSubscription(chainInfo), 1_000);
+    const previousDelay = Date.now() - connectedAt >= DEPOSIT_WS_RECONNECT_MAX_MS
+      ? 0 : realtimeRetries.get(chainInfo.externalChainId)?.delay || 0;
+    const delay = Math.min(Math.max(DEPOSIT_WS_RECONNECT_BASE_MS, previousDelay * 2), DEPOSIT_WS_RECONNECT_MAX_MS);
+    realtimeRetries.set(chainInfo.externalChainId, { delay, retryAt: Date.now() + delay });
+    setTimeout(() => syncRealtimeSubscription(chainInfo), delay);
   };
   const socket = provider.websocket as any;
   if (typeof socket.on === "function") {

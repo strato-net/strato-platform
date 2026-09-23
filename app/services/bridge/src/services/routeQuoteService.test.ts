@@ -78,3 +78,19 @@ test("binds every refreshed step to the signed final minimum", () => {
     ["90", "72"],
   );
 });
+
+test("bridge quote requests respect the backend slippage minimum", async (t) => {
+  for (const name of ["BA_USERNAME", "BA_PASSWORD", "CLIENT_SECRET", "CLIENT_ID", "OPENID_DISCOVERY_URL", "BRIDGE_ADDRESS", "EXTERNAL_ASSET_BRIDGE_ADDRESS", "PRICE_ORACLE_ADDRESS", "SAFE_ADDRESS", "SAFE_PROPOSER_ADDRESS", "SAFE_PROPOSER_KMS_KEY_ID", "SAFE_PROPOSER_KMS_REGION", "RELAYER_BA_USERNAME", "RELAYER_BA_PASSWORD", "RELAYER_CLIENT_ID", "RELAYER_CLIENT_SECRET", "RELAYER_OPENID_DISCOVERY_URL"]) process.env[name] ||= "test";
+  const { config } = await import("../config");
+  const { app } = await import("../utils/api");
+  const { fetchRouteSteps } = await import("./routeQuoteService");
+  const previous = config.api.appUrl;
+  config.api.appUrl = "https://app.example.test";
+  t.after(() => { config.api.appUrl = previous; });
+  t.mock.method(app, "get", async (_path: string, options: any) => {
+    assert.equal(options.params.slippageBps, 1);
+    return quote as any;
+  });
+  const steps = await fetchRouteSteps({ tokenIn, tokenOut, amountIn: "100", minFinalOut: "90" });
+  assert.equal(steps[0].minAmountOut, "90", "the signed deposit minimum is preserved");
+});

@@ -156,10 +156,6 @@ test("builds actions only for eligible routes and configured products", () => {
         price: "2000",
       }],
     },
-    bridgeActionConfig: {
-      directMintPsm: constants.directMintPsm,
-      saveUsdstVault: vault,
-    },
     bridgeActionRoutes,
   };
 
@@ -460,4 +456,23 @@ test("keeps pending and completed withdrawal totals separate across bridge types
     cirrus.get = originalGet;
     Object.defineProperty(constants, "stratoNativeBridge", originalNativeBridge);
   }
+});
+
+test("withdrawal listing enriches only the requested page", async (t) => {
+  const helper = await import("../helpers/bridge.helper");
+  const { getBridgeTransactions } = await import("./bridge.service");
+  const originalLegacy = config.mercataBridge;
+  const originalNative = config.stratoNativeBridge;
+  (config as any).mercataBridge = "";
+  (config as any).stratoNativeBridge = "";
+  t.after(() => { (config as any).mercataBridge = originalLegacy; (config as any).stratoNativeBridge = originalNative; });
+  const rows = [1, 2, 3].map(id => ({ id, block_timestamp: `2026-09-0${id}T00:00:00Z` }));
+  t.mock.method(helper, "executeParallelQueries", async () => ({ results: rows, totalCount: 3 }));
+  t.mock.method(helper, "enrichTransactionData", async (_token: string, selected: any[]) => {
+    assert.deepEqual(selected.map((row: any) => row.id), [2]);
+    return selected;
+  });
+  const page = await getBridgeTransactions("token", "withdrawal", undefined, { offset: "1", limit: "1" });
+  assert.equal(page.totalCount, 3);
+  assert.deepEqual(page.data.map((row: any) => row.id), [2]);
 });

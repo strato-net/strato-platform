@@ -5,6 +5,11 @@ export interface BalanceResponse {
   balance: string;
 }
 
+export interface TokenDisplayMetadata {
+  _symbol: string;
+  customDecimals: number;
+}
+
 export interface BridgeResponse {
   success: boolean;
   data?: TransactionResponse;
@@ -20,6 +25,12 @@ export type NetworkSummary = {
   chainName: string;
   enabled: boolean;
   depositRouter: string;
+};
+
+export type AutoRouteDepositResult = {
+  txHash: `0x${string}`;
+  status: "pending" | "confirmed";
+  type: "approval" | "deposit";
 };
 
 export type BridgeContextType = {

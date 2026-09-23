@@ -18,3 +18,10 @@ test("anonymous quotes coalesce, expire, isolate mutations and do not cache erro
   await assert.rejects(cachedAnonymousQuote("failure", undefined, async () => { throw Error("unavailable"); }));
   assert.equal((await cachedAnonymousQuote("failure", undefined, load)).amount, 4);
 });
+
+test("quote cache keys normalize address and integer encodings", async () => {
+  const { quoteCacheKey } = await import("./anonymousQuoteCache.service");
+  assert.equal(quoteCacheKey("route", [`0x${"AB".repeat(20)}`, "00100", "01"]),
+    quoteCacheKey("route", ["ab".repeat(20), 100, 1]));
+  assert.notEqual(quoteCacheKey("route", ["a", "100"]), quoteCacheKey("route", ["a", "101"]));
+});

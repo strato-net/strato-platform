@@ -24,16 +24,34 @@ test("applies a rebase factor after decimal conversion", () => {
 });
 
 test("rejects unsupported external decimals", () => {
-  assert.throws(
-    () => convertExternalToStratoAmount(1n, 19),
-    /Unsupported external token decimals/
-  );
+  for (const decimals of [19, -1, 1.5, NaN, Infinity]) {
+    assert.throws(() => convertExternalToStratoAmount(1n, decimals), /Unsupported external token decimals/);
+  }
+});
+
+test("composite quotes reject missing and malformed indexed decimals", async (t) => {
+  const service = await import("./bridge.service");
+  const { getCompositeBridgeRouteQuote } = await import("./bridge-route.service");
+  let externalDecimals: unknown;
+  t.mock.method(service, "getBridgeableTokens", async () => [{ routeType: "standard", enabled: true,
+    depositsEnabled: true, externalToken: "1".repeat(40), stratoToken: "2".repeat(40), externalDecimals }] as any);
+  for (externalDecimals of [null, undefined, "", " ", "wat", "1.5", "0x12"]) {
+    await assert.rejects(getCompositeBridgeRouteQuote("token", "1", "1".repeat(40), "2".repeat(40), "2".repeat(40), 1n), /Unsupported external token decimals/);
+  }
 });
 
 test("requires DepositRouter 3.2 for routed ETH", () => {
   assert.equal(supportsAutoRouteRouter("3.1.0", true), false);
   assert.equal(supportsAutoRouteRouter("3.2.0", true), true);
   assert.equal(supportsAutoRouteRouter("3.0.0", false), true);
+});
+
+test("composite quotes reject zero slippage even for bridge-only deposits", async () => {
+  const { getCompositeBridgeRouteQuote } = await import("./bridge-route.service");
+  await assert.rejects(
+    getCompositeBridgeRouteQuote("token", "1", "1".repeat(40), "2".repeat(40), "2".repeat(40), 100n, 0),
+    /slippageBps must be an integer between 1 and 9999/
+  );
 });
 
 

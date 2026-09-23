@@ -51,6 +51,7 @@ contract record TokenRouter is Ownable {
     event SaveUsdstVaultUpdated(address newSaveUsdstVault);
     event YieldVaultApprovalUpdated(address yieldVault, bool approved);
     event PauseUpdated(bool paused);
+    event TokensRescued(address token, address recipient, uint256 amount);
 
     modifier nonReentrant() {
         require(!locked, "TR: reentrant");
@@ -114,6 +115,15 @@ contract record TokenRouter is Ownable {
     function setPaused(bool isPaused) external onlyOwner {
         paused = isPaused;
         emit PauseUpdated(isPaused);
+    }
+
+    function rescueTokens(address token, address recipient, uint256 amount) external onlyOwner nonReentrant {
+        require(paused, "TR: rescue requires pause");
+        require(token != address(0), "TR: zero token");
+        require(recipient != address(0) && recipient != address(this), "TR: invalid recipient");
+        require(amount > 0, "TR: zero amount");
+        require(IERC20(token).transfer(recipient, amount), "TR: rescue transfer failed");
+        emit TokensRescued(token, recipient, amount);
     }
 
     function executeRoute(

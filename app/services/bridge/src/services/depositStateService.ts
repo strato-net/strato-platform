@@ -154,6 +154,7 @@ export const depositStateService = {
     updateState((state) => {
       const key = identity(deposit);
       const existing = state[key];
+      if (existing?.status === "settled") return existing;
       const relocated =
         existing &&
         existing.deposit.externalBlockHash !== deposit.externalBlockHash;
@@ -169,7 +170,6 @@ export const depositStateService = {
         existing.reviewReason = "Deposit identity changed after detection";
         return existing;
       }
-      if (existing?.status === "settled") return existing;
       state[key] = {
         deposit: {
           ...deposit,
@@ -230,13 +230,17 @@ export const depositStateService = {
         deposit.depositId === depositId,
     ),
 
-  markReceiptMissing: (deposit: DepositArgs, graceMs: number) =>
+  markReceiptMissing: (
+    deposit: DepositArgs,
+    graceMs: number,
+    reason = "External receipt remained unavailable",
+  ) =>
     updateState((state) => {
       const pending = state[identity(deposit)];
       if (!pending) return undefined;
       if (hasReceiptGraceExpired(pending.deposit.detectedAt, graceMs)) {
         pending.status = "review";
-        pending.reviewReason = "External receipt remained unavailable";
+        pending.reviewReason = reason;
       }
       return pending;
     }),

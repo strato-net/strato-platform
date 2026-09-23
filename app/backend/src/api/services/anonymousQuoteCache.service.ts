@@ -3,6 +3,13 @@ import { AnonymousQuoteCacheEntry } from "../../types/types";
 
 const quotes = new Map<string, AnonymousQuoteCacheEntry>();
 
+export const quoteCacheKey = (name: string, values: unknown[]): string => name + ":" + JSON.stringify(values.map(value => {
+  if (value == null) return null;
+  const text = String(value).trim();
+  if (/^(0x)?[a-f0-9]{40}$/i.test(text)) return text.toLowerCase().replace(/^0x/, "");
+  return /^\d+$/.test(text) ? BigInt(text).toString() : text;
+}));
+
 export const cachedAnonymousQuote = async <T>(key: string, userAddress: string | undefined, load: () => Promise<T>): Promise<T> => {
   if (userAddress) return load();
   const now = Date.now();

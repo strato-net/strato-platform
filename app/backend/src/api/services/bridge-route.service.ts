@@ -10,7 +10,8 @@ import {
   getNetworkConfigs,
   isAutoRouteEnabled,
 } from "./bridge.service";
-import { getRouteQuote } from "./route.service";
+import { applyRouteSlippage, getRouteQuote } from "./route.service";
+import { TRADE_DEADLINE_SECONDS } from "./trade.service";
 
 const WAD = 10n ** 18n;
 const DEFAULT_SLIPPAGE_BPS = 50;
@@ -36,7 +37,7 @@ export const convertExternalToStratoAmount = (
   externalDecimals: number,
   rebaseFactor?: string
 ): bigint => {
-  if (externalDecimals < 0 || externalDecimals > 18) {
+  if (!Number.isInteger(externalDecimals) || externalDecimals < 0 || externalDecimals > 18) {
     throw new Error("Unsupported external token decimals");
   }
   const scaledAmount = amount * 10n ** BigInt(18 - externalDecimals);
@@ -75,6 +76,7 @@ export const getCompositeBridgeRouteQuote = async (
   amount: bigint,
   slippageBps = DEFAULT_SLIPPAGE_BPS
 ): Promise<CompositeRouteQuoteResponse> => {
+  applyRouteSlippage(amount, slippageBps);
   const routes = await getBridgeableTokens(accessToken, externalChainId);
   const route = routes.find(
     (candidate) =>
@@ -87,6 +89,9 @@ export const getCompositeBridgeRouteQuote = async (
         normalizeAddress(targetStratoToken)
   );
   if (!route) throw new Error("No enabled bridge route found");
+  if (route.externalDecimals == null || !/^\d+$/.test(String(route.externalDecimals))) {
+    throw new Error("Unsupported external token decimals");
+  }
 
   const requiresRebase = await isRouteRebaseRequired(
     accessToken,
@@ -129,7 +134,7 @@ export const getCompositeBridgeRouteQuote = async (
       amountOut: bridgedAmount.toString(),
       minFinalOut: bridgedAmount.toString(),
       slippageBps,
-      deadline: Math.floor(Date.now() / 1000) + 300,
+      deadline: Math.floor(Date.now() / 1000) + TRADE_DEADLINE_SECONDS,
       steps: [],
       depositAction: {
         action: BridgeDepositAction.NONE,

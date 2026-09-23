@@ -8,7 +8,7 @@ import { formatBalance } from '@/utils/numberUtils';
 import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
-import { METAL_ACTIVITY_PAIR, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
+import { METAL_ACTIVITY_PAIR, resolveTokenMetadata, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
 import type { BridgeToken } from '@strato/shared-types';
 import type { NetworkSummary } from '@/lib/bridge/types';
 
@@ -26,6 +26,11 @@ type RecentTx = {
   paySymbol?: string;
   payAmount?: string;
   metalSymbol?: string;
+  stratoToken?: string;
+  finalToken?: string;
+  amountDecimals?: number;
+  finalDecimals?: number;
+  payDecimals?: number;
 };
 
 const STATUS_LABELS: Record<number, { text: string; color: string }> = {
@@ -86,6 +91,8 @@ const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): Recen
     externalChainId: (tx.externalChainId ?? info?.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
+    stratoToken: (info?.stratoToken ?? tx.stratoToken) as string,
+    finalToken: tx.finalToken as string | undefined,
     depositOutcome: (type === 'pending'
       ? (tx.type === 'saving' ? 'save' : tx.type === 'forge' ? 'forge' : tx.type === 'route' ? 'route' : 'bridge')
       : tx.depositOutcome) as RecentTx['depositOutcome'],
@@ -101,6 +108,7 @@ const mapWithdrawal = (tx: Record<string, unknown>): RecentTx => {
     externalChainId: (info?.externalChainId ?? tx.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
+    stratoToken: (info?.stratoToken ?? tx.stratoToken) as string,
   };
 };
 
@@ -115,9 +123,9 @@ function useMetalTransactions(limit: number, isLoggedIn: boolean) {
     try {
       const result = await activityFeedApi.getActivities(METAL_ACTIVITY_PAIR, { limit, myActivity: true });
       const events = result.events || [];
-      const symbolMap = await resolveTokenSymbols([...collectMetalTokenAddrs(events)]);
-      setTransactions(mapEventsToMetalTxs(events, symbolMap).map((tx) => ({
-        ...tx, _type: 'metal' as const, amount: tx.metalAmount, status: String(ExternalBridgeStatus.COMPLETED),
+      const metadata = await resolveTokenMetadata([...collectMetalTokenAddrs(events)]);
+      setTransactions(mapEventsToMetalTxs(events, metadata).map((tx) => ({
+        ...tx, _type: 'metal' as const, amount: tx.metalAmount, amountDecimals: tx.metalDecimals, status: String(ExternalBridgeStatus.COMPLETED),
       })));
     } catch { setTransactions([]); }
     finally { setLoading(false); loadedRef.current = true; }
@@ -191,17 +199,6 @@ const RecentTransactions = ({
       const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
       const { remaining } = mergePendingDeposits(apiDeposits);
       const routeEvents = routeResult.events || [];
-      const routeSymbols = new Map<string, string>();
-      if (routeEvents.length > 0) {
-        const addresses = routeEvents.flatMap((event) => [
-          event.attributes.tokenIn,
-          event.attributes.tokenOut,
-        ]);
-        const resolved = await resolveTokenSymbols(addresses);
-        for (const [address, symbol] of resolved) {
-          routeSymbols.set(normalizeAddress(address), symbol);
-        }
-      }
       const all = [
         ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
         ...apiDeposits.map((tx) => mapDeposit(tx, 'api')),
@@ -210,15 +207,22 @@ const RecentTransactions = ({
           _type: "route",
           block_timestamp: event.block_timestamp,
           amount: event.attributes.amountIn,
-          stratoTokenSymbol:
-            routeSymbols.get(normalizeAddress(event.attributes.tokenIn)) || "-",
+          stratoToken: event.attributes.tokenIn,
           finalAmount: event.attributes.amountOut,
-          finalTokenSymbol:
-            routeSymbols.get(normalizeAddress(event.attributes.tokenOut)) || "-",
+          finalToken: event.attributes.tokenOut,
           status: String(ExternalBridgeStatus.COMPLETED),
         })),
       ].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime())
        .slice(0, recentLimit);
+      const metadata = await resolveTokenMetadata(all.flatMap((tx) => [tx.stratoToken, tx.finalToken].filter(Boolean)));
+      for (const tx of all) {
+        const input = metadata.get(normalizeAddress(tx.stratoToken));
+        const output = metadata.get(normalizeAddress(tx.finalToken));
+        tx.amountDecimals = input?.customDecimals ?? 18;
+        tx.finalDecimals = output?.customDecimals ?? 18;
+        tx.stratoTokenSymbol = input?._symbol || tx.stratoTokenSymbol;
+        tx.finalTokenSymbol = output?._symbol || tx.finalTokenSymbol;
+      }
       setBridgeTxs(all);
       setBridgeLoading(false);
       bridgeLoadedRef.current = true;
@@ -243,20 +247,20 @@ const RecentTransactions = ({
   const renderTxRows = (txs: RecentTx[]) => (
     <div className="divide-y divide-border/40">
       {txs.map((tx, index) => {
-        const amt = formatBalance(tx.amount || "0", undefined, 18, 2, 4);
+        const amt = formatBalance(tx.amount || "0", undefined, tx.amountDecimals ?? 18, 2, 4);
         const key = `${tx.block_timestamp || "tx"}-${index}`;
 
         if (tx._type === 'metal') {
           return <TxRow key={key} icon={<Gem className="w-4 h-4 text-yellow-600" />} iconBg="bg-yellow-500/15"
             label="Metal Mint" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
-            fromAmount={formatBalance(tx.payAmount || "0", undefined, 18, 2, 4)} fromSymbol={tx.paySymbol || "-"}
+            fromAmount={formatBalance(tx.payAmount || "0", undefined, tx.payDecimals ?? 18, 2, 4)} fromSymbol={tx.paySymbol || "-"}
             toAmount={amt} toSymbol={tx.metalSymbol || "-"} />;
         }
         if (tx._type === "route") {
           return <TxRow key={key} icon={<ArrowDown className="w-4 h-4 text-blue-500" />} iconBg="bg-blue-500/15"
             label="Routed Trade" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
             fromAmount={amt} fromSymbol={tx.stratoTokenSymbol || "-"}
-            toAmount={formatBalance(tx.finalAmount || "0", undefined, 18, 2, 4)} toSymbol={tx.finalTokenSymbol || "-"} />;
+            toAmount={formatBalance(tx.finalAmount || "0", undefined, tx.finalDecimals ?? 18, 2, 4)} toSymbol={tx.finalTokenSymbol || "-"} />;
         }
 
         const isW = tx._type === 'withdrawal';
@@ -273,7 +277,7 @@ const RecentTransactions = ({
           label={isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : isRouted ? "Deposit & Trade" : "Deposit"} status={status}
           timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
           fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
-          toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, 18, 2, 4) : (isW ? externalAmt : amt)}
+          toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, tx.finalDecimals ?? 18, 2, 4) : (isW ? externalAmt : amt)}
           toSymbol={(hasOutcome ? tx.finalTokenSymbol : (isW ? tx.externalSymbol : tx.stratoTokenSymbol)) || "-"} />;
       })}
     </div>

@@ -11,7 +11,7 @@ import {
   CompositeRouteQuoteResponse,
 } from "@strato/shared-types";
 import { assertAutoRouteQuote } from "@/lib/bridge/utils";
-import { NetworkSummary } from "@/lib/bridge/types";
+import { AutoRouteDepositResult, NetworkSummary } from "@/lib/bridge/types";
 import { useUser } from "@/context/UserContext";
 import {
   checkPermit2Approval,
@@ -63,18 +63,24 @@ export function useAutoRouteDeposit() {
     outputSymbol: string;
     outputAddress: string;
     slippageBps: number;
-  }) => {
+  }): Promise<AutoRouteDepositResult> => {
     if (submitting.current) throw new Error("A deposit is already being submitted");
     submitting.current = true;
     setIsPending(true);
     try {
       quote = structuredClone(quote);
+      let approvalConfirmed = false;
       const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
-      const assertCurrentQuote = () => assertAutoRouteQuote(quote, {
-        externalChainId: network.chainId, externalToken: route.externalToken,
-        targetStratoToken: route.stratoToken, externalAmount: amountWei,
-        externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
-      });
+      const assertCurrentQuote = () => {
+        if (approvalConfirmed && quote.deadline <= Math.floor(Date.now() / 1000)) {
+          throw new Error("Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.");
+        }
+        assertAutoRouteQuote(quote, {
+          externalChainId: network.chainId, externalToken: route.externalToken,
+          targetStratoToken: route.stratoToken, externalAmount: amountWei,
+          externalDecimals: Number(route.externalDecimals ?? 18), tokenOut: outputAddress, slippageBps,
+        });
+      };
       assertCurrentQuote();
       if (
         !isExternalEvmWalletConnected ||
@@ -190,9 +196,16 @@ export function useAutoRouteDeposit() {
             chain,
             account: account.address,
           });
-          if (!(await waitForTransaction(approvalHash, network.chainId))) {
+          let approved: boolean;
+          try {
+            approved = await waitForTransaction(approvalHash, network.chainId);
+          } catch {
+            return { txHash: approvalHash, status: "pending", type: "approval" };
+          }
+          if (!approved) {
             throw new Error("Permit2 approval failed");
           }
+          approvalConfirmed = true;
         }
 
         const nonce = getPermit2Nonce();
@@ -257,10 +270,6 @@ export function useAutoRouteDeposit() {
               account: account.address,
             });
       }
-      if (!(await waitForTransaction(txHash, network.chainId))) {
-        throw new Error("External bridge transaction reverted");
-      }
-
       try {
         const pending = JSON.parse(
           localStorage.getItem("pendingDeposits") || "[]"
@@ -270,6 +279,7 @@ export function useAutoRouteDeposit() {
           externalTxHash: txHash,
           depositRouter: network.depositRouter,
           type: actionIntent ? "route" : "bridge",
+          finalToken: outputAddress,
           finalTokenSymbol: outputSymbol,
           finalAmount: quote.amountOut,
           DepositInfo: {
@@ -288,10 +298,30 @@ export function useAutoRouteDeposit() {
       } catch {
         toast({
           title: "Deposit submitted; local history unavailable",
-          description: `Your transaction succeeded: ${txHash}. Do not submit it again.`,
+          description: `Your transaction was broadcast: ${txHash}. Do not submit it again.`,
         });
       }
-      return txHash;
+
+      let confirmed: boolean;
+      try {
+        confirmed = await waitForTransaction(txHash, network.chainId);
+      } catch {
+        // A timeout or RPC error does not establish whether a broadcast transaction failed.
+        return { txHash, status: "pending", type: "deposit" };
+      }
+      if (!confirmed) {
+        try {
+          const pending = JSON.parse(localStorage.getItem("pendingDeposits") || "[]");
+          localStorage.setItem("pendingDeposits", JSON.stringify(pending.filter(
+            (deposit) => deposit.externalTxHash !== txHash ||
+              deposit.externalChainId !== Number(network.chainId)
+          )));
+        } catch {
+          // Storage may be unavailable; preserve the confirmed revert error.
+        }
+        throw new Error("External bridge transaction reverted");
+      }
+      return { txHash, status: "confirmed", type: "deposit" };
     } finally {
       submitting.current = false;
       setIsPending(false);

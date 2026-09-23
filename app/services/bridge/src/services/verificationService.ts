@@ -122,7 +122,7 @@ const fail = (txHash: string, msg: string): Error => new Error(`${msg} for ${txH
 export type DetectedDepositVerification =
   | { state: "verified" }
   | { state: "confirming" }
-  | { state: "missing" }
+  | { state: "missing"; error?: Error }
   | { state: "relocated" }
   | { state: "invalid"; error: Error };
 
@@ -388,14 +388,17 @@ export const verifyDetectedDepositsBatch = async (
           (deposit) => deposit.externalToken === ZERO_ADDRESS,
         );
         const transactionTraces = traces.get(transactionHash);
-        if (containsEth && !transactionTraces) {
-          setTransactionState(transactionDeposits, { state: "missing" });
+        if (containsEth && (!transactionTraces || transactionTraces instanceof Error)) {
+          setTransactionState(transactionDeposits, {
+            state: "missing",
+            error: transactionTraces || fail(transactionHash, "ETH trace unavailable"),
+          });
           continue;
         }
         const custodyError = verifyTransactionCustody(
           parsedReceipt.deposits,
           receipt,
-          transactionTraces || [],
+          Array.isArray(transactionTraces) ? transactionTraces : [],
           custodyAddress,
         );
         if (custodyError) {
@@ -471,8 +474,13 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
         }
 
         // Branch to appropriate verifier
+        const traces = internalTxsMap.get(deposit.externalTxHash);
+        if (ctx.isETH && traces instanceof Error) {
+          results.set(deposit.externalTxHash, traces);
+          continue;
+        }
         const error = ctx.isETH 
-          ? verifyEthDeposit(receipt, internalTxsMap.get(deposit.externalTxHash) || [], ctx)
+          ? verifyEthDeposit(receipt, Array.isArray(traces) ? traces : [], ctx)
           : verifyErc20Deposit(receipt, ctx);
 
         results.set(deposit.externalTxHash, error);

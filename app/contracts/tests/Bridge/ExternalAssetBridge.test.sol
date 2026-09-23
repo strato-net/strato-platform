@@ -19,12 +19,27 @@ contract ExternalBridgeUser {
     }
 }
 
+contract PlainRevertRouter {
+    bool public initialized = true;
+    function executeRouteWithActions(
+        address,
+        address,
+        uint256,
+        address,
+        RouteStepData[],
+        uint256,
+        uint256
+    ) public returns (uint256) {
+        revert();
+    }
+}
+
 contract RefundTestBridge is ExternalAssetBridge {
     using ExternalBridgeTypes for *;
     constructor(address initialOwner) ExternalAssetBridge(initialOwner) {}
 
     function seedRefund(address token, address recipient, address destinationVault) public {
-        withdrawals[1].status = Status.CANCELLED;
+        withdrawals[1].status = Status.READY;
         withdrawals[1].stratoToken = token;
         withdrawals[1].stratoSender = recipient;
         withdrawals[1].stratoTokenAmount = 100;
@@ -1343,6 +1358,151 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
     }
 
+    function it_prevents_set_chain_from_rewinding_the_poll_cursor() {
+        bridge.setChain("Test", externalVault, depositRouter, true, externalChainId, 100);
+        bool reverted = false;
+        try bridge.setChain("Test", externalVault, depositRouter, false, externalChainId, 99) {} catch {
+            reverted = true;
+        }
+        require(reverted, "setChain must not rewind the cursor");
+        bridge.setChain("Test", externalVault, depositRouter, false, externalChainId, 100);
+        bridge.setChain("Test", externalVault, depositRouter, true, externalChainId, 101);
+    }
+
+    function it_surfaces_router_step_slippage_in_deposit_action_failed() {
+        bridge.setBridgeOperator(address(this));
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            1
+        );
+        bridge.settleDepositWithRoute(
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            address(saveVault),
+            1,
+            _saveRoute(11e18)
+        );
+
+        require(
+            bridge.lastDepositActionFailureReason() == "TR: step slippage",
+            "Router require reason should surface in DepositActionFailed"
+        );
+        require(
+            saveVault.balanceOf(address(user)) == 0,
+            "Slippage should revert routed output"
+        );
+        require(
+            stratoToken.balanceOf(address(user)) == 10e18,
+            "Slippage should mint fallback tokens"
+        );
+    }
+
+    function it_surfaces_a_plain_router_revert_in_deposit_action_failed() {
+        bridge.setBridgeOperator(address(this));
+        bridge.setTokenRouter(address(new PlainRevertRouter()));
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            1
+        );
+        bridge.settleDepositWithRoute(
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            address(saveVault),
+            1,
+            _saveRoute(1)
+        );
+
+        require(
+            bridge.lastDepositActionFailureReason() == "Unknown token router error",
+            "Plain router revert should surface through the typed catch"
+        );
+        require(
+            stratoToken.balanceOf(address(user)) == 10e18,
+            "Plain router revert should mint fallback tokens"
+        );
+    }
+
+    function it_reverts_a_routed_settlement_when_mint_policy_is_exhausted() {
+        bridge.setBridgeOperator(address(this));
+        bridge.setMintPolicy(address(stratoToken), 5e18, 1e18);
+        _attestDeposit(
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE),
+            address(saveVault),
+            1
+        );
+        bool reverted = false;
+        try bridge.settleDepositWithRoute(
+            externalChainId,
+            depositRouter,
+            1,
+            address(0x1111),
+            externalToken,
+            10e18,
+            "0x2345",
+            address(user),
+            address(stratoToken),
+            address(saveVault),
+            1,
+            _saveRoute(1)
+        ) {} catch {
+            reverted = true;
+        }
+        require(reverted, "Mint-policy exhaustion during AUTO_ROUTE must revert the settlement");
+        require(
+            stratoToken.balanceOf(address(user)) == 0,
+            "Exhausted mint policy must not deliver fallback tokens"
+        );
+        (Status status, , , , , , , , , ) = bridge.deposits(
+            externalChainId,
+            depositRouter,
+            1
+        );
+        require(
+            status == Status.NONE,
+            "Failed mint must not persist a completed deposit"
+        );
+    }
+
     function it_executes_a_fresh_route_for_a_reviewed_deposit() {
         bridge.setBridgeOperator(address(this));
         bridge.recordDepositForReview(
@@ -1822,6 +1982,85 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
     }
 
+    function it_lets_anyone_expire_a_stale_withdrawal_review() {
+        stratoToken.mint(address(user), 150e18);
+        user.do(address(stratoToken), "approve", address(bridge), 150e18);
+        uint256 withdrawalId = user.do(
+            address(bridge),
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            address(stratoToken),
+            150e18
+        );
+        relayer.do(
+            address(bridge),
+            "recordWithdrawalReview",
+            withdrawalId,
+            "0xaaaa",
+            block.timestamp + 100,
+            "0xbbbb"
+        );
+
+        bool expiredEarly = false;
+        try user.do(address(bridge), "expireWithdrawalReview", withdrawalId) {}
+        catch { expiredEarly = true; }
+        require(expiredEarly, "Active review must not expire");
+
+        bool rejectedByUser = false;
+        try user.do(address(bridge), "rejectWithdrawalReview", withdrawalId) {}
+        catch { rejectedByUser = true; }
+        require(rejectedByUser, "Users must not reject an active review");
+
+        ExternalBridgeUser stranger = new ExternalBridgeUser();
+        fastForward(100);
+        bool expiredAtDeadline = false;
+        try stranger.do(address(bridge), "expireWithdrawalReview", withdrawalId) {}
+        catch { expiredAtDeadline = true; }
+        require(expiredAtDeadline, "Review must remain active at its deadline");
+
+        fastForward(1);
+        stranger.do(address(bridge), "expireWithdrawalReview", withdrawalId);
+        (Status initiatedStatus, , , , , , , , , , , , , , , ) = bridge
+            .withdrawals(withdrawalId);
+        require(
+            initiatedStatus == Status.INITIATED,
+            "Expired review should return to initiated"
+        );
+
+        (string reviewDigest, uint256 approvalDeadline, string proposalHash) = bridge
+            .withdrawalManualReviews(withdrawalId);
+        require(reviewDigest == "", "Expired review digest should be cleared");
+        require(approvalDeadline == 0, "Expired review deadline should be cleared");
+        require(proposalHash == "", "Expired review proposal should be cleared");
+        require(
+            stratoToken.balanceOf(address(bridge)) == 150e18,
+            "Expiring review must preserve escrow"
+        );
+
+        bool expiredTwice = false;
+        try stranger.do(address(bridge), "expireWithdrawalReview", withdrawalId) {}
+        catch { expiredTwice = true; }
+        require(expiredTwice, "An initiated withdrawal has no review to expire");
+
+        bool abortedEarly = false;
+        try user.do(address(bridge), "abortWithdrawal", withdrawalId) {}
+        catch { abortedEarly = true; }
+        require(abortedEarly, "Expiring review must not bypass the abort delay");
+
+        fastForward(172699);
+        bool abortedByStranger = false;
+        try stranger.do(address(bridge), "abortWithdrawal", withdrawalId) {}
+        catch { abortedByStranger = true; }
+        require(abortedByStranger, "Only the sender may reclaim without operator privileges");
+        user.do(address(bridge), "abortWithdrawal", withdrawalId);
+        require(
+            stratoToken.balanceOf(address(user)) == 150e18,
+            "Sender should reclaim escrow after the review expires"
+        );
+    }
+
     function it_allows_requested_reclaim_but_blocks_ready_reclaim() {
         stratoToken.mint(address(user), 100e18);
         user.do(address(stratoToken), "approve", address(bridge), 100e18);
@@ -1855,6 +2094,12 @@ contract Describe_ExternalAssetBridge is Authorizable {
             block.timestamp + 1800,
             1
         );
+
+        fastForward(1801);
+        bool expiredReady = false;
+        try user.do(address(bridge), "expireWithdrawalReview", readyId) {}
+        catch { expiredReady = true; }
+        require(expiredReady, "Review expiry must not reset a ready withdrawal");
 
         bool reverted = false;
         try user.do(address(bridge), "abortWithdrawal", readyId) {

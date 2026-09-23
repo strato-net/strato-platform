@@ -5,7 +5,7 @@ library ExternalBridgeTypes {
         PENDING_REVIEW,
         READY,
         COMPLETED,
-        CANCELLED,
+        CANCELLED, // Reserved for status-number compatibility; cancellation leaves withdrawals READY until refund.
         REFUNDED,
         ABORTED
     }

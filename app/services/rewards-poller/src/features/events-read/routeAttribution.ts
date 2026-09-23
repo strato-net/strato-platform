@@ -1,5 +1,5 @@
-const normalizeAddress = (address?: string): string =>
-  (address || "").toLowerCase().replace(/^0x/, "");
+import { normalizeAddressNoPrefix } from "../../shared/core/address";
+import { ZERO_ADDRESS } from "./eventRecord.mapper";
 
 export const resolveRoutedActivityUser = ({
   attributedUser,
@@ -12,14 +12,15 @@ export const resolveRoutedActivityUser = ({
   tokenRouter?: string;
   externalAssetBridge?: string;
 }): string | null => {
-  if (normalizeAddress(attributedUser) !== normalizeAddress(tokenRouter)) {
+  if (normalizeAddressNoPrefix(attributedUser || "") !== normalizeAddressNoPrefix(tokenRouter || "")) {
     return attributedUser || null;
   }
-  const bridge = normalizeAddress(externalAssetBridge);
+  const bridge = normalizeAddressNoPrefix(externalAssetBridge || "");
   if (
-    !bridge ||
+    !/^[a-f0-9]{40}$/.test(bridge) ||
+    bridge === ZERO_ADDRESS ||
     !routedCaller ||
-    normalizeAddress(routedCaller) === bridge
+    normalizeAddressNoPrefix(routedCaller) === bridge
   ) {
     return null;
   }

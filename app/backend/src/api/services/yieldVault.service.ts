@@ -1580,6 +1580,43 @@ const computeApy = async (
   }
 };
 
+export const getYieldVaultActionState = async (
+  key: string
+): Promise<Pick<YieldVaultInfo,
+  "vaultAddress" | "assetAddress" | "shareSymbol" | "name" | "decimals" |
+  "totalShares" | "projectedActiveAssets" | "paused"
+> | null> => {
+  const def = resolveVaultDef(key);
+  if (!def?.address) return null;
+
+  const serviceToken = await getServiceToken();
+  const vaultState = await getVaultState(serviceToken, def.address);
+  if (!vaultState || !parseBooleanLike(vaultState.vaultInitialized) || !vaultState._asset) return null;
+
+  const assetAddress = vaultState._asset;
+  const totalShares = parseBigIntLike(vaultState._totalSupply);
+  const [liveAssetBalance, pendingAccrual] = await Promise.all([
+    getAssetBalance(serviceToken, assetAddress, def.address),
+    getPendingAccrual(serviceToken, vaultState, def.address, assetAddress, totalShares),
+  ]);
+  const totalAssets = parseBigIntLike(liveAssetBalance) + parseBigIntLike(vaultState.deployedAssets);
+  const projectedActiveAssets = getActiveAssets(
+    totalAssets + pendingAccrual.fundedAmount,
+    parseBigIntLike(vaultState.totalClaimableAssets)
+  );
+
+  return {
+    vaultAddress: def.address,
+    assetAddress,
+    shareSymbol: vaultState._symbol || def.shareSymbol,
+    name: def.name,
+    decimals: Number(vaultState._underlyingDecimals ?? 18),
+    totalShares: totalShares.toString(),
+    projectedActiveAssets: projectedActiveAssets.toString(),
+    paused: parseBooleanLike(vaultState._paused),
+  };
+};
+
 export const getYieldVaultInfo = async (
   _accessToken: string,
   key: string
