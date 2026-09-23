@@ -4,7 +4,7 @@
  * Use --dry-run to print the complete call plan without authenticating or submitting.
  */
 const VAULT_NAME = 'HYPE Yield Vault';
-const SHARE_SYMBOL = 'carryHYPE';
+const SHARE_SYMBOL = 'yieldHYPE';
 const RAY = 1000000000000000000000000000n;
 const MAX_SAVINGS_RATE = 1000000021979553151239153027n;
 
