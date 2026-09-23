@@ -51,3 +51,48 @@ export interface FunctionInput {
   args: TxPayloadArgs;
 }
 export type TxInput = DeployInput | FunctionInput;
+
+export type EdgeKind =
+  | "SWAP"
+  | "PSM_MINT"
+  | "FORGE"
+  | "SAVE"
+  | "YIELD_VAULT_DEPOSIT";
+
+export type StratoRouteStep = Omit<import("@strato/shared-types").RouteStep, "action"> & {
+  action: string;
+};
+
+export interface RouteEdge {
+  kind: EdgeKind;
+  tokenIn: string;
+  tokenOut: string;
+  target?: string;
+  feeBps?: number;
+  maxBalance?: string;
+  mintCap?: string;
+  totalMinted?: string;
+  priceIn?: string;
+  priceOut?: string;
+  vaultDeposit?: VaultDepositState;
+  outputName?: string;
+  outputSymbol?: string;
+  outputDecimals?: number;
+}
+
+export interface RouteTopologyCache {
+  key: string;
+  expiresAt: number;
+  edges: Promise<RouteEdge[]>;
+}
+
+export interface VaultDepositState {
+  totalShares: string;
+  pricingAssets: string;
+  maxDeposit: string;
+}
+
+export interface AnonymousQuoteCacheEntry {
+  expiresAt: number;
+  result: Promise<unknown>;
+}

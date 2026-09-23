@@ -201,6 +201,26 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       )];
       const tokenSymbolMap = new Map<string, string>();
       const tokenImageMap = new Map<string, string>();
+      if (
+        response.events.some(
+          (event) =>
+            event.contract_name === "TokenRouter" &&
+            event.event_name === "RouteExecuted"
+        )
+      ) {
+        try {
+          const { data: routeAssets } = await api.get("/trade/route/assets");
+          for (const asset of routeAssets || []) {
+            const address = normalizeAddress(asset.address);
+            if (asset._symbol) tokenSymbolMap.set(address, asset._symbol);
+            if (asset.images?.[0]?.value) {
+              tokenImageMap.set(address, asset.images[0].value);
+            }
+          }
+        } catch {
+          // Routed activity can still render with token addresses.
+        }
+      }
 
       const yieldVaultAddresses = new Set(
         response.events

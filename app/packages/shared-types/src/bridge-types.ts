@@ -10,7 +10,8 @@ import {TransactionResponse} from "./common-types";
 export interface NetworkConfig {
   externalChainId: number;
   chainInfo: {
-    custody: string;
+    custody?: string;
+    vault?: string;
     enabled: boolean;
     chainName: string;
     depositRouter: string;
@@ -38,6 +39,9 @@ export interface BridgeToken {
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  manualReviewThreshold?: string;
+  depositsEnabled?: boolean;
+  withdrawalsEnabled?: boolean;
   instantWithdrawalThreshold?: string; // Native-only; amount eligible for automatic instant bridge-out
   enabled: boolean;              // effective route enabled state
   depositsPaused?: boolean;      // Native-only; hides native redemption/deposit routes when true
@@ -47,12 +51,45 @@ export interface BridgeToken {
   maxOutstandingWithdrawal?: string; // Native-only; aggregate custody cap, 0 means unlimited
   outstandingWithdrawal?: string; // Native-only; amount currently locked in custody
   remainingOutstandingWithdrawal?: string; // Native-only; available aggregate capacity
-  isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
 }
 
 export type BridgeRouteType = "standard" | "native";
+
+export enum ExternalBridgeStatus {
+  NONE = 0,
+  INITIATED = 1,
+  PENDING_REVIEW = 2,
+  READY = 3,
+  COMPLETED = 4,
+  CANCELLED = 5,
+  REFUNDED = 6,
+  ABORTED = 7,
+}
+
+export interface ExternalWithdrawalInfo {
+  status?: string;
+  bridgeStatus: string;
+  externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  requestedAt: string;
+  timestamp: string;
+  authorizationDeadline?: string;
+  requiresManualReview?: boolean;
+  reservationId?: string;
+  reservationTxHash?: string;
+  externalTxHash?: string;
+  cancellationTxHash?: string;
+  reviewApprovalDeadline?: string;
+  reviewDigest?: string;
+  reviewProposalHash?: string;
+}
 
 /**
  * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
@@ -102,11 +139,29 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
-  // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge" | "fallback";
+  // Deposit action outcome
+  depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;
+  routeType?: BridgeRouteType;
+  bridgeSource?: "external" | "legacy" | "native";
+  depositRouter?: string;
+  depositId?: string;
+  WithdrawalInfo?: ExternalWithdrawalInfo;
+  DepositInfo?: {
+    status?: string;
+    bridgeStatus: string;
+    externalSender: string;
+    externalToken: string;
+    externalTokenAmount: string;
+    externalTxHash: string;
+    stratoRecipient: string;
+    stratoToken: string;
+    stratoTokenAmount: string;
+    requestedAt: string;
+    timestamp: string;
+  };
 }
 
 /**

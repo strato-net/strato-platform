@@ -70,7 +70,8 @@ const inferStakeSemantics = (activity: {
   const isUsdNotional =
     USD_NOTIONAL_SWAP_SOURCES.has(sourceContract) ||
     USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES.has(sourceContract) ||
-    USD_NOTIONAL_AMOUNT_USD_SOURCES.has(sourceContract);
+    USD_NOTIONAL_AMOUNT_USD_SOURCES.has(sourceContract) ||
+    sourceContract === normalizeAddr(constants.externalAssetBridge || "");
 
   if (isUsdNotional) {
     return { stakeDenomination: "usd_notional", stakeAssetAddress: null };

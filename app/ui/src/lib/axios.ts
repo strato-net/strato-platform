@@ -362,16 +362,22 @@ api.interceptors.response.use(
           description: "Please refresh the page and try again.",
           variant: "destructive",
         });
+        (error as any).toastShown = true;
         return Promise.reject(error);
       }
     }
     
-    // For 401 errors, redirect to login (session expired)
+    // Anonymous requests can legitimately receive 401s from protected endpoints.
+    // Only an active STRATO session can expire.
     if (error.response?.status === 401) {
+      if (!_appAuthenticated) {
+        return Promise.reject(error);
+      }
       toast({
         title: "Session Expired",
         description: "Reauthenticating the user...",
       });
+      (error as any).toastShown = true;
       setTimeout(() => {
         redirectToLogin();
       }, 1500);
@@ -379,6 +385,9 @@ api.interceptors.response.use(
     }
     
     // Show toast for all other API errors
+    if (["/trade/route", "/trade/route/quote", "/trade/bridge-route/quote"].some(path => url.split("?")[0].endsWith(path))) {
+      return Promise.reject(error);
+    }
     const errorMessage = extractApiErrorMessage(error);
     const errorTitle = getErrorTitle(url);
     toast({

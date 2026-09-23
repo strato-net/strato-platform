@@ -102,6 +102,15 @@ export const defaultBridgeServiceFor: Record<string, string> = {
   "114784819836269":"https://bridge.testnet.strato.nexus", // Helium testnet
   "33056204878082667":"https://bridge.strato.nexus",       // Upquark mainnet
 };
+// Populate with verified proxy addresses after deployment, before releasing the backend.
+export const defaultExternalAssetBridgeFor: Record<string, string> = {
+  "114784819836269": "394d276e3b6109d6c58444653c26996bf3ae3eda", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
+export const defaultTokenRouterFor: Record<string, string> = {
+  "114784819836269": "ed37a83d3b1f7b49e44f0ca9ea342fe0e11cc1d6", // Helium testnet
+  "33056204878082667": "", // Upquark mainnet
+};
 export const defaultRewardsAddressFor: Record<string, string> = {
   "114784819836269": "170147f58738c9f46112a874030420b823901f3b", // Helium testnet
   "33056204878082667": "4a116cf8cb056036632aef08f7c0df27c720f1c0", // Upquark mainnet
@@ -242,6 +251,8 @@ export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let tokenRouter: string = '';
+export let externalAssetBridge: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -379,6 +390,14 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+export function setTokenRouterConfig(networkId: string) {
+  tokenRouter = process.env.TOKEN_ROUTER || defaultTokenRouterFor[networkId] || "";
+}
+
+export function setExternalAssetBridgeConfig(networkId: string) {
+  externalAssetBridge = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS || defaultExternalAssetBridgeFor[networkId] || "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -408,7 +427,7 @@ export function setExecutedIssuesLookbackConfig(networkId: string) {
 
 export async function initNetworkConfig() {
   // Import eth here to avoid circular dependency (eth depends on nodeUrl)
-  const { eth } = await import("../utils/appApiHelper");
+  const { eth, cirrus } = await import("../utils/appApiHelper");
   const accessToken = await getServiceToken();
   const { data } = await eth.get(accessToken, `/metadata`);
   networkId = data.networkID;
@@ -432,6 +451,48 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setTokenRouterConfig(networkId);
+  setExternalAssetBridgeConfig(networkId);
+  if (!externalAssetBridge) {
+    throw new Error("ExternalAssetBridge is not configured for this network; populate defaultExternalAssetBridgeFor or set EXTERNAL_ASSET_BRIDGE_ADDRESS");
+  }
+  if (!tokenRouter) {
+    throw new Error("TokenRouter is not configured for this network; populate defaultTokenRouterFor or set TOKEN_ROUTER");
+  }
+  const normalizedTokenRouter = tokenRouter.toLowerCase().replace(/^0x/, "");
+  const [{ data: bridgeRows }, { data: routerRows }] = await Promise.all([
+    cirrus.get(accessToken, "/BlockApps-ExternalAssetBridge", {
+      params: {
+        address: `eq.${externalAssetBridge}`,
+        select: "tokenRouter",
+        limit: 1,
+      },
+    }),
+    cirrus.get(accessToken, "/BlockApps-TokenRouter", {
+      params: {
+        address: `eq.${normalizedTokenRouter}`,
+        select: "initialized,poolFactory,poolV3Factory,directMintPsm,metalForge,saveUsdstVault",
+        limit: 1,
+      },
+    }),
+  ]);
+  if (
+    bridgeRows?.[0]?.tokenRouter?.toLowerCase().replace(/^0x/, "") !==
+    normalizedTokenRouter
+  ) {
+    throw new Error("ExternalAssetBridge.tokenRouter does not match TOKEN_ROUTER");
+  }
+  if (
+    routerRows?.[0]?.initialized !== true &&
+    String(routerRows?.[0]?.initialized) !== "true"
+  ) {
+    throw new Error("Configured TokenRouter is not initialized");
+  }
+  for (const [field, expected] of Object.entries({ poolFactory, poolV3Factory, directMintPsm, metalForge, saveUsdstVault })) {
+    if (!expected || routerRows[0][field]?.toLowerCase().replace(/^0x/, "") !== expected.toLowerCase().replace(/^0x/, "")) {
+      throw new Error(`TokenRouter.${field} does not match backend configuration`);
+    }
+  }
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);
@@ -449,6 +510,7 @@ export async function getInternalAddresses() {
   // Static: well-known system contract addresses from config
   const addresses: string[] = [
     mercataBridge,
+    externalAssetBridge,
     stratoNativeBridge,
     stratoNativeCustodyVault,
     burnAddress,
@@ -465,7 +527,7 @@ export async function getInternalAddresses() {
     goldstYieldVault,
     silvstYieldVault
   );
-  addresses.push(directMintPsm);
+  addresses.push(directMintPsm, tokenRouter);
 
   // Lending Registry --> lendingPool, collateralVault, liquidityPool
   const { data: [lending] } = await cirrus.get(accessToken, "/BlockApps-LendingRegistry", {

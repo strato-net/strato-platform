@@ -1,6 +1,14 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
 require("dotenv").config();
+const { NETWORKS } = require("./scripts/lib/externalBridgeNetworks");
+
+const accounts = process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [];
+const externalNetworks = Object.fromEntries(NETWORKS.map(({ name, rpcEnv, defaultRpcUrl }) => [name, {
+  url: process.env[rpcEnv] || (name === "mainnet" ? undefined : defaultRpcUrl),
+  accounts,
+  gasPrice: "auto",
+}]));
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -14,42 +22,13 @@ module.exports = {
     },
   },
   networks: {
-    sepolia: {
-      url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
-    mainnet: {
-      url: process.env.MAINNET_RPC_URL || "https://eth.merkle.io",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
-    base: {
-      url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
-    baseSepolia: {
-      url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
-    linea: {
-      url: process.env.LINEA_RPC_URL || "https://rpc.linea.build",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
-    lineaSepolia: {
-      url: process.env.LINEA_SEPOLIA_RPC_URL || "https://rpc.sepolia.linea.build",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: "auto",
-    },
+    ...externalNetworks,
     robinhoodTestnet: {
       url:
         process.env.ROBINHOOD_TESTNET_RPC_URL ||
         "https://rpc.testnet.chain.robinhood.com",
       chainId: 46630,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts,
       gasPrice: "auto",
     },
     robinhood: {
@@ -57,7 +36,7 @@ module.exports = {
         process.env.ROBINHOOD_RPC_URL ||
         "https://rpc.mainnet.chain.robinhood.com",
       chainId: 4663,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts,
       gasPrice: "auto",
     },
     hyperEvm: {

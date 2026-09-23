@@ -1,0 +1,17 @@
+**
+!services/
+!services/bridge/
+!services/bridge/package.json
+!services/bridge/package-lock.json
+!services/bridge/tsconfig.json
+!services/bridge/src/
+!services/bridge/src/**
+!packages/
+!packages/shared-types/
+!packages/shared-types/package.json
+!packages/shared-types/tsconfig.json
+!packages/shared-types/src/
+!packages/shared-types/src/**
+**/node_modules
+**/dist
+**/.env*

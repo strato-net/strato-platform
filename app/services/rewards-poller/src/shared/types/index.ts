@@ -151,6 +151,7 @@ export interface CirrusEvent {
   block_timestamp: string;
   event_index: number;
   event_name: string;
+  transaction_hash: string;
   transaction_sender: string;
   attributes: Record<string, any>;
 }

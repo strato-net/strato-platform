@@ -38,6 +38,7 @@ const event = (
   event_index: 7,
   event_name: eventName,
   transaction_sender: custodyVault,
+  transaction_hash: "0x" + "a".repeat(64),
   attributes,
 });
 

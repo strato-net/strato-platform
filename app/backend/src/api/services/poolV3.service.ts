@@ -136,6 +136,7 @@ interface RawV3SwapEvent {
   address: string; // pool the swap executed in
   id: number;
   block_timestamp: string;
+  transaction_hash: string;
   sender: string;
   recipient: string;
   amount0: string; // signed delta: positive = paid to the pool (input side)
@@ -695,6 +696,7 @@ export const fetchPairSwapHistory = async (
       amountOut: amountOut.toString(),
       impliedPrice,
       sender: event.sender,
+      transactionHash: event.transaction_hash,
       poolAddress: pool.address,
       poolName: `V3 ${Number(pool.fee) / 10000}%`,
       fee: Number(pool.fee),
@@ -764,6 +766,7 @@ export const fetchTokenSwapHistory = async (
       amountOut: amountOut.toString(),
       impliedPrice,
       sender: event.sender,
+      transactionHash: event.transaction_hash,
       poolAddress: pool.address,
       poolName: `V3 ${Number(pool.fee) / 10000}%`,
       fee: Number(pool.fee),

@@ -1,7 +1,19 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
-import { BridgeError } from "./types";
+import type { CompositeRouteQuoteResponse } from "@strato/shared-types";
+import { AutoRouteQuoteBinding, BridgeError } from "./types";
+
+export const ExternalBridgeStatus = {
+  NONE: 0,
+  INITIATED: 1,
+  PENDING_REVIEW: 2,
+  READY: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+  REFUNDED: 6,
+  ABORTED: 7,
+} as const;
 
 /**
  * Normalizes errors from various sources into a consistent BridgeError format
@@ -88,7 +100,10 @@ export function normalizeError(error: any): BridgeError {
 /**
  * Maps error codes to user-friendly messages
  */
-function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
+export function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
+  if (errorName.startsWith("Quote expired after approval")) return "Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.";
+  if (errorName.startsWith("Quote expired")) return "Quote expired; request a new quote.";
+  if (errorName.includes("No executable route") || errorName.includes("No route found")) return "No route is available for this amount. Try a different amount or token.";
   switch (errorName) {
     case "TokenNotAllowed":
       return "This token is not currently supported for bridging.";
@@ -109,6 +124,7 @@ function getFriendlyMessage(errorName: string, data?: `0x${string}`): string {
     case "USER_REJECTED":
       return "Transaction cancelled by user";
     case "execution reverted":
+    case "External bridge transaction reverted":
       return "Transaction reverted. Please check your inputs and try again.";
     case "insufficient funds":
       return "Insufficient funds for gas fees. Please add more ETH to your wallet.";
@@ -190,11 +206,18 @@ export function getChainName(chainId: number | string): string {
  */
 export const BRIDGE_STATUS_OPTIONS = [
   { value: 0, label: "All Statuses" },
-  { value: 1, label: "Initiated" },
-  { value: 2, label: "Pending Review" },
-  { value: 3, label: "Completed" },
-  { value: 4, label: "Aborted" },
+  { value: ExternalBridgeStatus.INITIATED, label: "Initiated" },
+  { value: ExternalBridgeStatus.PENDING_REVIEW, label: "Pending Review" },
+  { value: ExternalBridgeStatus.READY, label: "Ready" },
+  { value: ExternalBridgeStatus.COMPLETED, label: "Completed" },
+  { value: ExternalBridgeStatus.CANCELLED, label: "Cancelled" },
+  { value: ExternalBridgeStatus.REFUNDED, label: "Refunded" },
+  { value: ExternalBridgeStatus.ABORTED, label: "Aborted" },
 ];
+
+export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
+  [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.PENDING_REVIEW, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
+);
 
 /**
  * Chain options for filter dropdowns
@@ -227,4 +250,36 @@ export function mergePendingDeposits(apiDeposits: any[]): {
   const remaining = pendingRaw.filter((p: any) => !apiTxHashes.has(p?.externalTxHash));
   localStorage.setItem('pendingDeposits', JSON.stringify(remaining));
   return { remaining };
+}
+
+export function assertAutoRouteQuote(
+  quote: CompositeRouteQuoteResponse,
+  binding: AutoRouteQuoteBinding,
+  now = Math.floor(Date.now() / 1000),
+): void {
+  const address = (value: string) => {
+    const normalized = value.replace(/^0x/i, "").toLowerCase();
+    if (!/^[0-9a-f]{40}$/.test(normalized)) throw new Error("Invalid quote token address");
+    return normalized;
+  };
+  if (!Number.isSafeInteger(quote.deadline) || quote.deadline <= now) throw new Error("Quote expired; request a new quote");
+  if (BigInt(quote.bridge.externalChainId) !== BigInt(binding.externalChainId) ||
+      address(quote.bridge.externalToken) !== address(binding.externalToken) ||
+      address(quote.bridge.targetStratoToken) !== address(binding.targetStratoToken) ||
+      address(quote.tokenIn) !== address(binding.targetStratoToken) ||
+      address(quote.tokenOut) !== address(binding.tokenOut) ||
+      address(quote.depositAction.actionToken) !== address(binding.tokenOut)) throw new Error("Quote does not match the selected route and output token");
+  if (binding.externalAmount <= 0n || BigInt(quote.bridge.externalAmount) !== binding.externalAmount ||
+      Number(quote.bridge.externalDecimals) !== binding.externalDecimals ||
+      BigInt(quote.amountIn) !== BigInt(quote.bridge.bridgedAmount) || BigInt(quote.amountIn) <= 0n) throw new Error("Quote does not match the deposit amount");
+  if (!Number.isInteger(binding.slippageBps) || binding.slippageBps < 1 || binding.slippageBps >= 10000 ||
+      quote.slippageBps !== binding.slippageBps) throw new Error("Quote slippage does not match");
+  const minimum = BigInt(quote.depositAction.minFinalOut);
+  const output = BigInt(quote.amountOut);
+  if (minimum <= 0n || minimum !== BigInt(quote.minFinalOut) || minimum > output ||
+      minimum < output * BigInt(10000 - binding.slippageBps) / 10000n) throw new Error("Invalid quote minimum output");
+  const plain = address(binding.targetStratoToken) === address(binding.tokenOut);
+  if (quote.depositAction.action !== (plain ? 0 : 4) || (plain && (output !== BigInt(quote.amountIn) || minimum !== output))) {
+    throw new Error("Quote action does not match the selected output token");
+  }
 }

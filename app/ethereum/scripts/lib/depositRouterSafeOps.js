@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { ethers } = require("ethers");
+const { NETWORKS } = require("./externalBridgeNetworks");
 
 const safeProtocolKitPath = path.resolve(
   __dirname,
@@ -11,55 +12,18 @@ const safeApiKitPath = path.resolve(
   "../../../services/bridge/node_modules/@safe-global/api-kit",
 );
 
-if (!fs.existsSync(safeProtocolKitPath) || !fs.existsSync(safeApiKitPath)) {
-  throw new Error(
-    "Safe dependencies not found. Run `cd app/services/bridge && npm install && npm run build` from the repo root first.",
-  );
+function loadSafeDependencies() {
+  if (!fs.existsSync(safeProtocolKitPath) || !fs.existsSync(safeApiKitPath)) {
+    throw new Error(
+      "Safe dependencies not found. Run `cd app/services/bridge && npm install && npm run build` from the repo root first.",
+    );
+  }
+  const protocol = require(safeProtocolKitPath);
+  const api = require(safeApiKitPath);
+  return { SafeProtocolKit: protocol.default || protocol, SafeApiKit: api.default || api };
 }
 
-const SafeProtocolKitModule = require(safeProtocolKitPath);
-const SafeApiKitModule = require(safeApiKitPath);
-const SafeProtocolKit = SafeProtocolKitModule.default || SafeProtocolKitModule;
-const SafeApiKit = SafeApiKitModule.default || SafeApiKitModule;
-
-const CHAIN_CONFIG = {
-  1: {
-    chainId: 1,
-    name: "mainnet",
-    rpcEnv: "MAINNET_RPC_URL",
-    defaultRpcUrl: "https://ethereum-rpc.publicnode.com",
-  },
-  8453: {
-    chainId: 8453,
-    name: "base",
-    rpcEnv: "BASE_RPC_URL",
-    defaultRpcUrl: "https://mainnet.base.org",
-  },
-  11155111: {
-    chainId: 11155111,
-    name: "sepolia",
-    rpcEnv: "SEPOLIA_RPC_URL",
-    defaultRpcUrl: "https://ethereum-sepolia-rpc.publicnode.com",
-  },
-  84532: {
-    chainId: 84532,
-    name: "baseSepolia",
-    rpcEnv: "BASE_SEPOLIA_RPC_URL",
-    defaultRpcUrl: "https://sepolia.base.org",
-  },
-  59144: {
-    chainId: 59144,
-    name: "linea",
-    rpcEnv: "LINEA_RPC_URL",
-    defaultRpcUrl: "https://rpc.linea.build",
-  },
-  59141: {
-    chainId: 59141,
-    name: "lineaSepolia",
-    rpcEnv: "LINEA_SEPOLIA_RPC_URL",
-    defaultRpcUrl: "https://rpc.sepolia.linea.build",
-  },
-};
+const CHAIN_CONFIG = Object.fromEntries(NETWORKS.map((network) => [network.chainId, network]));
 
 function normalizeAddress(value) {
   if (!value) return "";
@@ -150,6 +114,7 @@ function resolveSafeTxGasOverride(parsedOptions) {
 }
 
 async function proposeBatch(chainId, transactions, options) {
+  const { SafeProtocolKit, SafeApiKit } = loadSafeDependencies();
   const parsedOptions =
     options && typeof options === "object" && !Array.isArray(options)
       ? options
@@ -218,6 +183,48 @@ function writeOutput(filePrefix, payload) {
   return outPath;
 }
 
+function buildTransactionBuilderBatch(
+  chainId,
+  safeAddress,
+  transactions,
+  { name, description = "" } = {},
+) {
+  const normalizedSafe = normalizeAddress(safeAddress);
+  if (!normalizedSafe) throw new Error("Invalid Safe address");
+  const normalizedTransactions = transactions.map((transaction) => {
+    if (Number(transaction.operation || 0) !== 0) {
+      throw new Error("Safe Transaction Builder export supports CALL operations only");
+    }
+    const to = normalizeAddress(transaction.to);
+    if (!to) throw new Error("Invalid Safe transaction target");
+    return {
+      to,
+      value: String(transaction.value || "0"),
+      data: transaction.data || "0x",
+      contractMethod: null,
+      contractInputsValues: null,
+    };
+  });
+  return {
+    version: "1.0",
+    chainId: String(chainId),
+    createdAt: Date.now(),
+    meta: {
+      name: name || "External Asset Bridge Safe operations",
+      description,
+      txBuilderVersion: "1.18.0",
+      createdFromSafeAddress: normalizedSafe,
+      createdFromOwnerAddress: "",
+      checksum: "",
+    },
+    transactions: normalizedTransactions,
+  };
+}
+
+function writeTransactionBuilderOutput(filePrefix, payload) {
+  return writeOutput(`${filePrefix}-txbuilder`, payload);
+}
+
 module.exports = {
   CHAIN_CONFIG,
   normalizeAddress,
@@ -228,4 +235,6 @@ module.exports = {
   proposeBatch,
   chunkArray,
   writeOutput,
+  buildTransactionBuilderBatch,
+  writeTransactionBuilderOutput,
 };

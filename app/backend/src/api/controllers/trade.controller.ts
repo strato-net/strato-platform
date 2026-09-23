@@ -1,3 +1,4 @@
+import { cachedAnonymousQuote, quoteCacheKey } from "../services/anonymousQuoteCache.service";
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
@@ -10,11 +11,20 @@ import {
   getTradeTokenHistory,
 } from "../services/trade.service";
 import {
+  executeRoute,
+  getRouteAssets,
+  getRouteQuote,
+} from "../services/route.service";
+import { getCompositeBridgeRouteQuote } from "../services/bridge-route.service";
+import {
   validateTradeTokenArgs,
   validateTradePairArgs,
   validateTradeQuoteArgs,
   validateTradeSwapArgs,
   validateTradeHistoryQuery,
+  validateCompositeRouteQuoteArgs,
+  validateRouteExecuteArgs,
+  validateRouteQuoteArgs,
 } from "../validators/trade.validator";
 
 class TradeController {
@@ -54,12 +64,16 @@ class TradeController {
     try {
       const { accessToken, query } = req;
       validateTradeQuoteArgs(query);
-      const response = await getTradeQuotes(
-        accessToken,
-        query.tokenIn as string,
-        query.tokenOut as string,
-        BigInt(query.amount as string),
-        query.type as "EXACT_INPUT" | "EXACT_OUTPUT"
+      const response = await cachedAnonymousQuote(
+        quoteCacheKey("getTradeQuotes", [query.tokenIn, query.tokenOut, query.amount, query.type]),
+        req.address as string | undefined,
+        () => getTradeQuotes(
+          accessToken,
+          query.tokenIn as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.type as "EXACT_INPUT" | "EXACT_OUTPUT"
+        )
       );
       res.status(RestStatus.OK).json(response);
     } catch (error) {
@@ -72,6 +86,77 @@ class TradeController {
       const { accessToken, body, address: userAddress } = req;
       validateTradeSwapArgs(body);
       const result = await executeTradeSwap(accessToken, body, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async routeQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      validateRouteQuoteArgs(query);
+      const result = await cachedAnonymousQuote(
+        quoteCacheKey("getRouteQuote", [query.tokenIn, query.tokenOut, query.amount, query.slippageBps]),
+        req.address as string | undefined,
+        () => getRouteQuote(
+          accessToken,
+          query.tokenIn as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+        )
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async routeAssets(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await getRouteAssets(
+        req.accessToken,
+        req.address as string | undefined
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async compositeRouteQuote(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      validateCompositeRouteQuoteArgs(query);
+      const result = await cachedAnonymousQuote(
+        quoteCacheKey("getCompositeBridgeRouteQuote", [query.externalChainId, query.externalToken, query.targetStratoToken, query.tokenOut, query.amount, query.slippageBps]),
+        req.address as string | undefined,
+        () => getCompositeBridgeRouteQuote(
+          accessToken,
+          query.externalChainId as string,
+          query.externalToken as string,
+          query.targetStratoToken as string,
+          query.tokenOut as string,
+          BigInt(query.amount as string),
+          query.slippageBps === undefined ? undefined : Number(query.slippageBps)
+        )
+      );
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async route(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, address: userAddress } = req;
+      validateRouteExecuteArgs(body);
+      const result = await executeRoute(
+        accessToken,
+        body,
+        userAddress as string
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

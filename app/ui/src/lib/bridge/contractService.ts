@@ -266,14 +266,34 @@ export async function simulateDeposit({
   const accountAddress = formatAddress(account);
 
   if (isNative) {
-    await client.simulateContract({
+    const request = {
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
-      functionName: "depositETH",
-      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
+      functionName: actionIntent?.action
+        ? "depositETHWithAction"
+        : "depositETH",
+      args: actionIntent?.action
+        ? [
+            formatAddress(userAddress),
+            formatAddress(targetStratoToken),
+            actionIntent.action,
+            formatAddress(actionIntent.actionToken),
+            actionIntent.minFinalOut,
+          ] as const
+        : [formatAddress(userAddress), formatAddress(targetStratoToken)] as const,
       value: amount,
       account: accountAddress,
-    });
+    } as const;
+    const [gas, fees, balance] = await Promise.all([
+      client.estimateContractGas(request),
+      client.estimateFeesPerGas(),
+      client.getBalance({ address: accountAddress }),
+    ]);
+    const gasPrice = fees.maxFeePerGas ?? fees.gasPrice;
+    if (balance < amount + (gas * gasPrice * 120n) / 100n) {
+      throw new Error("Insufficient funds for deposit and gas fees; reduce the deposit amount");
+    }
+    await client.simulateContract(request);
   } else {
     if (!permitData || !tokenAddress) {
       throw new Error("Permit data and token address are required for ERC20 deposits");

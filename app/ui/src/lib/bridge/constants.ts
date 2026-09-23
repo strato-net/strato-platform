@@ -74,6 +74,19 @@ export const DEPOSIT_ROUTER_ABI = [
   },
   {
     inputs: [
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
+      { name: 'action', type: 'uint8' },
+      { name: 'actionToken', type: 'address' },
+      { name: 'minFinalOut', type: 'uint256' }
+    ],
+    name: 'depositETHWithAction',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function'
+  },
+  {
+    inputs: [
       { name: 'token', type: 'address' },
       { name: 'amount', type: 'uint256' },
       { name: 'stratoAddress', type: 'address' },

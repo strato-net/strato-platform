@@ -1,7 +1,19 @@
-import { bloc, strato, extractErrorMessage } from "./api";
+import {
+  bloc,
+  strato,
+  relayerBloc,
+  relayerStrato,
+  extractErrorMessage,
+} from "./api";
 import { config } from "../config";
 import { logError, logInfo } from "./logger";
-import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
+import {
+  FunctionInput,
+  BuiltTx,
+  TxResult,
+  TxResponse,
+  ApiClient,
+} from "../types";
 
 // ============================================================================
 // Core Transaction Functions
@@ -116,6 +128,7 @@ const getImmediateResult = (
 export const postAndWaitForTx = async (
   postFn: () => Promise<any>,
   timeout = config.strato.polling.defaultTimeout,
+  resultsClient: ApiClient = bloc,
 ): Promise<TxResponse> => {
   // Post and validate
   const response = await postFn();
@@ -149,7 +162,7 @@ export const postAndWaitForTx = async (
       }
       return res.every((r) => r?.status !== "Pending");
     },
-    () => bloc.post("/transactions/results", txHashes),
+    () => resultsClient.post("/transactions/results", txHashes),
     { timeout },
   );
 
@@ -162,8 +175,11 @@ export const postAndWaitForTx = async (
 /**
  * Execute transaction(s) with logging
  */
-export const execute = async (
+const executeWithClients = async (
   inputs: FunctionInput | FunctionInput[],
+  transactionClient: ApiClient,
+  resultsClient: ApiClient,
+  authority: "operator" | "relayer",
   timeout?: number,
 ): Promise<TxResponse> => {
   const inputArray = Array.isArray(inputs) ? inputs : [inputs];
@@ -171,21 +187,46 @@ export const execute = async (
   const context = `${method} on ${contractName}`;
 
   return enqueueStratoWrite(async () => {
-    logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
+    logInfo(
+      "StratoHelper",
+      `Executing ${context} as ${authority} (${inputArray.length} tx)`,
+    );
 
     const result = await postAndWaitForTx(
       () =>
-        strato.post(
+        transactionClient.post(
           "/transaction/parallel?resolve=true",
           buildFunctionTx(inputs),
         ),
       timeout,
+      resultsClient,
     );
 
-    logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
+    logInfo(
+      "StratoHelper",
+      `${result.status}: ${context} as ${authority} (${result.hash})`,
+    );
     return result;
   });
 };
+
+export const execute = (
+  inputs: FunctionInput | FunctionInput[],
+  timeout?: number,
+): Promise<TxResponse> =>
+  executeWithClients(inputs, strato, bloc, "operator", timeout);
+
+export const executeAsRelayer = (
+  inputs: FunctionInput | FunctionInput[],
+  timeout?: number,
+): Promise<TxResponse> =>
+  executeWithClients(
+    inputs,
+    relayerStrato,
+    relayerBloc,
+    "relayer",
+    timeout,
+  );
 
 // ============================================================================
 // Exports
@@ -196,4 +237,5 @@ export default {
   until,
   postAndWaitForTx,
   execute,
+  executeAsRelayer,
 };

@@ -37,6 +37,7 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   LENDING_REGISTRY=0x1007 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
+  EXTERNAL_ASSET_BRIDGE_ADDRESS=external-asset-bridge-address-here \
   npm run dev
 ```
 
@@ -124,6 +125,7 @@ sudo \
   LENDING_REGISTRY=0x1007 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
+  EXTERNAL_ASSET_BRIDGE_ADDRESS=external-asset-bridge-address-here \
   docker compose up -d --build
 ```
 

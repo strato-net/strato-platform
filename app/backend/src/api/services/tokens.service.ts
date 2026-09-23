@@ -199,6 +199,19 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
   }
 };
 
+export const getTokenSymbols = async (accessToken: string, addresses: string[]) => {
+  if (!addresses.length) return [];
+  const responses = await Promise.all([Token, SaveUSDSTVault, YieldVault].map((table) =>
+    cirrus.get(accessToken, `/${table}`, {
+      params: {
+        address: `in.(${addresses.join(",")})`,
+        select: `address,_symbol,${table === Token ? "customDecimals" : "customDecimals:_underlyingDecimals"}`,
+      },
+    })
+  ));
+  return responses.flatMap((response) => response.data || []);
+};
+
 // Get all tokens
 export const getTokens = async (
   accessToken: string,

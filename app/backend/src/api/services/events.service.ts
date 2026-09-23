@@ -6,6 +6,38 @@ import type {
   EventResponse,
   ContractInfoResponse,
 } from "@strato/shared-types";
+import { applyDepositActionOutcomes } from "../helpers/events.helper";
+
+const enrichRoutedDepositEvents = async (
+  accessToken: string,
+  events: any[]
+): Promise<void> => {
+  const routedDepositTxHashes = events
+    .filter(
+      (event) =>
+        event.contract_name === "ExternalAssetBridge" &&
+        event.event_name === "DepositCompleted" &&
+        event.transaction_hash
+    )
+    .map((event) => event.transaction_hash);
+  if (routedDepositTxHashes.length === 0) return;
+
+  const { data: routedEvents } = await cirrus.get(
+    accessToken,
+    `/${constants.Event}`,
+    {
+      params: {
+        address: `eq.${constants.externalAssetBridge}`,
+        event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted)",
+        transaction_hash: `in.(${[
+          ...new Set(routedDepositTxHashes),
+        ].join(",")})`,
+        select: "address,event_index,transaction_hash,event_name,attributes",
+      },
+    }
+  );
+  applyDepositActionOutcomes(events, routedEvents || []);
+};
 
 export const getEvents = async (
   accessToken: string,
@@ -42,6 +74,7 @@ export const getEvents = async (
       contract_name: event.storage?.contract?.[0]?.contract_name || "",
     };
   });
+  await enrichRoutedDepositEvents(accessToken, events);
 
   return {
     events,
@@ -223,6 +256,13 @@ export const getActivitiesByTypes = async (
     pairs: ActivityTypePair[],
     params: Record<string, string>
   ) => {
+    if (constants.externalAssetBridge && pairs.some((pair) =>
+      pair.contract_name === "TokenRouter" && pair.event_name === "RouteExecuted"
+    )) {
+      const bridge = constants.externalAssetBridge.toLowerCase().replace(/^0x/, "");
+      // Bridge routes are represented by the enriched DepositCompleted activity.
+      params.and = `(or(event_name.neq.RouteExecuted,attributes->>caller.neq.${bridge}))`;
+    }
     if (internalAddrList) {
       for (const pair of pairs) {
         const attrs = pair.filterConfig?.excludeProtocolAddresses;
@@ -305,6 +345,7 @@ export const getActivitiesByTypes = async (
 
   // Apply global pagination: slice [offset, offset + limit]
   const events = allEvents.slice(offset, offset + limit);
+  await enrichRoutedDepositEvents(accessToken, events);
 
   return { events, total };
 };
