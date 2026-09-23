@@ -41,6 +41,13 @@ const config = {
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+    // Record each scanned block window with MercataBridge.recordDepositWindow, which stores the
+    // deposits and advances the checkpoint in one transaction. Enable only once the bridge logic
+    // with recordDepositWindow is live and the relayer is whitelisted for it.
+    recordDepositWindow: process.env.BRIDGE_RECORD_DEPOSIT_WINDOW === "true",
+    // How long to wait for Cirrus to show just-recorded deposits before leaving the checkpoint alone
+    readBackTimeoutMs: Number(process.env.BRIDGE_READ_BACK_TIMEOUT_MS) || 30_000,
+    readBackIntervalMs: 3_000,
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
@@ -115,6 +122,31 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
   }
 
   return rpcUrl;
+};
+
+// Blocks a deposit must be buried under before it is scanned, so a reorg or an RPC node lagging
+// behind the one that answered eth_blockNumber cannot hide it from an already-scanned range
+const DEFAULT_CHAIN_CONFIRMATIONS: Record<string, number> = {
+  "1": 3,
+  "11155111": 3,
+  "8453": 10,
+  "84532": 10,
+};
+const FALLBACK_CHAIN_CONFIRMATIONS = 5;
+
+export const getChainConfirmations = (chainId: number | bigint): number => {
+  const chainIdStr = chainId.toString();
+  const configured = process.env[`CHAIN_${chainIdStr}_CONFIRMATIONS`]?.trim();
+  if (configured) {
+    const confirmations = Number(configured);
+    if (!Number.isInteger(confirmations) || confirmations < 0) {
+      throw new Error(
+        `CHAIN_${chainIdStr}_CONFIRMATIONS must be a non-negative integer, got "${configured}"`,
+      );
+    }
+    return confirmations;
+  }
+  return DEFAULT_CHAIN_CONFIRMATIONS[chainIdStr] ?? FALLBACK_CHAIN_CONFIRMATIONS;
 };
 
 export const getNativeRepresentationBridgeAddress = (

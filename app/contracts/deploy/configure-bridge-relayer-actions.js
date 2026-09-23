@@ -1,14 +1,17 @@
 /**
- * Add or remove the bridge relayer whitelist entries for action deposits.
+ * Add or remove bridge relayer whitelist entries on MercataBridge.
  *
  * Usage:
  *   node configure-bridge-relayer-actions.js \
  *     --bridge-address <address> \
  *     --relayer-address <address> \
+ *     [--methods <name,name>] \
  *     [--admin-registry <address>] \
  *     [--operation add|remove] \
  *     [--execute]
  *
+ * --methods defaults to the action deposit entry points; pass
+ * `--methods recordDepositWindow` before enabling BRIDGE_RECORD_DEPOSIT_WINDOW.
  * Without --execute, this script only prints the planned calls.
  */
 require('dotenv').config();
@@ -17,7 +20,7 @@ const auth = require('./auth');
 const { rest, util } = require('blockapps-rest');
 
 const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
-const METHODS = ['depositWithAction', 'depositBatchWithAction'];
+const DEFAULT_METHODS = ['depositWithAction', 'depositBatchWithAction'];
 
 function parseArgs() {
   const parsed = {};
@@ -96,7 +99,13 @@ async function main() {
   }
   const registryMethod =
     operation === 'add' ? 'addWhitelist' : 'removeWhitelist';
-  const plan = METHODS.map((_func) => ({
+  const methods = args.methods
+    ? args.methods.split(',').map((method) => method.trim()).filter(Boolean)
+    : DEFAULT_METHODS;
+  if (methods.length === 0) {
+    throw new Error('--methods must name at least one bridge function');
+  }
+  const plan = methods.map((_func) => ({
     contract: adminRegistry,
     method: registryMethod,
     args: { _target: bridgeAddress, _func, _user: relayerAddress },
@@ -138,7 +147,7 @@ async function main() {
     );
   }
   console.log(
-    'If governance approval is required, repeat as the remaining admins and verify both whitelist mappings before starting the relayer.'
+    'If governance approval is required, repeat as the remaining admins and verify every whitelist mapping before starting the relayer.'
   );
 }
 
