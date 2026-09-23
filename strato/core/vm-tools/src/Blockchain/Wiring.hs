@@ -65,6 +65,7 @@ import qualified Data.Text as T
 import Data.Traversable (for)
 import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
+import Text.Format (format)
 import UnliftIO
 
 type HasContext m = (Monad m, MonadIO m, AccessibleEnv Context m)
@@ -200,17 +201,22 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
   delete _ k = ContextM $ A.delete (A.Proxy @MP.NodeData) k
 
 -- | Ask peers for a node missing locally and wait (up to 10s) for the reply
--- on the VM's own task topic; used only while diagnosing a state-root mismatch.
+-- on the VM's own task topic; used only while diagnosing a state-root mismatch,
+-- so when no peer replies there is nothing left to do but say so and stop.
 fetchMPNode :: MP.StateRoot -> ContextM (Maybe MP.NodeData)
 fetchMPNode k = do
   void $ writeUnseqEvents [IEGetMPNodes [k]]
-  fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
+  mnd <- timeout 10000000 $
     runConsume "ethereum-vm" seqVmTasksTopicName $ \evs -> do
       let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
           findND _ = Nothing
           mND = foldr (<|>) Nothing (findND <$> evs)
       for_ mND $ A.insert (A.Proxy @MP.NodeData) k
       pure mND
+  case mnd of
+    Just nd -> pure (Just nd)
+    Nothing -> error $ "While diagnosing the stateRoot mismatch above, asked peers for MP node " ++ format k
+      ++ " to compare the block's state with ours; no reply reached the VM within 10s. Stopping here with what is known."
 
 instance A.Selectable Address AddressState ContextM where
   select _ = getAddressStateMaybe

@@ -19,7 +19,6 @@ module Control.Monad.Composable.NodeDB
     runNodeDBM,
     tickNodeDB,
     flushNodeDB,
-    discardNodeDB,
     NodeBytes (..),
     levelDBBytes,
     nodeDB,
@@ -48,9 +47,7 @@ data NodeDB = NodeDB
     -- | A block is done; a store holding writes back may write them through.
     tickNodes :: IO (),
     -- | Write everything held back, now.
-    flushNodes :: IO (),
-    -- | Drop writes held back since the last flush (a block that failed).
-    discardNodes :: IO ()
+    flushNodes :: IO ()
   }
 
 type NodeDBM es = Eff (NodeDB ': es)
@@ -60,10 +57,9 @@ type HasNodeDB m = (MonadIO m, AccessibleEnv NodeDB m)
 runNodeDBM :: NodeDB -> NodeDBM es a -> Eff es a
 runNodeDBM = provide
 
-tickNodeDB, flushNodeDB, discardNodeDB :: HasNodeDB m => m ()
+tickNodeDB, flushNodeDB :: HasNodeDB m => m ()
 tickNodeDB = accessEnv >>= liftIO . tickNodes
 flushNodeDB = accessEnv >>= liftIO . flushNodes
-discardNodeDB = accessEnv >>= liftIO . discardNodes
 
 instance (NodeDB :> es) => (MP.StateRoot `A.Alters` MP.NodeData) (Eff es) where
   lookup _ k = accessEnv >>= \db -> liftIO (lookupNode db k)
@@ -93,8 +89,7 @@ nodeDB raw =
       insertNode = \(MP.StateRoot k) nd -> writeBytes raw [(k, encodeNode nd)],
       deleteNode = \(MP.StateRoot k) -> deleteBytes raw k,
       tickNodes = pure (),
-      flushNodes = pure (),
-      discardNodes = pure ()
+      flushNodes = pure ()
     }
 
 encodeNode :: MP.NodeData -> B.ByteString
@@ -113,8 +108,7 @@ mapNodeDB ref =
       insertNode = \k v -> modifyIORef' ref (M.insert k v),
       deleteNode = \k -> modifyIORef' ref (M.delete k),
       tickNodes = pure (),
-      flushNodes = pure (),
-      discardNodes = pure ()
+      flushNodes = pure ()
     }
 
 -- | Writes stay in the overlay; a read misses through to the inner store.

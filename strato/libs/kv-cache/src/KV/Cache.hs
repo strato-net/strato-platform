@@ -18,7 +18,6 @@ module KV.Cache
     delete,
     tick,
     flush,
-    discard,
   )
 where
 
@@ -95,10 +94,6 @@ flush c write = do
   write kvs
   -- Already arena-resident; decode lazily, most written values are never read back.
   BoundedMap.insertMany (parsed c) [(k, decode (config c) bs) | (k, bs) <- kvs]
-
--- | Drop pending writes without writing them.
-discard :: MonadIO m => Cache v -> m ()
-discard c = () <$ WriteBatch.drain (pending c)
 
 cacheBytes :: MonadIO m => Cache v -> B.ByteString -> B.ByteString -> m v
 cacheBytes c key bs = liftIO $ do

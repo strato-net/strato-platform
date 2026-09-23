@@ -34,8 +34,7 @@ cachedNodeDB capacity flushEvery raw = do
         insertNode = \(MP.StateRoot k) nd -> KV.Cache.insert cache k nd,
         deleteNode = \(MP.StateRoot k) -> KV.Cache.delete cache k >> deleteBytes raw k,
         tickNodes = KV.Cache.tick cache (writeBytes raw),
-        flushNodes = KV.Cache.flush cache (writeBytes raw),
-        discardNodes = KV.Cache.discard cache
+        flushNodes = KV.Cache.flush cache (writeBytes raw)
       }
 
 -- | Leaf values escape into long-lived block maps; give them their own bytes so a

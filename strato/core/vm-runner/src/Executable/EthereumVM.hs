@@ -34,6 +34,7 @@ import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (stateRoot, getGenesisInfo)
 import Blockchain.Bootstrap
 import Blockchain.Database.MerklePatricia.NodeData ()
+import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Event
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
@@ -51,7 +52,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Control.Monad
-import Control.Monad.Change.Alter ()
+import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.NodeDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
 import Data.Foldable hiding (fold)
@@ -97,11 +98,17 @@ ethereumVM = do
 
   for_ failures $ \(BlockVerificationFailure bNum bHash bDetails) -> case bDetails of
     StateRootMismatch BlockDelta{..} -> do
-      let err = "stateRoot mismatch!!  New stateRoot doesn't match block stateRoot: " ++ format _inBlock
+      let story = "stateRoot mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
+            ++ ": the block header says " ++ format _inBlock ++ ", running the block gave " ++ format _derived
+      $logErrorS "ethereumVM/StateRootMismatch" $ T.pack story
+      -- Our side of the comparison was just computed; it can only be missing through a bug of ours.
+      haveDerived <- isJust <$> A.lookup (A.Proxy @MP.NodeData) _derived
+      unless haveDerived . error $ story ++ "\nOur own derived stateRoot is missing from the local node DB. This is a bug, not a peer problem."
+      -- The block's side comes from peers; fetchMPNode stops with the story if none reply.
       withFetchMissingNodes $ do
         sds <- stateDiff' Nothing bNum bHash _inBlock _derived
-        let sd = fromMaybe (error $ err ++ "\nError encountered while analyzing stateRoot mismatch") (listToMaybe sds)
-        $logErrorS "ethereumVM/StateRootMismatch" . T.pack $ formatStateRootMismatch sd
+        when (null sds) . error $ story ++ "\nNo difference found between the two states. This is a bug."
+        for_ sds $ $logErrorS "ethereumVM/StateRootMismatch" . T.pack . formatStateRootMismatch
     ValidatorMismatch BlockDelta{..} -> do
       $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "There was a validator mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
       $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found in block header:        " ++ show (fst _inBlock)
