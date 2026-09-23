@@ -253,6 +253,7 @@ export interface YieldVaultUserInfo extends YieldVaultInfo {
 /** Keys and display metadata only; addresses come from config / env. */
 const CARRY_VAULT_ENTRIES: (Omit<YieldVaultDef, "address"> & { getAddress: () => string })[] = [
   { key: "eth-carry",  name: "ETH Yield Vault",  assetSymbol: "ETH",  shareSymbol: "carryETH",  getAddress: () => config.ethCarryVault },
+  { key: "hype-yield", name: "HYPE Yield Vault", assetSymbol: "WHYPE", shareSymbol: "carryHYPE", getAddress: () => config.hypeYieldVault },
   { key: "wbtc-carry", name: "wBTC Carry Vault", assetSymbol: "wBTC", shareSymbol: "carryWBTC", getAddress: () => config.wbtcCarryVault },
   { key: "usdc-yield", name: "USDC Yield Vault", assetSymbol: "USDC", shareSymbol: "yieldUSDC", getAddress: () => config.usdcYieldVault },
   { key: "goldst-yield", name: "GOLDST Yield Vault", assetSymbol: "GOLDST", shareSymbol: "yieldGOLDST", getAddress: () => config.goldstYieldVault },
