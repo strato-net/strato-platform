@@ -66,7 +66,8 @@ import SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as Def
 import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
-import SolidVM.Solidity.Parse.File
+import qualified SolidVM.Solidity.Parse.Fast.Parser as Fast
+import SolidVM.Solidity.Parse.File (File (..))
 import SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as ConstantFunctions
 import SolidVM.Solidity.StaticAnalysis.Optimizer as O
@@ -155,7 +156,7 @@ parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
 parseSource = parseSourceWith defaultParseOptions
 
 parseSourceWith :: ParseOptions -> T.Text -> T.Text -> Either CompilationError [SourceUnit]
-parseSourceWith opts fileName src = bimap PEx unsourceUnits $ runWithReference solidityFile (parserStateFor opts) (T.unpack fileName) (T.unpack src)
+parseSourceWith opts fileName src = bimap PEx unsourceUnits $ Fast.parseSolidity (parserStateFor opts) (T.unpack fileName) src
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)

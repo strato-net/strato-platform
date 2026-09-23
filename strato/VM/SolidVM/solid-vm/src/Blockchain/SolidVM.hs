@@ -122,13 +122,12 @@ import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value
 import SolidVM.Solidity.Parse.ParserTypes
-import SolidVM.Solidity.Parse.Statement
+import qualified SolidVM.Solidity.Parse.Fast.Parser as Fast
 import SolidVM.Solidity.Parse.UnParser hiding (sortWith)
 import System.Environment (lookupEnv)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Colors as C
 import Text.Format
-import Text.Parsec (runParser)
 import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
@@ -165,7 +164,7 @@ withSrcPos pos str =
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withStaticCallInfo $ do
   -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression initialParserState "" (T.unpack exprText)
+  let eExpr = Fast.parseExpression initialParserState "" exprText
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -263,7 +262,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
     opts <- parseOptionsForCurrentBlock
     (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
-    let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
+    let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
     argVals <- argsToVals argExps
 
@@ -334,6 +333,21 @@ create' creator newAddress ch cc contractName' valList = do
         erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
       }
 
+-- | Helium transactions sealed as failed by the old parser's rejection of hex"" (see 'callReturnEnv').
+heliumLegacyArgFailures :: [(Integer, Keccak256)]
+heliumLegacyArgFailures =
+    [ (573497, keccak256FromHex "0ca46ee0eaee987ad33e49f15c57e2c2d16c1efa26d5629b5d97a76e0efdda61")
+    , (573498, keccak256FromHex "d22543e2cf262434b5f03120454a7e3b958b175618c54b92e041b3e392a39a64")
+    , (573511, keccak256FromHex "ca5498b51a3a92400f5187a1352b0be128c42dfd2de2a32e470cfe27efce3666")
+    , (573512, keccak256FromHex "435ae29c6defec0011db4c645e764375f493c41e7255f413538fd61cb6427578")
+    , (573526, keccak256FromHex "c5d24c8a28c0bf693d17a391e98525e153360b24e9b7f2d8923c617706f23015")
+    , (573527, keccak256FromHex "79594488e567d1d18f3b3e5a490659331617c42903c009c8c99f7108b8e867f0")
+    , (573531, keccak256FromHex "1754c60122996a6e824449a041e1637bc8dfc245550fc591a25e2f72cd598a4b")
+    , (573532, keccak256FromHex "540b0ddd9d8637ef5baab2954aaa14a1dab73b30b74a4312efc2fd213f204c16")
+    , (573543, keccak256FromHex "c07fdec6ce3112c043281a0fdbc6e32c4399e901e382e4364e20da7f1782de65")
+    , (573544, keccak256FromHex "02f0ed301bc40e4a3bed332a10bd70dbda3db7cf5f0cc9b97bdb2f7015b40a86")
+    ]
+
 call ::
   SolidVMBase m =>
   BlockHeader ->
@@ -394,11 +408,20 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
         srcLength = 0
-        !argExps =
-          if null argsStrings
-            then []
-            else either (parseError "call arguments") id $
-              traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
+        -- Helium network ID = 114784819836269
+        -- These helium blocks hold settleDeposit calls whose last argument is hex"", which the
+        -- parser of the time rejected, so the chain has them sealed as failed transactions.
+        -- The parser now accepts hex""; fail exactly those transactions the old way to
+        -- compensate for the old bug already hardcoded in the chain.
+        isHeliumLegacyArgFailure =
+          Conf.networkID (networkConfig ethConf) == 114784819836269
+            && (BlockHeader.number blockData, txHash') `elem` heliumLegacyArgFailures
+        !argExps
+          | null argsStrings = []
+          | isHeliumLegacyArgFailure = parseError "call arguments" ("hex\"\" rejected by the parser that sealed this block" :: String)
+          | otherwise =
+              either (parseError "call arguments") id $
+                traverse (Fast.parseArg (initialParserStateWithLength srcLength) "") argsStrings
     argVals <- argsToVals argExps
 
     maybeVal <-
@@ -481,7 +504,7 @@ call' from to' fnCalltype functionName valList = do
           CC.DefaultCall -> functionName
           _
             | '(' `notElem` functionName -> functionName
-            | otherwise -> case runParser parseExternalCallArgs initialParserState "" functionName of
+            | otherwise -> case Fast.parseExternalCallArgs initialParserState "" (T.pack functionName) of
                 Right (funcToCall, _) -> funcToCall
                 _ -> functionName
       nullifyRefs (ts, v) = case v of
