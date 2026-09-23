@@ -20,7 +20,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
   const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
-  const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4);
+  const DEPOSIT_STATUS_OPTIONS = [
+    ...BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4),
+    { value: 6, label: "On Hold" },
+  ];
 
   const {
     loading: isLoading,
@@ -200,6 +203,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Completed
+            </span>
+          );
+        } else if (statusNum === 6) {
+          // Quarantined on the bridge: received, but the requested route cannot be minted
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              On Hold
             </span>
           );
         }

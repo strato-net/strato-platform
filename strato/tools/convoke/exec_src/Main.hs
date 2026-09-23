@@ -19,7 +19,9 @@ import Control.Concurrent.Async
 import Control.Exception
 import Control.Monad
 import Text.Read (readMaybe)
+import Data.List (partition)
 import Data.Maybe (catMaybes)
+import Data.Time.Clock (NominalDiffTime, UTCTime, diffUTCTime, getCurrentTime)
 import qualified ShellWords as Sh
 import System.FilePath ((</>))
 import Log
@@ -43,9 +45,17 @@ parseLine line =
     Right [] -> Nothing
     Right (cmd:args) -> Just (cmd, args)
 
+-- | A running child process, with what it takes to relaunch it.
+data Child = Child
+  { childCmd :: (FilePath, [String])
+  , childPid :: ProcessID
+  , childStarted :: UTCTime
+  , childAsync :: Async (ExitCode, ProcessID, FilePath)
+  }
+
 -- Launch a command and track its PID
-launchCommand :: (FilePath, [String]) -> IO (Async (ExitCode, ProcessID, FilePath))
-launchCommand (cmd, args) = do
+launchCommand :: (FilePath, [String]) -> IO Child
+launchCommand cmdArgs@(cmd, args) = do
   let logFile = logsDir </> cmd
   createDirectoryIfMissing True logsDir
   -- Append so logs survive restarts (like the docker service logs, which use
@@ -68,15 +78,25 @@ launchCommand (cmd, args) = do
       hClose h
       error $ "Could not get PID for: " ++ cmd
     Just pid -> do
-      appendFile pidFile (show pid ++ "\n")
       -- Log the full command line: the RTS flags in it are sized per machine
       -- at setup time (see Blockchain.Init.RtsFlags), and support needs to see
       -- what a node is actually running with from convoke.log alone.
       say $ "Started: " ++ unwords (cmd : args) ++ " (PID " ++ show pid ++ ")"
-      async $ do
+      started <- getCurrentTime
+      a <- async $ do
         ec <- waitForProcess ph
         hClose h
         return (ec, pid, cmd)
+      return $ Child cmdArgs pid started a
+
+-- | Rewrite pids.txt from the children that are actually running.
+--
+-- Each launch used to append a line. That was harmless while a child was never
+-- relaunched, but a restarted command leaves its dead PID behind, and
+-- 'killAllProcesses' signals every PID it reads: once the kernel recycles that
+-- number, shutdown would signal an unrelated process group.
+writePidFile :: [Child] -> IO ()
+writePidFile children = writeFile pidFile $ unlines (map (show . childPid) children)
 
 
 
@@ -200,6 +220,98 @@ raiseOpenFileLimit = do
       say $ "Raised open-file soft limit from " ++ show s ++ " to " ++ show wanted
     _ -> return ()
 
+-- | How many times in a row a single command may be relaunched before convoke
+-- treats its failure as permanent and shuts the node down.
+maxRestarts :: Int
+maxRestarts = 8
+
+-- | A child that stays up this long has recovered, so its restart budget is
+-- returned. Anything shorter is a crash loop and keeps spending it.
+restartBudgetReset :: NominalDiffTime
+restartBudgetReset = 300
+
+-- | Pause before the Nth relaunch, doubling each time up to a cap.
+--
+-- A fixed pause makes the tolerance window @maxRestarts * delay@, which stayed
+-- flat no matter how many attempts were allowed -- 10 seconds at 5 restarts of
+-- 2s. Production showed that is far too short for a slow dependency: a
+-- sequencer that loses the startup race against Redis loading its dataset dies
+-- in ~15ms with @LOADING Redis is loading the dataset in memory@, so the whole
+-- budget was spent in well under a minute of real waiting and convoke shut down
+-- a node that only needed to wait. Doubling makes the window grow with the
+-- attempts instead: 2+4+8+16+30+30+30 is about two minutes before the last try.
+restartDelay :: Int -> Int
+restartDelay attempt = min maxRestartDelay (baseRestartDelay * (2 ^ max 0 (attempt - 1)))
+
+baseRestartDelay :: Int
+baseRestartDelay = 2 * 1000 * 1000
+
+maxRestartDelay :: Int
+maxRestartDelay = 30 * 1000 * 1000
+
+-- | Supervise the children, relaunching any that exit.
+--
+-- Returns 'True' for a clean interrupt and 'False' when a command exhausted its
+-- restart budget; either way the caller does the shutdown.
+--
+-- convoke used to stop at the *first* child exit and go straight to
+-- killAllProcesses and "docker compose down", so one process dying removed
+-- every container on the host. That is how a single uncaught exception in
+-- vm-runner became four fully offline validators at helium block 595971: the
+-- chain was intact and the nodes were gone, with "docker ps -a" empty on all of
+-- them. A process that dies once is now restarted in place; only one that will
+-- not stay up takes the node down with it.
+supervise :: [Child] -> IO Bool
+supervise = go []
+  where
+    go budgets children = do
+      result <- awaitAnyOrInterrupt (map childAsync children)
+      case result of
+        Nothing -> do
+          say "Interrupted by Ctrl-C"
+          return True
+        Just (finished, (exitCode, pid, cmd)) -> do
+          now <- getCurrentTime
+          let (dead, survivors) = partition ((== finished) . childAsync) children
+          say $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
+          tailFile 20 (logsDir </> cmd)
+          case dead of
+            [] -> do
+              -- Unreachable: the Async came out of this very list.
+              say $ "Internal error: no tracked child matched " ++ cmd ++ "; shutting down."
+              return False
+            (c : _) -> do
+              let ranFor = diffUTCTime now (childStarted c)
+                  attempt
+                    | ranFor >= restartBudgetReset = 1
+                    | otherwise = 1 + maybe 0 id (lookup cmd budgets)
+              if attempt > maxRestarts
+                then do
+                  say $ "Giving up on " ++ cmd ++ ": " ++ show maxRestarts
+                          ++ " restarts without staying up for " ++ show restartBudgetReset
+                          ++ ". Shutting the node down."
+                  return False
+                else do
+                  say $ "Restarting " ++ cmd ++ " (attempt " ++ show attempt ++ " of "
+                          ++ show maxRestarts ++ "; it ran for " ++ show ranFor ++ ")"
+                  threadDelay (restartDelay attempt)
+                  -- A relaunch can fail outright (launchCommand errors when it
+                  -- cannot read the new PID). Treat that as the give-up case
+                  -- rather than letting it escape: an exception here would skip
+                  -- the caller's killAllProcesses and leave the surviving
+                  -- children running with no supervisor and no pid file.
+                  attempted <- try (launchCommand (childCmd c))
+                  case attempted of
+                    Left e -> do
+                      say $ "Could not restart " ++ cmd ++ ": "
+                              ++ displayException (e :: SomeException)
+                              ++ ". Shutting the node down."
+                      return False
+                    Right restarted -> do
+                      let children' = restarted : survivors
+                      writePidFile children'
+                      go ((cmd, attempt) : filter ((/= cmd) . fst) budgets) children'
+
 main :: IO ()
 main = do
   setupLogging
@@ -223,17 +335,13 @@ main = do
 
   raiseOpenFileLimit
   say $ "Launching " ++ show (length commandList) ++ " processes..."
-  asyncs <- sequence $ map launchCommand commandList
+  -- Before the first wait, so no signal arrives while the handler is unset.
+  installInterruptHandler
+  children <- mapM launchCommand commandList
+  writePidFile children
 
-  result <- waitAnyOrInterrupt asyncs
-  case result of
-    Just (_, (exitCode, pid, cmd)) -> do
-      say $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
-      killAllProcesses
-      tailFile 20 (logsDir </> cmd)
-    Nothing -> do
-      say "Interrupted by Ctrl-C"
-      killAllProcesses
+  _ <- supervise children
+  killAllProcesses
 
   -- Stop docker compose on shutdown (unless --no-docker)
   unless noDocker dockerComposeDown

@@ -235,7 +235,8 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     // CommodityPriceAPI: rates.{symbol} object with close price
     } else if (parsePattern === 'rates.{symbol}' && data.rates) {
         symbols.forEach(symbol => {
-            const rate = data.rates[symbol];
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const rate = data.rates[mapped];
             if (rate) {
                 // Handle both direct number and object with close price
                 const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);

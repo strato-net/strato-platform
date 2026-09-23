@@ -134,15 +134,32 @@ const usdstFeeField = (label: string, amount: string): ActivityField => ({
   rawAmount: getFullAmount(amount),
 });
 
-// Validator-lifecycle cards share one shape: the operator address plus a note.
+// Operator-side staking events. The validator-keyed contract names both the operator and
+// the validator it acts for; historical operator-keyed events carry only the operator.
+const operatorValidatorFields = (event: Event, userAddress: string | null | undefined): ActivityField[] => {
+  const fields: ActivityField[] = [addressField("Operator", getEventAttribute(event, "operator", "Operator"), userAddress)];
+  const validator = getEventAttribute(event, "validator", "Validator");
+  if (validator) fields.push(addressField("Validator", validator, userAddress));
+  return fields;
+};
+
+// Delegator-side events renamed operator -> validator; historical events keep the old names.
+const delegatedValidator = (event: Event, prefix?: "from" | "to"): string => {
+  if (!prefix) return getEventAttribute(event, "validator", "Validator", "operator", "Operator");
+  const cap = prefix === "from" ? "From" : "To";
+  return getEventAttribute(event, `${prefix}Validator`, `${cap}Validator`, `${prefix}Operator`, `${cap}Operator`);
+};
+
+// Validator-lifecycle cards share one shape: the operator (and validator, when named) plus a note.
 const stratoValidatorCard = (
   title: string,
   event: Event,
   userAddress: string | null | undefined,
   note?: string
 ): ActivityCardData => {
-  const operator = getEventAttribute(event, "operator", "Operator");
-  const fields: ActivityField[] = [addressField("Operator", operator, userAddress)];
+  const addressFields = operatorValidatorFields(event, userAddress);
+  const addressLabels = addressFields.map((field) => field.label);
+  const fields: ActivityField[] = [...addressFields];
   if (note) fields.push({ label: "Note", value: note, type: "text" });
   return {
     title,
@@ -151,8 +168,8 @@ const stratoValidatorCard = (
     eventId: event.id?.toString(),
     layout: {
       type: "two-line",
-      line1: { fieldLabels: note ? ["Note"] : ["Operator"] },
-      line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
+      line1: { fieldLabels: note ? ["Note"] : [addressLabels[addressLabels.length - 1]] },
+      line2: { fieldLabels: addressLabels, renderer: "addresses-with-bullet" },
     },
   };
 };
@@ -1406,7 +1423,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconConfig: { icon: ShieldCheck, color: "bg-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const validator = delegatedValidator(event);
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
 
       return {
@@ -1414,7 +1431,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields: [
           stratoAmountField("Amount", amount),
           addressField("User", user, userAddress),
-          addressField("Validator", operator, userAddress),
+          addressField("Validator", validator, userAddress),
         ],
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1433,8 +1450,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconConfig: { icon: ArrowLeftRight, color: "bg-cyan-600" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
-      const fromOperator = getEventAttribute(event, "fromOperator", "FromOperator");
-      const toOperator = getEventAttribute(event, "toOperator", "ToOperator");
+      const fromValidator = delegatedValidator(event, "from");
+      const toValidator = delegatedValidator(event, "to");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
 
       return {
@@ -1442,8 +1459,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         fields: [
           stratoAmountField("Amount", amount),
           addressField("User", user, userAddress),
-          addressField("From Validator", fromOperator, userAddress),
-          addressField("To Validator", toOperator, userAddress),
+          addressField("From Validator", fromValidator, userAddress),
+          addressField("To Validator", toValidator, userAddress),
         ],
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -1462,7 +1479,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     iconConfig: { icon: Clock, color: "bg-cyan-400" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const validator = delegatedValidator(event);
       const requestId = getEventAttribute(event, "requestId", "RequestId");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
       const releaseTime = formatUnixSeconds(getEventAttribute(event, "releaseTime", "ReleaseTime"));
@@ -1470,7 +1487,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         stratoAmountField("Amount", amount),
         addressField("User", user, userAddress),
-        addressField("Validator", operator, userAddress),
+        addressField("Validator", validator, userAddress),
       ];
       if (requestId) fields.push({ label: "Request", value: `#${requestId}`, type: "text" });
       if (releaseTime) fields.push({ label: "Releases", value: releaseTime, type: "text" });
@@ -1544,21 +1561,18 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "STRATO Self-Bonded",
     iconConfig: { icon: Coins, color: "bg-sky-600" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const addressFields = operatorValidatorFields(event, userAddress);
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
 
       return {
         title: "STRATO Self-Bonded",
-        fields: [
-          stratoAmountField("Amount", amount),
-          addressField("Operator", operator, userAddress),
-        ],
+        fields: [stratoAmountField("Amount", amount), ...addressFields],
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         layout: {
           type: "two-line",
           line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
-          line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
+          line2: { fieldLabels: addressFields.map((field) => field.label), renderer: "addresses-with-bullet" },
         },
       };
     },
@@ -1569,15 +1583,13 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "STRATO Self-Bond Unstaking",
     iconConfig: { icon: Clock, color: "bg-sky-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const addressFields = operatorValidatorFields(event, userAddress);
+      const addressLabels = addressFields.map((field) => field.label);
       const requestId = getEventAttribute(event, "requestId", "RequestId");
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
       const releaseTime = formatUnixSeconds(getEventAttribute(event, "releaseTime", "ReleaseTime"));
 
-      const fields: ActivityField[] = [
-        stratoAmountField("Amount", amount),
-        addressField("Operator", operator, userAddress),
-      ];
+      const fields: ActivityField[] = [stratoAmountField("Amount", amount), ...addressFields];
       if (requestId) fields.push({ label: "Request", value: `#${requestId}`, type: "text" });
       if (releaseTime) fields.push({ label: "Releases", value: releaseTime, type: "text" });
 
@@ -1589,7 +1601,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         layout: {
           type: "two-line",
           line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
-          line2: { fieldLabels: releaseTime ? ["Operator", "Releases"] : ["Operator"] },
+          line2: { fieldLabels: releaseTime ? [...addressLabels, "Releases"] : addressLabels },
         },
       };
     },
@@ -1625,21 +1637,18 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "Operator Fees Claimed",
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-emerald-500 to-sky-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const addressFields = operatorValidatorFields(event, userAddress);
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
 
       return {
         title: "Operator Fees Claimed",
-        fields: [
-          usdstFeeField("Amount", amount),
-          addressField("Operator", operator, userAddress),
-        ],
+        fields: [usdstFeeField("Amount", amount), ...addressFields],
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         layout: {
           type: "two-line",
           line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
-          line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
+          line2: { fieldLabels: addressFields.map((field) => field.label), renderer: "addresses-with-bullet" },
         },
       };
     },
@@ -1699,21 +1708,18 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "STRATO Operator Rewards Claimed",
     iconConfig: { icon: Gift, color: "bg-gradient-to-br from-sky-400 to-cyan-500" },
     handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null): ActivityCardData => {
-      const operator = getEventAttribute(event, "operator", "Operator");
+      const addressFields = operatorValidatorFields(event, userAddress);
       const amount = getEventAttribute(event, "amount", "Amount") || "0";
 
       return {
         title: "STRATO Operator Rewards Claimed",
-        fields: [
-          stratoAmountField("Amount", amount),
-          addressField("Operator", operator, userAddress),
-        ],
+        fields: [stratoAmountField("Amount", amount), ...addressFields],
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
         layout: {
           type: "two-line",
           line1: { fieldLabels: ["Amount"], renderer: "amount-with-token" },
-          line2: { fieldLabels: ["Operator"], renderer: "addresses-with-bullet" },
+          line2: { fieldLabels: addressFields.map((field) => field.label), renderer: "addresses-with-bullet" },
         },
       };
     },

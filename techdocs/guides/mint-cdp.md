@@ -1,558 +1,104 @@
 # Mint USDST via CDP
 
-Create USDST stablecoin by depositing collateral into a CDP (Collateralized Debt Position).
+How CDP (Collateralized Debt Position) vaults create USDST, and how to manage them.
 
-!!! info "Alternative: Borrow from Lending Pool"
-    You can also **[borrow USDST from the lending pool](borrow.md)** which offers more flexibility but typically has higher interest rates.
+The app's **Borrow** page runs on CDP vaults. For the step-by-step flow, see **[Borrow USDST](borrow.md)**. This page explains the mechanics behind it (contract: `CDPEngine`).
 
-!!! note "Variable Parameters"
-    Stability fees, gas costs, and collateralization requirements shown are typical examples. Actual values may vary based on network conditions, asset type, and governance settings. Always check current parameters in the app before transacting.
-
----
-
-## Complete Example: Mint $1,000 USDST
-
-**Your situation:**
-
-- You have: 1 ETHST in your wallet
-- ETHST price: $3,000
-- You need: $1,000 USDST long-term
-
-**What you'll do:**
-
-1. Deposit 1 ETHST into CDP vault
-2. Mint 1,000 USDST
-3. Use your USDST
-4. Burn USDST to repay (anytime)
-5. Withdraw your collateral
-
-**Time needed:** 5 minutes  
-**Total gas cost:** ~$0.30 (3 transactions)  
-**Stability fee:** ~2-3% annually (lower than lending)
+!!! info "Live values"
+    Every parameter below is set per collateral asset by governance. The app shows current values. The only numbers given here are the ranges the contract enforces.
 
 ---
 
-## CDP vs Lending: Which to Choose?
+## Vaults
 
-| Feature | CDP (Minting) | Lending Pool (Borrowing) |
-|---------|---------------|--------------------------|
-| **Action** | Mint new USDST | Borrow from pool |
-| **Fees** | Stability fee (~2-3% annually) | Interest (~5% annually) |
-| **Best for** | Long-term positions (months) | Short-term needs (days/weeks) |
-| **Metric** | Collateralization Ratio (CR) | Health Factor |
-| **Min Ratio** | 150% (varies by asset) | Depends on liquidation threshold |
-| **Flexibility** | More capital efficient | Easier to manage |
-
-**Choose CDP if:**
-
-- ✅ You want lower fees
-- ✅ Long-term position (months+)
-- ✅ Maximizing capital efficiency
-- ✅ Comfortable managing vaults
-
-**Choose Lending if:**
-
-- ✅ Short-term liquidity need
-- ✅ Want simpler management
-- ✅ Frequent changes to position
-- ✅ See **[Borrow Guide](borrow.md)**
+- You get **one vault per collateral asset**. A vault holds one asset and tracks the USDST debt minted against it.
+- Collateral sits in the protocol's CDP vault contract, not in your wallet.
+- Each vault is valued, fee-charged and liquidated **on its own**. A healthy ETH vault does not protect an unhealthy gold vault.
+- The Borrow page's automatic allocation can spread a single mint across several vaults. **Your Vaults** lists each one separately.
 
 ---
 
-## Step 1: Deposit Collateral
+## Per-Asset Parameters
 
-**What you have:**
+| Parameter | Meaning | Contract rule |
+|---|---|---|
+| **Liquidation ratio** | CR below which the vault can be liquidated | At least 100% |
+| **Minimum CR** | CR that mints and withdrawals must keep | At least the liquidation ratio |
+| **Stability fee** | Rate added to debt over time, compounded every second | Can't be negative |
+| **Debt floor** | Minimum debt a vault with debt must carry | Not above the ceiling |
+| **Debt ceiling** | Most USDST that can be outstanding against this asset | 0 = no ceiling |
+| **Liquidation penalty** | Extra collateral a liquidator receives | 5% to 30% |
+| **Close factor** | Most of a vault's debt one liquidation can repay | 50% to 100% |
 
-- 1 ETHST worth $3,000
+Admins can also pause one asset or the whole engine. While paused, minting and withdrawing are blocked for that asset. Deposits still require the collateral token to be active.
 
-**In the app:**
+---
 
-1. **Go to Advanced** (in sidebar) → **"Mint"** tab (Vaults sub-tab is default)
-2. **In the Mint Widget:**
-   - **Select collateral asset:** Choose **ETH**
-   - **Enter deposit amount:** Type **1.0** (or click "Max")
-   - Leave borrow amount empty for now
-3. **Click the action button** (will show "Deposit")
-   - Confirm in wallet (~$0.10 gas)
-   - Approval + deposit happen automatically in one transaction
-   - Wait 1-2 seconds
+## The Math
 
-**Result:**
 ```
-✅ Deposited: 1 ETHST ($3,000) into CDP vault
-✅ Can mint up to: $2,000 USDST (150% min CR)
-✅ Collateralization Ratio: N/A (no debt yet)
+Debt (USD)            = scaled debt × rate accumulator
+Collateral value      = collateral amount × oracle price
+CR                    = collateral value / debt
+Health factor         = CR / liquidation ratio
+Max you can mint      = collateral value / minimum CR − current debt
 ```
 
-**Your wallet:**
+- **Debt is in USD terms and USDST is treated as $1.** Minting 1,000 USDST adds 1,000 of debt.
+- **Stability fee:** each asset has a rate accumulator that grows every second at the stability fee rate. Your debt is your share of that accumulator, so it grows continuously without you doing anything. Fees are minted as USDST and split between the CDP reserve and the protocol fee collector.
+- **Prices** come from the on-chain `PriceOracle`, which an off-chain oracle service updates. See [Safety](../safety.md#oracle-risk).
 
-- Before: 1 ETHST
-- After: 0 ETHST (moved to CDP vault)
-
----
-
-## Step 2: Mint USDST
-
-**What you want:** Mint $1,000 USDST
-
-**In the app:**
-
-1. **Go to Advanced** (in sidebar) → **"Mint"** tab → Vaults sub-tab
-2. **In the Mint Widget:**
-   - Your existing collateral shows automatically
-   - **Enter borrow amount:** Type **1000** USDST
-3. **Review the preview:**
-
-   - Minting: 1,000 USDST
-   - New Collateralization Ratio: **300%** (Very safe ✓)
-   - Stability Fee: ~2-3% annually
-   - Min required CR: 150%
-4. **Click "Mint USDST"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result:**
-```
-✅ Minted: 1,000 USDST (created new tokens)
-✅ Collateralization Ratio: 300% (Very safe)
-✅ Your wallet: +1,000 USDST
-```
-
-**Your position now:**
-
-- Collateral: 1 ETHST ($3,000)
-- Debt: 1,000 USDST
-- Collateralization Ratio (CR): 300%
-- Min required CR: 150%
-- Still can mint: ~$1,000 more (but don't!)
-
-**What is Collateralization Ratio?**
-```
-CR = (Collateral Value / Debt) × 100%
-   = ($3,000 / $1,000) × 100% = 300%
-```
-
-- **Above 200%:** Very safe ✅
-- **150-200%:** Moderate risk ⚠️
-- **Below 150%:** Liquidation danger ❌
-
-Your 300% CR means you have a huge safety buffer.
+The Borrow page and **Your Vaults** show CR as a health factor, so 1.0 means you are exactly at the liquidation ratio.
 
 ---
 
-## Step 3: Use Your USDST
+## Rules for Vault Actions
 
-You now have 1,000 USDST to use for:
+The contract enforces these rules on the actions in **Borrow > Your Vaults** (the steps are in [Borrow USDST](borrow.md#step-3-manage-your-position)):
 
-- ✅ Transaction fees on STRATO
-- ✅ Swap for other tokens
-- ✅ Provide liquidity
-- ✅ Bridge to other chains
-- ✅ Any other purpose
+| Action | Allowed when |
+|---|---|
+| Deposit | The collateral token is active. Deposits always raise the health factor. |
+| Withdraw | CR stays at or above the minimum CR, and the asset isn't paused |
+| Mint | CR stays at or above the minimum CR, the debt ceiling isn't exceeded, the vault ends at or above the debt floor, and the asset isn't paused |
+| Repay | The vault's debt doesn't end between zero and the debt floor. Repay-all burns the full debt, including accrued fees. |
 
-**Your debt grows slowly:**
-
-- Stability fee: ~2-3% per year
-- After 30 days: Owe ~$1,002
-- After 1 year: Owe ~$1,025
-
-**Lower fees than lending:**
-
-- CDP: ~$2-3 per month on $1,000
-- Lending: ~$4-5 per month on $1,000
-- **Savings:** ~40% lower fees
+!!! tip "Keep a buffer"
+    Minting right up to the minimum CR leaves almost no room for price moves or fee accrual. Keep a margin you are comfortable with, especially for volatile collateral.
 
 ---
 
-## Step 4: Burn USDST (Repay Anytime)
+## Liquidation
 
-**When you're ready** to close or reduce your position:
+A vault can be liquidated once **CR < liquidation ratio** (health factor below 1). Liquidation is a direct sale at the oracle price, with no auction:
 
-1. **Get USDST to burn:**
+1. A liquidator picks your vault and an amount of debt to cover. **Advanced > Liquidations** lists candidates.
+2. The repaid amount is capped by the smallest of:
+    - your total debt
+    - the close factor (a share of your debt)
+    - the amount your collateral can cover **including the penalty**
+3. The liquidator burns that much USDST.
+4. They receive collateral worth `repaid debt × (1 + penalty)` at the oracle price. The amount is clamped to what the vault holds.
+5. If only dust collateral remains, it is seized too.
 
-   - You might still have what you minted
-   - Or swap other tokens for USDST
-   - Or borrow from lending pool
+Afterwards your vault has less debt and less collateral. The penalty is your loss.
 
-2. **In the Mint Widget:**
-   - **Enter repay amount:** How much USDST to burn
-3. **Enter amount:**
+### Bad Debt
 
-   - Type specific amount (e.g., 1002 to close completely)
-   - Or click **"Burn Max"** to burn all debt
-4. **Click "Burn USDST"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result after full burn:**
-```
-✅ Burned: 1,002 USDST (destroyed tokens)
-✅ Debt repaid: 1,000 principal + 2 stability fee
-✅ CR: Infinite (no debt)
-✅ Gas cost: ~$0.10
-```
-
-**Your position:**
-
-- Collateral: 1 ETHST (still in vault)
-- Debt: 0 USDST
-- CR: No debt
-- You can now withdraw collateral
+If a liquidation takes all of a vault's collateral and debt still remains, that remainder is recorded as **bad debt** for the asset. **Advanced > Bad Debt** shows the total per asset. Users can burn USDST to pay down bad debt through **junior notes**. A junior note is later repaid from CDP reserve inflows, up to a cap that includes a premium.
 
 ---
 
-## Step 5: Withdraw Collateral
-
-**After burning all debt:**
-
-1. **In your vault** (shown below the Mint Widget)
-2. **Enter amount:** Type **1.0** (or click "Withdraw Max")
-3. **Click "Withdraw"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result:**
-```
-✅ Withdrawn: 1 ETHST to your wallet
-✅ Vault closed
-```
-
-**Final accounting:**
-
-- You minted: 1,000 USDST
-- You burned: 1,002 USDST
-- Total cost: $2 stability fee + $0.30 gas = **$2.30 total**
-- You still have: 1 ETHST (same as you started)
-
----
-
-## What If Prices Change?
-
-### Scenario: ETHST Drops to $2,200
-
-**What happens:**
-
-- Your collateral value: Now $2,200 (was $3,000)
-- Your debt: Still 1,000 USDST (unchanged)
-- Your CR: Drops to **220%** (still safe ✓)
-
-**What to do:**
-
-- **Option 1: Monitor** - Still above 150% minimum
-- **Option 2: Add collateral** - Deposit more ETHST to increase CR
-- **Option 3: Burn some debt** - Burn 200 USDST to boost CR
-
-### Scenario: ETHST Drops to $1,600 (Danger!)
-
-**What happens:**
-
-- Your collateral value: Now $1,600
-- Your debt: Still 1,000 USDST
-- Your CR: **160%** (approaching minimum ⚠️)
-
-**Danger zone:**
-
-- CR below 150% = **you can be liquidated**
-- Liquidators can take your collateral + 5-10% penalty
-- You lose ETHST value beyond your debt
-
-**What to do immediately:**
-
-1. **Add more collateral** (safer), OR
-2. **Burn some debt** (faster)
-3. Keep CR above 200% for safety
-
-**Best practice:** Keep CR **above 200%** for peace of mind.
-
----
-
-## Managing Your Vault
-
-### Check Your Vault
-
-**In the app:**
-
-- Go to **Advanced** (in sidebar) → **Mint** tab → **My Vaults**
-- You'll see:
-
-  - Collateral amount and value
-  - Debt amount (with accrued fees)
-  - Collateralization Ratio with indicator
-  - Available to mint or withdraw
-
-**CR indicators:**
-
-- 🟢 **Green (> 200%):** Safe
-- 🟡 **Yellow (150-200%):** Caution
-- 🔴 **Red (< 150%):** Danger - liquidation risk
-
-### Adding More Collateral
-
-If CR drops:
-
-1. Go to **Deposit**
-2. Add more collateral
-3. CR improves immediately
-
-### Partial Burn
-
-Don't need to burn all at once:
-
-1. Go to **Burn**
-2. Enter any amount
-3. Reduces debt and improves CR
-
-### Mint More USDST
-
-If you need more USDST and have room:
-
-1. Check current CR
-2. If above 200%, can safely mint more
-3. Go to **Mint** → Enter amount
-4. CR will decrease
-
----
-
-## Multiple Vaults
-
-**You can have one vault per collateral type:**
-
-**Example:**
-
-- ETHST Vault: 2 ETHST deposited, 2,000 USDST minted
-- WBTC Vault: 0.1 WBTC deposited, 3,000 USDST minted
-
-**Each vault:**
-
-- Has its own CR
-- Is managed separately
-- Can be liquidated independently
-
-**Combined view:**
-
-- Total collateral value: $10,000
-- Total debt: 5,000 USDST
-- Overall CR: 200%
-
----
-
-## Tips & Best Practices
-
-### DO ✅
-
-- **Over-collateralize:** Keep CR above 200%
-- **Monitor daily:** Check CR when prices move
-- **Set alerts:** Use price alerts for your collateral
-- **Long-term use:** CDP works best for months+ positions
-- **Diversify vaults:** Spread across different collateral
-- **Track fees:** Stability fees are lower but still accrue
-
-### DON'T ❌
-
-- **Min CR trap:** Don't mint at exactly 150% CR
-- **Ignore warnings:** Yellow/red CR = take action
-- **Forget fees:** Even 2-3% adds up over time
-- **Mix up debt:** Track which vault has which debt
-- **Panic close:** Can add collateral instead
-- **Forget gas:** Keep USDST for fees
-
----
-
-## Common Issues
-
-### "Insufficient collateral"
-
-**Problem:** Trying to mint more than your CR allows
-
-**Solution:**
-
-1. Deposit more collateral first, OR
-2. Reduce the mint amount
-
----
-
-### "Below debt floor"
-
-**Problem:** Trying to mint less than minimum required debt
-
-**Solution:**
-
-- Each asset has minimum debt (e.g., 100 USDST)
-- Mint at least that amount
-- Or close vault completely by burning all
-
----
-
-### "Would violate minimum CR"
-
-**Problem:** This action would make your CR too low
-
-**Solution:**
-
-- If minting: Reduce amount or add collateral
-- If withdrawing: Reduce amount or burn some debt
-- Keep buffer above 150% minimum
-
----
-
-### "Insufficient USDST balance"
-
-**Problem:** Don't have enough USDST to burn
-
-**Solution:**
-
-1. Swap other tokens for USDST, OR
-2. Borrow USDST from lending pool temporarily, OR
-3. Burn a smaller amount now, rest later
-
----
-
-### CR dropping
-
-**Problem:** Your collateral value is decreasing
-
-**Solution (act quickly):**
-
-1. **Deposit more collateral** (safest)
-2. **Burn some debt** (also good)
-3. **Monitor closely** if still above 200%
-4. **Don't wait** until you're near 150%
-
----
-
-## Understanding Costs
-
-### Stability Fees
-
-**How fees work:**
-
-- Fees accrue every second
-- Typical rate: ~2-3% annually
-- Lower than lending pool rates
-- Compounds continuously
-
-**Example costs:**
-| Minted | Time | Fee Owed |
-|--------|------|----------|
-| $1,000 | 1 day | $0.08 |
-| $1,000 | 1 week | $0.50 |
-| $1,000 | 30 days | $2 |
-| $1,000 | 1 year | $25 |
-| $10,000 | 30 days | $20 |
-
-**Compare to Lending:**
-| Amount | Time | CDP Fee | Lending Interest | Savings |
-|--------|------|---------|------------------|---------|
-| $1,000 | 30 days | $2 | $4 | $2 (50%) |
-| $1,000 | 1 year | $25 | $50 | $25 (50%) |
-| $10,000 | 1 year | $250 | $500 | $250 (50%) |
-
-### Gas Fees
-
-| Action | Gas Cost |
-|--------|----------|
-| Deposit collateral | ~$0.10 |
-| Mint USDST | ~$0.10 |
-| Burn USDST | ~$0.10 |
-| Withdraw collateral | ~$0.10 |
-
-**Total for complete cycle:** ~$0.30-$0.40
-
----
-
-## CDP vs Lending: Real Comparison
-
-### Example: $10,000 Position for 6 Months
-
-**CDP:**
-
-- Collateral: 5 ETHST ($10,000)
-- Minted: 5,000 USDST
-- CR: 200%
-- Stability fee: 2.5% annually
-- Cost: $62.50 for 6 months
-
-**Lending:**
-
-- Collateral: 5 ETHST ($10,000)
-- Borrowed: 5,000 USDST
-- Health Factor: 1.2
-- Interest: 5% annually
-- Cost: $125 for 6 months
-
-**Savings with CDP: $62.50 (50% less)**
-
----
-
-## When to Use Each
-
-### Use CDP (Minting) When:
-
-✅ Long-term position (6+ months)  
-✅ Want lowest fees  
-✅ Maximizing capital efficiency  
-✅ Comfortable managing CR  
-✅ Planning to hold position  
-
-**Example:** You want to mint USDST to provide liquidity for a year
-
-### Use Lending (Borrowing) When:
-
-✅ Short-term need (days/weeks)  
-✅ Want simple management  
-✅ Frequent position changes  
-✅ Testing strategies  
-✅ Need flexibility  
-
-**Example:** You need USDST for a quick trade this week
-
----
-
-## Advanced: Capital Efficiency
-
-### Maximum Leverage Example
-
-**Conservative (Recommended):**
-
-- Deposit: 2 ETHST ($6,000)
-- Mint: 2,000 USDST
-- CR: 300%
-- Very safe ✓
-
-**Moderate:**
-
-- Deposit: 1.5 ETHST ($4,500)
-- Mint: 2,000 USDST
-- CR: 225%
-- Safe with buffer
-
-**Aggressive (Not Recommended):**
-
-- Deposit: 1.2 ETHST ($3,600)
-- Mint: 2,000 USDST
-- CR: 180%
-- Risky - small price drop = danger
-
-**Never go below 200% CR in volatile markets!**
+## Other Ways to Get USDST
+
+- **[Swap](swap.md)** another token for USDST on the Trade page.
+- **Advanced > PSM** (Direct Mint PSM) mints USDST against supported tokens, and redeems USDST for them, at a per-token fee.
+- **Bridge in stablecoins** on the Fund page when a route delivers USDST ([Bridge Assets](bridge.md)).
 
 ---
 
 ## Next Steps
 
-### Earn While You Have USDST
-
-- **[Provide Liquidity](liquidity.md)** - Earn fees with your USDST
-- **[Swap Tokens](swap.md)** - Trade for other assets
-- **[Earn Rewards](rewards.md)** - Claim Reward Points for minting
-
-### Learn More
-
-- **[Core Concepts](../concepts.md)** - CR, liquidation, fees
-- **[Safety Guide](../safety.md)** - Risk management
-- **[FAQ](../faq.md)** - Common questions
-
-### Need Help?
-
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
+- **[Borrow USDST](borrow.md):** step-by-step minting in the app
+- **[Provide Liquidity](liquidity.md):** put USDST to work
+- **[Safety Guide](../safety.md):** liquidation, oracle and admin risk

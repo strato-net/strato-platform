@@ -1,5 +1,6 @@
 abstract contract ERC20_Template {
   function transfer(address _to, uint _amount) public;
+  function approve(address _spender, uint _amount) public;
 }
 
 interface IStakingGovernanceLookup {
@@ -10,6 +11,7 @@ interface IStakingFeeHook {
     function proposerFeeBps() external view returns (uint);
     function processBlock() external;
     function stratoToken() external view returns (address);
+    function creditBlockReward(address validator, uint256 amount) external;
 }
 
 // Transaction fee implementation for Decider (0xDEC1DE), installed with
@@ -48,8 +50,9 @@ contract record FeeRouter {
     // so address(this) is the router and this really is the router's own storage.
     uint256 public lastRewardedBlock;
 
-    // Flat reward per block, paid to the proposer out of this contract's own
-    // STRATO balance. Fund the router to switch it on: an unfunded router pays
+    // Flat reward per block for the proposer, paid out of this contract's own
+    // STRATO balance into staking, which splits it between the proposer's operator
+    // and its delegators. Fund the router to switch it on: an unfunded router pays
     // nothing rather than stalling the chain.
     uint256 constant BLOCK_REWARD = 1e16; // 0.01 STRATO
 
@@ -82,10 +85,20 @@ contract record FeeRouter {
         if (strato == address(0)) return;
 
         // Must never revert: this runs inside block execution on every node, so a
-        // router that has run dry has to be survivable.
-        bool paid = false;
+        // router that has run dry, or a proposer staking will not credit (not listed,
+        // delisted), has to be survivable. Staking pulls the approved amount, so it
+        // can only credit what the router actually pays; if it declines, the reward
+        // simply stays here.
+        bool approved = false;
         try {
-            ERC20_Template(strato).transfer(proposer, BLOCK_REWARD);
+            ERC20_Template(strato).approve(staking, BLOCK_REWARD);
+            approved = true;
+        } catch {
+        }
+        if (!approved) return;
+
+        bool paid = false;
+        try IStakingFeeHook(staking).creditBlockReward(proposer, BLOCK_REWARD) {
             paid = true;
         } catch {
         }

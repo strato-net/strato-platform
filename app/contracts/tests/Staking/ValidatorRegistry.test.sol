@@ -1,312 +1,226 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pinned to the V1 (18.4) ValidatorRegistry, which is what BaseCodeCollection
-// currently ships. The V2 contract is parked outside the collection until the
-// validator fleet is upgraded past the staking fork.
-//
-// Tests for the V2 contract live in ValidatorRegistryV2.test.sol and are not run by
-// Jenkins yet — the "Contract tests" stage skips *V2.test.sol.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import "../../concrete/Staking/ValidatorRegistry.sol";
 import "../Util.sol";
 
-contract record MockOperatorSync is IStratoStakingOperatorSync {
-    uint256 public syncCount;
-    address public lastOperator;
+contract record MockValidatorSync is IStratoStakingValidatorSync {
+    uint256 public recordSyncCount;
+    uint256 public operatorSyncCount;
+    address public lastValidator;
     bool public lastActive;
-    uint256 public lastCommissionBps;
+    address public lastOperator;
 
-    mapping(address => bool) public record operatorActive;
-    mapping(address => uint256) public record operatorCommissionBps;
+    mapping(address => bool) public record validatorActive;
+    mapping(address => address) public record validatorOperator;
 
-    function syncOperator(address operator, bool active, uint256 commissionBps) external override {
-        syncCount += 1;
-        lastOperator = operator;
+    function syncValidatorRecord(address validator, bool active, uint256 commissionBps, address operator) external override {
+        recordSyncCount += 1;
+        lastValidator = validator;
         lastActive = active;
-        lastCommissionBps = commissionBps;
-        operatorActive[operator] = active;
-        operatorCommissionBps[operator] = commissionBps;
+        lastOperator = operator;
+        validatorActive[validator] = active;
+        validatorOperator[validator] = operator;
+    }
+
+    function syncValidatorOperator(address validator, address operator) external override {
+        operatorSyncCount += 1;
+        lastValidator = validator;
+        lastOperator = operator;
+        validatorOperator[validator] = operator;
+    }
+
+    mapping(address => bool) public record overOneThird;
+    function setOverOneThird(address validator, bool over) public { overOneThird[validator] = over; }
+    function exceedsOneThird(address validator) external view override returns (bool) { return overOneThird[validator]; }
+}
+
+// Signing is impossible inside a test, so this registry stands in a key's signature with a
+// record of which digests each key has "signed". Digests carry the nonce, so a recorded
+// consent goes stale exactly when a real signature would. The real recovery path is covered
+// against a known secp256k1 vector below.
+contract ConsentRegistry is ValidatorRegistry {
+    mapping(bytes32 => address) public record signedBy;
+
+    constructor(address initialOwner) ValidatorRegistry(initialOwner) { }
+
+    function sign(address validator, address operator) public {
+        signedBy[operatorAuthorizationDigest(validator, operator)] = validator;
+    }
+
+    function _recoverSigner(bytes32 digest, uint8 v, uint256 r, uint256 s) internal override returns (address) {
+        return signedBy[digest];
+    }
+}
+
+contract RecoveryHarness is ValidatorRegistry {
+    constructor(address initialOwner) ValidatorRegistry(initialOwner) { }
+
+    function recover(bytes32 digest, uint8 v, uint256 r, uint256 s) public returns (address) {
+        return _recoverSigner(digest, v, r, s);
     }
 }
 
 contract Describe_ValidatorRegistry {
-    ValidatorRegistry registry;
-    MockOperatorSync staking;
+    address constant VALIDATOR_A = address(0xaaaa);
+    address constant GENESIS_X = address(0xcccc);
+
+    ConsentRegistry registry;
+    MockValidatorSync staking;
 
     User operatorA;
     User operatorB;
     User user;
+    User validatorKey;
 
     function beforeAll() public {
         operatorA = new User();
         operatorB = new User();
         user = new User();
+        validatorKey = new User();
     }
 
     function beforeEach() public {
-        staking = new MockOperatorSync();
-        registry = new ValidatorRegistry(address(this));
+        staking = new MockValidatorSync();
+        registry = new ConsentRegistry(address(this));
         registry.initialize(address(staking));
     }
 
-    function _addOperatorA() internal {
-        registry.addOperator(address(operatorA), 500, "Operator A", "First operator", "ipfs://operator-a", "validator-a");
+    function _addValidatorA() internal {
+        registry.addValidator(VALIDATOR_A, address(operatorA), 500, "Validator A", "First validator", "ipfs://validator-a", "validator-a");
     }
 
-    function _profile(address operator) internal returns (
-        bool exists,
-        bool active,
-        string name,
-        string description,
-        string metadataURI,
-        string protocolValidatorId
-    ) {
-        (exists, active, name, description, metadataURI, protocolValidatorId) = registry.operators(operator);
+    function _register(User operator, address validator) internal {
+        operator.doSuccessfully(address(registry), "register", validator, uint256(0), "Validator", "", "", uint8(0), uint256(0), uint256(0));
     }
 
-    function it_initializes_once_with_fixed_staking_target() public {
-        require(address(registry.staking()) == address(staking), "Initial staking target");
+    function it_lists_validators_by_key_with_the_operator_as_a_field() public {
+        _addValidatorA();
+        (bool exists, bool active, string name,,, string protocolValidatorId, address operator) = registry.operators(VALIDATOR_A);
+        require(exists && active, "listed");
+        require(name == "Validator A" && protocolValidatorId == "validator-a", "profile stored");
+        require(operator == address(operatorA), "operator field");
+        require(registry.operatorOf(VALIDATOR_A) == address(operatorA), "operatorOf");
+        require(registry.operatorList(0) == VALIDATOR_A, "listed by validator");
+        require(staking.validatorOperator(VALIDATOR_A) == address(operatorA), "staking record keyed by validator");
+        require(registry.protocolValidatorOperators("validator-a") == VALIDATOR_A, "protocol id resolves to the validator");
 
-        bool reinitialized = false;
-        try registry.initialize(address(staking)) {
+        bool rejected = false;
+        try registry.addValidator(VALIDATOR_A, address(operatorB), 0, "Again", "", "", "") {
         } catch {
-            reinitialized = true;
+            rejected = true;
         }
-        require(reinitialized, "Registry should initialize once");
-
-        ValidatorRegistry zeroRegistry = new ValidatorRegistry(address(this));
-        bool zeroRejected = false;
-        try zeroRegistry.initialize(address(0)) {
-        } catch {
-            zeroRejected = true;
-        }
-        require(zeroRejected, "Zero staking target rejected");
+        require(rejected, "a listed validator cannot be listed twice");
     }
 
-    function it_adds_operator_profile_and_syncs_staking() public {
-        _addOperatorA();
+    // FINDING 2 regression: a registration names a validator only with that key's consent.
+    function it_rejects_registration_without_the_validator_keys_consent() public {
+        user.doExpectingFailure(address(registry), "register", "VR: validator did not authorize operator", GENESIS_X, uint256(0), "Squat", "", "", uint8(27), uint256(1), uint256(1));
 
-        (bool exists, bool active, string name, string description, string metadataURI, string protocolValidatorId) = _profile(address(operatorA));
+        registry.sign(GENESIS_X, address(operatorB));
+        user.doExpectingFailure(address(registry), "register", "VR: validator did not authorize operator", GENESIS_X, uint256(0), "Squat", "", "", uint8(27), uint256(1), uint256(1));
 
-        require(registry.operatorCount() == 1, "Operator count");
-        require(registry.operatorList(0) == address(operatorA), "Operator list");
-        require(exists, "Profile exists");
-        require(active, "Profile active");
-        require(keccak256(name) == keccak256("Operator A"), "Profile name");
-        require(keccak256(description) == keccak256("First operator"), "Profile description");
-        require(keccak256(metadataURI) == keccak256("ipfs://operator-a"), "Profile metadata URI");
-        require(keccak256(protocolValidatorId) == keccak256("validator-a"), "Protocol validator id");
-        require(registry.protocolValidatorOperators("validator-a") == address(operatorA), "Protocol id owner");
+        registry.sign(GENESIS_X, address(user));
+        _register(user, GENESIS_X);
+        require(registry.operatorOf(GENESIS_X) == address(user), "consented operator bound");
+        require(registry.authorizationNonce(GENESIS_X) == 1, "consent spent");
+        require(staking.validatorOperator(GENESIS_X) == address(user), "staking record created");
 
-        require(staking.syncCount() == 1, "Sync count");
-        require(staking.lastOperator() == address(operatorA), "Synced operator");
-        require(staking.lastActive(), "Synced active");
-        require(staking.lastCommissionBps() == 500, "Synced commission");
-        require(staking.operatorActive(address(operatorA)), "Operator active in staking");
-        require(staking.operatorCommissionBps(address(operatorA)) == 500, "Operator commission in staking");
+        operatorB.doExpectingFailure(address(registry), "register", "VR: already registered", GENESIS_X, uint256(0), "Again", "", "", uint8(0), uint256(0), uint256(0));
     }
 
-    function it_batch_adds_operators() public {
-        address[] memory operators = new address[](2);
-        operators[0] = address(operatorA);
-        operators[1] = address(operatorB);
-
-        uint256[] memory commissions = new uint256[](2);
-        commissions[0] = 500;
-        commissions[1] = 250;
-
-        string[] memory names = new string[](2);
-        names[0] = "Operator A";
-        names[1] = "Operator B";
-
-        string[] memory descriptions = new string[](2);
-        descriptions[0] = "First operator";
-        descriptions[1] = "Second operator";
-
-        string[] memory metadataURIs = new string[](2);
-        metadataURIs[0] = "ipfs://operator-a";
-        metadataURIs[1] = "ipfs://operator-b";
-
-        string[] memory protocolValidatorIds = new string[](2);
-        protocolValidatorIds[0] = "validator-a";
-        protocolValidatorIds[1] = "validator-b";
-
-        registry.addOperators(operators, commissions, names, descriptions, metadataURIs, protocolValidatorIds);
-
-        (bool exists, bool active, string name,,,) = _profile(address(operatorB));
-
-        require(registry.operatorCount() == 2, "Operator count");
-        require(registry.operatorList(1) == address(operatorB), "Second operator");
-        require(exists, "Operator B exists");
-        require(active, "Operator B active");
-        require(keccak256(name) == keccak256("Operator B"), "Operator B name");
-        require(staking.syncCount() == 2, "Batch sync count");
-        require(staking.lastOperator() == address(operatorB), "Last synced operator");
-        require(staking.lastCommissionBps() == 250, "Last synced commission");
+    function it_lets_a_validator_key_register_itself() public {
+        _register(validatorKey, address(validatorKey));
+        require(registry.operatorOf(address(validatorKey)) == address(validatorKey), "self-operated");
     }
 
-    function it_rejects_invalid_operator_adds() public {
-        bool zeroOperatorRejected = false;
-        try registry.addOperator(address(0), 0, "Zero", "", "", "") {
-        } catch {
-            zeroOperatorRejected = true;
-        }
-        require(zeroOperatorRejected, "Zero operator should reject");
+    function it_spends_each_consent_once() public {
+        registry.sign(GENESIS_X, address(user));
+        _register(user, GENESIS_X);
 
-        _addOperatorA();
+        registry.sign(GENESIS_X, address(operatorB));
+        operatorB.doSuccessfully(address(registry), "setOperator", GENESIS_X, address(operatorB), uint8(0), uint256(0), uint256(0));
+        require(registry.operatorOf(GENESIS_X) == address(operatorB), "handed over with consent");
+        require(staking.operatorSyncCount() == 1, "staking settles the handover");
 
-        bool duplicateRejected = false;
-        try registry.addOperator(address(operatorA), 500, "Operator A", "", "", "") {
-        } catch {
-            duplicateRejected = true;
-        }
-        require(duplicateRejected, "Active duplicate should reject");
-
-        address[] memory operators = new address[](1);
-        operators[0] = address(operatorB);
-
-        uint256[] memory commissions = new uint256[](1);
-        commissions[0] = 250;
-
-        string[] memory emptyStrings = new string[](0);
-        string[] memory oneString = new string[](1);
-        oneString[0] = "";
-
-        bool lengthMismatchRejected = false;
-        try registry.addOperators(operators, commissions, emptyStrings, oneString, oneString, oneString) {
-        } catch {
-            lengthMismatchRejected = true;
-        }
-        require(lengthMismatchRejected, "Batch length mismatch should reject");
+        registry.adminSetOperator(GENESIS_X, address(user));
+        // operatorB's consent was recorded at an earlier nonce; it cannot be replayed.
+        operatorB.doExpectingFailure(address(registry), "setOperator", "VR: validator did not authorize operator", GENESIS_X, address(operatorB), uint8(0), uint256(0), uint256(0));
+        require(registry.operatorOf(GENESIS_X) == address(user), "unchanged");
     }
 
-    function it_enforces_unique_non_empty_protocol_validator_ids() public {
-        _addOperatorA();
-
-        bool duplicateAddRejected = false;
-        try registry.addOperator(address(operatorB), 250, "Operator B", "", "", "validator-a") {
+    function it_only_lets_the_owner_move_an_operator_without_consent() public {
+        _addValidatorA();
+        bool rejected = false;
+        try user.do(address(registry), "adminSetOperator(address,address)", VALIDATOR_A, address(user)) {
         } catch {
-            duplicateAddRejected = true;
+            rejected = true;
         }
-        require(duplicateAddRejected, "Duplicate protocol id add should reject");
+        require(rejected, "non-owner rejected");
+        require(registry.operatorOf(VALIDATOR_A) == address(operatorA), "unchanged");
 
-        registry.addOperator(address(operatorB), 250, "Operator B", "", "", "validator-b");
+        operatorA.doExpectingFailure(address(registry), "setOperator", "VR: validator did not authorize operator", VALIDATOR_A, address(user), uint8(0), uint256(0), uint256(0));
 
-        bool duplicateUpdateRejected = false;
-        try operatorB.do(
-            address(registry),
-            "updateProfile",
-            address(operatorB),
-            "Operator B",
-            "",
-            "",
-            "validator-a"
-        ) {
-        } catch {
-            duplicateUpdateRejected = true;
-        }
-        require(duplicateUpdateRejected, "Duplicate protocol id update should reject");
-
-        registry.updateProfile(address(operatorA), "Operator A", "", "", "validator-a-v2");
-        require(registry.protocolValidatorOperators("validator-a") == address(0), "Old protocol id cleared");
-        require(registry.protocolValidatorOperators("validator-a-v2") == address(operatorA), "New protocol id owner");
-
-        registry.updateProfile(address(operatorB), "Operator B", "", "", "validator-a");
-        require(registry.protocolValidatorOperators("validator-a") == address(operatorB), "Released protocol id reused");
+        registry.adminSetOperator(VALIDATOR_A, address(operatorB));
+        require(registry.operatorOf(VALIDATOR_A) == address(operatorB), "owner moved it");
+        require(staking.validatorOperator(VALIDATOR_A) == address(operatorB), "synced");
     }
 
-    function it_allows_operator_and_owner_profile_updates() public {
-        _addOperatorA();
-
-        operatorA.do(
-            address(registry),
-            "updateProfile",
-            address(operatorA),
-            "Operator A Self",
-            "Self updated",
-            "ipfs://self",
-            "validator-a-self"
-        );
-
-        (,, string selfName, string selfDescription, string selfMetadataURI, string selfProtocolValidatorId) = _profile(address(operatorA));
-        require(keccak256(selfName) == keccak256("Operator A Self"), "Self update name");
-        require(keccak256(selfDescription) == keccak256("Self updated"), "Self update description");
-        require(keccak256(selfMetadataURI) == keccak256("ipfs://self"), "Self update metadata");
-        require(keccak256(selfProtocolValidatorId) == keccak256("validator-a-self"), "Self update protocol id");
-        require(registry.protocolValidatorOperators("validator-a") == address(0), "Old self protocol id cleared");
-        require(registry.protocolValidatorOperators("validator-a-self") == address(operatorA), "Self protocol id owner");
-
-        registry.updateProfile(address(operatorA), "Operator A Admin", "Admin updated", "ipfs://admin", "validator-a-admin");
-
-        (,, string adminName, string adminDescription, string adminMetadataURI, string adminProtocolValidatorId) = _profile(address(operatorA));
-        require(keccak256(adminName) == keccak256("Operator A Admin"), "Admin update name");
-        require(keccak256(adminDescription) == keccak256("Admin updated"), "Admin update description");
-        require(keccak256(adminMetadataURI) == keccak256("ipfs://admin"), "Admin update metadata");
-        require(keccak256(adminProtocolValidatorId) == keccak256("validator-a-admin"), "Admin update protocol id");
-        require(registry.protocolValidatorOperators("validator-a-self") == address(0), "Old admin protocol id cleared");
-        require(registry.protocolValidatorOperators("validator-a-admin") == address(operatorA), "Admin protocol id owner");
+    function it_updates_profiles_only_by_the_operator_or_owner() public {
+        _addValidatorA();
+        user.doExpectingFailure(address(registry), "updateProfile", "VR: not operator", VALIDATOR_A, "Hijacked", "", "", "");
+        operatorA.doSuccessfully(address(registry), "updateProfile", VALIDATOR_A, "Renamed", "d", "u", "validator-a2");
+        (,, string name,,, string protocolValidatorId,) = registry.operators(VALIDATOR_A);
+        require(name == "Renamed" && protocolValidatorId == "validator-a2", "profile updated");
+        require(registry.protocolValidatorOperators("validator-a") == address(0), "old protocol id released");
     }
 
-    function it_rejects_profile_update_by_unrelated_user() public {
-        _addOperatorA();
+    function it_delists_and_relists_through_the_owner() public {
+        _addValidatorA();
+        registry.removeValidator(VALIDATOR_A);
+        (, bool active,,,,,) = registry.operators(VALIDATOR_A);
+        require(!active, "delisted");
+        require(!staking.validatorActive(VALIDATOR_A), "staking synced as delisted");
+        require(staking.lastOperator() == address(operatorA), "delisting names the operator");
 
-        bool unauthorized = false;
-        try user.do(
-            address(registry),
-            "updateProfile",
-            address(operatorA),
-            "Bad Update",
-            "",
-            "",
-            ""
-        ) {
-        } catch {
-            unauthorized = true;
-        }
-        require(unauthorized, "Unrelated user should not update profile");
-
-        bool missingRejected = false;
-        try registry.updateProfile(address(operatorB), "Missing", "", "", "") {
-        } catch {
-            missingRejected = true;
-        }
-        require(missingRejected, "Missing operator should reject profile update");
+        registry.addValidator(VALIDATOR_A, address(operatorB), 250, "Validator A", "", "", "validator-a");
+        require(staking.validatorActive(VALIDATOR_A), "relisted");
+        require(registry.operatorOf(VALIDATOR_A) == address(operatorB), "relisted under a new operator");
+        require(registry.validatorCount() == 1, "slot reused");
     }
 
-    function it_removes_operator_syncs_staking_and_reactivates_without_duplicate_list_entry() public {
-        _addOperatorA();
+    function it_emergency_kick_only_by_the_kicker_and_only_over_one_third() public {
+        _addValidatorA();
+        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: not the emergency kicker", VALIDATOR_A);
 
-        registry.removeOperator(address(operatorA));
+        registry.setEmergencyKicker(address(user));
+        user.doExpectingFailure(address(registry), "emergencyKick(address)", "VR: validator below one third of stake", VALIDATOR_A);
 
-        (, bool active,,,,) = _profile(address(operatorA));
-        require(!active, "Operator inactive");
-        require(registry.operatorCount() == 1, "Operator count after removal");
-        require(staking.syncCount() == 2, "Removal sync count");
-        require(staking.lastOperator() == address(operatorA), "Removed operator synced");
-        require(!staking.lastActive(), "Removal synced inactive");
-        require(staking.lastCommissionBps() == 0, "Removal commission");
-        require(!staking.operatorActive(address(operatorA)), "Operator inactive in staking");
+        staking.setOverOneThird(VALIDATOR_A, true);
+        user.doSuccessfully(address(registry), "emergencyKick(address)", VALIDATOR_A);
+        (, bool active,,,,,) = registry.operators(VALIDATOR_A);
+        require(!active, "validator delisted");
+        require(!staking.lastActive(), "staking synced as delisted");
+    }
 
-        bool duplicateRemovalRejected = false;
-        try registry.removeOperator(address(operatorA)) {
-        } catch {
-            duplicateRemovalRejected = true;
-        }
-        require(duplicateRemovalRejected, "Inactive removal should reject");
+    // Known vector, produced off-chain with:
+    //   cast keccak $(cast abi-encode --packed "f(string,address,address,address,uint256)" \
+    //     "STRATO validator operator authorization" 0x1111...1111 <validator> 0x2222...2222 7)
+    //   cast wallet sign --no-hash --private-key <anvil key 0> <digest>
+    // It pins both the digest encoding off-chain tooling must reproduce and the signature
+    // conventions (v as 27/28 or as a 0/1 recovery id) the registry accepts.
+    function it_matches_off_chain_digests_and_recovers_real_signatures() public {
+        address signer = address(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266);
+        bytes32 expected = bytes32(0xb40f7746740b70994c96fae88ae656ddfaf42a06872675fdde41dbee73e79bd3);
+        bytes32 digest = registry.authorizationDigest(address(0x1111111111111111111111111111111111111111), signer, address(0x2222222222222222222222222222222222222222), 7);
+        require(digest == expected, "digest matches Ethereum packed encoding");
 
-        registry.addOperator(address(operatorA), 700, "Operator A Reactivated", "Back online", "", "validator-a-v2");
-
-        (, bool reactivated, string name, string description,, string protocolValidatorId) = _profile(address(operatorA));
-        require(reactivated, "Operator reactivated");
-        require(registry.operatorCount() == 1, "Reactivation should not duplicate list entry");
-        require(keccak256(name) == keccak256("Operator A Reactivated"), "Reactivated name");
-        require(keccak256(description) == keccak256("Back online"), "Reactivated description");
-        require(keccak256(protocolValidatorId) == keccak256("validator-a-v2"), "Reactivated protocol id");
-        require(staking.syncCount() == 3, "Reactivation sync count");
-        require(staking.operatorActive(address(operatorA)), "Operator active in staking");
-        require(staking.operatorCommissionBps(address(operatorA)) == 700, "Reactivated commission");
+        uint256 r = 0xb5eefa7d20ec97007bd0fb457ac8da3140d90a4f163337c3de9778650b83d121;
+        uint256 s = 0x545274b8ace3c5a2044b42023d102bdc9cce776288710f2d4a09ef1751ba939f;
+        RecoveryHarness harness = new RecoveryHarness(address(this));
+        require(harness.recover(digest, 27, r, s) == signer, "recovers with v = 27");
+        require(harness.recover(digest, 0, r, s) == signer, "recovers with a 0/1 recovery id");
+        require(harness.recover(digest, 28, r, s) != signer, "the other parity is someone else");
+        require(harness.recover(digest, 5, r, s) == address(0), "nonsense v recovers nobody");
     }
 }

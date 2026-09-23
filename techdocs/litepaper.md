@@ -40,7 +40,7 @@ Moving from dollars to stablecoins was a major unlock. Moving gold onto crypto r
 
 STRATO is an institutional-grade Layer-1 app-chain for real-world asset-backed credit. Three pieces define the stack.
 
-**Chain.** An L1 built on the original Haskell Ethereum client, with EVM compatibility and a validator-based architecture. BlockApps shipped that Haskell core in 2014, before the Ethereum mainnet launched, and the codebase has been under continuous development for over a decade.
+**Chain.** An L1 built on the original Haskell Ethereum client, with PBFT consensus among staked validators. Contracts run on SolidVM rather than the EVM, while the chain accepts Ethereum-format signed transactions and serves Ethereum-style JSON-RPC, so standard wallets work. BlockApps shipped that Haskell core in 2014, before the Ethereum mainnet launched, and the codebase has been under continuous development for over a decade.
 
 **Stablecoin.** USDST is STRATO's native USD-denominated stablecoin, minted through a Collateralized Debt Position (CDP). USDST is overcollateralized and redeemable into USDC and USDT.
 
@@ -129,11 +129,11 @@ The liquid supply at TGE comes from the pre-TGE public sales, airdrop, and a por
 
 ### 8.2 Utilities
 
-**Gas.** Users pay gas in $STRATO or USDST.
+**Gas.** Today every transaction pays a flat fee of 0.01 USDST, or one voucher. Paying gas in $STRATO is part of the planned design.
 
 **Fee discounts for borrowers.** Holding $STRATO reduces certain fees on certain on-platform actions.
 
-**Validator staking.** Validators will need to stake a minimum amount of $STRATO to operate a node. Non-operators can delegate stake and earn pro-rata rewards.
+**Validator staking.** Validators stake a minimum amount of $STRATO, set on-chain, to join the validator set, and block proposers are selected in proportion to stake. Non-operators can delegate stake and earn pro-rata rewards, net of validator commission.
 
 **Governance.** Tokenholders stake $STRATO to vote on parameters like fees, collateral types, risk limits, treasury allocation, and incentive design.
 

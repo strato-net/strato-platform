@@ -645,7 +645,8 @@ function updatePortfolioInfoMapping(portfolioInfo: any, newInfo: MappingHistoryE
     }
     case 'operators': {
       // StratoStaking: operator self-bond (if user is an operator)
-      // key = operatorAddress, value = { selfBond, ... }
+      // key = operatorAddress (v2: validator address, whose operator is the key only for
+      // records predating the upgrade; see USER_MAPPING_COLLECTIONS), value = { selfBond, ... }
       const operatorValue = newInfo.value || {};
       const selfBond = BigInt(operatorValue.selfBond || '0');
       if (selfBond > 0n) {

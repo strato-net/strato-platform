@@ -1,62 +1,27 @@
-import { promises as fs, mkdirSync } from 'fs';
-import path from 'path';
-import { logInfo, logError } from '../utils/logger';
+import { logInfo } from '../utils/logger';
 import { config } from '../config';
 import { execute } from '../utils/stratoHelper';
+import { JsonFileStore, dataFilePath } from '../utils/jsonFileStore';
 
 const BLOCK_TRACKING_FILE = 'lastProcessedBlocks.json';
-const DATA_DIR = path.join(process.cwd(), 'data');
-mkdirSync(DATA_DIR, { recursive: true });
-const BLOCK_TRACKING_PATH = path.join(DATA_DIR, BLOCK_TRACKING_FILE);
 
 interface BlockTrackingData {
   [chainId: string]: number;
 }
 
 class BlockTrackingService {
-  private cachedData: BlockTrackingData | null = null;
-
-  /**
-   * Load block tracking data from file
-   */
-  private async loadBlockData(): Promise<BlockTrackingData> {
-    if (this.cachedData !== null) {
-      return this.cachedData;
-    }
-
-    try {
-      const fileContent = await fs.readFile(BLOCK_TRACKING_PATH, 'utf-8');
-      this.cachedData = JSON.parse(fileContent);
-      return this.cachedData!;
-    } catch (error) {
-      // File doesn't exist or is invalid, return empty object
-      this.cachedData = {};
-      return this.cachedData;
-    }
-  }
-
-  /**
-   * Save block tracking data to file
-   */
-  private async saveBlockData(data: BlockTrackingData): Promise<void> {
-    try {
-      await fs.writeFile(BLOCK_TRACKING_PATH, JSON.stringify(data, null, 2));
-      this.cachedData = data;
-      logInfo('BlockTrackingService', `Saved block tracking data to ${BLOCK_TRACKING_FILE}`);
-    } catch (error) {
-      logError('BlockTrackingService', error as Error, {
-        operation: 'saveBlockData',
-        filePath: BLOCK_TRACKING_PATH,
-      });
-      throw error;
-    }
-  }
+  // An unreadable file falls back to the on-chain checkpoint, and re-scanning is safe
+  private store = new JsonFileStore<BlockTrackingData>(
+    dataFilePath(BLOCK_TRACKING_FILE),
+    () => ({}),
+    "empty",
+  );
 
   /**
    * Get the last processed block for a chain (locally stored)
    */
   async getLastProcessedBlock(chainId: number): Promise<number> {
-    const data = await this.loadBlockData();
+    const data = await this.store.read();
     return data[chainId.toString()] || 0;
   }
 
@@ -64,10 +29,10 @@ class BlockTrackingService {
    * Update the last processed block locally
    */
   async updateLastProcessedBlockLocally(chainId: number, blockNumber: number): Promise<void> {
-    const data = await this.loadBlockData();
-    data[chainId.toString()] = blockNumber;
-    await this.saveBlockData(data);
-    
+    await this.store.update((data) => {
+      data[chainId.toString()] = blockNumber;
+    });
+
     logInfo('BlockTrackingService', `Updated local lastProcessedBlock for chain ${chainId}: ${blockNumber}`);
   }
 
@@ -93,22 +58,11 @@ class BlockTrackingService {
         lastProcessedBlock: blockNumber,
       },
     });
-    
+
     logInfo(
       "BlockTrackingService",
       `Updated lastProcessedBlock on blockchain for chain ${chainId}: ${blockNumber}`,
     );
-  }
-
-  /**
-   * Update last processed block both locally and on blockchain
-   * Use this when deposits have been processed and blockchain state should be updated
-   */
-  async updateLastProcessedBlockEverywhere(chainId: number, blockNumber: number): Promise<void> {
-    await Promise.all([
-      this.updateLastProcessedBlockLocally(chainId, blockNumber),
-      this.updateLastProcessedBlockOnBlockchain(chainId, blockNumber)
-    ]);
   }
 }
 

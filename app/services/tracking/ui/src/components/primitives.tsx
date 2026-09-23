@@ -146,6 +146,42 @@ export const RangeSlider = ({
   );
 };
 
+// One-of-N picker (period selector): a radio group styled as joined buttons,
+// so keyboard users get the native semantics without a component library.
+export const SegmentedControl = <Value extends string>({
+  options,
+  value,
+  onChange,
+  label,
+}: {
+  options: { value: Value; label: string }[];
+  value: Value;
+  onChange: (next: Value) => void;
+  label: string;
+}) => (
+  <div role="radiogroup" aria-label={label} className="inline-flex rounded-md border border-border p-0.5">
+    {options.map((option) => {
+      const active = option.value === value;
+      return (
+        <button
+          key={option.value}
+          type="button"
+          role="radio"
+          aria-checked={active}
+          onClick={() => onChange(option.value)}
+          className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+            active
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          }`}
+        >
+          {option.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
 export const Skeleton = ({ className = '' }: { className?: string }) => (
   <div className={`animate-pulse rounded-md bg-muted ${className}`} />
 );
