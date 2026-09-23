@@ -28,8 +28,10 @@ const WEI = (n: number) => (BigInt(n) * 10n ** 18n).toString();
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 
-const snapshot = async (): Promise<any> => {
-  const res = await authed("/tracking-api/metrics/daily");
+const snapshot = async (period?: string): Promise<any> => {
+  const res = await authed(
+    `/tracking-api/metrics/daily${period === undefined ? "" : `?period=${period}`}`
+  );
   assert.equal(res.status, 200);
   return res.json();
 };
@@ -40,6 +42,12 @@ const utcDayStart = (): number => {
   const now = new Date();
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 };
+
+const dayString = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+// Midday yesterday (UTC): inside yesterday's whole-day window whatever time
+// of day the suite runs at, and never inside today's or the 7d/30d baseline.
+const yesterdayMidday = (): Date => new Date(utcDayStart() - DAY_MS / 2);
 
 // A moment inside yesterday's "same elapsed window" (>= yesterday 00:00 UTC,
 // < now - 24h). Waits out the first seconds of a UTC day, where that window
@@ -270,5 +278,101 @@ describe("daily metrics snapshot", () => {
         "changePct must follow value/previous (null without a baseline)"
       );
     }
+  });
+
+  it("windows every metric by ?period and rejects an unknown one", async () => {
+    assert.equal((await authed("/tracking-api/metrics/daily?period=week")).status, 400);
+    assert.equal((await authed("/tracking-api/metrics/daily?period=")).status, 200);
+
+    // No period at all still means today (the endpoint stays compatible)
+    const implicit = await snapshot();
+    const today = await snapshot("today");
+    assert.equal(implicit.period, "today");
+    assert.equal(today.period, "today");
+    assert.equal(today.days, 1);
+    assert.equal(today.date, dayString(utcDayStart()));
+    assert.equal(today.startDate, today.date);
+    assert.equal(today.endDate, today.date);
+
+    const yesterday = await snapshot("yesterday");
+    assert.equal(yesterday.days, 1);
+    assert.equal(yesterday.date, dayString(utcDayStart() - DAY_MS));
+    assert.equal(yesterday.startDate, yesterday.date);
+
+    const week = await snapshot("7d");
+    assert.equal(week.days, 7);
+    assert.equal(week.endDate, today.date, "a trailing window ends today");
+    assert.equal(week.startDate, dayString(utcDayStart() - 6 * DAY_MS));
+
+    const month = await snapshot("30d");
+    assert.equal(month.days, 30);
+    assert.equal(month.endDate, today.date);
+    assert.equal(month.startDate, dayString(utcDayStart() - 29 * DAY_MS));
+
+    // Every window keeps the snapshot's shape, and a longer one can only
+    // contain more of the suite's opens than the shorter one inside it
+    for (const snap of [yesterday, week, month]) {
+      assert.equal(snap.opensByHour.length, 24);
+      assert.equal(sum(snap.opensByHour), snap.opens.value);
+      assert.ok(snap.topLinks.length <= 6);
+    }
+    assert.ok(week.opens.value >= today.opens.value);
+    assert.ok(month.opens.value >= week.opens.value);
+    assert.ok(month.opens.value >= yesterday.opens.value);
+  });
+
+  it("counts yesterday's rows under period=yesterday, and the trailing windows contain both days", async () => {
+    const baseToday = await snapshot("today");
+    const baseYesterday = await snapshot("yesterday");
+    const baseWeek = await snapshot("7d");
+    const link = await createLink({ label: "Snapshot period window" });
+    const backdated = yesterdayMidday();
+    const sessionId = await insertBackdatedSession(link.id, backdated, true);
+
+    const strato = randomAddress();
+    const tokenAddress = cirrusAddress(randomAddress());
+    await sql(
+      `INSERT INTO wallet_connections (session_id, link_id, external_wallet_address, strato_address, connector, connected_at)
+       VALUES ($1, $2, '', $3, 'Backdated', $4)`,
+      [sessionId, link.id, cirrusAddress(strato), backdated]
+    );
+    await seedCirrus(DEPOSITS, [
+      {
+        id: 9301,
+        externalChainId: 1,
+        externalSender: cirrusAddress(randomAddress()),
+        externalTxHash: "0xext9301",
+        stratoRecipient: cirrusAddress(strato),
+        stratoToken: tokenAddress,
+        stratoTokenAmount: WEI(1),
+        block_timestamp: new Date(backdated.getTime() + 1000).toISOString(),
+        transaction_hash: "strato9301",
+      },
+    ]);
+    await seedCirrus(PRICES, [{ key: tokenAddress, value: WEI(2000) }]);
+
+    const yesterday = await snapshot("yesterday");
+    assert.equal(yesterday.opens.value - baseYesterday.opens.value, 1);
+    assert.equal(yesterday.engagedOpens - baseYesterday.engagedOpens, 1);
+    assert.equal(yesterday.wallets.value - baseYesterday.wallets.value, 1);
+    assert.equal(yesterday.bridgeIns - baseYesterday.bridgeIns, 1);
+    assert.equal(yesterday.bridgeValueUsd.value - baseYesterday.bridgeValueUsd.value, 2000);
+    assert.equal(
+      yesterday.linksWithOpens - baseYesterday.linksWithOpens,
+      1,
+      "the link is active in yesterday's window"
+    );
+
+    // …the same rows also sit inside the trailing 7-day window…
+    const week = await snapshot("7d");
+    assert.equal(week.opens.value - baseWeek.opens.value, 1);
+    assert.equal(week.wallets.value - baseWeek.wallets.value, 1);
+    assert.equal(week.bridgeValueUsd.value - baseWeek.bridgeValueUsd.value, 2000);
+
+    // …and never in today's
+    const today = await snapshot("today");
+    assert.equal(today.opens.value, baseToday.opens.value, "yesterday's open is not today's");
+    assert.equal(today.wallets.value, baseToday.wallets.value);
+    assert.equal(today.bridgeValueUsd.value, baseToday.bridgeValueUsd.value);
   });
 });
