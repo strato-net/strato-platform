@@ -52,6 +52,32 @@ test("finds direct routes before longer alternatives", () => {
   assert.equal(routes[0].length, 1);
 });
 
+test("pool deep links resolve token addresses across pool types without loading analytics", async (t) => {
+  const { getRoutePoolTokens } = await import("./route.service");
+  const swapping = await import("../helpers/swapping.helper");
+  const v3 = await import("./poolV3.service");
+  const config = await import("../../config/config");
+  const pool = "a".repeat(40);
+  let kind = "stable";
+  t.mock.method(swapping, "fetchPoolCoins", async (_token: string, address: string) => {
+    assert.equal(address, pool);
+    return kind === "stable" ? ["1", "2", "3"].map((digit, coinIndex) => ({ coinIndex, tokenAddress: digit.repeat(40) })) : [];
+  });
+  t.mock.method(swapping, "fetchPoolTokenAddresses", async () => kind === "v2" ? { tokenA: "1".repeat(40), tokenB: "2".repeat(40) } : undefined);
+  t.mock.method(v3, "getPoolTokenPairs", async () => new Map(kind === "v3" ? [[pool, { token0: "2".repeat(40), token1: "3".repeat(40) }]] : []));
+  assert.deepEqual(await getRoutePoolTokens("token", `0x${pool.toUpperCase()}`), ["1".repeat(40), "2".repeat(40), "3".repeat(40)]);
+  kind = "v2";
+  assert.deepEqual(await getRoutePoolTokens("token", pool), ["1".repeat(40), "2".repeat(40)]);
+  kind = "v3";
+  assert.deepEqual(await getRoutePoolTokens("token", pool), ["2".repeat(40), "3".repeat(40)]);
+  config.hiddenSwapPools.add(pool);
+  t.after(() => config.hiddenSwapPools.delete(pool));
+  assert.deepEqual(await getRoutePoolTokens("token", pool), []);
+  config.hiddenSwapPools.delete(pool);
+  kind = "missing";
+  assert.deepEqual(await getRoutePoolTokens("token", pool), []);
+});
+
 test("does not revisit tokens or exceed six steps", () => {
   const edges = [
     swap("a", "b"),

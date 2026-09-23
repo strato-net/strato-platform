@@ -3,6 +3,9 @@ import { useMemo, useState } from "react";
 import { api } from "@/lib/axios";
 import { SwapToken } from "@/interface";
 import type { BridgeToken, NetworkConfig } from "@strato/shared-types";
+import { useUser } from "@/context/UserContext";
+import { getTokenConfig } from "@/lib/bridge/contractService";
+import { metalForgeService } from "@/services/metalForgeService";
 import type { NetworkSummary } from "@/lib/bridge/types";
 
 const TRADE_NETWORK_NAMES: Record<string, string> = {
@@ -29,14 +32,28 @@ export function useTradeTokens() {
 
 /** Every asset that can be reached through TokenRouter. */
 export function useRouteAssets() {
+  const { userAddress, isAppAuthenticated } = useUser();
   return useQuery({
-    queryKey: ["trade", "route", "assets"],
+    queryKey: ["trade", "route", "assets", userAddress, isAppAuthenticated],
     queryFn: async ({ signal }) => {
       const { data } = await api.get<SwapToken[]>("/trade/route/assets", {
         signal,
       });
       return data ?? [];
     },
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
+export function useRoutePoolTokens(poolAddress?: string) {
+  return useQuery({
+    queryKey: ["trade", "route", "pool", poolAddress],
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get<string[]>(`/trade/route/pool/${poolAddress}`, { signal });
+      return data;
+    },
+    enabled: !!poolAddress,
     staleTime: 30_000,
     retry: 1,
   });
@@ -115,6 +132,28 @@ export function useTradePairableTokens(tokenAddress?: string) {
     enabled: !!tokenAddress,
     // keep the previous token's list rendered while a new one loads
     placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
+export function useRouteDepositConfig(network?: NetworkSummary, route?: BridgeToken, enabled = false) {
+  const chainId = Number(network?.chainId);
+  return useQuery({
+    queryKey: ["trade", "deposit-config", network?.chainId, network?.depositRouter, route?.externalToken],
+    queryFn: () => getTokenConfig({
+      chainId, tokenAddress: route!.externalToken, depositRouterAddress: network!.depositRouter!,
+    }),
+    enabled: enabled && Number.isSafeInteger(chainId) && chainId > 0 && !!network?.depositRouter && !!route,
+    staleTime: 30_000,
+    retry: 1,
+  });
+}
+
+export function useRouteMetals() {
+  return useQuery({
+    queryKey: ["trade", "metals"],
+    queryFn: metalForgeService.getConfigs,
     staleTime: 30_000,
     retry: 1,
   });

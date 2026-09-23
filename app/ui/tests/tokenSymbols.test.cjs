@@ -61,7 +61,7 @@ test('metal activity retains separate payment and output decimals, including zer
   assert.equal(numberUtils.formatBalance(tx.metalAmount, undefined, tx.metalDecimals, 2, 4), '2.00');
 });
 
-async function recentRows({ deposits = [], routes = [], metals = [], pending = [] }) {
+async function recentRows({ deposits = [], routes = [], metals = [], pending = [], unified = false }) {
   const exports = {};
   const states = [];
   let stateIndex = 0, firstRender = true, loaded;
@@ -79,7 +79,7 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
         useState: (initial) => {
           const index = stateIndex++;
           if (firstRender) states[index] = initial;
-          return [states[index], (value) => { states[index] = value; if (index === (metals.length ? 3 : 1) && value === false) loaded(); }];
+          return [states[index], (value) => { states[index] = value; if (index === (metals.length && !unified ? 3 : 1) && value === false) loaded(); }];
         },
         useEffect: (callback) => { if (firstRender) callback(); },
         useMemo: (callback) => callback(), useCallback: (callback) => callback,
@@ -94,11 +94,11 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
       if (id === '@/lib/metalActivity') return metadataModule;
       if (id === '@/utils/numberUtils') return numberUtils;
       if (id === '@/hooks/use-mobile') return { useIsMobile: () => false };
-      if (id === '@/lib/activityFeed') return { activityFeedApi: { getActivities: async () => ({ events: metals.length ? metals : routes }) } };
+      if (id === '@/lib/activityFeed') return { activityFeedApi: { getActivities: async () => ({ events: [...routes.map(event => ({ event_name: 'RouteExecuted', ...event })), ...metals.map(event => ({ event_name: 'MetalMinted', ...event }))] }) } };
       return {};
     },
   });
-  const props = { includeRoutes: true, fundingMode: metals.length ? 'metals' : 'bridge' };
+  const props = { includeRoutes: true, fundingMode: metals.length && !unified ? 'metals' : 'bridge' };
   exports.default(props);
   await ready;
   firstRender = false; stateIndex = 0;
@@ -147,17 +147,49 @@ test('fallback warning uses bridged-token decimals, including zero and missing r
     ts.forEachChild(node, visit);
   }
   visit(source);
+  const summary = ts.createSourceFile('summary.tsx', fs.readFileSync(path.join(__dirname, '../src/components/router/RouteTradeSummary.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  function findFormat(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(summary) === 'formatUnits' && node.arguments[0]?.getText(summary) === 'bridge.bridgedAmount') formatFallback = node.getText(summary);
+    ts.forEachChild(node, findFormat);
+  }
+  findFormat(summary);
   for (const decimals of [0, 2, 6, 18]) {
     const exports = {};
-    vm.runInNewContext(transpile(`const ${bridgedToken}; exports.value = ${formatFallback};`), {
+    vm.runInNewContext(transpile(`const ${bridgedToken}; const fallbackDecimals = bridgedToken?.customDecimals ?? 18; exports.value = ${formatFallback};`), {
       exports, ensureHexPrefix: numberUtils.ensureHexPrefix, formatUnits: numberUtils.formatUnits,
       routeAssetsQuery: { data: [{ address: input, customDecimals: decimals }, { address: output, customDecimals: 18 }] },
       externalRoute: { stratoToken: `0x${input.toUpperCase()}` },
-      compositeQuote: { data: { bridge: { bridgedAmount: (2n * 10n ** BigInt(decimals)).toString() } } },
+      bridge: { bridgedAmount: (2n * 10n ** BigInt(decimals)).toString() },
     });
     assert.equal(Number(exports.value), 2);
   }
   assert.doesNotThrow(() => vm.runInNewContext(transpile(`const ${bridgedToken};`), {
     ensureHexPrefix: numberUtils.ensureHexPrefix, routeAssetsQuery: { data: [{ address: input, customDecimals: 6 }] }, externalRoute: undefined,
   }));
+});
+
+test('unified activity includes direct metal purchases beside routed trades with their own decimals', async () => {
+  const rows = await recentRows({ unified: true,
+    routes: [{ block_timestamp: '2026-09-23T12:00:00Z', attributes: { tokenIn: input, tokenOut: output, amountIn: '1000000', amountOut: '100' } }],
+    metals: [{ block_timestamp: '2026-09-23T13:00:00Z', attributes: { payToken: input, metalToken: output, payAmount: '1250000', metalAmount: '250' } }],
+  });
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].label, 'Metal Mint');
+  assert.equal(rows[0].fromAmount, '1.25');
+  assert.equal(rows[0].toAmount, '2.50');
+  assert.equal(rows[1].label, 'Routed Trade');
+});
+
+test('metal effective price includes mint spread and rejects unusable oracle prices', () => {
+  assert.equal(numberUtils.effectiveDollarWei('99000000000000000000', '100'), '$100.00');
+  assert.equal(numberUtils.effectiveDollarWei('0', '100'), null);
+  assert.equal(numberUtils.effectiveDollarWei('1000000000000000000', '10000'), null);
+});
+
+test('trade USD estimates respect token decimals and omit missing prices', () => {
+  for (const decimals of [0, 2, 6, 18]) {
+    assert.equal(numberUtils.formatTokenUsd((2n * 10n ** BigInt(decimals)).toString(), decimals, '3500000000000000000'), '$7.00');
+  }
+  assert.equal(numberUtils.formatTokenUsd('1', 6, undefined), null);
+  assert.equal(numberUtils.formatTokenUsd('1', 6, 'bad price'), null);
 });

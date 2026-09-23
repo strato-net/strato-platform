@@ -46,6 +46,8 @@ export const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 // ============================================
 export const VOUCHER_TO_USDST_FACTOR = 100n; // 1 voucher (1e18) = 0.01 USDST (1e16)
 export const SWAP_FEE = "0.02"; // USDST fee for swap transactions
+export const USDST_BALANCE_REFRESH_MS = 10_000;
+export const LOW_USDST_THRESHOLD = "0.10";
 export const TRANSFER_FEE = "0.01"; // USDST fee for transfer transactions
 export const BORROW_FEE = "0.01"; // USDST fee for borrow transactions
 export const REPAY_FEE = "0.02"; // USDST fee for repay transactions

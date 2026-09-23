@@ -99,6 +99,7 @@ router.get(
   authHandler.authorizeRequest(true),
   TradeController.routeAssets
 );
+router.get("/route/pool/:poolAddress", authHandler.authorizeRequest(true), TradeController.routePoolTokens);
 router.get(
   "/route/quote",
   authHandler.authorizeRequest(true),

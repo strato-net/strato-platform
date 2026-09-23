@@ -1,14 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { useBalance, useReadContract } from "wagmi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useBalance, useReadContracts } from "wagmi";
+import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { maxUint256 } from "viem";
 import { ERC20_ABI } from "@/lib/bridge/constants";
-import { ArrowDownUp, Globe2, Layers3 } from "lucide-react";
+import { ArrowDownUp, ArrowDown, Globe2, Layers3, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   TradeBridgeCatalog,
   useRouteAssets,
+  useRoutePoolTokens,
+  useRouteDepositConfig,
+  useRouteMetals,
 } from "@/hooks/trade/useTradeTokens";
 import { useRouteQuote } from "@/hooks/trade/useRouteQuote";
 import { useCompositeRouteQuote } from "@/hooks/trade/useCompositeRouteQuote";
@@ -19,10 +23,23 @@ import {
   formatUnits,
   safeParseUnits,
   ensureHexPrefix,
+  truncateAddress,
+  formatTokenUsd,
 } from "@/utils/numberUtils";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/axios";
+import { useOracleContext } from "@/context/OracleContext";
+import { useUserTokens } from "@/context/UserTokensContext";
+import { requestWalletConnection, redirectToLogin } from "@/lib/auth";
+import RouteTokenPicker from "./RouteTokenPicker";
+import RouteTradeSummary, { RouteFallback } from "./RouteTradeSummary";
 import RoutePreview from "./RoutePreview";
+import RouteConfirmDialog from "./RouteConfirmDialog";
+import type { RouteConfirmation, RoutePickerToken } from "@/interface/swap";
+import { assertRouteConfirmation, normalizeRouteAddress, resolveRouteSelection } from "@/lib/route";
 import { useTokenContext } from "@/context/TokenContext";
-import { SWAP_FEE, usdstAddress } from "@/lib/constants";
+import { LOW_USDST_THRESHOLD, SWAP_FEE, USDST_BALANCE_REFRESH_MS, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
@@ -35,17 +52,54 @@ const RouterWidget = ({
   onPairChange,
   userRewards,
   bridgeCatalog,
+  initialTokenIn = "",
+  initialTokenOut = "",
+  initialPool = "",
 }: {
   guestMode?: boolean;
   onTransactionSubmitted?: () => void;
   onPairChange?: (tokenIn?: string, tokenOut?: string) => void;
   userRewards?: UserRewardsData | null;
   bridgeCatalog: TradeBridgeCatalog;
+  initialTokenIn?: string;
+  initialTokenOut?: string;
+  initialPool?: string;
 }) => {
   const { toast } = useToast();
-  const { isLoggedIn, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
-  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
+  const { openAccountModal } = useAccountModal();
+  const { isLoggedIn, isAppAuthenticated, stratoAddress, userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, getEarningAssets } =
     useTokenContext();
+  const { fetchTokens } = useUserTokens();
+  const { prices } = useOracleContext();
+  const metalsQuery = useRouteMetals();
+  const publicPrices = useQuery({
+    queryKey: ["trade", "oracle-prices"],
+    queryFn: async ({ signal }) => (await api.get<Array<{ asset: string; price: string }>>("/oracle/price", { signal })).data,
+    enabled: !isLoggedIn,
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const priceMap = useMemo(() => new Map(
+    (isLoggedIn ? Object.entries(prices) : (publicPrices.data ?? []).map(item => [item.asset, item.price]))
+      .map(([address, price]) => [normalizeRouteAddress(address), price])
+  ), [isLoggedIn, prices, publicPrices.data]);
+  const [feeBalanceOwner, setFeeBalanceOwner] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn || !userAddress) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      await fetchUsdstBalance(controller.signal);
+      if (!controller.signal.aborted) setFeeBalanceOwner(userAddress);
+    };
+    void refresh();
+    const timer = setInterval(refresh, USDST_BALANCE_REFRESH_MS);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [isLoggedIn, userAddress, fetchUsdstBalance]);
+  const feeBalancesReady = !!userAddress && feeBalanceOwner === userAddress;
   const {
     availableNetworks,
     bridgeableTokens,
@@ -98,13 +152,20 @@ const RouterWidget = ({
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
   const [slippageBps, setSlippageBps] = useState(50);
+  const [confirmation, setConfirmation] = useState<RouteConfirmation | null>(null);
+  const confirming = useRef(false);
 
-  const tokenIn =
-    routeSources.find((token) => token.address === tokenInAddress) ??
-    routeSources[0];
-  const tokenOut =
-    routeAssets.find((token) => token.address === tokenOutAddress) ??
-    routeAssets.find((token) => token.address !== tokenIn?.address);
+  const poolAddress = normalizeRouteAddress(initialPool);
+  const needsPool = !!initialPool && !(initialTokenIn && initialTokenOut);
+  const poolTokensQuery = useRoutePoolTokens(needsPool && /^[0-9a-f]{40}$/.test(poolAddress) ? poolAddress : undefined);
+  const selection = resolveRouteSelection(routeSources, routeAssets,
+    tokenInAddress || initialTokenIn, tokenOutAddress || initialTokenOut, poolTokensQuery.data);
+  const resolvingPool = needsPool && poolTokensQuery.isFetching && !poolTokensQuery.data;
+  const tokenIn = resolvingPool ? undefined : selection.tokenIn;
+  const tokenOut = resolvingPool ? undefined : selection.tokenOut;
+  const selectionError = sourceMode === "strato" && !routeAssetsQuery.isLoading ? selection.error : undefined;
+  const poolLinkError = needsPool && !resolvingPool && !poolTokensQuery.data?.length
+    ? "The linked pool is unavailable. Choose the tokens you want to trade." : undefined;
   const network =
     availableNetworks.find(({ chainName }) => chainName === selectedNetwork) ??
     availableNetworks[0];
@@ -140,18 +201,19 @@ const RouterWidget = ({
   const nativeBalance = useBalance({
     address: externalAddress,
     chainId: balanceChainId,
-    query: { enabled: balanceEnabled && isNativeInput, refetchInterval: 15000 },
+    query: { enabled: balanceEnabled, refetchInterval: 15000 },
   });
-  const tokenBalance = useReadContract({
-    address: ensureHexPrefix(externalRoute?.externalToken),
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: externalAddress ? [externalAddress] : undefined,
-    chainId: balanceChainId,
-    query: { enabled: balanceEnabled && !isNativeInput, refetchInterval: 15000 },
+  const tokenBalance = useReadContracts({
+    contracts: externalRoutes.filter(route => BigInt(route.externalToken) !== 0n).map(route => ({
+      address: ensureHexPrefix(route.externalToken), abi: ERC20_ABI,
+      functionName: "balanceOf", args: externalAddress ? [externalAddress] : undefined,
+      chainId: balanceChainId,
+    })),
+    query: { enabled: balanceEnabled, refetchInterval: 15000 },
   });
+  const externalTokenBalances = new Map(externalRoutes.filter(route => BigInt(route.externalToken) !== 0n).map((route, index) => [route.id, tokenBalance.data?.[index]?.result as bigint | undefined]));
   const externalBalance = balanceEnabled
-    ? isNativeInput ? nativeBalance.data?.value : tokenBalance.data as bigint | undefined
+    ? isNativeInput ? nativeBalance.data?.value : externalTokenBalances.get(externalRoute!.id)
     : undefined;
   const externalBalanceQuery = isNativeInput ? nativeBalance : tokenBalance;
   const amountWei = useMemo(() => {
@@ -162,6 +224,28 @@ const RouterWidget = ({
       return "0";
     }
   }, [amount, inputDecimals]);
+  const depositConfig = useRouteDepositConfig(network, externalRoute, sourceMode === "external");
+  const depositConfigReady = !!depositConfig.data && !depositConfig.isError;
+  const minDepositError = sourceMode !== "external" ? "" : network && (!balanceChainId || !network.depositRouter)
+    ? "Deposits are unavailable on this network." : depositConfig.isError
+    ? "Deposit limits unavailable. Retry before depositing."
+    : depositConfig.data && !depositConfig.data.isPermitted ? "This token is not permitted for deposits."
+    : depositConfig.data && BigInt(amountWei) > 0n && BigInt(amountWei) < BigInt(depositConfig.data.minAmount)
+      ? `Minimum deposit is ${formatUnits(depositConfig.data.minAmount, inputDecimals)} ${externalRoute?.externalSymbol}` : "";
+  const pickerTokens: RoutePickerToken[] = tokens.map(token => {
+    const metal = metalsQuery.data?.metals.find(item => normalizeRouteAddress(item.address) === token.address);
+    return { id: token.address, address: token.address, symbol: token._symbol, name: token._name,
+      image: token.images?.[0]?.value ?? metal?.imageUrl, decimals: token.customDecimals ?? 18,
+      balance: isLoggedIn ? token.balance : undefined, price: metal?.price ?? priceMap.get(token.address) ?? token.price,
+      metalFeeBps: metal?.feeBps };
+  });
+  const externalPickerTokens: RoutePickerToken[] = externalRoutes.map(route => ({
+    id: route.id, address: route.externalToken, symbol: route.externalSymbol, name: route.externalName,
+    image: route.stratoTokenImage, decimals: Number(route.externalDecimals),
+    balance: balanceEnabled ? (BigInt(route.externalToken) === 0n ? nativeBalance.data?.value : externalTokenBalances.get(route.id))?.toString() : undefined,
+    price: !route.rebaseFactor ? priceMap.get(normalizeRouteAddress(route.stratoToken)) : undefined,
+    detail: `Deposits as ${route.stratoTokenSymbol}`,
+  }));
   const routeFeeWei = safeParseUnits(SWAP_FEE);
   const externalBalanceError = sourceMode === "external" && externalBalance !== undefined &&
     (BigInt(amountWei) > externalBalance || (isNativeInput && BigInt(amountWei) > 0n && BigInt(amountWei) === externalBalance))
@@ -170,10 +254,11 @@ const RouterWidget = ({
   const feeError =
     !guestMode &&
     sourceMode === "strato" &&
-    !loadingUsdstBalance &&
+    feeBalancesReady &&
     availableFees < routeFeeWei
-      ? "Insufficient USDST + voucher balance for two transaction fees"
+      ? `You need ${SWAP_FEE} USDST for fees; you have ${formatUnits(availableFees)} including vouchers.`
       : "";
+  const lowFeeBalance = !guestMode && sourceMode === "strato" && feeBalancesReady && availableFees <= safeParseUnits(LOW_USDST_THRESHOLD);
   const inputBalance = BigInt(tokenIn?.balance || "0");
   const usdFeePortion =
     routeFeeWei > BigInt(voucherBalance || "0")
@@ -205,17 +290,20 @@ const RouterWidget = ({
   });
   const quote =
     sourceMode === "external" ? compositeQuote.data : routeQuote.data;
-  const quoteLoading =
-    sourceMode === "external"
-      ? compositeQuote.isFetching
-      : routeQuote.isFetching;
-  const quoteError =
-    sourceMode === "external"
-      ? compositeQuote.error
-      : routeQuote.error;
+  const quoteFetching = sourceMode === "external" ? compositeQuote.isFetching : routeQuote.isFetching;
+  const quoteError = sourceMode === "external" ? compositeQuote.error : routeQuote.error;
+  const quoteLoading = !quote && amountWei !== "0" && !quoteError;
   const routeExecute = useRouteExecute();
   const autoRouteDeposit = useAutoRouteDeposit();
   const pending = routeExecute.isPending || autoRouteDeposit.isPending;
+  const recipient = sourceMode === "external"
+    ? isAppAuthenticated ? stratoAddress : externalEvmWalletAddress
+    : userAddress;
+  const selectionKey = JSON.stringify([
+    sourceMode, sourceMode === "external" ? externalRoute?.externalToken : tokenIn?.address, tokenOut?.address, amountWei, slippageBps,
+    sourceMode === "external" ? [network?.chainId, externalRoute?.id, externalRoute?.externalToken, externalRoute?.stratoToken] : null,
+    recipient, userAddress, externalEvmWalletAddress, isAppAuthenticated,
+  ]);
   const rewardedRouteSteps = useMemo(() => {
     if (sourceMode !== "strato" || !quote || !userRewards) return [];
     const seen = new Set<string>();
@@ -246,16 +334,52 @@ const RouterWidget = ({
     });
   }, [sourceMode, quote, userRewards, tokens]);
 
-  const handleTrade = async () => {
-    if (!quote || quoteLoading || pending || !tokenOut || amountWei === "0" || amountError || feeError || externalBalanceError) return;
+  const inputSymbol = sourceMode === "external" ? externalRoute?.externalSymbol : tokenIn?._symbol;
+  const inputPrice = sourceMode === "external" ? externalPickerTokens.find(token => token.id === externalRoute?.id)?.price : pickerTokens.find(token => token.id === tokenIn?.address)?.price;
+  const outputPrice = pickerTokens.find(token => token.id === tokenOut?.address)?.price;
+  const inputUsd = formatTokenUsd(amountWei, inputDecimals, inputPrice);
+  const outputUsd = quote ? formatTokenUsd(quote.amountOut, tokenOut?.customDecimals ?? 18, outputPrice) : null;
+  const flipTokens = () => {
+    if (sourceMode !== "strato" || !tokenIn || !tokenOut || !routeSources.some(token => token.address === tokenOut.address)) return;
+    setTokenInAddress(tokenOut.address);
+    setTokenOutAddress(tokenIn.address);
+    setAmount("");
+    setAmountError("");
+  };
+
+  const reviewTrade = () => {
+    if (!quote || quoteLoading || pending || guestMode || !recipient || !tokenOut || amountWei === "0" || amountError || feeError || externalBalanceError || minDepositError || selectionError) return;
+    if (sourceMode === "strato" ? !tokenIn || !feeBalancesReady : !externalRoute || !network || !isExternalEvmWalletConnected || !depositConfigReady) return;
+    const reviewed = structuredClone({
+      selectionKey, quote, inputSymbol: sourceMode === "external" ? externalRoute!.externalSymbol : tokenIn!._symbol,
+      inputDecimals, inputAmount: amountWei, outputToken: tokenOut, tokens, recipient,
+      networkName: sourceMode === "external" ? network!.chainName : "STRATO",
+    });
     try {
+      assertRouteConfirmation(reviewed, selectionKey);
+      setConfirmation(reviewed);
+    } catch (error) {
+      toast({ title: "Quote unavailable", description: getFriendlyMessage((error as Error).message), variant: "destructive" });
+    }
+  };
+
+  const handleTrade = async () => {
+    if (!confirmation || confirming.current || pending) return;
+    confirming.current = true;
+    try {
+      assertRouteConfirmation(confirmation, selectionKey);
+      if (!tokenOut || amountWei === "0" || amountError || feeError || externalBalanceError || minDepositError || selectionError) {
+        toast({ title: "Quote unavailable", description: feeError || amountError || externalBalanceError || minDepositError || selectionError || "Review your trade and request a new quote.", variant: "destructive" });
+        return;
+      }
+      const quote = confirmation.quote;
       if (sourceMode === "external") {
-        if (!externalRoute || !network || !compositeQuote.data) return;
+        if (!externalRoute || !network || !depositConfigReady || !("bridge" in quote)) return;
         const result = await autoRouteDeposit.execute({
           route: externalRoute,
           network,
           amount,
-          quote: compositeQuote.data,
+          quote,
           outputSymbol: tokenOut._symbol,
           outputAddress: tokenOut.address,
           slippageBps,
@@ -272,7 +396,7 @@ const RouterWidget = ({
           toast({
             title: "Deposit submitted",
             description:
-              compositeQuote.data.depositAction.action ===
+              quote.depositAction.action ===
               4
                 ? `Your deposit will settle into ${tokenOut._symbol}, or fall back to ${externalRoute.stratoTokenSymbol} if the minimum cannot be met.`
                 : `Your deposit will settle as ${externalRoute.stratoTokenSymbol}.`,
@@ -280,7 +404,7 @@ const RouterWidget = ({
           });
         }
       } else {
-        if (!tokenIn || !isLoggedIn) return;
+        if (!tokenIn || !isLoggedIn || !feeBalancesReady) return;
         try {
           await routeExecute.mutateAsync({
             tokenIn: tokenIn.address,
@@ -288,9 +412,12 @@ const RouterWidget = ({
             amountIn: amountWei,
             minFinalOut: quote.minFinalOut,
             slippageBps,
+            recipient: confirmation.recipient,
           });
         } finally {
           void fetchUsdstBalance();
+          void fetchTokens();
+          void getEarningAssets(false);
         }
         toast({
           title: "Trade submitted",
@@ -309,16 +436,20 @@ const RouterWidget = ({
         description: normalized.code === "UNKNOWN_ERROR" ? getFriendlyMessage(normalized.message) : normalized.userMessage,
         variant: "destructive",
       });
+    } finally {
+      confirming.current = false;
+      setConfirmation(null);
     }
   };
 
   return (
     <div className="space-y-5">
+      <RouteConfirmDialog confirmation={confirmation} pending={pending} stage={autoRouteDeposit.stage} onClose={() => setConfirmation(null)} onConfirm={handleTrade} />
       <div className="grid grid-cols-2 rounded-xl border border-border/60 bg-muted/60 p-1.5">
         <Button
           type="button"
           variant={sourceMode === "strato" ? "default" : "ghost"}
-          className="h-11 gap-2 rounded-lg"
+          className="h-11 gap-1 rounded-lg px-2 text-xs sm:gap-2 sm:text-sm"
           onClick={() => {
             setSourceMode("strato");
             setAmount("");
@@ -326,12 +457,13 @@ const RouterWidget = ({
           }}
         >
           <Layers3 className="h-4 w-4" />
-          Trade on STRATO
+          On STRATO
         </Button>
         <Button
           type="button"
           variant={sourceMode === "external" ? "default" : "ghost"}
-          className="h-11 gap-2 rounded-lg"
+          className="h-11 gap-1 rounded-lg px-2 text-xs sm:gap-2 sm:text-sm"
+          disabled={bridgeCatalog.loading}
           onClick={() => {
             setSourceMode("external");
             setAmount("");
@@ -339,20 +471,18 @@ const RouterWidget = ({
           }}
         >
           <Globe2 className="h-4 w-4" />
-          Deposit from external
+          From another network
         </Button>
       </div>
 
-      {sourceMode === "external" && (
-        <div className="space-y-3">
-          <BridgeWalletStatus
-            guestMode={guestMode}
-            externalOnly
-            connectedLabel="External Wallet"
-            connectLabel="Connect External Wallet"
-            copiedDescription="External wallet address copied to clipboard"
-          />
-          <select
+      <div className="rounded-xl border border-border/60 px-3 py-2 text-xs">
+        <div className="flex justify-between gap-3"><span className="text-muted-foreground">{sourceMode === "external" ? "External wallet" : "Trading account"}</span><span className="font-mono" title={(sourceMode === "external" ? externalEvmWalletAddress : userAddress) ?? ""}>{truncateAddress(sourceMode === "external" ? externalEvmWalletAddress : userAddress) || "Not connected"}{openAccountModal && isExternalEvmWalletConnected && (sourceMode === "external" || !isAppAuthenticated) && <button type="button" className="ml-2 font-sans text-primary" onClick={openAccountModal}>Manage</button>}</span></div>
+        <div className="mt-1 flex justify-between gap-3"><span className="text-muted-foreground">Receiving on STRATO</span><span className="font-mono" title={recipient ?? ""}>{truncateAddress(recipient) || "Connect wallet or sign in"}</span></div>
+      </div>
+      <div className="grid">
+        <div aria-hidden={sourceMode !== "strato"} className={`col-start-1 row-start-1 flex h-11 items-center rounded-xl bg-muted/30 px-3 text-sm text-muted-foreground transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "strato" ? "opacity-100" : "pointer-events-none opacity-0"}`}>Trade using your STRATO balance.</div>
+        <div aria-hidden={sourceMode !== "external"} {...(sourceMode !== "external" ? { inert: "" } : {})} className={`col-start-1 row-start-1 transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "external" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+          <select aria-label="Source network" tabIndex={sourceMode === "external" ? 0 : -1}
             className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-medium"
             value={network?.chainName ?? ""}
             onChange={(event) => {
@@ -362,22 +492,21 @@ const RouterWidget = ({
               setSelectedNetwork(event.target.value);
             }}
           >
-            {availableNetworks.map((item) => (
-              <option key={item.chainId} value={item.chainName}>
-                {item.chainName}
-              </option>
-            ))}
+            {availableNetworks.map((item) => <option key={item.chainId} value={item.chainName}>{item.chainName}</option>)}
           </select>
         </div>
-      )}
+      </div>
 
       <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 transition-colors focus-within:border-primary/40 focus-within:bg-muted/50">
         <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          You pay
+          You pay · {sourceMode === "external" ? network?.chainName ?? "Choose network" : "STRATO"}
         </label>
         <div className="flex items-center gap-3">
           <input
             className="min-w-0 flex-1 bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+            aria-label="Amount to pay"
+            aria-describedby="pay-amount-help"
+            aria-invalid={!!(amountError || externalBalanceError || minDepositError)}
             inputMode="decimal"
             placeholder="0"
             value={amount}
@@ -387,7 +516,7 @@ const RouterWidget = ({
                     event.target.value,
                     setAmount,
                     setAmountError,
-                    maxSpendableWei,
+                    guestMode ? maxUint256.toString() : maxSpendableWei,
                     inputDecimals
                   )
                 : handleAmountInputChange(
@@ -400,33 +529,13 @@ const RouterWidget = ({
                   )
             }
           />
-          <select
-            className="h-11 max-w-[45%] rounded-full border border-input bg-background px-3 text-sm font-semibold"
-            value={
-              sourceMode === "external"
-                ? externalRoute?.id ?? ""
-                : tokenIn?.address ?? ""
-            }
-            onChange={(event) =>
-              sourceMode === "external"
-                ? setExternalRouteId(event.target.value)
-                : setTokenInAddress(event.target.value)
-            }
-          >
-            {(sourceMode === "external" ? externalRoutes : routeSources).map(
-              (item) => (
-                <option
-                  key={item.id ?? item.address}
-                  value={item.id ?? item.address}
-                >
-                  {"externalSymbol" in item
-                    ? item.externalSymbol
-                    : item._symbol}
-                </option>
-              )
-            )}
-          </select>
+          <RouteTokenPicker label="Choose pay token" external={sourceMode === "external"}
+            tokens={sourceMode === "external" ? externalPickerTokens : pickerTokens.filter(token => routeSources.some(source => source.address === token.id))}
+            value={sourceMode === "external" ? externalRoute?.id : tokenIn?.address}
+            loading={sourceMode === "external" ? bridgeCatalog.loading : routeAssetsQuery.isLoading}
+            onSelect={id => { sourceMode === "external" ? setExternalRouteId(id) : setTokenInAddress(id); setAmount(""); setAmountError(""); }} />
         </div>
+        <p className="mt-1 min-h-4 text-xs text-muted-foreground">{inputUsd ? `≈ ${inputUsd}` : "— USD"}</p>
         {sourceMode === "strato" && tokenIn && (
           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>
@@ -439,6 +548,7 @@ const RouterWidget = ({
             <button
               type="button"
               className="font-semibold text-primary"
+              disabled={!feeBalancesReady}
               onClick={() => {
                 setAmount(
                   formatUnits(maxSpendableWei, tokenIn.customDecimals)
@@ -454,24 +564,34 @@ const RouterWidget = ({
           <div className="mt-2 text-xs text-muted-foreground">
             {!isExternalEvmWalletConnected
               ? "Connect an external wallet to see your balance"
-              : externalBalanceQuery.isError
+              : (externalBalanceQuery.isError || (!isNativeInput && externalBalance === undefined && tokenBalance.isSuccess))
                 ? "Balance unavailable"
                 : externalBalance === undefined
                   ? "Loading balance..."
                   : `Available: ${formatAmount(formatUnits(externalBalance.toString(), inputDecimals))} ${externalRoute.externalSymbol}`}
           </div>
         )}
+        <div id="pay-amount-help" className="mt-2 min-h-10 text-xs text-muted-foreground">
+          {sourceMode === "external" && externalRoute && <>
+            {minDepositError && !depositConfig.data ? "" : depositConfig.data ? `Minimum deposit: ${formatUnits(depositConfig.data.minAmount, inputDecimals)} ${externalRoute.externalSymbol}` : "Loading deposit limits…"}
+            {depositConfig.isError && <button type="button" className="ml-2 font-semibold text-primary" onClick={() => void depositConfig.refetch()}>Retry</button>}
+          </>}
+          {(amountError || externalBalanceError || minDepositError) && <p className="mt-1 text-destructive" role="alert">{amountError || externalBalanceError || minDepositError}</p>}
+        </div>
       </div>
 
-      <div className="relative z-10 -my-7 flex justify-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-md">
+      <div className="relative z-10 !-my-7 flex justify-center">
+        {sourceMode === "strato" ? <button type="button" aria-label="Swap pay and receive tokens"
+          disabled={pending || !tokenIn || !tokenOut || !routeSources.some(token => token.address === tokenOut.address)}
+          title={tokenOut && !routeSources.some(token => token.address === tokenOut.address) ? "This token cannot be used as a route input" : "Swap tokens"}
+          onClick={flipTokens} className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-md disabled:opacity-50">
           <ArrowDownUp className="h-4 w-4" />
-        </div>
+        </button> : <div className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-muted text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>}
       </div>
 
       <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
         <label className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          You receive
+          You receive on STRATO
         </label>
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1 text-3xl font-semibold tracking-tight">
@@ -482,26 +602,13 @@ const RouterWidget = ({
                     tokenOut?.customDecimals ?? 18
                   )
                 )
-              : "0"}
+              : "—"}
           </div>
-          <select
-            className="h-11 max-w-[45%] rounded-full border border-input bg-background px-3 text-sm font-semibold"
-            value={tokenOut?.address ?? ""}
-            onChange={(event) => setTokenOutAddress(event.target.value)}
-          >
-            {routeAssets
-              .filter(
-                (token) =>
-                  sourceMode === "external" ||
-                  token.address !== tokenIn?.address
-              )
-              .map((token) => (
-                <option key={token.address} value={token.address}>
-                  {token._symbol}
-                </option>
-              ))}
-          </select>
+          <RouteTokenPicker label="Choose receive token" tokens={pickerTokens.filter(token => sourceMode === "external" || token.id !== tokenIn?.address)}
+            value={tokenOut?.address} onSelect={setTokenOutAddress} loading={routeAssetsQuery.isLoading} />
         </div>
+        <p className="mt-1 min-h-4 text-xs text-muted-foreground">{outputUsd ? `≈ ${outputUsd}` : "— USD"}</p>
+        {selectionError && <p className="mt-1 text-xs text-destructive">{selectionError}</p>}
       </div>
 
       <label className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-3 py-2.5 text-sm">
@@ -517,14 +624,41 @@ const RouterWidget = ({
         </select>
       </label>
 
-      {quote?.steps.length ? (
-        <RoutePreview
-          steps={quote.steps}
-          tokens={tokens}
-          minFinalOut={quote.minFinalOut}
-          outputToken={tokenOut}
-        />
-      ) : null}
+      <RouteTradeSummary quote={quote} inputAmount={amountWei} inputDecimals={inputDecimals} inputSymbol={inputSymbol} outputToken={tokenOut}
+        external={sourceMode === "external"} fetching={quoteFetching || quoteLoading}
+        error={quoteError && amountWei !== "0" ? getFriendlyMessage((quoteError as Error).message) : undefined} />
+      <div className="min-h-10 text-xs" aria-live="polite">
+        {feeError ? <p className="text-destructive">{feeError}</p> : lowFeeBalance ? <p className="text-amber-700 dark:text-amber-400">Your fee balance is running low ({formatUnits(availableFees)} USDST including vouchers). Add funds for future trades.</p> : poolLinkError ? <p className="text-muted-foreground">{poolLinkError}</p> : null}
+      </div>
+
+      {sourceMode === "external" && !isExternalEvmWalletConnected ? <BridgeWalletStatus externalOnly connectLabel="Connect external wallet" /> : <Button
+        className="h-12 w-full rounded-xl text-sm font-semibold shadow-sm"
+        disabled={
+          pending || (!guestMode && (
+            quoteLoading ||
+            !quote ||
+            !!selectionError ||
+            !!amountError ||
+            !!feeError ||
+            (sourceMode === "strato" && !feeBalancesReady) ||
+            !!externalBalanceError ||
+            (sourceMode === "external" && (!depositConfigReady || !!minDepositError)) ||
+            amountWei === "0"
+          ))
+        }
+        onClick={guestMode ? requestWalletConnection : reviewTrade}
+      >
+        {guestMode
+          ? "Connect wallet"
+          : pending
+            ? "Submitting..."
+            : sourceMode === "external"
+              ? "Deposit & Trade"
+              : "Trade"}
+      </Button>}
+      {sourceMode === "external" && <RouteFallback quote={compositeQuote.data} fallbackDecimals={bridgedToken?.customDecimals ?? 18} outputSymbol={tokenOut?._symbol} />}
+      {quote?.steps.length ? <RoutePreview steps={quote.steps} tokens={tokens} minFinalOut={quote.minFinalOut} outputToken={tokenOut} showMinimum={false} /> : null}
+      {rewardedRouteSteps.length > 0 && <details><summary className="cursor-pointer text-sm font-medium">Rewards · {rewardedRouteSteps.length} eligible activit{rewardedRouteSteps.length === 1 ? "y" : "ies"} · View details</summary><div className="mt-3 space-y-3">
       {rewardedRouteSteps.map(({ activity, inputAmount, tokenIn }) => (
         <RewardsWidget
           key={activity.activityId}
@@ -536,59 +670,9 @@ const RouterWidget = ({
           hideWhenZero
         />
       ))}
-      {sourceMode === "external" &&
-        compositeQuote.data?.depositAction.action === 4 &&
-        externalRoute && (
-          <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-muted-foreground">
-            If the STRATO route is unavailable or cannot meet your minimum,
-            you will receive{" "}
-            {formatAmount(
-              formatUnits(compositeQuote.data.bridge.bridgedAmount, bridgedToken?.customDecimals ?? 18)
-            )}{" "}
-            {externalRoute.stratoTokenSymbol} instead.
-          </p>
-        )}
-      {quoteError && amountWei !== "0" && (
-        <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-          {getFriendlyMessage((quoteError as Error).message)}
-        </p>
-      )}
-      {(amountError || feeError || externalBalanceError) && (
-        <p className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-          {amountError || feeError || externalBalanceError}
-        </p>
-      )}
-      {!amount && !guestMode && (
-        <p className="text-center text-xs text-muted-foreground">
-          Enter an amount to preview the route and minimum received.
-        </p>
-      )}
-
-      <Button
-        className="h-12 w-full rounded-xl text-sm font-semibold shadow-sm"
-        disabled={
-          guestMode ||
-          pending ||
-          quoteLoading ||
-          !quote ||
-          !!amountError ||
-          !!feeError ||
-          !!externalBalanceError ||
-          (sourceMode === "external" && !isExternalEvmWalletConnected) ||
-          amountWei === "0"
-        }
-        onClick={handleTrade}
-      >
-        {guestMode
-          ? "Sign in to trade"
-          : pending
-            ? "Submitting..."
-            : sourceMode === "external" && !isExternalEvmWalletConnected
-              ? "Connect external wallet"
-            : sourceMode === "external"
-              ? "Deposit & Trade"
-              : "Trade"}
-      </Button>
+      </div></details>}
+      {guestMode && <button type="button" className="w-full text-center text-sm text-primary" onClick={() => redirectToLogin()}>Sign in with STRATO</button>}
+      {sourceMode === "external" && <Link to="/dashboard/onramp" className="flex items-center justify-center gap-2 text-sm text-primary"><CreditCard className="h-4 w-4" />Add funds with card</Link>}
     </div>
   );
 };

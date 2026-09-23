@@ -16,9 +16,28 @@ import type {
   PoolV3CollectParams,
   PoolV3CreateParams,
   PoolV3FeeTier,
+  RouteQuoteResponse,
+  CompositeRouteQuoteResponse,
 } from '@strato/shared-types';
 
 export * from '@strato/shared-types';
+export interface RouteConfirmation {
+  selectionKey: string;
+  quote: RouteQuoteResponse | CompositeRouteQuoteResponse;
+  inputSymbol: string;
+  inputDecimals: number;
+  inputAmount: string;
+  outputToken: SwapToken;
+  tokens: SwapToken[];
+  recipient: string;
+  networkName: string;
+}
+
+export interface RouteTokenSelection {
+  tokenIn?: SwapToken;
+  tokenOut?: SwapToken;
+  error?: string;
+}
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 
@@ -269,4 +288,17 @@ export interface LiquidityFormState {
   isAToB: boolean;
   loading: boolean;
   error: string | null;
+}
+
+export interface RoutePickerToken {
+  id: string;
+  address: string;
+  symbol: string;
+  name: string;
+  image?: string;
+  decimals: number;
+  balance?: string;
+  price?: string;
+  metalFeeBps?: string;
+  detail?: string;
 }

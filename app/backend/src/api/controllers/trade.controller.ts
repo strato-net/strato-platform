@@ -14,6 +14,7 @@ import {
   executeRoute,
   getRouteAssets,
   getRouteQuote,
+  getRoutePoolTokens,
 } from "../services/route.service";
 import { getCompositeBridgeRouteQuote } from "../services/bridge-route.service";
 import {
@@ -26,8 +27,18 @@ import {
   validateRouteExecuteArgs,
   validateRouteQuoteArgs,
 } from "../validators/trade.validator";
+import { validatePoolAddressArgs } from "../validators/swapping.validator";
 
 class TradeController {
+  static async routePoolTokens(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      validatePoolAddressArgs(req.params);
+      res.status(RestStatus.OK).json(await getRoutePoolTokens(req.accessToken, req.params.poolAddress));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async tokens(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;

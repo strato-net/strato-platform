@@ -6,6 +6,7 @@ import {
   ERC20_ABI, 
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
+  EIP7702_DELEGATION_CODE_PATTERN,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -44,6 +45,20 @@ async function getClient(chainId: string) {
 function formatAddress(address: string): `0x${string}` {
     return (address.startsWith('0x') ? address : `0x${address}`) as `0x${string}`;
   }
+
+export async function assertExternalWalletRecipient(address: string, chainId: string): Promise<void> {
+  let code: `0x${string}` | undefined;
+  try {
+    const client = await getClient(chainId);
+    code = await client.getCode({ address: formatAddress(address) });
+  } catch {
+    throw new Error("Recipient wallet check unavailable");
+  }
+  // EIP-7702 delegation preserves the EOA's key-controlled address.
+  if (code && code !== '0x' && !EIP7702_DELEGATION_CODE_PATTERN.test(code)) {
+    throw new Error("Contract wallet cannot receive on STRATO");
+  }
+}
 
 export function getPermit2Nonce(): bigint {
     return BigInt(Date.now());

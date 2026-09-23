@@ -11,9 +11,10 @@ import {
   CompositeRouteQuoteResponse,
 } from "@strato/shared-types";
 import { assertAutoRouteQuote } from "@/lib/bridge/utils";
-import { AutoRouteDepositResult, NetworkSummary } from "@/lib/bridge/types";
+import { AutoRouteDepositResult, AutoRouteDepositStage, NetworkSummary } from "@/lib/bridge/types";
 import { useUser } from "@/context/UserContext";
 import {
+  assertExternalWalletRecipient,
   checkPermit2Approval,
   createPermit2Message,
   getPermit2Domain,
@@ -34,6 +35,7 @@ import { ensureHexPrefix, safeParseUnits } from "@/utils/numberUtils";
 
 export function useAutoRouteDeposit() {
   const [isPending, setIsPending] = useState(false);
+  const [stage, setStage] = useState<AutoRouteDepositStage | null>(null);
   const submitting = useRef(false);
   const { toast } = useToast();
   const account = useAccount();
@@ -46,6 +48,15 @@ export function useAutoRouteDeposit() {
     isAppAuthenticated,
     stratoAddress,
   } = useUser();
+  const identity = {
+    recipient: isAppAuthenticated ? stratoAddress : externalEvmWalletAddress,
+    isAppAuthenticated,
+    sender: externalEvmWalletAddress,
+    walletAddress: account.address,
+    connected: isExternalEvmWalletConnected,
+  };
+  const currentIdentity = useRef(identity);
+  currentIdentity.current = identity;
 
   const execute = async ({
     route,
@@ -67,11 +78,22 @@ export function useAutoRouteDeposit() {
     if (submitting.current) throw new Error("A deposit is already being submitted");
     submitting.current = true;
     setIsPending(true);
+    setStage({ label: "Checking deposit…" });
     try {
       quote = structuredClone(quote);
+      const recipient = identity.recipient;
+      if (!recipient) throw new Error("STRATO recipient is unavailable");
       let approvalConfirmed = false;
       const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
       const assertCurrentQuote = () => {
+        const current = currentIdentity.current;
+        if (current.recipient?.toLowerCase() !== recipient.toLowerCase() ||
+            current.isAppAuthenticated !== identity.isAppAuthenticated ||
+            current.sender?.toLowerCase() !== identity.sender?.toLowerCase() ||
+            current.walletAddress?.toLowerCase() !== identity.walletAddress?.toLowerCase() ||
+            !current.connected) {
+          throw new Error("Deposit wallet or session changed");
+        }
         if (approvalConfirmed && quote.deadline <= Math.floor(Date.now() / 1000)) {
           throw new Error("Quote expired after approval. Your approval succeeded and is reusable; request a new quote. No deposit was sent.");
         }
@@ -94,10 +116,6 @@ export function useAutoRouteDeposit() {
       ) {
         throw new Error("Connected external wallet address does not match");
       }
-      const recipient = isAppAuthenticated ? stratoAddress : externalEvmWalletAddress;
-      if (!recipient) {
-        throw new Error("STRATO recipient is unavailable");
-      }
       if (!network.depositRouter) {
         throw new Error("Deposit router is unavailable");
       }
@@ -105,7 +123,12 @@ export function useAutoRouteDeposit() {
       if (!Number.isSafeInteger(expectedChainId) || expectedChainId <= 0) {
         throw new Error("External network chain ID is not wallet-compatible");
       }
+      if (!isAppAuthenticated) {
+        await assertExternalWalletRecipient(recipient, network.chainId);
+      }
+      assertCurrentQuote();
       if (account.chainId !== expectedChainId) {
+        setStage({ label: `Switch to ${network.chainName} in your wallet` });
         await switchChainAsync({ chainId: expectedChainId });
       }
 
@@ -135,6 +158,7 @@ export function useAutoRouteDeposit() {
               actionToken: quote.depositAction.actionToken,
               minFinalOut: BigInt(quote.depositAction.minFinalOut),
             };
+      let totalSteps = 1;
       let txHash: `0x${string}`;
       if (isNative) {
         await simulateDeposit({
@@ -148,6 +172,7 @@ export function useAutoRouteDeposit() {
           actionIntent,
         });
         assertCurrentQuote();
+        setStage({ step: 1, total: 1, label: "Confirm deposit in your wallet" });
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),
@@ -183,8 +208,10 @@ export function useAutoRouteDeposit() {
           amount: amountWei,
           chainId: network.chainId,
         });
+        totalSteps = approval.isApproved ? 2 : 3;
         if (!approval.isApproved) {
           assertCurrentQuote();
+          setStage({ step: 1, total: totalSteps, label: `Approve ${route.externalSymbol} in your wallet` });
           const approvalHash = await writeContractAsync({
             address: ensureHexPrefix(route.externalToken),
             abi: ERC20_ABI,
@@ -196,6 +223,7 @@ export function useAutoRouteDeposit() {
             chain,
             account: account.address,
           });
+          setStage({ step: 1, total: totalSteps, label: "Waiting for approval confirmation…" });
           let approved: boolean;
           try {
             approved = await waitForTransaction(approvalHash, network.chainId);
@@ -211,6 +239,7 @@ export function useAutoRouteDeposit() {
         const nonce = getPermit2Nonce();
         assertCurrentQuote();
         const deadline = BigInt(Math.min(quote.deadline, Math.floor(Date.now() / 1000) + 900));
+        setStage({ step: totalSteps - 1, total: totalSteps, label: "Sign Permit2 authorization in your wallet" });
         const signature = await signTypedDataAsync({
           domain: getPermit2Domain(network.chainId),
           types: getPermit2Types(),
@@ -244,6 +273,7 @@ export function useAutoRouteDeposit() {
           ensureHexPrefix(route.stratoToken),
         ] as const;
         assertCurrentQuote();
+        setStage({ step: totalSteps, total: totalSteps, label: "Confirm deposit in your wallet" });
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),
@@ -302,6 +332,7 @@ export function useAutoRouteDeposit() {
         });
       }
 
+      setStage({ step: totalSteps, total: totalSteps, label: "Waiting for deposit confirmation…" });
       let confirmed: boolean;
       try {
         confirmed = await waitForTransaction(txHash, network.chainId);
@@ -325,12 +356,14 @@ export function useAutoRouteDeposit() {
     } finally {
       submitting.current = false;
       setIsPending(false);
+      setStage(null);
     }
   };
 
   return {
     execute,
     isPending,
+    stage,
     connectedAddress: externalEvmWalletAddress,
     connectedChainId: account.chainId,
   };

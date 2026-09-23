@@ -209,3 +209,9 @@ export interface AutoRouteQuoteBinding {
   tokenOut: string;
   slippageBps: number;
 }
+
+export interface AutoRouteDepositStage {
+  label: string;
+  step?: number;
+  total?: number;
+}

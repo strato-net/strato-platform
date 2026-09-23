@@ -105,6 +105,14 @@ export function getFriendlyMessage(errorName: string, data?: `0x${string}`): str
   if (errorName.startsWith("Quote expired")) return "Quote expired; request a new quote.";
   if (errorName.includes("No executable route") || errorName.includes("No route found")) return "No route is available for this amount. Try a different amount or token.";
   switch (errorName) {
+    case "Trade details changed; review your trade again":
+      return "Your trade details or receiving account changed. Review the trade again before submitting.";
+    case "Contract wallet cannot receive on STRATO":
+      return "This contract wallet cannot receive at the same address on STRATO. Sign in to your STRATO account or connect a key-controlled wallet before depositing.";
+    case "Recipient wallet check unavailable":
+      return "Unable to verify the receiving wallet. No deposit was sent. Please try again.";
+    case "Deposit wallet or session changed":
+      return "Your wallet or sign-in session changed. No deposit was sent. Check the receiving account and start again; any completed token approval remains reusable.";
     case "TokenNotAllowed":
       return "This token is not currently supported for bridging.";
     case "BelowMinimum":

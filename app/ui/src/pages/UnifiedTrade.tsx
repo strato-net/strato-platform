@@ -8,11 +8,12 @@ import RecentTransactions from "@/components/bridge/RecentTransactions";
 import { useCallback, useState } from "react";
 import { useRewardsUserInfo } from "@/hooks/useRewardsUserInfo";
 import PairSwapHistory from "@/components/router/PairSwapHistory";
-import { Route, ShieldCheck } from "lucide-react";
 import { useTradeBridgeCatalog } from "@/hooks/trade/useTradeTokens";
+import { useSearchParams } from "react-router-dom";
 
 const UnifiedTrade = () => {
   const { isLoggedIn } = useUser();
+  const [searchParams] = useSearchParams();
   const [routeRefreshKey, setRouteRefreshKey] = useState(0);
   const [historyPair, setHistoryPair] = useState<{
     tokenIn?: string;
@@ -35,30 +36,10 @@ const UnifiedTrade = () => {
             <GuestSignInBanner message="Sign in to trade across STRATO and external networks in one route" />
           )}
           <div className="mx-auto max-w-7xl space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight md:text-2xl">
-                  One trade. One clear route.
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                  Swap on STRATO or deposit from an external network and route
-                  directly into your destination asset.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 text-xs font-medium">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5">
-                  <Route className="h-3.5 w-3.5 text-primary" />
-                  Multi-step routing
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                  Bridge fallback protection
-                </span>
-              </div>
-            </div>
+            <h2 className="text-lg font-semibold">Trade on STRATO or deposit from another network.</h2>
 
-            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-12">
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm xl:col-span-7">
+            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm lg:col-span-7">
                 <div className="border-b border-border/60 bg-gradient-to-r from-primary/[0.07] via-transparent to-transparent px-4 py-4 md:px-6">
                   <h3 className="font-semibold">Build your trade</h3>
                   <p className="mt-0.5 text-xs text-muted-foreground">
@@ -67,6 +48,10 @@ const UnifiedTrade = () => {
                 </div>
                 <div className="p-4 md:p-6">
                   <RouterWidget
+                    key={JSON.stringify([searchParams.get("tokenIn"), searchParams.get("tokenOut"), searchParams.get("pool")])}
+                    initialTokenIn={searchParams.get("tokenIn") ?? ""}
+                    initialTokenOut={searchParams.get("tokenOut") ?? ""}
+                    initialPool={searchParams.get("pool") ?? ""}
                     guestMode={!isLoggedIn}
                     userRewards={userRewards}
                     bridgeCatalog={bridgeCatalog}
@@ -77,7 +62,7 @@ const UnifiedTrade = () => {
                   />
                 </div>
               </div>
-              <div className="xl:col-span-5">
+              <div className="lg:col-span-5">
                 <RecentTransactions
                   fundingMode="bridge"
                   includeRoutes
@@ -86,12 +71,13 @@ const UnifiedTrade = () => {
                   routeTokens={bridgeCatalog.bridgeableTokens}
                 />
               </div>
-              <div className="xl:col-span-12">
-                <PairSwapHistory
+              {historyPair.tokenIn && historyPair.tokenOut && <details className="lg:col-span-12">
+                <summary className="cursor-pointer text-sm text-muted-foreground">Market activity · View recent trades for this pair</summary>
+                <div className="mt-3"><PairSwapHistory
                   tokenIn={historyPair.tokenIn}
                   tokenOut={historyPair.tokenOut}
-                />
-              </div>
+                /></div>
+              </details>}
             </div>
           </div>
         </main>

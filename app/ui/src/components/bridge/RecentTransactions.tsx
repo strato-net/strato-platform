@@ -191,14 +191,15 @@ const RecentTransactions = ({
       fetchWithdrawTransactions(params, "deposits"),
       includeRoutes
         ? activityFeedApi.getActivities(
-            [{ contract_name: "TokenRouter", event_name: "RouteExecuted" }],
+            [{ contract_name: "TokenRouter", event_name: "RouteExecuted" }, ...METAL_ACTIVITY_PAIR],
             { limit: recentLimit, myActivity: true }
           )
         : Promise.resolve({ events: [], total: 0 }),
     ]).then(async ([depositResult, withdrawalResult, routeResult]) => {
       const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
       const { remaining } = mergePendingDeposits(apiDeposits);
-      const routeEvents = routeResult.events || [];
+      const routeEvents = (routeResult.events || []).filter(event => event.event_name === "RouteExecuted");
+      const metalEvents = (routeResult.events || []).filter(event => event.event_name === "MetalMinted");
       const all = [
         ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
         ...apiDeposits.map((tx) => mapDeposit(tx, 'api')),
@@ -214,7 +215,7 @@ const RecentTransactions = ({
         })),
       ].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime())
        .slice(0, recentLimit);
-      const metadata = await resolveTokenMetadata(all.flatMap((tx) => [tx.stratoToken, tx.finalToken].filter(Boolean)));
+      const metadata = await resolveTokenMetadata([...all.flatMap((tx) => [tx.stratoToken, tx.finalToken].filter(Boolean)), ...collectMetalTokenAddrs(metalEvents)]);
       for (const tx of all) {
         const input = metadata.get(normalizeAddress(tx.stratoToken));
         const output = metadata.get(normalizeAddress(tx.finalToken));
@@ -223,7 +224,10 @@ const RecentTransactions = ({
         tx.stratoTokenSymbol = input?._symbol || tx.stratoTokenSymbol;
         tx.finalTokenSymbol = output?._symbol || tx.finalTokenSymbol;
       }
-      setBridgeTxs(all);
+      const metals: RecentTx[] = mapEventsToMetalTxs(metalEvents, metadata).map(tx => ({
+        ...tx, _type: "metal", amount: tx.metalAmount, amountDecimals: tx.metalDecimals, status: String(ExternalBridgeStatus.COMPLETED),
+      }));
+      setBridgeTxs([...all, ...metals].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime()).slice(0, recentLimit));
       setBridgeLoading(false);
       bridgeLoadedRef.current = true;
     }).catch(() => { setBridgeTxs([]); setBridgeLoading(false); bridgeLoadedRef.current = true; });

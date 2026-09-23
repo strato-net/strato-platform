@@ -136,17 +136,28 @@ const approvalHash = `0x${'cd'.repeat(32)}`;
 const receiptSource = ts.createSourceFile('contractService.ts', fs.readFileSync(path.join(__dirname, '../src/lib/bridge/contractService.ts'), 'utf8'), ts.ScriptTarget.Latest, true);
 const receiptFunction = receiptSource.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'waitForTransaction');
 const widgetSource = ts.createSourceFile('RouterWidget.tsx', fs.readFileSync(path.join(__dirname, '../src/components/router/RouterWidget.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-let tradeHandler;
+let tradeHandler, reviewHandler;
 function findTradeHandler(node) {
   if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'handleTrade') tradeHandler = node.initializer.getText(widgetSource);
+  if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'reviewTrade') reviewHandler = node.initializer.getText(widgetSource);
   ts.forEachChild(node, findTradeHandler);
 }
 findTradeHandler(widgetSource);
 
 function runSource(source, globals) {
   vm.runInNewContext(ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    fileName: 'test.tsx',
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText, globals);
+}
+
+const routeHelpers = {};
+runSource(fs.readFileSync(path.join(__dirname, '../src/lib/route.ts'), 'utf8'), { exports: routeHelpers });
+function confirmedTrade(quote) {
+  return { ...routeHelpers, minDepositError: "", depositConfigReady: true, fetchTokens: async () => {}, getEarningAssets: async () => {}, confirming: { current: false }, selectionError: undefined,
+    selectionKey: 'selected', confirmation: { selectionKey: 'selected', quote: {
+      deadline: Math.floor(Date.now() / 1000) + 600, ...quote,
+    } }, setConfirmation: () => {} };
 }
 
 const friendlyExports = {};
@@ -154,11 +165,24 @@ runSource(utilsSource.statements.filter(node => ts.isFunctionDeclaration(node) &
   ['normalizeError', 'getFriendlyMessage'].includes(node.name?.text)).map(node => node.getText(utilsSource)).join('\n'),
   { exports: friendlyExports });
 
-function depositHarness({ native = true, approval = false, outcome = 'success', storageUnavailable = false, rejected = false, approvalExpires = false } = {}) {
+function depositHarness({ native = true, approval = false, outcome = 'success', storageUnavailable = false, rejected = false, approvalExpires = false,
+  appAuthenticated = true, code, codeError = false, changeIdentityAt, mutateIdentity } = {}) {
   let now = Date.now();
   let stored = JSON.stringify([{ externalTxHash: 'other', externalChainId: 1 }]);
   const records = () => JSON.parse(stored);
-  const writes = [], toasts = [], pendingStates = [];
+  const writes = [], toasts = [], pendingStates = [], stages = [];
+  const codeChecks = [];
+  const refs = [];
+  let refIndex = 0;
+  const account = `0x${address('5')}`;
+  const wallet = { address: account, chainId: 1 };
+  const user = { externalEvmWalletAddress: account, isExternalEvmWalletConnected: true,
+    isAppAuthenticated: appAuthenticated, stratoAddress: address('6') };
+  const stage = (name) => {
+    if (name !== changeIdentityAt) return;
+    mutateIdentity(user, wallet);
+    renderHook();
+  };
   let refreshed = 0, cleared = 0;
   const localStorage = {
     getItem: () => { if (storageUnavailable) throw new Error('Storage disabled'); return stored; },
@@ -168,35 +192,46 @@ function depositHarness({ native = true, approval = false, outcome = 'success', 
   runSource(receiptFunction.getText(receiptSource), { exports: receiptExports, getClient: async () => ({
     waitForTransactionReceipt: async ({ hash }) => {
       // The deposit must already be persisted before its receipt is available.
-      assert.equal(records().some((record) => record.externalTxHash === depositHash), !approval && !storageUnavailable);
-      assert.equal(hash, approval ? approvalHash : depositHash);
+      assert.equal(records().some((record) => record.externalTxHash === depositHash), hash !== approvalHash && !storageUnavailable);
+      assert.ok(hash === approvalHash || hash === depositHash);
       if (outcome === 'timeout') throw new WaitForTransactionReceiptTimeoutError({ hash });
       if (outcome === 'rpc-error') throw new Error('RPC disconnected');
       if (approvalExpires) now += 1_000_000;
+      stage('approval');
       return { status: outcome };
     },
   }) });
-  const account = `0x${address('5')}`;
+  const guardExports = {};
+  const guard = receiptSource.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'assertExternalWalletRecipient');
+  const constantsSource = fs.readFileSync(path.join(__dirname, '../src/lib/bridge/constants.ts'), 'utf8');
+  runSource(`${constantsSource.match(/export const EIP7702_DELEGATION_CODE_PATTERN = .*;/)[0]}
+    ${guard.getText(receiptSource)}`, { exports: guardExports, formatAddress: value => value,
+    getClient: async chainId => ({ getCode: async ({ address }) => {
+      codeChecks.push({ address, chainId });
+      if (codeError) throw new Error('RPC unavailable');
+      return code;
+    } }) });
   const exports = {};
   runSource(fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useAutoRouteDeposit.ts'), 'utf8'), {
     exports, structuredClone, localStorage, Date: class extends Date { static now() { return now; } }, require: (id) => {
-      if (id === 'react') return { useState: () => [false, (value) => pendingStates.push(value)], useRef: (value) => ({ current: value }) };
+      if (id === 'react') return { useState: initial => [initial, (value) => (initial === false ? pendingStates : stages).push(value)],
+        useRef: (value) => refs[refIndex++] ?? (refs[refIndex - 1] = { current: value }) };
       if (id === '@/hooks/use-toast') return { useToast: () => ({ toast: (value) => toasts.push(value) }) };
       if (id === 'wagmi') return {
-        useAccount: () => ({ address: account, chainId: 1 }), useSwitchChain: () => ({}),
+        useAccount: () => ({ ...wallet }), useSwitchChain: () => ({}),
         useWriteContract: () => ({ writeContractAsync: async (params) => {
           if (rejected) throw new Error('User rejected request');
           writes.push(params.functionName);
           return params.functionName === 'approve' ? approvalHash : depositHash;
         } }),
-        useSignTypedData: () => ({ signTypedDataAsync: async () => '0xsignature' }),
+        useSignTypedData: () => ({ signTypedDataAsync: async () => { stage('signature'); return '0xsignature'; } }),
       };
-      if (id === '@/context/UserContext') return { useUser: () => ({ externalEvmWalletAddress: account,
-        isExternalEvmWalletConnected: true, isAppAuthenticated: true, stratoAddress: address('6') }) };
+      if (id === '@/context/UserContext') return { useUser: () => ({ ...user }) };
       if (id === '@/lib/bridge/contractService') return {
-        validateRouterContract: async () => ({ isValid: true }), checkPermit2Approval: async () => ({ isApproved: !approval }),
+        ...guardExports,
+        validateRouterContract: async () => { stage('validation'); return { isValid: true }; }, checkPermit2Approval: async () => ({ isApproved: !approval }),
         getPermit2Nonce: () => 1n, getPermit2Domain: () => ({}), getPermit2Types: () => ({}),
-        createPermit2Message: (input) => input, simulateDeposit: async () => {}, ...receiptExports,
+        createPermit2Message: (input) => input, simulateDeposit: async () => { stage('simulation'); }, ...receiptExports,
       };
       if (id === '@/lib/bridge/constants') return { resolveViemChain: async () => ({ id: 1 }) };
       if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote };
@@ -204,21 +239,25 @@ function depositHarness({ native = true, approval = false, outcome = 'success', 
       throw new Error(`Unexpected import ${id}`);
     },
   });
+  function renderHook() {
+    refIndex = 0;
+    return exports.useAutoRouteDeposit();
+  }
   const quote = structuredClone(composite);
   quote.deadline = Math.floor(Date.now() / 1000) + 600;
   if (native) quote.bridge.externalToken = address('0');
   const handlerExports = {};
   runSource(`exports.handleTrade = ${tradeHandler}`, {
-    exports: handlerExports, quote, quoteLoading: false, pending: false,
+    exports: handlerExports, ...confirmedTrade(quote), quote, quoteLoading: false, pending: false,
     ...friendlyExports, amountError: '', feeError: '',
     tokenOut: { _symbol: 'OUT', address: address('3') }, amountWei: '100', externalBalanceError: false,
-    sourceMode: 'external', externalRoute: { externalToken: quote.bridge.externalToken, stratoToken: address('2'), externalDecimals: '2' },
+    sourceMode: 'external', externalRoute: { externalSymbol: 'USDC', externalToken: quote.bridge.externalToken, stratoToken: address('2'), externalDecimals: '2' },
     network: { chainId: '1', depositRouter: address('7') }, compositeQuote: { data: quote },
-    autoRouteDeposit: exports.useAutoRouteDeposit(), amount: '1', slippageBps: 50, toast: (value) => toasts.push(value),
+    autoRouteDeposit: renderHook(), amount: '1', slippageBps: 50, toast: (value) => toasts.push(value),
     onTransactionSubmitted: () => { refreshed++; }, balanceEnabled: false,
     setAmount: (value) => { assert.equal(value, ''); cleared++; },
   });
-  return { handleTrade: handlerExports.handleTrade, records, writes, toasts, pendingStates,
+  return { handleTrade: handlerExports.handleTrade, records, writes, toasts, pendingStates, stages, codeChecks,
     refreshed: () => refreshed, cleared: () => cleared };
 }
 
@@ -252,6 +291,149 @@ for (const native of [true, false]) {
     });
   }
 }
+
+for (const [label, code] of [['EOA', undefined], ['empty bytecode', '0x'],
+  ['delegated EOA', `0xef0100${address('a')}`]]) {
+  test(`wallet-only deposit supports ${label} and pins its recipient`, async () => {
+    const harness = depositHarness({ appAuthenticated: false, code });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, ['depositETHWithAction']);
+    assert.deepEqual(harness.codeChecks, [{ address: `0x${address('5')}`, chainId: '1' }]);
+    assert.equal(harness.records()[1].DepositInfo.stratoRecipient, `0x${address('5')}`);
+  });
+}
+
+for (const native of [true, false]) {
+  test(`${native ? 'ETH' : 'ERC20'} contract-wallet recipient is blocked before approval or deposit`, async () => {
+    const harness = depositHarness({ native, approval: !native, appAuthenticated: false, code: '0x60806040' });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, []);
+    assert.equal(harness.records().length, 1);
+    assert.match(harness.toasts[0].description, /contract wallet cannot receive/);
+  });
+}
+
+test('recipient verification fails closed on RPC errors and malformed delegation code', async () => {
+  for (const options of [{ codeError: true }, { code: '0xef0100' }, { code: `0xef0100${address('a')}00` }]) {
+    const harness = depositHarness({ appAuthenticated: false, ...options });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, []);
+    assert.equal(harness.records().length, 1);
+    assert.match(harness.toasts[0].description, options.codeError ? /Unable to verify/ : /contract wallet cannot receive/);
+  }
+});
+
+test('an app-authenticated deposit keeps the STRATO recipient without rejecting its external contract wallet', async () => {
+  const harness = depositHarness({ code: '0x60806040' });
+  await harness.handleTrade();
+  assert.deepEqual(harness.codeChecks, []);
+  assert.deepEqual(harness.writes, ['depositETHWithAction']);
+  assert.equal(harness.records()[1].DepositInfo.stratoRecipient, address('6'));
+});
+
+for (const [label, native, approval, stage, mutateIdentity] of [
+  ['session expiry after approval', false, true, 'approval', user => { user.isAppAuthenticated = false; user.stratoAddress = null; }],
+  ['session expiry while signing', false, false, 'signature', user => { user.isAppAuthenticated = false; user.stratoAddress = null; }],
+  ['session expiry during native simulation', true, false, 'simulation', user => { user.isAppAuthenticated = false; user.stratoAddress = null; }],
+  ['STRATO recipient change', true, false, 'validation', user => { user.stratoAddress = address('8'); }],
+  ['wallet account switch', false, false, 'signature', (_user, wallet) => { wallet.address = `0x${address('8')}`; }],
+  ['external sender change', false, false, 'signature', user => { user.externalEvmWalletAddress = `0x${address('8')}`; }],
+  ['wallet disconnect', true, false, 'validation', user => { user.isExternalEvmWalletConnected = false; }],
+]) {
+  test(`${label} aborts before broadcasting a deposit`, async () => {
+    const harness = depositHarness({ native, approval, changeIdentityAt: stage, mutateIdentity });
+    await harness.handleTrade();
+    assert.deepEqual(harness.writes, approval ? ['approve'] : []);
+    assert.equal(harness.records().length, 1);
+    assert.match(harness.toasts[0].description, /wallet or sign-in session changed/);
+    assert.deepEqual(harness.pendingStates, [true, false]);
+  });
+}
+
+test('Trade loads and polls fee balances for the current account and cancels obsolete updates', async () => {
+  let effect, dependencies, cleanup, timer, cleared = false;
+  const requests = [], owners = [];
+  function visit(node) {
+    if (ts.isCallExpression(node) && node.expression.getText(widgetSource) === 'useEffect' &&
+        node.arguments[0].getText(widgetSource).includes('fetchUsdstBalance')) effect = node.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const fetchUsdstBalance = signal => new Promise(resolve => requests.push({ signal, resolve }));
+  const mount = (isLoggedIn, userAddress) => runSource(effect, {
+    isLoggedIn, userAddress, fetchUsdstBalance, AbortController, USDST_BALANCE_REFRESH_MS: 10000,
+    setFeeBalanceOwner: owner => owners.push(owner),
+    useEffect: (fn, deps) => { dependencies = deps; cleanup = fn(); },
+    setInterval: (fn, ms) => { assert.equal(ms, 10000); timer = fn; return 123; },
+    clearInterval: id => { assert.equal(id, 123); cleared = true; },
+  });
+  mount(false, null);
+  assert.equal(requests.length, 0);
+  mount(true, 'first');
+  assert.equal(requests.length, 1, 'direct navigation fetches immediately');
+  assert.deepEqual(Array.from(dependencies), [true, 'first', fetchUsdstBalance]);
+  requests[0].resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(owners, ['first']);
+  const refresh = timer();
+  assert.equal(requests.length, 2);
+  cleanup();
+  assert.equal(cleared, true);
+  assert.equal(requests[1].signal.aborted, true);
+  mount(true, 'second');
+  requests[1].resolve();
+  await refresh;
+  assert.deepEqual(owners, ['first'], 'the old account cannot become ready after cleanup');
+  requests[2].resolve();
+  await new Promise(setImmediate);
+  assert.deepEqual(owners, ['first', 'second']);
+  cleanup();
+});
+
+test('STRATO trading waits for fee balances instead of interpreting initial zeroes as insufficient funds', async () => {
+  const expressions = {};
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ['feeBalancesReady', 'feeError', 'usdFeePortion', 'maxSpendableWei'].includes(node.name.getText(widgetSource))) {
+      expressions[node.name.getText(widgetSource)] = node.initializer.getText(widgetSource);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const evaluate = (overrides = {}) => {
+    const exports = {};
+    runSource(`const feeBalancesReady = ${expressions.feeBalancesReady};
+      const usdFeePortion = ${expressions.usdFeePortion};
+      exports.ready = feeBalancesReady; exports.error = ${expressions.feeError};
+      exports.max = ${expressions.maxSpendableWei};`, {
+      exports, SWAP_FEE: '0.02', formatUnits: require('ethers').formatUnits, userAddress: 'user', feeBalanceOwner: null, loadingUsdstBalance: false,
+      guestMode: false, sourceMode: 'strato', availableFees: 0n, routeFeeWei: 2n,
+      voucherBalance: '0', inputBalance: 100n, tokenIn: { address: 'usdst' }, usdstAddress: 'usdst',
+      ...overrides,
+    });
+    return exports;
+  };
+  assert.equal(evaluate().ready, false);
+  assert.equal(evaluate().error, '');
+  assert.equal(evaluate({ feeBalanceOwner: 'other' }).ready, false);
+  assert.equal(evaluate({ loadingUsdstBalance: true }).ready, false);
+  assert.equal(evaluate({ loadingUsdstBalance: true }).error, '');
+  assert.match(evaluate({ feeBalanceOwner: 'user' }).error, /You need/);
+  const loaded = evaluate({ feeBalanceOwner: 'user', availableFees: 2n, voucherBalance: '2' });
+  assert.equal(loaded.ready, true);
+  assert.equal(loaded.error, '');
+  assert.equal(loaded.max, '100', 'loaded vouchers preserve the USDST input balance');
+  assert.deepEqual(evaluate({ feeBalanceOwner: 'user', availableFees: 2n, voucherBalance: '2', loadingUsdstBalance: true }),
+    loaded, 'background refresh keeps the loaded account ready');
+  assert.match(evaluate({ feeBalanceOwner: 'user', loadingUsdstBalance: true }).error, /You need/);
+  const exports = {};
+  runSource(`exports.handleTrade = ${tradeHandler}`, {
+    exports, ...confirmedTrade({}), sourceMode: 'strato', isLoggedIn: true, feeBalancesReady: false,
+    quote: {}, quoteLoading: false, pending: false, tokenIn: {}, tokenOut: {}, amountWei: '100',
+    amountError: '', feeError: '', externalBalanceError: '',
+    routeExecute: { mutateAsync: () => assert.fail('must not trade before fee balances load') },
+  });
+  await exports.handleTrade();
+});
 
 for (const outcome of ['timeout', 'rpc-error', 'reverted']) {
   test(`approval receipt ${outcome} never submits or records a deposit`, async () => {
@@ -295,8 +477,8 @@ for (const [name, isLoggedIn, isAppAuthenticated, expectedSubmissions] of [
     const exports = {};
     const submissions = [];
     runSource(`exports.handleTrade = ${tradeHandler}`, {
-      exports, ...friendlyExports, amountError: '', feeError: '', fetchUsdstBalance: async () => {},
-      isLoggedIn, isAppAuthenticated, sourceMode: 'strato',
+      exports, ...confirmedTrade({ minFinalOut: '90' }), ...friendlyExports, amountError: '', feeError: '', fetchUsdstBalance: async () => {},
+      isLoggedIn, isAppAuthenticated, sourceMode: 'strato', feeBalancesReady: true,
       quote: { minFinalOut: '90' }, quoteLoading: false, pending: false,
       tokenIn: { address: address('1'), _symbol: 'IN' }, tokenOut: { address: address('2') },
       amount: '1', amountWei: '100', slippageBps: 50, externalBalanceError: '', balanceEnabled: false,
@@ -337,18 +519,21 @@ test('native deposit reserves estimated gas before wallet submission', async () 
 
 for (const alreadyShown of [false, true]) {
   test(`failed STRATO trade refreshes fee balances and ${alreadyShown ? 'avoids duplicate' : 'shows friendly'} toast`, async () => {
-    let refreshed = 0;
+    let refreshed = 0, tokensRefreshed = 0, earningsRefreshed = 0;
     const toasts = [], exports = {};
     runSource(`exports.handleTrade = ${tradeHandler}`, {
-      exports, ...friendlyExports, isLoggedIn: true, sourceMode: 'strato',
+      exports, ...confirmedTrade({ minFinalOut: '90' }), ...friendlyExports, isLoggedIn: true, sourceMode: 'strato', feeBalancesReady: true,
       quote: { minFinalOut: '90' }, quoteLoading: false, pending: false,
       tokenIn: { address: address('1') }, tokenOut: { address: address('2') },
       amount: '1', amountWei: '100', amountError: '', feeError: '', externalBalanceError: '', slippageBps: 50,
       routeExecute: { mutateAsync: async () => { const err = new Error('backend internals'); err.toastShown = alreadyShown; throw err; } },
+      fetchTokens: async () => { tokensRefreshed++; }, getEarningAssets: async () => { earningsRefreshed++; },
       fetchUsdstBalance: async () => { refreshed++; }, toast: value => toasts.push(value),
     });
     await exports.handleTrade();
     assert.equal(refreshed, 1);
+    assert.equal(tokensRefreshed, 1);
+    assert.equal(earningsRefreshed, 1);
     assert.equal(toasts.length, alreadyShown ? 0 : 1);
     if (!alreadyShown) assert.doesNotMatch(toasts[0].description, /backend internals/);
   });
@@ -368,4 +553,294 @@ test('route asset dropdown deduplicates prefixed and differently cased bridge to
   assert.equal(exports.assets.length, 1);
   assert.equal(exports.assets[0].customDecimals, 6);
   assert.equal(exports.assets[0].address, 'ab'.repeat(20));
+});
+
+test('deep links normalize addresses, respect explicit tokens and orient pool pairs', () => {
+  const tokens = ['a', 'b', 'c'].map(digit => ({ address: address(digit), _symbol: digit.toUpperCase() }));
+  const select = (input, output, pool = []) => routeHelpers.resolveRouteSelection(tokens, tokens, input, output, pool);
+  const selected = select(`0x${address('C')}`, `0x${address('A')}`, [address('a'), address('b')]);
+  assert.equal(selected.tokenIn, tokens[2]);
+  assert.equal(selected.tokenOut, tokens[0]);
+  const pool = [address('a'), address('b'), address('c')];
+  assert.equal(select('', '', pool).tokenIn, tokens[0]);
+  assert.equal(select('', '', pool).tokenOut, tokens[1]);
+  assert.equal(select('', address('a'), pool).tokenIn, tokens[1]);
+  assert.equal(select(address('c'), '', pool).tokenOut, tokens[0]);
+  assert.match(select(address('a'), `0x${address('A')}`).error, /different/);
+  for (const input of ['bad-address', address('d')]) {
+    assert.match(select(input, address('b')).error, /unavailable/);
+    assert.equal(select(input, address('b')).tokenIn, undefined);
+  }
+  assert.equal(routeHelpers.resolveRouteSelection([], [], address('b'), address('c')).tokenIn, undefined);
+  assert.equal(select(address('b'), address('c')).tokenIn, tokens[1], 'async asset arrival preserves requested tokens');
+});
+
+test('review freezes the quote and does not submit a transaction', async () => {
+  const quote = { ...structuredClone(composite), deadline: Math.floor(Date.now() / 1000) + 600 };
+  let confirmation;
+  const exports = {};
+  runSource(`exports.review = ${reviewHandler}`, {
+    exports, ...routeHelpers, structuredClone, quote, quoteLoading: false, pending: false, guestMode: false,
+    recipient: address('5'), selectionKey: 'selected', sourceMode: 'strato', feeBalancesReady: true,
+    tokenIn: { address: address('2'), _symbol: 'IN' }, tokenOut: { address: address('3'), _symbol: 'OUT' },
+    minDepositError: '', depositConfigReady: true, inputDecimals: 18, amountWei: '100', amountError: '', feeError: '', externalBalanceError: '', selectionError: undefined,
+    tokens: [], setConfirmation: value => { confirmation = value; },
+    routeExecute: { mutateAsync: () => assert.fail('review cannot submit') },
+  });
+  exports.review();
+  assert.equal(confirmation.quote.minFinalOut, '199');
+  quote.minFinalOut = '150';
+  assert.equal(confirmation.quote.minFinalOut, '199', 'refresh cannot change the displayed minimum');
+  assert.equal(confirmation.recipient, address('5'));
+});
+
+test('confirmed submission uses the reviewed minimum during refresh and prevents duplicate clicks', async () => {
+  let finish;
+  const submissions = [];
+  const state = confirmedTrade({ minFinalOut: '199' });
+  state.confirmation.recipient = address('5');
+  const exports = {};
+  runSource(`exports.handleTrade = ${tradeHandler}`, {
+    exports, ...state, ...friendlyExports, quote: { minFinalOut: '100' }, quoteLoading: true,
+    sourceMode: 'strato', isLoggedIn: true, feeBalancesReady: true, pending: false,
+    tokenIn: { address: address('2'), _symbol: 'IN' }, tokenOut: { address: address('3') },
+    amount: '1', amountWei: '100', slippageBps: 50, amountError: '', feeError: '', externalBalanceError: '',
+    routeExecute: { mutateAsync: params => { submissions.push(params); return new Promise(resolve => { finish = resolve; }); } },
+    fetchUsdstBalance: async () => {}, toast: () => {}, onTransactionSubmitted: undefined,
+    balanceEnabled: false, setAmount: () => {},
+  });
+  const first = exports.handleTrade();
+  await exports.handleTrade();
+  assert.equal(submissions.length, 1);
+  assert.equal(submissions[0].minFinalOut, '199');
+  assert.equal(submissions[0].recipient, address('5'));
+  finish();
+  await first;
+});
+
+test('a fee balance failure after review explains why confirmation cannot submit', async () => {
+  const state = confirmedTrade({ minFinalOut: '199' });
+  const toasts = [], exports = {};
+  let closed = false;
+  const feeError = 'You need 0.02 USDST for fees; you have 0 including vouchers.';
+  runSource(`exports.handleTrade = ${tradeHandler}`, {
+    exports, ...state, ...friendlyExports, pending: false,
+    tokenOut: { address: address('3') }, amountWei: '100', amountError: '', feeError,
+    routeExecute: { mutateAsync: () => assert.fail('must not submit') },
+    autoRouteDeposit: { execute: () => assert.fail('must not deposit') },
+    toast: value => toasts.push(value), setConfirmation: value => { closed = value === null; },
+  });
+  await exports.handleTrade();
+  assert.equal(toasts.length, 1);
+  assert.equal(toasts[0].title, 'Quote unavailable');
+  assert.equal(toasts[0].description, feeError);
+  assert.equal(closed, true);
+  assert.equal(state.confirming.current, false);
+});
+
+for (const reason of ['no confirmation', 'expired', 'selection changed']) {
+  test(`${reason} cannot broadcast from the confirmation dialog`, async () => {
+    const state = confirmedTrade({ deadline: reason === 'expired' ? 0 : Math.floor(Date.now() / 1000) + 600 });
+    if (reason === 'no confirmation') state.confirmation = null;
+    if (reason === 'selection changed') state.selectionKey = 'changed-account-or-input';
+    const toasts = [], exports = {};
+    runSource(`exports.handleTrade = ${tradeHandler}`, {
+      exports, ...state, ...friendlyExports, pending: false,
+      routeExecute: { mutateAsync: () => assert.fail('must not submit') },
+      autoRouteDeposit: { execute: () => assert.fail('must not deposit') }, toast: value => toasts.push(value),
+    });
+    await exports.handleTrade();
+    assert.equal(toasts.length, reason === 'no confirmation' ? 0 : 1);
+    if (toasts.length) assert.match(toasts[0].description, reason === 'expired' ? /Quote expired/ : /changed/);
+  });
+}
+
+test('confirmation renders exact decimal amounts, fees, route and a distinct fallback outcome', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const { formatUnits } = require('ethers');
+  const components = {};
+  const wrapper = ({ children }) => React.createElement('div', null, children);
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteConfirmDialog.tsx'), 'utf8'), {
+    exports: components, require: id => {
+      if (id === 'react/jsx-runtime') return require(id);
+      if (id === '@/components/ui/button') return { Button: wrapper };
+      if (id === '@/components/ui/dialog') return Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper]));
+      if (id === '@/lib/constants') return { SWAP_FEE: '0.02', WAD: 10n ** 18n };
+      if (id === '@/utils/numberUtils') return { formatUnits, truncateAddress: value => value };
+      if (id === '@/lib/route') return routeHelpers;
+      if (id === './RoutePreview') return { default: props => { assert.equal(props.showMinimum, false); return React.createElement('span', null, props.steps[0].label); } };
+      throw new Error(`Unexpected import ${id}`);
+    },
+  });
+  const confirmation = {
+    quote: { ...structuredClone(composite), amountOut: '1234567', minFinalOut: '1200000',
+      bridge: { ...composite.bridge, bridgedAmount: '1000000000000000000', targetStratoSymbol: 'USDST' },
+      steps: [{ action: 5, label: 'Metal Forge', tokenIn: address('2'), tokenOut: address('3'), feeAmount: '10000000000000000', feeBps: 25, target: address('7') }] },
+    inputSymbol: 'USDC', inputDecimals: 6, inputAmount: '2000000',
+    outputToken: { _symbol: 'METAL', customDecimals: 6 }, tokens: [{ address: address('2'), _symbol: 'USDST', customDecimals: 18 }],
+    recipient: address('5'), networkName: 'Ethereum',
+  };
+  const render = () => renderToStaticMarkup(React.createElement(components.default, { confirmation, pending: false, onClose: () => {}, onConfirm: () => {} }));
+  const html = render();
+  for (const text of ['2.0 USDC', '1.234567 METAL', '0.6172835 METAL', '1.2 METAL', '0.25%', 'Metal Forge',
+    'Fallback: 1.0 USDST', 'minimum does not apply to this fallback', 'Network gas', address('5')]) assert.ok(html.includes(text), text);
+  confirmation.quote.bridge.rebaseFactor = '1000000000000000000';
+  assert.match(render(), /approximately.*factor at settlement/);
+  confirmation.quote.depositAction.action = 0;
+  assert.match(render(), /received amount depends on the rebase factor at settlement/);
+  assert.doesNotMatch(render(), /Minimum received/);
+  delete confirmation.quote.bridge;
+  delete confirmation.quote.depositAction;
+  assert.match(render(), /0.02 USDST/);
+  assert.doesNotMatch(render(), /Fallback:/);
+});
+
+test('external deposit limits gate initial loading, failures, disabled tokens and below-minimum amounts', () => {
+  const declarations = {};
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && ['depositConfigReady', 'minDepositError'].includes(node.name.getText(widgetSource))) declarations[node.name.getText(widgetSource)] = node.initializer.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const evaluate = (depositConfig, amountWei = '1000000', overrides = {}) => {
+    const exports = {};
+    runSource(`exports.ready = ${declarations.depositConfigReady}; exports.error = ${declarations.minDepositError};`, {
+      exports, depositConfig, amountWei, sourceMode: 'external', network: { depositRouter: address('1') }, balanceChainId: 1,
+      inputDecimals: 6, externalRoute: { externalSymbol: 'USDC' }, formatUnits: require('ethers').formatUnits, ...overrides,
+    });
+    return exports;
+  };
+  assert.equal(evaluate({}).ready, false);
+  assert.match(evaluate({ isError: true }).error, /unavailable/);
+  const allowed = { data: { minAmount: '1000000', isPermitted: true } };
+  assert.equal(evaluate(allowed).error, '');
+  assert.match(evaluate(allowed, '999999').error, /Minimum deposit is 1.0 USDC/);
+  assert.match(evaluate({ data: { ...allowed.data, isPermitted: false } }).error, /not permitted/);
+  assert.equal(evaluate(allowed, '0').error, '');
+  assert.equal(evaluate({ isError: true }, '1', { sourceMode: 'strato' }).error, '');
+  assert.match(evaluate(allowed, '1', { balanceChainId: undefined }).error, /unavailable/);
+});
+
+test('deposit-limit query follows chain, router and token without retaining prior limits', async () => {
+  const hooks = {};
+  let query, args;
+  runSource(fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useTradeTokens.ts'), 'utf8'), {
+    exports: hooks, require: id => {
+      if (id === '@tanstack/react-query') return { useQuery: options => { query = options; return options; } };
+      if (id === '@/lib/bridge/contractService') return { getTokenConfig: async input => { args = input; return { minAmount: '100', isPermitted: true }; } };
+      return {};
+    },
+  });
+  hooks.useRouteDepositConfig({ chainId: '1', depositRouter: address('1') }, { externalToken: address('2') }, true);
+  const key = JSON.stringify(query.queryKey);
+  assert.equal(query.enabled, true);
+  await query.queryFn();
+  assert.equal(args.chainId, 1);
+  assert.equal(args.tokenAddress, address('2'));
+  hooks.useRouteDepositConfig({ chainId: '8453', depositRouter: address('3') }, { externalToken: address('4') }, true);
+  assert.notEqual(JSON.stringify(query.queryKey), key);
+  assert.equal(query.placeholderData, undefined);
+  hooks.useRouteDepositConfig({ chainId: '9007199254740992', depositRouter: address('1') }, { externalToken: address('2') }, true);
+  assert.equal(query.enabled, false);
+});
+
+test('guest primary action opens wallet connection while authenticated trades require a valid quote', () => {
+  let button;
+  function visit(node) {
+    if (ts.isJsxOpeningElement(node) && node.tagName.getText(widgetSource) === 'Button' && node.attributes.getText(widgetSource).includes('onClick={guestMode ? requestWalletConnection')) button = node;
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const expression = name => button.attributes.properties.find(prop => prop.name?.getText(widgetSource) === name).initializer.expression.getText(widgetSource);
+  let connections = 0, reviews = 0;
+  const evaluate = guestMode => {
+    const exports = {};
+    runSource(`exports.disabled = ${expression('disabled')}; exports.click = ${expression('onClick')};`, {
+      exports, guestMode, pending: false, sourceMode: 'strato', quoteLoading: false, quote: null,
+      selectionError: '', amountError: '', feeError: '', feeBalancesReady: false, externalBalanceError: '', amountWei: '0',
+      requestWalletConnection: () => connections++, reviewTrade: () => reviews++,
+    });
+    return exports;
+  };
+  const guest = evaluate(true);
+  assert.equal(guest.disabled, false);
+  guest.click();
+  assert.equal(connections, 1);
+  assert.equal(reviews, 0);
+  assert.equal(evaluate(false).disabled, true);
+});
+
+for (const [native, approval, labels, total] of [
+  [true, false, ['Confirm deposit in your wallet'], 1],
+  [false, false, ['Sign Permit2 authorization in your wallet', 'Confirm deposit in your wallet'], 2],
+  [false, true, ['Approve USDC in your wallet', 'Sign Permit2 authorization in your wallet', 'Confirm deposit in your wallet'], 3],
+]) {
+  test(`deposit progress follows native=${native}, approval=${approval} wallet interactions`, async () => {
+    const harness = depositHarness({ native, approval });
+    await harness.handleTrade();
+    assert.equal(harness.toasts[0].title, 'Deposit submitted');
+    const walletStages = harness.stages.filter(stage => stage?.label.includes('in your wallet'));
+    assert.deepEqual(walletStages.map(stage => stage.label), labels);
+    assert.deepEqual(walletStages.map(stage => stage.step), Array.from({ length: total }, (_, index) => index + 1));
+    assert.ok(walletStages.every(stage => stage.total === total));
+    assert.equal(harness.stages.at(-1), null);
+  });
+}
+
+test('flip clears the amount and swaps valid STRATO tokens, excluding output-only and external routes', () => {
+  let flip;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'flipTokens') flip = node.initializer.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const run = (sourceMode, routable) => {
+    const exports = {}, changes = [];
+    runSource(`exports.flip = ${flip};`, { exports, sourceMode, tokenIn: { address: 'in' }, tokenOut: { address: 'out' }, routeSources: routable ? [{ address: 'out' }] : [],
+      setTokenInAddress: value => changes.push(['in', value]), setTokenOutAddress: value => changes.push(['out', value]),
+      setAmount: value => changes.push(['amount', value]), setAmountError: value => changes.push(['error', value]) });
+    exports.flip();
+    return changes;
+  };
+  assert.deepEqual(run('strato', true), [['in', 'out'], ['out', 'in'], ['amount', ''], ['error', '']]);
+  assert.deepEqual(run('external', true), []);
+  assert.deepEqual(run('strato', false), []);
+});
+
+test('quote state permits background refresh but blocks missing quotes for changed inputs', () => {
+  let loading;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'quoteLoading') loading = node.initializer.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  for (const [quote, amountWei, expected] of [[{}, '100', false], [undefined, '100', true], [undefined, '0', false]]) {
+    const exports = {};
+    runSource(`exports.loading = ${loading};`, { exports, quote, amountWei, quoteError: null });
+    assert.equal(exports.loading, expected);
+  }
+});
+
+test('quote summary distinguishes first load, changed inputs and background refresh while retaining the minimum', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const exports = {};
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteTradeSummary.tsx'), 'utf8'), { exports, require: id => {
+    if (id === 'react/jsx-runtime') return require(id);
+    if (id === '@/lib/constants') return { SWAP_FEE: '0.02', WAD: 10n ** 18n };
+    if (id === '@/utils/numberUtils') return { formatUnits: require('ethers').formatUnits, formatAmount: value => value };
+    throw new Error(id);
+  } });
+  const render = (quote, fetching) => renderToStaticMarkup(React.createElement(exports.default, {
+    quote, fetching, inputAmount: '2000000', inputDecimals: 6, inputSymbol: 'USDC', outputToken: { _symbol: 'GOLDST', customDecimals: 6 }, external: false,
+  }));
+  assert.match(render(undefined, false), /Enter an amount/);
+  assert.match(render(undefined, true), /Getting quote/);
+  const html = render({ amountOut: '1234567', minFinalOut: '1200000' }, true);
+  assert.match(html, /Updating quote/);
+  assert.match(html, /1.2 GOLDST/);
+  assert.match(html, /0.6172835 GOLDST/);
+  assert.match(html, /0.02 USDST/);
+  assert.doesNotMatch(render(undefined, true), /1.2 GOLDST/);
 });

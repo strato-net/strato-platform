@@ -415,6 +415,23 @@ export const getRouteAssets = async (
   );
 };
 
+export const getRoutePoolTokens = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<string[]> => {
+  const address = normalizeAddress(poolAddress);
+  if (config.hiddenSwapPools.has(address)) return [];
+  const [coins, pair, v3Pairs] = await Promise.all([
+    fetchPoolCoins(accessToken, address),
+    fetchPoolTokenAddresses(accessToken, address),
+    getPoolTokenPairs(accessToken, [address]),
+  ]);
+  if (coins.length >= 2) return coins.map(({ tokenAddress }) => normalizeAddress(tokenAddress));
+  if (pair) return [pair.tokenA, pair.tokenB].map(normalizeAddress);
+  const v3 = v3Pairs.get(address);
+  return v3 ? [v3.token0, v3.token1].map(normalizeAddress) : [];
+};
+
 export const findRoutePaths = (
   edges: RouteEdge[],
   tokenIn: string,

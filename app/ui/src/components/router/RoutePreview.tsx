@@ -15,11 +15,13 @@ const RoutePreview = ({
   tokens,
   minFinalOut,
   outputToken,
+  showMinimum = true,
 }: {
   steps: RouteStepQuote[];
   tokens: SwapToken[];
   minFinalOut: string;
   outputToken?: SwapToken;
+  showMinimum?: boolean;
 }) => {
   const tokenByAddress = new Map(
     tokens.map((token) => [normalizeAddress(token.address), token])
@@ -33,13 +35,9 @@ const RoutePreview = ({
 
   return (
     <div className="flex flex-col gap-3 border-t border-border pt-3">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Route</span>
-        <span className="font-medium">
-          {steps.length} step{steps.length === 1 ? "" : "s"}
-        </span>
-      </div>
-      <div className="space-y-2">
+      <details className="group">
+        <summary className="cursor-pointer text-sm font-medium">Route · {steps.length} step{steps.length === 1 ? "" : "s"} · View details</summary>
+      <div className="mt-3 space-y-2">
         {steps.map((step, index) => {
           const tokenIn = getToken(step.tokenIn);
           const tokenOut = getToken(step.tokenOut);
@@ -62,11 +60,13 @@ const RoutePreview = ({
                   {tokenOut?._symbol ?? truncateAddress(step.tokenOut)}
                 </span>
               </div>
+              <div className="mt-1 text-muted-foreground">Price impact: {Number.isFinite(step.priceImpact) ? `${step.priceImpact.toFixed(2)}%` : "Unavailable"}</div>
             </div>
           );
         })}
       </div>
-      <div className="flex items-start justify-between gap-3 text-sm">
+      </details>
+      {showMinimum && <div className="flex items-start justify-between gap-3 text-sm">
         <span className="text-muted-foreground">Minimum received</span>
         <span className="text-right font-medium">
           {formatAmount(
@@ -74,7 +74,7 @@ const RoutePreview = ({
           )}{" "}
           {outputToken?._symbol ?? ""}
         </span>
-      </div>
+      </div>}
     </div>
   );
 };

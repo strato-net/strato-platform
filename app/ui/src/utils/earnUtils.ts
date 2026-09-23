@@ -300,3 +300,21 @@ export const findPoolEarnApyInfo = (
   }
   return null;
 };
+
+export const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
+  switch (info.source) {
+    case "lending":
+      return "/dashboard/earn-lending";
+    case "vault":
+      return "/dashboard/earn-vault";
+    case "swap":
+    case "weighted_swap":
+      return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
+    case "safety":
+      return "/dashboard/advanced?tab=safety";
+    case "staking":
+      return "/dashboard/earn-staking";
+    default:
+      return "/dashboard/earn";
+  }
+};
