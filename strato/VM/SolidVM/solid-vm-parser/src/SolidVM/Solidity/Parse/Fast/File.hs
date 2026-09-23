@@ -22,10 +22,13 @@ import SolidVM.Solidity.Parse.Fast.Monad
 import SolidVM.Solidity.Parse.ParserTypes
 
 solidityFile :: P File
-solidityFile = File <$> many sourceUnit <* eof
+solidityFile = File <$> manyTill sourceUnit eof
 
 sourceUnit :: P SourceUnit
-sourceUnit = do
+sourceUnit = sourceUnit' <?> "pragma, import or declaration"
+
+sourceUnit' :: P SourceUnit
+sourceUnit' = do
   t <- peek
   case tText t of
     "pragma" -> pragma
@@ -81,7 +84,7 @@ rawUntilSemi = do
       t <- peekAt n
       case tKind t of
         TPunct | tText t == ";" -> pure (tByte t)
-        TEOF -> empty
+        TEOF -> tByte t <$ (skipToByte (tByte t) *> semi)
         _ -> semiByte (n + 1)
 
 -- | @import "path";@, @import "path" as "name";@ or
@@ -110,7 +113,7 @@ freeFunction = do
   (name, decl) <- functionDeclaration True
   case decl of
     FuncDeclaration f | SolidVM._funcVisibility f == Just SolidVM.Internal -> pure (FLFunc name f)
-    _ -> empty
+    _ -> failWith ("free function " ++ name ++ " is internal; it cannot be given another visibility")
 
 -- | Only constants may be declared at file level.
 constant :: P SourceUnit
@@ -118,4 +121,4 @@ constant = do
   (name, decl) <- stateVariable
   case decl of
     ConstantDeclaration c -> pure (FLConstant (T.pack name) c)
-    _ -> empty
+    _ -> failWith ("only constants can be declared at file level; " ++ name ++ " is a variable")

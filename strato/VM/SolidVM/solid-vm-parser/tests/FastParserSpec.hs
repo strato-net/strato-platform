@@ -313,3 +313,30 @@ spec = do
       findVer "pragma solidity   ^0.4.24 ;" `shouldBe` Right ZeroPointFour
       findVer "pragma solidity 0.5.0;" `shouldBe` Right ZeroPointFive
       findVer "pragma solidity   ^0.5.2  ;" `shouldBe` Right ZeroPointFive
+
+  describe "Error messages" $ do
+    let failing = either (unwords . words . show) (const "parsed") . parseSolidity initialParserState "f.sol"
+        ecases =
+          [ ("contract C { uint x = ; }", "\"f.sol\" (line 1, column 23): unexpected \";\" expecting expression"),
+            ("contract C { function f() public { x = 1 } }", "\"f.sol\" (line 1, column 42): unexpected \"}\" expecting \";\""),
+            ("contract C { function f() public { if (x) } }", "\"f.sol\" (line 1, column 43): unexpected \"}\" expecting \"{\" or statement"),
+            ("contract C { mapping(uint => ) m; }", "\"f.sol\" (line 1, column 30): unexpected \")\" expecting type"),
+            ("contract C { function f() public { x.; } }", "\"f.sol\" (line 1, column 38): unexpected \";\" expecting identifier"),
+            ("contract C {\n\tfunction f() public {\n\t\treturn 1 +;\n\t}\n}", "\"f.sol\" (line 3, column 27): unexpected \";\" expecting expression"),
+            ("contract C", "\"f.sol\" (line 1, column 11): unexpected end of input expecting \"{\""),
+            ("pragma solidity", "\"f.sol\" (line 1, column 16): unexpected end of input expecting \";\""),
+            ("contract C { string s = \"abc; }", "\"f.sol\" (line 1, column 25): unterminated string"),
+            ("contract C { /* never closed", "\"f.sol\" (line 1, column 14): unterminated comment"),
+            ("contract C { uint x = 1 # 2; }", "\"f.sol\" (line 1, column 25): unexpected character '#'"),
+            ("contract C { bytes b = hex\"abc\"; }", "\"f.sol\" (line 1, column 27): a hex literal has an even number of digits"),
+            ("contract C { uint constant X; }", "\"f.sol\" (line 1, column 31): constant X must be initialized"),
+            ("contract C { uint public private x; }", "\"f.sol\" (line 1, column 37): more than one visibility for x"),
+            ("contract C { constructor() {} constructor(uint a) {} }", "\"f.sol\" (line 1, column 55): more than one constructor"),
+            ("contract C { function f(uint a) public {} function f(uint b) public {} }", "\"f.sol\" (line 1, column 73): function f is already defined with these parameter types"),
+            ("contract C { function f() public { try f() { } catch Error(uint x) { } } }", "\"f.sol\" (line 1, column 68): catch Error takes one string parameter"),
+            ("function g() public {}", "\"f.sol\" (line 1, column 23): free function g is internal; it cannot be given another visibility"),
+            ("uint x = 1;", "\"f.sol\" (line 1, column 12): only constants can be declared at file level; x is a variable"),
+            ("contract C { using L for uint global; }", "\"f.sol\" (line 1, column 37): using ... global is only allowed at file level")
+          ]
+    forM_ ecases $ \(input, want) ->
+      it ("reports " ++ want) $ failing (T.pack input) `shouldBe` want

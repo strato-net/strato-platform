@@ -21,10 +21,13 @@ import SolidVM.Solidity.Parse.Fast.Types
 
 -- | A block: statements between braces.
 statements :: P [Statement]
-statements = braces (many statement)
+statements = sym "{" *> manyTill statement (sym "}")
 
 statement :: P Statement
-statement = do
+statement = statement' <?> "statement"
+
+statement' :: P Statement
+statement' = do
   t <- peek
   case tKind t of
     TWord -> case tText t of
@@ -167,11 +170,11 @@ variableDefinition = do
       pure (VarDefEntry t loc name a)
 
 location :: P (Maybe Location)
-location =
-  optionMaybe $
-    (Memory <$ reserved "memory")
-      <|> (Storage <$ reserved "storage")
-      <|> (Calldata <$ reserved "calldata")
+location = optionMaybe . next $ \t -> case tText t of
+  "memory" | tKind t == TWord -> Just Memory
+  "storage" | tKind t == TWord -> Just Storage
+  "calldata" | tKind t == TWord -> Just Calldata
+  _ -> Nothing
 
 ------------------------------------------------------------------------------
 -- try / catch
@@ -192,8 +195,8 @@ solidityTryCatch = do
       reserved "catch"
       kind <- optionMaybe identifier
       params <- optionMaybe catchParams
-      s <- statements
       (name, param) <- catchClause kind params
+      s <- statements
       pure (name, (param, s))
     pure (e, returns, success, catches)
   pure (SolidityTryCatchStatement e returns success (Map.fromList catches) a)
@@ -207,7 +210,10 @@ solidityTryCatch = do
       (Just "Error", ps) | maybe True null ps -> pure ("Error", Nothing)
       (Just "Panic", ps) | maybe True null ps -> pure ("Panic", Nothing)
       (Nothing, ps) | maybe True null ps -> pure ("Nill", Nothing)
-      _ -> empty
+      (Just "Error", _) -> failWith "catch Error takes one string parameter"
+      (Just "Panic", _) -> failWith "catch Panic takes one uint parameter"
+      (Nothing, _) -> failWith "catch takes one bytes parameter"
+      (Just other, _) -> failWith ("unknown catch clause " ++ other ++ "; expected Error or Panic")
 
 catchParams :: P [(String, SVMType.Type)]
 catchParams = parens $

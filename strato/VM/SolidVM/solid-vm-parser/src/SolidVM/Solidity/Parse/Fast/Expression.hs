@@ -10,7 +10,6 @@ module SolidVM.Solidity.Parse.Fast.Expression
 where
 
 import Blockchain.Strato.Model.Address (Address)
-import Control.Monad (when)
 import Data.Char (isHexDigit)
 import Data.Decimal (Decimal)
 import Data.Foldable (foldl')
@@ -30,7 +29,10 @@ import SolidVM.Solidity.Parse.Fast.Types
 import Text.Read (readMaybe)
 
 expression :: P Expression
-expression = do
+expression = expression' <?> "expression"
+
+expression' :: P Expression
+expression' = do
   legacy <- legacyOperatorPrecedence <$> getSt
   climb (if legacy then legacyTable else solidityTable)
 
@@ -180,14 +182,26 @@ ternary = do
 -- Operands
 
 operand :: P Expression
-operand = tuple <|> array <|> primaryExpression
+operand = primaryExpression <?> "expression"
 
+-- | Calls, member accesses and indexings following an operand; dispatched
+-- on the next token rather than tried in turn.
 callChain :: P (Expression -> Expression)
-callChain = chainl1 (functionCall <|> memberAccess <|> arrayIndex) (pure (flip (.)))
+callChain = chainl1 call (pure (flip (.)))
+  where
+    call = do
+      t <- peek
+      case tText t of
+        "(" -> functionCall
+        "." -> memberAccess
+        "[" -> arrayIndex
+        _ -> empty
 
 functionCall :: P (Expression -> Expression)
 functionCall = do
-  ~(a, args) <- withPosition (parens (namedArgs <|> commaSep expression))
+  ~(a, args) <- withPosition . parens $ do
+    t <- peek
+    if tText t == "{" then namedArgs else commaSep expression
   pure (flip (FunctionCall a) args)
 
 -- | @{name: value, ...}@; the names are dropped.
@@ -228,12 +242,16 @@ primaryExpression = do
       "true" -> boolLiteral True
       "false" -> boolLiteral False
       "new" -> newExpression
-      "hex" -> hexLiteral <|> variable
+      "hex" -> do
+        t1 <- peekAt 1
+        if tKind t1 == TString then hexLiteral else variable
       _ -> variable
     TDecimal -> decimalLiteral
     TNumber -> numberLiteral
     TString -> uncurry StringLiteral <$> withPosition stringLiteral
     TOp | tText t == "<" -> uncurry AddressLiteral <$> withPosition accountLiteral
+    TPunct | tText t == "(" -> tuple
+    TPunct | tText t == "[" -> array
     _ -> empty
 
 variable :: P Expression
@@ -270,21 +288,28 @@ numberLiteral = do
   pure (NumberLiteral a val unit)
 
 numberUnit :: P NumberUnit
-numberUnit =
-  (Wei <$ reserved "wei")
-    <|> (Szabo <$ reserved "szabo")
-    <|> (Finney <$ reserved "finney")
-    <|> (Ether <$ reserved "ether")
+numberUnit = next $ \t -> case tText t of
+  "wei" | tKind t == TWord -> Just Wei
+  "szabo" | tKind t == TWord -> Just Szabo
+  "finney" | tKind t == TWord -> Just Finney
+  "ether" | tKind t == TWord -> Just Ether
+  _ -> Nothing
 
 -- | @hex"00ff"@: an even number of hex digits between quotes.
 hexLiteral :: P Expression
-hexLiteral = try $ do
+hexLiteral = do
   ~(a, digits) <- withPosition $ do
     reserved "hex"
-    digits <- next $ \t -> if tKind t == TString then Just (T.unpack (T.init (T.tail (tText t)))) else Nothing
-    when (not (all isHexDigit digits) || odd (length digits)) empty
-    pure digits
+    digits <- T.unpack . T.init . T.tail . tText <$> peek
+    hexDigits digits
+    digits <$ next (const (Just ()))
   pure (HexaLiteral a digits)
+
+hexDigits :: String -> P ()
+hexDigits digits
+  | not (all isHexDigit digits) = failWith "a hex literal has only hex digits"
+  | odd (length digits) = failWith "a hex literal has an even number of digits"
+  | otherwise = pure ()
 
 -- | @<hex>@ with nothing between the brackets; read from the source text,
 -- since its parts are not tokens.
@@ -308,7 +333,10 @@ accountLiteral = do
 -- an array or an object of these. A quoted string that reads as an address
 -- is an address; @string(...)@ pins the type.
 literal :: P Expression
-literal = do
+literal = literal' <?> "literal"
+
+literal' :: P Expression
+literal' = do
   t <- peek
   case tKind t of
     TNumber -> numberLiteral
@@ -352,15 +380,15 @@ castLiteral = do
     -- a string, or the text of a number token: hex digits, with or without 0x
     addressContent = do
       s <- stringLiteral <|> next (\t -> if tKind t == TNumber then Just (T.unpack (stripHex (tText t))) else Nothing)
-      maybe empty pure (readMaybe s)
+      maybe (failWith (show s ++ " is not an address")) pure (readMaybe s)
     stripHex s = fromMaybe s (T.stripPrefix "0x" s)
     decimalContent =
       next (\t -> if tKind t == TDecimal then Just (decimalOf t) else Nothing)
-        <|> (stringLiteral >>= maybe empty pure . readMaybe)
+        <|> (stringLiteral >>= \s -> maybe (failWith (show s ++ " is not a decimal")) pure (readMaybe s))
         <|> (fromInteger <$> integer)
     bytesContent = do
       s <- stringLiteral
-      when (not (all isHexDigit s) || odd (length s)) empty
+      hexDigits s
       pure s
 
 -- | @{key: literal, ...}@; a key is a word or a string.

@@ -22,7 +22,10 @@ import SolidVM.Solidity.Parse.ParserTypes
 -- | A type with its array dimensions: @T[n][m]@ is @(T[n])[m]@. A dimension
 -- may be an arithmetic expression over number literals.
 simpleTypeExpression :: P SVMType.Type
-simpleTypeExpression = do
+simpleTypeExpression = simpleTypeExpression' <?> "type"
+
+simpleTypeExpression' :: P SVMType.Type
+simpleTypeExpression' = do
   base <- simpleType <|> mappingType
   sizes <- many (brackets (optionMaybe intExpr))
   pure (foldl SVMType.Array base sizes)
@@ -66,7 +69,7 @@ builtin w = case w of
 userType :: P SVMType.Type
 userType = do
   name <- identifier
-  member <- optionMaybe (try (sym "." *> identifier))
+  member <- optionMaybe (sym "." *> identifier)
   case member of
     Just m -> pure (SVMType.UnknownLabel (name ++ "." ++ m))
     Nothing -> do

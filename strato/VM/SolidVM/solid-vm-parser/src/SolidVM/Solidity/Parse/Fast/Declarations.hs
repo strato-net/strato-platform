@@ -18,8 +18,7 @@ module SolidVM.Solidity.Parse.Fast.Declarations
   )
 where
 
-import Blockchain.VM.SolidException (invalidArguments, parseError)
-import Control.Monad (when)
+import Control.Monad (foldM, when)
 import Data.List (nub, uncons)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust, listToMaybe)
@@ -33,7 +32,7 @@ import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Declarations (Declaration (..), SourceUnit, SourceUnitF (..))
 import SolidVM.Solidity.Parse.Fast.Expression
-import SolidVM.Solidity.Parse.Fast.Lexer (Token (..))
+import SolidVM.Solidity.Parse.Fast.Lexer (Kind (..), Token (..))
 import SolidVM.Solidity.Parse.Fast.Monad
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Fast.Statement
@@ -57,11 +56,12 @@ solidityContract = do
     -- constructor arguments given to a parent here are not kept
     parents <- option [] $ reserved "is" *> commaSep1 (dotted <* optional (parens (commaSep expression)))
     pure (kind, name, parents)
-  declarations <- braces (many (declaration False))
+  declarations <- sym "{" *> manyTill (declaration False) (sym "}")
   constructor <- case [c | (_, ConstructorDeclaration c) <- declarations] of
     [] -> pure Nothing
     [c] -> pure (Just c)
-    _ -> empty
+    _ -> failWith "more than one constructor"
+  functions <- foldM overload Map.empty [(stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
   pure . FLContract $
     SolidVM.Contract
       { SolidVM._contractName = stringToLabel name,
@@ -73,7 +73,7 @@ solidityContract = do
         SolidVM._structs = Map.fromList [(n, (\(k, v) -> (k, v, x)) <$> vals) | (n, StructDeclaration (SolidVM.Struct vals _ x)) <- declarations],
         SolidVM._errors = Map.fromList [(n, (\(k, v) -> (k, v, x)) <$> vals) | (n, ErrorDeclaration (SolidVM.Error vals _ x)) <- declarations],
         SolidVM._events = Map.fromList [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations],
-        SolidVM._functions = Map.fromListWith overload [(stringToLabel n, f) | (n, FuncDeclaration f) <- declarations],
+        SolidVM._functions = functions,
         SolidVM._modifiers = Map.fromList [(stringToLabel n, m) | (n, ModifierDeclaration m) <- declarations],
         SolidVM._usings = [u | (_, UsingDeclaration u) <- declarations],
         SolidVM._constructor = constructor,
@@ -83,15 +83,21 @@ solidityContract = do
       }
   where
     dotted = T.unpack . T.intercalate "." . map T.pack <$> sepBy1 identifier (sym ".")
-    overload new old =
-      let params f = map snd (SolidVM._funcArgs f)
-       in if params old == params new || params new `elem` map params (SolidVM._funcOverload old)
-            then invalidArguments "Function is already defined with similar params." (SolidVM._funcArgs new)
-            else old {SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]}
+    -- a function may be redefined only with different parameter types
+    overload fs (name, new) = case Map.lookup name fs of
+      Nothing -> pure (Map.insert name new fs)
+      Just old
+        | params new `elem` map params (old : SolidVM._funcOverload old) ->
+            failWith ("function " ++ labelToString name ++ " is already defined with these parameter types")
+        | otherwise -> pure (Map.insert name old {SolidVM._funcOverload = SolidVM._funcOverload old ++ [new]} fs)
+    params f = map snd (SolidVM._funcArgs f)
 
 -- | Anything a contract declares; @free@ for a declaration at file level.
 declaration :: Bool -> P (String, Declaration)
-declaration free = do
+declaration free = declaration' free <?> "declaration"
+
+declaration' :: Bool -> P (String, Declaration)
+declaration' free = do
   t <- peek
   case tText t of
     "struct" -> structDeclaration
@@ -183,7 +189,7 @@ usingDeclaration free = do
     reserved "for"
     typ <- (Nothing <$ sym "*") <|> (Just <$> simpleTypeExpression)
     global <- isJust <$> optionMaybe (reserved "global")
-    when (global && not free) empty
+    when (global && not free) $ failWith "using ... global is only allowed at file level"
     semi
     pure (lib, typ, global)
   pure (Xabi.Using lib typ global a)
@@ -199,14 +205,7 @@ stateVariable :: P (String, Declaration)
 stateVariable = do
   ~(a, (t, keywords, name, value)) <- withPosition $ do
     t <- simpleTypeExpression
-    keywords <-
-      many $
-        (KConstant <$ reserved "constant")
-          <|> (KImmutable <$ reserved "immutable")
-          <|> (KPublic <$ reserved "public")
-          <|> (KPrivate <$ reserved "private")
-          <|> (KInternal <$ reserved "internal")
-          <|> (KRecord <$ reserved "record")
+    keywords <- many keyword
     name <- identifier
     value <- optionMaybe (sym "=" *> expression)
     pure (t, keywords, name, value)
@@ -216,11 +215,21 @@ stateVariable = do
     [KPublic] -> pure (Just SolidVM.Public)
     [KInternal] -> pure (Just SolidVM.Internal)
     [KPrivate] -> pure (Just SolidVM.Private)
-    _ -> empty
-  pure . (name,) $
-    if KConstant `elem` keywords
-      then ConstantDeclaration (SolidVM.ConstantDecl t visibility (fromMaybe (parseError "constants must be initialized" name) value) a)
-      else VariableDeclaration (SolidVM.VariableDecl t visibility value a (KImmutable `elem` keywords))
+    _ -> failWith ("more than one visibility for " ++ name)
+  if KConstant `elem` keywords
+    then case value of
+      Just v -> pure (name, ConstantDeclaration (SolidVM.ConstantDecl t visibility v a))
+      Nothing -> failWith ("constant " ++ name ++ " must be initialized")
+    else pure (name, VariableDeclaration (SolidVM.VariableDecl t visibility value a (KImmutable `elem` keywords)))
+  where
+    keyword = next $ \t -> case tText t of
+      "constant" | tKind t == TWord -> Just KConstant
+      "immutable" | tKind t == TWord -> Just KImmutable
+      "public" | tKind t == TWord -> Just KPublic
+      "private" | tKind t == TWord -> Just KPrivate
+      "internal" | tKind t == TWord -> Just KInternal
+      "record" | tKind t == TWord -> Just KRecord
+      _ -> Nothing
 
 ------------------------------------------------------------------------------
 -- Functions
@@ -249,11 +258,14 @@ functionBody free = do
   let variadic = (== SVMType.Variadic) . snd . snd
       lastIsVariadic = maybe False (variadic . fst) (uncons (reverse args))
       oneVariadic = length (filter variadic args) == 1
-  when (lastIsVariadic /= oneVariadic) empty
+  case (lastIsVariadic, oneVariadic) of
+    (True, False) -> failWith "only one variadic parameter is allowed"
+    (False, True) -> failWith "the variadic parameter must be the last one"
+    _ -> pure ()
   (returns, visibility, mutability, virtual, overrides, modifiers) <- functionModifiers
   end <- getPos
   contents <- (Just <$> statements) <|> (Nothing <$ semi)
-  when (free && (virtual || isJust overrides)) empty
+  when (free && (virtual || isJust overrides)) $ failWith "free functions cannot be virtual or override"
   let indexed xs = zipWith (\(name, (loc, t)) i -> (if T.null name then Nothing else Just (textToLabel name), SolidVM.IndexedType i t loc)) xs [0 ..]
   pure
     SolidVM.Func
@@ -276,12 +288,12 @@ parameters :: P [(Text, (Bool, Maybe Location, SVMType.Type))]
 parameters = parens $
   commaSep $ do
     t <- simpleTypeExpression
-    (indexed, loc) <-
-      option (False, Nothing) $
-        ((True, Nothing) <$ reserved "indexed")
-          <|> ((False, Just Storage) <$ reserved "storage")
-          <|> ((False, Just Memory) <$ reserved "memory")
-          <|> ((False, Just Calldata) <$ reserved "calldata")
+    (indexed, loc) <- option (False, Nothing) . next $ \k -> case tText k of
+      "indexed" | tKind k == TWord -> Just (True, Nothing)
+      "storage" | tKind k == TWord -> Just (False, Just Storage)
+      "memory" | tKind k == TWord -> Just (False, Just Memory)
+      "calldata" | tKind k == TWord -> Just (False, Just Calldata)
+      _ -> Nothing
     name <- option "" identifier
     pure (T.pack name, (indexed, loc, t))
 
@@ -304,20 +316,21 @@ functionModifiers ::
       [(SolidString, [SolidVM.Expression])]
     )
 functionModifiers = do
-  mods <-
-    many $
-      (ReturnsMod . map (\(name, (_, loc, t)) -> (name, (loc, t))) <$> (reserved "returns" *> parameters))
-        <|> (VisibilityMod SolidVM.Public <$ reserved "public")
-        <|> (VisibilityMod SolidVM.Private <$ reserved "private")
-        <|> (VisibilityMod SolidVM.External <$ reserved "external")
-        <|> (VisibilityMod SolidVM.Internal <$ reserved "internal")
-        <|> (MutabilityMod SolidVM.Constant <$ reserved "constant")
-        <|> (MutabilityMod SolidVM.Pure <$ reserved "pure")
-        <|> (MutabilityMod SolidVM.View <$ reserved "view")
-        <|> (MutabilityMod SolidVM.Payable <$ reserved "payable")
-        <|> (VirtualMod <$ reserved "virtual")
-        <|> (OverrideMod <$> (reserved "override" *> option [] (parens (commaSep identifier))))
-        <|> (CallMod <$> ((,) <$> (stringToLabel <$> identifier) <*> option [] (parens (commaSep expression))))
+  mods <- many $ do
+    t <- peek
+    case tText t of
+      "returns" -> ReturnsMod . map (\(name, (_, loc, t')) -> (name, (loc, t'))) <$> (reserved "returns" *> parameters)
+      "public" -> VisibilityMod SolidVM.Public <$ reserved "public"
+      "private" -> VisibilityMod SolidVM.Private <$ reserved "private"
+      "external" -> VisibilityMod SolidVM.External <$ reserved "external"
+      "internal" -> VisibilityMod SolidVM.Internal <$ reserved "internal"
+      "constant" -> MutabilityMod SolidVM.Constant <$ reserved "constant"
+      "pure" -> MutabilityMod SolidVM.Pure <$ reserved "pure"
+      "view" -> MutabilityMod SolidVM.View <$ reserved "view"
+      "payable" -> MutabilityMod SolidVM.Payable <$ reserved "payable"
+      "virtual" -> VirtualMod <$ reserved "virtual"
+      "override" -> OverrideMod <$> (reserved "override" *> option [] (parens (commaSep identifier)))
+      _ -> CallMod <$> ((,) <$> (stringToLabel <$> identifier) <*> option [] (parens (commaSep expression)))
   pure
     ( concat [v | ReturnsMod v <- mods],
       listToMaybe [v | VisibilityMod v <- mods],

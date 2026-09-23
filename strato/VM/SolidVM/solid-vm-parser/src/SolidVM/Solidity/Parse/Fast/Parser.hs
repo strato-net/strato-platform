@@ -25,7 +25,7 @@ import SolidVM.Solidity.Parse.Fast.Lexer
 import SolidVM.Solidity.Parse.Fast.Monad
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Fast.Types
-import Text.Parsec.Error (Message (..), ParseError, newErrorMessage)
+import Text.Parsec.Error (Message (..), ParseError, addErrorMessage, newErrorMessage)
 import Text.Parsec.Pos (newPos)
 
 -- | A whole source file.
@@ -45,17 +45,21 @@ parseArg = runRule (literal <* eof)
 parseExternalCallArgs :: ParserState -> String -> Text -> Either ParseError (SolidString, [SVMType.Type])
 parseExternalCallArgs = runRule ((,) <$> option "fallback" identifier <*> parens (commaSep simpleType))
 
--- | Runs a rule over the tokens of a text. On failure the error names the
--- furthest token any rule failed at.
+-- | Runs a rule over the tokens of a text. On failure the error is at the
+-- furthest token any rule failed at: what stood there, what could have, or
+-- why it was rejected.
 runRule :: P a -> ParserState -> String -> Text -> Either ParseError a
 runRule rule st name src = case runP rule (St toks src name st) of
   Right (a, _) -> Right a
-  Left i ->
+  Left (i, err) ->
     let t = toks V.! i
-        msg = case tKind t of
+        pos = newPos name (tLine t) (tCol t)
+        unexpected = case tKind t of
           TEOF -> SysUnExpect ""
-          TError -> Message (tStr t)
           _ -> SysUnExpect (show (T.unpack (tText t)))
-     in Left (newErrorMessage msg (newPos name (tLine t) (tCol t)))
+     in Left $ case (tKind t, err) of
+          (TError, _) -> newErrorMessage (Message (tStr t)) pos
+          (_, Because why) -> newErrorMessage (Message why) pos
+          (_, Expecting es) -> foldr (addErrorMessage . Expect . T.unpack) (newErrorMessage unexpected pos) es
   where
     toks = tokenize src

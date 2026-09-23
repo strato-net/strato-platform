@@ -134,7 +134,13 @@ tokenize (Text arr start len) = runST $ do
         | i >= j = (l, c)
         | otherwise =
             let Iter ch d = iterArray arr i
-             in if ch == '\n' then advance (i + d) j (l + 1) 1 else advance (i + d) j l (c + 1)
+             in if
+                  | ch == '\n' -> advance (i + d) j (l + 1) 1
+                  | ch == '\t' -> advance (i + d) j l (tab c)
+                  | otherwise -> advance (i + d) j l (c + 1)
+
+      -- the column after a tab, as parsec counts it
+      tab c = c + 8 - ((c - 1) `mod` 8)
 
       slice i j = Text arr i (j - i)
 
@@ -159,6 +165,7 @@ tokenize (Text arr start len) = runST $ do
              in if
                   | b == 0x20 -> go mv k (i + 1) line (col + 1)
                   | b == 0x0a -> go mv k (i + 1) (line + 1) 1
+                  | b == 0x09 -> go mv k (i + 1) line (tab col)
                   | b == 0x2f, i + 1 < end, byteAt (i + 1) == 0x2f ->
                       let j = spanP (/= '\n') i in go mv k j line (col + T.length (slice i j))
                   | b == 0x2f, i + 1 < end, byteAt (i + 1) == 0x2a ->
@@ -205,13 +212,13 @@ tokenize (Text arr start len) = runST $ do
           | isOpChar ch ->
               let run = slice i (spanP isOpChar i)
                   match n
-                    | n == 0 = err (after i) "unexpected character"
+                    | n == 0 = err (after i) ("unexpected character " ++ show ch)
                     | otherwise =
                         let op = T.take n run
                          in if Set.member op operatorSet then flat TOp (i + n) 0 "" else match (n - 1)
                in match (min longestOperator (T.length run))
           | ch `elem` ("(){}[];," :: String) -> flat TPunct (i + 1) 0 ""
-          | otherwise -> err (after i) "unexpected character"
+          | otherwise -> err (after i) ("unexpected character " ++ show ch)
 
   go mv0 0 start 1 1
 
