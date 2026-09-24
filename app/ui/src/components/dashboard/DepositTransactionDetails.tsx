@@ -23,6 +23,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const DEPOSIT_STATUS_OPTIONS = [
     ...BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4),
     { value: 6, label: "On Hold" },
+    { value: 7, label: "Announced" },
   ];
 
   const {
@@ -211,6 +212,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
               <AlertCircle className="h-3 w-3 mr-1" />
               On Hold
+            </span>
+          );
+        } else if (statusNum === 7) {
+          // Announced by a solver against a bond; not yet observed by the relayer
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">
+              <AlertCircle className="h-3 w-3 mr-1" />
+              Announced
             </span>
           );
         }
