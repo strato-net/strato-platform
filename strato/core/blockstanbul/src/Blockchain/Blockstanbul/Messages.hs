@@ -181,6 +181,9 @@ data OutEvent
     GapFound {have :: Integer, require :: Integer, peer :: Address}
   | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
   | RunPreprepare Block
+  | -- Whether this node is the proposer for the view just entered; the VM
+    -- builds candidate blocks only while it is.
+    ProposerStatus Bool
   deriving (Eq, Show, Generic)
 
 type EOutEvent = Either OutEvent OutEvent
@@ -196,6 +199,7 @@ instance Format OutEvent where
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
   format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
+  format (ProposerStatus p) = "ProposerStatus " ++ show p
 
 blkNum :: Block -> String
 blkNum = show . number . blockBlockData
@@ -229,6 +233,7 @@ outShortLog loc eoev = do
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
+      ProposerStatus p -> prefix ++ CL.blue "PROPOSER_STATUS " ++ show p
 
 instance NFData OutEvent
 

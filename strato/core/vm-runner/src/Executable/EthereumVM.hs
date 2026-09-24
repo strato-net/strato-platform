@@ -86,6 +86,10 @@ ethereumVM = runResourceT $ do
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()
 
+        -- The sequencer reports the proposer for every view; the latest word wins.
+        for_ (listToMaybe . reverse $ [ p | VmProposerStatus p <- toList seqEvents ]) $ \p ->
+          contextModify' $ \cs@(ContextState{}) -> cs{_isProposer = p}
+
         -- Handle flush mempool events immediately
         forM_ seqEvents $ \event -> case event of
           VmFlushMempool req -> handleVmFlushMempool req
@@ -197,6 +201,7 @@ logEventSummaries evs = do
     getNames (VmRunPreprepare _) = "VmRunPreprepare"
     getNames (VmSelfAddress _) = "VmSelfAddress"
     getNames (VmFlushMempool _) = "FlushMempool"
+    getNames (VmProposerStatus _) = "VmProposerStatus"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x

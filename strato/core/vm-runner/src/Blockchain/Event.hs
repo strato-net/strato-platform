@@ -68,6 +68,7 @@ insertInBatch e b = case e of
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
   VmSelfAddress sa -> b {selfAddress = Just sa}
   VmFlushMempool _ -> b  -- Flush mempool events are handled immediately, not batched
+  VmProposerStatus _ -> b  -- Proposer status is applied immediately, not batched
 
 data BlockDelta a = BlockDelta
   { _inBlock :: a
