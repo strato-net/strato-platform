@@ -322,8 +322,7 @@ addBlockTransactions b@OutputBlock {obBlockData = bd, obReceiptTransactions = tr
 
   runPatches bd
 
-  when (Conf.sqlDiff $ vmConfig ethConf) $
-    emitOut . OutVMEvents =<< sendNewActionMessage b trrs
+  emitOut . OutVMEvents =<< sendNewActionMessage b trrs
 
   timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
   resetAddressStateTxDBMap
@@ -368,9 +367,8 @@ addTransactions blockData txs proposer =
   timeit ("addTransactions, " ++ show (length txs) ++ " TXs") (Just vmBlockInsertionMined) $ do
     rewardResult <- payBlockRewards blockData proposer
     trrs <- Bagger.attachBlockRewards blockData rewardResult <$> go (getBlockGasLimit blockData) txs DL.empty
-    when (Conf.sqlDiff $ vmConfig ethConf) $ do
-      mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
-      emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
+    mapM_ (outputTransactionResult blockData blockHeaderHash) trrs
+    emitOut . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
     go :: VMBase m =>
