@@ -45,7 +45,6 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.ProposalFacts (ProposalFacts (..))
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
-import Blockchain.Data.Log
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
@@ -64,7 +63,6 @@ import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.SyncDB (updateVmBestBlockNumber)
 import SolidVM.Model.Delta
-import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -716,12 +714,6 @@ setNewAddresses trr@(TxRunResult _ result _ before after _) = do
       unseen <- filterM (fmap not . NoCache.addressStateExists) . moveToFront $ erNewContractAddress erResult
       return trr {trrNewAddresses = unseen}
 
-mkLogEntry :: Keccak256 -> Keccak256 -> Log -> LogDB
-mkLogEntry bHash tHash Log {..} = LogDB bHash tHash address (topics `indexMaybe` 0) (topics `indexMaybe` 1) (topics `indexMaybe` 2) (topics `indexMaybe` 3) logData bloom
-
-mkEventEntry :: Event -> EventDB
-mkEventEntry Event {..} = EventDB evBlockHash evTxHash evContractAddress evName $ map eventArgValueString evArgs -- drop everything but the rendered value string; only slipstream needs the rest
-
 outputTransactionResult ::
   BlockHeader ->
   (BlockHeader -> Keccak256) ->
@@ -745,14 +737,12 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
       afterAddresses = S.fromList [x | (x, ASModification _) <- M.toList afterMap]
       afterDeletes = S.fromList [x | (x, ASDeleted) <- M.toList afterMap]
       ranBlockHash = hashFunction b
-      (!response, theTrace', theLogs, theEvents) =
+      (!response, theTrace') =
         case result of
-          Left _ -> (Nothing, [], [], [])
+          Left _ -> (Nothing, [])
           Right r ->
-            (erReturnVal r, unlines $ reverse $ erTrace r, erLogs r, erEvents r)
+            (erReturnVal r, unlines $ reverse $ erTrace r)
 
-  mapM_ (emitOut . OutLog . mkLogEntry ranBlockHash theHash) theLogs
-  emitOut . OutEvent $ mkEventEntry <$> theEvents
   let txr = NewTransactionResult $ TransactionResult
         { transactionResultBlockHash = ranBlockHash,
           transactionResultTransactionHash = theHash,
@@ -817,12 +807,6 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
         shortDescription t ++ " " ++ extra,
         "t = " ++ printf "%.5f" (realToFrac deltaT :: Double) ++ "s"
       ]
-
-indexMaybe :: [a] -> Int -> Maybe a
-indexMaybe _ i | i < 0 = error "indexMaybe called for i < 0"
-indexMaybe [] _ = Nothing
-indexMaybe (x : _) 0 = Just x
-indexMaybe (_ : rest) i = indexMaybe rest (i - 1)
 
 ----------------
 

@@ -26,8 +26,6 @@ emitOut :: VmOutEvent -> ContextM ()
 emitOut (OutVMEvents vmes) = void $ produceVMEvents vmes
 emitOut (OutIndexEvent e) = void $ produceIndexEvents [e]
 emitOut (OutStateDiff diff) = void $ produceIndexEvents [StateDiffEntry diff]
-emitOut (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-emitOut (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
 emitOut (OutASM asm) =
   when (not $ Conf.sqlDiff $ Conf.vmConfig ethConf) $
     timeit "produceAddressStateUpdates" (Just vmBlockInsertionMined) $
