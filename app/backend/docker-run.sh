@@ -11,8 +11,7 @@ else
   exit 1
 fi
 
-STRATO_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
-STRATO_HOSTNAME=$(echo "$STRATO_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+STRATO_HOSTNAME=host.docker.internal  # host-side STRATO processes, aliased by docker-compose
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 STRATO_API_URL="http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2"
 

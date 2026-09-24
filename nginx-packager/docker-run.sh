@@ -37,9 +37,9 @@ RPC_PORT=${RPC_PORT:-8545}
 # over /rpc, so deployments that expose the SMD wallet must set JSONRPC_ENABLED=true.
 JSONRPC_ENABLED=${JSONRPC_ENABLED:-false}
 
+# Host-side STRATO processes are reached as host.docker.internal (aliased by docker-compose)
+STRATO_HOSTNAME=host.docker.internal
 # Read config from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
-STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 HTTP_PORT=$(yq '.networkConfig.httpPort' /config/ethconf.yaml)
 VAULT_URL=$(yq '.urlConfig.vaultUrl' /config/ethconf.yaml | xargs)

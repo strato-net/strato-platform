@@ -2,7 +2,7 @@
 
 Every STRATO node serves an Ethereum-compatible JSON-RPC API at `/rpc`. Wallets (MetaMask, the STRATO wallet extension) and EVM libraries (viem, ethers) use it to read chain data and submit signed transactions.
 
-The API is **on by default**: the `ethereum-jsonrpc` process listens on port 8545 and nginx proxies `/rpc` to it. Node operators can turn it off with `--jsonrpc=false`.
+The API is **on by default**: the `ethereum-jsonrpc` process listens on port 8545 on the host's container-facing address (`apiConfig.apiListenAddress`, never a public interface) and nginx proxies `/rpc` to it. Node operators can turn it off with `--jsonrpc=false`.
 
 ## Endpoints
 

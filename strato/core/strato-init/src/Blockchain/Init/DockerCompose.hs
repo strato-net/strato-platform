@@ -5,7 +5,7 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
+import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
@@ -15,22 +15,21 @@ import Data.Default (def)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
-import System.Process (readProcess)
 
 generateDockerCompose :: IO ()
 generateDockerCompose = do
   uid <- show <$> getEffectiveUserID
   gid <- show <$> getEffectiveGroupID
-  
-  localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
 
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
-      rpcPort = "8545"
+      rpcPort = show jsonRpcPort
       stratoApiPort = show $ apiPort (apiConfig conf)
       userGid = uid ++ ":" ++ gid
-      hostGateway = Just [localHostname ++ ":host-gateway"]
+      -- Containers reach host-side processes as host.docker.internal: Docker
+      -- Desktop defines it natively, Linux needs this host-gateway alias.
+      hostGateway = Just ["host.docker.internal:host-gateway"]
 
   -- Disable Docker logging since we redirect stdout/stderr to files
   let noLogging = Just Logging

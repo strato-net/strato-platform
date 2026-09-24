@@ -1,6 +1,5 @@
 # All config derived from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' /config/ethconf.yaml)
-STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+STRATO_HOSTNAME=host.docker.internal  # host-side STRATO processes, aliased by docker-compose
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' /config/ethconf.yaml)
 
 # Resolve hostname to IPv4 via /etc/hosts to avoid IPv6 connection failures in Docker.
