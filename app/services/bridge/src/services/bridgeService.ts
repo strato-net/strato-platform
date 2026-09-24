@@ -23,6 +23,8 @@ import {
   buildWithdrawalReview,
   buildWithdrawalAuthorization,
   cancelExpiredWithdrawal,
+  checkWithdrawalPolicy,
+  getConfirmedRotationState,
   getExternalChainLatestTimestamp,
   getReservationId,
   getReservationState,
@@ -30,6 +32,7 @@ import {
   proposeWithdrawalReview,
   releaseWithdrawal,
   reserveWithdrawal,
+  WithdrawalManualReviewError,
 } from "./externalWithdrawalService";
 import {
   getDepositStatusByIdentity,
@@ -658,6 +661,27 @@ export const processExternalWithdrawal = async (
     config.externalAssetBridge.address!,
   );
 
+  if (String(withdrawal.bridgeStatus) === "1") {
+    // Every verifier must clear the withdrawal before markWithdrawalReady
+    // starts the authorization clock: a verifier-demanded manual review is
+    // recorded on STRATO while the withdrawal is still INITIATED, and the
+    // clock only starts after the Safe approval executes (same lifecycle as
+    // route-threshold reviews).
+    try {
+      await checkWithdrawalPolicy(authorization);
+    } catch (error) {
+      if (error instanceof WithdrawalManualReviewError) {
+        await recordExternalWithdrawalReview(withdrawal);
+        logInfo(
+          "BridgeService",
+          `Withdrawal ${withdrawal.withdrawalId} entered verifier-requested manual review before authorization`,
+        );
+        return;
+      }
+      throw error;
+    }
+  }
+
   if (
     String(withdrawal.bridgeStatus) === "1" ||
     (String(withdrawal.bridgeStatus) === "2" && manualReviewApproved)
@@ -678,6 +702,58 @@ export const processExternalWithdrawal = async (
   let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
   const authorizationExpired =
     reservationState.latestTimestamp > BigInt(authorization.deadline);
+
+  if (
+    !withdrawal.reservationId &&
+    reservationState.status === 0 &&
+    !authorizationExpired &&
+    reservationState.signerSetVersion > BigInt(authorization.signerSetVersion)
+  ) {
+    // The latest-head reads above are independent and can mix blocks, so
+    // they only nominate a refresh. Rotation AND non-reservation must hold
+    // at one confirmed block before the committed version is overwritten: a
+    // reservation mined just before the rotation still binds the original
+    // authorization digest, and release/refund verifiers hold it to that
+    // digest forever.
+    const confirmed = await getConfirmedRotationState(authorization);
+    if (
+      confirmed.reserved ||
+      confirmed.signerSetVersion <= BigInt(authorization.signerSetVersion)
+    ) {
+      // Either a reservation bound to the original authorization exists, or
+      // the rotation is not yet confirmed. Defer: the next poll's latest
+      // reads will be coherent and recover the reservation normally with
+      // the original authorization.
+      logInfo(
+        "BridgeService",
+        `Deferred signer set refresh for withdrawal ${withdrawal.withdrawalId}: rotation and reservation state not yet coherent at the confirmed block`,
+      );
+      return;
+    }
+    // A vault signer-set rotation after READY strands the committed
+    // authorization: verifiers and the vault only honor the current set.
+    // Move the committed version forward on STRATO (the authorization window
+    // is unchanged) so the withdrawal can still be signed and reserved
+    // before its deadline. Commit the CONFIRMED version, not the latest-head
+    // one: the contract only moves forward, so committing an unconfirmed
+    // rotation that reorganizes away would strand the withdrawal again.
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "refreshWithdrawalSignerSet",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        signerSetVersion: confirmed.signerSetVersion.toString(),
+      },
+    });
+    authorization.signerSetVersion = confirmed.signerSetVersion.toString();
+    logInfo(
+      "BridgeService",
+      `Refreshed signer set version for withdrawal ${withdrawal.withdrawalId} after vault rotation`,
+      { signerSetVersion: confirmed.signerSetVersion.toString() },
+    );
+  }
+
   let reservationId = withdrawal.reservationId;
   if (!reservationId) {
     if (reservationState.status === 0 && authorizationExpired) {
@@ -721,10 +797,21 @@ export const processExternalWithdrawal = async (
     reservationState.status === 3 ||
     (reservationState.status === 1 && authorizationExpired)
   ) {
+    // The vault cancellation always runs: an expired RESERVED reservation
+    // must be cancelled on the vault whatever STRATO metadata says, or
+    // refund verifiers keep rejecting the still-reserved withdrawal. The
+    // call is idempotent — already-cancelled reservations only have their
+    // cancellation hash read back.
     const cancellationTxHash = await cancelExpiredWithdrawal(
       authorization,
       reservationId,
     );
+    if (withdrawal.cancellationTxHash) {
+      // The STRATO record is one-shot: the refund digest binds the recorded
+      // hash, so re-recording would invalidate in-flight refund
+      // attestations. Only the write is skipped.
+      return;
+    }
     await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
@@ -767,14 +854,9 @@ export const processExternalWithdrawal = async (
   );
 };
 
-export const queueExternalWithdrawalReview = async (
+const recordExternalWithdrawalReview = async (
   withdrawal: WithdrawalInfo,
 ): Promise<void> => {
-  if (!withdrawal.requiresManualReview) {
-    throw new Error(
-      `Withdrawal ${withdrawal.withdrawalId} does not require manual review`,
-    );
-  }
   const sourceChainId = await getStratoNetworkId();
   const review = buildWithdrawalReview(
     withdrawal,
@@ -793,6 +875,17 @@ export const queueExternalWithdrawalReview = async (
       proposalHash: proposal.proposalHash,
     },
   });
+};
+
+export const queueExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.requiresManualReview) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} does not require manual review`,
+    );
+  }
+  await recordExternalWithdrawalReview(withdrawal);
 };
 
 export const processPendingExternalWithdrawalReview = async (

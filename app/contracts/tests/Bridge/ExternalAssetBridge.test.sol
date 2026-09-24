@@ -1982,6 +1982,211 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
     }
 
+    function it_refreshes_signer_set_only_for_live_unreserved_withdrawals() {
+        stratoToken.mint(address(user), 20e18);
+        user.do(address(stratoToken), "approve", address(bridge), 20e18);
+        uint256 withdrawalId = user.do(
+            address(bridge),
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            address(stratoToken),
+            10e18
+        );
+        uint256 deadline = block.timestamp + 1800;
+        relayer.do(
+            address(bridge),
+            "markWithdrawalReady",
+            withdrawalId,
+            block.timestamp,
+            deadline,
+            1
+        );
+
+        bool reverted = false;
+        try user.do(
+            address(bridge),
+            "refreshWithdrawalSignerSet",
+            withdrawalId,
+            2
+        ) {} catch { reverted = true; }
+        require(reverted, "Only the operator may refresh the signer set");
+
+        reverted = false;
+        try relayer.do(
+            address(bridge),
+            "refreshWithdrawalSignerSet",
+            withdrawalId,
+            1
+        ) {} catch { reverted = true; }
+        require(reverted, "Refresh must require a newer signer set");
+
+        relayer.do(
+            address(bridge),
+            "refreshWithdrawalSignerSet",
+            withdrawalId,
+            2
+        );
+        (
+            ,
+            uint256 refreshedDeadline,
+            uint256 signerSetVersion,
+
+        ) = bridge.withdrawalAuthorizations(withdrawalId);
+        require(
+            signerSetVersion == 2 && refreshedDeadline == deadline,
+            "Refresh must move the signer set forward without touching the window"
+        );
+
+        relayer.do(
+            address(bridge),
+            "recordWithdrawalReservation",
+            withdrawalId,
+            "0xaaaa",
+            "0xbbbb"
+        );
+        reverted = false;
+        try relayer.do(
+            address(bridge),
+            "refreshWithdrawalSignerSet",
+            withdrawalId,
+            3
+        ) {} catch { reverted = true; }
+        require(reverted, "Reserved withdrawal must not refresh");
+
+        uint256 secondId = user.do(
+            address(bridge),
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            address(stratoToken),
+            10e18
+        );
+        relayer.do(
+            address(bridge),
+            "markWithdrawalReady",
+            secondId,
+            block.timestamp,
+            block.timestamp + 10,
+            1
+        );
+        fastForward(11);
+        reverted = false;
+        try relayer.do(
+            address(bridge),
+            "refreshWithdrawalSignerSet",
+            secondId,
+            2
+        ) {} catch { reverted = true; }
+        require(reverted, "Expired authorization must not refresh");
+    }
+
+    function it_records_verifier_initiated_review_below_route_threshold() {
+        stratoToken.mint(address(user), 200e18);
+        user.do(address(stratoToken), "approve", address(bridge), 200e18);
+        uint256 withdrawalId = user.do(
+            address(bridge),
+            "requestWithdrawal",
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            address(stratoToken),
+            50e18
+        );
+        (
+            Status requestedStatus,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool requestedReviewFlag,
+            ,
+            ,
+            ,
+
+        ) = bridge.withdrawals(withdrawalId);
+        require(
+            requestedStatus == Status.INITIATED && !requestedReviewFlag,
+            "Amount below route threshold should not require review"
+        );
+
+        // A local verifier policy may demand review below the route
+        // threshold; recording the review flips the flag so the withdrawal
+        // inherits the standard review lifecycle.
+        relayer.do(
+            address(bridge),
+            "recordWithdrawalReview",
+            withdrawalId,
+            "0xaaaa",
+            block.timestamp + 7 * 24 * 60 * 60,
+            "0xbbbb"
+        );
+        (
+            Status pendingStatus,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            ,
+            bool pendingReviewFlag,
+            ,
+            ,
+            ,
+
+        ) = bridge.withdrawals(withdrawalId);
+        require(
+            pendingStatus == Status.PENDING_REVIEW && pendingReviewFlag,
+            "Verifier-initiated review should mark the withdrawal as reviewed"
+        );
+
+        uint256 deadline = block.timestamp + 1800;
+        relayer.do(
+            address(bridge),
+            "markWithdrawalReady",
+            withdrawalId,
+            block.timestamp,
+            deadline,
+            1
+        );
+        (Status readyStatus, , , , , , , , , , , , , , , ) = bridge
+            .withdrawals(withdrawalId);
+        require(
+            readyStatus == Status.READY,
+            "Approved review should authorize the withdrawal"
+        );
+
+        bool reviewAfterReady = false;
+        try
+            relayer.do(
+                address(bridge),
+                "recordWithdrawalReview",
+                withdrawalId,
+                "0xcccc",
+                block.timestamp + 7 * 24 * 60 * 60,
+                "0xdddd"
+            )
+        {} catch {
+            reviewAfterReady = true;
+        }
+        require(
+            reviewAfterReady,
+            "Review must not be recordable once authorized"
+        );
+    }
+
     function it_lets_anyone_expire_a_stale_withdrawal_review() {
         stratoToken.mint(address(user), 150e18);
         user.do(address(stratoToken), "approve", address(bridge), 150e18);
@@ -2161,6 +2366,7 @@ contract Describe_ExternalAssetBridge is Authorizable {
     function it_finalizes_multiple_releases_in_one_transaction_despite_cancellation_metadata() {
         stratoToken.mint(address(user), 20e18);
         user.do(address(stratoToken), "approve", address(bridge), 20e18);
+        bool cancellationOverwritten = false;
         for (uint256 i = 1; i <= 2; i++) {
             uint256 id = user.do(address(bridge), "requestWithdrawal", externalChainId,
                 externalRecipient, externalToken, address(stratoToken), 10e18);
@@ -2169,6 +2375,12 @@ contract Describe_ExternalAssetBridge is Authorizable {
             relayer.do(address(bridge), "recordWithdrawalReservation", id, reservation, "0xdddd");
             fastForward(11);
             relayer.do(address(bridge), "recordWithdrawalCancellation", id, reservation, "0xeeee");
+            // The refund digest binds the recorded hash, so the record is
+            // one-shot: a repeat submission must not overwrite it.
+            cancellationOverwritten = false;
+            try relayer.do(address(bridge), "recordWithdrawalCancellation", id, reservation, "0xffff") {}
+            catch { cancellationOverwritten = true; }
+            require(cancellationOverwritten, "Cancellation record must be one-shot");
             _attestWithdrawal(id, reservation, "0xcccc");
             bridge.finalizeWithdrawal(id, reservation, "0xcccc");
         }

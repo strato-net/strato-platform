@@ -150,8 +150,8 @@ export const getCompositeBridgeRouteQuote = async (
   if (nativeRedemption) {
     const [version, { data }, { data: permissions }] = await Promise.all([
       getDepositRouterVersion(externalChainId, route.externalBridge!),
-      cirrus.get(accessToken, `/${constants.StratoNativeBridge}`, {
-        params: { address: `eq.${constants.stratoNativeBridge}`, select: "tokenRouter", limit: "1" },
+      cirrus.get(accessToken, "/storage", {
+        params: { address: `eq.${constants.stratoNativeBridge}`, select: "data->>tokenRouter", limit: "1" },
       }),
       cirrus.get(accessToken, `/${constants.StratoNativeBridge}-autoRouteEnabled`, {
         params: { address: `eq.${constants.stratoNativeBridge}`, key: `eq.${normalizeAddress(route.stratoToken)}`,

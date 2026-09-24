@@ -138,6 +138,10 @@ contract record ExternalAssetBridge is Ownable {
         uint256 authorizationDeadline,
         uint256 signerSetVersion
     );
+    event WithdrawalSignerSetRefreshed(
+        uint256 withdrawalId,
+        uint256 signerSetVersion
+    );
     event WithdrawalReviewRequested(
         uint256 withdrawalId,
         string reviewDigest,
@@ -1216,6 +1220,37 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function refreshWithdrawalSignerSet(
+        uint256 withdrawalId,
+        uint256 signerSetVersion
+    ) external onlyBridgeOperator {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        // A vault signer-set rotation strands READY withdrawals: verifiers
+        // and the vault only honor the current set, while the committed
+        // authorization pins the old one. The version may move forward only
+        // while the authorization is live and nothing is reserved; the
+        // authorization window is never extended.
+        require(
+            withdrawal.status == Status.READY &&
+                withdrawal.reservationId.length == 0,
+            "EAB: bad state"
+        );
+        require(
+            block.timestamp <= withdrawal.authorizationDeadline,
+            "EAB: authorization expired"
+        );
+        WithdrawalAuthorizationInfo authorization = withdrawalAuthorizations[
+            withdrawalId
+        ];
+        require(
+            signerSetVersion > authorization.signerSetVersion,
+            "EAB: not newer"
+        );
+        authorization.signerSetVersion = signerSetVersion;
+        withdrawal.timestamp = block.timestamp;
+        emit WithdrawalSignerSetRefreshed(withdrawalId, signerSetVersion);
+    }
+
     function recordWithdrawalReview(
         uint256 withdrawalId,
         string reviewDigest,
@@ -1223,9 +1258,12 @@ contract record ExternalAssetBridge is Ownable {
         string proposalHash
     ) external onlyBridgeOperator {
         WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        // A review may be route-threshold driven (requiresManualReview set at
+        // request time) or verifier-initiated: a local verifier policy can
+        // demand review below the route threshold. Recording either flips the
+        // flag so the whole review lifecycle (ready/reject/expire) is shared.
         require(
-            withdrawal.status == Status.INITIATED &&
-                withdrawal.requiresManualReview,
+            withdrawal.status == Status.INITIATED,
             "EAB: bad state"
         );
         require(
@@ -1241,6 +1279,7 @@ contract record ExternalAssetBridge is Ownable {
         review.reviewDigest = normalizedDigest;
         review.approvalDeadline = approvalDeadline;
         review.proposalHash = normalizedProposalHash;
+        withdrawal.requiresManualReview = true;
         withdrawal.status = Status.PENDING_REVIEW;
         withdrawal.timestamp = block.timestamp;
         emit WithdrawalReviewRequested(
@@ -1385,6 +1424,12 @@ contract record ExternalAssetBridge is Ownable {
             "EAB: authorization active"
         );
         require(cancellationTxHash.length > 0, "EAB: invalid cancellation");
+        // One-shot: the refund digest binds the recorded hash, so an
+        // overwrite would invalidate refund attestations collected against it.
+        require(
+            withdrawal.cancellationTxHash.length == 0,
+            "EAB: cancellation recorded"
+        );
 
         string normalizedReservationId = reservationId.normalizeHex();
         require(

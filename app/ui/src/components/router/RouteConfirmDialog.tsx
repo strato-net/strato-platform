@@ -4,7 +4,7 @@ import type { RouteConfirmation } from "@/interface/swap";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SWAP_FEE, WAD } from "@/lib/constants";
-import { formatUnits } from "@/utils/numberUtils";
+import { formatUnits, truncateAddress } from "@/utils/numberUtils";
 import { getRouteActionLabel, normalizeRouteAddress } from "@/lib/route";
 import RoutePreview from "./RoutePreview";
 
@@ -41,22 +41,22 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">You receive · STRATO (estimated)</dt>
             <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(quote.amountOut, outputDecimals)} {outputToken._symbol}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Receiving account</dt>
-            <dd className="flex max-w-[65%] items-start gap-1 text-right text-xs"><span className="min-w-0 break-all font-mono">{recipient}</span><span className="shrink-0"><CopyButton address={recipient} /></span></dd></div>
+            <dd className="flex items-center gap-1 font-mono font-medium"><span>{truncateAddress(recipient)}</span><CopyButton address={recipient} /></dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Rate</dt>
-            <dd className="text-right break-all">1 {inputSymbol} ≈ {formatUnits(rate.toString())} {outputToken._symbol}</dd></div>
+            <dd className="text-right font-medium break-all">1 {inputSymbol} ≈ {formatUnits(rate.toString())} {outputToken._symbol}</dd></div>
           {!(bridge?.rebaseFactor && !hasFallback) && (
             <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{deposit ? hasFallback ? "Minimum shares if deposited" : "Minimum shares received" : hasFallback ? "Minimum if swapped" : "Minimum received"}</dt>
-              <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(quote.minFinalOut, outputDecimals)} {outputToken._symbol}</dd></div>
+              <dd className="max-w-[60%] shrink-0 text-right font-medium break-words">{formatUnits(quote.minFinalOut, outputDecimals)} {outputToken._symbol}</dd></div>
           )}
-          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Slippage tolerance</dt><dd>{quote.slippageBps / 100}%</dd></div>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Slippage tolerance</dt><dd className="font-medium">{quote.slippageBps / 100}%</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{bridge ? "Network gas" : "Transaction fee"}</dt>
-            <dd className="text-right">{bridge ? "Shown in your wallet; approval may cost extra" : `${SWAP_FEE} USDST (vouchers applied when available)`}</dd></div>
+            <dd className="text-right font-medium">{bridge ? "Shown in your wallet; approval may cost extra" : `${SWAP_FEE} USDST (vouchers applied when available)`}</dd></div>
         </dl>
         {bridge?.rebaseFactor && !hasFallback && <p className="text-xs text-muted-foreground">The received amount depends on the rebase factor at settlement.</p>}
         {hasFallback && bridge && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-            <p className="font-medium">Fallback: {bridge.rebaseFactor ? "approximately " : ""}{formatUnits(bridge.bridgedAmount, fallbackToken?.customDecimals ?? 18)} {bridge.targetStratoSymbol}</p>
-            <p className="mt-1 text-xs text-muted-foreground">If the {deposit ? "vault or savings deposit" : "swap"} cannot meet your minimum, you receive this deposited asset instead. The {outputToken._symbol} minimum does not apply to this fallback.{deposit ? " Savings or vault APY does not apply to the fallback asset." : ""}{bridge.rebaseFactor ? " The amount depends on the rebase factor at settlement." : ""}</p>
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs">
+            <p className="font-semibold">Fallback: {bridge.rebaseFactor ? "approximately " : ""}{formatUnits(bridge.bridgedAmount, fallbackToken?.customDecimals ?? 18)} {bridge.targetStratoSymbol}</p>
+            <p className="mt-1 text-muted-foreground">If the {deposit ? "vault or savings deposit" : "swap"} cannot meet your minimum, you receive this deposited asset instead. The {outputToken._symbol} minimum does not apply to this fallback.{deposit ? " Savings or vault APY does not apply to the fallback asset." : ""}{bridge.rebaseFactor ? " The amount depends on the rebase factor at settlement." : ""}</p>
           </div>
         )}
         {bridge && <p className="text-xs text-muted-foreground">Deposit from {networkName} → {bridge.targetStratoSymbol} on STRATO.</p>}

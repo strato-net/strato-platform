@@ -40,11 +40,12 @@ import RouteConfirmDialog from "./RouteConfirmDialog";
 import RouteProgressDialog from "./RouteProgressDialog";
 import { Link } from "react-router-dom";
 import type { RouteConfirmation, RoutePickerToken } from "@/interface/swap";
-import { assertRouteConfirmation, getRouteActionLabel, normalizeRouteAddress, resolveRouteSelection } from "@/lib/route";
+import { assertRouteConfirmation, getRouteActionLabel, getRouteValueWarning, normalizeRouteAddress, resolveRouteSelection } from "@/lib/route";
 import { useTokenContext } from "@/context/TokenContext";
 import { LOW_USDST_THRESHOLD, SWAP_FEE, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import PercentageButtons from "@/components/ui/PercentageButtons";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
 import { getFriendlyMessage, getQuoteErrorMessage, normalizeError } from "@/lib/bridge/utils";
@@ -273,7 +274,6 @@ const RouterWidget = ({
   });
   const quote =
     sourceMode === "external" ? compositeQuote.data : routeQuote.data;
-  const quoteFetching = sourceMode === "external" ? compositeQuote.isFetching : routeQuote.isFetching;
   const quoteError = sourceMode === "external" ? compositeQuote.error : routeQuote.error;
   const quoteLoading = !quote && amountWei !== "0" && !quoteError;
   const routeExecute = useRouteExecute();
@@ -289,32 +289,30 @@ const RouterWidget = ({
   ]);
   const rewardedRouteSteps = useMemo(() => {
     if (sourceMode !== "strato" || !quote || !userRewards) return [];
-    const seen = new Set<string>();
-    return quote.steps.flatMap((step) => {
-      if (step.action < 1 || step.action > 3) return [];
-      const target = step.target.toLowerCase().replace(/^0x/, "");
-      if (seen.has(target)) return [];
-      const activity = userRewards.activities.find(
-        (item) =>
-          item.activity.sourceContract?.toLowerCase().replace(/^0x/, "") ===
-          target
-      );
-      if (!activity) return [];
-      seen.add(target);
-      const stepInputToken = tokens.find(
-        (token) =>
-          token.address.toLowerCase().replace(/^0x/, "") ===
-          step.tokenIn.toLowerCase().replace(/^0x/, "")
-      );
-      return [{
-        activity,
-        inputAmount: formatUnits(
-          step.amountIn,
-          stepInputToken?.customDecimals ?? 18
-        ),
-        tokenIn: step.tokenIn,
-      }];
-    });
+    // Only the destination hop's rewards are shown; intermediate pool hops are
+    // routing detail the user didn't choose.
+    const step = [...quote.steps].reverse().find((item) => item.action >= 1 && item.action <= 3);
+    if (!step) return [];
+    const target = step.target.toLowerCase().replace(/^0x/, "");
+    const activity = userRewards.activities.find(
+      (item) =>
+        item.activity.sourceContract?.toLowerCase().replace(/^0x/, "") ===
+        target
+    );
+    if (!activity) return [];
+    const stepInputToken = tokens.find(
+      (token) =>
+        token.address.toLowerCase().replace(/^0x/, "") ===
+        step.tokenIn.toLowerCase().replace(/^0x/, "")
+    );
+    return [{
+      activity,
+      inputAmount: formatUnits(
+        step.amountIn,
+        stepInputToken?.customDecimals ?? 18
+      ),
+      tokenIn: step.tokenIn,
+    }];
   }, [sourceMode, quote, userRewards, tokens]);
 
   const inputSymbol = sourceMode === "external" ? externalRoute?.externalSymbol : tokenIn?._symbol;
@@ -322,6 +320,19 @@ const RouterWidget = ({
   const outputPrice = pickerTokens.find(token => token.id === tokenOut?.address)?.price;
   const inputUsd = formatTokenUsd(amountWei, inputDecimals, inputPrice);
   const outputUsd = quote ? formatTokenUsd(quote.amountOut, tokenOut?.customDecimals ?? 18, outputPrice) : null;
+  let routeValueWarning = "";
+  if (quote && inputPrice && outputPrice) {
+    try {
+      routeValueWarning = getRouteValueWarning(
+        BigInt(amountWei) * BigInt(inputPrice) / 10n ** BigInt(inputDecimals),
+        BigInt(quote.amountOut) * BigInt(outputPrice) / 10n ** BigInt(tokenOut?.customDecimals ?? 18),
+      );
+    } catch { /* unparseable price — skip the warning */ }
+  }
+  const applyAmount = (value: string) =>
+    sourceMode === "strato"
+      ? handleAmountInputChange(value, setAmount, setAmountError, guestMode ? maxUint256.toString() : maxSpendableWei, inputDecimals)
+      : handleAmountInputChange(value, setAmount, setAmountError, externalBalance?.toString() ?? maxUint256.toString(), inputDecimals, "Insufficient external token balance");
   const flipTokens = () => {
     if (sourceMode !== "strato" || !tokenIn || !tokenOut || !routeSources.some(token => token.address === tokenOut.address)) return;
     setTokenInAddress(tokenOut.address);
@@ -548,24 +559,7 @@ const RouterWidget = ({
             inputMode="decimal"
             placeholder="0"
             value={amount}
-            onChange={(event) =>
-              sourceMode === "strato"
-                ? handleAmountInputChange(
-                    event.target.value,
-                    setAmount,
-                    setAmountError,
-                    guestMode ? maxUint256.toString() : maxSpendableWei,
-                    inputDecimals
-                  )
-                : handleAmountInputChange(
-                    event.target.value,
-                    setAmount,
-                    setAmountError,
-                    externalBalance?.toString() ?? maxUint256.toString(),
-                    inputDecimals,
-                    "Insufficient external token balance"
-                  )
-            }
+            onChange={(event) => applyAmount(event.target.value)}
           />
         </div>
         {inputUsd && <p className="text-right text-xs text-muted-foreground pt-0.5">≈ {inputUsd}</p>}
@@ -573,29 +567,17 @@ const RouterWidget = ({
           <span className="text-xs text-muted-foreground">
             {sourceMode === "strato"
               ? tokenIn && <>Balance: <span className="text-foreground font-medium">{formatAmount(formatUnits(maxSpendableWei, tokenIn.customDecimals))} {tokenIn._symbol}</span></>
-              : externalRoute && (!isExternalEvmWalletConnected
-                ? "Connect an external wallet to see your balance"
-                : (externalBalanceQuery.isError || (!isNativeInput && externalBalance === undefined && tokenBalance.isSuccess))
+              : externalRoute && isExternalEvmWalletConnected && (
+                (externalBalanceQuery.isError || (!isNativeInput && externalBalance === undefined && tokenBalance.isSuccess))
                   ? "Balance unavailable"
                   : externalBalance === undefined
                     ? "Loading balance..."
                     : <>Balance: <span className="text-foreground font-medium">{formatAmount(formatUnits(externalBalance.toString(), inputDecimals))} {externalRoute.externalSymbol}</span></>)}
           </span>
-          {sourceMode === "strato" && tokenIn && (
-            <button
-              type="button"
-              className="text-xs font-semibold text-primary"
-              disabled={!feeBalancesReady}
-              onClick={() => {
-                setAmount(
-                  formatUnits(maxSpendableWei, tokenIn.customDecimals)
-                );
-                setAmountError("");
-              }}
-            >
-              Max
-            </button>
-          )}
+          <PercentageButtons value={amount} onChange={applyAmount} decimals={inputDecimals}
+            maxValue={sourceMode === "strato" ? maxSpendableWei : externalBalance?.toString() ?? "0"}
+            disabled={sourceMode === "strato" ? !feeBalancesReady : externalBalance === undefined}
+            className="[&_button]:!h-6 [&_button]:!px-2 [&_button]:!text-[10px] [&_button]:!min-w-0 [&_button:not(.border-blue-500)]:!text-muted-foreground" />
         </div>
         <div id="pay-amount-help" className="text-xs text-muted-foreground">
           {sourceMode === "external" && externalRoute && !nativeRedemption && <>
@@ -622,22 +604,23 @@ const RouterWidget = ({
       </section>
 
       <div className="space-y-4">
-      <label className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-        <span>Slippage tolerance</span>
-        <select
-          className="rounded-md border-0 bg-muted px-2 py-1 font-medium text-foreground outline-none"
-          value={slippageBps}
-          onChange={(event) => setSlippageBps(Number(event.target.value))}
-        >
-          <option value={25}>0.25%</option>
-          <option value={50}>0.5%</option>
-          <option value={100}>1%</option>
-        </select>
-      </label>
-
-      {amountWei !== "0" && <RouteTradeSummary quote={quote} inputAmount={amountWei} inputDecimals={inputDecimals} inputSymbol={inputSymbol} outputToken={tokenOut}
-        external={sourceMode === "external"} fetching={quoteFetching || quoteLoading}
-        error={quoteError ? getQuoteErrorMessage(quoteError) : undefined} />}
+      <div className="rounded-md border-2 border-border p-3 space-y-2">
+        <RouteTradeSummary quote={quote} inputAmount={amountWei} inputDecimals={inputDecimals} inputSymbol={inputSymbol} outputToken={tokenOut}
+          external={sourceMode === "external"} error={quoteError ? getQuoteErrorMessage(quoteError) : undefined} />
+        <label className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Slippage tolerance</span>
+          <select
+            className="rounded-md border-0 bg-muted px-2 py-1 font-medium text-foreground outline-none"
+            value={slippageBps}
+            onChange={(event) => setSlippageBps(Number(event.target.value))}
+          >
+            <option value={25}>0.25%</option>
+            <option value={50}>0.5%</option>
+            <option value={100}>1%</option>
+          </select>
+        </label>
+      </div>
+      {routeValueWarning && <p className="rounded-md border-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300" role="alert">{routeValueWarning}</p>}
       <div className="text-xs" aria-live="polite">
         {feeError ? <p className="text-destructive">{feeError}</p> : lowFeeBalance ? <p className="text-amber-700 dark:text-amber-400">Your fee balance is running low ({formatUnits(availableFees)} USDST including vouchers). Add funds for future trades.</p> : poolLinkError ? <p className="text-muted-foreground">{poolLinkError}</p> : null}
       </div>
@@ -655,6 +638,7 @@ const RouterWidget = ({
         />
       ))}
 
+      {quote?.steps.length ? <RoutePreview steps={quote.steps} tokens={tokens} minFinalOut={quote.minFinalOut} outputToken={tokenOut} showMinimum={false} /> : null}
       <Button
         className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
         disabled={
@@ -681,7 +665,6 @@ const RouterWidget = ({
               : `Review ${getRouteActionLabel(tokenOut?.routeDestination, sourceMode === "external", normalizeRouteAddress(externalRoute?.stratoToken ?? "") === tokenOut?.address)}`}
       </Button>
       {sourceMode === "external" && compositeQuote.data && <RouteFallback quote={compositeQuote.data} fallbackDecimals={bridgedToken?.customDecimals ?? 18} outputSymbol={tokenOut?._symbol} destination={tokenOut?.routeDestination} />}
-      {quote?.steps.length ? <RoutePreview steps={quote.steps} tokens={tokens} minFinalOut={quote.minFinalOut} outputToken={tokenOut} showMinimum={false} /> : null}
       <p className="text-right">
         <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
           Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>

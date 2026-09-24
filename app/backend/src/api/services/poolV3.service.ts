@@ -18,7 +18,7 @@ import {
   V3_DEADLINE_SECONDS,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
-import { toUTCTime } from "../helpers/cirrusHelpers";
+import { buildSwapHistoryUserFilter, toUTCTime } from "../helpers/cirrusHelpers";
 import { getOraclePrices } from "./oracle.service";
 import { getNFTItem } from "./nfts.service";
 import {
@@ -461,9 +461,7 @@ export const fetchPairSwapHistory = async (
   const poolByAddress = new Map(rawPools.map((p) => [p.address, p]));
 
   // either side of the trade counts as the user's (the pool pays out to `recipient`)
-  const senderFilter = senderAddress
-    ? { or: `(sender.eq.${normalizeAddress(senderAddress)},recipient.eq.${normalizeAddress(senderAddress)})` }
-    : {};
+  const senderFilter = buildSwapHistoryUserFilter(senderAddress, true);
   const eventFilters = {
     address: `in.(${rawPools.map((p) => p.address).join(",")})`,
     ...senderFilter,
@@ -512,7 +510,8 @@ export const fetchPairSwapHistory = async (
       amountIn: amountIn.toString(),
       amountOut: amountOut.toString(),
       impliedPrice,
-      sender: event.sender,
+      sender: senderAddress && event.sender === normalizeAddress(config.tokenRouter || "")
+        ? normalizeAddress(senderAddress) : event.sender,
       transactionHash: event.transaction_hash,
       poolAddress: pool.address,
       poolName: `V3 ${Number(pool.fee) / 10000}%`,

@@ -644,6 +644,11 @@ test('deep links normalize addresses, respect explicit tokens and orient pool pa
   }
   assert.equal(routeHelpers.resolveRouteSelection([], [], address('b'), address('c')).tokenIn, undefined);
   assert.equal(select(address('b'), address('c')).tokenIn, tokens[1], 'async asset arrival preserves requested tokens');
+  // Without an explicit token or pool link the receive side stays empty…
+  assert.equal(select(address('a'), '').tokenOut, undefined);
+  assert.equal(select('', '').tokenOut, undefined);
+  // …unless there is exactly one possible destination (native redemption).
+  assert.equal(routeHelpers.resolveRouteSelection(tokens, [tokens[2]], address('a'), '').tokenOut, tokens[2]);
 });
 
 test('review freezes the quote and does not submit a transaction', async () => {
@@ -1081,6 +1086,42 @@ test('flip clears the amount and swaps valid STRATO tokens, excluding output-onl
   assert.deepEqual(run('strato', false), []);
 });
 
+test('route rewards banner covers only the destination hop, not intermediate pools', () => {
+  let initializer;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'rewardedRouteSteps') initializer = node.initializer.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const quote = { steps: [
+    { action: 1, target: address('1'), tokenIn: address('a'), amountIn: '5000000000000000000' },
+    { action: 2, target: address('2'), tokenIn: address('b'), amountIn: '3000000' },
+    { action: 9, target: address('3'), tokenIn: address('c'), amountIn: '1' }, // trailing non-rewardable action
+  ] };
+  const evaluate = (activities) => {
+    const exports = {};
+    runSource(`exports.steps = ${initializer};`, {
+      exports, useMemo: fn => fn(), sourceMode: 'strato', quote,
+      userRewards: { activities },
+      tokens: [{ address: address('b'), customDecimals: 6 }],
+      formatUnits: require('ethers').formatUnits,
+    });
+    return exports.steps;
+  };
+  // Both hops have activities: only the destination hop (savings deposit) renders,
+  // sized by that hop's own input amount and decimals.
+  const both = evaluate([
+    { activity: { sourceContract: `0x${address('1')}`, name: 'Pool hop' } },
+    { activity: { sourceContract: `0x${address('2')}`, name: 'Savings' } },
+  ]);
+  assert.equal(both.length, 1);
+  assert.equal(both[0].activity.activity.name, 'Savings');
+  assert.equal(both[0].inputAmount, '3.0');
+  // Destination hop has no activity: nothing renders even though an
+  // intermediate pool is rewarded.
+  assert.equal(evaluate([{ activity: { sourceContract: `0x${address('1')}`, name: 'Pool hop' } }]).length, 0);
+});
+
 test('quote state permits background refresh but blocks missing quotes for changed inputs', () => {
   let loading;
   function visit(node) {
@@ -1095,7 +1136,7 @@ test('quote state permits background refresh but blocks missing quotes for chang
   }
 });
 
-test('quote summary distinguishes first load, changed inputs and background refresh while retaining the minimum', () => {
+test('quote summary shows detail rows with placeholders and inline errors, without status chatter', () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const exports = {};
@@ -1106,22 +1147,21 @@ test('quote summary distinguishes first load, changed inputs and background refr
     if (id === '@/utils/numberUtils') return { formatUnits: require('ethers').formatUnits, formatAmount: value => value };
     throw new Error(id);
   } });
-  const render = (quote, fetching, error) => renderToStaticMarkup(React.createElement(exports.default, {
-    quote, fetching, error, inputAmount: '2000000', inputDecimals: 6, inputSymbol: 'USDC', outputToken: { _symbol: 'GOLDST', customDecimals: 6 }, external: false,
+  const render = (quote, error) => renderToStaticMarkup(React.createElement(exports.default, {
+    quote, error, inputAmount: '2000000', inputDecimals: 6, inputSymbol: 'USDC', outputToken: { _symbol: 'GOLDST', customDecimals: 6 }, external: false,
   }));
-  assert.match(render(undefined, false), /Enter an amount/);
-  assert.match(render(undefined, true), /Getting quote/);
-  const html = render({ amountOut: '1234567', minFinalOut: '1200000' }, true);
-  assert.match(html, /Updating quote/);
+  const html = render({ amountOut: '1234567', minFinalOut: '1200000' });
   assert.match(html, /1.2 GOLDST/);
   assert.match(html, /0.6172835 GOLDST/);
   assert.match(html, /0.02 USDST/);
-  assert.doesNotMatch(render(undefined, true), /1.2 GOLDST/);
-  const blocked = render(undefined, false, 'No route is available for this amount.');
+  assert.doesNotMatch(html, /Quote ready|Updating quote|Getting quote|Enter an amount/);
+  const empty = render(undefined);
+  assert.match(empty, /—/);
+  assert.doesNotMatch(empty, /1.2 GOLDST|text-destructive|role="alert"/);
+  const blocked = render(undefined, 'No route is available for this amount.');
   assert.match(blocked, /text-destructive/);
   assert.match(blocked, /role="alert"/);
   assert.match(blocked, /No route is available/);
-  assert.doesNotMatch(render(undefined, true), /text-destructive|role="alert"/);
 });
 
 test('native redemption approves its own bridge only when needed and records the pinned recipient', async () => {
@@ -1340,6 +1380,18 @@ test('receive asset shows holding yield only, keeping rewards in the hop-deduped
   assert.doesNotMatch(html, /154.00|150/, 'pool rewards APY is excluded — it does not accrue from holding the asset');
   assert.equal(JSON.stringify(tooltipInfo.breakdown.map(item => item.label)), JSON.stringify(['Base APY']));
   assert.doesNotMatch(html, /Rewards available|View requirements|additional deposit or stake|href=/);
+});
+
+test('route value warning flags oracle-value losses only, never gains or missing prices', () => {
+  const usd = (dollars) => BigInt(dollars) * 10n ** 18n;
+  // Fees and slippage stay quiet; a mispriced pool trips the warning with the loss spelled out.
+  assert.equal(routeHelpers.getRouteValueWarning(usd(100), usd(97)), '');
+  assert.match(routeHelpers.getRouteValueWarning(usd(100), usd(90)), /about 10\.0% less value/);
+  assert.match(routeHelpers.getRouteValueWarning(usd(100), usd(1)), /about 99\.0% less value/);
+  // Gains are the LP-drain direction, not a user risk — no warning on the user side.
+  assert.equal(routeHelpers.getRouteValueWarning(usd(1), usd(691)), '');
+  assert.equal(routeHelpers.getRouteValueWarning(0n, usd(5)), '');
+  assert.equal(routeHelpers.getRouteValueWarning(usd(5), null), '');
 });
 
 test('route action labels distinguish savings, vault deposits, swaps and plain bridging', () => {

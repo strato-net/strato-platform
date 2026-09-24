@@ -34,6 +34,7 @@ import {
 } from "../helpers/swapping.helper";
 import * as stable from "../helpers/stablePoolMath.helper";
 import { getOraclePrices } from "./oracle.service";
+import { buildSwapHistoryUserFilter } from "../helpers/cirrusHelpers";
 import {
   fetchPairSwapHistory as fetchV3PairSwapHistory,
   fetchTokenSwapHistory as fetchV3TokenSwapHistory,
@@ -398,7 +399,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
-        ...(normalizedSenderAddress ? { sender: `eq.${normalizedSenderAddress}` } : {}),
+        ...buildSwapHistoryUserFilter(normalizedSenderAddress),
         select: swapHistorySelectFields.join(','),
         order: 'block_timestamp.desc',
         limit: limit.toString(),
@@ -408,7 +409,7 @@ export const getSwapHistory = async (
     cirrus.get(accessToken, `/${PoolSwap}`, {
       params: {
         address: `eq.${poolAddress}`,
-        ...(normalizedSenderAddress ? { sender: `eq.${normalizedSenderAddress}` } : {}),
+        ...buildSwapHistoryUserFilter(normalizedSenderAddress),
         select: "count()",
       }
     })
@@ -433,7 +434,8 @@ export const getSwapHistory = async (
       amountIn: event.amountIn,
       amountOut: event.amountOut,
       impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, isAToB, isStable),
-      sender: event.sender,
+      sender: normalizedSenderAddress && event.sender === normalizeAddress(constants.tokenRouter || "")
+        ? normalizedSenderAddress : event.sender,
       transactionHash: event.transaction_hash,
     };
   });
@@ -466,7 +468,7 @@ export const getPairSwapHistory = async (
 
   const v2Filters = {
     or: `(and(tokenIn.eq.${a},tokenOut.eq.${b}),and(tokenIn.eq.${b},tokenOut.eq.${a}))`,
-    ...(normalizedSender ? { sender: `eq.${normalizedSender}` } : {}),
+    ...buildSwapHistoryUserFilter(normalizedSender),
   };
 
   const [v2EventsResponse, v2CountResponse, symbolsResponse, v3Result] = await Promise.all([
@@ -506,7 +508,8 @@ export const getPairSwapHistory = async (
     amountIn: event.amountIn,
     amountOut: event.amountOut,
     impliedPrice: calculateImpliedPrice(event.amountIn, event.amountOut, event.tokenIn === a, event.pool.isStable),
-    sender: event.sender,
+    sender: normalizedSender && event.sender === normalizeAddress(constants.tokenRouter || "")
+      ? normalizedSender : event.sender,
     transactionHash: event.transaction_hash,
     poolAddress: event.address,
     poolName: event.pool.isStable ? "Stable" : "V2",

@@ -99,7 +99,8 @@ test("native deposits quote TokenRouter outputs only after both bridges support 
   const route = { id: "native", routeType: "native", enabled: true, externalBridge: "3".repeat(40),
     externalToken: "1".repeat(40), stratoToken: "2".repeat(40), externalDecimals: "18" };
   t.mock.method(service, "getBridgeableTokens", async () => [route] as any);
-  let version = "1.2.0", router = "5".repeat(40);
+  let version = "1.2.0";
+  let router: string | null | undefined = "5".repeat(40);
   let permission: unknown = true;
   t.mock.getter(constants, "tokenRouter", () => "5".repeat(40));
   t.mock.method(service, "getDepositRouterVersion", async (chain: string, bridge: string) => {
@@ -112,7 +113,11 @@ test("native deposits quote TokenRouter outputs only after both bridges support 
       assert.equal(options.params.key2, "eq.1");
       return { data: permission === undefined ? [] : [{ value: permission }] } as any;
     }
-    assert.equal(path, `/${constants.StratoNativeBridge}`); return { data: [{ tokenRouter: router }] } as any;
+    assert.equal(path, "/storage");
+    assert.deepEqual(options.params, {
+      address: `eq.${constants.stratoNativeBridge}`, select: "data->>tokenRouter", limit: "1",
+    });
+    return { data: router === undefined ? [] : [{ tokenRouter: router }] } as any;
   });
   t.mock.method(service, "isAutoRouteEnabled", async () => { assert.fail("must not use EAB action configs"); });
   t.mock.method(routeService, "getRouteQuote", async (_token: string, tokenIn: string, tokenOut: string, amount: bigint) => {
@@ -134,6 +139,8 @@ test("native deposits quote TokenRouter outputs only after both bridges support 
     version = invalid;
     await assert.rejects(getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "4".repeat(40), 12345n), /not configured/);
   }
-  version = "1.2.0"; router = "6".repeat(40);
-  await assert.rejects(getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "4".repeat(40), 12345n), /not configured/);
+  version = "1.2.0";
+  for (router of ["6".repeat(40), "0".repeat(40), "", null, undefined]) {
+    await assert.rejects(getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "4".repeat(40), 12345n), /not configured/);
+  }
 });

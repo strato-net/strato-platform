@@ -326,6 +326,73 @@ test("pending review alone cannot authorize a deposit; approval binds the exact 
   assert.equal(await check({ ...deposit, stratoRecipient: policy.sourceBridge }, "0"), false);
 });
 
+test("enforceWithdrawalPolicy requires an executed Safe approval covering the authorization deadline", async () => {
+  // Local limit 500, contract review threshold 100: amounts of 150 and 501
+  // exercise the contract-threshold and local-policy triggers respectively.
+  const localPolicy = { ...policy, tokens: [{ ...policy.tokens[0], maxAutoWithdrawalAmount: "500" }] };
+  const tokenPolicy = { enabled: true, maxPerWithdrawal: 1000n, manualReviewThreshold: 100n };
+  let approvalDeadline = 0n;
+  let requestedDigest: string | undefined;
+  class ManualReviewRequiredError extends Error {}
+  const checks = loadSignerChecks(
+    ["WITHDRAWAL_REVIEW_TYPES", "domain", "reviewDigest", "enforceWithdrawalPolicy"],
+    {
+      destinationChainId: BigInt(policy.destinationChainId),
+      destinationVault: policy.destinationVault,
+      TypedDataEncoder,
+      evaluateWithdrawalPolicy,
+      verifierPolicy: localPolicy,
+      ManualReviewRequiredError,
+      vault: {
+        tokenPolicies: async () => tokenPolicy,
+        largeWithdrawalApprovalDeadline: async (digest: string) => {
+          requestedDigest = digest;
+          return approvalDeadline;
+        },
+      },
+    },
+  );
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "50",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+
+  // Below both limits: approved without consulting the Safe approval.
+  await checks.enforceWithdrawalPolicy(authorization);
+  assert.equal(requestedDigest, undefined);
+
+  // Above the contract review threshold with no recorded approval.
+  const large = { ...authorization, amount: "150" };
+  await assert.rejects(checks.enforceWithdrawalPolicy(large), ManualReviewRequiredError);
+  assert.equal(requestedDigest, checks.reviewDigest(large));
+
+  // An approval that expires before the authorization deadline is insufficient.
+  approvalDeadline = 1099n;
+  await assert.rejects(checks.enforceWithdrawalPolicy(large), ManualReviewRequiredError);
+
+  // An executed approval covering the deadline permits signing, and binds
+  // the exact review digest of the authorization being signed.
+  approvalDeadline = 1100n;
+  await checks.enforceWithdrawalPolicy(large);
+  assert.equal(requestedDigest, checks.reviewDigest(large));
+
+  // The local verifier policy alone triggers the same requirement (F2's
+  // original mismatch): 501 exceeds the local limit of 500 while staying
+  // below the contract threshold, now raised to 1000.
+  tokenPolicy.manualReviewThreshold = 1000n;
+  approvalDeadline = 0n;
+  await assert.rejects(checks.enforceWithdrawalPolicy({ ...authorization, amount: "501" }), ManualReviewRequiredError);
+  approvalDeadline = 1100n;
+  await checks.enforceWithdrawalPolicy({ ...authorization, amount: "501" });
+
+  // Hard limits reject outright — never downgraded to manual review.
+  await assert.rejects(checks.enforceWithdrawalPolicy({ ...authorization, amount: "1001" }), /exceeds destination vault maximum/);
+  tokenPolicy.enabled = false;
+  await assert.rejects(checks.enforceWithdrawalPolicy(authorization), /token is disabled/);
+});
+
 test("withdrawal review dissent takes precedence over two returned signatures", async () => {
   const source = ts.createSourceFile("externalWithdrawalService.ts",
     readFileSync(resolve(__dirname, "../../src/services/externalWithdrawalService.ts"), "utf8"), ts.ScriptTarget.Latest, true);

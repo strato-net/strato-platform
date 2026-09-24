@@ -18,6 +18,7 @@ import {
   config,
   VERIFIER_REQUEST_TIMEOUT_MS,
   EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
+  getDepositConfirmationPolicy,
   getExternalBridgeExecutorKmsConfig,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
@@ -272,6 +273,71 @@ export const proposeWithdrawalReview = (review: WithdrawalReview) => {
   return pending;
 };
 
+export class WithdrawalManualReviewError extends Error {}
+
+// Pre-flight: ask every verifier for its policy decision before
+// markWithdrawalReady starts the authorization clock. A demanded manual
+// review surfaces as WithdrawalManualReviewError so the caller can record the
+// review on STRATO while the withdrawal is still INITIATED; any other failure
+// (verifier down, reject) blocks processing until the next poll, because a
+// withdrawal marked READY cannot re-enter review.
+export const checkWithdrawalPolicy = async (
+  authorization: WithdrawalAuthorization,
+): Promise<void> => {
+  const signerUrls = getExternalBridgeVerifierUrls(
+    BigInt(authorization.destinationChainId),
+  );
+  const signerApiTokens = getExternalBridgeVerifierApiTokens(
+    BigInt(authorization.destinationChainId),
+  );
+  if (signerUrls.length === 0) {
+    throw new Error(
+      `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
+    );
+  }
+  if (signerApiTokens.length !== signerUrls.length) {
+    throw new Error(
+      `External bridge signer API token count does not match signer URL count for chain ${authorization.destinationChainId}`,
+    );
+  }
+
+  const results = await Promise.allSettled(
+    signerUrls.map((url, index) =>
+      axios.post(`${url}/v1/check-withdrawal`, authorization, {
+        timeout: VERIFIER_REQUEST_TIMEOUT_MS,
+        signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
+        headers: {
+          Authorization: `Bearer ${signerApiTokens[index]}`,
+        },
+      }),
+    ),
+  );
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      logError("ExternalWithdrawal", result.reason as Error, {
+        operation: "checkWithdrawalPolicy",
+        verifierUrl: signerUrls[index],
+        withdrawalId: authorization.sourceWithdrawalId,
+      });
+    }
+  });
+  if (
+    results.some(
+      (result) =>
+        result.status === "rejected" &&
+        axios.isAxiosError(result.reason) &&
+        result.reason.response?.status === 409 &&
+        result.reason.response?.data?.decision === "manual_review",
+    )
+  ) {
+    throw new WithdrawalManualReviewError(
+      `Local verifier manual review required for withdrawal ${authorization.sourceWithdrawalId}`,
+    );
+  }
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure && failure.status === "rejected") throw failure.reason;
+};
+
 export const signWithdrawalAuthorization = async (
   authorization: WithdrawalAuthorization,
 ): Promise<string[]> => {
@@ -509,6 +575,7 @@ export const getReservationState = async (
   reservationId: string;
   status: number;
   latestTimestamp: bigint;
+  signerSetVersion: bigint;
   reservationTxHash?: string;
 }> => {
   const provider = getChainProvider(BigInt(authorization.destinationChainId));
@@ -518,9 +585,10 @@ export const getReservationState = async (
     provider,
   );
   const reservationId = getReservationId(authorization);
-  const [reservation, latestBlock] = await Promise.all([
+  const [reservation, latestBlock, signerSetVersion] = await Promise.all([
     vault.reservations(reservationId),
     provider.getBlock("latest"),
+    vault.signerSetVersion(),
   ]);
   if (!latestBlock) {
     throw new Error(
@@ -532,6 +600,7 @@ export const getReservationState = async (
     reservationId,
     status,
     latestTimestamp: BigInt(latestBlock.timestamp),
+    signerSetVersion: BigInt(signerSetVersion.toString()),
     reservationTxHash:
       status === 0 || !includeReservationTxHash
         ? undefined
@@ -542,6 +611,39 @@ export const getReservationState = async (
             reservationId,
             authorization.notBefore,
           ),
+  };
+};
+
+// Rotation and non-reservation must be established from the SAME confirmed
+// block before a signer-set refresh. getReservationState reads at latest with
+// independent calls, which can mix heads: the reservation read can miss a
+// version-N reservation that mines just before the rotation the version read
+// observes. Overwriting the committed version then strands the reservation —
+// release and refund verifiers both hold it to the original authorization
+// digest. Reading both facts at one confirmed block makes the orderings
+// coherent: a reservation always precedes the rotation that would strand it
+// (post-rotation reservations revert as StaleSignerSet), so any block that
+// shows the rotation also shows the reservation.
+export const getConfirmedRotationState = async (
+  authorization: WithdrawalAuthorization,
+): Promise<{ signerSetVersion: bigint; reserved: boolean }> => {
+  const destinationChainId = BigInt(authorization.destinationChainId);
+  const provider = getChainProvider(destinationChainId);
+  const vault = new Contract(
+    authorization.destinationVault,
+    EXTERNAL_VAULT_ABI,
+    provider,
+  );
+  const blockTag =
+    (await provider.getBlockNumber()) -
+    getDepositConfirmationPolicy(destinationChainId);
+  const [reservation, signerSetVersion] = await Promise.all([
+    vault.reservations(getReservationId(authorization), { blockTag }),
+    vault.signerSetVersion({ blockTag }),
+  ]);
+  return {
+    signerSetVersion: BigInt(signerSetVersion.toString()),
+    reserved: Number(reservation.status ?? reservation[0]) !== 0,
   };
 };
 

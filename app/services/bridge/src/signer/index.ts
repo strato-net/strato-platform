@@ -316,6 +316,9 @@ const validateSourceWithdrawal = async (
   authorization: WithdrawalAuthorization,
   allowedStatuses = [3],
   requireEnabledChain = true,
+  // Pre-flight checks run before markWithdrawalReady commits the
+  // authorization on STRATO, so there is no stored record to match yet.
+  requireCommittedAuthorization = true,
 ) => {
   if (normalize(authorization.sourceBridge) !== normalize(sourceBridge)) {
     throw new Error("Source bridge mismatch");
@@ -344,18 +347,20 @@ const validateSourceWithdrawal = async (
     throw new Error("Source withdrawal does not match authorization");
   }
 
-  const authorizationResponse = await stratoGet(
-    "/cirrus/search/BlockApps-ExternalAssetBridge-withdrawalAuthorizations",
-    {
-      address: `eq.${sourceBridge}`,
-      key: `eq.${authorization.sourceWithdrawalId}`,
-      select: "value",
-    },
-  );
-  const sourceAuthorization = authorizationResponse.data?.[0]?.value;
-  if (!matchesSourceWithdrawalAuthorization(sourceAuthorization, authorization) ||
-      normalize(sourceAuthorization?.destinationVault || "") !== normalize(authorization.destinationVault)) {
-    throw new Error("Source withdrawal authorization does not match request");
+  if (requireCommittedAuthorization) {
+    const authorizationResponse = await stratoGet(
+      "/cirrus/search/BlockApps-ExternalAssetBridge-withdrawalAuthorizations",
+      {
+        address: `eq.${sourceBridge}`,
+        key: `eq.${authorization.sourceWithdrawalId}`,
+        select: "value",
+      },
+    );
+    const sourceAuthorization = authorizationResponse.data?.[0]?.value;
+    if (!matchesSourceWithdrawalAuthorization(sourceAuthorization, authorization) ||
+        normalize(sourceAuthorization?.destinationVault || "") !== normalize(authorization.destinationVault)) {
+      throw new Error("Source withdrawal authorization does not match request");
+    }
   }
 
   const chainResponse = await stratoGet(
@@ -666,6 +671,42 @@ app.post("/v1/sign-withdrawal", async (req, res) => {
       (error as Error).message,
     );
     console.error("Withdrawal authorization rejected", (error as Error).message);
+    res.status(manualReview ? 409 : 422).json({
+      decision: manualReview ? "manual_review" : "reject",
+      error: (error as Error).message,
+    });
+  }
+});
+
+// Pre-flight policy decision for an INITIATED withdrawal. Runs the same
+// checks as signing but issues no signature and does not require the
+// authorization to be committed on STRATO, so the bridge service can learn
+// about a manual-review demand before markWithdrawalReady starts the
+// authorization clock.
+app.post("/v1/check-withdrawal", async (req, res) => {
+  try {
+    const authorization = req.body as WithdrawalAuthorization;
+    await Promise.all([
+      validateSourceWithdrawal(authorization, [1], true, false),
+      validateDestination(authorization),
+    ]);
+    const policyReason = await enforceWithdrawalPolicy(authorization);
+    auditDecision(
+      "check_withdrawal",
+      authorization.sourceWithdrawalId,
+      "approve",
+      policyReason,
+    );
+    res.json({ decision: "approve", reason: policyReason });
+  } catch (error) {
+    const manualReview = error instanceof ManualReviewRequiredError;
+    auditDecision(
+      "check_withdrawal",
+      String(req.body?.sourceWithdrawalId || ""),
+      manualReview ? "manual_review" : "reject",
+      (error as Error).message,
+    );
+    console.error("Withdrawal pre-flight rejected", (error as Error).message);
     res.status(manualReview ? 409 : 422).json({
       decision: manualReview ? "manual_review" : "reject",
       error: (error as Error).message,
