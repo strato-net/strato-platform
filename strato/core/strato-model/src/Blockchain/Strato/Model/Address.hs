@@ -30,13 +30,12 @@ module Blockchain.Strato.Model.Address
 where
 
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
+import Blockchain.Strato.Model.ExtendedWord (Word160)
 import qualified Blockchain.Strato.Model.Keccak256 as SHA (hash, keccak256ToWord256)
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Util
 import Control.DeepSeq
 import Control.Lens.Operators
-import Control.Monad
 import qualified Data.Aeson as AS
 import qualified Data.Aeson.Encoding as Enc
 import qualified Data.Aeson.Key as DAK
@@ -48,6 +47,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Char
 import Data.Data
 import Data.Hashable
+import Data.List (foldl')
 import qualified Data.NibbleString as N
 import Data.OpenApi hiding (Format, format, get, put)
 import qualified Data.OpenApi as OPENAPI
@@ -79,8 +79,10 @@ newtype Address = Address Word160
   deriving (Eq, Enum, Bounded, Ord, Generic, Data)
   deriving newtype (Real, Num, Integral, Hashable)
 
+-- show/read on the raw Integer: Word160's Num ops reduce mod 2^160 on every
+-- step, so showHex/readHex at Word160 cost 40 Integer quotRem/mod each.
 instance Show Address where
-  show (Address a) = printf "%040x" a
+  show (Address a) = padZeros 40 $ showHex (toInteger a) ""
 
 instance Read Address where
   readsPrec _ input =
@@ -88,9 +90,9 @@ instance Read Address where
         (hexPart, rest) = splitAt 40 $ case trimmed of
           '0':'x':rest' -> rest'
           _ -> trimmed
-    in case readHex hexPart of
-         [(num, "")] -> [(Address num, rest)]
-         _           -> []
+    in if not (null hexPart) && all isHexDigit hexPart
+         then [(Address . fromInteger $ foldl' (\acc c -> acc * 16 + toInteger (digitToInt c)) 0 hexPart, rest)]
+         else []
 
 instance PrintfArg Address where
   formatArg (Address word) = formatArg word
@@ -142,14 +144,12 @@ instance Format Address where
   format = CL.yellow . formatAddressWithoutColor
 
 instance ShortDescription Address where
-  shortDescription x = shorten 8 . padZeros 40 $ showHex x ""
+  shortDescription x = shorten 8 . padZeros 40 $ showHex (toInteger x) ""
 
+-- Same 20 big-endian bytes as before, via Word160's word-sized put/get.
 instance Binary Address where
-  put (Address x) = sequence_ $ fmap put $ word160ToBytes $ fromIntegral x
-  get = do
-    bytes <- replicateM 20 get
-    let byteString = B.pack bytes
-    return (Address $ fromInteger $ byteString2Integer byteString)
+  put (Address x) = put x
+  get = Address <$> get
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m
@@ -273,7 +273,7 @@ addressFromNibbleString :: N.NibbleString -> Address
 addressFromNibbleString = addressFromByteString . nibbleString2ByteString
 
 formatAddressWithoutColor :: Address -> String
-formatAddressWithoutColor x = padZeros 40 $ showHex x ""
+formatAddressWithoutColor x = padZeros 40 $ showHex (toInteger x) ""
 
 addressToHex :: Address -> B.ByteString
 addressToHex = B16.encode . BL.toStrict . encode
