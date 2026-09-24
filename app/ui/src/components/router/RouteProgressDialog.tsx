@@ -23,7 +23,7 @@ export default function RouteProgressDialog({ progress, onClose, operation = "Tr
             <div key={tx.index} className="rounded-lg border p-3 text-sm">
               <p className="font-medium">Step {tx.index + 1} of {tx.total}: {tx.functionName === "approve" || tx.index === 0 && tx.total > 1 ? "Token approval" : operation === "Withdrawal" ? "Withdrawal request" : "Trade"}</p>
               <p className="text-muted-foreground">{tx.status === "signing" ? "Confirm in your wallet" : tx.status === "submitting" ? "Submitting transaction…" : tx.status === "submitted" || tx.status === "confirming" ? "Waiting for confirmation…" : tx.status === "completed" ? "Confirmed" : "Not completed"}</p>
-              {tx.submittedHash && <p className="mt-1 break-all font-mono text-xs">Transaction: {tx.submittedHash}</p>}
+              {tx.submittedHash && <p className="mt-1 break-all text-xs">Transaction: <span className="font-mono">{tx.submittedHash}</span></p>}
             </div>
           ))}
           {progress.hash && !progress.transactions.some(tx => tx.submittedHash === progress.hash) && <p className="break-all text-xs">Transaction: {progress.hash}</p>}

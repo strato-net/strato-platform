@@ -1,3 +1,4 @@
+import CopyButton from "@/components/ui/copy";
 import type { AutoRouteDepositStage } from "@/lib/bridge/types";
 import type { RouteConfirmation } from "@/interface/swap";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">You receive · STRATO (estimated)</dt>
             <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(quote.amountOut, outputDecimals)} {outputToken._symbol}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Receiving account</dt>
-            <dd className="max-w-[65%] break-all text-right font-mono text-xs">{recipient}</dd></div>
+            <dd className="flex max-w-[65%] items-start gap-1 text-right text-xs"><span className="min-w-0 break-all font-mono">{recipient}</span><span className="shrink-0"><CopyButton address={recipient} /></span></dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Rate</dt>
             <dd className="text-right break-all">1 {inputSymbol} ≈ {formatUnits(rate.toString())} {outputToken._symbol}</dd></div>
           {!(bridge?.rebaseFactor && !hasFallback) && (

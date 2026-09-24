@@ -52,6 +52,31 @@ test("finds direct routes before longer alternatives", () => {
   assert.equal(routes[0].length, 1);
 });
 
+test("reserves candidates for every hop count after shorter paths fill their quota", async () => {
+  const { ROUTE_CANDIDATES_PER_HOP } = await import("../../config/constants");
+  const edges = [swap("a", "z")];
+  for (let hops = 2; hops <= 6; hops++) {
+    for (let route = 0; route <= ROUTE_CANDIDATES_PER_HOP; route++) {
+      const tokens = ["a", ...Array.from({ length: hops - 1 }, (_, step) => `h${hops}r${route}s${step}`), "z"];
+      for (let step = 1; step < tokens.length; step++) edges.push(swap(tokens[step - 1], tokens[step]));
+    }
+  }
+  const routes = findRoutePaths(edges, "a", "z");
+  assert.deepEqual(routes[0], [swap("a", "z")]);
+  for (let hops = 2; hops <= 6; hops++) {
+    assert.equal(routes.filter((path) => path.length === hops).length, ROUTE_CANDIDATES_PER_HOP);
+  }
+  assert.equal(routes.length, 1 + 5 * ROUTE_CANDIDATES_PER_HOP);
+});
+
+test("bounds search work on a dense cyclic graph and still checks the direct edge", () => {
+  const tokens = Array.from({ length: 50 }, (_, i) => `t${i}`);
+  const edges = tokens.flatMap((a) => tokens.filter((b) => a !== b).map((b) => swap(a, b)));
+  edges.push(swap("t0", "destination"));
+  assert.deepEqual(findRoutePaths(edges, "t0", "destination"), [[swap("t0", "destination")]]);
+  assert.deepEqual(findRoutePaths(edges, "t0", "unreachable"), []);
+});
+
 test("factory pool index lookup uses JSON address values and preserves index zero", async (t) => {
   const { fetchFactoryPoolIndex } = await import("./route.service");
   const { cirrus } = await import("../../utils/appApiHelper");
@@ -270,19 +295,30 @@ test("selects the shortest route within the output tolerance of the global best"
       isPaused: false, isDisabled: false,
     })) };
     if (path === `/${constants.Token}`) {
-      return { data: ["a", "b", "c", "d"].map((address) => ({ address, status: "2" })) };
+      return { data: [...new Set(pairs.flat())].map((address) => ({ address, status: "2" })) };
     }
     return { data: [] };
   });
-  t.mock.method(swapping, "fetchPoolTokenAddresses", async (_token: string, pool: string) => ({
-    tokenA: pool[0], tokenB: pool[1],
-  }));
+  t.mock.method(swapping, "fetchPoolTokenAddresses", async (_token: string, pool: string) => {
+    const [tokenA, tokenB] = pairs.find(([a, b]) => a + b === pool)!;
+    return { tokenA, tokenB };
+  });
   let outputs: string[];
+  let measureConcurrency = false;
+  let activeQuotes = 0;
+  let peakQuotes = 0;
   t.mock.method(trade, "getTradeQuotes", async (_token: string, tokenIn: string, tokenOut: string, amount: bigint) => {
+    if (measureConcurrency) {
+      activeQuotes++;
+      peakQuotes = Math.max(peakQuotes, activeQuotes);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      activeQuotes--;
+    }
     const pair = tokenIn + tokenOut;
     const amountOut = pair === "ad" ? outputs[0] : pair === "bd" ? outputs[1]
       : pair === "cd" ? outputs[amount === 300n ? 3 : 2]
-      : pair === "bc" ? "300" : pair === "ab" || pair === "ac" ? "200" : null;
+      : pair === "bc" ? "300" : pair === "ab" || pair === "ac" || tokenOut.startsWith("x") ? "200"
+      : tokenIn.startsWith("x") && tokenOut === "d" ? "100000" : null;
     if (amountOut === null) throw new Error("No executable pool");
     return {
       bestPoolAddress: pair,
@@ -314,6 +350,131 @@ test("selects the shortest route within the output tolerance of the global best"
   outputs = ["100000", "100001", "90000", "90000"];
   const strict = await getRouteQuote("token", "a", "d", 100n);
   assert.deepEqual(strict.steps.map(({ target }) => target), ["ab", "bd"]);
+
+  (settings as any).ROUTE_OUTPUT_TOLERANCE_BPS = originalTolerance;
+  (config as any).networkId = "route-expanded-search-test";
+  for (let i = 0; i < settings.ROUTE_CANDIDATES_PER_HOP; i++) pairs.push(["a", `x${i}`], [`x${i}`, "d"]);
+  outputs = ["100000", "100000", "100000", "200000"];
+  measureConcurrency = true;
+  const expanded = await getRouteQuote("token", "a", "d", 100n);
+  assert.deepEqual(expanded.steps.map(({ target }) => target), ["ab", "bc", "cd"],
+    "a materially better longer route survives a full set of shorter candidates");
+  assert.equal(expanded.amountOut, "200000");
+  assert.ok(peakQuotes > 1 && peakQuotes <= settings.ROUTE_QUOTE_CONCURRENCY,
+    "expanded route evaluation keeps concurrent pair-quote requests bounded");
+});
+
+test("alternative quotes never treat paused or disabled pools as executable", async (t) => {
+  const trade = await import("./trade.service");
+  const v3 = await import("./poolV3.service");
+  t.mock.method(trade, "findCandidatePools", async () =>
+    ["paused", "disabled", "active"].map((address) => ({
+      pool: {
+        address, poolType: "v3", poolLabel: address, feeBps: 30,
+        tokenIn: { address: "a" }, tokenOut: { address: "b" },
+        isPaused: address === "paused", isDisabled: address === "disabled", totalLiquidityUSD: 100,
+      },
+      v3ZeroForOne: true,
+    })) as any);
+  const called: string[] = [];
+  t.mock.method(v3, "getQuote", async (_token: string, pool: string) => {
+    called.push(pool);
+    return { amountIn: "100", amountOut: "200", feeAmount: "1", fee: 3000, priceImpact: 0, partialFill: true };
+  });
+  const exactIn = await trade.getTradeQuotes("token", "a", "b", 100n, "EXACT_INPUT");
+  assert.deepEqual(called, ["active"]);
+  assert.equal(exactIn.bestPoolAddress, "active", "single-pool exact-input partial quotes remain available");
+  assert.ok(exactIn.quotes.slice(0, 2).every(({ error }) => error === "Pool is paused or disabled"));
+  const exactOut = await trade.getTradeQuotes("token", "a", "b", 100n, "EXACT_OUTPUT");
+  assert.equal(exactOut.bestPoolAddress, null, "exact-output partial fills remain excluded");
+});
+
+test("route diagnostics reach the API while server error details remain private", async (t) => {
+  const { errorHandler } = await import("../middleware/errorHandler");
+  const { StratoError } = await import("../../errors");
+  t.mock.method(console, "error", () => {});
+  t.mock.method(console, "warn", () => {});
+  let body: any;
+  let status: number | undefined;
+  const response = { status: (value: number) => { status = value; return response; }, json: (value: any) => { body = value; } };
+  const details = { rejections: [{ tokenIn: "a", tokenOut: "b", reason: "PARTIAL_FILL" }] };
+  errorHandler(new StratoError("No executable route found", 422, details), {} as any, response as any, () => {});
+  assert.equal(status, 422);
+  assert.deepEqual(body.error.details, details);
+  errorHandler(new StratoError("private server error", 500, details), {} as any, response as any, () => {});
+  assert.equal(status, 500);
+  assert.equal(body.error.details, undefined);
+  assert.doesNotMatch(body.error.message, /private/);
+});
+
+test("tries full-fill pool alternatives and preserves safe rejection diagnostics", async (t) => {
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const { constants } = await import("../../config/constants");
+  const config = await import("../../config/config");
+  const trade = await import("./trade.service");
+  const swapping = await import("../helpers/swapping.helper");
+  const psm = await import("./psm.service");
+  const forge = await import("./metalForge.service");
+  const save = await import("./saveUsdst.service");
+  const { getRouteQuote } = await import("./route.service");
+  const originalNetwork = config.networkId;
+  (config as any).networkId = "alternative-pools-test";
+  t.after(() => { (config as any).networkId = originalNetwork; });
+  t.mock.method(swapping, "fetchMultiTokenStablePools", async () => []);
+  t.mock.method(psm, "getPsmMintState", async () => ({ mintPaused: true }));
+  t.mock.method(forge, "getConfigs", async () => ({ metals: [], payTokens: [] }));
+  t.mock.method(save, "getSaveUsdstActionState", async () => null);
+  t.mock.method(cirrus, "get", async (_token: string, path: string) => {
+    if (path === `/${constants.PoolFactory}-allPools`) return { data: [{ key: 10 }] };
+    if (path === `/${constants.Pool}`) return { data: [{
+      address: "ab", tokenA: { address: "a", status: "2" }, tokenB: { address: "b", status: "2" },
+      tokenABalance: "100", tokenBBalance: "100", isPaused: false, isDisabled: false,
+    }] };
+    if (path === `/${constants.Token}`) return { data: ["a", "b"].map((address) => ({ address, status: "2" })) };
+    return { data: [] };
+  });
+  const built: string[] = [];
+  t.mock.method(swapping, "fetchPoolTokenAddresses", async (_token: string, pool: string) => {
+    built.push(pool);
+    if (pool === "broken") throw new Error("RPC unavailable with private credentials");
+    return { tokenA: "a", tokenB: "b" };
+  });
+  const poolQuote = (poolAddress: string, amountOut: string, extra = {}) => ({
+    poolAddress, poolType: "v2", tokenIn: "a", tokenOut: "b", amountIn: "100", amountOut,
+    feeAmount: "0", feeBps: 0, priceImpact: 0, poolLabel: "test", ...extra,
+  });
+  let options = [
+    poolQuote("lower", "110"), poolQuote("partial", "500", { partialFill: true }),
+    poolQuote("broken", "400"), poolQuote("disabled", "600", { error: "Pool is paused or disabled" }),
+    poolQuote("best-full", "200"), poolQuote("short-input", "700", { amountIn: "99" }),
+  ];
+  t.mock.method(trade, "getTradeQuotes", async () => ({ bestPoolAddress: "partial", quotes: options }));
+  const quote = () => getRouteQuote("token", "a", "b", 100n);
+  const result = await quote();
+  assert.equal(result.amountOut, "200");
+  assert.equal(result.steps[0].target, "best-full");
+  assert.deepEqual(built, ["broken", "best-full"], "builds candidates lazily, in output order");
+
+  options = options.filter(({ poolAddress }) => !["lower", "best-full"].includes(poolAddress));
+  await assert.rejects(quote(), (error: any) => {
+    assert.equal(error.status, 422);
+    assert.deepEqual(new Set(error.details.rejections.map((r: any) => r.reason)),
+      new Set(["PARTIAL_FILL", "POOL_UNAVAILABLE", "QUOTE_UNAVAILABLE"]));
+    assert.ok(error.details.rejections.every((r: any) => r.tokenIn === "a" && r.tokenOut === "b"));
+    assert.ok(error.details.rejections.some((r: any) => r.pool === "broken"));
+    assert.doesNotMatch(JSON.stringify(error.details), /RPC|credentials/);
+    return true;
+  });
+  for (const [message, reason] of [
+    ["Pool has insufficient liquidity for this trade", "INSUFFICIENT_LIQUIDITY"],
+    ["PSM token balance cap exceeded", "CAPACITY_LIMIT"],
+    ["Vault deposit would mint zero shares", "AMOUNT_TOO_SMALL"],
+  ]) {
+    options = [poolQuote("failed", "0", { error: message })];
+    await assert.rejects(quote(), (error: any) => error.details.rejections[0].reason === reason);
+  }
+  options = [];
+  await assert.rejects(quote(), (error: any) => error.details.rejections[0].reason === "NO_POOL");
 });
 
 test("excludes repeated-pool paths while retaining direct and distinct-pool routes", async (t) => {
@@ -352,6 +513,7 @@ test("excludes repeated-pool paths while retaining direct and distinct-pool rout
     ["a:c", { pool: "1111", output: "90" }],
     ["c:d", { pool: "2222", output: "80" }],
   ]);
+  let alternativePool = false;
   t.mock.method(trade, "getTradeQuotes", async (_token: string, tokenIn: string, tokenOut: string, amount: bigint) => {
     const result = available.get(`${tokenIn}:${tokenOut}`);
     if (!result) throw new Error("No executable pool");
@@ -359,13 +521,29 @@ test("excludes repeated-pool paths while retaining direct and distinct-pool rout
       bestPoolAddress: result.pool,
       quotes: [{ poolAddress: result.pool, poolType: "stable", tokenIn, tokenOut,
         amountIn: String(amount), amountOut: result.output, feeAmount: "0", feeBps: 0,
-        priceImpact: 0, poolLabel: "test" }],
+        priceImpact: 0, poolLabel: "test" },
+        ...(alternativePool && tokenIn === "b" && tokenOut === "d" ? [{
+          poolAddress: "3333", poolType: "stable", tokenIn, tokenOut,
+          amountIn: String(amount), amountOut: "500", feeAmount: "0", feeBps: 0,
+          priceImpact: 0, poolLabel: "alternative",
+        }] : [])],
     };
   });
   const quote = () => getRouteQuote("token", "a", "d", 100n);
   const direct = await quote();
   assert.equal(direct.steps.length, 1);
   assert.equal(direct.amountOut, "100");
+  alternativePool = true;
+  const retried = await quote();
+  assert.deepEqual(retried.steps.map(({ target }) => target), ["abcd", "3333"]);
+  assert.equal(retried.amountOut, "500", "tries another pool before discarding a repeated-pool path");
+  available.set("c:b", { pool: "4444", output: "400" });
+  const sharedCandidates = await quote();
+  assert.deepEqual(sharedCandidates.steps.map(({ target }) => target), ["1111", "4444", "abcd"],
+    "cached candidates remain usable by paths that have not visited that pool");
+  assert.equal(sharedCandidates.amountOut, "800");
+  available.delete("c:b");
+  alternativePool = false;
   available.delete("a:d");
   const alternative = await quote();
   assert.deepEqual(alternative.steps.map(({ target }) => target), ["1111", "2222"]);

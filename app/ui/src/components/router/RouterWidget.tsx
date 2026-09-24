@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import CopyButton from "@/components/ui/copy";
+import { useMemo, useRef, useState } from "react";
 import { useBalance, useReadContracts } from "wagmi";
-import { useAccountModal } from "@rainbow-me/rainbowkit";
 import { maxUint256 } from "viem";
 import { ERC20_ABI } from "@/lib/bridge/constants";
-import { ArrowDownUp, ArrowDown, Globe2, Layers3 } from "lucide-react";
+import { ArrowDownUp, Globe2, Layers3, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/context/UserContext";
 import { useToast } from "@/hooks/use-toast";
 import {
   TradeBridgeCatalog,
+  useFeeBalancesReady,
   useRouteAssets,
   useRoutePoolTokens,
   useRouteDepositConfig,
@@ -30,18 +31,18 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/axios";
 import { useOracleContext } from "@/context/OracleContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { requestWalletConnection, redirectToLogin } from "@/lib/auth";
+import { requestWalletConnection } from "@/lib/auth";
 import RouteTokenPicker from "./RouteTokenPicker";
 import RouteReceivePanel from "./RouteReceivePanel";
 import RouteTradeSummary, { RouteFallback } from "./RouteTradeSummary";
 import RoutePreview from "./RoutePreview";
 import RouteConfirmDialog from "./RouteConfirmDialog";
 import RouteProgressDialog from "./RouteProgressDialog";
-import WithdrawalWidget from "./WithdrawalWidget";
+import { Link } from "react-router-dom";
 import type { RouteConfirmation, RoutePickerToken } from "@/interface/swap";
 import { assertRouteConfirmation, getRouteActionLabel, normalizeRouteAddress, resolveRouteSelection } from "@/lib/route";
 import { useTokenContext } from "@/context/TokenContext";
-import { LOW_USDST_THRESHOLD, SWAP_FEE, USDST_BALANCE_REFRESH_MS, usdstAddress } from "@/lib/constants";
+import { LOW_USDST_THRESHOLD, SWAP_FEE, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
@@ -66,7 +67,6 @@ const RouterWidget = ({
   initialPool?: string;
 }) => {
   const { toast } = useToast();
-  const { openAccountModal } = useAccountModal();
   const { isLoggedIn, isAppAuthenticated, stratoAddress, userAddress, externalEvmWalletAddress, isExternalEvmWalletConnected } = useUser();
   const { usdstBalance, voucherBalance, usdstBalanceError, fetchUsdstBalance, getEarningAssets } =
     useTokenContext();
@@ -84,22 +84,7 @@ const RouterWidget = ({
     (isLoggedIn ? Object.entries(prices) : (publicPrices.data ?? []).map(item => [item.asset, item.price]))
       .map(([address, price]) => [normalizeRouteAddress(address), price])
   ), [isLoggedIn, prices, publicPrices.data]);
-  const [feeBalanceOwner, setFeeBalanceOwner] = useState<string | null>(null);
-  useEffect(() => {
-    if (!isLoggedIn || !userAddress) return;
-    const controller = new AbortController();
-    const refresh = async () => {
-      await fetchUsdstBalance(controller.signal);
-      if (!controller.signal.aborted) setFeeBalanceOwner(userAddress);
-    };
-    void refresh();
-    const timer = setInterval(refresh, USDST_BALANCE_REFRESH_MS);
-    return () => {
-      controller.abort();
-      clearInterval(timer);
-    };
-  }, [isLoggedIn, userAddress, fetchUsdstBalance]);
-  const feeBalancesReady = !!userAddress && feeBalanceOwner === userAddress && !usdstBalanceError;
+  const feeBalancesReady = useFeeBalancesReady();
   const {
     availableNetworks,
     bridgeableTokens,
@@ -145,10 +130,9 @@ const RouterWidget = ({
     () => routeAssets.filter((token) => token.routableSource),
     [routeAssets]
   );
-  const [sourceMode, setSourceMode] = useState<"strato" | "external" | "withdrawal">(
-    "strato"
+  const [sourceMode, setSourceMode] = useState<"strato" | "external">(
+    initialTokenIn || initialTokenOut || initialPool ? "strato" : "external"
   );
-  const [withdrawalPending, setWithdrawalPending] = useState(false);
   const [tokenInAddress, setTokenInAddress] = useState("");
   const [tokenOutAddress, setTokenOutAddress] = useState("");
   const [externalRouteId, setExternalRouteId] = useState("");
@@ -294,7 +278,7 @@ const RouterWidget = ({
   const quoteLoading = !quote && amountWei !== "0" && !quoteError;
   const routeExecute = useRouteExecute();
   const autoRouteDeposit = useAutoRouteDeposit();
-  const pending = routeExecute.isPending || autoRouteDeposit.isPending || withdrawalPending;
+  const pending = routeExecute.isPending || autoRouteDeposit.isPending;
   const recipient = sourceMode === "external"
     ? isAppAuthenticated ? stratoAddress : externalEvmWalletAddress
     : userAddress;
@@ -347,7 +331,6 @@ const RouterWidget = ({
   };
 
   const reviewTrade = () => {
-    if (sourceMode === "withdrawal") return;
     if (!quote || quoteLoading || pending || guestMode || !recipient || !tokenOut || amountWei === "0" || amountError || feeError || externalBalanceError || minDepositError || selectionError) return;
     if (sourceMode === "strato" ? !tokenIn || !feeBalancesReady : !externalRoute || !network || !isExternalEvmWalletConnected || !depositConfigReady) return;
     const reviewed = structuredClone({
@@ -441,85 +424,124 @@ const RouterWidget = ({
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-7">
       <RouteConfirmDialog confirmation={routeExecute.progress ? null : confirmation} pending={pending} stage={autoRouteDeposit.stage} onClose={() => setConfirmation(null)} onConfirm={handleTrade} />
       <RouteProgressDialog progress={routeExecute.progress} onClose={routeExecute.closeProgress} />
-      <div className="grid grid-cols-3 rounded-xl border border-border/60 bg-muted/60 p-1.5">
-        <Button
+      {/* STEP 1 */}
+      <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">1</span>
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">How Are You Trading?</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <button
           type="button"
-          variant={sourceMode === "external" ? "default" : "ghost"}
-          className="h-auto min-h-11 gap-1 whitespace-normal rounded-lg px-2 py-2 text-xs sm:gap-2 sm:text-sm"
           disabled={pending || bridgeCatalog.loading}
           onClick={() => {
             setSourceMode("external");
             setAmount("");
             setAmountError("");
           }}
+          className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+            sourceMode === "external"
+              ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+              : "border-border hover:bg-muted/30"
+          }`}
         >
-          <Globe2 className="h-4 w-4" />
-          Bridge & Trade
-        </Button>
-        <Button
+          {sourceMode === "external" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+          <Globe2 className={`w-5 h-5 mb-2 ${sourceMode === "external" ? "text-blue-500" : "text-muted-foreground"}`} />
+          <p className="text-sm font-semibold">Bridge In</p>
+          <p className="text-xs text-muted-foreground mt-0.5">From another network</p>
+        </button>
+        <button
           type="button"
-          variant={sourceMode === "strato" ? "default" : "ghost"}
           disabled={pending}
-          className="h-auto min-h-11 gap-1 whitespace-normal rounded-lg px-2 py-2 text-xs sm:gap-2 sm:text-sm"
           onClick={() => {
             setSourceMode("strato");
             setAmount("");
             setAmountError("");
           }}
+          className={`relative rounded-md border-2 p-3 text-left transition-colors ${
+            sourceMode === "strato"
+              ? "border-blue-500 bg-blue-500/5 dark:bg-blue-500/10"
+              : "border-border hover:bg-muted/30"
+          }`}
         >
-          <Layers3 className="h-4 w-4" />
-          Trade on STRATO
-        </Button>
-        <Button type="button" variant={sourceMode === "withdrawal" ? "default" : "ghost"}
-          className="h-auto min-h-11 gap-1 whitespace-normal rounded-lg px-2 py-2 text-xs sm:gap-2 sm:text-sm"
-          disabled={pending || bridgeCatalog.loading} onClick={() => { setSourceMode("withdrawal"); setConfirmation(null); }}>
-          <Globe2 className="h-4 w-4 shrink-0" />Bridge Out
-        </Button>
+          {sourceMode === "strato" && <div className="absolute top-2 right-2"><CheckCircle2 className="w-5 h-5 text-blue-500" /></div>}
+          <Layers3 className={`w-5 h-5 mb-2 ${sourceMode === "strato" ? "text-blue-500" : "text-muted-foreground"}`} />
+          <p className="text-sm font-semibold">Swap</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Between STRATO assets</p>
+        </button>
       </div>
 
-      <p className="min-h-10 text-sm text-muted-foreground">
-        {sourceMode === "strato" ? "Swap tokens or deposit directly into savings and yield vaults." : sourceMode === "external"
-          ? "Bridge into tokens, savings, or yield vaults on STRATO."
-          : "Move assets from STRATO to another network."}
-      </p>
-
-      {sourceMode !== "strato" && <BridgeWalletStatus externalOnly connectLabel="Connect external wallet" connectedLabel="External wallet connected" />}
-
-      <div className="grid">
-      <div aria-hidden={sourceMode === "withdrawal"} {...(sourceMode === "withdrawal" ? { inert: "" } : {})}
-        className={`col-start-1 row-start-1 space-y-5 transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "withdrawal" ? "pointer-events-none opacity-0" : "opacity-100"}`}>
-      <div className="rounded-xl border border-border/60 px-3 py-2 text-xs">
-        <div className="flex justify-between gap-3"><span className="text-muted-foreground">{sourceMode === "external" ? "External wallet" : "Trading account"}</span><span className="font-mono" title={(sourceMode === "external" ? externalEvmWalletAddress : userAddress) ?? ""}>{truncateAddress(sourceMode === "external" ? externalEvmWalletAddress : userAddress) || "Not connected"}{openAccountModal && isExternalEvmWalletConnected && (sourceMode === "external" || !isAppAuthenticated) && <button type="button" className="ml-2 font-sans text-primary" onClick={openAccountModal}>Manage</button>}</span></div>
-        <div className="mt-1 flex justify-between gap-3"><span className="text-muted-foreground">Receiving on STRATO</span><span className="font-mono" title={recipient ?? ""}>{truncateAddress(recipient) || "Connect wallet or sign in"}</span></div>
-      </div>
-      <div className="grid">
-        <div aria-hidden={sourceMode !== "strato"} className={`col-start-1 row-start-1 flex h-11 items-center rounded-xl bg-muted/30 px-3 text-sm text-muted-foreground transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "strato" ? "opacity-100" : "pointer-events-none opacity-0"}`}>Network · STRATO</div>
-        <div aria-hidden={sourceMode !== "external"} {...(sourceMode !== "external" ? { inert: "" } : {})} className={`col-start-1 row-start-1 transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "external" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-          <select aria-label="Source network" tabIndex={sourceMode === "external" ? 0 : -1}
-            className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-medium"
-            value={network?.chainName ?? ""}
-            onChange={(event) => {
-              setExternalRouteId("");
-              setAmount("");
-              setAmountError("");
-              setSelectedNetwork(event.target.value);
-            }}
-          >
-            {availableNetworks.map((item) => <option key={item.chainId} value={item.chainName}>{item.chainName}</option>)}
-          </select>
+      <div aria-hidden={sourceMode !== "external"} {...(sourceMode !== "external" ? { inert: "" } : {})} className={`overflow-hidden transition-all duration-300 ease-in-out ${sourceMode === "external" ? "max-h-[200px] opacity-100" : "max-h-0 opacity-0"}`}>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Choose Network</p>
+        <div className="grid gap-2" role="group" aria-label="Source network" style={{ gridTemplateColumns: `repeat(${availableNetworks.length || 1}, 1fr)` }}>
+          {availableNetworks.map((item) => {
+            const active = network?.chainName === item.chainName;
+            return (
+              <button
+                key={item.chainId}
+                type="button"
+                tabIndex={sourceMode === "external" ? 0 : -1}
+                disabled={pending}
+                onClick={() => {
+                  setExternalRouteId("");
+                  setAmount("");
+                  setAmountError("");
+                  setSelectedNetwork(item.chainName);
+                }}
+                className={`relative h-10 rounded-md text-sm font-medium border-2 transition-colors flex items-center justify-center ${
+                  active
+                    ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-300"
+                    : "border-border text-foreground hover:bg-muted/50"
+                }`}
+              >
+                {active && (
+                  <div className="absolute top-1 right-1">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                  </div>
+                )}
+                {item.chainName}
+              </button>
+            );
+          })}
         </div>
       </div>
+      </section>
 
-      <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3 transition-colors focus-within:border-primary/40 focus-within:bg-muted/50">
-        <label className="mb-3 lg:mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          You send · {sourceMode === "external" ? network?.chainName ?? "Choose network" : "STRATO"}
-        </label>
-        <div className="flex items-center gap-3">
+      {/* STEP 2 */}
+      <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">2</span>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Send{sourceMode === "strato" ? " From STRATO" : ""}</h3>
+        </div>
+        {sourceMode === "strato"
+          ? <button type="button" aria-label="Swap send and receive tokens"
+              disabled={pending || !tokenIn || !tokenOut || !routeSources.some(token => token.address === tokenOut.address)}
+              title={tokenOut && !routeSources.some(token => token.address === tokenOut.address) ? "This token cannot be used as a route input" : "Swap send and receive tokens"}
+              onClick={flipTokens}
+              className="flex h-7 w-7 items-center justify-center rounded-md border-2 border-border text-muted-foreground transition-colors hover:bg-muted/50 disabled:opacity-50">
+              <ArrowDownUp className="h-3.5 w-3.5" />
+            </button>
+          : <div className="flex items-center gap-2">
+              <div className="fund-wallet-compact [&_>div]:!mb-0 [&_.group>div]:!h-7 [&_.group>div]:!text-[11px] [&_.group>div]:!px-2.5 [&_.group>div]:!rounded-md [&_.group>div.absolute]:!rounded-md [&_.group>div.absolute>span]:!text-[11px] [&_button]:!h-7 [&_button]:!text-[11px] [&_button]:!px-2.5 [&_button]:!py-0 [&_button]:!rounded-md [&_button]:!font-medium">
+                <style>{`.fund-wallet-compact > div > div.flex { gap: 0 !important; } .fund-wallet-compact > div > div.flex > :not(.group) { display: none !important; } .fund-wallet-compact > div { width: auto !important; }`}</style>
+                <BridgeWalletStatus guestMode={guestMode} externalOnly connectedLabel="External Wallet" connectLabel="Connect External" copiedDescription="External wallet address copied to clipboard" />
+              </div>
+              {externalEvmWalletAddress && <span className="flex items-center text-[11px] font-mono text-muted-foreground" title={externalEvmWalletAddress}>{truncateAddress(externalEvmWalletAddress)}<CopyButton address={externalEvmWalletAddress} /></span>}
+            </div>}
+      </div>
+      <div className="rounded-md border-2 border-border p-3 space-y-2 transition-colors focus-within:border-blue-500">
+        <div className="flex items-center gap-2">
+          <RouteTokenPicker label="Choose send token" external={sourceMode === "external"}
+            tokens={sourceMode === "external" ? externalPickerTokens : pickerTokens.filter(token => routeSources.some(source => source.address === token.id))}
+            value={sourceMode === "external" ? externalRoute?.id : tokenIn?.address}
+            loading={sourceMode === "external" ? bridgeCatalog.loading : routeAssetsQuery.isLoading}
+            onSelect={id => { sourceMode === "external" ? setExternalRouteId(id) : setTokenInAddress(id); setAmount(""); setAmountError(""); }} />
           <input
-            className="min-w-0 flex-1 bg-transparent text-3xl font-semibold tracking-tight outline-none placeholder:text-muted-foreground/50"
+            className="h-10 min-w-0 flex-1 bg-transparent text-right text-xl font-bold outline-none placeholder:text-muted-foreground/50"
             aria-label="Amount to pay"
             aria-describedby="pay-amount-help"
             aria-invalid={!!(amountError || externalBalanceError || minDepositError)}
@@ -545,26 +567,24 @@ const RouterWidget = ({
                   )
             }
           />
-          <RouteTokenPicker label="Choose send token" external={sourceMode === "external"}
-            tokens={sourceMode === "external" ? externalPickerTokens : pickerTokens.filter(token => routeSources.some(source => source.address === token.id))}
-            value={sourceMode === "external" ? externalRoute?.id : tokenIn?.address}
-            loading={sourceMode === "external" ? bridgeCatalog.loading : routeAssetsQuery.isLoading}
-            onSelect={id => { sourceMode === "external" ? setExternalRouteId(id) : setTokenInAddress(id); setAmount(""); setAmountError(""); }} />
         </div>
-        <div className="lg:mt-1 lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-x-3 lg:gap-y-1">
-        <p className="mt-1 lg:mt-0 min-h-4 text-xs text-muted-foreground">{inputUsd ? `≈ ${inputUsd}` : "— USD"}</p>
-        {sourceMode === "strato" && tokenIn && (
-          <div className="mt-2 lg:mt-0 flex items-center justify-between lg:gap-3 text-xs text-muted-foreground">
-            <span>
-              Available:{" "}
-              {formatAmount(
-                formatUnits(maxSpendableWei, tokenIn.customDecimals)
-              )}{" "}
-              {tokenIn._symbol}
-            </span>
+        {inputUsd && <p className="text-right text-xs text-muted-foreground pt-0.5">≈ {inputUsd}</p>}
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-xs text-muted-foreground">
+            {sourceMode === "strato"
+              ? tokenIn && <>Balance: <span className="text-foreground font-medium">{formatAmount(formatUnits(maxSpendableWei, tokenIn.customDecimals))} {tokenIn._symbol}</span></>
+              : externalRoute && (!isExternalEvmWalletConnected
+                ? "Connect an external wallet to see your balance"
+                : (externalBalanceQuery.isError || (!isNativeInput && externalBalance === undefined && tokenBalance.isSuccess))
+                  ? "Balance unavailable"
+                  : externalBalance === undefined
+                    ? "Loading balance..."
+                    : <>Balance: <span className="text-foreground font-medium">{formatAmount(formatUnits(externalBalance.toString(), inputDecimals))} {externalRoute.externalSymbol}</span></>)}
+          </span>
+          {sourceMode === "strato" && tokenIn && (
             <button
               type="button"
-              className="font-semibold text-primary"
+              className="text-xs font-semibold text-primary"
               disabled={!feeBalancesReady}
               onClick={() => {
                 setAmount(
@@ -575,21 +595,9 @@ const RouterWidget = ({
             >
               Max
             </button>
-          </div>
-        )}
-        {sourceMode === "external" && externalRoute && (
-          <div className="mt-2 lg:mt-0 text-xs text-muted-foreground">
-            {!isExternalEvmWalletConnected
-              ? "Connect an external wallet to see your balance"
-              : (externalBalanceQuery.isError || (!isNativeInput && externalBalance === undefined && tokenBalance.isSuccess))
-                ? "Balance unavailable"
-                : externalBalance === undefined
-                  ? "Loading balance..."
-                  : `Available: ${formatAmount(formatUnits(externalBalance.toString(), inputDecimals))} ${externalRoute.externalSymbol}`}
-          </div>
-        )}
+          )}
         </div>
-        <div id="pay-amount-help" className="mt-2 min-h-10 lg:mt-1 lg:min-h-5 text-xs text-muted-foreground">
+        <div id="pay-amount-help" className="text-xs text-muted-foreground">
           {sourceMode === "external" && externalRoute && !nativeRedemption && <>
             {minDepositError && !depositConfig.data ? "" : depositConfig.data ? `Minimum deposit: ${formatUnits(depositConfig.data.minAmount, inputDecimals)} ${externalRoute.externalSymbol}` : "Loading deposit limits…"}
             {depositConfig.isError && <button type="button" className="ml-2 font-semibold text-primary" onClick={() => void depositConfig.refetch()}>Retry</button>}
@@ -597,24 +605,27 @@ const RouterWidget = ({
           {(amountError || externalBalanceError || minDepositError) && <p className="mt-1 text-destructive" role="alert">{amountError || externalBalanceError || minDepositError}</p>}
         </div>
       </div>
+      </section>
 
-      <div className="relative z-10 !-my-7 flex justify-center">
-        {sourceMode === "strato" ? <button type="button" aria-label="Swap send and receive tokens"
-          disabled={pending || !tokenIn || !tokenOut || !routeSources.some(token => token.address === tokenOut.address)}
-          title={tokenOut && !routeSources.some(token => token.address === tokenOut.address) ? "This token cannot be used as a route input" : "Swap tokens"}
-          onClick={flipTokens} className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-primary text-primary-foreground shadow-md disabled:opacity-50">
-          <ArrowDownUp className="h-4 w-4" />
-        </button> : <div className="flex h-11 w-11 items-center justify-center rounded-full border-4 border-card bg-muted text-muted-foreground"><ArrowDown className="h-4 w-4" /></div>}
+      {/* STEP 3 */}
+      <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-500 text-xs font-bold flex items-center justify-center shrink-0">3</span>
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You Receive On STRATO</h3>
+        </div>
+        {recipient && <span className="flex items-center text-[11px] font-mono text-muted-foreground" title={recipient}>{truncateAddress(recipient)}<CopyButton address={recipient} /></span>}
       </div>
-
       <RouteReceivePanel tokens={pickerTokens.filter(token => sourceMode === "external" || token.id !== tokenIn?.address)}
         token={tokenOut} quote={quote} usd={outputUsd} loading={routeAssetsQuery.isLoading} pending={pending}
         error={selectionError} onSelect={setTokenOutAddress} />
+      </section>
 
-      <label className="flex items-center justify-between rounded-xl border border-border/60 bg-background px-3 py-2.5 text-sm">
-        <span className="text-muted-foreground">Slippage tolerance</span>
+      <div className="space-y-4">
+      <label className="flex items-center justify-between px-1 text-xs text-muted-foreground">
+        <span>Slippage tolerance</span>
         <select
-          className="rounded-md border-0 bg-muted px-2 py-1 font-medium outline-none"
+          className="rounded-md border-0 bg-muted px-2 py-1 font-medium text-foreground outline-none"
           value={slippageBps}
           onChange={(event) => setSlippageBps(Number(event.target.value))}
         >
@@ -624,10 +635,10 @@ const RouterWidget = ({
         </select>
       </label>
 
-      <RouteTradeSummary quote={quote} inputAmount={amountWei} inputDecimals={inputDecimals} inputSymbol={inputSymbol} outputToken={tokenOut}
+      {amountWei !== "0" && <RouteTradeSummary quote={quote} inputAmount={amountWei} inputDecimals={inputDecimals} inputSymbol={inputSymbol} outputToken={tokenOut}
         external={sourceMode === "external"} fetching={quoteFetching || quoteLoading}
-        error={quoteError && amountWei !== "0" ? getQuoteErrorMessage(quoteError) : undefined} />
-      <div className="min-h-10 text-xs" aria-live="polite">
+        error={quoteError ? getQuoteErrorMessage(quoteError) : undefined} />}
+      <div className="text-xs" aria-live="polite">
         {feeError ? <p className="text-destructive">{feeError}</p> : lowFeeBalance ? <p className="text-amber-700 dark:text-amber-400">Your fee balance is running low ({formatUnits(availableFees)} USDST including vouchers). Add funds for future trades.</p> : poolLinkError ? <p className="text-muted-foreground">{poolLinkError}</p> : null}
       </div>
 
@@ -644,8 +655,8 @@ const RouterWidget = ({
         />
       ))}
 
-      {(sourceMode !== "external" || isExternalEvmWalletConnected) && <Button
-        className="h-12 w-full rounded-xl text-sm font-semibold shadow-sm"
+      <Button
+        className="w-full h-11 bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90 text-base font-semibold"
         disabled={
           pending || (!guestMode && (
             quoteLoading ||
@@ -655,7 +666,7 @@ const RouterWidget = ({
             !!feeError ||
             (sourceMode === "strato" && !feeBalancesReady) ||
             !!externalBalanceError ||
-            (sourceMode === "external" && (!depositConfigReady || !!minDepositError)) ||
+            (sourceMode === "external" && (!isExternalEvmWalletConnected || !depositConfigReady || !!minDepositError)) ||
             amountWei === "0"
           ))
         }
@@ -665,17 +676,17 @@ const RouterWidget = ({
           ? "Connect wallet"
           : pending
             ? "Submitting..."
-            : `Review ${getRouteActionLabel(tokenOut?.routeDestination, sourceMode === "external", normalizeRouteAddress(externalRoute?.stratoToken ?? "") === tokenOut?.address)}`}
-      </Button>}
-      {sourceMode === "external" && <RouteFallback quote={compositeQuote.data} fallbackDecimals={bridgedToken?.customDecimals ?? 18} outputSymbol={tokenOut?._symbol} destination={tokenOut?.routeDestination} />}
+            : sourceMode === "external" && !isExternalEvmWalletConnected
+              ? "Connect External Wallet"
+              : `Review ${getRouteActionLabel(tokenOut?.routeDestination, sourceMode === "external", normalizeRouteAddress(externalRoute?.stratoToken ?? "") === tokenOut?.address)}`}
+      </Button>
+      {sourceMode === "external" && compositeQuote.data && <RouteFallback quote={compositeQuote.data} fallbackDecimals={bridgedToken?.customDecimals ?? 18} outputSymbol={tokenOut?._symbol} destination={tokenOut?.routeDestination} />}
       {quote?.steps.length ? <RoutePreview steps={quote.steps} tokens={tokens} minFinalOut={quote.minFinalOut} outputToken={tokenOut} showMinimum={false} /> : null}
-      {guestMode && <button type="button" className="w-full text-center text-sm text-primary" onClick={() => redirectToLogin()}>Sign in with STRATO</button>}
-      </div>
-      <div aria-hidden={sourceMode !== "withdrawal"} {...(sourceMode !== "withdrawal" ? { inert: "" } : {})}
-        className={`col-start-1 row-start-1 transition-opacity duration-200 motion-reduce:transition-none ${sourceMode === "withdrawal" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
-        <WithdrawalWidget catalog={bridgeCatalog} active={sourceMode === "withdrawal"} feeBalancesReady={feeBalancesReady}
-          onPendingChange={setWithdrawalPending} onSubmitted={onTransactionSubmitted} />
-      </div>
+      <p className="text-right">
+        <Link to="/dashboard/withdrawals" className="text-xs text-blue-500 hover:text-blue-400">
+          Need to withdraw? <span className="font-semibold">Withdraw {"\u2192"}</span>
+        </Link>
+      </p>
       </div>
     </div>
   );

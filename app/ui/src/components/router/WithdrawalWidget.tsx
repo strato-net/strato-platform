@@ -1,3 +1,4 @@
+import CopyButton from "@/components/ui/copy";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { maxUint256 } from "viem";
@@ -116,7 +117,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
   return <div className="space-y-5">
     <RouteProgressDialog progress={execute.progress} onClose={execute.closeProgress} operation="Withdrawal" />
     <div className="rounded-xl border border-border/60 px-3 py-2 text-xs">
-      <div className="flex justify-between gap-3"><span className="text-muted-foreground">Sending account · STRATO</span><span className="font-mono" title={userAddress ?? ""}>{truncateAddress(userAddress) || "Connect wallet or sign in"}</span></div>
+      <div className="flex justify-between gap-3"><span className="text-muted-foreground">Sending account · STRATO</span><span className={userAddress ? "font-mono" : undefined} title={userAddress ?? ""}>{truncateAddress(userAddress) || "Connect wallet or sign in"}<CopyButton address={userAddress} /></span></div>
     </div>
     <label className="block space-y-2 text-sm"><span>Destination network</span>
       <select aria-label="Destination network" className="h-11 w-full rounded-xl border border-input bg-background px-3" value={network?.chainName ?? ""}
@@ -125,11 +126,11 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
       </select>
     </label>
     <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
-      <label htmlFor="withdrawal-amount" className="mb-3 lg:mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">You send · STRATO</label>
+      <label htmlFor="withdrawal-amount" className="mb-3 lg:mb-2 block text-sm font-semibold text-muted-foreground">You send · STRATO</label>
       <div className="flex items-center gap-3">
         <input id="withdrawal-amount" inputMode="decimal" placeholder="0" value={amount} disabled={execute.isPending}
           aria-invalid={!!validationError} aria-describedby="withdrawal-amount-error"
-          className="min-w-0 flex-1 bg-transparent text-3xl font-semibold outline-none"
+          className="min-w-0 flex-1 bg-transparent text-2xl md:text-3xl font-semibold tracking-tight outline-none"
           onChange={event => handleAmountInputChange(event.target.value, setAmount, setAmountError, isLoggedIn ? maximum.toString() : maxUint256.toString(), decimals)} />
         <RouteTokenPicker label="Choose withdrawal token" loading={catalog.loading} value={route?.id}
           tokens={routes.map(item => ({ id: item.id, address: item.stratoToken, name: item.stratoTokenName, symbol: item.stratoTokenSymbol,
@@ -148,16 +149,16 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
     </div>
     <div className="flex justify-center"><ArrowDown className="h-5 w-5 text-muted-foreground" /></div>
     <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
-      <p className="mb-3 lg:mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">You receive · {network?.chainName ?? "Choose network"}</p>
-      <p className="break-words text-2xl font-semibold">{preview && route ? display(preview.externalAmount, Number(route.externalDecimals)) : "—"} {route?.externalSymbol}</p>
+      <p className="mb-3 lg:mb-2 text-sm font-semibold text-muted-foreground">You receive · {network?.chainName ?? "Choose network"}</p>
+      <p className="break-words text-2xl md:text-3xl font-semibold tracking-tight">{preview && route ? display(preview.externalAmount, Number(route.externalDecimals)) : "—"} {route?.externalSymbol}</p>
       <p className="mt-2 lg:mt-1 text-xs text-muted-foreground">Receive the selected asset’s external counterpart.</p>
     </div>
-    <label className="block space-y-2 text-sm"><span>Receiving address on {network?.chainName ?? "the destination network"}</span>
-      <Input aria-label="External receiving address" value={recipient} placeholder="0x…" disabled={execute.isPending} aria-invalid={!!recipient && !validRecipient}
+    <div className="space-y-2 text-sm"><div className="flex items-center justify-between gap-2"><label htmlFor="withdrawal-recipient">Receiving address on {network?.chainName ?? "the destination network"}</label>{validRecipient && <CopyButton address={recipient} />}</div>
+      <Input id="withdrawal-recipient" aria-label="External receiving address" value={recipient} placeholder="0x…" disabled={execute.isPending} aria-invalid={!!recipient && !validRecipient}
         onChange={event => setRecipientInput(event.target.value)} />
       {recipient && !validRecipient && <span className="text-xs text-destructive">Enter a valid, nonzero EVM address.</span>}
       {externalEvmWalletAddress && recipient !== externalEvmWalletAddress && <button type="button" className="block text-xs text-primary" onClick={() => setRecipientInput(null)}>Use connected wallet</button>}
-    </label>
+    </div>
     <div className="space-y-2 rounded-xl border border-border/60 p-3 text-xs text-muted-foreground">
       <p>Transaction fee: {BRIDGE_OUT_FEE} USDST (vouchers applied when available).</p>
       {route && cap > 0n && <p>Per-withdrawal limit: {display(cap.toString(), route.routeType === "native" ? decimals : Number(route.externalDecimals))} {route.routeType === "native" ? route.stratoTokenSymbol : route.externalSymbol}</p>}
@@ -177,7 +178,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
         {confirmation && <dl className="space-y-3 text-sm">
           <div><dt className="text-muted-foreground">You send · STRATO</dt><dd className="font-semibold">{display(confirmation.preview.escrowAmount, confirmation.route.stratoTokenDecimals ?? 18)} {confirmation.route.stratoTokenSymbol}</dd></div>
           <div><dt className="text-muted-foreground">You receive · {confirmation.networkName} (estimated)</dt><dd className="font-semibold">{display(confirmation.preview.externalAmount, Number(confirmation.route.externalDecimals))} {confirmation.route.externalSymbol}</dd></div>
-          <div><dt className="text-muted-foreground">Receiving address</dt><dd className="break-all font-mono">{confirmation.recipient}</dd></div>
+          <div><dt className="text-muted-foreground">Receiving address</dt><dd className="flex items-start gap-1"><span className="min-w-0 break-all font-mono">{confirmation.recipient}</span><span className="shrink-0"><CopyButton address={confirmation.recipient} /></span></dd></div>
           <div><dt className="text-muted-foreground">Transaction fee</dt><dd>{BRIDGE_OUT_FEE} USDST (vouchers applied when available)</dd></div>
           <div><dt className="text-muted-foreground">Processing</dt><dd>{confirmation.preview.manualReview ? "Manual approval required" : "Bridge verification and external transfer"}</dd></div>
         </dl>}

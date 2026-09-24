@@ -262,7 +262,7 @@ const RecentTransactions = ({
         }
         if (tx._type === "route") {
           return <TxRow key={key} icon={<ArrowDown className="w-4 h-4 text-blue-500" />} iconBg="bg-blue-500/15"
-            label="Trade on STRATO" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
+            label="Trade" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
             fromAmount={amt} fromSymbol={tx.stratoTokenSymbol || "-"}
             toAmount={formatBalance(tx.finalAmount || "0", undefined, tx.finalDecimals ?? 18, 2, 4)} toSymbol={tx.finalTokenSymbol || "-"} />;
         }

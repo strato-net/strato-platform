@@ -1,14 +1,42 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/axios";
 import { SwapToken } from "@/interface";
 import type { BridgeToken, NetworkConfig } from "@strato/shared-types";
 import { useUser } from "@/context/UserContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { getTokenConfig } from "@/lib/bridge/contractService";
 import { metalForgeService } from "@/services/metalForgeService";
 import type { NetworkSummary, TradeBridgeCatalog } from "@/lib/bridge/types";
 export type { TradeBridgeCatalog } from "@/lib/bridge/types";
 import { BRIDGE_SCOPES } from "@/lib/bridge/constants";
+import { USDST_BALANCE_REFRESH_MS } from "@/lib/constants";
+
+/**
+ * Keeps the USDST fee balance fresh for the signed-in account and reports
+ * whether it belongs to the current user (fee checks are unsafe until then).
+ */
+export function useFeeBalancesReady(): boolean {
+  const { isLoggedIn, userAddress } = useUser();
+  const { usdstBalanceError, fetchUsdstBalance } = useTokenContext();
+  const [feeBalanceOwner, setFeeBalanceOwner] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isLoggedIn || !userAddress) return;
+    const controller = new AbortController();
+    const refresh = async () => {
+      await fetchUsdstBalance(controller.signal);
+      if (!controller.signal.aborted) setFeeBalanceOwner(userAddress);
+    };
+    void refresh();
+    const timer = setInterval(refresh, USDST_BALANCE_REFRESH_MS);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [isLoggedIn, userAddress, fetchUsdstBalance]);
+  const feeBalancesReady = !!userAddress && feeBalanceOwner === userAddress && !usdstBalanceError;
+  return feeBalancesReady;
+}
 
 const TRADE_NETWORK_NAMES: Record<string, string> = {
   "1": "Ethereum Mainnet",

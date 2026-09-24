@@ -1,3 +1,4 @@
+import CopyButton from "@/components/ui/copy";
 import { ArrowRight } from "lucide-react";
 import { RouteStepQuote } from "@strato/shared-types";
 import { SwapToken } from "@/interface";
@@ -53,11 +54,13 @@ const RoutePreview = ({
                 <span>
                   {formatStepAmount(step.amountIn, step.tokenIn)}{" "}
                   {tokenIn?._symbol ?? truncateAddress(step.tokenIn)}
+                  {!tokenIn?._symbol && <CopyButton address={step.tokenIn} />}
                 </span>
                 <ArrowRight className="h-3 w-3" />
                 <span>
                   {formatStepAmount(step.amountOut, step.tokenOut)}{" "}
                   {tokenOut?._symbol ?? truncateAddress(step.tokenOut)}
+                  {!tokenOut?._symbol && <CopyButton address={step.tokenOut} />}
                 </span>
               </div>
               <div className="mt-1 text-muted-foreground">Price impact: {Number.isFinite(step.priceImpact) ? `${step.priceImpact.toFixed(2)}%` : "Unavailable"}</div>

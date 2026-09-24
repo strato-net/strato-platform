@@ -139,6 +139,7 @@ function widgetHarness(route, isAppAuthenticated = true) {
     if (id === '@/utils/numberUtils') return numberUtils;
     if (id === '@/utils/transferValidation') return transfer;
     if (id === '@/components/ui/button') return { Button: wrapper };
+    if (id === '@/components/ui/copy') return { default: () => null };
     if (id === '@/components/ui/input') return { Input: wrapper };
     if (id === '@/components/ui/dialog') return Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper]));
     if (id.startsWith('./')) return { default: wrapper };

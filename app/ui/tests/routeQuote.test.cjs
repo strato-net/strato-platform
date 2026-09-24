@@ -141,6 +141,8 @@ const approvalHash = `0x${'cd'.repeat(32)}`;
 const receiptSource = ts.createSourceFile('contractService.ts', fs.readFileSync(path.join(__dirname, '../src/lib/bridge/contractService.ts'), 'utf8'), ts.ScriptTarget.Latest, true);
 const receiptFunction = receiptSource.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'waitForTransaction');
 const widgetSource = ts.createSourceFile('RouterWidget.tsx', fs.readFileSync(path.join(__dirname, '../src/components/router/RouterWidget.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+// Fee-balance readiness lives in the shared useFeeBalancesReady hook.
+const feeHookSource = ts.createSourceFile('useTradeTokens.ts', fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useTradeTokens.ts'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 let tradeHandler, reviewHandler;
 function findTradeHandler(node) {
   if (ts.isVariableDeclaration(node) && node.name.getText(widgetSource) === 'handleTrade') tradeHandler = node.initializer.getText(widgetSource);
@@ -185,6 +187,30 @@ test('quote errors use the API reason without claiming a transaction failed or e
   ]) assert.equal(friendlyExports.getQuoteErrorMessage(error), 'Quote unavailable. Please try again.');
   assert.match(friendlyExports.getQuoteErrorMessage({ message: 'Network Error' }), /Check your connection/);
   assert.match(friendlyExports.getQuoteErrorMessage({ message: 'timeout of 30000ms exceeded' }), /Quote request timed out/);
+});
+
+test('route rejection reasons give actionable messages without echoing backend data', () => {
+  const error = (rejections, status = 422) => ({ response: { status, data: { error: {
+    message: 'No executable route found for a -> b', details: { rejections },
+  } } } });
+  for (const [reason, message] of [
+    ['PARTIAL_FILL', /liquidity.*smaller amount/],
+    ['INSUFFICIENT_LIQUIDITY', /liquidity.*smaller amount/],
+    ['CAPACITY_LIMIT', /deposit or mint limit/],
+    ['AMOUNT_TOO_SMALL', /larger amount/],
+    ['POOL_UNAVAILABLE', /paused or disabled/],
+    ['QUOTE_UNAVAILABLE', /data is unavailable/],
+    ['POOL_REUSE', /No route is available/],
+    ['NO_POOL', /No route is available/],
+  ]) assert.match(friendlyExports.getQuoteErrorMessage(error([{ reason }])), message);
+  const repeated = friendlyExports.getQuoteErrorMessage(error([
+    { reason: 'PARTIAL_FILL' }, { reason: 'INSUFFICIENT_LIQUIDITY' },
+  ]));
+  assert.equal(repeated.match(/liquidity/g).length, 1);
+  assert.equal(friendlyExports.getQuoteErrorMessage(error([{ reason: 'private credentials' }, null])),
+    'No route is available for this amount. Try a different amount or token.');
+  assert.equal(friendlyExports.getQuoteErrorMessage(error([{ reason: 'CAPACITY_LIMIT' }], 500)),
+    'Quote unavailable. Please try again.');
 });
 
 test('STRATO pool registration errors remain actionable for API and wallet failures', () => {
@@ -398,11 +424,11 @@ test('Trade loads and polls fee balances for the current account and cancels obs
   let effect, dependencies, cleanup, timer, cleared = false;
   const requests = [], owners = [];
   function visit(node) {
-    if (ts.isCallExpression(node) && node.expression.getText(widgetSource) === 'useEffect' &&
-        node.arguments[0].getText(widgetSource).includes('fetchUsdstBalance')) effect = node.getText(widgetSource);
+    if (ts.isCallExpression(node) && node.expression.getText(feeHookSource) === 'useEffect' &&
+        node.arguments[0].getText(feeHookSource).includes('fetchUsdstBalance')) effect = node.getText(feeHookSource);
     ts.forEachChild(node, visit);
   }
-  visit(widgetSource);
+  visit(feeHookSource);
   const fetchUsdstBalance = signal => new Promise(resolve => requests.push({ signal, resolve }));
   const mount = (isLoggedIn, userAddress) => runSource(effect, {
     isLoggedIn, userAddress, fetchUsdstBalance, AbortController, USDST_BALANCE_REFRESH_MS: 10000,
@@ -436,13 +462,15 @@ test('Trade loads and polls fee balances for the current account and cancels obs
 
 test('STRATO trading waits for fee balances instead of interpreting initial zeroes as insufficient funds', async () => {
   const expressions = {};
-  function visit(node) {
-    if (ts.isVariableDeclaration(node) && ['feeBalancesReady', 'feeError', 'usdFeePortion', 'maxSpendableWei'].includes(node.name.getText(widgetSource))) {
-      expressions[node.name.getText(widgetSource)] = node.initializer.getText(widgetSource);
+  function visit(node, file) {
+    if (ts.isVariableDeclaration(node) && ['feeBalancesReady', 'feeError', 'usdFeePortion', 'maxSpendableWei'].includes(node.name.getText(file)) &&
+        node.initializer && !node.initializer.getText(file).includes('useFeeBalancesReady')) {
+      expressions[node.name.getText(file)] = node.initializer.getText(file);
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, child => visit(child, file));
   }
-  visit(widgetSource);
+  visit(widgetSource, widgetSource);
+  visit(feeHookSource, feeHookSource);
   const evaluate = (overrides = {}) => {
     const exports = {};
     runSource(`const feeBalancesReady = ${expressions.feeBalancesReady};
@@ -817,6 +845,7 @@ test('confirmation renders exact decimal amounts, fees, route and a distinct fal
     exports: components, require: id => {
       if (id === 'react/jsx-runtime') return require(id);
       if (id === '@/components/ui/button') return { Button: wrapper };
+      if (id === '@/components/ui/copy') return { default: () => null };
       if (id === '@/components/ui/dialog') return Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper]));
       if (id === '@/lib/constants') return { SWAP_FEE: '0.02', WAD: 10n ** 18n };
       if (id === '@/utils/numberUtils') return { formatUnits, truncateAddress: value => value };
@@ -863,12 +892,15 @@ test('fee balance failures stay unavailable until both requests succeed', async 
     if (ts.isVariableDeclaration(node)) {
       const name = node.name.getText(file);
       if (name === 'fetchUsdstBalance' && node.initializer) fetchBalance = node.initializer.arguments[0].getText(file);
-      if (['feeBalancesReady', 'feeError'].includes(name)) gates[name] = node.initializer.getText(file);
+      if (['feeBalancesReady', 'feeError'].includes(name) && node.initializer && !node.initializer.getText(file).includes('useFeeBalancesReady')) {
+        gates[name] = node.initializer.getText(file);
+      }
     }
     ts.forEachChild(node, child => visit(child, file));
   }
   visit(source, source);
   visit(widgetSource, widgetSource);
+  visit(feeHookSource, feeHookSource);
   for (const failedEndpoint of ['/tokens/balance', '/vouchers/balance']) {
     let fail = true, balances = ['0', '0'], error = null, loading = false;
     const exports = {};
@@ -1286,15 +1318,15 @@ test('asset APY excludes rewards and opportunities requiring an additional earn 
   assert.equal(earnUtils.buildAssetApyInfo([{ source: 'base', apy: '-' }]), null);
 });
 
-test('receive asset separates holding yield from rewards eligibility', () => {
+test('receive asset shows holding yield only, keeping rewards in the hop-deduped route widget', () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const exports = {};
+  let tooltipInfo;
   runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteAssetYield.tsx'), 'utf8'), {
     exports,
     require: id => {
-      if (id === 'react-router-dom') return { Link: ({ to, children, ...props }) => React.createElement('a', { href: to, ...props }, children) };
-      if (id === '@/components/earn/EarnApyTooltip') return { default: ({ children }) => children };
+      if (id === '@/components/earn/EarnApyTooltip') return { default: ({ info, children }) => { tooltipInfo = info; return children; } };
       if (id === '@/context/EarnContext') return { useEarnContext: () => ({ tokenApysLoaded: true, tokenApys: [{ token: 'AB', apys: [
         { source: 'base', apy: '4' }, { source: 'rewards', apy: '150', poolAddress: 'pool' },
       ] }] }) };
@@ -1304,10 +1336,10 @@ test('receive asset separates holding yield from rewards eligibility', () => {
     },
   });
   const html = renderToStaticMarkup(React.createElement(exports.default, { address: '0xab' }));
-  assert.match(html, /Asset APY · 4.00% estimated/);
-  assert.doesNotMatch(html, /154.00|150/);
-  assert.match(html, /Rewards available/);
-  assert.match(html, /additional deposit or stake/);
+  assert.match(html, /Est\. APY · 4\.00%/);
+  assert.doesNotMatch(html, /154.00|150/, 'pool rewards APY is excluded — it does not accrue from holding the asset');
+  assert.equal(JSON.stringify(tooltipInfo.breakdown.map(item => item.label)), JSON.stringify(['Base APY']));
+  assert.doesNotMatch(html, /Rewards available|View requirements|additional deposit or stake|href=/);
 });
 
 test('route action labels distinguish savings, vault deposits, swaps and plain bridging', () => {
@@ -1330,6 +1362,15 @@ test('receive categories follow route metadata, preserve linked selections and e
         { value: 'token', label: 'Tokens' }, { value: 'savings', label: 'Savings' }, { value: 'vault', label: 'Yield vaults' },
       ] };
       if (id === '@/utils/numberUtils') return { formatAmount: value => value, formatUnits: value => value };
+      if (id === '@/context/EarnContext') return { useEarnContext: () => ({ tokenApysLoaded: true, tokenApys: [
+        { token: 'vault1', apys: [{ apy: '4' }] }, { token: 'vault2', apys: [{ apy: '6.2' }] },
+        { token: 'vault3', apys: [{ apy: '147286' }] },
+      ] }) };
+      if (id === '@/lib/route') return { normalizeRouteAddress: value => (value ?? '').toLowerCase().replace(/^0x/, '') };
+      if (id === '@/utils/earnUtils') return { buildAssetApyInfo: apys => {
+        const total = apys.reduce((sum, entry) => sum + Number(entry.apy), 0);
+        return total > 0 ? { total } : null;
+      } };
       if (id === './RouteAssetYield') return { default: () => null };
       if (id === './RouteTokenPicker') return { default: props => { pickerProps = props; return null; } };
       return require(id);
@@ -1339,16 +1380,19 @@ test('receive categories follow route metadata, preserve linked selections and e
     { id: 'token', address: 'token', symbol: 'TOKEN' },
     { id: 'vault1', address: 'vault1', symbol: 'ONE', routeDestination: 'vault' },
     { id: 'vault2', address: 'vault2', symbol: 'TWO', routeDestination: 'vault' },
+    { id: 'vault3', address: 'vault3', symbol: 'BAD', routeDestination: 'vault' },
   ];
   let selected;
   const props = { tokens, token: { address: 'vault2', _symbol: 'TWO', routeDestination: 'vault' },
     loading: false, pending: false, onSelect: id => { selected = id; } };
   const html = renderToStaticMarkup(React.createElement(exports.default, props));
   assert.match(html, /You receive TWO shares on STRATO/);
+  assert.match(html, /Yield vaults · up to 6\.2%/, 'earn categories advertise their best plausible holding APY');
+  assert.doesNotMatch(html, /Tokens ·|Savings ·|147286/, 'categories without yield data stay unlabeled and bad benchmark data is excluded');
   assert.equal(pickerProps.value, 'vault2');
-  assert.deepEqual(pickerProps.tokens.map(t => t.id), ['vault1', 'vault2']);
+  assert.deepEqual(pickerProps.tokens.map(t => t.id), ['vault1', 'vault2', 'vault3']);
   const tree = exports.default(props);
-  const categoryButtons = tree.props.children[2].props.children;
+  const categoryButtons = tree.props.children[0].props.children;
   assert.equal(categoryButtons[1].props.disabled, true, 'no savings product is fabricated');
   assert.equal(categoryButtons[2].props['aria-pressed'], true);
   categoryButtons[0].props.onClick();

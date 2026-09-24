@@ -115,6 +115,22 @@ export function getQuoteErrorMessage(error: unknown): string {
   if (status && status >= 500) return "Quote unavailable. Please try again.";
   const { message } = normalizeError(error);
   if (message.includes("No executable route") || message.includes("No route found")) {
+    const rejections = (error as { response?: { data?: { error?: { details?: { rejections?: unknown } } } } })
+      ?.response?.data?.error?.details?.rejections;
+    if (Array.isArray(rejections)) {
+      const reasons = rejections.map((rejection) => {
+        switch (rejection?.reason) {
+          case "PARTIAL_FILL":
+          case "INSUFFICIENT_LIQUIDITY": return "Pool liquidity cannot fill this amount. Try a smaller amount.";
+          case "CAPACITY_LIMIT": return "A route deposit or mint limit has been reached. Try a smaller amount or another asset.";
+          case "AMOUNT_TOO_SMALL": return "The amount is too small to produce a usable output. Try a larger amount.";
+          case "POOL_UNAVAILABLE": return "A required pool is paused or disabled. Try another asset.";
+          case "QUOTE_UNAVAILABLE": return "Some route data is unavailable. Please try again.";
+          default: return "";
+        }
+      }).filter(Boolean);
+      if (reasons.length) return [...new Set(reasons)].join(" ");
+    }
     return getFriendlyMessage(message);
   }
   if (/timeout|timed out/i.test(message)) return "Quote request timed out. Please try again.";

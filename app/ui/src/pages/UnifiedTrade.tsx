@@ -28,26 +28,24 @@ const UnifiedTrade = () => {
             <GuestSignInBanner message="Sign in to trade across STRATO and external networks in one route" />
           )}
           <div className="mx-auto max-w-7xl space-y-6">
-            <p className="text-muted-foreground">Trade or bridge directly into savings, yield vaults, and other STRATO assets.</p>
+            <p className="text-muted-foreground">From an external network into any STRATO asset—swap, save, or earn yield in one step.</p>
 
-            <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm lg:col-span-7">
-                <div className="p-4 md:p-6">
-                  <RouterWidget
-                    key={JSON.stringify([searchParams.get("tokenIn"), searchParams.get("tokenOut"), searchParams.get("pool")])}
-                    initialTokenIn={searchParams.get("tokenIn") ?? ""}
-                    initialTokenOut={searchParams.get("tokenOut") ?? ""}
-                    initialPool={searchParams.get("pool") ?? ""}
-                    guestMode={!isLoggedIn}
-                    userRewards={userRewards}
-                    bridgeCatalog={bridgeCatalog}
-                    onTransactionSubmitted={() =>
-                      setRouteRefreshKey((key) => key + 1)
-                    }
-                  />
-                </div>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+              <div className="xl:col-span-7">
+                <RouterWidget
+                  key={JSON.stringify([searchParams.get("tokenIn"), searchParams.get("tokenOut"), searchParams.get("pool")])}
+                  initialTokenIn={searchParams.get("tokenIn") ?? ""}
+                  initialTokenOut={searchParams.get("tokenOut") ?? ""}
+                  initialPool={searchParams.get("pool") ?? ""}
+                  guestMode={!isLoggedIn}
+                  userRewards={userRewards}
+                  bridgeCatalog={bridgeCatalog}
+                  onTransactionSubmitted={() =>
+                    setRouteRefreshKey((key) => key + 1)
+                  }
+                />
               </div>
-              <div className="lg:col-span-5">
+              <div className="xl:col-span-5">
                 <RecentTransactions
                   fundingMode="bridge"
                   includeRoutes

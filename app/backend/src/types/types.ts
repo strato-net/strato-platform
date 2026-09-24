@@ -83,6 +83,19 @@ export interface RouteEdge {
   outputDecimals?: number;
 }
 
+export interface RouteStepCandidate {
+  pool?: string;
+  getStep: () => Promise<import("@strato/shared-types").RouteStepQuote>;
+}
+
+export interface RouteQuoteRejection {
+  tokenIn: string;
+  tokenOut: string;
+  pool?: string;
+  reason: "PARTIAL_FILL" | "INSUFFICIENT_LIQUIDITY" | "CAPACITY_LIMIT" |
+    "AMOUNT_TOO_SMALL" | "POOL_UNAVAILABLE" | "NO_POOL" | "QUOTE_UNAVAILABLE" | "POOL_REUSE";
+}
+
 export interface RouteTopologyCache {
   key: string;
   expiresAt: number;

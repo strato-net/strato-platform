@@ -7,9 +7,9 @@ import {
   TransactionResponse,
   TradeQuote,
 } from "@strato/shared-types";
-import { constants, ROUTE_TOPOLOGY_TTL_MS, ROUTE_OUTPUT_TOLERANCE_BPS, MAX_UINT256 } from "../../config/constants";
+import { constants, ROUTE_TOPOLOGY_TTL_MS, ROUTE_OUTPUT_TOLERANCE_BPS, ROUTE_CANDIDATES_PER_HOP, ROUTE_QUOTE_CONCURRENCY, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
-import { FunctionInput, RouteEdge, RouteTopologyCache, StratoRouteStep } from "../../types/types";
+import { FunctionInput, RouteEdge, RouteQuoteRejection, RouteStepCandidate, RouteTopologyCache, StratoRouteStep } from "../../types/types";
 import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
@@ -33,7 +33,6 @@ import { getYieldVaultActionState, listVaultDefs } from "./yieldVault.service";
 const BPS = 10_000n;
 const WAD = 10n ** 18n;
 const MAX_ROUTE_STEPS = 6;
-const MAX_CANDIDATE_ROUTES = 12;
 const MAX_SEARCH_STATES = 2_000;
 const DEFAULT_SLIPPAGE_BPS = 50;
 
@@ -476,22 +475,19 @@ export const findRoutePaths = (
     visited: Set<string>;
   }> = [{ token: start, path: [], visited: new Set([start]) }];
   const routes: RouteEdge[][] = [];
-  let searched = 0;
-  while (
-    queue.length > 0 &&
-    routes.length < MAX_CANDIDATE_ROUTES &&
-    searched < MAX_SEARCH_STATES
-  ) {
-    const current = queue.shift()!;
-    searched++;
-    if (current.path.length >= MAX_ROUTE_STEPS) continue;
+  const countsByHop = new Map<number, number>();
+  for (let head = 0; head < queue.length; head++) {
+    const current = queue[head];
     for (const edge of adjacency.get(current.token) || []) {
       if (current.visited.has(edge.tokenOut)) continue;
       const path = [...current.path, edge];
       if (edge.tokenOut === destination) {
-        routes.push(path);
-        if (routes.length >= MAX_CANDIDATE_ROUTES) break;
-      } else {
+        const count = countsByHop.get(path.length) || 0;
+        if (count < ROUTE_CANDIDATES_PER_HOP) {
+          routes.push(path);
+          countsByHop.set(path.length, count + 1);
+        }
+      } else if (path.length < MAX_ROUTE_STEPS && queue.length < MAX_SEARCH_STATES) {
         queue.push({
           token: edge.tokenOut,
           path,
@@ -630,28 +626,6 @@ const quoteEdge = async (
   amountIn: bigint,
   slippageBps: number
 ): Promise<RouteStepQuote> => {
-  if (edge.kind === "SWAP") {
-    const response = await getTradeQuotes(
-      accessToken,
-      edge.tokenIn,
-      edge.tokenOut,
-      amountIn,
-      "EXACT_INPUT"
-    );
-    const quote = response.quotes.find(
-      ({ poolAddress }) => poolAddress === response.bestPoolAddress
-    );
-    if (!quote) {
-      throw new Error(
-        `No executable pool for ${edge.tokenIn} -> ${edge.tokenOut}`
-      );
-    }
-    if (quote.partialFill) {
-      throw new Error("V3 route step cannot consume the full input amount");
-    }
-    return buildSwapStep(accessToken, quote, slippageBps);
-  }
-
   let amountOut = 0n;
   let feeAmount = 0n;
   let action: RouteAction;
@@ -726,17 +700,32 @@ const quoteEdge = async (
   };
 };
 
+const routeRejectionReason = (error: unknown): RouteQuoteRejection["reason"] => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (/partial|full input/i.test(message)) return "PARTIAL_FILL";
+  if (/insufficient liquidity/i.test(message)) return "INSUFFICIENT_LIQUIDITY";
+  if (/cap exceeded|exceeds executable limits|overflows uint256/i.test(message)) return "CAPACITY_LIMIT";
+  if (/output is zero|zero shares|below the slippage minimum/i.test(message)) return "AMOUNT_TOO_SMALL";
+  if (/paused|disabled/i.test(message)) return "POOL_UNAVAILABLE";
+  if (/No executable pool/i.test(message)) return "NO_POOL";
+  return "QUOTE_UNAVAILABLE";
+};
+
 const quotePath = async (
   accessToken: string,
   path: RouteEdge[],
   amountIn: bigint,
   slippageBps: number,
-  quotes: Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>
+  quotes: Map<RouteEdge, Map<bigint, Promise<RouteStepCandidate[]>>>,
+  rejections: RouteQuoteRejection[]
 ): Promise<RouteStepQuote[]> => {
   const steps: RouteStepQuote[] = [];
   const usedPools = new Set<string>();
   let currentAmount = amountIn;
   for (const edge of path) {
+    const reject = (reason: RouteQuoteRejection["reason"], pool?: string) => {
+      rejections.push({ tokenIn: edge.tokenIn, tokenOut: edge.tokenOut, pool, reason });
+    };
     let edgeQuotes = quotes.get(edge);
     if (!edgeQuotes) {
       edgeQuotes = new Map();
@@ -744,16 +733,55 @@ const quotePath = async (
     }
     let pending = edgeQuotes.get(currentAmount);
     if (!pending) {
-      pending = quoteEdge(accessToken, edge, currentAmount, slippageBps);
-      edgeQuotes.set(currentAmount, pending);
+      const input = currentAmount;
+      pending = (async (): Promise<RouteStepCandidate[]> => {
+        if (edge.kind !== "SWAP") {
+          let step: Promise<RouteStepQuote> | undefined;
+          return [{ getStep: () => step ??= quoteEdge(accessToken, edge, input, slippageBps) }];
+        }
+        const response = await getTradeQuotes(accessToken, edge.tokenIn, edge.tokenOut, input, "EXACT_INPUT");
+        const candidates = response.quotes.filter((quote) => {
+          if (quote.error) reject(routeRejectionReason(new Error(quote.error)), quote.poolAddress);
+          else if (quote.partialFill || BigInt(quote.amountIn) !== input) reject("PARTIAL_FILL", quote.poolAddress);
+          else if (BigInt(quote.amountOut) <= 0n) reject("INSUFFICIENT_LIQUIDITY", quote.poolAddress);
+          else return true;
+          return false;
+        });
+        candidates.sort((a, b) => BigInt(a.amountOut) > BigInt(b.amountOut) ? -1 : BigInt(a.amountOut) < BigInt(b.amountOut) ? 1 : 0);
+        if (!response.quotes.length) reject("NO_POOL");
+        return candidates.map((quote) => {
+          let step: Promise<RouteStepQuote> | undefined;
+          return {
+            pool: normalizeAddress(quote.poolAddress),
+            getStep: () => step ??= buildSwapStep(accessToken, quote, slippageBps),
+          };
+        });
+      })();
+      edgeQuotes.set(input, pending);
     }
-    const step = await pending;
-    if (edge.kind === "SWAP") {
-      const pool = normalizeAddress(step.target);
+    let candidates: RouteStepCandidate[];
+    try {
+      candidates = await pending;
+    } catch (error) {
+      reject(routeRejectionReason(error));
+      return [];
+    }
+    let step: RouteStepQuote | undefined;
+    for (const candidate of candidates) {
       // Independent hop quotes do not reflect earlier swaps in the same pool.
-      if (usedPools.has(pool)) throw new Error("Route cannot reuse a swap pool");
-      usedPools.add(pool);
+      if (candidate.pool && usedPools.has(candidate.pool)) {
+        reject("POOL_REUSE", candidate.pool);
+        continue;
+      }
+      try {
+        step = await candidate.getStep();
+        break;
+      } catch (error) {
+        reject(routeRejectionReason(error), candidate.pool);
+      }
     }
+    if (!step) return [];
+    if (edge.kind === "SWAP") usedPools.add(normalizeAddress(step.target));
     steps.push(step);
     currentAmount = BigInt(step.amountOut);
   }
@@ -782,12 +810,16 @@ export const getRouteQuote = async (
     throw new StratoError(`No route found for ${input} -> ${output}`, 422);
   }
 
-  const quotes = new Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>();
-  const quoted = await Promise.all(
-    paths.map((path) =>
-      quotePath(accessToken, path, amountIn, slippageBps, quotes).catch(() => null)
-    )
-  );
+  const quotes = new Map<RouteEdge, Map<bigint, Promise<RouteStepCandidate[]>>>();
+  const rejections: RouteQuoteRejection[] = [];
+  const quoted: RouteStepQuote[][] = new Array(paths.length);
+  let nextPath = 0;
+  await Promise.all(Array.from({ length: Math.min(paths.length, ROUTE_QUOTE_CONCURRENCY) }, async () => {
+    while (nextPath < paths.length) {
+      const index = nextPath++;
+      quoted[index] = await quotePath(accessToken, paths[index], amountIn, slippageBps, quotes, rejections);
+    }
+  }));
   const executable = quoted.filter(
     (steps): steps is RouteStepQuote[] => Boolean(steps?.length)
   );
@@ -810,7 +842,9 @@ export const getRouteQuote = async (
         : current;
     }, null);
   if (!best) {
-    throw new StratoError(`No executable route found for ${input} -> ${output}`, 422);
+    throw new StratoError(`No executable route found for ${input} -> ${output}`, 422, {
+      rejections: [...new Map(rejections.map((rejection) => [JSON.stringify(rejection), rejection])).values()],
+    });
   }
 
   const amountOut = BigInt(best[best.length - 1].amountOut);

@@ -487,7 +487,9 @@ const App = () => {
                                                   path="/dashboard/withdrawals"
                                                   element={
                                                     <GuestAccessibleRoute>
-                                                      <WithdrawalsPage />
+                                                      <BridgeProvider scope="trade">
+                                                        <WithdrawalsPage />
+                                                      </BridgeProvider>
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

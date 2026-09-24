@@ -117,7 +117,7 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
 const input = 'ab'.repeat(20), output = 'cd'.repeat(20);
 test('routed trade amounts use address-specific input and output decimals', async () => {
   const [row] = await recentRows({ routes: [{ attributes: { tokenIn: `0x${input.toUpperCase()}`, tokenOut: output, amountIn: '1250000', amountOut: '250' } }] });
-  assert.equal(row.label, 'Trade on STRATO');
+  assert.equal(row.label, 'Trade');
   assert.equal(row.fromAmount, '1.25');
   assert.equal(row.toAmount, '2.50');
 });
@@ -174,7 +174,7 @@ test('unified activity shows routed trades only; metal purchases stay on the Buy
     metals: [{ block_timestamp: '2026-09-23T13:00:00Z', attributes: { payToken: input, metalToken: output, payAmount: '1250000', metalAmount: '250' } }],
   });
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].label, 'Trade on STRATO');
+  assert.equal(rows[0].label, 'Trade');
 });
 
 test('metal effective price includes mint spread and rejects unusable oracle prices', () => {
