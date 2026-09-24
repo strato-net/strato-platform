@@ -39,6 +39,7 @@ library
   default-extensions:
       BangPatterns
       OverloadedStrings
+  ghc-options: -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   build-depends:
       Decimal
     , QuickCheck

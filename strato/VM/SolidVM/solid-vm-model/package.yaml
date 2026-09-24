@@ -10,6 +10,7 @@ default-extensions:
 
 library:
   source-dirs: src/
+  ghc-options: -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   dependencies:
   - aeson >=2.1.1.0 && <2.3
   - aeson-casing
