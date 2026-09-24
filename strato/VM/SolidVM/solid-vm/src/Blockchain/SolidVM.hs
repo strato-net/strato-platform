@@ -1030,13 +1030,13 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
 
           let evArgs = zipWith3
                         (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
-                          (T.unpack name, value, valStr, idxType))
+                          (name, value, valStr, idxType))
                         (CC._eventLogs ev) expVals expStrs
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
-          let contractName' = labelToString $ CC._contractName curCnct
+          let contractName' = labelToText $ CC._contractName curCnct
           -- Derive the Ethereum log topics (topic0 + indexed args) from the event
           -- ABI now, while the CodeCollection is in hand, so the block producer can
           -- build a real logsBloom without re-deriving them. Uses the same encoder
@@ -1046,8 +1046,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 encodeEventToLog
                   (stringToLabel eventName)
                   ev
-                  (M.fromList [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs])
-          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
+                  (M.fromList [(n, v) | (n, _, v, _) <- evArgs])
+          addEvent $ Event bHash tHash txSender contractName' address (T.pack eventName) evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos

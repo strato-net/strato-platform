@@ -190,8 +190,8 @@ simulateOne header spec = do
       logs =
         [ TraceLog
             (evContractAddress ev)
-            (T.pack $ evName ev)
-            [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs ev]
+            (evName ev)
+            [(n, v) | (n, _, v, _) <- evArgs ev]
           | ev <- maybe [] erEvents mEr
         ]
       hex n = "0x" ++ showHex n ""

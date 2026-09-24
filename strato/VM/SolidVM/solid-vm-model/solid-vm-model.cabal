@@ -78,6 +78,7 @@ test-suite storage-test
   other-modules:
       BasicValueStringTest
       StorageTest
+      ValueBinaryTest
   hs-source-dirs:
       test/
   default-extensions:
@@ -86,13 +87,17 @@ test-suite storage-test
   ghc-options: -dynamic
   build-depends:
       base
+    , binary
     , bytestring
+    , containers
     , ethereum-rlp
     , format
     , hspec
     , persistent
     , solid-vm-model
+    , strato-model
     , unliftio
+    , vector
   default-language: Haskell2010
 
 benchmark storage-bench

@@ -49,14 +49,19 @@ tests:
     other-modules:
       - BasicValueStringTest
       - StorageTest
+      - ValueBinaryTest
     dependencies:
+      - binary
       - bytestring
+      - containers
       - ethereum-rlp
       - format
       - hspec
       - persistent
       - solid-vm-model
+      - strato-model
       - unliftio
+      - vector
 
 benchmarks:
   storage-bench:

@@ -299,7 +299,7 @@ contractResult txHash txResult@TransactionResult {..} name = do
         case mDelAddr of
           Just _ -> lift . throwIO . UserError $ "Contract failed to upload, likely because the constructor threw"
           Nothing -> lift . throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, transactionResultContractsDeleted=" ++ show transactionResultContractsDeleted ++ ", transactionResultContractsCreated=" ++ show transactionResultContractsCreated
-      stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
+      stratoMsg -> lift . throwIO $ UserError stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
       details <- lift $ go acct name (0 :: Integer)
@@ -346,7 +346,7 @@ functionResult txHash txResult@TransactionResult {..} funcName addr = do
                           txHash
                           (Just txResult)
                           (Just $ Call formattedResponse)
-      stratoMsg -> throwIO $ UserError $ Text.pack stratoMsg
+      stratoMsg -> throwIO $ UserError stratoMsg
 
 getReturnTypes ::
   ( MonadIO m,

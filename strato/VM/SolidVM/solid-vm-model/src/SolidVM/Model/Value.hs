@@ -24,6 +24,7 @@ where
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Util (getUtf8String, putUtf8String)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import Control.Applicative ((<|>))
@@ -32,7 +33,6 @@ import Control.Monad ((<=<))
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Binary as Binary
-import qualified Data.ByteString.Lazy as BSL
 import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
@@ -442,15 +442,42 @@ instance FromJSON Value where
       _ -> fail $ "Unknown Value tag: " ++ t
   parseJSON _ = pure SNULL
 
--- Binary instance for Value goes through the Aeson encoding so we don't have
--- to duplicate the (already non-trivial) variant logic. Lossy in the same
--- ways that the JSON instance is — IORef-backed aggregates serialize as
--- their resolved snapshots, which is what we want for receipts and Kafka
--- payloads anyway.
+-- Binary instance for Value. Carries the same variants, with the same losses,
+-- as the JSON instance: IORef-backed aggregates serialize as snapshots
+-- ('Variable' becomes SNULL, 'Constant' its value), and variants the JSON
+-- instance maps to () are SNULL. Everything else is a tag and the fields.
 instance Binary.Binary Value where
-  put = Binary.put . Aeson.encode
+  put v = case v of
+    SInteger n -> tag 0 >> Binary.put n
+    SDecimal d -> tag 1 >> Binary.put (decimalPlaces d) >> Binary.put (decimalMantissa d)
+    SString s -> tag 2 >> putUtf8String s
+    SBool b -> tag 3 >> Binary.put b
+    SAddress a p -> tag 4 >> Binary.put a >> Binary.put p
+    SEnumVal tn vn vi -> tag 5 >> Binary.put tn >> Binary.put vn >> Binary.put vi
+    SStruct n vs -> tag 6 >> Binary.put n >> Binary.put (M.map snapshot vs)
+    STuple items -> tag 7 >> Binary.put (map snapshot (V.toList items))
+    SArray items -> tag 8 >> Binary.put (map snapshot (V.toList items))
+    SContract n a -> tag 9 >> Binary.put n >> Binary.put a
+    SBytes bs -> tag 10 >> Binary.put bs
+    _ -> tag 11
+    where
+      tag :: Word8 -> Binary.Put
+      tag = Binary.put
+      snapshot (Constant c) = c
+      snapshot (Variable _) = SNULL
   get = do
-    bs <- Binary.get :: Binary.Get BSL.ByteString
-    case Aeson.eitherDecode bs of
-      Left err -> fail err
-      Right v -> return v
+    t <- Binary.get :: Binary.Get Word8
+    case t of
+      0 -> SInteger <$> Binary.get
+      1 -> SDecimal <$> (Decimal <$> Binary.get <*> Binary.get)
+      2 -> SString <$> getUtf8String
+      3 -> SBool <$> Binary.get
+      4 -> SAddress <$> Binary.get <*> Binary.get
+      5 -> SEnumVal <$> Binary.get <*> Binary.get <*> Binary.get
+      6 -> SStruct <$> Binary.get <*> (M.map Constant <$> Binary.get)
+      7 -> STuple . V.fromList . map Constant <$> Binary.get
+      8 -> SArray . V.fromList . map Constant <$> Binary.get
+      9 -> SContract <$> Binary.get <*> Binary.get
+      10 -> SBytes <$> Binary.get
+      11 -> pure SNULL
+      _ -> fail $ "Unknown Value tag: " ++ show t

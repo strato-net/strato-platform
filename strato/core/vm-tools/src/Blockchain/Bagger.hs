@@ -172,7 +172,7 @@ txsDroppedCallback rejections bestBlockShas = forM_ rejections $ \rejection -> d
       DD.TransactionResult
         { transactionResultBlockHash = unsafeCreateKeccak256FromWord256 0,
           transactionResultTransactionHash = theHash,
-          transactionResultMessage = message,
+          transactionResultMessage = T.pack message,
           transactionResultResponse = Nothing,
           transactionResultTrace = "rejected",
           transactionResultGasUsed = 0,

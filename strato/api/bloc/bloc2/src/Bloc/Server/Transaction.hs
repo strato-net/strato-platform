@@ -1561,7 +1561,7 @@ getResultAndRespond txHashes resolve = do
   case (blocTransactionStatus result, blocTransactionTxResult result, resolve) of
     (Success, _, _) -> return result
     (Failure, Nothing, _) -> throwIO (VMError "unknown reason")
-    (Failure, Just tr, _) -> throwIO (VMError $ Text.pack $ "Error running the transaction: " ++ transactionResultMessage tr)
+    (Failure, Just tr, _) -> throwIO (VMError $ "Error running the transaction: " <> transactionResultMessage tr)
     (Pending, _, _) -> return result
 
 checkIsSynced ::
