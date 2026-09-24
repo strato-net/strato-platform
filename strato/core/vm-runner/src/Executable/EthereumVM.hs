@@ -92,7 +92,7 @@ ethereumVM = do
       -- runConsume advances the input checkpoint.
       flushNodeDB
 
-      loopTimeit "compactContextM" $ compactContextM
+      timeit "compactContextM" Nothing compactContextM
 
       return $ if null failures then Nothing else Just failures
 
