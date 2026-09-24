@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -24,6 +25,8 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Aeson
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Source
 import GHC.Generics
 import SolidVM.Model.CodeCollection.Statement
@@ -45,6 +48,8 @@ data VariableDeclF a = VariableDecl
 makeLenses ''VariableDeclF
 
 instance Binary a => Binary (VariableDeclF a)
+
+makeStore ''VariableDeclF
 
 instance ToJSON a => ToJSON (VariableDeclF a)
 

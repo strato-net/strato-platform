@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -34,6 +36,9 @@ import Blockchain.Strato.Model.Address
 import Control.DeepSeq
 import Data.Aeson
 import Data.Binary
+import Data.Store.TH (makeStore)
+import Data.Functor.Contravariant (contramap)
+import Data.Store (Store (..))
 import Data.Decimal
 import qualified Data.Map.Strict as Map
 import Data.OpenApi (ToSchema)
@@ -289,3 +294,15 @@ instance ToJSON WrappedDecimal where
         [ "decimalPlaces" .= places
         , "decimalMantissa" .= mantissa
         ]
+
+instance Store WrappedDecimal where
+  size = contramap (\(WrappedDecimal (Decimal p m)) -> (p, m)) size
+  poke (WrappedDecimal (Decimal p m)) = poke (p, m)
+  peek = (\(p, m) -> WrappedDecimal (Decimal p m)) <$> peek
+
+concat <$> traverse makeStore [''Location, ''InlineAssembly, ''NumberUnit]
+
+-- Generic path: makeStore's ConstSize detection loops on directly self-recursive types.
+instance Store a => Store (ExpressionF a)
+
+concat <$> traverse makeStore [''StatementF, ''SimpleStatementF, ''VarDefEntryF]

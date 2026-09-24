@@ -9,6 +9,7 @@ import Control.DeepSeq
 import Control.Lens (mapped, (&), (?~))
 import Data.Aeson hiding (Array, String)
 import Data.Binary
+import Data.Store (Store)
 import Data.Int (Int32)
 import Data.Maybe (fromMaybe)
 import Data.OpenApi
@@ -56,6 +57,9 @@ typeEquals (Mapping d1 k1 v1 kn1 vn1) (Mapping d2 k2 v2 kn2 vn2) = d1 `maybeEq` 
 typeEquals t1 t2 = t1 == t2
 
 instance Binary Type
+
+-- Generic path: makeStore's ConstSize detection loops on directly self-recursive types.
+instance Store Type
 
 instance ToJSON Type where
   toJSON = genericToJSON typeAesonOptions {omitNothingFields = True}

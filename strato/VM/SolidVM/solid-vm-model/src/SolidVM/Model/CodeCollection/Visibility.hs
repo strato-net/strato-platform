@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 
@@ -13,6 +15,8 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.OpenApi
 import Data.Text (Text)
 import GHC.Generics
@@ -34,6 +38,8 @@ tShowVisibility Internal = "internal"
 tShowVisibility External = "external"
 
 instance Binary Visibility
+
+makeStore ''Visibility
 
 instance ToJSON Visibility where
   toJSON = String . tShowVisibility

@@ -36,6 +36,7 @@ library:
   - scientific
   - servant-server
   - source-tools
+  - store
   - strato-model
   - openapi3
   - text

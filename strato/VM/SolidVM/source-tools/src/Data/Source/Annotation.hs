@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -34,6 +35,8 @@ import Data.Default
 import qualified Data.Map as M
 import Data.OpenApi
 import Data.Source.Position
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Text (Text, pack)
 import qualified Data.Text as T
 import GHC.Generics
@@ -52,6 +55,8 @@ data SourceAnnotation a = SourceAnnotation
 makeLenses ''SourceAnnotation
 
 instance Binary a => Binary (SourceAnnotation a)
+
+makeStore ''SourceAnnotation
 
 instance ToJSON a => ToJSON (SourceAnnotation a) where
   toJSON ann =

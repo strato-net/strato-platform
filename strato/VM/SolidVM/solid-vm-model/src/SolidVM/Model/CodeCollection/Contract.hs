@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -37,6 +38,8 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Default
 import Data.Map (Map, empty, fromList)
 import Data.OpenApi
@@ -55,6 +58,8 @@ import qualified Text.Colors as CL
 data ContractType = ContractType | LibraryType | AbstractType | InterfaceType deriving (Show, Generic, NFData, Eq, ToJSON, FromJSON)
 
 instance Binary ContractType
+
+makeStore ''ContractType
 
 -- Changes to this structure should also have changes in the Unparser :)
 data ContractF a = Contract
@@ -151,6 +156,8 @@ instance Default a => Default (ContractF a) where
 type Contract = Positioned ContractF
 
 makeLenses ''ContractF
+
+makeStore ''ContractF
 
 instance Arbitrary Contract where
   arbitrary = do

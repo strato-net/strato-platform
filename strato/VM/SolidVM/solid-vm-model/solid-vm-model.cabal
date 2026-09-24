@@ -67,6 +67,7 @@ library
     , scientific
     , servant-server
     , source-tools
+    , store
     , strato-model
     , text
     , utf8-string

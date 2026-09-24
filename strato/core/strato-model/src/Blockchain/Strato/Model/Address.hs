@@ -49,8 +49,10 @@ import Data.Data
 import Data.Hashable
 import Data.List (foldl')
 import qualified Data.NibbleString as N
+import Data.Functor.Contravariant (contramap)
 import Data.OpenApi hiding (Format, format, get, put)
 import qualified Data.OpenApi as OPENAPI
+import Data.Store (Store (..))
 import qualified Data.Text as T
 import Database.Persist.Sql hiding (get)
 -- import Debug.Trace
@@ -150,6 +152,11 @@ instance ShortDescription Address where
 instance Binary Address where
   put (Address x) = put x
   get = Address <$> get
+
+instance Store Address where
+  size = contramap toInteger size
+  poke = poke . toInteger
+  peek = fromInteger <$> peek
 
 maybeToEither :: b -> Maybe a -> Either b a
 maybeToEither err m = maybe (Left err) Right m

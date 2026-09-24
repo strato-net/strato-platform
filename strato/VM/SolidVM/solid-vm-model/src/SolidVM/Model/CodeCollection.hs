@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -55,6 +56,8 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
 import Data.Binary
+import Data.Store.TH (makeStore)
+import qualified Data.Store as Store
 import Data.Default
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -103,8 +106,6 @@ instance (Show a) => Show (CodeCollectionF a) where
     ++ CL.yellow "\nCodeCollection._pragmas\t" ++ show _pragmas
     ++ CL.yellow "\nCodeCollection._imports\t" ++ show _imports
 -}
-instance Binary a => Binary (CodeCollectionF a)
-
 instance ToJSON a => ToJSON (CodeCollectionF a)
 
 instance FromJSON a => FromJSON (CodeCollectionF a)
@@ -112,6 +113,14 @@ instance FromJSON a => FromJSON (CodeCollectionF a)
 type CodeCollection = Positioned CodeCollectionF
 
 makeLenses ''CodeCollectionF
+
+makeStore ''CodeCollectionF
+
+-- Transitional: the vmevents stream is still framed with Binary at the top level,
+-- so the code collection travels inside it as a Store-encoded blob.
+instance Store.Store a => Binary (CodeCollectionF a) where
+  put = put . Store.encode
+  get = either (fail . show) pure . Store.decode =<< get
 
 emptyCodeCollection :: CodeCollectionF a
 emptyCodeCollection = CodeCollection M.empty M.empty M.empty M.empty M.empty M.empty [] [] []
