@@ -18,6 +18,7 @@ import type {
   PoolV3FeeTier,
   RouteQuoteResponse,
   CompositeRouteQuoteResponse,
+  RouteDestination,
 } from '@strato/shared-types';
 
 import type { WalletTxProgressEvent } from '@/lib/axios';
@@ -314,4 +315,5 @@ export interface RoutePickerToken {
   price?: string;
   metalFeeBps?: string;
   detail?: string;
+  routeDestination?: RouteDestination;
 }

@@ -24,7 +24,7 @@ import RouteProgressDialog from "./RouteProgressDialog";
 
 export default function WithdrawalWidget({ catalog, active, feeBalancesReady, onPendingChange, onSubmitted }: WithdrawalWidgetProps) {
   const { isLoggedIn, userAddress, isAppAuthenticated, externalEvmWalletAddress } = useUser();
-  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useTokenContext();
+  const { usdstBalance, voucherBalance, usdstBalanceError, fetchUsdstBalance } = useTokenContext();
   const { activeTokens, fetchTokens } = useUserTokens();
   const { triggerWithdrawalRefresh } = useBridgeContext();
   const { toast } = useToast();
@@ -52,10 +52,10 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
     refetchInterval: active ? 10_000 : false,
   });
   const fee = safeParseUnits(BRIDGE_OUT_FEE);
-  let feeError = "";
+  let feeError = usdstBalanceError || "";
   let maximum = BigInt(computeMaxTransferable(balance.data ?? "0", normalizeRouteAddress(route?.stratoToken ?? "") === normalizeRouteAddress(usdstAddress),
     voucherBalance, usdstBalance, fee.toString(), () => {}));
-  if (BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0") < fee) {
+  if (!feeError && BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0") < fee) {
     feeError = `You need ${BRIDGE_OUT_FEE} USDST for fees; you have ${formatUnits(BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0"))} including vouchers.`;
   }
   const factor = BigInt(route?.rebaseFactor || "0");
@@ -124,8 +124,8 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
         {catalog.availableNetworks.map(item => <option key={item.chainId} value={item.chainName}>{item.chainName}</option>)}
       </select>
     </label>
-    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-      <label htmlFor="withdrawal-amount" className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">You send · STRATO</label>
+    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
+      <label htmlFor="withdrawal-amount" className="mb-3 lg:mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">You send · STRATO</label>
       <div className="flex items-center gap-3">
         <input id="withdrawal-amount" inputMode="decimal" placeholder="0" value={amount} disabled={execute.isPending}
           aria-invalid={!!validationError} aria-describedby="withdrawal-amount-error"
@@ -138,19 +138,19 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
             detail: `Receive ${item.externalSymbol} on ${network?.chainName}` }))}
           onSelect={id => { setRouteId(id); clearAmount(); }} />
       </div>
-      <div className="mt-3 flex justify-between text-xs text-muted-foreground">
+      <div className="mt-3 lg:mt-1 flex justify-between text-xs text-muted-foreground">
         <span>{!isLoggedIn ? "Connect wallet to see your balance" : balance.isError ? "Balance unavailable" : balance.data === undefined ? "Loading balance…" : `Available: ${display(maximum.toString(), decimals)} ${route?.stratoTokenSymbol ?? ""}`}</span>
         <button type="button" className="font-semibold text-primary" disabled={!feeBalancesReady || balance.data === undefined || execute.isPending}
           onClick={() => { setAmount(formatUnits(maximum, decimals)); setAmountError(""); }}>Max</button>
       </div>
-      <p id="withdrawal-amount-error" role={validationError ? "alert" : undefined} className="mt-2 min-h-4 text-xs text-destructive">{validationError}</p>
+      <p id="withdrawal-amount-error" role={validationError ? "alert" : undefined} className="mt-2 lg:mt-1 min-h-4 text-xs text-destructive">{validationError}</p>
       {!catalog.loading && !routes.length && <p className="text-sm text-muted-foreground">No withdrawals are available on this network.</p>}
     </div>
     <div className="flex justify-center"><ArrowDown className="h-5 w-5 text-muted-foreground" /></div>
-    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">You receive · {network?.chainName ?? "Choose network"}</p>
+    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
+      <p className="mb-3 lg:mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">You receive · {network?.chainName ?? "Choose network"}</p>
       <p className="break-words text-2xl font-semibold">{preview && route ? display(preview.externalAmount, Number(route.externalDecimals)) : "—"} {route?.externalSymbol}</p>
-      <p className="mt-2 text-xs text-muted-foreground">Receive the selected asset’s external counterpart.</p>
+      <p className="mt-2 lg:mt-1 text-xs text-muted-foreground">Receive the selected asset’s external counterpart.</p>
     </div>
     <label className="block space-y-2 text-sm"><span>Receiving address on {network?.chainName ?? "the destination network"}</span>
       <Input aria-label="External receiving address" value={recipient} placeholder="0x…" disabled={execute.isPending} aria-invalid={!!recipient && !validRecipient}
@@ -165,7 +165,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
       <p>{preview?.manualReview ? "This amount requires manual approval. Processing time depends on that approval." : "Processed after bridge verification and network confirmation; vault capacity can delay the transfer."}</p>
       {route?.rebaseRequired && <p>Estimated external amount uses the current conversion rate; the on-chain rate at submission determines the amount.</p>}
     </div>
-    <div className="min-h-5 text-xs text-destructive">{isLoggedIn && feeBalancesReady ? feeError : ""}</div>
+    <div className="min-h-5 text-xs text-destructive">{isLoggedIn && (feeBalancesReady || usdstBalanceError) ? feeError : ""}</div>
     <Button className="h-12 w-full rounded-xl" disabled={execute.isPending || (isLoggedIn && !ready)} onClick={() => {
       if (!isLoggedIn) { requestWalletConnection(); return; }
       if (ready) setConfirmation({ selectionKey, route, networkName: network.chainName, recipient, preview });
@@ -175,8 +175,8 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
       <DialogContent className="max-w-[95vw] sm:max-w-lg">
         <DialogHeader><DialogTitle>Confirm withdrawal</DialogTitle><DialogDescription>Review the asset, destination network and receiving address.</DialogDescription></DialogHeader>
         {confirmation && <dl className="space-y-3 text-sm">
-          <div><dt className="text-muted-foreground">Amount locked on STRATO</dt><dd className="font-semibold">{display(confirmation.preview.escrowAmount, confirmation.route.stratoTokenDecimals ?? 18)} {confirmation.route.stratoTokenSymbol}</dd></div>
-          <div><dt className="text-muted-foreground">Estimated received on {confirmation.networkName}</dt><dd className="font-semibold">{display(confirmation.preview.externalAmount, Number(confirmation.route.externalDecimals))} {confirmation.route.externalSymbol}</dd></div>
+          <div><dt className="text-muted-foreground">You send · STRATO</dt><dd className="font-semibold">{display(confirmation.preview.escrowAmount, confirmation.route.stratoTokenDecimals ?? 18)} {confirmation.route.stratoTokenSymbol}</dd></div>
+          <div><dt className="text-muted-foreground">You receive · {confirmation.networkName} (estimated)</dt><dd className="font-semibold">{display(confirmation.preview.externalAmount, Number(confirmation.route.externalDecimals))} {confirmation.route.externalSymbol}</dd></div>
           <div><dt className="text-muted-foreground">Receiving address</dt><dd className="break-all font-mono">{confirmation.recipient}</dd></div>
           <div><dt className="text-muted-foreground">Transaction fee</dt><dd>{BRIDGE_OUT_FEE} USDST (vouchers applied when available)</dd></div>
           <div><dt className="text-muted-foreground">Processing</dt><dd>{confirmation.preview.manualReview ? "Manual approval required" : "Bridge verification and external transfer"}</dd></div>

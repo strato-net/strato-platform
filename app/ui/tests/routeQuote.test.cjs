@@ -167,8 +167,25 @@ function confirmedTrade(quote) {
 
 const friendlyExports = {};
 runSource(utilsSource.statements.filter(node => ts.isFunctionDeclaration(node) &&
-  ['normalizeError', 'getFriendlyMessage'].includes(node.name?.text)).map(node => node.getText(utilsSource)).join('\n'),
+  ['normalizeError', 'getFriendlyMessage', 'getQuoteErrorMessage'].includes(node.name?.text)).map(node => node.getText(utilsSource)).join('\n'),
   { exports: friendlyExports });
+
+test('quote errors use the API reason without claiming a transaction failed or exposing server details', () => {
+  for (const message of ['No route found for a -> b', 'No executable route found for a -> b']) {
+    for (const data of [{ error: { message } }, { error: message }, { message }]) {
+      const result = friendlyExports.getQuoteErrorMessage({ message: 'Request failed with status code 422', response: { status: 422, data } });
+      assert.equal(result, 'No route is available for this amount. Try a different amount or token.');
+    }
+  }
+  for (const error of [
+    { response: { status: 500, data: { error: { message: 'internal SQL credentials' } } } },
+    { response: { status: 500, data: { error: { message: 'No route found in broken infrastructure' } } } },
+    { message: 'Unexpected backend response' },
+    null,
+  ]) assert.equal(friendlyExports.getQuoteErrorMessage(error), 'Quote unavailable. Please try again.');
+  assert.match(friendlyExports.getQuoteErrorMessage({ message: 'Network Error' }), /Check your connection/);
+  assert.match(friendlyExports.getQuoteErrorMessage({ message: 'timeout of 30000ms exceeded' }), /Quote request timed out/);
+});
 
 test('STRATO pool registration errors remain actionable for API and wallet failures', () => {
   const message = 'solidity require failed: TR: unregistered v2 pool';
@@ -433,7 +450,7 @@ test('STRATO trading waits for fee balances instead of interpreting initial zero
       exports.ready = feeBalancesReady; exports.error = ${expressions.feeError};
       exports.max = ${expressions.maxSpendableWei};`, {
       exports, SWAP_FEE: '0.02', formatUnits: require('ethers').formatUnits, userAddress: 'user', feeBalanceOwner: null, loadingUsdstBalance: false,
-      guestMode: false, sourceMode: 'strato', availableFees: 0n, routeFeeWei: 2n,
+      guestMode: false, sourceMode: 'strato', availableFees: 0n, routeFeeWei: 2n, usdstBalanceError: null,
       voucherBalance: '0', inputBalance: 100n, tokenIn: { address: 'usdst' }, usdstAddress: 'usdst',
       ...overrides,
     });
@@ -683,7 +700,7 @@ for (const reason of ['no confirmation', 'expired', 'selection changed']) {
 
 test('STRATO execution reports wallet steps and retains terminal results without replaying the trade', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/hooks/trade/useRouteExecute.ts'), 'utf8');
-  for (const outcome of ['wallet success', 'account success', 'pending', 'rejected', 'reverted', 'failure response', 'confirmation unavailable']) {
+  for (const outcome of ['wallet success', 'account success', 'account response lost', 'account rejected', 'pending', 'rejected', 'reverted', 'failure response', 'confirmation unavailable']) {
     const states = [], exports = {};
     let finish, calls = 0, invalidations = 0;
     runSource(source, { exports, require: id => {
@@ -701,6 +718,8 @@ test('STRATO execution reports wallet steps and retains terminal results without
         assert.equal(params.minFinalOut, '99');
         await new Promise(resolve => { finish = resolve; });
         if (outcome === 'account success') return { data: { status: 'Success', hash: 'account-hash' } };
+        if (outcome === 'account response lost') throw { message: 'Network Error', request: {} };
+        if (outcome === 'account rejected') throw { message: 'Request rejected', request: {}, response: { status: 400 } };
         const emit = options.walletTxProgress;
         emit({ index: 0, total: 2, status: 'signing', functionName: 'approve', hash: 'unsigned-approval' });
         assert.equal(states.at(-1).transactions[0].submittedHash, undefined);
@@ -731,10 +750,10 @@ test('STRATO execution reports wallet steps and retains terminal results without
     const promise = hook.mutateAsync({ minFinalOut: '99' });
     assert.equal(states.at(-1).status, 'pending', 'progress starts before the API responds');
     finish();
-    if (['rejected', 'reverted', 'failure response', 'confirmation unavailable'].includes(outcome)) await assert.rejects(promise);
+    if (['account response lost', 'account rejected', 'rejected', 'reverted', 'failure response', 'confirmation unavailable'].includes(outcome)) await assert.rejects(promise);
     else await promise;
     const result = states.at(-1);
-    assert.equal(result.status, outcome.includes('success') ? 'success' : ['pending', 'confirmation unavailable'].includes(outcome) ? 'unconfirmed' : 'error');
+    assert.equal(result.status, outcome.includes('success') ? 'success' : ['account response lost', 'pending', 'confirmation unavailable'].includes(outcome) ? 'unconfirmed' : 'error');
     if (outcome === 'wallet success') assert.equal(result.hash, 'trade-hash');
     if (outcome === 'rejected') assert.match(result.message, /cancelled/);
     if (outcome === 'reverted') {
@@ -818,6 +837,13 @@ test('confirmation renders exact decimal amounts, fees, route and a distinct fal
   const html = render();
   for (const text of ['2.0 USDC', '1.234567 METAL', '0.6172835 METAL', '1.2 METAL', '0.25%', 'Metal Forge',
     'Fallback: 1.0 USDST', 'minimum does not apply to this fallback', 'Network gas', address('5')]) assert.ok(html.includes(text), text);
+  for (const destination of ['vault', 'savings']) {
+    confirmation.outputToken.routeDestination = destination;
+    assert.match(render(), new RegExp(`Confirm bridge &amp; ${destination} deposit`));
+    assert.match(render(), /Minimum shares if deposited/);
+    assert.match(render(), /APY does not apply to the fallback asset/);
+  }
+  delete confirmation.outputToken.routeDestination;
   confirmation.quote.bridge.rebaseFactor = '1000000000000000000';
   assert.match(render(), /approximately.*factor at settlement/);
   confirmation.quote.depositAction.action = 0;
@@ -827,6 +853,86 @@ test('confirmation renders exact decimal amounts, fees, route and a distinct fal
   delete confirmation.quote.depositAction;
   assert.match(render(), /0.02 USDST/);
   assert.doesNotMatch(render(), /Fallback:/);
+});
+
+test('fee balance failures stay unavailable until both requests succeed', async () => {
+  const source = ts.createSourceFile('TokenContext.tsx', fs.readFileSync(path.join(__dirname, '../src/context/TokenContext.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let fetchBalance;
+  const gates = {};
+  function visit(node, file) {
+    if (ts.isVariableDeclaration(node)) {
+      const name = node.name.getText(file);
+      if (name === 'fetchUsdstBalance' && node.initializer) fetchBalance = node.initializer.arguments[0].getText(file);
+      if (['feeBalancesReady', 'feeError'].includes(name)) gates[name] = node.initializer.getText(file);
+    }
+    ts.forEachChild(node, child => visit(child, file));
+  }
+  visit(source, source);
+  visit(widgetSource, widgetSource);
+  for (const failedEndpoint of ['/tokens/balance', '/vouchers/balance']) {
+    let fail = true, balances = ['0', '0'], error = null, loading = false;
+    const exports = {};
+    runSource(`exports.fetch = ${fetchBalance};`, {
+      exports, usdstAddress: address('1'),
+      api: { get: async url => {
+        if (fail && url === failedEndpoint) throw new Error('Network Error');
+        return { data: url === '/tokens/balance' ? [{ balance: '1000000000000000000' }] : { balance: '0' } };
+      } },
+      setUsdstBalance: value => { balances[0] = value; }, setVoucherBalance: value => { balances[1] = value; },
+      setUsdstBalanceError: value => { error = value; }, setLoadingUsdstBalance: value => { loading = value; },
+    });
+    const gate = () => {
+      const result = {};
+      runSource(`const feeBalancesReady = ${gates.feeBalancesReady}; exports.ready = feeBalancesReady; exports.error = ${gates.feeError};`, {
+        exports: result, userAddress: address('1'), feeBalanceOwner: address('1'), usdstBalanceError: error,
+        guestMode: false, sourceMode: 'strato', availableFees: BigInt(balances[0]) + BigInt(balances[1]),
+        routeFeeWei: 20000000000000000n, SWAP_FEE: '0.02', formatUnits: require('ethers').formatUnits,
+      });
+      return result;
+    };
+    await exports.fetch();
+    assert.equal(loading, false);
+    assert.equal(gate().ready, false);
+    assert.match(gate().error, /Fee balances unavailable/);
+    assert.doesNotMatch(gate().error, /you have 0/);
+    fail = false;
+    await exports.fetch();
+    assert.equal(gate().ready, true);
+    assert.equal(gate().error, '');
+    fail = true;
+    await exports.fetch();
+    assert.equal(gate().ready, false, 'a failed background refresh also blocks fee-dependent actions');
+    assert.match(gate().error, /Fee balances unavailable/);
+    fail = false;
+    await exports.fetch();
+    const controller = new AbortController();
+    controller.abort();
+    fail = true;
+    await exports.fetch(controller.signal);
+    assert.equal(error, null, 'cancelled requests do not overwrite fee state');
+  }
+});
+
+test('native redemption hides DepositRouter limits while standard deposits show loading and limits', () => {
+  let help;
+  function visit(node) {
+    if (ts.isJsxElement(node) && node.openingElement.attributes.getText(widgetSource).includes('id="pay-amount-help"')) help = node.getText(widgetSource);
+    ts.forEachChild(node, visit);
+  }
+  visit(widgetSource);
+  const render = (nativeRedemption, depositConfig) => {
+    const exports = {};
+    runSource(`exports.element = (${help});`, {
+      exports, require, nativeRedemption, depositConfig, sourceMode: 'external', externalRoute: { externalSymbol: 'USDC' },
+      inputDecimals: 6, minDepositError: '', amountError: '', externalBalanceError: '', formatUnits: require('ethers').formatUnits,
+    });
+    return require('react-dom/server').renderToStaticMarkup(exports.element);
+  };
+  assert.match(render(false, {}), /Loading deposit limits/);
+  assert.match(render(false, { data: { minAmount: '1000000' } }), /Minimum deposit: 1.0 USDC/);
+  for (const config of [{}, { data: { minAmount: '1000000' } }, { isError: true }]) {
+    assert.doesNotMatch(render(true, config), /Loading deposit limits|Minimum deposit|Retry/);
+  }
 });
 
 test('external deposit limits gate initial loading, failures, disabled tokens and below-minimum amounts', () => {
@@ -963,12 +1069,13 @@ test('quote summary distinguishes first load, changed inputs and background refr
   const exports = {};
   runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteTradeSummary.tsx'), 'utf8'), { exports, require: id => {
     if (id === 'react/jsx-runtime') return require(id);
+    if (id === 'lucide-react') return require(id);
     if (id === '@/lib/constants') return { SWAP_FEE: '0.02', WAD: 10n ** 18n };
     if (id === '@/utils/numberUtils') return { formatUnits: require('ethers').formatUnits, formatAmount: value => value };
     throw new Error(id);
   } });
-  const render = (quote, fetching) => renderToStaticMarkup(React.createElement(exports.default, {
-    quote, fetching, inputAmount: '2000000', inputDecimals: 6, inputSymbol: 'USDC', outputToken: { _symbol: 'GOLDST', customDecimals: 6 }, external: false,
+  const render = (quote, fetching, error) => renderToStaticMarkup(React.createElement(exports.default, {
+    quote, fetching, error, inputAmount: '2000000', inputDecimals: 6, inputSymbol: 'USDC', outputToken: { _symbol: 'GOLDST', customDecimals: 6 }, external: false,
   }));
   assert.match(render(undefined, false), /Enter an amount/);
   assert.match(render(undefined, true), /Getting quote/);
@@ -978,6 +1085,11 @@ test('quote summary distinguishes first load, changed inputs and background refr
   assert.match(html, /0.6172835 GOLDST/);
   assert.match(html, /0.02 USDST/);
   assert.doesNotMatch(render(undefined, true), /1.2 GOLDST/);
+  const blocked = render(undefined, false, 'No route is available for this amount.');
+  assert.match(blocked, /text-destructive/);
+  assert.match(blocked, /role="alert"/);
+  assert.match(blocked, /No route is available/);
+  assert.doesNotMatch(render(undefined, true), /text-destructive|role="alert"/);
 });
 
 test('native redemption approves its own bridge only when needed and records the pinned recipient', async () => {
@@ -1152,4 +1264,93 @@ test('native routed deposits submit the pinned output and minimum to the represe
   assert.equal(request.address, `0x${address('8')}`);
   assert.deepEqual(Array.from(request.args), [`0x${address('1')}`, 100n, `0x${address('6')}`, `0x${composite.tokenOut}`, BigInt(composite.minFinalOut)]);
   assert.equal(harness.records()[1].type, 'route');
+});
+
+const earnUtils = {};
+runSource(fs.readFileSync(path.join(__dirname, '../src/utils/earnUtils.ts'), 'utf8'), { exports: earnUtils });
+
+test('asset APY excludes rewards and opportunities requiring an additional earn action', () => {
+  const opportunities = [
+    { source: 'lending', apy: '9' },
+    { source: 'rewards', apy: '100', meta: 'vault' },
+    { source: 'staking', apy: '12' },
+    { source: 'swap', apy: '8', poolAddress: 'pool' },
+    { source: 'base', apy: '4', poolAddress: 'pool' },
+  ];
+  assert.equal(earnUtils.buildAssetApyInfo(opportunities), null);
+  assert.equal(earnUtils.buildAssetApyInfo([...opportunities, { source: 'base', apy: '3.5' }]).total, 3.5);
+  assert.equal(earnUtils.buildAssetApyInfo([{ source: 'lending', apy: '5', meta: 'save_usdst' }]).total, 5);
+  assert.equal(earnUtils.buildAssetApyInfo([
+    { source: 'vault', apy: '2' }, { source: 'vault_weighted', apy: '4' }, ...opportunities,
+  ]).total, 6);
+  assert.equal(earnUtils.buildAssetApyInfo([{ source: 'base', apy: '-' }]), null);
+});
+
+test('receive asset separates holding yield from rewards eligibility', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const exports = {};
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteAssetYield.tsx'), 'utf8'), {
+    exports,
+    require: id => {
+      if (id === 'react-router-dom') return { Link: ({ to, children, ...props }) => React.createElement('a', { href: to, ...props }, children) };
+      if (id === '@/components/earn/EarnApyTooltip') return { default: ({ children }) => children };
+      if (id === '@/context/EarnContext') return { useEarnContext: () => ({ tokenApysLoaded: true, tokenApys: [{ token: 'AB', apys: [
+        { source: 'base', apy: '4' }, { source: 'rewards', apy: '150', poolAddress: 'pool' },
+      ] }] }) };
+      if (id === '@/lib/route') return { normalizeRouteAddress: value => value.toLowerCase().replace(/^0x/, '') };
+      if (id === '@/utils/earnUtils') return earnUtils;
+      return require(id);
+    },
+  });
+  const html = renderToStaticMarkup(React.createElement(exports.default, { address: '0xab' }));
+  assert.match(html, /Asset APY · 4.00% estimated/);
+  assert.doesNotMatch(html, /154.00|150/);
+  assert.match(html, /Rewards available/);
+  assert.match(html, /additional deposit or stake/);
+});
+
+test('route action labels distinguish savings, vault deposits, swaps and plain bridging', () => {
+  for (const [destination, external, bridgeOnly, expected] of [
+    ['vault', false, false, 'vault deposit'], ['vault', true, false, 'bridge & vault deposit'],
+    ['savings', false, false, 'savings deposit'], ['savings', true, false, 'bridge & savings deposit'],
+    ['token', false, false, 'swap'], ['token', true, false, 'bridge & swap'],
+    ['vault', true, true, 'deposit'],
+  ]) assert.equal(routeHelpers.getRouteActionLabel(destination, external, bridgeOnly), expected);
+});
+
+test('receive categories follow route metadata, preserve linked selections and exclude unavailable products', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const exports = {};
+  let pickerProps;
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteReceivePanel.tsx'), 'utf8'), {
+    exports, require: id => {
+      if (id === '@/lib/constants') return { ROUTE_DESTINATIONS: [
+        { value: 'token', label: 'Tokens' }, { value: 'savings', label: 'Savings' }, { value: 'vault', label: 'Yield vaults' },
+      ] };
+      if (id === '@/utils/numberUtils') return { formatAmount: value => value, formatUnits: value => value };
+      if (id === './RouteAssetYield') return { default: () => null };
+      if (id === './RouteTokenPicker') return { default: props => { pickerProps = props; return null; } };
+      return require(id);
+    },
+  });
+  const tokens = [
+    { id: 'token', address: 'token', symbol: 'TOKEN' },
+    { id: 'vault1', address: 'vault1', symbol: 'ONE', routeDestination: 'vault' },
+    { id: 'vault2', address: 'vault2', symbol: 'TWO', routeDestination: 'vault' },
+  ];
+  let selected;
+  const props = { tokens, token: { address: 'vault2', _symbol: 'TWO', routeDestination: 'vault' },
+    loading: false, pending: false, onSelect: id => { selected = id; } };
+  const html = renderToStaticMarkup(React.createElement(exports.default, props));
+  assert.match(html, /You receive TWO shares on STRATO/);
+  assert.equal(pickerProps.value, 'vault2');
+  assert.deepEqual(pickerProps.tokens.map(t => t.id), ['vault1', 'vault2']);
+  const tree = exports.default(props);
+  const categoryButtons = tree.props.children[2].props.children;
+  assert.equal(categoryButtons[1].props.disabled, true, 'no savings product is fabricated');
+  assert.equal(categoryButtons[2].props['aria-pressed'], true);
+  categoryButtons[0].props.onClick();
+  assert.equal(selected, 'token');
 });

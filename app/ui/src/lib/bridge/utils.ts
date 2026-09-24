@@ -110,6 +110,18 @@ export function normalizeError(error: any): BridgeError {
   };
 }
 
+export function getQuoteErrorMessage(error: unknown): string {
+  const status = (error as { response?: { status?: number } })?.response?.status;
+  if (status && status >= 500) return "Quote unavailable. Please try again.";
+  const { message } = normalizeError(error);
+  if (message.includes("No executable route") || message.includes("No route found")) {
+    return getFriendlyMessage(message);
+  }
+  if (/timeout|timed out/i.test(message)) return "Quote request timed out. Please try again.";
+  if (/network error/i.test(message)) return "Unable to fetch a quote. Check your connection and try again.";
+  return "Quote unavailable. Please try again.";
+}
+
 /**
  * Maps error codes to user-friendly messages
  */

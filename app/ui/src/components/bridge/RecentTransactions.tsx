@@ -262,7 +262,7 @@ const RecentTransactions = ({
         }
         if (tx._type === "route") {
           return <TxRow key={key} icon={<ArrowDown className="w-4 h-4 text-blue-500" />} iconBg="bg-blue-500/15"
-            label="Routed Trade" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
+            label="Trade on STRATO" status={METAL_STATUS} timeLabel={formatTimeAgo(tx.block_timestamp)}
             fromAmount={amt} fromSymbol={tx.stratoTokenSymbol || "-"}
             toAmount={formatBalance(tx.finalAmount || "0", undefined, tx.finalDecimals ?? 18, 2, 4)} toSymbol={tx.finalTokenSymbol || "-"} />;
         }
@@ -279,7 +279,9 @@ const RecentTransactions = ({
         return <TxRow key={key}
           icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
           iconBg={isW ? "bg-amber-500/15" : "bg-emerald-500/15"}
-          label={isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : isRouted ? "Deposit & Trade" : "Deposit"} status={status}
+          label={includeRoutes
+            ? isW ? "Bridge Out" : isFallback ? "Bridge In (Fallback)" : isRouted ? "Bridge & Trade" : "Bridge In"
+            : isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : isRouted ? "Deposit & Trade" : "Deposit"} status={status}
           timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
           fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
           toAmount={hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, tx.finalDecimals ?? 18, 2, 4) : (isW ? externalAmt : amt)}
@@ -321,7 +323,7 @@ const RecentTransactions = ({
       <CardContent className="p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/70">
           <CardTitle className="text-base">
-            {includeRoutes ? "Recent Activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
+            {includeRoutes ? "Your activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
           </CardTitle>
           <Link to={viewAllLink} className={linkClass}>
             View All {"\u2192"}

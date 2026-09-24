@@ -55,7 +55,7 @@ function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (par
         return data;
       } catch (error) {
         const normalized = normalizeError(error);
-        const responseUnknown = operation === "withdrawal" && !!(error as any)?.request && !(error as any)?.response;
+        const responseUnknown = !!(error as any)?.request && !(error as any)?.response;
         const unconfirmed = !executionFailed && (transactions.some(tx => tx.submittedHash) || responseUnknown) &&
           !transactions.some(tx => tx.status === "failed");
         setProgress({

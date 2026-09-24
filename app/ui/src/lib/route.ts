@@ -1,7 +1,13 @@
-import type { SwapToken } from "@strato/shared-types";
+import type { RouteDestination, SwapToken } from "@strato/shared-types";
 import type { RouteConfirmation, RouteTokenSelection } from "@/interface/swap";
 
 export const normalizeRouteAddress = (value: string) => value.toLowerCase().replace(/^0x/, "");
+
+export function getRouteActionLabel(destination: RouteDestination = "token", external = false, bridgeOnly = false): string {
+  if (external && bridgeOnly) return "deposit";
+  const action = destination === "vault" ? "vault deposit" : destination === "savings" ? "savings deposit" : "swap";
+  return external ? `bridge & ${action}` : action;
+}
 
 export function resolveRouteSelection(
   sources: SwapToken[],

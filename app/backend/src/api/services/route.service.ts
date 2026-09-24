@@ -14,6 +14,7 @@ import { cirrus } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
+import { StratoError } from "../../errors";
 import {
   buildTokenApprovalTx,
   fetchMultiTokenStablePools,
@@ -406,8 +407,10 @@ export const getRouteAssets = async (
       ? getVaultSharePrice(prices.get(edge.tokenIn) || "0", edge.vaultDeposit)
       : prices.get(edge.tokenOut) || edge.priceOut || "0";
     const existing = assets.get(edge.tokenOut);
+    const routeDestination = edge.kind === "SAVE" ? "savings" : edge.kind === "YIELD_VAULT_DEPOSIT" ? "vault" : "token";
     if (existing) {
       existing.price = price;
+      if (routeDestination !== "token") existing.routeDestination = routeDestination;
       continue;
     }
     assets.set(edge.tokenOut, {
@@ -421,6 +424,7 @@ export const getRouteAssets = async (
       poolBalance: "0",
       images: [],
       routableSource: sourceAddresses.has(edge.tokenOut),
+      routeDestination,
     });
   }
   return [...assets.values()].sort((a, b) =>
@@ -775,7 +779,7 @@ export const getRouteQuote = async (
     output
   );
   if (paths.length === 0) {
-    throw new Error(`No route found for ${input} -> ${output}`);
+    throw new StratoError(`No route found for ${input} -> ${output}`, 422);
   }
 
   const quotes = new Map<RouteEdge, Map<bigint, Promise<RouteStepQuote>>>();
@@ -806,7 +810,7 @@ export const getRouteQuote = async (
         : current;
     }, null);
   if (!best) {
-    throw new Error(`No executable route found for ${input} -> ${output}`);
+    throw new StratoError(`No executable route found for ${input} -> ${output}`, 422);
   }
 
   const amountOut = BigInt(best[best.length - 1].amountOut);

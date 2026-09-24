@@ -166,6 +166,8 @@ export interface SwapHistoryResponse {
 // POOL & TOKEN TYPES
 // ============================================================================
 
+export type RouteDestination = "token" | "savings" | "vault";
+
 /**
  * Token information within a swap context
  */
@@ -180,6 +182,7 @@ export interface SwapToken {
   poolBalance: string; // Pool balance of this token
   images: Array<{ value: string }>; // Token images (filtered to exclude empty values)
   routableSource?: boolean; // TokenRouter has at least one outgoing route
+  routeDestination?: RouteDestination;
 }
 
 /**

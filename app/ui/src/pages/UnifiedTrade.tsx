@@ -22,22 +22,16 @@ const UnifiedTrade = () => {
       <DashboardSidebar />
 
       <div className="transition-all duration-300" style={{ paddingLeft: "var(--sidebar-width, 0px)" }}>
-          <DashboardHeader title="Bridge & Trade" />
+          <DashboardHeader title="Trade" />
         <main className="flex-1 p-4 md:p-6">
           {!isLoggedIn && (
             <GuestSignInBanner message="Sign in to trade across STRATO and external networks in one route" />
           )}
           <div className="mx-auto max-w-7xl space-y-6">
-            <h2 className="text-lg font-semibold">Trade on STRATO or transfer assets between networks.</h2>
+            <p className="text-muted-foreground">Trade or bridge directly into savings, yield vaults, and other STRATO assets.</p>
 
             <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
               <div className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm lg:col-span-7">
-                <div className="border-b border-border/60 bg-gradient-to-r from-primary/[0.07] via-transparent to-transparent px-4 py-4 md:px-6">
-                  <h3 className="font-semibold">Trade or transfer</h3>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Select a source, destination and amount to preview execution.
-                  </p>
-                </div>
                 <div className="p-4 md:p-6">
                   <RouterWidget
                     key={JSON.stringify([searchParams.get("tokenIn"), searchParams.get("tokenOut"), searchParams.get("pool")])}

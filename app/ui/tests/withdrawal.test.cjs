@@ -178,7 +178,7 @@ for (const route of [standard, native]) {
   }
 }
 
-for (const change of ['account', 'recipient', 'session', 'fee balance']) {
+for (const change of ['account', 'recipient', 'session', 'fee balance', 'fee balance unavailable']) {
   test(`a late ${change} change requires withdrawal review again`, () => {
     const h = widgetHarness(standard);
     h.change('withdrawal-amount', '1');
@@ -187,6 +187,7 @@ for (const change of ['account', 'recipient', 'session', 'fee balance']) {
     if (change === 'recipient') h.change('External receiving address', `0x${address('6')}`);
     if (change === 'session') h.user.isAppAuthenticated = false;
     if (change === 'fee balance') h.fees.usdstBalance = '0';
+    if (change === 'fee balance unavailable') h.fees.usdstBalanceError = 'Fee balances unavailable. Retrying…';
     h.render();
     h.click('Confirm withdrawal');
     assert.equal(h.submitted.length, 0);

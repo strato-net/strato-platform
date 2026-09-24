@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SWAP_FEE, WAD } from "@/lib/constants";
 import { formatUnits } from "@/utils/numberUtils";
-import { normalizeRouteAddress } from "@/lib/route";
+import { getRouteActionLabel, normalizeRouteAddress } from "@/lib/route";
 import RoutePreview from "./RoutePreview";
 
 export default function RouteConfirmDialog({ confirmation, pending, stage, onClose, onConfirm }: {
@@ -22,27 +22,29 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
     (BigInt(inputAmount) * 10n ** BigInt(outputDecimals));
   const fallbackToken = bridge && tokens.find(token => normalizeRouteAddress(token.address) === normalizeRouteAddress(bridge.targetStratoToken));
   const hasFallback = "depositAction" in quote && quote.depositAction.action === 4;
+  const deposit = outputToken.routeDestination === "vault" || outputToken.routeDestination === "savings";
+  const confirmLabel = `Confirm ${getRouteActionLabel(outputToken.routeDestination, !!bridge, !!bridge && !hasFallback)}`;
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !pending) onClose(); }}>
       <DialogContent className="max-w-[95vw] sm:max-w-lg" aria-busy={pending}>
         <DialogHeader>
-          <DialogTitle>{bridge ? "Confirm deposit" : "Confirm trade"}</DialogTitle>
+          <DialogTitle>{confirmLabel}</DialogTitle>
           <DialogDescription>
-            Review the amounts and receiving account.{quote.steps.length > 0 ? " The execution route may change while preserving the trade minimum below." : ""}
+            Review the amounts and receiving account.{quote.steps.length > 0 ? " The execution route may change while preserving the minimum below." : ""}
           </DialogDescription>
         </DialogHeader>
         <dl className="space-y-3 text-sm">
-          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">You pay · {networkName}</dt>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">You send · {networkName}</dt>
             <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(inputAmount, inputDecimals)} {inputSymbol}</dd></div>
-          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Estimated received · STRATO</dt>
+          <div className="flex justify-between gap-4"><dt className="text-muted-foreground">You receive · STRATO (estimated)</dt>
             <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(quote.amountOut, outputDecimals)} {outputToken._symbol}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Receiving account</dt>
             <dd className="max-w-[65%] break-all text-right font-mono text-xs">{recipient}</dd></div>
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Rate</dt>
             <dd className="text-right break-all">1 {inputSymbol} ≈ {formatUnits(rate.toString())} {outputToken._symbol}</dd></div>
           {!(bridge?.rebaseFactor && !hasFallback) && (
-            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{hasFallback ? "Minimum if traded" : "Minimum received"}</dt>
+            <div className="flex justify-between gap-4"><dt className="text-muted-foreground">{deposit ? hasFallback ? "Minimum shares if deposited" : "Minimum shares received" : hasFallback ? "Minimum if swapped" : "Minimum received"}</dt>
               <dd className="max-w-[60%] shrink-0 text-right font-semibold break-words">{formatUnits(quote.minFinalOut, outputDecimals)} {outputToken._symbol}</dd></div>
           )}
           <div className="flex justify-between gap-4"><dt className="text-muted-foreground">Slippage tolerance</dt><dd>{quote.slippageBps / 100}%</dd></div>
@@ -53,7 +55,7 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
         {hasFallback && bridge && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
             <p className="font-medium">Fallback: {bridge.rebaseFactor ? "approximately " : ""}{formatUnits(bridge.bridgedAmount, fallbackToken?.customDecimals ?? 18)} {bridge.targetStratoSymbol}</p>
-            <p className="mt-1 text-xs text-muted-foreground">If the trade cannot meet your minimum, you receive this deposited asset instead. The {outputToken._symbol} minimum does not apply to this fallback.{bridge.rebaseFactor ? " The amount depends on the rebase factor at settlement." : ""}</p>
+            <p className="mt-1 text-xs text-muted-foreground">If the {deposit ? "vault or savings deposit" : "swap"} cannot meet your minimum, you receive this deposited asset instead. The {outputToken._symbol} minimum does not apply to this fallback.{deposit ? " Savings or vault APY does not apply to the fallback asset." : ""}{bridge.rebaseFactor ? " The amount depends on the rebase factor at settlement." : ""}</p>
           </div>
         )}
         {bridge && <p className="text-xs text-muted-foreground">Deposit from {networkName} → {bridge.targetStratoSymbol} on STRATO.</p>}
@@ -69,7 +71,7 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
         {pending && stage && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{stage.step && `Step ${stage.step} of ${stage.total}: `}{stage.label}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>Cancel</Button>
-          <Button onClick={onConfirm} disabled={pending}>{pending ? "Submitting…" : bridge ? "Confirm deposit" : "Confirm trade"}</Button>
+          <Button onClick={onConfirm} disabled={pending}>{pending ? "Submitting…" : confirmLabel}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

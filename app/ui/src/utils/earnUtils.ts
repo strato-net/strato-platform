@@ -240,6 +240,12 @@ const buildTokenCompositeInfo = (
   };
 };
 
+export const buildAssetApyInfo = (apys: ApySource[]): EarnApyInfo | null =>
+  buildTokenCompositeInfo(apys.filter((entry) => !entry.poolAddress && (
+    entry.source === "base" || entry.source === "vault" || entry.source === "vault_weighted" ||
+    (entry.source === "lending" && entry.meta === "save_usdst")
+  )));
+
 export const buildEarnApyMap = (
   tokenApys: TokenApyEntry[],
   options?: EarnApyLookupOptions

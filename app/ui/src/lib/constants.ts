@@ -20,6 +20,12 @@ export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO
 export const DECIMAL = 18
 export const WAD = 10n ** 18n;
 
+export const ROUTE_DESTINATIONS = [
+  { value: "token", label: "Tokens" },
+  { value: "savings", label: "Savings" },
+  { value: "vault", label: "Yield vaults" },
+] as const;
+
 // ============================================
 // Feature Flags
 // ============================================

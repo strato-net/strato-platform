@@ -222,7 +222,7 @@ test("reuses swap topology and request-local quotes without reusing live outputs
   assert.equal(calls.filter((key) => key === "a:b:100").length, 1);
   assert.ok(calls.includes("c:d:900"), "different input amounts get different quotes");
   failQuote = true;
-  await assert.rejects(quote(), /No executable route/, "cached topology does not bypass live quote failure");
+  await assert.rejects(quote(), { name: "StratoError", status: 422, message: /No executable route/ }, "cached topology does not bypass live quote failure");
   failQuote = false;
   assert.equal((await quote()).amountOut, "2700", "failed quotes do not persist across requests");
 
@@ -480,7 +480,7 @@ test("both vault routes quote from accounting totals and respect deposit availab
     assert.equal(quote.steps[0].target, target);
   }
   paused = true;
-  for (const target of ["save", "yield"]) await assert.rejects(getRouteQuote("token", "asset", target, 100n), /No route/);
+  for (const target of ["save", "yield"]) await assert.rejects(getRouteQuote("token", "asset", target, 100n), { name: "StratoError", status: 422, message: /No route/ });
   paused = false;
   deployed = false;
   for (const target of ["save", "yield"]) await assert.rejects(getRouteQuote("token", "asset", target, 100n), /No route/);
@@ -677,8 +677,10 @@ test("route assets price vault shares from projected backing for guests and sign
     const token = await read(user);
     assert.equal(token.price, "5000000000000000000000", "1.25 GOLDST per share at $4,000 gives $5,000");
     assert.equal(token.images[0].value, "vault.png", "pricing preserves existing token metadata");
+    assert.equal(token.routeDestination, "vault", "deposit destinations do not depend on APY or token symbols");
   }
   indexed = false;
+  assert.equal((await read()).routeDestination, "vault", "synthetic vault assets retain their destination category");
   assert.equal((await read()).price, "5000000000000000000000", "synthetic vault assets also receive a price");
   for (decimals of [0, 2, 6, 18]) {
     totalShares = (100n * 10n ** BigInt(decimals)).toString();
@@ -695,6 +697,13 @@ test("route assets price vault shares from projected backing for guests and sign
   assert.equal((await read()).price, "0", "missing oracle data remains unavailable");
   oracleFailure = true;
   assert.equal((await read()).price, "0", "cosmetic price failure does not hide route assets");
+  const savingsAddress = "d".repeat(40);
+  Object.assign(config, { saveUsdstVault: savingsAddress });
+  t.mock.method(savings, "getSaveUsdstActionState", async () => ({
+    vaultAddress: savingsAddress, assetAddress: gold, shareSymbol: "SAVINGS",
+    totalShares: "0", pricingAssets: "0", maxDeposit: "1000", projectedExchangeRate: "1000000000000000000", paused: false,
+  }));
+  assert.equal((await getRouteAssets("token")).find(token => token.address === savingsAddress)?.routeDestination, "savings");
 });
 
 test("startup rejects router dependencies that disagree with backend quote configuration", async (t) => {
