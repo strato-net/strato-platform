@@ -40,6 +40,24 @@ test("composite quotes reject missing and malformed indexed decimals", async (t)
   }
 });
 
+test("disabled EAB routing returns a client error and still permits bridge-only quotes", async (t) => {
+  const service = await import("./bridge.service");
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const { getCompositeBridgeRouteQuote } = await import("./bridge-route.service");
+  const route = { routeType: "standard", enabled: true, depositsEnabled: true,
+    externalToken: "1".repeat(40), stratoToken: "2".repeat(40), externalDecimals: "6" };
+  t.mock.method(service, "getBridgeableTokens", async () => [route] as any);
+  t.mock.method(cirrus, "get", async () => ({ data: [] }) as any);
+  t.mock.method(service, "isAutoRouteEnabled", async () => false);
+  t.mock.method(service, "getNetworkConfigs", async () => []);
+  await assert.rejects(
+    getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "3".repeat(40), 2000000n),
+    { name: "StratoError", status: 422, message: "Automatic routing is not enabled for this bridge route" }
+  );
+  const quote = await getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, route.stratoToken, 2000000n);
+  assert.equal(quote.depositAction.action, 0);
+});
+
 test("requires DepositRouter 3.2 for routed ETH", () => {
   assert.equal(supportsAutoRouteRouter("3.1.0", true), false);
   assert.equal(supportsAutoRouteRouter("3.2.0", true), true);
@@ -130,7 +148,8 @@ test("native deposits quote TokenRouter outputs only after both bridges support 
   assert.equal(quote.depositAction.minFinalOut, "24566");
   assert.equal(quote.bridge.bridgedAmount, "12345");
   for (permission of [false, undefined, "false", null, "1"]) {
-    await assert.rejects(getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "4".repeat(40), 12345n), /routing is disabled/);
+    await assert.rejects(getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, "4".repeat(40), 12345n),
+      { name: "StratoError", status: 422, message: "Automatic routing is disabled for this native bridge route" });
     const plain = await getCompositeBridgeRouteQuote("token", "1", route.externalToken, route.stratoToken, route.stratoToken, 12345n);
     assert.equal(plain.depositAction.action, 0);
   }

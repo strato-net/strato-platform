@@ -3,6 +3,7 @@ import {
   CompositeRouteQuoteResponse,
 } from "@strato/shared-types";
 import { constants } from "../../config/constants";
+import { StratoError } from "../../errors";
 import { cirrus } from "../../utils/appApiHelper";
 import {
   getBridgeableTokens,
@@ -159,7 +160,7 @@ export const getCompositeBridgeRouteQuote = async (
       }),
     ]);
     if (String(permissions?.[0]?.value).toLowerCase() !== "true") {
-      throw new Error("Automatic routing is disabled for this native bridge route");
+      throw new StratoError("Automatic routing is disabled for this native bridge route", 422);
     }
     const [major, minor] = (version || "").split(".").map(Number);
     if (!(major > 1 || (major === 1 && minor >= 2)) ||
@@ -179,7 +180,7 @@ export const getCompositeBridgeRouteQuote = async (
       getNetworkConfigs(accessToken),
     ]);
     if (!autoRouteEnabled) {
-      throw new Error("Automatic routing is not enabled for this bridge route");
+      throw new StratoError("Automatic routing is not enabled for this bridge route", 422);
     }
 
     const network = networks.find(

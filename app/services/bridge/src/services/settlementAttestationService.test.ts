@@ -196,3 +196,108 @@ test("ignores unregistered identities and preserves a late manual-review decisio
   rejectThird(error);
   await rejected;
 });
+
+
+test("a mixed quorum authorizes fallback only; duplicate or malformed votes cannot complete it", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two,token-three";
+  let mode: unknown = true;
+  let duplicate = false;
+  t.mock.method(axios, "post", async (url: string) => {
+    if (url.startsWith("https://three")) throw new Error("offline");
+    return { data: { transactionHash: "tx", settlementAttestor: duplicate ? "one" : url.split("/")[2],
+      fallbackOnly: url.startsWith("https://two") ? mode : false } };
+  });
+  assert.equal(await attestDepositSettlement(deposit), true);
+  mode = false;
+  assert.equal(await attestDepositSettlement(deposit), false);
+  mode = "true";
+  await assert.rejects(attestDepositSettlement(deposit), /1\/2/);
+  mode = true;
+  duplicate = true;
+  await assert.rejects(attestDepositSettlement(deposit), /1\/2/);
+});
+
+test("prefers a full quorum in every arrival order of two full and one fallback approval", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  for (const order of [
+    ["one", "two", "three"], ["two", "one", "three"],
+    ["one", "three", "two"], ["two", "three", "one"],
+    ["three", "one", "two"], ["three", "two", "one"],
+  ]) {
+    await t.test(order.join(", "), async (t) => {
+      const responses = new Map<string, (value: any) => void>();
+      t.mock.method(axios, "post", (url: string, _payload: unknown, options: any) => new Promise((resolve, reject) => {
+        responses.set(url.split("/")[2], resolve);
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+      }));
+      let completed = false;
+      const pending = attestDepositSettlement(deposit).then((fallbackOnly) => {
+        completed = true;
+        return fallbackOnly;
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      for (let i = 0; i < order.length; i++) {
+        const attestor = order[i];
+        responses.get(attestor)!({ data: { transactionHash: `tx-${attestor}`, settlementAttestor: attestor, fallbackOnly: attestor === "two" } });
+        await new Promise((resolve) => setImmediate(resolve));
+        const received = order.slice(0, i + 1);
+        assert.equal(completed, received.includes("one") && received.includes("three"));
+      }
+      assert.equal(await pending, false);
+    });
+  }
+});
+
+test("uses fallback immediately when a full quorum is impossible and cancels the remaining request", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  let cancelled = false;
+  t.mock.method(axios, "post", async (url: string, _payload: unknown, options: any) => {
+    if (url.startsWith("https://three")) {
+      return new Promise((_, reject) => {
+        options.signal.addEventListener("abort", () => { cancelled = true; reject(options.signal.reason); }, { once: true });
+      });
+    }
+    return { data: { transactionHash: url, settlementAttestor: url.split("/")[2], fallbackOnly: true } };
+  });
+  assert.equal(await attestDepositSettlement(deposit), true);
+  assert.equal(cancelled, true);
+});
+
+test("waits for the existing deadline before using a mixed quorum when the last verifier stalls", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const { attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  const deadlines: AbortController[] = [];
+  t.mock.method(AbortSignal, "timeout", (milliseconds: number) => {
+    assert.equal(milliseconds, 60_000);
+    const controller = new AbortController();
+    deadlines.push(controller);
+    return controller.signal;
+  });
+  t.mock.method(axios, "post", async (url: string, _payload: unknown, options: any) => {
+    if (url.startsWith("https://three")) {
+      return new Promise((_, reject) => {
+        options.signal.addEventListener("abort", () => reject(options.signal.reason), { once: true });
+      });
+    }
+    return { data: { transactionHash: url, settlementAttestor: url.split("/")[2], fallbackOnly: url.startsWith("https://two") } };
+  });
+  let completed = false;
+  const pending = attestDepositSettlement(deposit).then((fallbackOnly) => {
+    completed = true;
+    return fallbackOnly;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(completed, false);
+  assert.equal(deadlines.length, 3);
+  for (const deadline of deadlines) deadline.abort(new Error("verifier deadline exceeded"));
+  assert.equal(await pending, true);
+});

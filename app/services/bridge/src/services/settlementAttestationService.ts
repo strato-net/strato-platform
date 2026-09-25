@@ -19,7 +19,7 @@ const requestVerifierQuorum = async (
   chainId: string | number,
   path: string,
   payload: unknown,
-): Promise<void> => {
+): Promise<boolean> => {
   const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
   const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
   const { threshold, verifiers } = await getSettlementVerifierConfig();
@@ -41,10 +41,12 @@ const requestVerifierQuorum = async (
   const eligible = new Set(verifiers.map((address) => address.toLowerCase().replace(/^0x/, "")));
   if (eligible.size < threshold) throw new Error("Insufficient distinct settlement verifiers configured");
   const accepted = new Set<string>();
+  const unrestricted = new Set<string>();
   const controller = new AbortController();
+  let remaining = urls.length;
   let completed = false;
   let manualReviewRequired = 0;
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<boolean>((resolve, reject) => {
     void Promise.allSettled(urls.map(async (url, index) => {
       try {
         const response = await axios.post(`${url}${path}`, payload, {
@@ -57,19 +59,30 @@ const requestVerifierQuorum = async (
         if (typeof response.data?.transactionHash !== "string" || !response.data.transactionHash.length || !eligible.has(attestor)) {
           throw new Error(`Verifier ${url} returned no valid settlement attestation`);
         }
-        accepted.add(attestor);
-        if (accepted.size >= threshold) {
-          completed = true;
-          logInfo("SettlementAttestation", `${accepted.size}/${urls.length} settlement verifiers accepted ${path}`);
-          resolve();
-          controller.abort();
+        if (response.data.fallbackOnly !== undefined && typeof response.data.fallbackOnly !== "boolean") {
+          throw new Error(`Verifier ${url} returned an invalid fallback mode`);
         }
+        if (response.data.fallbackOnly === true && path !== "/v1/attest-deposit") {
+          throw new Error(`Verifier ${url} returned an unexpected fallback attestation`);
+        }
+        accepted.add(attestor);
+        if (response.data.fallbackOnly !== true) unrestricted.add(attestor);
       } catch (error) {
         if (completed) return;
         if (axios.isAxiosError(error) && error.response?.status === 409 && error.response?.data?.decision === "manual_review") {
           manualReviewRequired++;
         }
         logError("SettlementAttestation", error as Error, { chainId, verifierUrl: url, path });
+      } finally {
+        remaining--;
+        // Prefer routing while outstanding responses can still complete a full quorum.
+        if (!completed && (unrestricted.size >= threshold ||
+          (accepted.size >= threshold && unrestricted.size + remaining < threshold))) {
+          completed = true;
+          logInfo("SettlementAttestation", `${accepted.size}/${urls.length} settlement verifiers accepted ${path}`);
+          resolve(unrestricted.size < threshold);
+          controller.abort();
+        }
       }
     })).then(() => {
       if (completed) return;
@@ -83,11 +96,12 @@ const requestVerifierQuorum = async (
   });
 };
 
+// Returns true when the collected quorum authorizes source-token fallback only.
 export const attestDepositSettlement = async (
   deposit: DepositArgs | ActionDepositArgs,
-): Promise<void> => {
+): Promise<boolean> => {
   const actionDeposit = deposit as Partial<ActionDepositArgs>;
-  await requestVerifierQuorum(
+  return requestVerifierQuorum(
     deposit.externalChainId,
     "/v1/attest-deposit",
     {
@@ -115,9 +129,10 @@ export const attestWithdrawalRelease = async (
   authorization: WithdrawalAuthorization,
   reservationId: string,
   externalTxHash: string,
-): Promise<void> =>
-  requestVerifierQuorum(
+): Promise<void> => {
+  await requestVerifierQuorum(
     authorization.destinationChainId,
     "/v1/attest-release",
     { authorization, reservationId, externalTxHash },
   );
+};

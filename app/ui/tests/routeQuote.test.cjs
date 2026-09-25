@@ -189,6 +189,16 @@ test('quote errors use the API reason without claiming a transaction failed or e
   assert.match(friendlyExports.getQuoteErrorMessage({ message: 'timeout of 30000ms exceeded' }), /Quote request timed out/);
 });
 
+test('disabled bridge routing has a specific quote message while server errors stay generic', () => {
+  for (const message of ['Automatic routing is not enabled for this bridge route', 'Automatic routing is disabled for this native bridge route']) {
+    const response = { status: 422, data: { error: { message } } };
+    assert.equal(friendlyExports.getQuoteErrorMessage({ response }),
+      'Routing is not enabled for this token on this network. Choose another token or receive the bridged token directly.');
+    assert.equal(friendlyExports.getQuoteErrorMessage({ response: { ...response, status: 500 } }),
+      'Quote unavailable. Please try again.');
+  }
+});
+
 test('route rejection reasons give actionable messages without echoing backend data', () => {
   const error = (rejections, status = 422) => ({ response: { status, data: { error: {
     message: 'No executable route found for a -> b', details: { rejections },
@@ -840,7 +850,7 @@ test('STRATO progress dialog displays steps and blocks dismissal until execution
   assert.match(render(), /Trade awaiting confirmation/);
 });
 
-test('confirmation renders exact decimal amounts, fees, route and a distinct fallback outcome', () => {
+test('confirmation renders rounded display amounts, fees, route and a distinct fallback outcome', () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
   const { formatUnits } = require('ethers');
@@ -853,7 +863,11 @@ test('confirmation renders exact decimal amounts, fees, route and a distinct fal
       if (id === '@/components/ui/copy') return { default: () => null };
       if (id === '@/components/ui/dialog') return Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper]));
       if (id === '@/lib/constants') return { SWAP_FEE: '0.02', WAD: 10n ** 18n };
-      if (id === '@/utils/numberUtils') return { formatUnits, truncateAddress: value => value };
+      if (id === '@/utils/numberUtils') return {
+        formatUnits, truncateAddress: value => value,
+        // Mirrors the real formatAmount: floor to six decimals for display.
+        formatAmount: amount => amount ? (Math.floor(Number(amount) * 1000000) / 1000000).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 6 }) : '',
+      };
       if (id === '@/lib/route') return routeHelpers;
       if (id === './RoutePreview') return { default: props => { assert.equal(props.showMinimum, false); return React.createElement('span', null, props.steps[0].label); } };
       throw new Error(`Unexpected import ${id}`);
@@ -869,8 +883,10 @@ test('confirmation renders exact decimal amounts, fees, route and a distinct fal
   };
   const render = () => renderToStaticMarkup(React.createElement(components.default, { confirmation, pending: false, onClose: () => {}, onConfirm: () => {} }));
   const html = render();
-  for (const text of ['2.0 USDC', '1.234567 METAL', '0.6172835 METAL', '1.2 METAL', '0.25%', 'Metal Forge',
-    'Fallback: 1.0 USDST', 'minimum does not apply to this fallback', 'Network gas', address('5')]) assert.ok(html.includes(text), text);
+  // Display amounts are rounded down to six decimals; the exact minFinalOut
+  // still protects the trade on-chain.
+  for (const text of ['2 USDC', '1.234567 METAL', '0.617283 METAL', '1.2 METAL', '0.25%', 'Metal Forge',
+    'Fallback: 1 USDST', 'minimum does not apply to this fallback', 'Network gas', address('5')]) assert.ok(html.includes(text), text);
   for (const destination of ['vault', 'savings']) {
     confirmation.outputToken.routeDestination = destination;
     assert.match(render(), new RegExp(`Confirm bridge &amp; ${destination} deposit`));
@@ -1231,24 +1247,36 @@ test('native quotes bind the representation bridge, output and redemption amount
 test('native tokens appear without swap pools and allow a selected routed destination', () => {
   const expressions = {};
   function visit(node) {
-    if (ts.isVariableDeclaration(node) && ['routeAssets', 'externalRoutes', 'tokenOut'].includes(node.name.getText(widgetSource))) {
+    if (ts.isVariableDeclaration(node) && ['routeAssets', 'externalRoutes', 'routingDisabled', 'bridgedTokenAddress', 'selectedTokenOut', 'tokenOut'].includes(node.name.getText(widgetSource))) {
       expressions[node.name.getText(widgetSource)] = node.initializer.getText(widgetSource);
     }
     ts.forEachChild(node, visit);
   }
   visit(widgetSource);
   const native = { routeType: 'native', enabled: true, externalBridge: address('8'), stratoToken: `0x${address('a')}`, stratoTokenDecimals: 2 };
-  const exports = {};
-  runSource(`const routeAssets = ${expressions.routeAssets}; exports.assets = routeAssets;
-    exports.external = ${expressions.externalRoutes}; exports.output = ${expressions.tokenOut};`, {
-    exports, useMemo: fn => fn(), ...routeHelpers, routeAssetsQuery: { data: [] }, nativeRedemption: true, externalRoute: native,
-    resolvingPool: false, selection: { tokenOut: { address: address('b') } },
-    bridgeableTokens: [native, { ...native, depositsPaused: true }, { ...native, depositsDisabled: true }, { ...native, enabled: false }, { ...native, externalBridge: '' }],
-  });
+  const run = (route, tokenOutAddress) => {
+    const exports = {};
+    runSource(`const routeAssets = ${expressions.routeAssets}; exports.assets = routeAssets;
+      exports.external = ${expressions.externalRoutes};
+      const routingDisabled = ${expressions.routingDisabled};
+      const bridgedTokenAddress = ${expressions.bridgedTokenAddress};
+      const selectedTokenOut = ${expressions.selectedTokenOut};
+      exports.output = ${expressions.tokenOut};`, {
+      exports, useMemo: fn => fn(), ...routeHelpers, routeAssetsQuery: { data: [] }, nativeRedemption: true, externalRoute: route,
+      sourceMode: 'external', resolvingPool: false, selection: { tokenOut: { address: tokenOutAddress } },
+      bridgeableTokens: [native, { ...native, depositsPaused: true }, { ...native, depositsDisabled: true }, { ...native, enabled: false }, { ...native, externalBridge: '' }],
+    });
+    return exports;
+  };
+  const exports = run(native, address('b'));
   assert.equal(exports.assets.length, 1);
   assert.equal(exports.assets[0].customDecimals, 2);
   assert.equal(exports.external.length, 1);
   assert.equal(exports.output.address, address('b'));
+  // When the route's on-chain auto-route flag is off, only the bridged token
+  // itself is receivable; any other selection is dropped.
+  assert.equal(run({ ...native, autoRouteEnabled: false }, address('b')).output, undefined);
+  assert.equal(run({ ...native, autoRouteEnabled: false }, address('a')).output.address, address('a'));
 });
 
 test('Fund and Trade providers keep catalog caches and history endpoints separate', async () => {

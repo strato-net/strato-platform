@@ -749,6 +749,32 @@ npm run upgrade -- --proxy-address <EXTERNAL_ASSET_BRIDGE_PROXY> --contract-name
    AUTO_ROUTE, reviewed settlement, and withdrawal finalization before declaring
    the interface update complete. Do not re-deposit to recover a pending transfer.
 
+## Existing EAB: verifier-approved source-token fallback
+
+This update requires the STRATO EAB implementation, all verifier images, and the
+bridge runtime from the same reviewed commit. No Sepolia contract changes or
+policy-file edits are required. `autoRouteEnabled: false` continues to prohibit
+trading; a valid routed deposit can instead receive fallback-only attestations.
+Deposit limits, receipt/custody verification, and required governance review remain
+enforced. Disabling deposits for the route still blocks both outcomes.
+
+1. Gate new external intake and stop the runtime during the coordinated update.
+   Preserve pending-deposit files and cursors.
+2. Upgrade the existing STRATO EAB proxy with the usual AdminRegistry approvals.
+   Verify `attestDepositFallback` and `getDepositFallbackDigest` are present.
+   Existing full-settlement digests are unchanged; fallback uses a separate domain.
+3. Deploy the matching image to all three verifiers, one at a time, checking health
+   after each. Then deploy and start the matching bridge runtime. Do not resume
+   intake with mixed service versions: older runtimes do not understand fallback-only
+   responses, and older contracts cannot consume fallback attestations.
+4. Test a valid routed deposit whose local policy disables automatic routing:
+   verify source-token delivery and `DepositActionFallback`, with no `AutoRouted`.
+   Test an allowed route, an invalid deposit, and an above-limit deposit as well.
+   Invalid evidence must not mint; above-limit deposits must still require review.
+5. Recover already-reviewed deposits through governance approval and the existing
+   confirmation endpoint. This upgrade does not automatically release deposits
+   already in review. Capture the resulting transaction and recipient balance.
+
 ## Failure handling
 
 - Stale approval: `status`, use the new command.

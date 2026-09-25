@@ -165,6 +165,17 @@ test("AUTO_ROUTE retries missing Cirrus metadata then submits a named-enum route
   quotedOut = "80";
   await confirmReviewedDeposit(11155111, deposit.depositRouter, "4");
   assert.equal(calls[3].method, "confirmReviewedDeposit");
+
+  t.mock.method(attestation, "attestDepositSettlement", async () => true);
+  quotedOut = "95";
+  await reconcileExternalDeposits(11155111);
+  assert.equal(calls[4].method, "settleDeposit");
+  assert.equal(calls[4].args.action, "4");
+  assert.equal(calls[4].args.minFinalOut, "90");
+  const quoteCount = quotes.mock.callCount();
+  await confirmReviewedDeposit(11155111, deposit.depositRouter, "4");
+  assert.equal(calls[5].method, "confirmReviewedDeposit");
+  assert.equal(quotes.mock.callCount(), quoteCount);
 });
 
 test("legacy withdrawal polling can be disabled without disabling EAB polling", async (t) => {

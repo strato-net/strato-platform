@@ -38,6 +38,7 @@ export interface WithdrawalPolicyInput {
 export interface PolicyDecision {
   decision: "approve" | "manual_review";
   reason: string;
+  fallbackOnly?: boolean;
 }
 
 const uint = (value: unknown, label: string): string => {
@@ -163,20 +164,24 @@ export const evaluateDepositPolicy = (
     throw new Error("Local verifier policy rejects the deposit route");
   }
   const action = Number(deposit.action);
-  if (action !== 0 && !(action === 4 && route.autoRouteEnabled)) {
+  if (action !== 0 && action !== 4) {
     throw new Error("Local verifier policy rejects the deposit action");
   }
   if (action === 4 && (BigInt(uint(deposit.minFinalOut, "deposit.minFinalOut")) === 0n ||
       /^0+$/.test(stratoAddress(deposit.actionToken, "deposit.actionToken")))) {
     throw new Error("AUTO_ROUTE requires a destination token and positive minFinalOut");
   }
+  const fallbackOnly = action === 4 && !route.autoRouteEnabled;
   if (BigInt(deposit.externalTokenAmount) > BigInt(route.maxAutoDepositAmount)) {
     return {
       decision: "manual_review",
       reason: "deposit exceeds local automatic approval limit",
+      fallbackOnly,
     };
   }
-  return { decision: "approve", reason: "local deposit policy satisfied" };
+  return { decision: "approve", fallbackOnly, reason: fallbackOnly
+    ? "local policy permits source-token fallback only"
+    : "local deposit policy satisfied" };
 };
 
 export const evaluateWithdrawalPolicy = (

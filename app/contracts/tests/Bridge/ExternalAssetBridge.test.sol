@@ -1173,6 +1173,109 @@ contract Describe_ExternalAssetBridge is Authorizable {
         steps[0] = step;
     }
 
+    function _fallbackVote(ExternalBridgeUser verifier, uint256 id) internal {
+        verifier.do(address(bridge), "attestDepositFallback", externalChainId, depositRouter, id,
+            address(0x1111), externalToken, 10e18, "0x1234", address(user), address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1,
+            bridge.depositGenerations(externalChainId, depositRouter, id));
+    }
+
+    function _settleFallback(uint256 id) internal {
+        bridge.settleDeposit(externalChainId, depositRouter, id, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1);
+    }
+
+    function it_fallback_votes_cannot_authorize_a_trade_or_change_the_deposit() {
+        bridge.setBridgeOperator(address(this));
+        bool reverted = false;
+        try _fallbackVote(user, 1) {} catch { reverted = true; }
+        require(reverted, "Only registered verifiers can attest fallback");
+        _fallbackVote(verifierOne, 1);
+        _fallbackVote(verifierOne, 1);
+        reverted = false;
+        try _settleFallback(1) {} catch { reverted = true; }
+        require(reverted, "Duplicate votes cannot reach fallback quorum");
+        _fallbackVote(verifierTwo, 1);
+        reverted = false;
+        try bridge.settleDepositWithRoute(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), address(saveVault), 1, _saveRoute(1)) {}
+        catch { reverted = true; }
+        require(reverted, "Fallback quorum cannot authorize routed settlement");
+        reverted = false;
+        try bridge.settleDeposit(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            10e18, "0x1234", address(relayer), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1) {}
+        catch { reverted = true; }
+        require(reverted, "Fallback binds the recipient");
+        reverted = false;
+        try bridge.settleDeposit(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 2) {}
+        catch { reverted = true; }
+        require(reverted, "Fallback binds the original minimum");
+        reverted = false;
+        try bridge.settleDeposit(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            11e18, "0x1234", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1) {}
+        catch { reverted = true; }
+        require(reverted, "Fallback binds the source amount");
+        _settleFallback(1);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Fallback delivers the full source amount");
+        require(saveVault.balanceOf(address(user)) == 0, "Fallback cannot mint savings shares");
+        require(bridge.lastDepositActionFailureReason() == "EAB: verifier approved source-token fallback only", "Fallback reason is observable");
+        reverted = false;
+        try _settleFallback(1) {} catch { reverted = true; }
+        require(reverted, "Fallback cannot settle twice");
+    }
+
+    function it_combines_full_and_fallback_votes_without_authorizing_a_trade() {
+        bridge.setBridgeOperator(address(this));
+        verifierOne.do(address(bridge), "attestDepositSettlement", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0x1234", address(user), address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1, 0);
+        _fallbackVote(verifierTwo, 1);
+        bool reverted = false;
+        try bridge.settleDepositWithRoute(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), address(saveVault), 1, _saveRoute(1)) {}
+        catch { reverted = true; }
+        require(reverted, "Mixed quorum does not grant routing permission");
+        _settleFallback(1);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Mixed quorum permits source-token delivery");
+    }
+
+    function it_reviewed_fallback_requires_governance_and_cannot_reuse_old_votes() {
+        bridge.setBridgeOperator(address(this));
+        bridge.recordDepositForReview(externalChainId, depositRouter, 1, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1);
+        _fallbackVote(verifierOne, 1);
+        _fallbackVote(verifierTwo, 1);
+        bool reverted = false;
+        try bridge.confirmReviewedDeposit(externalChainId, depositRouter, 1) {} catch { reverted = true; }
+        require(reverted, "Fallback votes cannot bypass governance review");
+        bridge.approveReviewedDeposit(externalChainId, depositRouter, 1, bridge.getReviewedDepositDigest(externalChainId, depositRouter, 1));
+        reverted = false;
+        try bridge.confirmReviewedDepositWithRoute(externalChainId, depositRouter, 1, _saveRoute(1)) {} catch { reverted = true; }
+        require(reverted, "Review approval does not upgrade fallback votes to routing votes");
+        bridge.confirmReviewedDeposit(externalChainId, depositRouter, 1);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Approved review delivers fallback");
+
+        bridge.recordDepositForReview(externalChainId, depositRouter, 2, address(0x1111), externalToken,
+            10e18, "0x1234", address(user), address(stratoToken), uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1);
+        _fallbackVote(verifierOne, 2);
+        _fallbackVote(verifierTwo, 2);
+        bridge.abortDeposit(externalChainId, depositRouter, 2);
+        bridge.authorizeDepositReuse(externalChainId, depositRouter, 2);
+        reverted = false;
+        try _settleFallback(2) {} catch { reverted = true; }
+        require(reverted, "Old fallback quorum cannot authorize a reused slot");
+        reverted = false;
+        try verifierOne.do(address(bridge), "attestDepositFallback", externalChainId, depositRouter, 2,
+            address(0x1111), externalToken, 10e18, "0x1234", address(user), address(stratoToken),
+            uint256(DepositAction.AUTO_ROUTE), address(saveVault), 1, 0) {} catch { reverted = true; }
+        require(reverted, "Reject late votes for a stale generation");
+        _fallbackVote(verifierOne, 2);
+        _fallbackVote(verifierTwo, 2);
+        _settleFallback(2);
+        require(stratoToken.balanceOf(address(user)) == 20e18, "Fresh generation votes allow settlement");
+    }
+
     function it_executes_auto_route_and_delivers_the_final_token() {
         bool reverted = false;
         _attestDeposit(

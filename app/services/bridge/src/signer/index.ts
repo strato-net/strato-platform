@@ -383,7 +383,8 @@ const validateSourceWithdrawal = async (
 
 const validateSourceDepositRoute = async (
   deposit: DepositSettlementAttestation,
-): Promise<void> => {
+  allowFallback = false,
+): Promise<boolean> => {
   const filters = {
       address: `eq.${sourceBridge}`,
       key: `eq.${normalize(deposit.externalToken)}`,
@@ -410,8 +411,10 @@ const validateSourceDepositRoute = async (
     Number(deposit.action) === 4 &&
     !actionResponse?.data?.[0]?.value?.autoRoute
   ) {
-    throw new Error("AUTO_ROUTE is not enabled by the source bridge");
+    if (!allowFallback) throw new Error("AUTO_ROUTE is not enabled by the source bridge");
+    return true;
   }
+  return false;
 };
 
 const isDepositReviewApproved = async (
@@ -743,9 +746,10 @@ app.post("/v1/attest-deposit", async (req, res) => {
       chain.routers,
       verifierConfirmations,
     );
-    await validateSourceDepositRoute(deposit);
+    const sourceFallbackOnly = await validateSourceDepositRoute(deposit, true);
+    const fallbackOnly = policyDecision.fallbackOnly === true || sourceFallbackOnly;
     const transactionHash = await submitStratoAttestation(
-      "attestDepositSettlement",
+      fallbackOnly ? "attestDepositFallback" : "attestDepositSettlement",
       {
         externalChainId: deposit.externalChainId,
         depositRouter: deposit.depositRouter,
@@ -766,11 +770,11 @@ app.post("/v1/attest-deposit", async (req, res) => {
       "attest_deposit",
       `${deposit.externalChainId}:${deposit.depositId}`,
       "approve",
-      manuallyReviewed
+      fallbackOnly ? "verified deposit; source-token fallback only" : manuallyReviewed
         ? "STRATO governance approval satisfies local deposit policy"
         : policyDecision.reason,
     );
-    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, fallbackOnly });
   } catch (error) {
     const manualReview = error instanceof ManualReviewRequiredError;
     auditDecision(

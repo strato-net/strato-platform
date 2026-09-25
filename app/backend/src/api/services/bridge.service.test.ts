@@ -8,6 +8,7 @@ import * as oracleHelper from "../helpers/oracle.helper";
 import * as rpcConfig from "../../config/rpc.config";
 import {
   buildDepositActionCatalog,
+  getBridgeableTokens,
   getBridgeTransferContractName,
   getDepositRouterMajor,
   getNetworkConfigs,
@@ -316,8 +317,13 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
   t.mock.method(cirrus, "get", async (_token: string, path: string, request?: any) => {
     const params = request?.params || {};
 
-    if (path === "/mapping" || path === `/${constants.ExternalAssetBridge}-routes` || path === `/${constants.ExternalAssetBridge}-routeRebaseRequired`) {
+    if (path === "/mapping" || path === `/${constants.ExternalAssetBridge}-routes` || path === `/${constants.ExternalAssetBridge}-routeRebaseRequired`
+      || path === `/${constants.ExternalAssetBridge}-depositActionConfigs`) {
       return { status: 200, data: [] };
+    }
+
+    if (path === `/${constants.StratoNativeBridge}-autoRouteEnabled`) {
+      return { status: 200, data: [{ key: stratoToken, key2: "1", value: true }] };
     }
 
     if (path === `/${constants.StratoNativeBridge}-assets`) {
@@ -390,6 +396,10 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
   assert.equal(summary.availableToWithdraw, "6000000000000000000");
   assert.equal(summary.pendingWithdrawals, "0");
   assert.equal(summary.totalWithdrawn30d, "0");
+
+  // The catalog joins the on-chain auto-route flag onto each route.
+  const [route] = await getBridgeableTokens("access-token");
+  assert.equal(route.autoRouteEnabled, true);
 });
 
 const encodeAbiString = (value: string): string => {

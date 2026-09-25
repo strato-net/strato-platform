@@ -98,16 +98,18 @@ test("validates structured Cirrus deposit routes and AUTO_ROUTE permissions", as
       assert.equal(params["value->>depositsEnabled"], undefined);
       return { data: [{ value: { autoRoute } }] };
     },
-  }) as (input: DepositSettlementAttestation) => Promise<void>;
+  }) as (input: DepositSettlementAttestation, allowFallback?: boolean) => Promise<boolean>;
 
   await validate(deposit);
   for (route of [undefined, false, true, {}, { depositsEnabled: false }, { depositsEnabled: "true" }]) {
     await assert.rejects(validate(deposit), /Deposit route is not enabled/);
+    await assert.rejects(validate({ ...deposit, action: "4" }, true), /Deposit route is not enabled/);
   }
   route = { depositsEnabled: true };
   await assert.rejects(validate({ ...deposit, action: "4" }), /AUTO_ROUTE is not enabled/);
+  assert.equal(await validate({ ...deposit, action: "4" }, true), true);
   autoRoute = true;
-  await validate({ ...deposit, action: "4" });
+  assert.equal(await validate({ ...deposit, action: "4" }, true), false);
 });
 
 test("requires local review above the automatic deposit limit", () => {
@@ -121,11 +123,19 @@ test("requires local review above the automatic deposit limit", () => {
   );
 });
 
-test("rejects AUTO_ROUTE unless the local route enables it", () => {
-  assert.throws(
-    () => evaluateDepositPolicy(policy, { ...deposit, action: "4" }),
-    /rejects the deposit action/,
-  );
+test("disallowed AUTO_ROUTE permits only fallback while deposit validation and limits still apply", () => {
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  assert.equal(evaluateDepositPolicy(policy, routed).fallbackOnly, true);
+  assert.equal(evaluateDepositPolicy(policy, routed).decision, "approve");
+  const reviewed = evaluateDepositPolicy(policy, { ...routed, externalTokenAmount: "101" });
+  assert.equal(reviewed.decision, "manual_review");
+  assert.equal(reviewed.fallbackOnly, true);
+  assert.equal(evaluateDepositPolicy({ ...policy, routes: [{ ...policy.routes[0], autoRouteEnabled: true }] }, routed).fallbackOnly, false);
+  assert.throws(() => evaluateDepositPolicy({ ...policy, routes: [] }, routed), /rejects the deposit route/);
+  assert.throws(() => evaluateDepositPolicy({ ...policy, routes: [{ ...policy.routes[0], depositsEnabled: false }] }, routed), /rejects the deposit route/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, action: "3" }), /rejects the deposit action/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, minFinalOut: "0" }), /positive minFinalOut/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, actionToken: "0".repeat(40) }), /positive minFinalOut/);
 });
 
 test("requires local review above the automatic withdrawal limit", () => {
@@ -421,4 +431,77 @@ test("withdrawal review dissent takes precedence over two returned signatures", 
   });
   await assert.rejects(sign({ destinationChainId: "1", sourceWithdrawalId: "7" }), /executed Safe approval/);
   assert.equal(reviews, 1);
+});
+
+test("deposit handler validates custody and route before submitting fallback-only attestations", async () => {
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-deposit"');
+  assert.ok(endpoint);
+  let handler: any;
+  let localPolicy = structuredClone(policy);
+  let invalidReceipt = false;
+  let disabledRoute = false;
+  let sourceFallbackOnly = false;
+  let reviewApproved = false;
+  const calls: any[] = [];
+  class ManualReviewRequiredError extends Error {}
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    sourceBridge: policy.sourceBridge, destinationChainId: BigInt(policy.destinationChainId),
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    stratoGet: async () => ({ data: [{ value: "2" }] }),
+    getDepositChainConfig: async () => ({ routers: [deposit.depositRouter], vault: policy.destinationVault }),
+    verifierPolicy: localPolicy, evaluateDepositPolicy, ManualReviewRequiredError,
+    isDepositReviewApproved: async () => reviewApproved,
+    provider: {}, verifierConfirmations: 12,
+    validateDepositSettlement: async () => { calls.push("receipt"); if (invalidReceipt) throw new Error("custody mismatch"); },
+    validateSourceDepositRoute: async (_deposit: any, allowFallback: boolean) => {
+      calls.push("route"); assert.equal(allowFallback, true);
+      if (disabledRoute) throw new Error("deposit route disabled");
+      return sourceFallbackOnly;
+    },
+    submitStratoAttestation: async (method: string, args: any) => { calls.push({ method, args }); return "tx"; },
+    auditDecision: () => {}, settlementAttestorAddress: policy.settlementAttestor,
+    console: { error: () => {} },
+  });
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  const invoke = async (body = routed) => {
+    calls.length = 0;
+    let status = 200;
+    let result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body }, response);
+    return { status, result };
+  };
+  const fallback = await invoke();
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.result.fallbackOnly, true);
+  assert.deepEqual(calls.slice(0, 2), ["receipt", "route"]);
+  assert.equal(calls[2].method, "attestDepositFallback");
+  assert.equal(calls[2].args.action, "4");
+  assert.equal(calls[2].args.minFinalOut, "1");
+  assert.equal(calls[2].args.expectedGeneration, "2");
+  localPolicy.routes[0].autoRouteEnabled = true;
+  assert.equal((await invoke()).result.fallbackOnly, false);
+  assert.equal(calls[2].method, "attestDepositSettlement");
+  sourceFallbackOnly = true;
+  assert.equal((await invoke()).result.fallbackOnly, true);
+  assert.equal(calls[2].method, "attestDepositFallback");
+  invalidReceipt = true;
+  assert.equal((await invoke()).status, 422);
+  assert.equal(JSON.stringify(calls), JSON.stringify(["receipt"]));
+  invalidReceipt = false;
+  disabledRoute = true;
+  assert.equal((await invoke()).status, 422);
+  assert.equal(JSON.stringify(calls), JSON.stringify(["receipt", "route"]));
+  disabledRoute = false;
+  localPolicy.routes[0].autoRouteEnabled = false;
+  assert.equal((await invoke({ ...routed, externalTokenAmount: "101" })).status, 409);
+  assert.equal(calls.length, 0);
+  reviewApproved = true;
+  assert.equal((await invoke({ ...routed, externalTokenAmount: "101" })).result.fallbackOnly, true);
+  assert.equal(calls[2].method, "attestDepositFallback");
 });

@@ -28,7 +28,7 @@ const UnifiedTrade = () => {
             <GuestSignInBanner message="Sign in to trade across STRATO and external networks in one route" />
           )}
           <div className="mx-auto max-w-7xl space-y-6">
-            <p className="text-muted-foreground">From an external network into any STRATO asset—swap, save, or earn yield in one step.</p>
+            <p className="text-muted-foreground">Bridge, swap, save, or earn yield in one step.</p>
 
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
               <div className="xl:col-span-7">

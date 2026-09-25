@@ -454,6 +454,8 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string,
     nativeTokenConfigResponse,
     nativeLockedBalanceResponse,
     routeRebaseResponse,
+    depositActionResponse,
+    nativeAutoRouteResponse,
   ] = await Promise.all([
     cirrus.get(accessToken, legacy ? "/mapping" : `/${ExternalAssetBridge}-routes`, { params: standardParams }),
     constants.stratoNativeBridge
@@ -494,6 +496,26 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string,
         },
       }
     ),
+    legacy ? Promise.resolve({ data: [] }) : cirrus.get(
+      accessToken,
+      `/${ExternalAssetBridge}-depositActionConfigs`,
+      {
+        params: {
+          address: `eq.${constants.externalAssetBridge}`,
+          select: "key,key2,key3,value",
+          ...(chainId ? { key2: `eq.${chainId}` } : {}),
+        },
+      }
+    ),
+    !legacy && constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-autoRouteEnabled`, {
+          params: {
+            address: `eq.${constants.stratoNativeBridge}`,
+            select: "key,key2,value",
+            ...(chainId ? { key2: `eq.${chainId}` } : {}),
+          },
+        })
+      : Promise.resolve({ data: [] }),
   ]);
 
   const standardRoutes = Array.isArray(standardResponse.data)
@@ -544,6 +566,21 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string,
           depositActionRouteKey(key, String(key2), key3)
       )
   );
+  const autoRouteConfigs = new Map<string, boolean>(
+    (depositActionResponse.data || []).map(
+      ({ key, key2, key3, value }: { key: string; key2: string; key3: string; value: unknown }) =>
+        [depositActionRouteKey(key, String(key2), key3), parseDepositActionFlags(value).autoRoute]
+    )
+  );
+  const nativeAutoRoutes = new Map<string, boolean>(
+    (nativeAutoRouteResponse.data || []).map(
+      ({ key, key2, value }: { key: string; key2: string; value: unknown }) =>
+        [
+          `${normalizeCatalogAddress(key)}:${key2}`,
+          value === true || String(value).toLowerCase() === "true",
+        ]
+    )
+  );
   for (const token of tokens) {
     const factor = rebaseFactorMap.get(token.stratoToken.toLowerCase().replace(/^0x/, ''));
     const requiresRebase =
@@ -557,6 +594,13 @@ export const getBridgeableTokens = async (accessToken: string, chainId?: string,
       );
     if (!legacy && token.routeType === "standard") token.rebaseRequired = requiresRebase;
     if (requiresRebase && factor) token.rebaseFactor = factor;
+    if (!legacy) {
+      token.autoRouteEnabled = token.routeType === "native"
+        ? nativeAutoRoutes.get(`${normalizeCatalogAddress(token.stratoToken)}:${token.externalChainId}`) === true
+        : autoRouteConfigs.get(
+            depositActionRouteKey(token.externalToken, String(token.externalChainId), token.stratoToken)
+          ) === true;
+    }
   }
   return tokens;
 };

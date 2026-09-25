@@ -114,6 +114,10 @@ export function getQuoteErrorMessage(error: unknown): string {
   const status = (error as { response?: { status?: number } })?.response?.status;
   if (status && status >= 500) return "Quote unavailable. Please try again.";
   const { message } = normalizeError(error);
+  if (message === "Automatic routing is not enabled for this bridge route" ||
+      message === "Automatic routing is disabled for this native bridge route") {
+    return "Routing is not enabled for this token on this network. Choose another token or receive the bridged token directly.";
+  }
   if (message.includes("No executable route") || message.includes("No route found")) {
     const rejections = (error as { response?: { data?: { error?: { details?: { rejections?: unknown } } } } })
       ?.response?.data?.error?.details?.rejections;

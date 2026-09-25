@@ -228,9 +228,15 @@ const isDuplicateDepositError = (error: unknown): boolean => {
 export const settleDeposit = async (
   deposit: DepositArgs | ActionDepositArgs,
 ): Promise<string | null> => {
+  await attestDepositSettlement(deposit);
+  return submitDepositSettlement(deposit);
+};
+
+const submitDepositSettlement = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<string | null> => {
   const actionDeposit = deposit as Partial<ActionDepositArgs>;
   try {
-    await attestDepositSettlement(deposit);
     const submit = actionDeposit.action && actionDeposit.action !== "0"
       ? execute
       : executeAsRelayer;
@@ -285,7 +291,8 @@ export const settleRoutedDeposit = async (
   deposit: RouteDepositArgs,
 ): Promise<string | null> => {
   try {
-    await attestDepositSettlement(deposit);
+    const fallbackOnly = await attestDepositSettlement(deposit);
+    if (fallbackOnly) return await submitDepositSettlement(deposit);
     const result = await execute({
       contractName: "ExternalAssetBridge",
       contractAddress: config.externalAssetBridge.address!,
@@ -410,7 +417,7 @@ export const confirmReviewedDeposit = async (
         : verification?.state || "unknown";
     throw new Error(`Reviewed deposit re-verification failed: ${reason}`);
   }
-  await attestDepositSettlement(pending.deposit);
+  const fallbackOnly = await attestDepositSettlement(pending.deposit);
   const actionDeposit = pending.deposit as Partial<ActionDepositArgs>;
   const submit = actionDeposit.action && actionDeposit.action !== "0"
     ? execute
@@ -421,7 +428,7 @@ export const confirmReviewedDeposit = async (
     depositRouter,
     depositId,
   };
-  if (actionDeposit.action === "4") {
+  if (actionDeposit.action === "4" && !fallbackOnly) {
     const settlementInfo = await getDepositSettlementInfoByIdentity(
       externalChainId,
       depositRouter,

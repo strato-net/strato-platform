@@ -56,6 +56,7 @@ export interface BridgeToken {
   stratoTokenImage?: string;     // First image URL from TokenFactory images
   rebaseRequired?: boolean;
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
+  autoRouteEnabled?: boolean;    // On-chain auto-route flag for this deposit route (undefined for legacy)
 }
 
 export type BridgeRouteType = "standard" | "native";

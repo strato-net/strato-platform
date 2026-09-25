@@ -668,22 +668,58 @@ contract record ExternalAssetBridge is Ownable {
         uint256 expectedGeneration
     ) external {
         require(expectedGeneration == depositGenerations[externalChainId][depositRouter][depositId], "EAB: stale deposit generation");
-        _recordSettlementAttestation(
-            getDepositSettlementDigest(
-                externalChainId,
-                depositRouter,
-                depositId,
-                externalSender,
-                externalToken,
-                externalTokenAmount,
-                externalTxHash,
-                stratoRecipient,
-                stratoToken,
-                action,
-                actionToken,
-                minFinalOut
-            )
+        bytes32 digest = getDepositSettlementDigest(
+            externalChainId,
+            depositRouter,
+            depositId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            stratoToken,
+            action,
+            actionToken,
+            minFinalOut
         );
+        _recordSettlementAttestation(digest);
+        if (action == uint256(DepositAction.AUTO_ROUTE)) {
+            _recordSettlementAttestation(getDepositFallbackDigest(digest));
+        }
+    }
+
+    function attestDepositFallback(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut,
+        uint256 expectedGeneration
+    ) external {
+        require(expectedGeneration == depositGenerations[externalChainId][depositRouter][depositId], "EAB: stale deposit generation");
+        require(action == uint256(DepositAction.AUTO_ROUTE), "EAB: fallback requires auto-route");
+        bytes32 digest = getDepositSettlementDigest(
+            externalChainId,
+            depositRouter,
+            depositId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            stratoToken,
+            action,
+            actionToken,
+            minFinalOut
+        );
+        _recordSettlementAttestation(getDepositFallbackDigest(digest));
     }
 
     function attestWithdrawalRelease(
@@ -720,7 +756,7 @@ contract record ExternalAssetBridge is Ownable {
         address actionToken,
         uint256 minFinalOut
     ) external whenDepositsOpen {
-        _requireSettlementAttestations(
+        bool fallbackOnly = _requireDepositSettlementAttestations(
             getDepositSettlementDigest(
                 externalChainId,
                 depositRouter,
@@ -734,7 +770,8 @@ contract record ExternalAssetBridge is Ownable {
                 action,
                 actionToken,
                 minFinalOut
-            )
+            ),
+            action == uint256(DepositAction.AUTO_ROUTE)
         );
         require(
             action == uint256(DepositAction.NONE) ||
@@ -759,7 +796,8 @@ contract record ExternalAssetBridge is Ownable {
         _confirmDeposit(
             externalChainId,
             depositRouter,
-            depositId
+            depositId,
+            fallbackOnly
         );
     }
 
@@ -816,7 +854,8 @@ contract record ExternalAssetBridge is Ownable {
         _confirmDeposit(
             externalChainId,
             depositRouter,
-            depositId
+            depositId,
+            false
         );
     }
 
@@ -888,11 +927,12 @@ contract record ExternalAssetBridge is Ownable {
     function _requireReviewedDepositAttestations(
         uint256 externalChainId,
         address depositRouter,
-        uint256 depositId
-    ) internal view {
+        uint256 depositId,
+        bool allowFallback
+    ) internal view returns (bool) {
         bytes32 digest = getReviewedDepositDigest(externalChainId, depositRouter, depositId);
         require(depositReviewApprovals[externalChainId][depositRouter][depositId] == digest, "EAB: owner review required");
-        _requireSettlementAttestations(digest);
+        return _requireDepositSettlementAttestations(digest, allowFallback);
     }
 
     function confirmReviewedDeposit(
@@ -909,11 +949,12 @@ contract record ExternalAssetBridge is Ownable {
                 msg.sender == bridgeOperator,
             "EAB: routed settlement requires operator"
         );
-        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId);
+        bool fallbackOnly = _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, true);
         _confirmDeposit(
             externalChainId,
             depositRouter,
-            depositId
+            depositId,
+            fallbackOnly
         );
     }
 
@@ -923,7 +964,7 @@ contract record ExternalAssetBridge is Ownable {
         uint256 depositId,
         RouteStep[] steps
     ) external onlyBridgeOperator whenDepositsOpen {
-        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId);
+        _requireReviewedDepositAttestations(externalChainId, depositRouter, depositId, false);
         _recordDepositRoute(
             externalChainId,
             depositRouter,
@@ -933,14 +974,16 @@ contract record ExternalAssetBridge is Ownable {
         _confirmDeposit(
             externalChainId,
             depositRouter,
-            depositId
+            depositId,
+            false
         );
     }
 
     function _confirmDeposit(
         uint256 externalChainId,
         address depositRouter,
-        uint256 depositId
+        uint256 depositId,
+        bool fallbackOnly
     ) internal {
         DepositInfo depositInfo = deposits[
             externalChainId
@@ -964,7 +1007,12 @@ contract record ExternalAssetBridge is Ownable {
                 intent.action
             );
 
-        if (executable) {
+        if (fallbackOnly) {
+            _handleDepositActionFailure(
+                depositInfo, externalChainId, depositRouter, depositId, intent,
+                "EAB: verifier approved source-token fallback only"
+            );
+        } else if (executable) {
             try {
                 _executeDepositAction(
                     externalChainId,
@@ -1582,6 +1630,20 @@ contract record ExternalAssetBridge is Ownable {
                 destinationHash
             )
         );
+    }
+
+    // A fallback vote binds the full original intent, but cannot authorize a trade.
+    function getDepositFallbackDigest(bytes32 settlementDigest) public pure returns (bytes32) {
+        return keccak256(abi.encode(keccak256("EAB_DEPOSIT_FALLBACK_V1"), settlementDigest));
+    }
+
+    function _requireDepositSettlementAttestations(bytes32 digest, bool allowFallback) internal view returns (bool) {
+        if (settlementVerifierThreshold > 0 && settlementAttestationCounts[digest] >= settlementVerifierThreshold) {
+            return false;
+        }
+        require(allowFallback, "EAB: insufficient verifier attestations");
+        _requireSettlementAttestations(getDepositFallbackDigest(digest));
+        return true;
     }
 
     function getWithdrawalReleaseDigest(
