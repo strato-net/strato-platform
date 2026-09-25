@@ -18,13 +18,13 @@ library
       Blockchain.BlockChain
       Blockchain.Event
       Blockchain.TraceReplay
+      Blockchain.Verifier
       Executable.EthereumVM
       Executable.EthereumVM2
   other-modules:
       Blockchain.Bootstrap
       Blockchain.JsonRpcCommand
       Blockchain.TheDAOFork
-      Blockchain.Verifier
       Blockchain.VMConstants
       Executable.EVMCheckpoint
       Paths_vm_runner
@@ -152,6 +152,7 @@ test-suite ethereum-vm-test
     , merkle-patricia-db
     , monad-alter
     , strato-model
+    , time
     , vm-runner
     , vm-tools
   default-language: Haskell2010

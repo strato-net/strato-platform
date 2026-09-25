@@ -18,11 +18,14 @@ so that they could be properly moved to their respective version's subsection.
 ### Added
 - Partial support for ipv6
 - `Blockchain.Forks.isOperatorPrecedenceForkActive`: the SolidVM parser's operator table is now a fork-gated choice. Live networks (helium, upquark, forktest) keep the legacy table until a height is scheduled; every other network gets Solidity's precedence from genesis. The code-collection cache is keyed by the choice.
+- `maxTimestampDriftS` in `networkConfig` (`--blockstanbul_max_timestamp_drift_s` at setup, default 15): a validator refuses to vote for a proposal whose header timestamp runs further than that ahead of its own clock, and requests a round change instead. Local policy, not consensus: it is never applied to committed blocks, so nodes with different values do not fork.
+- Block verification rejects a block stamped before its parent (`TimestampBeforeParent`) on the pre-prepare replay, on insertion and on sync, on every network from genesis.
 
 ### Changed
 - Total difficulty now refers to block number (corresponds to ethVersion now being 63)
 
 ### Fixed
+- Consensus applied no validation to block header timestamps: a proposer could stamp any value, past or future, and `block.timestamp` in contracts reads that field. The proposer now never stamps a block before its parent, validators refuse to vote for stamps ahead of their clock (`maxTimestampDriftS`), the VM rejects a block stamped before its parent, and the sequencer's post-commit wait is capped at one block period.
 - ethereum-jsonrpc ran one `consumeFromLatest` on the `jsonrpcresponse` topic per request. On the JLog streaming backend all of them share one subscriber checkpoint, so under concurrent load requests consumed each other's vm-runner replies and failed with "timeout waiting for vm-runner response" (eth_call, eth_getBalance returning 0x0, strato_simulate*, debug traces). The topic is now consumed once per process by a dispatcher that delivers each reply to the handler registered under its request id.
 - Ethereum-discovery now looks at udp_enable_time instead of enable_time for bonded/available peers 
 - SolidVM parsed expressions with the wrong operator precedence: assignment bound tighter than `&&`/`||` (so `flag = flag || cond` only ever stored `flag`), the ternary bound tighter than `&&`/`||`, equality bound tighter than the relational operators, and `**`/assignment associated to the left. Fixed behind the operator-precedence fork (see Added).

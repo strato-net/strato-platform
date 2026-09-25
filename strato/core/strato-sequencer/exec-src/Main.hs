@@ -69,10 +69,13 @@ main = do
   ctx <- do
     let blockPeriodMs' = Conf.blockPeriodMs (networkConfig ethConf)
     let roundPeriodS' = Conf.roundPeriodS (networkConfig ethConf)
+    let maxTimestampDriftS' = Conf.maxTimestampDriftS (networkConfig ethConf)
     unless (blockPeriodMs' >= 0) . ioError . userError $
       "blockPeriodMs must be nonnegative"
     unless (roundPeriodS' > 0) . ioError . userError $
       "roundPeriodS must be positive"
+    unless (maxTimestampDriftS' > 0) . ioError . userError $
+      "maxTimestampDriftS must be positive"
 
     putStrLn $ "ACTUAL validators list: " ++ show validators
 
@@ -88,8 +91,9 @@ main = do
           }
         activation = Conf.stakingActivationBlock (networkConfig ethConf)
     putStrLn $ "strato-sequencer stakingActivationBlock: " ++ show activation
+    putStrLn $ "strato-sequencer maxTimestampDriftS: " ++ show maxTimestampDriftS'
 
-    return $ newContext (Conf.network (networkConfig ethConf)) (Conf.networkID (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior activation
+    return $ newContext (Conf.network (networkConfig ethConf)) (Conf.networkID (networkConfig ethConf)) ckpt Nothing flags_validatorBehavior activation (fromIntegral maxTimestampDriftS')
 
   cht <- atomically newTMChan
 

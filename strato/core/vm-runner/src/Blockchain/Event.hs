@@ -39,6 +39,7 @@ import Blockchain.Strato.StateDiff
 import Blockchain.Stream.VMEvent
 import qualified Data.DList as DL
 import Data.Map (Map)
+import Data.Time.Clock (UTCTime)
 
 type VmInEvent = VmTask
 
@@ -84,6 +85,8 @@ data BlockVerificationFailureDetails
   | UnclesMismatch           (BlockDelta Keccak256)
   | UnexpectedBlockNumber    (BlockDelta Integer)
   | ReceiptsRootMismatch     (BlockDelta StateRoot)
+  -- | The block's timestamp precedes its parent's (@_derived@ is the parent's)
+  | TimestampBeforeParent    (BlockDelta UTCTime)
   deriving (Eq, Show)
 
 data BlockVerificationFailure = BlockVerificationFailure

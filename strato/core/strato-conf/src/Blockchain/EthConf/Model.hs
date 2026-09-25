@@ -215,6 +215,16 @@ data NetworkConf = NetworkConf
   , gasLimit :: Integer
   , blockPeriodMs :: Int
   , roundPeriodS :: Int
+  -- | Seconds a proposed block's header timestamp may run ahead of this node's
+  -- clock before the node refuses to vote for it (a rejected proposal triggers
+  -- a round change). Local policy, not consensus: it is consulted only while
+  -- voting, never when replaying or syncing committed blocks, so nodes with
+  -- different values do not fork, they only differ on which proposals they
+  -- vote for. Must be positive: stamps are rounded to the nearest second, so
+  -- an honest proposer can legitimately run up to half a second ahead, plus
+  -- whatever clock skew separates the validators. The default matches the
+  -- tolerance common Ethereum clients use.
+  , maxTimestampDriftS :: Int
   -- | Block number from which stake-weighted proposer selection (BlockHeaderV3)
   -- is in force. 'Nothing' means "from genesis". Every node of a network must
   -- agree on this value.
@@ -243,6 +253,7 @@ instance FromJSON NetworkConf where
       <*> v .:? "gasLimit" .!= 1000000
       <*> v .:? "blockPeriodMs" .!= 1000
       <*> v .:? "roundPeriodS" .!= 3600
+      <*> v .:? "maxTimestampDriftS" .!= defaultMaxTimestampDriftS
       <*> v .:? "stakingActivationBlock" .!= defaultStakingActivationBlock net
       <*> v .:? "stakingContractAddress" .!= defaultStakingContractAddress net
       <*> v .:? "stakingEventsFromGovernanceBlock" .!= defaultStakingEventsFromGovernanceBlock net
@@ -252,6 +263,10 @@ instance FromJSON NetworkConf where
 -- switches consensus rules on its own. Set an explicit height in ethconf.yaml.
 stakingNotScheduled :: Integer
 stakingNotScheduled = 2 ^ (62 :: Int)
+
+-- | Default for 'maxTimestampDriftS'.
+defaultMaxTimestampDriftS :: Int
+defaultMaxTimestampDriftS = 15
 
 -- | Existing live networks default to "not scheduled"; anything else (fresh
 -- dev/test networks) activates from genesis.
@@ -435,6 +450,7 @@ instance Default NetworkConf where
     , gasLimit = 1000000
     , blockPeriodMs = 1000   -- minimum delay between blocks
     , roundPeriodS = 3600    -- backstop: seconds without progress before a forced round change
+    , maxTimestampDriftS = defaultMaxTimestampDriftS
     , stakingActivationBlock = defaultStakingActivationBlock "upquark"
     , stakingContractAddress = defaultStakingContractAddress "upquark"
     , stakingEventsFromGovernanceBlock = defaultStakingEventsFromGovernanceBlock "upquark"

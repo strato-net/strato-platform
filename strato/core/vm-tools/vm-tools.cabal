@@ -121,6 +121,7 @@ test-suite contextm-test
     , merkle-patricia-db
     , solid-vm-model
     , strato-model
+    , time
     , vector
     , vm-tools
   default-language: Haskell2010

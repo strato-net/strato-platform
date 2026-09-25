@@ -139,6 +139,10 @@ ethereumVM = runResourceT $ do
         $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash
         $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Receipts root in block header: " ++ format _inBlock
         $logErrorS "ethereumVM/ReceiptsRootMismatch" . T.pack $ "Derived receipts root:         " ++ format _derived
+      TimestampBeforeParent BlockDelta{..} -> do
+        $logErrorS "ethereumVM/TimestampBeforeParent" . T.pack $ "Block #" ++ show bNum ++ ", hash " ++ format bHash ++ " is stamped before its parent"
+        $logErrorS "ethereumVM/TimestampBeforeParent" . T.pack $ "Timestamp in block header: " ++ show _inBlock
+        $logErrorS "ethereumVM/TimestampBeforeParent" . T.pack $ "Parent's timestamp:        " ++ show _derived
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
 bootstrapIfFirstRun :: (VMBase m, HasContext m, Mod.Accessible RedisConnection m) => m ()
