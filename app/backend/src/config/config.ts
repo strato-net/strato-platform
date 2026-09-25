@@ -196,7 +196,7 @@ export const defaultEthCarryVaultFor: Record<string, string> = {
 
 export const defaultHypeYieldVaultFor: Record<string, string> = {
   "114784819836269": "52042da4c65e8226472b4869019a0aee6d920e21", // Helium testnet
-  "33056204878082667": "", // Upquark mainnet: populate after deployment
+  "33056204878082667": "fc6b457bf1629c74acd4b33ba49ddc2365d9855b", // Upquark mainnet: populate after deployment
 };
 
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
