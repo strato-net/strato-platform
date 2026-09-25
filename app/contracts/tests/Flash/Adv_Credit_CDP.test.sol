@@ -213,7 +213,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         collT.setStatus(2);
         oracle.setAssetPrice(COLL, 100e18);
         // mainnet-shaped: LR 1.50, minCR 1.55, 10% penalty, 50% close factor, no accrual.
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));
@@ -301,7 +301,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         (uint r, uint l, uint tsd) = cdp.collateralGlobalStates(COLL);
         uint outstanding = (tsd * r) / RAY;
         uint ceiling = outstanding + 100000e18;   // only $100,000 of headroom left
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, ceiling, WAD, false);
+        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, ceiling, false);
 
         CeilingRider cr = new CeilingRider();
         cr.init(address(fm), address(cdp), USDST);
@@ -329,7 +329,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         require(after_ <= ceiling, "BLOCKED: outstanding never exceeded the ceiling");
 
         // Restore a loose ceiling for later tests.
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -658,7 +658,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         c2.setStatus(2);
         oracle.setAssetPrice(C2, 100e18);
         uint SFR5 = 1000000001547125956666413085;         // ~5% APY per-second factor, RAY
-        cdp.setCollateralAssetParams(C2, LR, MINCR, PEN, CF, SFR5, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(C2, LR, MINCR, PEN, CF, SFR5, 1e18, 1e30, false);
 
         Vault_ v = new Vault_();
         v.init(address(cdp));
@@ -713,7 +713,7 @@ contract Describe_Adv_Credit_CDP is Authorizable {
         Token c3 = Token(C3);
         c3.setStatus(2);
         oracle.setAssetPrice(C3, 100e18);
-        cdp.setCollateralAssetParams(C3, LR, MINCR, PEN, CF, 1000000001547125956666413085, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(C3, LR, MINCR, PEN, CF, 1000000001547125956666413085, 1e18, 1e30, false);
 
         Vault_ v = new Vault_();
         v.init(address(cdp));

@@ -119,6 +119,10 @@
           "targetAssetAddress": "444f474500000000000000000000000000000000",
           "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
         },
+        "CBDOGE": {
+          "targetAssetAddress": "3d859c0a30e6bb2f71ce09be59d82f87e64e4dc1",
+          "comment": "Coinbase Wrapped DOGE (cbDOGE). Base 0xcbd06e5a2b0c65597161de254aa074e489deb510. Helium STRATO token used until mainnet token exists."
+        },
         "BOOE": {
           "targetAssetAddress": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
           "comment": "Book of Ethereum (BOOE). Ethereum 0x289ff00235d2b98b0145ff5d4435d3e92f9540a6. Same STRATO token address on Upquark and Helium."
@@ -405,6 +409,7 @@
             "KHYPE",
             "LIT",
             "DOGE",
+            "CBDOGE",
             "BOOE"
           ],
           "symbolMapping": {
@@ -427,6 +432,7 @@
             "KHYPE": "kinetic-staked-hype",
             "LIT": "lighter",
             "DOGE": "dogecoin",
+            "CBDOGE": "coinbase-wrapped-doge",
             "BOOE": "book-of-ethereum"
           }
         },
@@ -480,6 +486,7 @@
             "KHYPE",
             "LIT",
             "DOGE",
+            "CBDOGE",
             "BOOE"
           ],
           "symbolMapping": {
@@ -502,22 +509,25 @@
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
             "LIT": "coingecko:lighter",
             "DOGE": "coingecko:dogecoin",
+            "CBDOGE": "coingecko:coinbase-wrapped-doge",
             "BOOE": "coingecko:book-of-ethereum"
           }
         },
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",
-            "BOOE"
+            "BOOE",
+            "CBDOGE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
             "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
-            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
+            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510"
           }
         },
         "DIA": {
@@ -735,6 +745,10 @@
           "targetAssetAddress": "444f474500000000000000000000000000000000",
           "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
         },
+        "CBDOGE": {
+          "targetAssetAddress": "3d859c0a30e6bb2f71ce09be59d82f87e64e4dc1",
+          "comment": "Coinbase Wrapped DOGE (cbDOGE). Base 0xcbd06e5a2b0c65597161de254aa074e489deb510."
+        },
         "BOOE": {
           "targetAssetAddress": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
           "comment": "Book of Ethereum (BOOE). Ethereum 0x289ff00235d2b98b0145ff5d4435d3e92f9540a6. Same STRATO token address on Upquark and Helium."
@@ -1021,6 +1035,7 @@
             "KHYPE",
             "LIT",
             "DOGE",
+            "CBDOGE",
             "BOOE"
           ],
           "symbolMapping": {
@@ -1043,6 +1058,7 @@
             "KHYPE": "kinetic-staked-hype",
             "LIT": "lighter",
             "DOGE": "dogecoin",
+            "CBDOGE": "coinbase-wrapped-doge",
             "BOOE": "book-of-ethereum"
           }
         },
@@ -1096,6 +1112,7 @@
             "KHYPE",
             "LIT",
             "DOGE",
+            "CBDOGE",
             "BOOE"
           ],
           "symbolMapping": {
@@ -1118,22 +1135,25 @@
             "KHYPE": "hyperliquid:0xfd739d4e423301ce9385c1fb8850539d657c296d",
             "LIT": "coingecko:lighter",
             "DOGE": "coingecko:dogecoin",
+            "CBDOGE": "coingecko:coinbase-wrapped-doge",
             "BOOE": "coingecko:book-of-ethereum"
           }
         },
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",
-            "BOOE"
+            "BOOE",
+            "CBDOGE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
             "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
-            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6"
+            "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
+            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510"
           }
         },
         "DIA": {

@@ -1,0 +1,413 @@
+// SPDX-License-Identifier: MIT
+// Frozen copy of the deployed DepositRouter, kept only so the upgrade
+// plugin can diff storage layouts against it. Not deployed.
+pragma solidity ^0.8.26;
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../../bridge/DepositRouter.sol";
+
+contract DepositRouterLegacyV3 is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
+    using SafeERC20 for IERC20;
+
+    // ============ Custom Errors ============
+    error UseDepositETH();
+    error BelowMinimum();
+    error ZeroAmount();
+    error PermitExpired();
+    error InvalidAddress();
+    error ETHTransferFailed();
+    error ArrayLengthMismatch();
+    error SameAddressProposed();
+    error SweepEthFailed();
+    error NotPermitted();
+    error FeesNotSupported();
+
+    // ============ State Variables ============
+    //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
+    // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
+    IPermit2 public PERMIT2;
+
+    address public gnosisSafe;
+    uint96 public depositId;
+    // address(0) represents ETH configuration for depositETH()
+    mapping(address => TokenConfig) public tokenConfig;
+    // key: external token => target STRATO token => permitted route
+    mapping(address => mapping(address => bool)) public routePermitted;
+
+    // ============ Structs ============
+    struct TokenConfig {
+        uint96 min;
+        bool isPermitted;
+    }
+
+    struct ActionIntent {
+        uint8 action;
+        address actionToken;
+        uint256 minFinalOut;
+    }
+
+    struct DepositRequest {
+        address token;
+        uint256 amount;
+        address stratoAddress;
+        address targetStratoToken;
+        uint256 nonce;
+        uint256 deadline;
+        bytes signature;
+    }
+
+    // ============ Events ============
+    event DepositRouted(
+        address indexed token,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoAddress,
+        address targetStratoToken,
+        uint96 depositId
+    );
+    event DepositRoutedWithAction(
+        address indexed token,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoAddress,
+        address targetStratoToken,
+        uint96 depositId,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut
+    );
+    event TokenConfigUpdated(
+        address indexed token,
+        uint256 minAmount,
+        bool isPermitted
+    );
+    event RoutePermittedUpdated(
+        address indexed token,
+        address indexed targetStratoToken,
+        bool isPermitted
+    );
+    event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address permit2_,
+        address gnosisSafe_,
+        address owner_
+    ) public initializer {
+        if (
+            owner_ == address(0) ||
+            gnosisSafe_ == address(0) ||
+            permit2_ == address(0)
+        ) revert InvalidAddress();
+        __Ownable_init(owner_);
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+
+        // Set PERMIT2 once during initialization - this value persists across all upgrades
+        PERMIT2 = IPermit2(permit2_);
+
+        gnosisSafe = gnosisSafe_;
+        emit GnosisSafeUpdated(address(0), gnosisSafe_);
+    }
+
+    function deposit(
+        address token,
+        uint256 amount,
+        address stratoAddress,
+        address targetStratoToken,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant {
+        DepositRequest memory request;
+        request.token = token;
+        request.amount = amount;
+        request.stratoAddress = stratoAddress;
+        request.targetStratoToken = targetStratoToken;
+        request.nonce = nonce;
+        request.deadline = deadline;
+        request.signature = signature;
+        (uint256 depositedAmount, uint96 id) = _processDeposit(request);
+
+        emit DepositRouted(
+            request.token,
+            depositedAmount,
+            msg.sender,
+            request.stratoAddress,
+            request.targetStratoToken,
+            id
+        );
+    }
+
+    function depositWithAction(
+        address token,
+        uint256 amount,
+        address stratoAddress,
+        address targetStratoToken,
+        uint8 action,
+        address actionToken,
+        uint256 minFinalOut,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant {
+        ActionIntent memory intent;
+        intent.action = action;
+        intent.actionToken = actionToken;
+        intent.minFinalOut = minFinalOut;
+
+        DepositRequest memory request;
+        request.token = token;
+        request.amount = amount;
+        request.stratoAddress = stratoAddress;
+        request.targetStratoToken = targetStratoToken;
+        request.nonce = nonce;
+        request.deadline = deadline;
+        request.signature = signature;
+        (uint256 depositedAmount, uint96 id) = _processDeposit(request);
+
+        _emitDepositWithAction(
+            request.token,
+            depositedAmount,
+            request.stratoAddress,
+            request.targetStratoToken,
+            id,
+            intent
+        );
+    }
+
+    function _emitDepositWithAction(
+        address token,
+        uint256 depositedAmount,
+        address stratoAddress,
+        address targetStratoToken,
+        uint96 id,
+        ActionIntent memory intent
+    ) internal {
+        emit DepositRoutedWithAction(
+            token,
+            depositedAmount,
+            msg.sender,
+            stratoAddress,
+            targetStratoToken,
+            id,
+            intent.action,
+            intent.actionToken,
+            intent.minFinalOut
+        );
+    }
+
+    function _processDeposit(
+        DepositRequest memory request
+    ) internal returns (uint256 depositedAmount, uint96 id) {
+        if (request.amount == 0) revert ZeroAmount();
+        if (request.token == address(0)) revert UseDepositETH();
+        if (request.stratoAddress == address(0)) revert InvalidAddress();
+        if (request.targetStratoToken == address(0)) revert InvalidAddress();
+        if (request.deadline < block.timestamp) revert PermitExpired();
+
+        TokenConfig storage c = tokenConfig[request.token];
+        if (request.amount < c.min) revert BelowMinimum();
+        if (!c.isPermitted) revert NotPermitted();
+        if (!routePermitted[request.token][request.targetStratoToken]) revert NotPermitted();
+
+        address safe = gnosisSafe;
+        unchecked {
+            id = ++depositId;
+        }
+
+        uint256 balanceBefore = IERC20(request.token).balanceOf(safe);
+
+        IPermit2.PermitTransferFrom memory permit = IPermit2
+            .PermitTransferFrom({
+                permitted: IPermit2.TokenPermissions({
+                    token: request.token,
+                    amount: request.amount
+                }),
+                nonce: request.nonce,
+                deadline: request.deadline
+            });
+        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
+            .SignatureTransferDetails({to: safe, requestedAmount: request.amount});
+        PERMIT2.permitTransferFrom(
+            permit,
+            transferDetails,
+            msg.sender,
+            request.signature
+        );
+
+        depositedAmount = IERC20(request.token).balanceOf(safe) - balanceBefore;
+
+        if (depositedAmount == 0) revert ZeroAmount();
+        if (depositedAmount < request.amount) revert FeesNotSupported();
+    }
+
+    // using address(0) for ETH
+    function depositETH(
+        address stratoAddress,
+        address targetStratoToken
+    ) external payable whenNotPaused nonReentrant {
+        if (msg.value == 0) revert ZeroAmount();
+        if (stratoAddress == address(0)) revert InvalidAddress();
+        if (targetStratoToken == address(0)) revert InvalidAddress();
+
+        TokenConfig storage c = tokenConfig[address(0)];
+        if (msg.value < c.min) revert BelowMinimum();
+        if (!c.isPermitted) revert NotPermitted();
+        if (!routePermitted[address(0)][targetStratoToken]) revert NotPermitted();
+
+        address safe = gnosisSafe;
+        unchecked {
+            ++depositId;
+        }
+
+        (bool success, ) = safe.call{value: msg.value}("");
+        if (!success) revert ETHTransferFailed();
+
+        emit DepositRouted(
+            address(0),
+            msg.value,
+            msg.sender,
+            stratoAddress,
+            targetStratoToken,
+            depositId
+        );
+    }
+
+    function setMinDepositAmount(
+        address token,
+        uint96 minAmount
+    ) external onlyOwner {
+        TokenConfig storage c = tokenConfig[token];
+        if (c.min == minAmount) return;
+        c.min = minAmount;
+        emit TokenConfigUpdated(token, minAmount, c.isPermitted);
+    }
+
+    function setPermitted(address token, bool isPermitted) external onlyOwner {
+        TokenConfig storage c = tokenConfig[token];
+        if (c.isPermitted == isPermitted) return;
+        c.isPermitted = isPermitted;
+        emit TokenConfigUpdated(token, c.min, isPermitted);
+    }
+
+    function setRoutePermitted(
+        address token,
+        address targetStratoToken,
+        bool isPermitted
+    ) external onlyOwner {
+        if (targetStratoToken == address(0)) revert InvalidAddress();
+        if (routePermitted[token][targetStratoToken] == isPermitted) return;
+        routePermitted[token][targetStratoToken] = isPermitted;
+        emit RoutePermittedUpdated(token, targetStratoToken, isPermitted);
+    }
+
+    function batchUpdateTokens(
+        address[] calldata tokens,
+        uint96[] calldata minAmounts,
+        bool[] calldata isPermitteds,
+        address[] calldata targetStratoTokens
+    ) external onlyOwner {
+        uint256 len = tokens.length;
+        if (len != minAmounts.length) revert ArrayLengthMismatch();
+        if (len != isPermitteds.length) revert ArrayLengthMismatch();
+        if (len != targetStratoTokens.length) revert ArrayLengthMismatch();
+
+        for (uint256 i; i < len; ) {
+            address t = tokens[i];
+            uint96 m = minAmounts[i];
+            bool p = isPermitteds[i];
+            address targetStratoToken = targetStratoTokens[i];
+            if (targetStratoToken == address(0)) revert InvalidAddress();
+            TokenConfig storage c = tokenConfig[t];
+            c.min = m;
+            c.isPermitted = p;
+            routePermitted[t][targetStratoToken] = p;
+            emit TokenConfigUpdated(t, m, p);
+            emit RoutePermittedUpdated(t, targetStratoToken, p);
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function setGnosisSafe(address newSafe) external onlyOwner {
+        if (newSafe == address(0)) revert InvalidAddress();
+        address old = gnosisSafe;
+        if (newSafe == old) revert SameAddressProposed();
+        gnosisSafe = newSafe;
+        emit GnosisSafeUpdated(old, newSafe);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function canDeposit(
+        address token,
+        uint256 amount,
+        address targetStratoToken
+    ) external view returns (bool) {
+        if (amount == 0 || paused()) return false;
+        if (targetStratoToken == address(0)) return false;
+
+        TokenConfig storage c = tokenConfig[token];
+        if (amount < c.min) return false;
+        if (!c.isPermitted) return false;
+        if (!routePermitted[token][targetStratoToken]) return false;
+        return true;
+    }
+
+    function version() external pure virtual returns (string memory) {
+        return "3.0.0";
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
+    receive() external payable {
+        revert UseDepositETH();
+    }
+    fallback() external payable {
+        revert UseDepositETH();
+    }
+
+    function sweepETH(address to) external onlyOwner nonReentrant {
+        if (to == address(0)) revert InvalidAddress();
+        (bool ok, ) = to.call{value: address(this).balance}("");
+        if (!ok) revert SweepEthFailed();
+    }
+
+    function sweepERC20(
+        address token,
+        address to
+    ) external onlyOwner nonReentrant {
+        if (to == address(0) || token == address(0)) revert InvalidAddress();
+        uint256 bal = IERC20(token).balanceOf(address(this));
+        if (bal != 0) IERC20(token).safeTransfer(to, bal);
+    }
+}
+
+// see https://github.com/dragonfly-xyz/useful-solidity-patterns/blob/main/patterns/permit2/Permit2Vault.sol

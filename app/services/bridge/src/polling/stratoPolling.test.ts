@@ -47,6 +47,7 @@ const withPollStubs = async (
     monitor: safeService.monitorSafeTransactionStatusBatch,
     finalize: bridgeService.finaliseWithdrawalBatch,
     abort: bridgeService.handleRejectedWithdrawalBatch,
+    triage: bridgeService.triageRejectedWithdrawals,
   };
   (cirrusService as any).getWithdrawalsByStatus = async () => stubs.pending;
   (cirrusService as any).getSafeTxHashFromEvents = async (ids: string[]) => {
@@ -65,6 +66,12 @@ const withPollStubs = async (
   (bridgeService as any).handleRejectedWithdrawalBatch = async (ids: number[]) => {
     seen.aborted.push(...ids);
   };
+  // The external-chain settlement check is exercised in fastPath.test.ts; here every
+  // rejected proposal is one the external chain did not pay
+  (bridgeService as any).triageRejectedWithdrawals = async (rejected: WithdrawalInfo[]) => ({
+    abort: rejected.map((w) => Number(w.withdrawalId)),
+    finalize: [] as number[],
+  });
   try {
     await run(seen);
   } finally {
@@ -73,6 +80,7 @@ const withPollStubs = async (
     (safeService as any).monitorSafeTransactionStatusBatch = originals.monitor;
     (bridgeService as any).finaliseWithdrawalBatch = originals.finalize;
     (bridgeService as any).handleRejectedWithdrawalBatch = originals.abort;
+    (bridgeService as any).triageRejectedWithdrawals = originals.triage;
   }
 };
 

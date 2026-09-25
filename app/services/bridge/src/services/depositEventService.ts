@@ -1,6 +1,7 @@
 import { Interface, ZeroAddress } from "ethers";
 import {
   ActionDepositArgs,
+  FeeDepositArgs,
   NonEmptyArray,
   WindowDeposit,
 } from "../types";
@@ -9,6 +10,7 @@ import { normalizeAddress } from "../utils/utils";
 const DEPOSIT_EVENTS_ABI = [
   "event DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId)",
   "event DepositRoutedWithAction(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint8 action, address actionToken, uint256 minFinalOut)",
+  "event DepositRoutedWithFee(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, address targetStratoToken, uint96 depositId, uint256 maxFee, uint256 requestedAt, uint256 feeHalfLife)",
 ];
 
 const depositEvents = new Interface(DEPOSIT_EVENTS_ABI);
@@ -65,21 +67,34 @@ export const parseDepositLog = (
     blockNumber: Number(log.blockNumber),
     logIndex: Number(log.logIndex),
   };
+  const noAction = { action: "0", actionToken: ZeroAddress, minFinalOut: "0" };
+  // A plain deposit carries no schedule; requestedAt 0 tells STRATO not to write one
+  const noFee = { maxFee: "0", requestedAt: "0", feeHalfLife: "0" };
   if (parsed.name === "DepositRouted") {
+    return { ...base, ...noAction, ...noFee, kind: "standard" };
+  }
+
+  if (parsed.name === "DepositRoutedWithFee") {
     return {
       ...base,
-      kind: "standard",
-      action: "0",
-      actionToken: ZeroAddress,
-      minFinalOut: "0",
+      ...noAction,
+      kind: "fee",
+      maxFee: parsed.args.maxFee.toString(),
+      // The ORIGIN chain's timestamp, passed through unchanged. STRATO
+      // measures the fee decay from here, so relayer lag is refunded to the
+      // user; substituting a local clock would hand that back to the solver.
+      requestedAt: parsed.args.requestedAt.toString(),
+      feeHalfLife: parsed.args.feeHalfLife.toString(),
     };
   }
+
   if (parsed.name !== "DepositRoutedWithAction") {
     throw new Error(`Unsupported deposit event ${parsed.name}`);
   }
 
   return {
     ...base,
+    ...noFee,
     kind: "action",
     action: parsed.args.action.toString(),
     actionToken: normalizeAddress(parsed.args.actionToken),
@@ -162,6 +177,32 @@ export const buildDepositWindowArgs = (
   actions: deposits.map((deposit) => deposit.action),
   actionTokens: deposits.map((deposit) => deposit.actionToken),
   minFinalOuts: deposits.map((deposit) => deposit.minFinalOut),
+  maxFees: deposits.map((deposit) => deposit.maxFee),
+  requestedAts: deposits.map((deposit) => deposit.requestedAt),
+});
+
+/**
+ * Arguments for MercataBridge.depositBatchWithFee.
+ *
+ * `requestedAt` is the ORIGIN chain's timestamp and is passed through
+ * untouched: STRATO starts the fee decay there, so a relayer that is an hour
+ * behind hands the user an hour of decay rather than handing it to a solver.
+ * `feeHalfLife` is deliberately NOT passed -- STRATO commits its own configured
+ * half-life at record time, and the log's copy exists for solvers reading the
+ * origin chain directly.
+ */
+export const buildFeeDepositBatchArgs = (
+  depositArgs: NonEmptyArray<FeeDepositArgs>,
+) => ({
+  externalChainIds: depositArgs.map((deposit) => deposit.externalChainId),
+  externalSenders: depositArgs.map((deposit) => deposit.externalSender),
+  externalTokens: depositArgs.map((deposit) => deposit.externalToken),
+  externalTokenAmounts: depositArgs.map((deposit) => deposit.externalTokenAmount),
+  externalTxHashes: depositArgs.map((deposit) => deposit.externalTxHash),
+  stratoRecipients: depositArgs.map((deposit) => deposit.stratoRecipient),
+  targetStratoTokens: depositArgs.map((deposit) => deposit.targetStratoToken),
+  maxFees: depositArgs.map((deposit) => deposit.maxFee),
+  requestedAts: depositArgs.map((deposit) => deposit.requestedAt),
 });
 
 export const buildActionDepositBatchArgs = (
