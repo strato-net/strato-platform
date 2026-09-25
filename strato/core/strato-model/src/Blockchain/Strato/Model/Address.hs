@@ -43,6 +43,7 @@ import Data.Aeson.Types
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Char
 import Data.Data
@@ -81,10 +82,8 @@ newtype Address = Address Word160
   deriving (Eq, Enum, Bounded, Ord, Generic, Data)
   deriving newtype (Real, Num, Integral, Hashable)
 
--- show/read on the raw Integer: Word160's Num ops reduce mod 2^160 on every
--- step, so showHex/readHex at Word160 cost 40 Integer quotRem/mod each.
 instance Show Address where
-  show (Address a) = padZeros 40 $ showHex (toInteger a) ""
+  show = BC.unpack . addressToHex
 
 instance Read Address where
   readsPrec _ input =
@@ -93,6 +92,9 @@ instance Read Address where
           '0':'x':rest' -> rest'
           _ -> trimmed
     in if not (null hexPart) && all isHexDigit hexPart
+         -- Deliberately accumulates in Integer rather than Word160 (or readHex
+         -- at Word160): every Word160 (+) and (*) reduces mod 2^160, which is
+         -- an Integer mod per digit. Converting once at the end avoids that.
          then [(Address . fromInteger $ foldl' (\acc c -> acc * 16 + toInteger (digitToInt c)) 0 hexPart, rest)]
          else []
 
@@ -280,7 +282,7 @@ addressFromNibbleString :: N.NibbleString -> Address
 addressFromNibbleString = addressFromByteString . nibbleString2ByteString
 
 formatAddressWithoutColor :: Address -> String
-formatAddressWithoutColor x = padZeros 40 $ showHex (toInteger x) ""
+formatAddressWithoutColor = show
 
 addressToHex :: Address -> B.ByteString
 addressToHex = B16.encode . BL.toStrict . encode
