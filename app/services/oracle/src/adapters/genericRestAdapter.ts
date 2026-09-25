@@ -281,12 +281,12 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum pair where baseToken matches the mapped contract address
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base pair where baseToken matches the mapped contract address
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
             const candidates = data.pairs.filter((p: any) =>
-                p.chainId === 'ethereum' &&
+                (p.chainId === 'ethereum' || p.chainId === 'base') &&
                 p.baseToken?.address?.toLowerCase() === mappedAddress &&
                 p.priceUsd
             );
