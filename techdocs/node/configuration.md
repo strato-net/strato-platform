@@ -80,7 +80,7 @@ Main sections:
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |
 | `sqlConfig`, `cirrusConfig`, `redisBlockDBConfig` | Database connections |
 | `apiConfig` | `strato-api` port (`3000`) and bind address |
-| `vmConfig` | `sqlDiff`, plus the transaction-simulation settings `vmJsonRpcUrl` and `simMaxConcurrent` (default `8`) |
+| `vmConfig` | `sqlDiff`, plus the transaction-simulation setting `simMaxConcurrent` (default `8`) |
 
 ### Node directory layout
 
