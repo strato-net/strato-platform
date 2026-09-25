@@ -138,7 +138,6 @@ contract Describe_BadDebt_Basic is Authorizable {
             1000000000315522921573372069, // ~1% APR stability fee rate
             1e18, // 1 USDST debt floor
             1000000000000000000000000000000000, // Large debt ceiling
-            1e18, // 1e18 unit scale (18 decimals)
             false // not paused
         );
         // log("Collateral asset params set successfully");
@@ -444,7 +443,6 @@ contract Describe_BadDebt_Basic is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
 
@@ -470,7 +468,6 @@ contract Describe_BadDebt_Basic is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
 

@@ -27,6 +27,7 @@ import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
+import           Data.String (fromString)
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
@@ -79,7 +80,7 @@ initP2P = labelTheThread "initP2P" $ do
         runContextM cfg' . f $ seqSrc
   liftIO $
     raceAll
-      [ run 10248 $ prometheus def p2pApp
+      [ runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 10248 defaultSettings) $ prometheus def p2pApp
       , runSeqEventBroadcaster bcast
       , stratoP2P runner
       ]

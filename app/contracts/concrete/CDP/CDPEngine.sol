@@ -31,7 +31,7 @@ contract record CDPEngine is Ownable {
         uint stabilityFeeRate;          // per‑second factor (RAY)
         uint debtFloor;                 // minimum debt per vault (USD 1e18)
         uint debtCeiling;               // asset debt ceiling (USD 1e18)
-        uint unitScale;                 // token units to 1e18 scale factor
+        uint unitScale;                 // 10**decimals(); derived at first listing, never admin-typed (see resyncUnitScale)
         bool isPaused;                  // asset pause switch (all ops)
     }
 
@@ -77,6 +77,7 @@ contract record CDPEngine is Ownable {
         uint unitScale,
         bool pause
     );
+    event UnitScaleResynced(address indexed asset, uint oldUnitScale, uint newUnitScale);
 
     event Accrued(
         address indexed asset,
@@ -575,7 +576,13 @@ contract record CDPEngine is Ownable {
 
     /**
      * @notice Configure per-asset risk parameters
-     * @dev Validates bounds for LR, minCR, penalty, close-factor, rate, floor/ceiling, and unitScale
+     * @dev Validates bounds for LR, minCR, penalty, close-factor, rate, floor/ceiling.
+     *      unitScale is deliberately NOT a parameter. It is the divisor in every collateral
+     *      valuation, so rewriting it on an open book rescales every CR for the asset in one
+     *      block (1e18 -> 1e19 makes a CR-3 vault liquidatable at 0.3; 1e18 -> 1e17 lets
+     *      borrowers mint 10x unbacked). On first listing it is derived from the token's own
+     *      decimals() and the asset must be a TokenFactory token; later calls leave it untouched.
+     *      resyncUnitScale is the only re-derivation path and requires pause + zero debt.
      */
     function setCollateralAssetParams(
         address asset,
@@ -586,7 +593,6 @@ contract record CDPEngine is Ownable {
         uint stabilityFeeRate,
         uint debtFloor,
         uint debtCeiling,
-        uint unitScale,
         bool pause
     ) public onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
@@ -595,10 +601,14 @@ contract record CDPEngine is Ownable {
         require(liquidationPenaltyBps >= 500 && liquidationPenaltyBps <= 3000, "penalty out of range");
         require(closeFactorBps >= 5000 && closeFactorBps <= 10000, "CDPEngine: close factor out of range");
         require(stabilityFeeRate >= RAY, "CDPEngine: stability fee too low");
-        require(unitScale > 0, "CDPEngine: invalid unit scale");
         if (debtCeiling > 0) { require(debtFloor <= debtCeiling, "CDPEngine: debt floor above ceiling"); }
 
         CollateralConfig storage config = collateralConfigs[asset];
+        if (config.unitScale == 0) {
+            // First listing: membership and scale come from the token itself, not from calldata.
+            require(_tokenFactory().isFactoryToken(asset), "CDPEngine: not a factory token");
+            config.unitScale = _deriveUnitScale(asset);
+        }
         config.liquidationRatio = liquidationRatio;
         config.minCR = minCR;
         config.liquidationPenaltyBps = liquidationPenaltyBps;
@@ -606,7 +616,6 @@ contract record CDPEngine is Ownable {
         config.stabilityFeeRate = stabilityFeeRate;
         config.debtFloor = debtFloor;
         config.debtCeiling = debtCeiling;
-        config.unitScale = unitScale;
         config.isPaused = pause;
 
         if (!isSupportedAsset[asset]) { isSupportedAsset[asset] = true; }
@@ -621,14 +630,42 @@ contract record CDPEngine is Ownable {
             stabilityFeeRate,
             debtFloor,
             debtCeiling,
-            unitScale,
+            config.unitScale,
             pause
         );
     }
 
     /**
+     * @dev 10**decimals() for a listed token. Read through IERC20Metadata so SolidVM dispatches
+     *      to the token's own override (see PoolFactory._rateMultiplierFor for why not ERC20(t)).
+     */
+    function _deriveUnitScale(address asset) internal view returns (uint) {
+        uint dec = uint(IERC20Metadata(asset).decimals());
+        require(dec <= 36, "CDPEngine: unsupported token decimals");
+        return 10 ** dec;
+    }
+
+    /**
+     * @notice Re-derive an asset's unitScale from its token decimals().
+     * @dev Owner-only escape hatch for a listing whose stored unitScale is wrong (e.g. a legacy
+     *      admin-typed value). Allowed only while the asset is paused AND has zero outstanding
+     *      debt: pause closes the deposit -> resync -> mint race inside one block, and zero debt
+     *      means no vault's CR can move. Emits before writing so the old value is the real old value.
+     */
+    function resyncUnitScale(address asset) external onlyOwner {
+        require(collateralConfigs[asset].unitScale > 0, "CDPEngine: asset not configured");
+        require(collateralConfigs[asset].isPaused, "CDPEngine: pause asset first");
+        require(collateralGlobalStates[asset].totalScaledDebt == 0, "CDPEngine: debt outstanding");
+        require(_tokenFactory().isFactoryToken(asset), "CDPEngine: not a factory token");
+        uint newUnitScale = _deriveUnitScale(asset);
+        emit UnitScaleResynced(asset, collateralConfigs[asset].unitScale, newUnitScale);
+        collateralConfigs[asset].unitScale = newUnitScale;
+    }
+
+    /**
      * @notice Batch configure multiple collateral assets in one transaction
-     * @dev All arrays must have equal non-zero length N; i-th entries map to the same asset
+     * @dev All arrays must have equal non-zero length N; i-th entries map to the same asset.
+     *      No unitScales array: unitScale is derived per asset in setCollateralAssetParams.
      */
     function setCollateralAssetParamsBatch(
         address[] calldata assets,
@@ -639,7 +676,6 @@ contract record CDPEngine is Ownable {
         uint[] calldata stabilityFeeRates,
         uint[] calldata debtFloors,
         uint[] calldata debtCeilings,
-        uint[] calldata unitScales,
         bool[] calldata pauses
     ) external onlyOwner {
         uint len = assets.length;
@@ -652,7 +688,6 @@ contract record CDPEngine is Ownable {
             stabilityFeeRates.length == len &&
             debtFloors.length == len &&
             debtCeilings.length == len &&
-            unitScales.length == len &&
             pauses.length == len,
             "CDPEngine: array length mismatch"
         );
@@ -666,7 +701,6 @@ contract record CDPEngine is Ownable {
                 stabilityFeeRates[i],
                 debtFloors[i],
                 debtCeilings[i],
-                unitScales[i],
                 pauses[i]
             );
         }
@@ -689,8 +723,12 @@ contract record CDPEngine is Ownable {
     /// @param asset The asset to toggle support for.
     /// @param supported Whether the asset should be supported.
     /// @dev WARNING: This function can result in financial loss if there are open positions for the asset.
+    ///      Enabling requires an existing config so the zero-unitScale state is unreachable.
     function setSupportedAsset(address asset, bool supported) external onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
+        if (supported) {
+            require(collateralConfigs[asset].unitScale > 0, "CDPEngine: asset not configured");
+        }
         isSupportedAsset[asset] = supported;
     }
 
@@ -738,7 +776,8 @@ contract record CDPEngine is Ownable {
         require(price > 0, "invalid price");
         // require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
         uint unitScale = collateralConfigs[asset].unitScale;
-        uint collateralUSD = unitScale == 0 ? 0 : (v.collateral * price) / unitScale;
+        require(unitScale > 0, "CDPEngine: asset not configured");
+        uint collateralUSD = (v.collateral * price) / unitScale;
         return (collateralUSD * WAD) / debtUSD;
     }
 
@@ -1021,7 +1060,7 @@ contract record CDPEngine is Ownable {
     }
 
     /// @notice One-time backfill of collateralAssets for assets configured before this upgrade.
-    /// @dev Accepts only assets that already have a config (unitScale is validated > 0 on set),
+    /// @dev Accepts only assets that already have a config (unitScale is derived > 0 at first listing),
     ///      so a typo'd address cannot enter the enumeration. Duplicates are skipped, not reverted.
     function registerCollateralAssets(address[] calldata assets) external onlyOwner {
         for (uint i = 0; i < assets.length; i++) {

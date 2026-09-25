@@ -6,6 +6,7 @@ const config = require('./config');
 const auth = require('./auth');
 const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('./util');
 const { rest, importer, util } = require('blockapps-rest');
+const { assertSourceWithinBudget, withLargeDeployLock } = require('./deploySizeGuard');
 const fs = require('fs-extra');
 const path = require('path');
 
@@ -373,7 +374,21 @@ async function main() {
       query: { username: 'BlockApps' }
     };
 
-    const implementationAddress = await deployImplementationAsync(tokenObj, contractArgs, deployOptions);
+    // Refuse a source big enough to breach the broker's message.max.bytes on its
+    // own, and serialise this deploy against any other large one so two cannot
+    // share a block. Both are the lesson of the 2026-09-18 helium halt at block
+    // 595971: two ~655 KB deploys in one block produced a RanBlock event the
+    // broker rejected, which killed vm-runner and, through convoke's fail-fast,
+    // every container on all four validators. Neither deploy was individually
+    // too large; nothing refused them landing together.
+    const sourceBytes = assertSourceWithinBudget(contractName, source);
+    console.log(`Source size: ${sourceBytes} bytes (within the per-block budget)`);
+
+    const implementationAddress = await withLargeDeployLock(
+      contractName,
+      sourceBytes,
+      () => deployImplementationAsync(tokenObj, contractArgs, deployOptions)
+    );
     console.log(`Implementation deployed at: ${implementationAddress}\n`);
 
     // Step 2: Upgrade each proxy to point to the new implementation

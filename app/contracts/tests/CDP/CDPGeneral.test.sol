@@ -130,7 +130,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069, // ~1% APR stability fee rate
             1e18, // 1 USDST debt floor
             1000000000000000000000000000000000, // Large debt ceiling
-            1e18, // 1e18 unit scale (18 decimals)
             false // not paused
         );
 
@@ -228,7 +227,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069, // ~1% APR
             1e18, // 1 USDST debt floor
             1000000000000000000000000000000000, // Large ceiling
-            1e18, // 1e18 unit scale
             false
         );
         log("✅ Minimum liquidation ratio (150%) configured correctly");
@@ -244,7 +242,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
         log("✅ High liquidation ratio (300%) configured correctly");
@@ -275,7 +272,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         ) {
             log("⚠️  Non-admin was able to configure collateral (may be intended behavior)");
@@ -381,7 +377,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             true // Paused
         );
         log("✅ Collateral asset paused successfully");
@@ -403,7 +398,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false // Unpaused
         );
         log("✅ Collateral asset unpaused successfully");
@@ -423,7 +417,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
         log("✅ Liquidation ratio changed successfully");
@@ -438,7 +431,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
         log("✅ Liquidation penalty changed successfully");
@@ -467,7 +459,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         );
 
@@ -558,7 +549,6 @@ contract Describe_CDPGeneral is Authorizable {
             1000000000315522921573372069,
             1e18,
             1000000000000000000000000000000000,
-            1e18,
             false
         ) {
             require(false, "Should reject liquidation ratio < 100%");
