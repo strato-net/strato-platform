@@ -39,6 +39,7 @@ module Blockchain.VMContext
     bestBlockInfo,
     vmGasCap,
     selfAddress,
+    isProposer,
     runningTests,
     txRunResultsCache,
     debugSettings,
@@ -206,7 +207,8 @@ data ContextState = ContextState
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
     _vmTracer :: !(Maybe VmTracer),
-    _selfAddress :: !Address
+    _selfAddress :: !Address,
+    _isProposer :: !Bool
   }
   deriving (Generic, NFData)
 
@@ -223,7 +225,8 @@ instance Default ContextState where
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
         _vmTracer = Nothing,
-        _selfAddress = Address 0
+        _selfAddress = Address 0,
+        _isProposer = True
       }
 
 data QueueEvent
@@ -394,7 +397,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
               _vmTracer = Nothing,
-              _selfAddress = Address 0
+              _selfAddress = Address 0,
+              _isProposer = True
             }
       que <- newTQueueIO
       nodeCache <- newIORef HM.empty
@@ -461,6 +465,7 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions
   cdb <- DB.open (dbDir "h" ++ codeDBPath) ldbOptions
   blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
+  liftIO $ mapM_ removeStaleInfoLog [stateDBPath, hashDBPath, codeDBPath, blockSummaryCacheDBPath]
   rPool <- liftIO $ Redis.checkedConnect lookupRedisBlockDBConfig
   cache <- liftIO $ TRC.new 64
 
@@ -496,6 +501,15 @@ initContextWithOptions cacheBytes writeBufferBytes flushInterval = do
         _mpFlushCount = flushCount,
         _hashCache = hCache
       }
+
+-- LevelDB renames LOG to LOG.old when a database is opened and never reads
+-- either file, so the previous run's log would otherwise sit on disk until
+-- the restart after next.
+removeStaleInfoLog :: FilePath -> IO ()
+removeStaleInfoLog dbPath = do
+  let f = dbDir "h" ++ dbPath ++ "LOG.old"
+  exists <- doesFileExist f
+  when exists $ removeFile f
 
 runContextM ::
   (MonadUnliftIO m, MonadLoggerIO m) =>

@@ -416,6 +416,7 @@ blockstanbulSend' msg = do
         GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps)
         LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps)
         RunPreprepare b -> (VmRunPreprepare b : vms, p2ps)
+        ProposerStatus p -> (VmProposerStatus p : vms, p2ps)
         _ -> (vms, p2ps)
     vmEvenP2pCheckptFilterHelper [] = ([], [])
 

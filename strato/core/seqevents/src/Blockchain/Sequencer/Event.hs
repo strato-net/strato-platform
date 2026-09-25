@@ -192,6 +192,7 @@ data VmTask
   | VmRunPreprepare BDB.Block
   | VmSelfAddress Address
   | VmFlushMempool FlushMempoolRequest
+  | VmProposerStatus Bool
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmTask where
@@ -211,6 +212,7 @@ instance ShowConstructor VmTask where
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"
   showConstructor VmSelfAddress{} = "VmSelfAddress"
   showConstructor VmFlushMempool{} = "VmFlushMempool"
+  showConstructor VmProposerStatus{} = "VmProposerStatus"
 
 instance Binary IngestEvent
 
