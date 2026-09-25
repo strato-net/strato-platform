@@ -38,6 +38,7 @@ import Data.Char (isAlpha, isAlphaNum, isSpace)
 import Data.List (foldl')
 import qualified Data.Set as Set
 import Numeric
+import SolidVM.Model.SolidString (SolidString, stringToLabel)
 import SolidVM.Solidity.Parse.ParserTypes (SolidityParser)
 import Text.Parsec
 import Text.Parsec.Language (javaStyle)
@@ -65,12 +66,12 @@ reservedOp name =
 
 -- Same as 'P.identifier', with the reserved-word test as a 'Set' lookup
 -- instead of parsec's linear scan over the sorted list.
-identifier :: SolidityParser String
+identifier :: SolidityParser SolidString
 identifier = lexeme $ try $ do
   name <- ident
   if Set.member name reservedNames
     then unexpected ("reserved word " ++ show name)
-    else return name
+    else return (stringToLabel name)
 
 -- | @identStart@ then @many identLetter@ of 'solidityLanguage', as one span
 -- of the input. The parsec character parsers still run where the span starts

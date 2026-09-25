@@ -569,7 +569,7 @@ getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _ _) = mapMaybe
     go :: (Text, SVMType.Type) -> Maybe (T.Text, SqlType, Maybe T.Text)
     go (x, y) =
       (\v -> case y of
-        SVMType.UnknownLabel s -> (x, v, bool Nothing (Just $ T.pack s) $ Map.member s ccs)
+        SVMType.UnknownLabel s -> (x, v, bool Nothing (Just $ labelToText s) $ Map.member s ccs)
         _ -> (x, v, Nothing)
       ) <$> solidityTypeToSQLType isEvent Nothing cc y
 

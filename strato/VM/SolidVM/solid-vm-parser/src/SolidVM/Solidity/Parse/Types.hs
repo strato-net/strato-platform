@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
 
 -- |
@@ -14,6 +15,7 @@ import SolidVM.Solidity.Parse.Expression
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import Text.Parsec
+import SolidVM.Model.SolidString (stringToLabel)
 
 --import SolidVM.Solidity.Parse.Lexer (identifier)
 
@@ -57,7 +59,7 @@ simpleType = do
       name <- identifier
       member <- optionMaybe $ quiet $ try $ dot *> identifier
       case member of
-        Just m -> return $ SVMType.UnknownLabel (name ++ "." ++ m)
+        Just m -> return $ SVMType.UnknownLabel (name <> "." <> m)
         Nothing -> do
           isUserDefined <- isInUserDefinedTypes name
           if isUserDefined
@@ -89,7 +91,7 @@ anySimpleType =
           return $ (SVMType.UserDefined name (userTypeHelper' typ))
         else return $ (SVMType.UnknownLabel name)
     unknownLabelMemberParser = try $ do
-      name <- concat <$> sequence [identifier, dot, identifier]
+      name <- mconcat <$> sequence [identifier, stringToLabel <$> dot, identifier]
       return $ SVMType.UnknownLabel name
 
 simple :: String -> SVMType.Type -> SolidityParser SVMType.Type

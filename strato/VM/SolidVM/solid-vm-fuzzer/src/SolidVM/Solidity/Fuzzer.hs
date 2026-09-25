@@ -120,7 +120,7 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
                 _ -> do
                   let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
                   testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
-                    mResult <- fmap (fmap (withTestName $ T.pack fName)) $
+                    mResult <- fmap (fmap (withTestName fName)) $
                       if
                         | testPrefix `T.isPrefixOf` labelToText fName -> do
                             _ <- for (M.lookup "beforeEach" $ _functions c) $ test addr "beforeEach"

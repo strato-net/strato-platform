@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module SolidVM.Solidity.Parse.Statement where
 
@@ -11,7 +12,6 @@ import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
-import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
@@ -154,7 +154,7 @@ solidityTryCatchStatement = do
     pure (e, mReturns, sms, catchs)
   pure $ SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess (Map.fromList catchArr) a
 
-tupleDeclaration' :: SolidityParser [(String, SVMType.Type)]
+tupleDeclaration' :: SolidityParser [(SolidString, SVMType.Type)]
 tupleDeclaration' = parens $
   commaSep $ do
     partType <- simpleTypeExpression
@@ -252,7 +252,7 @@ revertStatement = try $ do
         choice
           [ braces $
               commaSep $ do
-                _ <- fmap stringToLabel identifier
+                _ <- identifier
                 void colon -- lol
                 fieldExpr <- expression
                 return fieldExpr,
@@ -273,7 +273,7 @@ location =
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
 varDefEntry tpar = do
-  ~(a, (t, l, i)) <- withPosition $ liftM3 (,,) tpar location $ fmap stringToLabel identifier
+  ~(a, (t, l, i)) <- withPosition $ liftM3 (,,) tpar location identifier
   pure $ VarDefEntry t l i a
 
 variableDefinitionStatement :: SolidityParser SimpleStatement
@@ -475,7 +475,7 @@ functionCall = do
         choice
           [ braces $
               commaSep $ do
-                _ <- fmap stringToLabel identifier
+                _ <- identifier
                 void colon -- haha
                 fieldExpr <- expression
                 return fieldExpr,
@@ -506,16 +506,16 @@ memberName :: SolidityParser SolidString
 memberName = do
   w <- peekWord
   case w of
-    Just word | word `notElem` ["call", "derive", "length"] -> fmap stringToLabel identifier `orElse` anyMemberName
+    Just word | word `notElem` ["call", "derive", "length"] -> identifier `orElse` anyMemberName
     _ -> anyMemberName
 
 anyMemberName :: SolidityParser SolidString
 anyMemberName =
   do
-    (reserved "call" >> return (stringToLabel "call"))
-    <|> (reserved "derive" >> return (stringToLabel "derive"))
-    <|> (reserved "length" >> return (stringToLabel "length"))
-    <|> fmap stringToLabel identifier
+    (reserved "call" >> return "call")
+    <|> (reserved "derive" >> return "derive")
+    <|> (reserved "length" >> return "length")
+    <|> identifier
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
 tuple = do
@@ -614,7 +614,7 @@ boolLiteral :: String -> Bool -> SolidityParser Expression
 boolLiteral kw b = uncurry BoolLiteral <$> withPosition (b <$ reserved kw)
 
 variableExpression :: SolidityParser Expression
-variableExpression = uncurry Variable <$> withPosition (stringToLabel <$> identifier)
+variableExpression = uncurry Variable <$> withPosition identifier
 
 newExpression :: SolidityParser Expression
 newExpression = do
@@ -646,7 +646,7 @@ myHexParser = try $ do
     val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit) <|> (between (symbol "\"") (symbol "\"") $ many1 hexDigit) --make this work with double quotes as well
     when (Prelude.length val' `mod` 2 /= 0) $ fail "hex digit must be even number"
     pure val'
-  return $ HexaLiteral a val
+  return $ HexaLiteral a (stringToLabel val)
 
 scientific :: SolidityParser Integer
 scientific = do
@@ -737,7 +737,7 @@ castLiteral =
       cast "int" (\a n -> NumberLiteral a n Nothing) integer,
       cast "bool" BoolLiteral boolContent,
       cast "decimal" (\a d -> DecimalLiteral a (WrappedDecimal d)) decimalContent,
-      cast "bytes" HexaLiteral bytesContent
+      cast "bytes" HexaLiteral (stringToLabel <$> bytesContent)
     ]
   where
     cast name f p = try $ do
@@ -817,5 +817,5 @@ inlineAssembly = do
           void comma
           match "32"
           return src
-      return $ MloadAdd32 (T.pack dst) (T.pack src)
+      return $ MloadAdd32 dst src
   pure $ AssemblyStatement e a

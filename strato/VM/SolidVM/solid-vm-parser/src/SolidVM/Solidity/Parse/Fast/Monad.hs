@@ -74,6 +74,7 @@ import Data.Source (SourceAnnotation (..), SourcePosition (..))
 import Data.Text (Text)
 import Data.Text.Internal (Text (..))
 import GHC.Exts (Int (I#), Int#, isTrue#, (+#), (==#))
+import SolidVM.Model.SolidString (SolidString)
 import SolidVM.Solidity.Parse.Fast.Lexer
 import SolidVM.Solidity.Parse.ParserTypes (ParserState)
 
@@ -206,7 +207,7 @@ afterWord w p = optionalIf (isWord w) (skip *> p)
 {-# INLINE afterWord #-}
 
 -- | An identifier, if one is next.
-optionalIdentifier :: P (Maybe String)
+optionalIdentifier :: P (Maybe SolidString)
 optionalIdentifier = optionalIf isIdentifier identifier
 
 -- | @p@ while the current token satisfies @f@.
@@ -350,13 +351,13 @@ reserved :: Text -> P ()
 reserved w = next (\t -> if tKind t == TWord && tText t == w then Just () else Nothing) <?> quoted w
 {-# INLINE reserved #-}
 
-identifier :: P String
-identifier = next (\t -> case tValue' t of Word _ s False -> Just s; _ -> Nothing) <?> "identifier"
+identifier :: P SolidString
+identifier = next (\t -> case tValue' t of Word s False -> Just s; _ -> Nothing) <?> "identifier"
 {-# INLINE identifier #-}
 
 -- | Any word, keyword or not.
-anyWord :: P String
-anyWord = next (\t -> case tValue' t of Word _ s _ -> Just s; _ -> Nothing) <?> "identifier"
+anyWord :: P SolidString
+anyWord = next (\t -> case tValue' t of Word s _ -> Just s; _ -> Nothing) <?> "identifier"
 
 -- | The operator or punctuation @s@.
 sym :: Text -> P ()

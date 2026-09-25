@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- |
 -- Module: Fast.Parser
 -- Description: Entry points of the token parser: run a rule over the tokens

@@ -207,7 +207,7 @@ namedArgs = braces $ commaSep (identifier *> sym ":" *> expression)
 memberAccess :: Expression -> P Expression
 memberAccess x = do
   (a, name) <- withPosition (sym "." *> anyWord)
-  pure (MemberAccess a x (stringToLabel name))
+  pure (MemberAccess a x name)
 
 -- | @x[i][j]@: one annotation for the whole group.
 arrayIndex :: Expression -> P Expression
@@ -252,10 +252,10 @@ primaryExpression = do
     _ -> empty
 
 variable :: P Expression
-variable = uncurry Variable <$> withPosition (stringToLabel <$> name)
+variable = uncurry Variable <$> withPosition name
   where
     name = next $ \t -> case tValue' t of
-      Word w s keyword | not keyword || Set.member w keywordVariables -> Just s
+      Word w keyword | not keyword || Set.member w keywordVariables -> Just w
       _ -> Nothing
 
 boolLiteral :: Bool -> P Expression
@@ -310,7 +310,7 @@ hexLiteral = do
     digits <- T.unpack . T.init . T.tail . tText <$> peek
     hexDigits digits
     digits <$ skip
-  pure (HexaLiteral a digits)
+  pure (HexaLiteral a (stringToLabel digits))
 
 hexDigits :: String -> P ()
 hexDigits digits
@@ -377,7 +377,7 @@ castLiteral = do
       "int" -> number
       "bool" -> BoolLiteral () <$> (next boolOf <?> "true or false")
       "decimal" -> DecimalLiteral () . WrappedDecimal <$> decimalContent
-      "bytes" -> HexaLiteral () <$> bytesContent
+      "bytes" -> HexaLiteral () . stringToLabel <$> bytesContent
       _ -> empty
   pure (a <$ e)
   where

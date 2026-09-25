@@ -85,7 +85,7 @@ userType = do
   name <- identifier
   member <- afterSym "." identifier
   case member of
-    Just m -> pure (SVMType.UnknownLabel (name ++ "." ++ m))
+    Just m -> pure (SVMType.UnknownLabel (name <> "." <> m))
     Nothing -> do
       aliases <- userDefinedTypes <$> getSt
       pure $ case Map.lookup name aliases of

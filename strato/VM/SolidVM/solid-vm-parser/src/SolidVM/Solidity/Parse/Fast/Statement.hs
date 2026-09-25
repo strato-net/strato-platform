@@ -13,7 +13,6 @@ where
 
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -231,7 +230,7 @@ variableDefinition = do
       (a, (t, loc, name)) <- withPosition $ do
         t <- typ
         loc <- location
-        name <- stringToLabel <$> identifier
+        name <- identifier
         pure (t, loc, name)
       pure (VarDefEntry t loc name a)
 
@@ -280,9 +279,9 @@ solidityTryCatch = do
       (Just "Error", _) -> failWith "catch Error takes one string parameter"
       (Just "Panic", _) -> failWith "catch Panic takes one uint parameter"
       (Nothing, _) -> failWith "catch takes one bytes parameter"
-      (Just other, _) -> failWith ("unknown catch clause " ++ other ++ "; expected Error or Panic")
+      (Just other, _) -> failWith ("unknown catch clause " ++ labelToString other ++ "; expected Error or Panic")
 
-catchParams :: P [(String, SVMType.Type)]
+catchParams :: P [(SolidString, SVMType.Type)]
 catchParams = parens $
   commaSep $ do
     t <- simpleTypeExpression
@@ -318,5 +317,5 @@ inlineAssembly = do
       src <- parens $ do
         reserved "add"
         parens (identifier <* comma <* next (\t -> if tKind t == TNumber && tValue t == 32 then Just () else Nothing))
-      pure (MloadAdd32 (T.pack dst) (T.pack src))
+      pure (MloadAdd32 dst src)
   pure (AssemblyStatement e a)

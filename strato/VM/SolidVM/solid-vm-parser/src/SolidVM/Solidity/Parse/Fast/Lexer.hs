@@ -100,8 +100,8 @@ tokenAt (Tokens _ ints vals arr) i =
 -- | What a token's text denotes. Every occurrence of a word shares one
 -- 'Word', every operator one static 'Op'.
 data Value
-  = -- | The word's text, its 'String' and whether it is in 'reservedNames'.
-    Word {-# UNPACK #-} !Text String !Bool
+  = -- | The word's text and whether it is in 'reservedNames'.
+    Word {-# UNPACK #-} !Text !Bool
   | -- | The operator as a 'String'.
     Op String
   | -- | An integer literal's value.
@@ -128,7 +128,7 @@ tValue t = case tValue' t of
 -- digits, or an error's message.
 tStr :: Token -> String
 tStr t = case tValue' t of
-  Word _ s _ -> s
+  Word w _ -> T.unpack w
   Op s -> s
   Decimal _ s -> s
   Str s -> s
@@ -137,7 +137,7 @@ tStr t = case tValue' t of
 -- | Whether the token is a word in 'reservedNames'.
 tReserved :: Token -> Bool
 tReserved t = case tValue' t of
-  Word _ _ r -> r
+  Word _ r -> r
   _ -> False
 {-# INLINE tReserved #-}
 
@@ -252,16 +252,18 @@ tokenize (Text arr start len) = runST $ do
 
       slice i j = Text arr i (j - i)
 
-      -- the 'Word' of the word at bytes [i, j), shared with its earlier occurrences
+      -- the 'Word' of the word at bytes [i, j), shared with its earlier
+      -- occurrences. Its text is a copy, not a slice: it ends up in the AST,
+      -- which must not keep the whole source alive.
       intern i j = do
         let txt = slice i j
             h = hashBytes i j .&. (buckets - 1)
-            look (w@(Word t _ _) : rest)
+            look (w@(Word t _) : rest)
               | t == txt = pure w
               | otherwise = look rest
             look _ = do
               bucket <- MV.unsafeRead names h
-              let w = Word txt (T.unpack txt) (Set.member txt reservedNames)
+              let w = Word (T.copy txt) (Set.member txt reservedNames)
               MV.unsafeWrite names h (w : bucket)
               pure w
         MV.unsafeRead names h >>= look

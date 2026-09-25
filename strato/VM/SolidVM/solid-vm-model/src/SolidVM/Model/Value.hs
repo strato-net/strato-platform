@@ -315,11 +315,11 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
-        _ -> case T.splitOn "." $ T.pack name of
+        _ -> case T.splitOn "." $ labelToText name of
           [_] -> return $ SContract name 0x0
-          (n:ns) -> case M.lookup (T.unpack n) $ cc ^. CC.contracts of
+          (n:ns) -> case M.lookup (textToLabel n) $ cc ^. CC.contracts of
             Nothing -> return $ SContract name 0x0
-            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . T.unpack $ T.intercalate "." ns)
+            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
 createDefaultValue _ _ _ = pure SNULL
 

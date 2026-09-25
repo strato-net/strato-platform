@@ -11,6 +11,7 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection
+import SolidVM.Model.SolidString (labelToText)
 import SolidVM.Solidity.StaticAnalysis.Types
 
 detector :: CompilerDetector
@@ -69,6 +70,6 @@ simpleStatementHelper a (VariableDefinition xs Nothing) =
       getAnn VarDefEntry {..} (Just (ns, w)) = Just (vardefName : ns, vardefContext <> w)
    in case foldr getAnn Nothing xs of
         Nothing -> [const "Redundant statement." <$> a]
-        Just ([n], ann) -> [const ("Uninitialized local variable " <> T.pack n <> ".") <$> ann]
-        Just (ns, ann) -> [const ("Uninitialized local variables " <> T.intercalate ", " (T.pack <$> ns) <> ".") <$> ann]
+        Just ([n], ann) -> [const ("Uninitialized local variable " <> labelToText n <> ".") <$> ann]
+        Just (ns, ann) -> [const ("Uninitialized local variables " <> T.intercalate ", " (labelToText <$> ns) <> ".") <$> ann]
 simpleStatementHelper _ _ = []

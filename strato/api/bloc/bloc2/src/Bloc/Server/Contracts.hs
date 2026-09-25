@@ -34,7 +34,6 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
-import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Maybe
@@ -199,8 +198,8 @@ getContractsState _ address mName mCount mOffset _ = withCodeCollectionCache $ d
       getFunction Func {..} =
         if isNothing _funcVisibility || _funcVisibility == Just Public || _funcVisibility == Just External
           then
-            let args = catMaybes $ sequence . (maybe "" Text.pack *** convertType) <$> _funcArgs
-                ret = catMaybes $ sequence . (fmap Text.pack *** convertType) <$> _funcVals
+            let args = catMaybes $ sequence . (fromMaybe "" *** convertType) <$> _funcArgs
+                ret = catMaybes $ sequence . (id *** convertType) <$> _funcVals
              in Just . valueToSolidityValue $ ValueFunction "dead" args ret
           else Nothing
 
@@ -214,10 +213,10 @@ getContractsState _ address mName mCount mOffset _ = withCodeCollectionCache $ d
           ]
       return $ case (decodeSolidVMValues $ map (key &&& value) storage') of
         Left err -> error $ Text.unpack err
-        Right vals -> (first Text.pack <$> contractFuncs contract') ++ vals
+        Right vals -> contractFuncs contract' ++ vals
     (StorageAddress {} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
-    ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
+    ([], Nothing) -> return $ contractFuncs contract'
     _ ->
       error $ "EVM contract state indexing no longer supported"
   $logDebugS "getContractsState/storage" $
@@ -299,7 +298,7 @@ getContractsFunctions ::
   m [FunctionName]
 getContractsFunctions _ contractId = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
-  pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
+  pure . map FunctionName . Map.keys $ _functions contract
 
 getContractsSymbols ::
   ( MonadIO m,
@@ -314,7 +313,7 @@ getContractsSymbols ::
   m [SymbolName]
 getContractsSymbols _ contractId = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
-  pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
+  pure . map SymbolName . Map.keys $ _storageDefs contract
 
 getContractsEnum ::
   ( MonadIO m,
@@ -330,7 +329,7 @@ getContractsEnum ::
   m [EnumValue]
 getContractsEnum _ contractId (EnumName enumName) = withCodeCollectionCache $ do
   contract <- getContractsDetails contractId
-  pure . maybe [] (map (EnumValue . Text.pack) . fst) . Map.lookup (Text.unpack enumName) $ _enums contract
+  pure . maybe [] (map EnumValue . fst) . Map.lookup enumName $ _enums contract
 
 getContractsStateMapping :: -- ( A.Selectable Account AddressState m
 -- , (Keccak256 `A.Selectable` SourceMap) m

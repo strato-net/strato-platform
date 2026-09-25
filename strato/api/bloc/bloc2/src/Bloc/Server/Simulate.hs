@@ -311,7 +311,7 @@ marshalOuterCall target fn args =
     Nothing ->
       throwIO . CouldNotFind $ "Couldn't find contract at address " <> Text.pack (format target)
     Just (theContract, cc) -> do
-      case M.lookup (Text.unpack fn) (theContract ^. functions) of
+      case M.lookup fn (theContract ^. functions) of
         Just _ -> pure ()
         Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> fn <> "'"
       marshalFunctionArgs theContract (Just cc) fn args

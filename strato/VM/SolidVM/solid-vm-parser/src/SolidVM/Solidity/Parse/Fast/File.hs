@@ -12,6 +12,7 @@ where
 import qualified Data.Map as M
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Import
+import SolidVM.Model.SolidString (labelToString)
 import qualified SolidVM.Model.CodeCollection as SolidVM
 import SolidVM.Solidity.Parse.Declarations (Declaration (..), SourceUnitF (..), SourceUnit)
 import SolidVM.Solidity.Parse.Fast.Declarations
@@ -38,14 +39,14 @@ sourceUnit' = do
     "function" -> freeFunction
     "struct" -> do
       (a, (name, fields)) <- withPosition structFields
-      pure (FLStruct (T.pack name) (mkStruct a fields))
+      pure (FLStruct name (mkStruct a fields))
     "enum" -> do
       (a, (name, fields)) <- withPosition enumFields
-      pure (FLEnum (T.pack name) (mkEnum a fields))
+      pure (FLEnum name (mkEnum a fields))
     "error" -> do
       (a, (name, args)) <- withPosition errorArgs
       semi
-      pure (FLError (T.pack name) (mkError a args))
+      pure (FLError name (mkError a args))
     w | w `elem` ["contract", "interface", "abstract", "library"] -> solidityContract
     _ -> constant
 
@@ -107,7 +108,7 @@ fileImport = do
       pure (Braced items e a)
     item = do
       (a, (name, as)) <- withPosition ((,) <$> identifier <*> afterWord "as" identifier)
-      pure (maybe (Named (T.pack name) a) (\n -> Aliased (T.pack name) (T.pack n) a) as)
+      pure (maybe (Named name a) (\n -> Aliased name n a) as)
 
 -- | A free function is always internal.
 freeFunction :: P SourceUnit
@@ -115,12 +116,12 @@ freeFunction = do
   (name, decl) <- functionDeclaration True
   case decl of
     FuncDeclaration f | SolidVM._funcVisibility f == Just SolidVM.Internal -> pure (FLFunc name f)
-    _ -> failWith ("free function " ++ name ++ " is internal; it cannot be given another visibility")
+    _ -> failWith ("free function " ++ labelToString name ++ " is internal; it cannot be given another visibility")
 
 -- | Only constants may be declared at file level.
 constant :: P SourceUnit
 constant = do
   (name, decl) <- stateVariable
   case decl of
-    ConstantDeclaration c -> pure (FLConstant (T.pack name) c)
-    _ -> failWith ("only constants can be declared at file level; " ++ name ++ " is a variable")
+    ConstantDeclaration c -> pure (FLConstant name c)
+    _ -> failWith ("only constants can be declared at file level; " ++ labelToString name ++ " is a variable")

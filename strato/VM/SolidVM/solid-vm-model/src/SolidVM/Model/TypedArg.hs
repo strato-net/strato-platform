@@ -42,6 +42,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Vector as V
 import GHC.Generics (Generic)
+import SolidVM.Model.SolidString (labelToString)
 import SolidVM.Model.Value (Value (..), Variable (..))
 
 data TypedArg
@@ -109,7 +110,7 @@ valueToTypedArg v = case v of
   SStruct _ fields -> do
     let pairs = M.toList fields  -- Data.Map.toList is canonically ordered by key
     converted <- traverse (\(name, var) -> (name,) <$> variableToTypedArg var) pairs
-    pure $ Just $ TAStruct [(n, ta) | (n, Just ta) <- converted]
+    pure $ Just $ TAStruct [(labelToString n, ta) | (n, Just ta) <- converted]
   _ -> pure Nothing
 
 -- | Resolve an aggregate's 'Variable' back to a 'TypedArg', reading

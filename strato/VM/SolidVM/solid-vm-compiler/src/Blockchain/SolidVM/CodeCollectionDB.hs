@@ -186,7 +186,7 @@ compileSourceNoInheritanceWith opts isRunningTests typeCheck initCodeMap = runEx
         sourceUnits <- parseSourceWith opts fileName src
         foldrM (\u ufu -> maybe (pure ufu) (first (IEx . (<$ (def :: SourceAnnotation ()))) . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
-      userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
+      userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, stringToLabel typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
         FLContract c -> do
           let ctrct = c & userDefined .~ userDefinedFromFile ss
@@ -194,19 +194,19 @@ compileSourceNoInheritanceWith opts isRunningTests typeCheck initCodeMap = runEx
         FLFunc name fdec ->
           pure . Just $ def & ufuUnits . at name ?~ FUFunction fdec
         FLConstant name cnst ->
-          pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUConstant cnst
+          pure . Just $ def & ufuUnits . at name ?~ FUConstant cnst
         FLStruct name (Def.Struct fs _ a) ->
           let fls = (\(n, t) -> (n, t, a)) <$> fs
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUStruct fls
+           in pure . Just $ def & ufuUnits . at name ?~ FUStruct fls
         FLEnum name (Def.Enum ns _ a) ->
           let fle = (ns, a)
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUEnum fle
+           in pure . Just $ def & ufuUnits . at name ?~ FUEnum fle
         FLError name (Def.Error ps _ a) ->
           let fler = (\(n, t) -> (n, t, a)) <$> ps
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUError fler
-        FLUsing u -> pure . Just $ def & ufuUnits . at (show u) ?~ FUUsing u
+           in pure . Just $ def & ufuUnits . at name ?~ FUError fler
+        FLUsing u -> pure . Just $ def & ufuUnits . at (stringToLabel (show u)) ?~ FUUsing u
         Pragma _ n v ->
-          pure . Just $ def & ufuPragmas . at n ?~ v
+          pure . Just $ def & ufuPragmas . at (labelToString n) ?~ v
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap

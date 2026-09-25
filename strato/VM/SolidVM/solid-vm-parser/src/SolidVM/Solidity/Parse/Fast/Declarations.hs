@@ -62,20 +62,20 @@ solidityContract = do
     [] -> pure Nothing
     [c] -> pure (Just c)
     _ -> failWith "more than one constructor"
-  functions <- foldM overload Map.empty [(stringToLabel n, f) | (n, FuncDeclaration f) <- declarations]
+  functions <- foldM overload Map.empty [(n, f) | (n, FuncDeclaration f) <- declarations]
   pure . FLContract $
     SolidVM.Contract
-      { SolidVM._contractName = stringToLabel name,
+      { SolidVM._contractName = name,
         SolidVM._parents = parents,
-        SolidVM._storageDefs = Map.fromList [(stringToLabel n, v) | (n, VariableDeclaration v) <- declarations],
+        SolidVM._storageDefs = Map.fromList [(n, v) | (n, VariableDeclaration v) <- declarations],
         SolidVM._userDefined = Map.empty,
-        SolidVM._constants = Map.fromList [(stringToLabel n, c) | (n, ConstantDeclaration c) <- declarations],
-        SolidVM._enums = Map.fromList [(stringToLabel n, (vals, x)) | (n, EnumDeclaration (SolidVM.Enum vals _ x)) <- declarations],
+        SolidVM._constants = Map.fromList [(n, c) | (n, ConstantDeclaration c) <- declarations],
+        SolidVM._enums = Map.fromList [(n, (vals, x)) | (n, EnumDeclaration (SolidVM.Enum vals _ x)) <- declarations],
         SolidVM._structs = Map.fromList [(n, (\(k, v) -> (k, v, x)) <$> vals) | (n, StructDeclaration (SolidVM.Struct vals _ x)) <- declarations],
         SolidVM._errors = Map.fromList [(n, (\(k, v) -> (k, v, x)) <$> vals) | (n, ErrorDeclaration (SolidVM.Error vals _ x)) <- declarations],
-        SolidVM._events = Map.fromList [(stringToLabel n, e) | (n, EventDeclaration e) <- declarations],
+        SolidVM._events = Map.fromList [(n, e) | (n, EventDeclaration e) <- declarations],
         SolidVM._functions = functions,
-        SolidVM._modifiers = Map.fromList [(stringToLabel n, m) | (n, ModifierDeclaration m) <- declarations],
+        SolidVM._modifiers = Map.fromList [(n, m) | (n, ModifierDeclaration m) <- declarations],
         SolidVM._usings = [u | (_, UsingDeclaration u) <- declarations],
         SolidVM._constructor = constructor,
         SolidVM._contractType = kind,
@@ -83,7 +83,7 @@ solidityContract = do
         SolidVM._contractContext = a
       }
   where
-    dotted = T.unpack . T.intercalate "." . map T.pack <$> sepBy1Sym identifier "."
+    dotted = T.intercalate "." <$> sepBy1Sym identifier "."
     -- a function may be redefined only with different parameter types
     overload fs (name, new) = case Map.lookup name fs of
       Nothing -> pure (Map.insert name new fs)
@@ -94,10 +94,10 @@ solidityContract = do
     params f = map snd (SolidVM._funcArgs f)
 
 -- | Anything a contract declares; @free@ for a declaration at file level.
-declaration :: Bool -> P (String, Declaration)
+declaration :: Bool -> P (SolidString, Declaration)
 declaration free = declaration' free <?> "declaration"
 
-declaration' :: Bool -> P (String, Declaration)
+declaration' :: Bool -> P (SolidString, Declaration)
 declaration' free = do
   t <- peek
   case tText t of
@@ -116,7 +116,7 @@ declaration' free = do
 ------------------------------------------------------------------------------
 -- Types
 
-structFields :: P (String, [(String, SVMType.Type)])
+structFields :: P (SolidString, [(SolidString, SVMType.Type)])
 structFields = do
   reserved "struct"
   name <- identifier
@@ -130,35 +130,35 @@ structFields = do
       semi
       pure (name, t)
 
-mkStruct :: SourceAnnotation () -> [(String, SVMType.Type)] -> SolidVM.Def
+mkStruct :: SourceAnnotation () -> [(SolidString, SVMType.Type)] -> SolidVM.Def
 mkStruct a fields =
   SolidVM.Struct
-    { SolidVM.fields = zipWith (\(n, v) i -> (stringToLabel n, SolidVM.FieldType i v)) fields [0 ..],
+    { SolidVM.fields = zipWith (\(n, v) i -> (n, SolidVM.FieldType i v)) fields [0 ..],
       SolidVM.bytes = 0,
       SolidVM.context = a
     }
 
-structDeclaration :: P (String, Declaration)
+structDeclaration :: P (SolidString, Declaration)
 structDeclaration = do
   (a, (name, fields)) <- withPosition structFields
   pure (name, StructDeclaration (mkStruct a fields))
 
-enumFields :: P (String, [String])
+enumFields :: P (SolidString, [SolidString])
 enumFields = do
   reserved "enum"
   name <- identifier
   fields <- braces (commaSep1 identifier)
   pure (name, fields)
 
-mkEnum :: SourceAnnotation () -> [String] -> SolidVM.Def
-mkEnum a fields = SolidVM.Enum {SolidVM.names = map stringToLabel fields, SolidVM.bytes = 0, SolidVM.context = a}
+mkEnum :: SourceAnnotation () -> [SolidString] -> SolidVM.Def
+mkEnum a fields = SolidVM.Enum {SolidVM.names = fields, SolidVM.bytes = 0, SolidVM.context = a}
 
-enumDeclaration :: P (String, Declaration)
+enumDeclaration :: P (SolidString, Declaration)
 enumDeclaration = do
   (a, (name, fields)) <- withPosition enumFields
   pure (name, EnumDeclaration (mkEnum a fields))
 
-errorArgs :: P (String, [(Text, SVMType.Type)])
+errorArgs :: P (SolidString, [(Text, SVMType.Type)])
 errorArgs = do
   reserved "error"
   name <- identifier
@@ -166,18 +166,18 @@ errorArgs = do
     commaSep $ do
       t <- simpleTypeExpression
       arg <- identifier
-      pure (T.pack arg, t)
+      pure (arg, t)
   pure (name, args)
 
 mkError :: SourceAnnotation () -> [(Text, SVMType.Type)] -> SolidVM.Def
 mkError a args =
   SolidVM.Error
-    { SolidVM.params = zipWith (\(k, v) i -> (textToLabel k, SolidVM.IndexedType i v Nothing)) args [0 ..],
+    { SolidVM.params = zipWith (\(k, v) i -> (k, SolidVM.IndexedType i v Nothing)) args [0 ..],
       SolidVM.bytes = 0,
       SolidVM.context = a
     }
 
-errorDeclaration :: P (String, Declaration)
+errorDeclaration :: P (SolidString, Declaration)
 errorDeclaration = do
   (a, (name, args)) <- withPosition errorArgs
   semi
@@ -205,7 +205,7 @@ data Keyword = KConstant | KPublic | KPrivate | KInternal | KImmutable | KRecord
   deriving (Eq)
 
 -- | @T [keywords] name [= value];@
-stateVariable :: P (String, Declaration)
+stateVariable :: P (SolidString, Declaration)
 stateVariable = do
   (a, (t, keywords, name, value)) <- withPosition $ do
     t <- simpleTypeExpression
@@ -219,11 +219,11 @@ stateVariable = do
     [KPublic] -> pure (Just SolidVM.Public)
     [KInternal] -> pure (Just SolidVM.Internal)
     [KPrivate] -> pure (Just SolidVM.Private)
-    _ -> failWith ("more than one visibility for " ++ name)
+    _ -> failWith ("more than one visibility for " ++ labelToString name)
   if KConstant `elem` keywords
     then case value of
       Just v -> pure (name, ConstantDeclaration (SolidVM.ConstantDecl t visibility v a))
-      Nothing -> failWith ("constant " ++ name ++ " must be initialized")
+      Nothing -> failWith ("constant " ++ labelToString name ++ " must be initialized")
     else pure (name, VariableDeclaration (SolidVM.VariableDecl t visibility value a (KImmutable `elem` keywords)))
   where
     keyword t = case tText t of
@@ -241,7 +241,7 @@ stateVariable = do
 -- | @function name@, @constructor@, @receive@ or @fallback@ with its
 -- parameters, modifiers and body. In a contract, a function named like it is
 -- its constructor.
-functionDeclaration :: Bool -> P (String, Declaration)
+functionDeclaration :: Bool -> P (SolidString, Declaration)
 functionDeclaration free = do
   (a, (name, func)) <- withPosition $ do
     t <- peek
@@ -271,7 +271,7 @@ functionBody free = do
   end <- getPos
   contents <- blockOrSemi
   when (free && (virtual || isJust overrides)) $ failWith "free functions cannot be virtual or override"
-  let indexed xs = zipWith (\(name, (loc, t)) i -> (if T.null name then Nothing else Just (textToLabel name), SolidVM.IndexedType i t loc)) xs [0 ..]
+  let indexed xs = zipWith (\(name, (loc, t)) i -> (if T.null name then Nothing else Just name, SolidVM.IndexedType i t loc)) xs [0 ..]
   pure
     SolidVM.Func
       { SolidVM._funcArgs = indexed args,
@@ -300,7 +300,7 @@ parameters = parens $
       "calldata" | tKind k == TWord -> Just (False, Just Calldata)
       _ -> Nothing)
     name <- fromMaybe "" <$> optionalIdentifier
-    pure (T.pack name, (indexed, loc, t))
+    pure (name, (indexed, loc, t))
 
 data Modifier
   = ReturnsMod [(Text, (Maybe Location, SVMType.Type))]
@@ -335,7 +335,7 @@ functionModifiers = do
       "payable" -> MutabilityMod SolidVM.Payable <$ reserved "payable"
       "virtual" -> VirtualMod <$ reserved "virtual"
       "override" -> OverrideMod . fromMaybe [] <$> (reserved "override" *> optionalIf (isSym "(") (parens (commaSep identifier)))
-      _ -> CallMod <$> ((,) <$> (stringToLabel <$> identifier) <*> (fromMaybe [] <$> optionalIf (isSym "(") (parens (commaSep expression))))
+      _ -> CallMod <$> ((,) <$> identifier <*> (fromMaybe [] <$> optionalIf (isSym "(") (parens (commaSep expression))))
   pure
     ( concat [v | ReturnsMod v <- mods],
       listToMaybe [v | VisibilityMod v <- mods],
@@ -345,7 +345,7 @@ functionModifiers = do
       [v | CallMod v <- mods]
     )
 
-eventDeclaration :: P (String, Declaration)
+eventDeclaration :: P (SolidString, Declaration)
 eventDeclaration = do
   (a, (name, logs, anonymous)) <- withPosition $ do
     reserved "event"
@@ -364,7 +364,7 @@ eventDeclaration = do
           }
     )
 
-modifierDeclaration :: P (String, Declaration)
+modifierDeclaration :: P (SolidString, Declaration)
 modifierDeclaration = do
   (a, (name, args, contents)) <- withPosition $ do
     reserved "modifier"
@@ -378,7 +378,7 @@ modifierDeclaration = do
       ModifierDeclaration
         Xabi.Modifier
           { Xabi._modifierArgs = zipWith named args [0 ..],
-            Xabi._modifierSelector = T.pack name,
+            Xabi._modifierSelector = name,
             Xabi._modifierContents = contents,
             Xabi._modifierContext = a
           }

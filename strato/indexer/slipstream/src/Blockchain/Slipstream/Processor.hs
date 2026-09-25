@@ -57,6 +57,7 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
+import SolidVM.Model.SolidString (labelToText)
 import Data.Traversable (for)
 --import Database.Persist
 import Database.Persist.Postgresql
@@ -172,7 +173,7 @@ getCollectionsFromContract :: ContractF () -> [(T.Text, [SVMType.Type], SVMType.
 getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . _storageDefs
   where filterAndExtract name vd = case extractKeys (_varType vd) of
           ([], _) -> Nothing
-          (ks, v) -> Just (T.pack name, ks, v)
+          (ks, v) -> Just (labelToText name, ks, v)
         extractKeys (SVMType.Array entry _)         = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
         extractKeys (SVMType.Mapping _ k entry _ _) = let (ks, v) = extractKeys entry in (k:ks, v)
         extractKeys v                               = ([], v)
@@ -214,7 +215,7 @@ processTheMessages messages = do
       let collectionNamesAndTypes = getCollectionsFromContract c
       $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
 
-      let nameParts@(cr', n'') = (cr, T.pack $ _contractName c)
+      let nameParts@(cr', n'') = (cr, labelToText $ _contractName c)
       $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", name=" <> n''
       multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
@@ -222,9 +223,9 @@ processTheMessages messages = do
       let cc' = SourceAnnotation (initialPosition "") (initialPosition "") () <$ cc
       inherited <- case getInheritedContracts cc' (_contractName c) of
         Left err -> do
-          $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
+          $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> labelToText (_contractName c) <> ": " <> T.pack (show err)
           pure []
-        Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
+        Right inheritedContracts -> pure $ map (labelToText . _contractName) inheritedContracts
       indexFkeys <- createIndexTable c cc nameParts inherited
       collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited

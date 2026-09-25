@@ -233,6 +233,7 @@ spec = do
     let parseStatement = fmap (fmap (const ())) . run (statement <* eof)
         scases =
           [ ("x++;", SimpleStatement $ ExpressionStatement $ PlusPlus () $ Variable () "x"),
+            ("delete m[k];", SimpleStatement $ ExpressionStatement $ Unitary () "delete" $ IndexAccess () (Variable () "m") (Just $ Variable () "k")),
             ( "assembly { dst := mload(add(src, 32)) }",
               AssemblyStatement $ MloadAdd32 "dst" "src"
             ),

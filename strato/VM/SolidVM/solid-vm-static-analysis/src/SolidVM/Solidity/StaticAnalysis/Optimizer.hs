@@ -126,12 +126,12 @@ functionHelperForUserDefined f = f {_funcArgs = tForm $ _funcArgs f, _funcVals =
             (xxxx, _) -> (xxxx, (IndexedType z y loc))
         )
 
-pushVar :: String -> SVMType.Type -> SSS ()
+pushVar :: SolidString -> SVMType.Type -> SSS ()
 pushVar n t = modify $ \(ms',uc) -> case ms' of
   [] -> ([], uc)
   (m:ms) -> ((M.insert n t m):ms, uc)
 
-getVar :: String -> SSS (Maybe SVMType.Type)
+getVar :: SolidString -> SSS (Maybe SVMType.Type)
 getVar n = foldr (\a b -> M.lookup n a <|> b) Nothing <$> gets fst
 
 withFrame :: SSS a -> SSS a
@@ -157,7 +157,7 @@ checkIntBounds ::
   Maybe Integer ->
   Maybe Integer ->
   a ->
-  String ->
+  SolidString ->
   ExpressionF a ->
   SSS (ExpressionF a)
 checkIntBounds s mL mU b var expr = gets snd >>= \uc -> getVariableByName var >>= \case
@@ -165,7 +165,7 @@ checkIntBounds s mL mU b var expr = gets snd >>= \uc -> getVariableByName var >>
     pure $ InlineBoundsCheck b mL mU expr
   _ -> pure expr
 
-checkUintUnderflow :: a -> String -> ExpressionF a -> SSS (ExpressionF a)
+checkUintUnderflow :: a -> SolidString -> ExpressionF a -> SSS (ExpressionF a)
 checkUintUnderflow = checkIntBounds (Just False) (Just 0) Nothing
 
 optimizeStatements :: [Statement] -> SSS [Statement]

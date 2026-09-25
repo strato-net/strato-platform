@@ -63,13 +63,13 @@ data StatementF a
   | Return (Maybe (ExpressionF a)) a
   | Throw (ExpressionF a) a
   | ModifierExecutor a
-  | EmitStatement String [(Maybe String, (ExpressionF a))] a
+  | EmitStatement SolidString [(Maybe SolidString, (ExpressionF a))] a
   | AssemblyStatement InlineAssembly a
   | SimpleStatement (SimpleStatementF a) a
-  | RevertStatement (Maybe String) (ArgListF a) a
+  | RevertStatement (Maybe SolidString) (ArgListF a) a
   | UncheckedStatement [StatementF a] a
-  | SolidityTryCatchStatement (ExpressionF a) (Maybe [(String, Type)]) [StatementF a] (Map.Map String (Maybe (String, Type), [StatementF a])) a
-  | TryCatchStatement [StatementF a] (Map.Map String (Maybe [String], [StatementF a])) a
+  | SolidityTryCatchStatement (ExpressionF a) (Maybe [(SolidString, Type)]) [StatementF a] (Map.Map SolidString (Maybe (SolidString, Type), [StatementF a])) a
+  | TryCatchStatement [StatementF a] (Map.Map SolidString (Maybe [SolidString], [StatementF a])) a
   deriving (Show, Eq, Generic, Functor, NFData, ToJSON, FromJSON, Foldable, Traversable)
 
 instance Binary a => Binary (StatementF a)

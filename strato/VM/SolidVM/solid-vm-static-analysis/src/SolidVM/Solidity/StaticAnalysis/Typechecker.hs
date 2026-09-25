@@ -48,7 +48,7 @@ data R = R
     codeCollection :: Annotated CodeCollectionF,
     contract :: Annotated ContractF,
     function :: Maybe (Annotated FuncF),
-    functName :: Maybe String,
+    functName :: Maybe SolidString,
     modifier :: Maybe (Annotated ModifierF)
   }
 
@@ -127,7 +127,7 @@ showType (SVMType.Array t l) =
     ]
 showType (SVMType.Contract n) = "contract " <> labelToText n
 showType (SVMType.Mapping _ k v kn vn) =
-  let p = maybe "" ((" " <>) . T.pack)
+  let p = maybe "" ((" " <>) . labelToText)
    in "mapping (" <> showType k <> (p kn) <> " => " <> (showType v) <> (p vn) <> ")"
 showType SVMType.Variadic = "variadic"
 
@@ -303,7 +303,7 @@ recursively ctx f = go
     recurse parentName = do
       cc <- asks codeCollection
       case M.lookup parentName $ cc ^. contracts of
-        Nothing -> pure . bottom $ "Could not find parent contract " <> T.pack parentName <$ ctx
+        Nothing -> pure . bottom $ "Could not find parent contract " <> labelToText parentName <$ ctx
         Just c' -> local (\r -> r {contract = c'}) go
 
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
@@ -1106,7 +1106,7 @@ checkOverrides ::
 checkOverrides cc c funcName f =
   let ctx = f ^. funcContext
       mOs = f ^. funcOverrides
-      tFuncName = T.pack funcName
+      tFuncName = labelToText funcName
       parentsWithSameFunc' =
         catMaybes $
           sequence . (_contractName &&& sequence . (id &&& (M.lookup funcName . _functions)))
@@ -1124,7 +1124,7 @@ checkOverrides cc c funcName f =
                 [ "Function ",
                   tFuncName,
                   " is not marked as override, but its parent(s) ",
-                  T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc,
+                  T.intercalate ", " $ labelToText . fst <$> parentsWithSameFunc,
                   " have a function by the same name"
                 ]
                 <$ ctx
@@ -1136,7 +1136,7 @@ checkOverrides cc c funcName f =
                         [ "Function ",
                           tFuncName,
                           " is marked as override, but parent contract ",
-                          T.pack n,
+                          labelToText n,
                           " does not mark the function as virtual"
                         ]
                         <$ ctx
@@ -1146,7 +1146,7 @@ checkOverrides cc c funcName f =
                   [ "Function ",
                     tFuncName,
                     " is marked as override, but does not specify which base contract to override. Options include ",
-                    T.intercalate ", " $ T.pack <$> psNub
+                    T.intercalate ", " $ labelToText <$> psNub
                   ]
                   <$ ctx
           Just os ->
@@ -1212,8 +1212,8 @@ modifierHelper test cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
       swap = uncurry $ flip (,)
       args =
         ( \(it, n) ->
-            ( T.unpack n,
-              VarDefEntry (Just $ indexedTypeType it) Nothing (T.unpack n) _modifierContext
+            ( n,
+              VarDefEntry (Just $ indexedTypeType it) Nothing n _modifierContext
             )
         )
           <$> (swap <$> _modifierArgs)
@@ -1259,7 +1259,7 @@ functionHelper test cc c funcName f@Func {..} =
                       argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                         fmap catMaybes . for (M.elems argVals) $ \case
                           VarDefEntry mType _ _ x -> for mType $ \case
-                            SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                            SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> labelToText l) <$> getVarTypeByName' l x
                             t -> pure $ Static t x
                           _ -> pure Nothing
                       mods <- flip evalStateT ((Nothing, argVals) :| []) $
@@ -1309,7 +1309,7 @@ functionHelper test cc c funcName f@Func {..} =
                           argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                             fmap catMaybes . for (M.elems argVals) $ \case
                               VarDefEntry mType _ _ x -> for mType $ \case
-                                SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                                SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> labelToText l) <$> getVarTypeByName' l x
                                 t -> pure $ Static t x
                               _ -> pure Nothing
                           mods <- flip evalStateT ((Nothing, argVals) :| []) $
@@ -1340,7 +1340,7 @@ functionHelper test cc c funcName f@Func {..} =
                     argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
                       fmap catMaybes . for (M.elems argVals) $ \case
                         VarDefEntry mType _ _ x -> for mType $ \case
-                          SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                          SVMType.UnknownLabel l -> withAnn ("Unknown type: " <> labelToText l) <$> getVarTypeByName' l x
                           t -> pure $ Static t x
                         _ -> pure Nothing
                     mods <- flip evalStateT ((Nothing, argVals) :| []) $
@@ -1787,14 +1787,14 @@ getVarType' "abi" ctx = pure $ Static (SVMType.UnknownLabel "abi") ctx
 getVarType' "super" ctx = pure $ Static (SVMType.UnknownLabel "super") ctx
 getVarType' name ctx = do
   c <- asks contract
-  let varDefy = M.lookup name (_storageDefs c)
+  let varDefy = M.lookup (stringToLabel name) (_storageDefs c)
   case varDefy of
     Just _ -> do
       case _varType <$> varDefy of
         Just (SVMType.UserDefined ggg b) -> return (Mutable $ Static (SVMType.UserDefined ggg b) ctx)
         _ -> getVarTypeByName' (stringToLabel name) ctx
     Nothing -> do
-      case filter (userDefinedHelper name . _varType) [x | x <- (M.elems (_storageDefs c))] of
+      case filter (userDefinedHelper (stringToLabel name) . _varType) [x | x <- (M.elems (_storageDefs c))] of
         (l:_) ->
           let vt = _varType l
            in pure . Mutable $ case _varInitialVal l of
@@ -1802,11 +1802,11 @@ getVarType' name ctx = do
                 _ -> Static (SVMType.actual vt) ctx
         [] -> getVarTypeByName' (stringToLabel name) ctx
 
-userDefinedHelper :: String -> Type -> Bool
+userDefinedHelper :: SolidString -> Type -> Bool
 userDefinedHelper nam (SVMType.UserDefined a _) = if a == nam then True else False
 userDefinedHelper _ _ = False
 
-userTypeHelper' :: Maybe String -> SVMType.Type
+userTypeHelper' :: Maybe SolidString -> SVMType.Type
 userTypeHelper' (Just "bool") = SVMType.Bool
 userTypeHelper' (Just "string") = SVMType.String $ Just True
 userTypeHelper' (Just "int") = (SVMType.Int (Just True) Nothing)
@@ -1826,7 +1826,7 @@ getFunctionByNameRecursively name ctx = do
       Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
       Nothing -> case M.lookup name $ c ^. events of
         Just theEvent -> pure $ eventType ctx theEvent
-        Nothing -> pure . bottom $ "Unknown variable " <> T.pack name <$ ctx
+        Nothing -> pure . bottom $ "Unknown variable " <> labelToText name <$ ctx
 
 getModifierByNameRecursively :: SolidString -> SolidString -> SourceAnnotation Text -> SSS Type'
 getModifierByNameRecursively funcName name ctx = recursively ctx $ do
@@ -1841,7 +1841,7 @@ getModifierByNameRecursively funcName name ctx = recursively ctx $ do
           else case c' ^. constructor of
             Just f -> pure $ functionType cc ctx name f
             Nothing -> pure $ Function (Unit ctx) (Unit ctx) ctx [] [] False
-        Nothing -> pure . bottom $ "Could not find contract modifier " <> T.pack name <$ ctx
+        Nothing -> pure . bottom $ "Could not find contract modifier " <> labelToText name <$ ctx
 
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
@@ -1965,7 +1965,7 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
           errorParams
           (map (fst . snd) (M.toList catchMap))
 
-      paramsToDefs :: [((String, IndexedType, a), String)] -> [Annotated VarDefEntryF]
+      paramsToDefs :: [((SolidString, IndexedType, a), SolidString)] -> [Annotated VarDefEntryF]
       paramsToDefs [] = []
       paramsToDefs (((_, a, _), b) : xs) = (VarDefEntry (Just $ indexedTypeType a) Nothing b x) : (paramsToDefs xs)
       localVarDefs = concatMap paramsToDefs zipped
@@ -1977,11 +1977,11 @@ statementHelper (TryCatchStatement tryStatmenets catchMap x) = do
 statementHelper (SolidityTryCatchStatement expr mtpl successStatements catchMap x) = do
   cs <- tcExpr expr
 
-  let errValsToVarDefs :: [Maybe (String, SVMType.Type)] -> [Annotated VarDefEntryF]
+  let errValsToVarDefs :: [Maybe (SolidString, SVMType.Type)] -> [Annotated VarDefEntryF]
       errValsToVarDefs [] = []
       errValsToVarDefs (Nothing : xs) = errValsToVarDefs xs
       errValsToVarDefs ((Just (name, ty)) : xs) = (VarDefEntry (Just ty) Nothing name x) : (errValsToVarDefs xs)
-      successValsToVarDefs :: Maybe [(String, SVMType.Type)] -> [Annotated VarDefEntryF]
+      successValsToVarDefs :: Maybe [(SolidString, SVMType.Type)] -> [Annotated VarDefEntryF]
       successValsToVarDefs Nothing = []
       successValsToVarDefs (Just xs) = errValsToVarDefs $ map Just xs
   let localVarDefs = (errValsToVarDefs $ (map (fst . snd) (M.toList catchMap))) ++ successValsToVarDefs mtpl
