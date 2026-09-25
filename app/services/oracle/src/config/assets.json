@@ -120,8 +120,8 @@
           "comment": "Dogecoin (DOGE). Native UTXO L1 - not an ERC-20, no bridge route, no STRATO token. Price-only feed. The key is the symbol as left-aligned ASCII, so it is derived from the feed name rather than assigned: hex-decode it and you get DOGE back. Consumers read it via PriceOracle.getAssetPrice(0x444f474500000000000000000000000000000000)."
         },
         "CBDOGE": {
-          "targetAssetAddress": "3d859c0a30e6bb2f71ce09be59d82f87e64e4dc1",
-          "comment": "Coinbase Wrapped DOGE (cbDOGE). Base 0xcbd06e5a2b0c65597161de254aa074e489deb510. Helium STRATO token used until mainnet token exists."
+          "targetAssetAddress": "27920067dc1f55fcc0d2ee73f07d15d1aafe9d2a",
+          "comment": "Coinbase Wrapped DOGE (cbDOGE)."
         },
         "BOOE": {
           "targetAssetAddress": "3103810e081d965f5f8b19195fd7f5f859ccb4f9",
