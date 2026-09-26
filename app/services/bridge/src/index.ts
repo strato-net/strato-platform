@@ -47,8 +47,9 @@ app.use(
 
 // Exposed Routes
 app.get("/health", async (_, res) => {
-  const errorFileExists = await healthMonitor.errorFileExists();
-  res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
+  const health = healthMonitor.snapshot();
+  const errorLogPresent = await healthMonitor.errorFileExists();
+  res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
 });
 
 app.get("/metrics/deposits", (_, res) => {
@@ -183,6 +184,7 @@ app.listen(port, async () => {
     startMultiChainDepositPolling();
     startNativeRedemptionPolling();
     await initializeStratoPolling();
+    healthMonitor.markReady();
 
     logInfo(
       "BridgeService",

@@ -1,3 +1,4 @@
+import { healthMonitor } from "../utils/healthMonitor";
 import { reconcileRecordedDepositReviews } from "../services/depositRecoveryService";
 import {
   config,
@@ -471,12 +472,15 @@ const pollChainForDeposits = async (chainInfo: ChainInfo): Promise<void> => {
     return;
   }
   pollingChains.add(chainId);
+  const healthOperation = `externalDepositChain:${chainId}`;
+  healthMonitor.beginOperation(healthOperation);
   try {
     do {
       trailingPolls.delete(chainId);
       await pollChainForDepositsUnlocked(chainInfo);
     } while (trailingPolls.has(chainId));
   } finally {
+    healthMonitor.finishOperation(healthOperation);
     pollingChains.delete(chainId);
     trailingPolls.delete(chainId);
   }
@@ -558,6 +562,7 @@ export const reconcileExternalDeposits = async (
 export const startMultiChainDepositPolling = () => {
   const interval = config.polling.bridgeInInterval || 100_000;
   const poll = async () => {
+    if (!healthMonitor.beginPoll("externalDeposits", interval)) return;
     try {
       const [chains, info] = await Promise.all([getEnabledChains(), getBridgeInfo()]);
       if (!chains.size) return logInfo("AlchemyPolling", "No enabled chains");
@@ -566,13 +571,19 @@ export const startMultiChainDepositPolling = () => {
       const infos = Array.from(chains.values());
       infos.forEach(syncRealtimeSubscription);
       (await Promise.allSettled(infos.map(pollChainForDeposits)))
-        .forEach((result, i) => result.status === "rejected" &&
+        .forEach((result, i) => {
+          if (result.status !== "rejected") return;
+          healthMonitor.failPoll("externalDeposits");
           logError("AlchemyPolling", result.reason, {
             operation: "pollChainForDeposits",
             chain: infos[i],
-          }));
+          });
+        });
     } catch (e) {
+      healthMonitor.failPoll("externalDeposits");
       logError("AlchemyPolling", e as Error, { operation: "startMultiChainDepositPolling" });
+    } finally {
+      healthMonitor.finishPoll("externalDeposits");
     }
   };
   poll();

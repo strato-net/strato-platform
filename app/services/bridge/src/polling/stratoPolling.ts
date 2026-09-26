@@ -24,6 +24,7 @@ import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
+import { healthMonitor } from "../utils/healthMonitor";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -41,11 +42,14 @@ const startNonOverlappingPolling = (
   poll: () => Promise<void>,
 ): void => {
   const run = async () => {
+    if (!healthMonitor.beginPoll(operation, pollingInterval)) return;
     try {
       await poll();
     } catch (e: any) {
+      healthMonitor.failPoll(operation);
       logError("StratoPolling", e as Error, { operation });
     } finally {
+      healthMonitor.finishPoll(operation);
       setTimeout(run, pollingInterval);
     }
   };
@@ -69,6 +73,7 @@ export const startWithdrawalRequestPolling = (): void => {
         await confirmWithdrawalBatch(batch as NonEmptyArray<WithdrawalInfo>);
       }
     } catch (e: any) {
+      healthMonitor.failPoll("startWithdrawalRequestPolling");
       logError("StratoPolling", e as Error, {
         operation: "startWithdrawalRequestPolling",
       });
@@ -213,6 +218,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
         }
       }
     } catch (e: any) {
+      healthMonitor.failPoll("startNativeDepositInitiatedPolling");
       logError("StratoPolling", e as Error, {
         operation: "startNativeDepositInitiatedPolling",
       });
@@ -274,6 +280,7 @@ export const startWithdrawalTxPolling = (): void => {
           await handleRejectedWithdrawalBatch(batch as NonEmptyArray<Number>);
         }
     } catch (e: any) {
+      healthMonitor.failPoll("startWithdrawalTxPolling");
       logError("StratoPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
         error: e.message,
@@ -317,6 +324,7 @@ export const startNativeWithdrawalRequestPolling = (): void => {
         }
       }
     } catch (e: any) {
+      healthMonitor.failPoll("startNativeWithdrawalRequestPolling");
       logError("StratoPolling", e as Error, {
         operation: "startNativeWithdrawalRequestPolling",
       });
@@ -364,6 +372,7 @@ export const startNativeWithdrawalTxPolling = (): void => {
         }
       }
     } catch (e: any) {
+      healthMonitor.failPoll("startNativeWithdrawalTxPolling");
       logError("StratoPolling", e as Error, {
         operation: "startNativeWithdrawalTxPolling",
         error: e.message,

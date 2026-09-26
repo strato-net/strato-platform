@@ -41,6 +41,7 @@ export const TRANSFER_EVENT_SIGNATURE =
 
 // Error file configuration
 export const ERROR_FILE_NAME = "bridge-error.flag";
+export const HEALTH_POLL_TIMEOUT_MS = 15 * 60_000;
 
 const config = {
   auth: {

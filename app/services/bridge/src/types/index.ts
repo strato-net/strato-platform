@@ -294,3 +294,12 @@ export interface PersistedWithdrawalReview {
   approvalDeadline: string;
   proposal: ProposeTransactionProps;
 }
+
+export interface PollHealthState {
+  intervalMs: number;
+  startedAt: number;
+  completedAt?: number;
+  running: boolean;
+  failed: boolean;
+  runFailed: boolean;
+}

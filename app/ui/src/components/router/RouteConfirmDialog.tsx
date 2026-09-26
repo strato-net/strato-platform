@@ -1,5 +1,4 @@
 import CopyButton from "@/components/ui/copy";
-import type { AutoRouteDepositStage } from "@/lib/bridge/types";
 import type { RouteConfirmation } from "@/interface/swap";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -8,10 +7,9 @@ import { formatAmount, formatUnits, truncateAddress } from "@/utils/numberUtils"
 import { getRouteActionLabel, normalizeRouteAddress } from "@/lib/route";
 import RoutePreview from "./RoutePreview";
 
-export default function RouteConfirmDialog({ confirmation, pending, stage, onClose, onConfirm }: {
+export default function RouteConfirmDialog({ confirmation, pending, onClose, onConfirm }: {
   confirmation: RouteConfirmation | null;
   pending: boolean;
-  stage?: AutoRouteDepositStage | null;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -71,7 +69,6 @@ export default function RouteConfirmDialog({ confirmation, pending, stage, onClo
         )}
         {bridge && <p className="text-xs text-muted-foreground">Deposit from {networkName} → {bridge.targetStratoSymbol} on STRATO.</p>}
         {quote.steps.length > 0 && <RoutePreview steps={quote.steps} tokens={tokens} minFinalOut={quote.minFinalOut} outputToken={outputToken} showMinimum={false} />}
-        {pending && stage && <p role="status" className="rounded-lg bg-muted p-3 text-sm">{stage.step && `Step ${stage.step} of ${stage.total}: `}{stage.label}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>Cancel</Button>
           <Button onClick={onConfirm} disabled={pending}>{pending ? "Submitting…" : confirmLabel}</Button>

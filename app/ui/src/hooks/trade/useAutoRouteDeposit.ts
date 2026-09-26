@@ -10,8 +10,8 @@ import {
   BridgeToken,
   CompositeRouteQuoteResponse,
 } from "@strato/shared-types";
-import { assertAutoRouteQuote } from "@/lib/bridge/utils";
-import { AutoRouteDepositResult, AutoRouteDepositStage, NetworkSummary } from "@/lib/bridge/types";
+import { assertAutoRouteQuote, normalizeError } from "@/lib/bridge/utils";
+import { AutoRouteDepositProgress, AutoRouteDepositResult, NetworkSummary } from "@/lib/bridge/types";
 import { useUser } from "@/context/UserContext";
 import {
   assertExternalWalletRecipient,
@@ -39,7 +39,7 @@ import { ensureHexPrefix, safeParseUnits } from "@/utils/numberUtils";
 
 export function useAutoRouteDeposit() {
   const [isPending, setIsPending] = useState(false);
-  const [stage, setStage] = useState<AutoRouteDepositStage | null>(null);
+  const [progress, setProgress] = useState<AutoRouteDepositProgress | null>(null);
   const submitting = useRef(false);
   const { toast } = useToast();
   const account = useAccount();
@@ -82,14 +82,21 @@ export function useAutoRouteDeposit() {
     if (submitting.current) throw new Error("A deposit is already being submitted");
     submitting.current = true;
     setIsPending(true);
-    setStage({ label: "Checking deposit…" });
+    const nativeRedemption = route.routeType === "native";
+    const progressBase = {
+      approvalRequired: false,
+      permitRequired: false,
+      isRedemption: nativeRedemption,
+      chainId: Number(network.chainId),
+    };
+    let submittedHash: `0x${string}` | undefined;
+    setProgress({ ...progressBase, step: "preparing" });
     try {
       quote = structuredClone(quote);
       const recipient = identity.recipient;
       if (!recipient) throw new Error("STRATO recipient is unavailable");
       let approvalConfirmed = false;
       const amountWei = safeParseUnits(amount, Number(route.externalDecimals ?? 18));
-      const nativeRedemption = route.routeType === "native";
       const assertCurrentQuote = () => {
         const current = currentIdentity.current;
         if (current.recipient?.toLowerCase() !== recipient.toLowerCase() ||
@@ -134,11 +141,11 @@ export function useAutoRouteDeposit() {
       }
       assertCurrentQuote();
       if (account.chainId !== expectedChainId) {
-        setStage({ label: `Switch to ${network.chainName} in your wallet` });
         await switchChainAsync({ chainId: expectedChainId });
       }
 
-      const isNative = BigInt(route.externalToken || "0") === 0n;
+      const isNative = !nativeRedemption && BigInt(route.externalToken || "0") === 0n;
+      progressBase.permitRequired = !nativeRedemption && !isNative;
       const validation = nativeRedemption ? { isValid: true } : await validateRouterContract({
         depositRouterAddress: network.depositRouter,
         amount,
@@ -164,26 +171,25 @@ export function useAutoRouteDeposit() {
               actionToken: quote.depositAction.actionToken,
               minFinalOut: BigInt(quote.depositAction.minFinalOut),
             };
-      let totalSteps = 1;
       let txHash: `0x${string}`;
       if (nativeRedemption) {
         const approval = await checkTokenApproval({
           token: route.externalToken, owner: externalEvmWalletAddress, amount: amountWei,
           chainId: network.chainId, spender: route.externalBridge!,
         });
-        totalSteps = approval.isApproved ? 1 : 2;
+        progressBase.approvalRequired = !approval.isApproved;
         if (!approval.isApproved) {
           assertCurrentQuote();
-          setStage({ step: 1, total: totalSteps, label: `Approve ${route.externalSymbol} in your wallet` });
+          setProgress({ ...progressBase, step: "approve" });
           const approvalHash = await writeContractAsync({
             address: ensureHexPrefix(route.externalToken), abi: ERC20_ABI, functionName: "approve",
             args: [ensureHexPrefix(route.externalBridge!), amountWei], chain, account: account.address,
           });
-          setStage({ step: 1, total: totalSteps, label: "Waiting for approval confirmation…" });
           let approved: boolean;
           try {
             approved = await waitForTransaction(approvalHash, network.chainId);
           } catch {
+            setProgress(null);
             return { txHash: approvalHash, status: "pending", type: "approval" };
           }
           if (!approved) throw new Error("Native token approval reverted");
@@ -195,7 +201,7 @@ export function useAutoRouteDeposit() {
           recipient, account: externalEvmWalletAddress, chainId: network.chainId, actionIntent,
         });
         assertCurrentQuote();
-        setStage({ step: totalSteps, total: totalSteps, label: "Confirm deposit in your wallet" });
+        setProgress({ ...progressBase, step: "confirm_tx" });
         txHash = await writeContractAsync({
           address: ensureHexPrefix(route.externalBridge!), abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
           ...(actionIntent ? {
@@ -219,7 +225,7 @@ export function useAutoRouteDeposit() {
           actionIntent,
         });
         assertCurrentQuote();
-        setStage({ step: 1, total: 1, label: "Confirm deposit in your wallet" });
+        setProgress({ ...progressBase, step: "confirm_tx" });
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),
@@ -255,10 +261,10 @@ export function useAutoRouteDeposit() {
           amount: amountWei,
           chainId: network.chainId,
         });
-        totalSteps = approval.isApproved ? 2 : 3;
+        progressBase.approvalRequired = !approval.isApproved;
         if (!approval.isApproved) {
           assertCurrentQuote();
-          setStage({ step: 1, total: totalSteps, label: `Approve ${route.externalSymbol} in your wallet` });
+          setProgress({ ...progressBase, step: "approve" });
           const approvalHash = await writeContractAsync({
             address: ensureHexPrefix(route.externalToken),
             abi: ERC20_ABI,
@@ -270,11 +276,11 @@ export function useAutoRouteDeposit() {
             chain,
             account: account.address,
           });
-          setStage({ step: 1, total: totalSteps, label: "Waiting for approval confirmation…" });
           let approved: boolean;
           try {
             approved = await waitForTransaction(approvalHash, network.chainId);
           } catch {
+            setProgress(null);
             return { txHash: approvalHash, status: "pending", type: "approval" };
           }
           if (!approved) {
@@ -286,7 +292,7 @@ export function useAutoRouteDeposit() {
         const nonce = getPermit2Nonce();
         assertCurrentQuote();
         const deadline = BigInt(Math.min(quote.deadline, Math.floor(Date.now() / 1000) + 900));
-        setStage({ step: totalSteps - 1, total: totalSteps, label: "Sign Permit2 authorization in your wallet" });
+        setProgress({ ...progressBase, step: "sign_permit" });
         const signature = await signTypedDataAsync({
           domain: getPermit2Domain(network.chainId),
           types: getPermit2Types(),
@@ -320,7 +326,7 @@ export function useAutoRouteDeposit() {
           ensureHexPrefix(route.stratoToken),
         ] as const;
         assertCurrentQuote();
-        setStage({ step: totalSteps, total: totalSteps, label: "Confirm deposit in your wallet" });
+        setProgress({ ...progressBase, step: "confirm_tx" });
         txHash = actionIntent
           ? await writeContractAsync({
               address: ensureHexPrefix(network.depositRouter),
@@ -379,12 +385,14 @@ export function useAutoRouteDeposit() {
         });
       }
 
-      setStage({ step: totalSteps, total: totalSteps, label: "Waiting for deposit confirmation…" });
+      submittedHash = txHash;
+      setProgress({ ...progressBase, step: "waiting_tx", txHash });
       let confirmed: boolean;
       try {
         confirmed = await waitForTransaction(txHash, network.chainId);
       } catch {
         // A timeout or RPC error does not establish whether a broadcast transaction failed.
+        setProgress(null);
         return { txHash, status: "pending", type: "deposit" };
       }
       if (!confirmed) {
@@ -399,18 +407,22 @@ export function useAutoRouteDeposit() {
         }
         throw new Error("External bridge transaction reverted");
       }
+      setProgress({ ...progressBase, step: "submitted", txHash });
       return { txHash, status: "confirmed", type: "deposit" };
+    } catch (error) {
+      setProgress({ ...progressBase, step: "error", error: normalizeError(error).userMessage, txHash: submittedHash });
+      throw error;
     } finally {
       submitting.current = false;
       setIsPending(false);
-      setStage(null);
     }
   };
 
   return {
     execute,
     isPending,
-    stage,
+    progress,
+    closeProgress: () => setProgress(null),
     connectedAddress: externalEvmWalletAddress,
     connectedChainId: account.chainId,
   };

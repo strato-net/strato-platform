@@ -4,6 +4,7 @@ import { BridgeToken } from "@strato/shared-types";
 import { ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import { WAD } from "@/lib/constants";
+import type { WithdrawalPreview } from "@/lib/bridge/types";
 
 interface BridgeConfirmationModalProps {
   open: boolean;
@@ -14,8 +15,10 @@ interface BridgeConfirmationModalProps {
   cancelText: string;
   fromNetwork: string;
   toNetwork: string;
-  amount: string;
+  amount?: string;
   selectedToken: BridgeToken | null;
+  preview?: WithdrawalPreview;
+  recipient?: string;
 }
 
 const BridgeConfirmationModal: React.FC<BridgeConfirmationModalProps> = ({
@@ -27,8 +30,10 @@ const BridgeConfirmationModal: React.FC<BridgeConfirmationModalProps> = ({
   cancelText,
   fromNetwork,
   toNetwork,
-  amount,
+  amount = "",
   selectedToken,
+  preview,
+  recipient,
 }) => {
   return (
     <Modal
@@ -89,10 +94,22 @@ const BridgeConfirmationModal: React.FC<BridgeConfirmationModalProps> = ({
               <span className="font-medium text-foreground">{selectedToken?.externalName} ({selectedToken?.externalSymbol})</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Amount:</span>
-              <span className="font-medium text-foreground">{amount} {selectedToken?.rebaseFactor && selectedToken?.stratoTokenSymbol}</span>
+              <span className="text-muted-foreground">{preview ? "Amount escrowed:" : "Amount:"}</span>
+              <span className="font-medium text-foreground">{preview ? formatUnits(preview.escrowAmount, selectedToken?.stratoTokenDecimals ?? 18) : amount} {(preview || selectedToken?.rebaseFactor) && selectedToken?.stratoTokenSymbol}</span>
             </div>
-            {selectedToken?.rebaseFactor && amount && (() => {
+            {preview && selectedToken && (
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Receive:</span>
+                <span className="font-medium text-foreground">{formatUnits(preview.externalAmount, Number(selectedToken.externalDecimals))} {selectedToken.externalSymbol}</span>
+              </div>
+            )}
+            {recipient && (
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Recipient:</span>
+                <span className="font-medium text-foreground break-all text-right">{recipient}</span>
+              </div>
+            )}
+            {!preview && selectedToken?.rebaseFactor && amount && (() => {
               try {
                 const factor = BigInt(selectedToken.rebaseFactor!);
                 if (factor <= 0n) return null;
@@ -118,6 +135,7 @@ const BridgeConfirmationModal: React.FC<BridgeConfirmationModalProps> = ({
           <div className="text-sm text-amber-800 dark:text-amber-200">
             <div className="font-medium mb-1">Important Notice</div>
             <div>Withdrawals are subject to liquidity availability and are not instant.</div>
+            {preview?.manualReview && <div>This amount requires manual approval. Processing time depends on that approval.</div>}
           </div>
         </div>
       </div>

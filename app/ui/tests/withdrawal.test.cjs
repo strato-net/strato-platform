@@ -9,7 +9,7 @@ const address = digit => digit.repeat(40);
 function load(file, imports) {
   const exports = {};
   const source = fs.readFileSync(path.join(__dirname, '../src', file), 'utf8');
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: {
+  vm.runInNewContext(ts.transpileModule(source, { fileName: file, compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX,
   } }).outputText, { exports, require: imports });
   return exports;
@@ -105,13 +105,13 @@ for (const routeType of ['standard', 'native']) {
 }
 
 function widgetHarness(route, isAppAuthenticated = true) {
-  const { parseUnits, formatUnits, maxUint256 } = require('viem');
+  const { parseUnits, formatUnits } = require('viem');
   const state = [], refs = [], submitted = [], toasts = [];
   let cursor = 0, refCursor = 0, tree;
   const user = { isLoggedIn: true, isAppAuthenticated, userAddress: address('4'), externalEvmWalletAddress: `0x${address('5')}` };
   const fees = { usdstBalance: WAD.toString(), voucherBalance: '0', fetchUsdstBalance: async () => {} };
   const parse = (value, decimals = 18) => { try { return parseUnits(value, decimals); } catch { return 0n; } };
-  const numberUtils = { safeParseUnits: parse, formatUnits: (value, decimals = 18) => formatUnits(BigInt(value), decimals), formatAmount: value => value, truncateAddress: value => value };
+  const numberUtils = { safeParseUnits: parse, formatUnits: (value, decimals = 18) => formatUnits(BigInt(value), decimals), formatAmount: value => value, formatBalance: value => value, truncateAddress: value => value };
   const transfer = load('utils/transferValidation.ts', id => {
     if (id === '@/lib/constants') return { DECIMAL: 18 };
     if (id === '@/utils/numberUtils') return numberUtils;
@@ -124,8 +124,7 @@ function widgetHarness(route, isAppAuthenticated = true) {
       useRef: initial => refs[refCursor++] ?? (refs[refCursor - 1] = { current: initial }),
     };
     if (id === 'react/jsx-runtime') return require(id);
-    if (id === 'viem') return { maxUint256 };
-    if (id === 'lucide-react') return { ArrowDown: wrapper };
+    if (id === 'lucide-react') return { Loader2: wrapper };
     if (id === '@/context/UserContext') return { useUser: () => user };
     if (id === '@/context/TokenContext') return { useTokenContext: () => fees };
     if (id === '@/context/UserTokensContext') return { useUserTokens: () => ({ activeTokens: [], fetchTokens: async () => {} }) };
@@ -134,16 +133,16 @@ function widgetHarness(route, isAppAuthenticated = true) {
     if (id === '@/hooks/trade/useRouteExecute') return { useWithdrawalExecute: () => ({ isPending: false, progress: null, closeProgress: () => {}, mutateAsync: async params => { submitted.push(params); } }) };
     if (id === '@tanstack/react-query') return { useQuery: () => ({ data: (10n * WAD).toString(), refetch: async () => {} }) };
     if (id === '@/lib/constants') return { WAD, BRIDGE_OUT_FEE: '0.02', usdstAddress: address('9') };
+    if (id === '@/lib/bridge/constants') return { BRIDGE_MODE_LABELS: { bridge: { title: 'Bridge Out Your Tokens', description: '', amountLabel: 'Amount' } } };
     if (id === '@/lib/route') return { normalizeRouteAddress: value => value.toLowerCase().replace(/^0x/, '') };
     if (id === '@/lib/bridge/utils') return utils;
     if (id === '@/utils/numberUtils') return numberUtils;
     if (id === '@/utils/transferValidation') return transfer;
     if (id === '@/components/ui/button') return { Button: wrapper };
-    if (id === '@/components/ui/copy') return { default: () => null };
     if (id === '@/components/ui/input') return { Input: wrapper };
-    if (id === '@/components/ui/dialog') return Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, wrapper]));
-    if (id.startsWith('./')) return { default: wrapper };
-    if (['@/lib/axios', '@/lib/auth'].includes(id)) return {};
+    if (id === '@/components/ui/label') return { Label: wrapper };
+    if (id.startsWith('@/components/') || id.startsWith('./')) return { default: wrapper };
+    if (id === '@/lib/axios') return {};
     throw new Error(`Unexpected import ${id}`);
   });
   const props = { active: true, feeBalancesReady: true, onPendingChange: () => {}, catalog: {
@@ -157,17 +156,57 @@ function widgetHarness(route, isAppAuthenticated = true) {
   }
   const change = (id, value) => { find(p => p.id === id || p['aria-label'] === id).props.onChange({ target: { value } }); render(); };
   const click = text => { const element = find(p => p.children === text && p.onClick); assert.ok(element, text); assert.ok(!element.props.disabled, `${text} enabled`); element.props.onClick(); render(); };
+  const confirmModal = () => { const modal = find(p => p.onOk); assert.ok(modal, 'confirmation modal'); assert.ok(modal.props.open, 'confirmation modal open'); modal.props.onOk(); render(); };
   render();
-  return { render, change, click, submitted, toasts, fees, user, props };
+  return { render, change, click, confirmModal, find, submitted, toasts, fees, user, props };
 }
+
+test('withdrawal summary and confirmation render exact preview amounts and the pinned recipient', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const numbers = load('utils/numberUtils.ts', id => id === 'json-bigint' ? { default: require(id) } : require(id));
+  const imports = id => {
+    if (id === '@/utils/numberUtils') return numbers;
+    if (id === '@/lib/constants') return { WAD, DECIMAL: 18, BRIDGE_OUT_FEE: '0.02' };
+    if (id === 'antd') return { Modal: ({ children }) => React.createElement('div', null, children) };
+    return require(id);
+  };
+  const Summary = load('components/bridge/TransactionSummary.tsx', imports).default;
+  const Confirmation = load('components/bridge/BridgeConfirmationModal.tsx', imports).default;
+  for (const [route, amount, received, escrowed] of [
+    [native, '1', '0.0000000000000001', '1.0'],
+    [standard, '1.0000009', '1.0', '1.0'],
+    [{ ...standard, rebaseRequired: true, rebaseFactor: (3n * WAD).toString(), manualReviewThreshold: '1' }, '0.0000006666667', '0.000002', '0.000000666666666667'],
+  ]) {
+    const h = widgetHarness(route);
+    h.change('withdrawal-amount', amount);
+    const summaryProps = h.find(p => p.balanceImpact).props;
+    const summary = renderToStaticMarkup(React.createElement(Summary, summaryProps));
+    assert.ok(summary.includes(`${received} ${route.externalSymbol}`), summary);
+    h.click('Bridge Out');
+    const confirmationProps = h.find(p => p.onOk).props;
+    const confirm = renderToStaticMarkup(React.createElement(Confirmation, confirmationProps));
+    assert.ok(confirm.includes(`${received} ${route.externalSymbol}`), confirm);
+    assert.ok(confirm.includes(`${escrowed} ${route.stratoTokenSymbol}`), confirm);
+    assert.ok(confirm.includes(h.user.externalEvmWalletAddress));
+    assert.equal(confirm.includes('requires manual approval'), !!confirmationProps.preview.manualReview);
+    h.user.externalEvmWalletAddress = `0x${address('6')}`;
+    h.change('withdrawal-amount', '2');
+    assert.equal(renderToStaticMarkup(React.createElement(Confirmation, h.find(p => p.onOk).props)), confirm,
+      'review must keep the original amounts and recipient until reconfirmed');
+  }
+  const empty = widgetHarness(native);
+  const summary = renderToStaticMarkup(React.createElement(Summary, empty.find(p => p.balanceImpact).props));
+  assert.ok(summary.includes('— wGOLDST'));
+});
 
 for (const route of [standard, native]) {
   for (const isAppAuthenticated of [true, false]) {
     test(`${route.routeType} review submits the same asset and recipient for ${isAppAuthenticated ? 'STRATO' : 'wallet-only'} login`, async () => {
       const h = widgetHarness(route, isAppAuthenticated);
       h.change('withdrawal-amount', '1');
-      h.click('Review withdrawal');
-      h.click('Confirm withdrawal');
+      h.click('Bridge Out');
+      h.confirmModal();
       await Promise.resolve();
       assert.equal(h.submitted.length, 1);
       const params = h.submitted[0];
@@ -183,14 +222,14 @@ for (const change of ['account', 'recipient', 'session', 'fee balance', 'fee bal
   test(`a late ${change} change requires withdrawal review again`, () => {
     const h = widgetHarness(standard);
     h.change('withdrawal-amount', '1');
-    h.click('Review withdrawal');
+    h.click('Bridge Out');
     if (change === 'account') h.user.userAddress = address('6');
-    if (change === 'recipient') h.change('External receiving address', `0x${address('6')}`);
+    if (change === 'recipient') h.user.externalEvmWalletAddress = `0x${address('6')}`;
     if (change === 'session') h.user.isAppAuthenticated = false;
     if (change === 'fee balance') h.fees.usdstBalance = '0';
     if (change === 'fee balance unavailable') h.fees.usdstBalanceError = 'Fee balances unavailable. Retrying…';
     h.render();
-    h.click('Confirm withdrawal');
+    h.confirmModal();
     assert.equal(h.submitted.length, 0);
     assert.equal(h.toasts[0].title, 'Review withdrawal again');
   });

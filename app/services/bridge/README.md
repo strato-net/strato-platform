@@ -354,3 +354,21 @@ Upgrade order:
 Disabling auto-routing blocks new routed quotes and is checked again during on-chain execution. Already-sent routed redemptions remain recordable and settle through the source-token fallback when permission is disabled, including if disabled after recording. This follows EAB behavior and avoids stranding externally burned representations. The toggle does not change withdrawal permissions.
 
 Do not enable routed redemptions until steps 1–3 are complete. No deployment or governance action is performed by the source changes themselves.
+
+## Runtime health
+
+The bridge runtime's `/health` returns HTTP 200 only after startup validation and
+an initial successful pass of every enabled polling loop. It returns HTTP 503
+with `status: false` and per-poll `checks` while starting, after a whole-poll
+failure, or when polling stalls. A successful retry clears that poll's failure.
+A running poll or external deposit reconciliation taking over 15 minutes is
+stalled; a missing scheduled poll is stale after its interval plus 15 minutes
+(`HEALTH_POLL_TIMEOUT_MS`). Empty queues and intentionally paused deposits do
+not fail health when their polling checks succeed.
+
+Individual deposit/withdrawal failures caught for retry or review remain in
+logs and `data/bridge-error.flag`. The file is historical evidence, not a health
+gate; `errorLogPresent: true` does not change the HTTP status. A healthy response
+confirms polling readiness, not that every transfer has settled. Monitor review
+queues and item failures separately. No error-file deletion is needed to recover
+health, and cursors/pending deposits are unchanged. Verifier health is unchanged.

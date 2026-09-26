@@ -1,5 +1,6 @@
 import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
+import type { DepositStep } from "@/components/bridge/DepositProgressModal";
 
 export interface BalanceResponse {
   balance: string;
@@ -243,10 +244,14 @@ export interface AutoRouteQuoteBinding {
   slippageBps: number;
 }
 
-export interface AutoRouteDepositStage {
-  label: string;
-  step?: number;
-  total?: number;
+export interface AutoRouteDepositProgress {
+  step: DepositStep;
+  txHash?: string;
+  error?: string;
+  approvalRequired: boolean;
+  permitRequired: boolean;
+  isRedemption: boolean;
+  chainId: number;
 }
 
 export interface WithdrawalPreview {

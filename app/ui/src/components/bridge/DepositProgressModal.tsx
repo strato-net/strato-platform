@@ -4,10 +4,12 @@ import { CheckCircle2, Loader2, Clock, AlertCircle } from "lucide-react";
 import { formatTxHash, getExplorerUrl } from "@/lib/bridge/utils";
 
 export type DepositStep = 
+  | "preparing"
   | "approve"
   | "sign_permit"
   | "confirm_tx"
   | "waiting_tx"
+  | "submitted"
   | "complete"
   | "error";
 
@@ -18,6 +20,8 @@ interface DepositProgressModalProps {
   chainId?: number;
   isNative?: boolean;
   isRedemption?: boolean;
+  approvalRequired?: boolean;
+  permitRequired?: boolean;
   error?: string;
   onClose?: () => void;
 }
@@ -29,6 +33,8 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
   chainId,
   isNative = true,
   isRedemption = false,
+  approvalRequired = !isNative,
+  permitRequired = !isNative && !isRedemption,
   error,
   onClose,
 }) => {
@@ -37,29 +43,28 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
 
   const getSteps = () => {
     // For Bridge In, include approve and sign_permit steps only if it's not native (ERC20 token)
-    const steps = [];
-    if (!isNative) {
-      steps.push(
-        { key: "approve", label: "Approve Token", description: "Approve token spending" },
-        { key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" }
-      );
+    const steps = [{ key: "preparing", label: "Check Deposit", description: "Check your account, network, and deposit details" }];
+    if (approvalRequired) {
+      steps.push({ key: "approve", label: "Approve Token", description: "Approve token spending" });
+    }
+    if (permitRequired) {
+      steps.push({ key: "sign_permit", label: "Sign Permit", description: "Sign permit message in your wallet" });
     }
     steps.push(
       { key: "confirm_tx", label: "Confirm Transaction", description: "Confirm transaction in your wallet" },
       { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
       {
-        key: "complete",
-        label: isRedemption ? "Processing Redemption" : "Processing Deposit",
-        description: isRedemption
-          ? "All set! STRATO is processing your redemption (1-2 min). You can close this modal anytime."
-          : "All set! STRATO is processing your deposit (1-2 min). You can close this modal anytime."
+        key: "submitted",
+        label: "Awaiting STRATO Settlement",
+        description: "Your external transaction is confirmed. Verification and STRATO settlement are still pending. Any trade or fallback occurs during settlement. You can close this modal and track your deposit in recent activity."
       }
     );
     return steps;
   };
 
   const steps = getSteps();
-  const rawStepIndex = steps.findIndex((s) => s.key === currentStep);
+  const awaitingSettlement = currentStep === "complete" || currentStep === "submitted";
+  const rawStepIndex = steps.findIndex((s) => s.key === (awaitingSettlement ? "submitted" : currentStep));
   const isError = currentStep === "error";
 
   // Track the last known active step so we can show it as failed on error
@@ -84,7 +89,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
 
   const getStepIcon = (stepIndex: number) => {
     const step = steps[stepIndex];
-    const isCompleteStep = step?.key === "complete";
+    const isSettlementStep = step?.key === "submitted";
     
     if (effectiveStepIndex === -1) {
       return <Clock className="w-5 h-5 text-muted-foreground" />;
@@ -96,7 +101,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       if (isError) {
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       }
-      if (isCompleteStep) {
+      if (isSettlementStep) {
         return <Clock className="w-5 h-5 text-yellow-500" />;
       }
       return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />;
@@ -115,15 +120,15 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       if (isError) {
         return "error";
       }
-      if (currentStep === "complete") {
-        return "completed";
+      if (awaitingSettlement) {
+        return "settling";
       }
       return "active";
     }
     return "pending";
   };
 
-  const canClose = currentStep === "complete" || currentStep === "error";
+  const canClose = awaitingSettlement || currentStep === "error";
 
   return (
     <Modal
@@ -132,8 +137,8 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
           <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
             {currentStep === "error" ? (
               <AlertCircle className="w-5 h-5 text-red-500" />
-            ) : currentStep === "complete" ? (
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
+            ) : awaitingSettlement ? (
+              <Clock className="w-5 h-5 text-yellow-500" />
             ) : (
               <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
             )}
@@ -141,8 +146,8 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
           <span className="text-lg font-semibold text-foreground">
             {currentStep === "error" 
               ? (isRedemption ? "Redemption Failed" : "Deposit Failed")
-              : currentStep === "complete" 
-              ? (isRedemption ? "Redemption Complete" : "Deposit Complete")
+              : awaitingSettlement
+              ? (isRedemption ? "Redemption Submitted" : "Deposit Submitted")
               : (isRedemption ? "Processing Redemption" : "Processing Deposit")}
           </span>
         </div>
@@ -178,14 +183,14 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
             const isCurrentStep = index === effectiveStepIndex;
             const isCollapsed = collapsedSteps.has(index);
 
-            const isCompleteStep = step.key === "complete" && isCurrentStep;
+            const isSettlementStep = status === "settling" && isCurrentStep;
             return (
               <div
                 key={step.key}
                 className={`rounded-lg transition-all ${
                   isActive
                     ? "bg-blue-500/10 border-2 border-blue-500/30"
-                    : isCompleted && isCompleteStep
+                    : isSettlementStep
                     ? "bg-yellow-500/10 border border-yellow-500/30"
                     : isCompleted
                     ? "bg-green-500/10 border border-green-500/30"
@@ -197,7 +202,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                 {isCollapsed ? (
                   <div 
                     className={`flex items-center gap-3 px-4 py-2 transition-colors cursor-pointer ${
-                      isCompleteStep ? "hover:bg-yellow-500/20" : isCompleted ? "hover:bg-green-500/20" : "hover:bg-muted/50"
+                      isSettlementStep ? "hover:bg-yellow-500/20" : isCompleted ? "hover:bg-green-500/20" : "hover:bg-muted/50"
                     }`}
                     onClick={() => setCollapsedSteps(prev => {
                       const next = new Set(prev);
@@ -208,11 +213,11 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                     <div className="flex-shrink-0">{getStepIcon(index)}</div>
                     <div className="flex-1 min-w-0">
                       <h4 className={`font-medium text-sm ${
-                        isCompleteStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
+                        isSettlementStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
                       }`}>{step.label}</h4>
                     </div>
                     <span className={`text-xs ${
-                      isCompleteStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
+                      isSettlementStep ? "text-yellow-500" : isCompleted ? "text-green-500" : "text-muted-foreground"
                     }`}>Click to expand</span>
                   </div>
                 ) : (
@@ -224,7 +229,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                           className={`font-medium ${
                             isActive
                               ? "text-blue-500"
-                              : isCompleted && isCompleteStep
+                              : isSettlementStep
                               ? "text-yellow-500"
                               : isCompleted
                               ? "text-green-500"
@@ -242,7 +247,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                           <button
                             onClick={() => setCollapsedSteps(prev => new Set(prev).add(index))}
                             className={`text-xs underline ${
-                              isCompleteStep 
+                              isSettlementStep
                                 ? "text-yellow-500 hover:text-yellow-600" 
                                 : isCompleted
                                 ? "text-green-500 hover:text-green-600"
@@ -257,7 +262,7 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
                         className={`text-sm mt-1 ${
                           isActive
                             ? "text-blue-500/80"
-                            : isCompleted && isCompleteStep
+                            : isSettlementStep
                             ? "text-yellow-500/80"
                             : isCompleted
                             ? "text-green-500/80"
@@ -293,4 +298,3 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
 };
 
 export default DepositProgressModal;
-

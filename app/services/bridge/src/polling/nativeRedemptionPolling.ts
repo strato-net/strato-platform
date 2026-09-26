@@ -5,6 +5,7 @@ import { recordNativeDepositBatch } from "../services/bridgeService";
 import { nativeBlockTrackingService } from "../services/nativeBlockTrackingService";
 import { NativeDepositArgs } from "../types";
 import { logError, logInfo } from "../utils/logger";
+import { healthMonitor } from "../utils/healthMonitor";
 
 import { parseNativeDepositLog } from "../utils/nativeRedemption";
 
@@ -51,10 +52,11 @@ const pollChainNativeRedemptions = async (chainId: number) => {
 
 export const startNativeRedemptionPolling = () => {
   const poll = async () => {
+    if (!healthMonitor.beginPoll("nativeRedemptions", config.polling.bridgeInInterval)) return;
     try {
       const enabledChains = Array.from((await getEnabledChains()).values());
 
-      await Promise.all(
+      const results = await Promise.allSettled(
         enabledChains.map(async (chainInfo) => {
           if (!chainInfo.externalChainId) {
             return;
@@ -63,10 +65,15 @@ export const startNativeRedemptionPolling = () => {
           await pollChainNativeRedemptions(Number(chainInfo.externalChainId));
         }),
       );
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed?.status === "rejected") throw failed.reason;
     } catch (error) {
+      healthMonitor.failPoll("nativeRedemptions");
       logError("NativeRedemptionPolling", error as Error, {
         operation: "startNativeRedemptionPolling",
       });
+    } finally {
+      healthMonitor.finishPoll("nativeRedemptions");
     }
   };
 

@@ -124,7 +124,7 @@ test('rechecks quote expiry after the Permit2 signing prompt and before deposit 
     if (id === '@/context/BridgeContext') return { useBridgeContext: () => ({ triggerDepositRefresh: () => {} }) };
     if (id === '@/lib/bridge/contractService') return contractService;
     if (id === '@/lib/bridge/constants') return { ...bridgeConstants, resolveViemChain: async () => ({ id: 1 }) };
-    if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote: (q, b) => assertAutoRouteQuote(q, b, now) };
+    if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote: (q, b) => assertAutoRouteQuote(q, b, now), normalizeError: error => ({ userMessage: error?.message ?? String(error) }) };
     if (id === '@/utils/numberUtils') return { safeParseUnits: () => 100n, ensureHexPrefix: (value) => `0x${value.replace(/^0x/, '')}` };
     throw new Error(`Unexpected import ${id}`);
   } });
@@ -308,7 +308,7 @@ function depositHarness({ native = true, redemption = false, routedRedemption = 
         createPermit2Message: (input) => input, simulateDeposit: async () => { stage('simulation'); }, ...receiptExports,
       };
       if (id === '@/lib/bridge/constants') return { ...bridgeConstants, resolveViemChain: async () => ({ id: 1 }) };
-      if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote };
+      if (id === '@/lib/bridge/utils') return { assertAutoRouteQuote, normalizeError: error => ({ userMessage: error?.message ?? String(error) }) };
       if (id === '@/utils/numberUtils') return { safeParseUnits: () => 100n, ensureHexPrefix: (value) => `0x${value.replace(/^0x/, '')}` };
       throw new Error(`Unexpected import ${id}`);
     },
@@ -1065,20 +1065,77 @@ test('guest primary action opens wallet connection while authenticated trades re
   assert.equal(evaluate(false).disabled, true);
 });
 
-for (const [native, approval, labels, total] of [
-  [true, false, ['Confirm deposit in your wallet'], 1],
-  [false, false, ['Sign Permit2 authorization in your wallet', 'Confirm deposit in your wallet'], 2],
-  [false, true, ['Approve USDC in your wallet', 'Sign Permit2 authorization in your wallet', 'Confirm deposit in your wallet'], 3],
+const WALLET_STEPS = ['approve', 'sign_permit', 'confirm_tx'];
+test('deposit modal renders only required wallet steps and never claims STRATO settlement', async () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const components = {};
+  let modalProps;
+  runSource(fs.readFileSync(path.join(__dirname, '../src/components/bridge/DepositProgressModal.tsx'), 'utf8'), {
+    exports: components, require: id => {
+      if (id === 'antd') return { Modal: props => {
+        modalProps = props;
+        return React.createElement('div', null, props.title, props.children, props.footer);
+      } };
+      if (id === '@/lib/bridge/utils') return { formatTxHash: hash => hash, getExplorerUrl: () => 'https://example.com/tx' };
+      return require(id);
+    },
+  });
+  const render = progress => renderToStaticMarkup(React.createElement(components.default, {
+    ...progress, currentStep: progress.step, open: true, onClose: () => {},
+  }));
+  for (const options of [
+    { native: true, approval: false },
+    { native: false, approval: false },
+    { native: false, approval: true },
+    { redemption: true, approval: false },
+    { redemption: true, approval: true },
+  ]) {
+    const h = depositHarness(options);
+    await h.handleTrade();
+    const preparing = render(h.stages[0]);
+    assert.ok(preparing.includes('Check Deposit'));
+    assert.ok(preparing.includes('In Progress'));
+    assert.equal(modalProps.closable, false);
+    const walletStages = h.stages.filter(stage => WALLET_STEPS.includes(stage?.step));
+    for (const stage of walletStages) {
+      const html = render(stage);
+      assert.equal(html.includes('Approve Token'), options.approval);
+      assert.equal(html.includes('Sign Permit'), !options.redemption && !options.native);
+      assert.equal(modalProps.closable, false);
+    }
+    const submitted = h.stages.at(-1);
+    assert.equal(submitted.step, 'submitted');
+    const html = render(submitted);
+    assert.ok(html.includes(options.redemption ? 'Redemption Submitted' : 'Deposit Submitted'));
+    assert.ok(html.includes('Awaiting STRATO Settlement'));
+    assert.ok(html.includes('Verification and STRATO settlement are still pending'));
+    assert.ok(!html.includes('Deposit Complete') && !html.includes('Redemption Complete'));
+    assert.equal(modalProps.closable, true);
+    const error = render({ ...submitted, step: 'error', error: 'Deposit reverted' });
+    assert.ok(error.includes('Deposit reverted'));
+    assert.equal(modalProps.closable, true);
+  }
+  const legacy = render({ step: 'complete', isNative: false, isRedemption: true });
+  assert.ok(legacy.includes('Redemption Submitted'));
+  assert.ok(!legacy.includes('Sign Permit'));
+});
+
+for (const [native, approval, steps] of [
+  [true, false, ['confirm_tx']],
+  [false, false, ['sign_permit', 'confirm_tx']],
+  [false, true, ['approve', 'sign_permit', 'confirm_tx']],
 ]) {
   test(`deposit progress follows native=${native}, approval=${approval} wallet interactions`, async () => {
     const harness = depositHarness({ native, approval });
     await harness.handleTrade();
     assert.equal(harness.toasts[0].title, 'Deposit submitted');
-    const walletStages = harness.stages.filter(stage => stage?.label.includes('in your wallet'));
-    assert.deepEqual(walletStages.map(stage => stage.label), labels);
-    assert.deepEqual(walletStages.map(stage => stage.step), Array.from({ length: total }, (_, index) => index + 1));
-    assert.ok(walletStages.every(stage => stage.total === total));
-    assert.equal(harness.stages.at(-1), null);
+    const walletStages = harness.stages.filter(stage => WALLET_STEPS.includes(stage?.step));
+    assert.deepEqual(walletStages.map(stage => stage.step), steps);
+    assert.ok(walletStages.every(stage => stage.approvalRequired === approval && stage.permitRequired === !native && !stage.isRedemption));
+    assert.equal(harness.stages[0].step, 'preparing');
+    assert.equal(harness.stages.at(-1).step, 'submitted');
+    assert.equal(harness.stages.at(-1).txHash, depositHash);
   });
 }
 
@@ -1196,7 +1253,10 @@ test('native redemption approves its own bridge only when needed and records the
       assert.equal(harness.records()[1].routeType, 'native');
       assert.equal(harness.records()[1].DepositInfo.stratoTokenAmount, '100');
       assert.equal(harness.records()[1].DepositInfo.stratoRecipient, appAuthenticated ? address('6') : `0x${address('5')}`);
-      assert.equal(harness.stages.find(stage => stage?.label === 'Confirm deposit in your wallet').total, approval ? 2 : 1);
+      assert.deepEqual(
+        harness.stages.filter(stage => WALLET_STEPS.includes(stage?.step)).map(stage => stage.step),
+        approval ? ['approve', 'confirm_tx'] : ['confirm_tx']
+      );
     }
   }
 });

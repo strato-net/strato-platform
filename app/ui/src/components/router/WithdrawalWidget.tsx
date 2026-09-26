@@ -1,8 +1,6 @@
-import CopyButton from "@/components/ui/copy";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { maxUint256 } from "viem";
-import { ArrowDown } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -10,23 +8,28 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useWithdrawalExecute } from "@/hooks/trade/useRouteExecute";
 import { api } from "@/lib/axios";
-import { requestWalletConnection, redirectToLogin } from "@/lib/auth";
 import { BRIDGE_OUT_FEE, WAD, usdstAddress } from "@/lib/constants";
+import { BRIDGE_MODE_LABELS } from "@/lib/bridge/constants";
 import { normalizeRouteAddress } from "@/lib/route";
 import { getWithdrawalPreview, isWithdrawalRouteAvailable } from "@/lib/bridge/utils";
 import type { WithdrawalConfirmation, WithdrawalPreview, WithdrawalWidgetProps } from "@/lib/bridge/types";
 import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
-import { formatUnits, safeParseUnits, truncateAddress } from "@/utils/numberUtils";
+import { formatBalance, formatUnits, safeParseUnits } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import RouteTokenPicker from "./RouteTokenPicker";
+import { Label } from "@/components/ui/label";
+import PercentageButtons from "@/components/ui/PercentageButtons";
+import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import NetworkSelector from "@/components/bridge/NetworkSelector";
+import TokenSelector from "@/components/bridge/TokenSelector";
+import TransactionSummary from "@/components/bridge/TransactionSummary";
+import BridgeConfirmationModal from "@/components/bridge/BridgeConfirmationModal";
 import RouteProgressDialog from "./RouteProgressDialog";
 
 export default function WithdrawalWidget({ catalog, active, feeBalancesReady, onPendingChange, onSubmitted }: WithdrawalWidgetProps) {
   const { isLoggedIn, userAddress, isAppAuthenticated, externalEvmWalletAddress } = useUser();
   const { usdstBalance, voucherBalance, usdstBalanceError, fetchUsdstBalance } = useTokenContext();
-  const { activeTokens, fetchTokens } = useUserTokens();
+  const { fetchTokens } = useUserTokens();
   const { triggerWithdrawalRefresh } = useBridgeContext();
   const { toast } = useToast();
   const execute = useWithdrawalExecute();
@@ -34,14 +37,15 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
   const [routeId, setRouteId] = useState("");
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
-  const [recipientInput, setRecipientInput] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<WithdrawalConfirmation | null>(null);
+  const modeLabels = BRIDGE_MODE_LABELS.bridge;
+  const guestMode = !isLoggedIn;
   const network = catalog.availableNetworks.find(n => n.chainName === catalog.selectedNetwork) ?? catalog.availableNetworks[0];
   const routes = catalog.bridgeableTokens.filter(route =>
     String(route.externalChainId) === network?.chainId && isWithdrawalRouteAvailable(route));
   const route = routes.find(item => item.id === routeId) ?? routes[0];
   const decimals = route?.stratoTokenDecimals ?? 18;
-  const recipient = (recipientInput ?? externalEvmWalletAddress ?? "").trim();
+  const recipient = (externalEvmWalletAddress ?? "").trim();
   const validRecipient = /^0x[0-9a-f]{40}$/i.test(recipient) && BigInt(recipient) > 0n;
   const balance = useQuery({
     queryKey: ["trade", "withdrawal-balance", userAddress, route?.stratoToken],
@@ -50,7 +54,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
       return String(data?.[0]?.balance ?? "0");
     },
     enabled: active && isLoggedIn && !!userAddress && !!route,
-    refetchInterval: active ? 10_000 : false,
+    refetchInterval: active ? 15_000 : false,
   });
   const fee = safeParseUnits(BRIDGE_OUT_FEE);
   let feeError = usdstBalanceError || "";
@@ -59,6 +63,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
   if (!feeError && BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0") < fee) {
     feeError = `You need ${BRIDGE_OUT_FEE} USDST for fees; you have ${formatUnits(BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0"))} including vouchers.`;
   }
+  const available = maximum;
   const factor = BigInt(route?.rebaseFactor || "0");
   const cap = BigInt(route?.maxPerWithdrawal || "0");
   if (route && cap > 0n) {
@@ -68,6 +73,8 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
         : 0n;
     if (inputCap < maximum) maximum = inputCap;
   }
+  const capacityExhausted = route?.routeType === "native" && BigInt(route.maxOutstandingWithdrawal || "0") > 0n
+    && BigInt(route.remainingOutstandingWithdrawal || "0") === 0n;
   if (route?.routeType === "native" && BigInt(route.maxOutstandingWithdrawal || "0") > 0n) {
     const remaining = BigInt(route.remainingOutstandingWithdrawal || "0");
     if (remaining < maximum) maximum = remaining;
@@ -81,10 +88,16 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
     if (balance.data !== undefined && amountWei > BigInt(balance.data)) validationError ||= "Insufficient token balance.";
     if (amountWei > maximum) validationError ||= "Amount exceeds the available balance after fees or bridge limits.";
   }
+  const balanceImpact = {
+    before: available.toString(),
+    after: (available > amountWei ? available - amountWei : 0n).toString(),
+  };
   const selectionKey = JSON.stringify([userAddress, isAppAuthenticated, externalEvmWalletAddress, network?.chainId, route, amountWei.toString(), recipient]);
   const ready = active && isLoggedIn && !!userAddress && !!route && !!network && !!preview && validRecipient &&
     feeBalancesReady && !feeError && !validationError && balance.data !== undefined && !balance.isError && !catalog.loading;
-  const display = (value: string, places: number) => formatUnits(value, places);
+  const formatBalanceDisplay = (valueWei: string) =>
+    Number(formatUnits(valueWei, decimals)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const setAmountChecked = (value: string) => handleAmountInputChange(value, setAmount, setAmountError, maximum.toString(), decimals);
   const clearAmount = () => { setAmount(""); setAmountError(""); };
   const confirm = async () => {
     if (submitting.current || execute.isPending || !confirmation) return;
@@ -114,76 +127,123 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
     }
   };
 
-  return <div className="space-y-5">
+  return <div className="space-y-6">
     <RouteProgressDialog progress={execute.progress} onClose={execute.closeProgress} operation="Withdrawal" />
-    <div className="rounded-xl border border-border/60 px-3 py-2 text-xs">
-      <div className="flex justify-between gap-3"><span className="text-muted-foreground">Sending account · STRATO</span><span className={userAddress ? "font-mono" : undefined} title={userAddress ?? ""}>{truncateAddress(userAddress) || "Connect wallet or sign in"}<CopyButton address={userAddress} /></span></div>
+    <div className="space-y-2 text-center">
+      <h3 className="text-lg font-semibold text-foreground">{modeLabels.title}</h3>
+      <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
     </div>
-    <label className="block space-y-2 text-sm"><span>Destination network</span>
-      <select aria-label="Destination network" className="h-11 w-full rounded-xl border border-input bg-background px-3" value={network?.chainName ?? ""}
-        disabled={execute.isPending} onChange={event => { catalog.setSelectedNetwork(event.target.value); setRouteId(""); clearAmount(); }}>
-        {catalog.availableNetworks.map(item => <option key={item.chainId} value={item.chainName}>{item.chainName}</option>)}
-      </select>
-    </label>
-    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
-      <label htmlFor="withdrawal-amount" className="mb-3 lg:mb-2 block text-sm font-semibold text-muted-foreground">You send · STRATO</label>
-      <div className="flex items-center gap-3">
-        <input id="withdrawal-amount" inputMode="decimal" placeholder="0" value={amount} disabled={execute.isPending}
-          aria-invalid={!!validationError} aria-describedby="withdrawal-amount-error"
-          className="min-w-0 flex-1 bg-transparent text-2xl md:text-3xl font-semibold tracking-tight outline-none"
-          onChange={event => handleAmountInputChange(event.target.value, setAmount, setAmountError, isLoggedIn ? maximum.toString() : maxUint256.toString(), decimals)} />
-        <RouteTokenPicker label="Choose withdrawal token" loading={catalog.loading} value={route?.id}
-          tokens={routes.map(item => ({ id: item.id, address: item.stratoToken, name: item.stratoTokenName, symbol: item.stratoTokenSymbol,
-            image: item.stratoTokenImage, decimals: item.stratoTokenDecimals ?? 18,
-            balance: activeTokens.find(token => normalizeRouteAddress(token.address) === normalizeRouteAddress(item.stratoToken))?.balance?.toString(),
-            detail: `Receive ${item.externalSymbol} on ${network?.chainName}` }))}
-          onSelect={id => { setRouteId(id); clearAmount(); }} />
+    <div className="w-full">
+      <BridgeWalletStatus
+        guestMode={guestMode}
+        externalOnly
+        connectedLabel="External Wallet Connected"
+        connectLabel="Connect External Wallet"
+        copiedDescription="External wallet address copied to clipboard"
+      />
+    </div>
+    <NetworkSelector
+      selectedNetwork={network?.chainName ?? null}
+      availableNetworks={catalog.availableNetworks}
+      onNetworkChange={name => { catalog.setSelectedNetwork(name); setRouteId(""); clearAmount(); }}
+      direction="out"
+      disabled={guestMode || execute.isPending}
+    />
+    <TokenSelector
+      selectedToken={route ?? null}
+      tokens={routes}
+      onTokenChange={token => { setRouteId(token?.id ?? ""); clearAmount(); }}
+      direction="out"
+      disabled={guestMode || execute.isPending || catalog.loading}
+    />
+    <div className="space-y-1.5">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-1">
+        <Label htmlFor="withdrawal-amount" className="text-sm">{modeLabels.amountLabel}</Label>
+        {isLoggedIn && !!route && balance.data === undefined && !balance.isError ? (
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            <p className="text-xs md:text-sm text-muted-foreground">Fetching balance...</p>
+          </div>
+        ) : capacityExhausted ? (
+          <p className="text-xs md:text-sm text-yellow-600">
+            Withdrawals temporarily unavailable — bridge capacity reached.
+          </p>
+        ) : isLoggedIn && balance.data !== undefined ? (
+          <div>
+            <div className="flex items-center gap-3">
+              <p className="text-xs md:text-sm text-muted-foreground">
+                Max: {formatBalance(maximum.toString(), undefined, decimals, 2, 6)}
+              </p>
+              <p className="text-xs md:text-sm text-muted-foreground">Min: 0</p>
+            </div>
+            {route?.rebaseRequired && factor > 0n && maximum > 0n && (
+              <p className="text-xs text-muted-foreground mt-0.5 text-right">
+                ≈ {formatBalance((maximum * factor / WAD).toString(), undefined, decimals, 2, 6)} {route.externalSymbol}
+              </p>
+            )}
+          </div>
+        ) : null}
       </div>
-      <div className="mt-3 lg:mt-1 flex justify-between text-xs text-muted-foreground">
-        <span>{!isLoggedIn ? "Connect wallet to see your balance" : balance.isError ? "Balance unavailable" : balance.data === undefined ? "Loading balance…" : `Available: ${display(maximum.toString(), decimals)} ${route?.stratoTokenSymbol ?? ""}`}</span>
-        <button type="button" className="font-semibold text-primary" disabled={!feeBalancesReady || balance.data === undefined || execute.isPending}
-          onClick={() => { setAmount(formatUnits(maximum, decimals)); setAmountError(""); }}>Max</button>
-      </div>
-      <p id="withdrawal-amount-error" role={validationError ? "alert" : undefined} className="mt-2 lg:mt-1 min-h-4 text-xs text-destructive">{validationError}</p>
-      {!catalog.loading && !routes.length && <p className="text-sm text-muted-foreground">No withdrawals are available on this network.</p>}
+      <Input
+        id="withdrawal-amount"
+        type="text"
+        inputMode="decimal"
+        pattern="[0-9]*\.?[0-9]*"
+        placeholder={
+          capacityExhausted ? "Bridge capacity reached"
+            : validRecipient ? "0.00" : "Connect external wallet to enter amount"
+        }
+        className={`w-full ${validationError ? "border-red-500 focus:ring-red-400" : ""}`}
+        value={amount}
+        onChange={event => { if (!guestMode) setAmountChecked(event.target.value); }}
+        disabled={guestMode || !validRecipient || execute.isPending || capacityExhausted}
+      />
+      {validationError && <p className="text-sm text-red-500">{validationError}</p>}
+      {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
+      {validRecipient && !guestMode && (
+        <PercentageButtons
+          value={amount}
+          maxValue={maximum.toString()}
+          onChange={setAmountChecked}
+          className="mt-2"
+          decimals={decimals}
+          disabled={execute.isPending || capacityExhausted || balance.data === undefined}
+        />
+      )}
     </div>
-    <div className="flex justify-center"><ArrowDown className="h-5 w-5 text-muted-foreground" /></div>
-    <div className="rounded-2xl border border-border/70 bg-muted/30 p-4 lg:py-3">
-      <p className="mb-3 lg:mb-2 text-sm font-semibold text-muted-foreground">You receive · {network?.chainName ?? "Choose network"}</p>
-      <p className="break-words text-2xl md:text-3xl font-semibold tracking-tight">{preview && route ? display(preview.externalAmount, Number(route.externalDecimals)) : "—"} {route?.externalSymbol}</p>
-      <p className="mt-2 lg:mt-1 text-xs text-muted-foreground">Receive the selected asset’s external counterpart.</p>
-    </div>
-    <div className="space-y-2 text-sm"><div className="flex items-center justify-between gap-2"><label htmlFor="withdrawal-recipient">Receiving address on {network?.chainName ?? "the destination network"}</label>{validRecipient && <CopyButton address={recipient} />}</div>
-      <Input id="withdrawal-recipient" aria-label="External receiving address" value={recipient} placeholder="0x…" disabled={execute.isPending} aria-invalid={!!recipient && !validRecipient}
-        onChange={event => setRecipientInput(event.target.value)} />
-      {recipient && !validRecipient && <span className="text-xs text-destructive">Enter a valid, nonzero EVM address.</span>}
-      {externalEvmWalletAddress && recipient !== externalEvmWalletAddress && <button type="button" className="block text-xs text-primary" onClick={() => setRecipientInput(null)}>Use connected wallet</button>}
-    </div>
-    <div className="space-y-2 rounded-xl border border-border/60 p-3 text-xs text-muted-foreground">
-      <p>Transaction fee: {BRIDGE_OUT_FEE} USDST (vouchers applied when available).</p>
-      {route && cap > 0n && <p>Per-withdrawal limit: {display(cap.toString(), route.routeType === "native" ? decimals : Number(route.externalDecimals))} {route.routeType === "native" ? route.stratoTokenSymbol : route.externalSymbol}</p>}
-      {route?.routeType === "native" && BigInt(route.maxOutstandingWithdrawal || "0") > 0n && <p>Remaining bridge capacity: {display(route.remainingOutstandingWithdrawal || "0", decimals)} {route.stratoTokenSymbol}</p>}
-      <p>{preview?.manualReview ? "This amount requires manual approval. Processing time depends on that approval." : "Processed after bridge verification and network confirmation; vault capacity can delay the transfer."}</p>
-      {route?.rebaseRequired && <p>Estimated external amount uses the current conversion rate; the on-chain rate at submission determines the amount.</p>}
-    </div>
-    <div className="min-h-5 text-xs text-destructive">{isLoggedIn && (feeBalancesReady || usdstBalanceError) ? feeError : ""}</div>
-    <Button className="h-12 w-full rounded-xl" disabled={execute.isPending || (isLoggedIn && !ready)} onClick={() => {
-      if (!isLoggedIn) { requestWalletConnection(); return; }
-      if (ready) setConfirmation({ selectionKey, route, networkName: network.chainName, recipient, preview });
-    }}>{!isLoggedIn ? "Connect wallet" : execute.isPending ? "Submitting…" : "Review withdrawal"}</Button>
-    {!isLoggedIn && <button type="button" className="w-full text-center text-sm text-primary" onClick={() => redirectToLogin()}>Sign in with STRATO</button>}
-    <Dialog open={!!confirmation} onOpenChange={open => { if (!open) setConfirmation(null); }}>
-      <DialogContent className="max-w-[95vw] sm:max-w-lg">
-        <DialogHeader><DialogTitle>Confirm withdrawal</DialogTitle><DialogDescription>Review the asset, destination network and receiving address.</DialogDescription></DialogHeader>
-        {confirmation && <dl className="space-y-3 text-sm">
-          <div><dt className="text-muted-foreground">You send · STRATO</dt><dd className="font-semibold">{display(confirmation.preview.escrowAmount, confirmation.route.stratoTokenDecimals ?? 18)} {confirmation.route.stratoTokenSymbol}</dd></div>
-          <div><dt className="text-muted-foreground">You receive · {confirmation.networkName} (estimated)</dt><dd className="font-semibold">{display(confirmation.preview.externalAmount, Number(confirmation.route.externalDecimals))} {confirmation.route.externalSymbol}</dd></div>
-          <div><dt className="text-muted-foreground">Receiving address</dt><dd className="flex items-start gap-1"><span className="min-w-0 break-all font-mono">{confirmation.recipient}</span><span className="shrink-0"><CopyButton address={confirmation.recipient} /></span></dd></div>
-          <div><dt className="text-muted-foreground">Transaction fee</dt><dd>{BRIDGE_OUT_FEE} USDST (vouchers applied when available)</dd></div>
-          <div><dt className="text-muted-foreground">Processing</dt><dd>{confirmation.preview.manualReview ? "Manual approval required" : "Bridge verification and external transfer"}</dd></div>
-        </dl>}
-        <DialogFooter><Button variant="outline" onClick={() => setConfirmation(null)}>Cancel</Button><Button onClick={() => void confirm()}>Confirm withdrawal</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <TransactionSummary
+      selectedToken={route ?? null}
+      amount={amount}
+      preview={preview}
+      selectedNetwork={network?.chainName ?? null}
+      amountError={validationError}
+      balanceImpact={balanceImpact}
+      formatBalanceDisplay={formatBalanceDisplay}
+    />
+    {preview?.manualReview && (
+      <p className="text-xs md:text-sm text-yellow-600">
+        This amount requires manual approval. Processing time depends on that approval.
+      </p>
+    )}
+    <Button
+      onClick={() => { if (ready) setConfirmation({ selectionKey, route, networkName: network.chainName, recipient, preview: preview! }); }}
+      disabled={guestMode || execute.isPending || !ready}
+      className="w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+    >
+      {execute.isPending ? "Processing..." : "Bridge Out"}
+    </Button>
+    <BridgeConfirmationModal
+      open={!!confirmation}
+      onOk={() => void confirm()}
+      onCancel={() => setConfirmation(null)}
+      title="Confirm Bridge Transaction"
+      okText="Yes, Bridge Assets"
+      cancelText="Cancel"
+      fromNetwork="STRATO"
+      toNetwork={confirmation?.networkName || "Not selected"}
+      selectedToken={confirmation?.route ?? null}
+      preview={confirmation?.preview}
+      recipient={confirmation?.recipient}
+    />
   </div>;
 }

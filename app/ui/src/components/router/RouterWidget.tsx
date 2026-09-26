@@ -38,6 +38,7 @@ import RouteTradeSummary, { RouteFallback } from "./RouteTradeSummary";
 import RoutePreview from "./RoutePreview";
 import RouteConfirmDialog from "./RouteConfirmDialog";
 import RouteProgressDialog from "./RouteProgressDialog";
+import DepositProgressModal from "@/components/bridge/DepositProgressModal";
 import { Link } from "react-router-dom";
 import type { RouteConfirmation, RoutePickerToken } from "@/interface/swap";
 import { assertRouteConfirmation, getRouteValueWarning, normalizeRouteAddress, resolveRouteSelection } from "@/lib/route";
@@ -445,8 +446,19 @@ const RouterWidget = ({
 
   return (
     <div className="space-y-7">
-      <RouteConfirmDialog confirmation={routeExecute.progress ? null : confirmation} pending={pending} stage={autoRouteDeposit.stage} onClose={() => setConfirmation(null)} onConfirm={handleTrade} />
+      <RouteConfirmDialog confirmation={routeExecute.progress || autoRouteDeposit.progress ? null : confirmation} pending={pending} onClose={() => setConfirmation(null)} onConfirm={handleTrade} />
       <RouteProgressDialog progress={routeExecute.progress} onClose={routeExecute.closeProgress} />
+      <DepositProgressModal
+        open={!!autoRouteDeposit.progress}
+        currentStep={autoRouteDeposit.progress?.step ?? "preparing"}
+        txHash={autoRouteDeposit.progress?.txHash}
+        chainId={autoRouteDeposit.progress?.chainId}
+        approvalRequired={autoRouteDeposit.progress?.approvalRequired ?? false}
+        permitRequired={autoRouteDeposit.progress?.permitRequired ?? false}
+        isRedemption={autoRouteDeposit.progress?.isRedemption}
+        error={autoRouteDeposit.progress?.error}
+        onClose={autoRouteDeposit.closeProgress}
+      />
       {/* STEP 1 */}
       <section className="space-y-3">
       <div className="flex items-center justify-between">
