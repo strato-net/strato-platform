@@ -47,6 +47,7 @@ library
     , blockstanbul
     , bytestring
     , common-log
+    , composable-monads-base
     , data-default
     , ethereum-discovery
     , ethereum-rlp

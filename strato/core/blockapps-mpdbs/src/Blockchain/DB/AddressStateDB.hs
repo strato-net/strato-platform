@@ -17,6 +17,7 @@ module Blockchain.DB.AddressStateDB
   ( getAddressStateMaybe,
     getAllAddressStates,
     putAddressState,
+    putAddressStates,
     deleteAddressState,
     addressStateExists,
     getAddressFromHash,
@@ -25,6 +26,8 @@ module Blockchain.DB.AddressStateDB
   )
 where
 
+import BatchMerge (putManyKeyValExisted)
+import BlockApps.Logging (MonadLogger)
 import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
@@ -34,10 +37,11 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util
-import Control.Monad (liftM)
+import Control.Monad (liftM, unless)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
+import Data.Foldable (for_)
 import Data.Maybe
 import qualified Data.NibbleString as N
 
@@ -71,12 +75,24 @@ getRawStorageKeyFromHash = fmap (fmap nibbleString2ByteString) . hashDBGet
 
 putAddressState :: (HasStateDB m, HasHashDB m) => Address -> AddressState -> m ()
 putAddressState address newState = do
-  hashDBPut addrNibbles
   sr <- getStateRoot Nothing
-  sr' <- MP.putKeyVal sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
+  (sr', existed) <- MP.putKeyValExisted sr addrNibbles $ rlpEncode $ rlpSerialize $ rlpEncode newState
+  -- the hash->address entry is immutable; only new accounts need one
+  unless existed $ hashDBPut addrNibbles
   setStateDBStateRoot Nothing sr'
   where
     addrNibbles = addressAsNibbleString address
+
+-- | One-pass insert of many accounts into the state trie (same as the
+-- storage flush); avoids rewriting the shared path once per account.
+putAddressStates :: (MonadLogger m, HasStateDB m, HasHashDB m) => [(Address, AddressState)] -> m ()
+putAddressStates [] = pure ()
+putAddressStates states = do
+  sr <- getStateRoot Nothing
+  let inserts = [(addressAsNibbleString a, rlpEncode $ rlpSerialize $ rlpEncode s) | (a, s) <- states]
+  (sr', existed) <- putManyKeyValExisted sr inserts
+  for_ inserts $ \(k, _) -> unless (k `elem` existed) $ hashDBPut k
+  setStateDBStateRoot Nothing sr'
 
 deleteAddressState :: HasStateDB m => Address -> m ()
 deleteAddressState address = do

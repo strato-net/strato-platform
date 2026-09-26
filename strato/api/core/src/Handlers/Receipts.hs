@@ -49,7 +49,7 @@ import Blockchain.Strato.Model.Secp256k1 (exportSignature)
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import qualified Data.Text.Encoding as TE
 import Control.Arrow ((&&&))
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Trans.Class
 import qualified Data.Text as T
 import SQLM (ApiError (..))
@@ -359,7 +359,7 @@ instance (Monad m, GetReceipts m, MonadTrans t) => GetReceipts (t m) where
   resolveBlockHashByNumber = lift . resolveBlockHashByNumber
   getBlockHeaderByHash = lift . getBlockHeaderByHash
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
+instance (SQLDB Base.:> es) => GetReceipts (Base.Eff es) where
   getReceiptsForBlockHash = receiptRefsForBlock
 
   resolveBlockHashByNumber n = do

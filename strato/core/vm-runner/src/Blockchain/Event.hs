@@ -24,7 +24,6 @@ where
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
-import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Data.TXOrigin
@@ -97,8 +96,6 @@ data VmOutEvent
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
   | OutStateDiff StateDiff
-  | OutLog LogDB
-  | OutEvent [EventDB]
   | OutASM (Map Address AddressStateModification)
   | OutJSONRPC JsonRpcResponse
   | OutBlockVerificationFailure [BlockVerificationFailure]
@@ -112,8 +109,6 @@ data VmOutEventBatch = OutBatch
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
     outStateDiffs :: DL.DList StateDiff,
-    outLogs :: DL.DList LogDB,
-    outEvents :: DL.DList EventDB,
     outASMs :: DL.DList (Map Address AddressStateModification),
     outJSONRPCs :: DL.DList JsonRpcResponse,
     outBlockVerificationFailure :: [BlockVerificationFailure],
@@ -132,8 +127,6 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
-    DL.empty
-    DL.empty
     []
     DL.empty
     DL.empty
@@ -145,8 +138,6 @@ insertOutBatch e b = case e of
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
-  OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
-  OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}
   OutJSONRPC r -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` r}
   OutBlockVerificationFailure bvf -> b {outBlockVerificationFailure = bvf}

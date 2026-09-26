@@ -18,14 +18,13 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Trans.Class
 import Data.Int
 import qualified Database.Esqueleto.Legacy as E
 import Servant
 import Servant.Client
 import Settings
-import UnliftIO
 
 type API =
   "transaction" :> "last"
@@ -46,7 +45,7 @@ class Monad m => GetLastTransactions m where
 instance (Monad m, GetLastTransactions m, MonadTrans t) => GetLastTransactions (t m) where
   getLastTransactions = lift . getLastTransactions
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastTransactions (SQLM m) where
+instance (SQLDB Base.:> es) => GetLastTransactions (Base.Eff es) where
   getLastTransactions num = do
     fmap (map E.entityVal) . sqlQuery $
       E.select $

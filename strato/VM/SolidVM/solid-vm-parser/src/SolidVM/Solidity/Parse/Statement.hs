@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module SolidVM.Solidity.Parse.Statement where
 
@@ -11,7 +12,6 @@ import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
-import qualified Data.Text as T
 import SolidVM.Model.CodeCollection.Statement
 import SolidVM.Model.SolidString
 import SolidVM.Model.Type
@@ -26,45 +26,97 @@ import Text.Read (readMaybe)
 statements :: SolidityParser [Statement]
 statements = braces $ many statement
 
+-- | Every alternative of 'anyStatement' that opens with a keyword accepts
+-- exactly the input whose first word is that keyword, so the word selects it
+-- directly. Anything else goes through the remaining alternatives in their
+-- original order; 'orElse' keeps the error message identical on failure.
 statement :: SolidityParser Statement
-statement =
+statement = do
+  w <- peekWord
+  case w of
+    Just "if" -> ifStatement
+    Just "while" -> whileStatement
+    Just "try" -> tryStatement
+    Just "do" -> doWhileStatement
+    Just "for" -> forStatement
+    Just "return" -> returnStatement
+    Just "emit" -> emitStatement
+    Just "throw" -> throwStatement
+    Just "continue" -> continueStatement
+    Just "break" -> breakStatement
+    Just "revert" -> revertStatement `orElse` anyStatement
+    Just _ ->
+      ( variableDefinitionStatement'
+          <|> assemblyStatement
+          <|> modifierExecutorStatement
+          <|> uncheckedStatement
+          <|> expressionStatement
+      )
+        `orElse` anyStatement
+    Nothing -> anyStatement
+
+anyStatement :: SolidityParser Statement
+anyStatement =
   ifStatement
     <|> whileStatement
-    <|> ( do
-            reserved "try"
-            (solidityTryCatchStatement <|> tryCatchStatement) -- hack to get it to differentiate between the two before parsing to avoid ambiguity
-        )
+    <|> tryStatement
     <|> doWhileStatement
     <|> forStatement
-    <|> ( do
-            ~(a, e) <- withPosition $ do
-              void $ reserved "return"
-              optionMaybe expression
-            _ <- semi
-            pure $ Return e a
-        )
-    <|> ( do
-            ~(a, (i, e)) <- withPosition $ do
-              reserved "emit"
-              ident <- identifier
-              exps <- parens $ commaSep expression
-              pure (ident, exps)
-            _ <- semi
-            pure $ EmitStatement i (map ((,) Nothing) e) a
-        )
+    <|> returnStatement
+    <|> emitStatement
     <|> throwStatement
-    <|> try
-      ( do
-          ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
-          pure $ SimpleStatement e a
-      )
-    <|> (Continue <$> (position (reserved "continue") <* semi))
-    <|> (Break <$> (position (reserved "break") <* semi))
-    <|> (reserved "assembly" >> inlineAssembly)
-    <|> (ModifierExecutor <$> (position (reserved "_") <* semi)) -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
+    <|> variableDefinitionStatement'
+    <|> continueStatement
+    <|> breakStatement
+    <|> assemblyStatement
+    <|> modifierExecutorStatement
     <|> revertStatement
     <|> uncheckedStatement
-    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
+    <|> expressionStatement
+
+tryStatement :: SolidityParser Statement
+tryStatement = do
+  reserved "try"
+  solidityTryCatchStatement <|> tryCatchStatement -- hack to get it to differentiate between the two before parsing to avoid ambiguity
+
+returnStatement :: SolidityParser Statement
+returnStatement = do
+  ~(a, e) <- withPosition $ do
+    void $ reserved "return"
+    optionMaybe expression
+  _ <- semi
+  pure $ Return e a
+
+emitStatement :: SolidityParser Statement
+emitStatement = do
+  ~(a, (i, e)) <- withPosition $ do
+    reserved "emit"
+    ident <- identifier
+    exps <- parens $ commaSep expression
+    pure (ident, exps)
+  _ <- semi
+  pure $ EmitStatement i (map ((,) Nothing) e) a
+
+variableDefinitionStatement' :: SolidityParser Statement
+variableDefinitionStatement' = try $ do
+  ~(a, e) <- (withPosition variableDefinitionStatement) <* semi
+  pure $ SimpleStatement e a
+
+continueStatement :: SolidityParser Statement
+continueStatement = Continue <$> (position (reserved "continue") <* semi)
+
+breakStatement :: SolidityParser Statement
+breakStatement = Break <$> (position (reserved "break") <* semi)
+
+assemblyStatement :: SolidityParser Statement
+assemblyStatement = reserved "assembly" >> inlineAssembly
+
+-- This parses the "_;" statement, which is used to signify when in a modifier the function should run
+modifierExecutorStatement :: SolidityParser Statement
+modifierExecutorStatement = ModifierExecutor <$> (position (reserved "_") <* semi)
+
+expressionStatement :: SolidityParser Statement
+expressionStatement = (\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi)
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -102,7 +154,7 @@ solidityTryCatchStatement = do
     pure (e, mReturns, sms, catchs)
   pure $ SolidityTryCatchStatement tryExpression returnsDecl statementsForSuccess (Map.fromList catchArr) a
 
-tupleDeclaration' :: SolidityParser [(String, SVMType.Type)]
+tupleDeclaration' :: SolidityParser [(SolidString, SVMType.Type)]
 tupleDeclaration' = parens $
   commaSep $ do
     partType <- simpleTypeExpression
@@ -200,7 +252,7 @@ revertStatement = try $ do
         choice
           [ braces $
               commaSep $ do
-                _ <- fmap stringToLabel identifier
+                _ <- identifier
                 void colon -- lol
                 fieldExpr <- expression
                 return fieldExpr,
@@ -221,7 +273,7 @@ location =
 
 varDefEntry :: SolidityParser (Maybe Type) -> SolidityParser VarDefEntry
 varDefEntry tpar = do
-  ~(a, (t, l, i)) <- withPosition $ liftM3 (,,) tpar location $ fmap stringToLabel identifier
+  ~(a, (t, l, i)) <- withPosition $ liftM3 (,,) tpar location identifier
   pure $ VarDefEntry t l i a
 
 variableDefinitionStatement :: SolidityParser SimpleStatement
@@ -243,75 +295,177 @@ variableDefinitionStatement = do
 expression :: SolidityParser Expression
 expression = do
   legacy <- getLegacyOperatorPrecedence
-  if legacy then legacyExpression else solidityExpression
+  fast <- getFastExpressions
+  case (legacy, fast) of
+    (True, True) -> legacyFastExpression
+    (True, False) -> legacyExpression
+    (False, True) -> solidityFastExpression
+    (False, False) -> solidityExpression
+
+-- | One precedence level of an operator table, tightest level first. Every
+-- level holds operators of a single kind, which is what lets 'climb' read the
+-- table the same way 'buildExpressionParser' does.
+data Level
+  = -- | Function calls, member accesses and index accesses, any number in a row.
+    Calls
+  | -- | One postfix operator, at most once.
+    Post String (SourceAnnotation () -> Expression -> Expression)
+  | -- | Prefix operators, at most one of them.
+    Pre [String]
+  | -- | Left-associative binary operators.
+    InfixL [String]
+  | -- | Right-associative binary operators.
+    InfixR [String]
+  | -- | The conditional @a ? b : c@, at most once.
+    Tern
 
 -- | Solidity's operator precedence, tightest first. Notable orderings that the
 -- legacy table below got wrong: relational operators bind tighter than
 -- equality, @&&@ tighter than @||@, both tighter than the ternary, and
 -- assignment is the loosest of all (so @a = b || c@ assigns @b || c@).
 -- @**@ and the assignment operators associate to the right.
-solidityExpression :: SolidityParser Expression
-solidityExpression =
-  buildExpressionParser
-    [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
-      [Postfix (PlusPlus <$> position (reservedOp "++"))],
-      [Postfix (MinusMinus <$> position (reservedOp "--"))],
-      [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
-      [binaryR "**"],
-      [binary "*", binary "/", binary "%"],
-      [binary "+", binary "-"],
-      [binary "<<", binary ">>", binary ">>>"],
-      [binary "&"],
-      [binary "^"],
-      [binary "|"],
-      [binary "<", binary ">", binary "<=", binary ">="],
-      [binary "==", binary "!="],
-      [binary "&&"],
-      [binary "||"],
-      [ternary],
-      [binaryR "=", binaryR "|=", binaryR "^=", binaryR "&=", binaryR "<<=", binaryR ">>=", binaryR ">>>=", binaryR "+=", binaryR "-=", binaryR "*=", binaryR "/=", binaryR "%="]
-    ]
-    (tuple <|> array <|> primaryExpression)
+solidityLevels :: [Level]
+solidityLevels =
+  [ Calls,
+    Post "++" PlusPlus,
+    Post "--" MinusMinus,
+    Pre ["!", "~", "delete", "++", "--", "+", "-"],
+    InfixR ["**"],
+    InfixL ["*", "/", "%"],
+    InfixL ["+", "-"],
+    InfixL ["<<", ">>", ">>>"],
+    InfixL ["&"],
+    InfixL ["^"],
+    InfixL ["|"],
+    InfixL ["<", ">", "<=", ">="],
+    InfixL ["==", "!="],
+    InfixL ["&&"],
+    InfixL ["||"],
+    Tern,
+    InfixR ["=", "|=", "^=", "&=", "<<=", ">>=", ">>>=", "+=", "-=", "*=", "/=", "%="]
+  ]
 
 -- | The operator table SolidVM shipped with before the operator-precedence
 -- fork. Kept verbatim so blocks produced under it still replay identically:
 -- assignment binds tighter than @&&@ and @||@, which is why
 -- @flag = flag || cond@ only ever stored @flag@.
-legacyExpression :: SolidityParser Expression
-legacyExpression =
-  buildExpressionParser
-    [ [postfix $ choice [functionCall, memberAccess, arrayIndex]],
-      [Postfix (PlusPlus <$> position (reservedOp "++"))],
-      [Postfix (MinusMinus <$> position (reservedOp "--"))],
-      [prefix "!", prefix "~", prefix "delete", prefix "++", prefix "--", prefix "+", prefix "-"],
-      [binary "**"],
-      [binary "*", binary "/", binary "%"],
-      [binary "+", binary "-"],
-      [binary "<<", binary ">>", binary ">>>"],
-      [binary "&"],
-      [binary "^"],
-      [binary "|"],
-      [binary "==", binary "!="],
-      [binary "<", binary ">", binary "<=", binary ">="],
-      [ternary],
-      [binary "=", binary "|=", binary "^=", binary "&=", binary "<<=", binary ">>=", binary ">>>=", binary "+=", binary "-=", binary "*=", binary "/=", binary "%="],
-      [binary "&&"],
-      [binary "||"]
-    ]
-    (tuple <|> array <|> primaryExpression)
+legacyLevels :: [Level]
+legacyLevels =
+  [ Calls,
+    Post "++" PlusPlus,
+    Post "--" MinusMinus,
+    Pre ["!", "~", "delete", "++", "--", "+", "-"],
+    InfixL ["**"],
+    InfixL ["*", "/", "%"],
+    InfixL ["+", "-"],
+    InfixL ["<<", ">>", ">>>"],
+    InfixL ["&"],
+    InfixL ["^"],
+    InfixL ["|"],
+    InfixL ["==", "!="],
+    InfixL ["<", ">", "<=", ">="],
+    Tern,
+    InfixL ["=", "|=", "^=", "&=", "<<=", ">>=", ">>>=", "+=", "-=", "*=", "/=", "%="],
+    InfixL ["&&"],
+    InfixL ["||"]
+  ]
+
+operand :: SolidityParser Expression
+operand = tuple <|> array <|> primaryExpression
+
+-- | The reference expression parsers: 'buildExpressionParser' over the tables.
+solidityExpression, legacyExpression :: SolidityParser Expression
+solidityExpression = buildExpressionParser (map operators solidityLevels) operand
+legacyExpression = buildExpressionParser (map operators legacyLevels) operand
+
+operators :: Level -> [Operator String ParserState Identity Expression]
+operators Calls = [Postfix callChain]
+operators (Post o k) = [Postfix (k <$> position (reservedOp o))]
+operators (Pre os) = map prefix os
+operators (InfixL os) = map binary os
+operators (InfixR os) = map binaryR os
+operators Tern = [ternary]
+
+-- | The fast expression parsers: 'climb' over the same tables.
+solidityFastExpression, legacyFastExpression :: SolidityParser Expression
+solidityFastExpression = climb solidityLevels
+legacyFastExpression = climb legacyLevels
+
+-- | Accepts exactly the language of @buildExpressionParser (map operators
+-- levels) operand@ and builds the same tree, but reads the operator token
+-- after an operand once ('peekOp') and hands it up through the levels, where
+-- 'buildExpressionParser' attempts every operator of every level against it.
+-- Each level does what its 'buildExpressionParser' counterpart does: an
+-- infix level loops while the operator is one of its own; postfix and
+-- conditional levels apply at most once; the prefix level takes at most one
+-- operator, and, since @delete@ is not made of operator characters, looks
+-- for it where no operator token is present. An operator token equals an
+-- operator name exactly when 'reservedOp' of that name would succeed, so a
+-- level that does not own the token leaves it to the next one, just as
+-- every 'reservedOp' of the level would have failed.
+climb :: [Level] -> SolidityParser Expression
+climb levels = fst <$> foldl level base levels
+  where
+    base = (,) <$> operand <*> peekOp
+    level term Calls = do
+      (x, op) <- term
+      post <- optionMaybe callChain
+      case post of
+        Nothing -> pure (x, op)
+        Just f -> (,) (f x) <$> peekOp
+    level term (Post o k) = do
+      (x, op) <- term
+      if op == Just o
+        then do
+          a <- position (reservedOp o)
+          (,) (k a x) <$> peekOp
+        else pure (x, op)
+    level term (Pre os) = do
+      op <- peekOp
+      pre <- case op of
+        Just o | o `elem` os -> Just <$> withPosition (o <$ reservedOp o)
+        Nothing | "delete" `elem` os -> optionMaybe (withPosition ("delete" <$ reservedOp "delete"))
+        _ -> pure Nothing
+      (x, op') <- term
+      pure (maybe x (\(a, o) -> Unitary a o x) pre, op')
+    level term (InfixL os) = term >>= uncurry go
+      where
+        go x (Just o) | o `elem` os = do
+          a <- position (reservedOp o)
+          (y, op) <- term
+          go (Binary a o x y) op
+        go x op = pure (x, op)
+    level term (InfixR os) = term >>= uncurry go
+      where
+        go x (Just o) | o `elem` os = do
+          a <- position (reservedOp o)
+          (z, op) <- term
+          (y, op') <- go z op
+          pure (Binary a o x y, op')
+        go x op = pure (x, op)
+    level term Tern = do
+      (x, op) <- term
+      if op == Just "?"
+        then do
+          f <- ternaryPostfix
+          (,) (f x) <$> peekOp
+        else pure (x, op)
+
+callChain :: SolidityParser (Expression -> Expression)
+callChain = chainl1 (choice [functionCall, memberAccess, arrayIndex]) $ return (flip (.))
 
 ternary :: Operator String ParserState Identity Expression
-ternary =
-  Postfix
-    ( do
-        ~(a, (e1, e2)) <- withPosition $ do
-          reservedOp "?"
-          e1 <- expression
-          reservedOp ":"
-          e2 <- expression
-          pure (e1, e2)
-        pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
-    )
+ternary = Postfix ternaryPostfix
+
+ternaryPostfix :: SolidityParser (Expression -> Expression)
+ternaryPostfix = do
+  ~(a, (e1, e2)) <- withPosition $ do
+    reservedOp "?"
+    e1 <- expression
+    reservedOp ":"
+    e2 <- expression
+    pure (e1, e2)
+  pure (\e -> Ternary (extractExpression e <> a) e e1 e2)
 
 functionCall :: SolidityParser (Expression -> Expression)
 functionCall = do
@@ -321,7 +475,7 @@ functionCall = do
         choice
           [ braces $
               commaSep $ do
-                _ <- fmap stringToLabel identifier
+                _ <- identifier
                 void colon -- haha
                 fieldExpr <- expression
                 return fieldExpr,
@@ -339,28 +493,29 @@ arrayIndex = do
   ~(a, idxs) <- withPosition $ many1 . brackets $ optionMaybe expression
   return $ \x -> foldl' (IndexAccess a) x idxs
 
-binary :: String -> Operator String u Identity Expression
+binary :: String -> Operator String ParserState Identity Expression
 binary x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocLeft
 
-binaryR :: String -> Operator String u Identity Expression
+binaryR :: String -> Operator String ParserState Identity Expression
 binaryR x = Infix (uncurry Binary <$> withPosition (x <$ reservedOp x)) AssocRight
 
-prefix :: String -> Operator String u Identity Expression
+prefix :: String -> Operator String ParserState Identity Expression
 prefix x = Prefix (uncurry Unitary <$> withPosition (x <$ reservedOp x))
 
-postfix ::
-  Stream s m t =>
-  ParsecT s u m (a -> a) ->
-  Operator s u m a
-postfix p = Postfix . chainl1 p $ return (flip (.))
-
 memberName :: SolidityParser SolidString
-memberName =
+memberName = do
+  w <- peekWord
+  case w of
+    Just word | word `notElem` ["call", "derive", "length"] -> identifier `orElse` anyMemberName
+    _ -> anyMemberName
+
+anyMemberName :: SolidityParser SolidString
+anyMemberName =
   do
-    (reserved "call" >> return (stringToLabel "call"))
-    <|> (reserved "derive" >> return (stringToLabel "derive"))
-    <|> (reserved "length" >> return (stringToLabel "length"))
-    <|> fmap stringToLabel identifier
+    (reserved "call" >> return "call")
+    <|> (reserved "derive" >> return "derive")
+    <|> (reserved "length" >> return "length")
+    <|> identifier
 
 tuple :: SolidityParser Expression -- includes the case of a 1-tuple, ie- parens...  but just returns as a simple expression
 tuple = do
@@ -412,50 +567,36 @@ objectE = do
         | PrimaryExpression
       -}
 
+-- | Keywords that 'anyPrimaryExpression' turns into a 'Variable'.
+keywordVariables :: [String]
+keywordVariables = ["msg", "address", "account", "payable", "bool", "this", "block", "tx", "uint", "int", "decimal", "byte", "bytes", "string"]
+
+-- | A leading word selects its alternative in 'anyPrimaryExpression': the
+-- keyword ones match exactly that word, and no literal starts with a word.
 primaryExpression :: SolidityParser Expression
 primaryExpression = do
-  let res' a b = withPosition $ b <$ reserved a
-      res a = res' a a
+  w <- peekWord
+  case w of
+    Nothing -> anyPrimaryExpression
+    Just word -> byWord word `orElse` anyPrimaryExpression
+  where
+    byWord "hex" = myHexParser <|> variableExpression
+    byWord "false" = boolLiteral "false" False
+    byWord "true" = boolLiteral "true" True
+    byWord "new" = newExpression
+    byWord word
+      | word `elem` keywordVariables = keywordVariable word
+      | otherwise = variableExpression
 
+anyPrimaryExpression :: SolidityParser Expression
+anyPrimaryExpression =
   myHexParser
-    <|> (uncurry Variable . fmap stringToLabel <$> res "msg")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "address")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "account")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "payable")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "bool")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "this")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "block")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "tx")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "uint")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "int")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "decimal")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "byte")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "bytes")
-    <|> (uncurry Variable . fmap stringToLabel <$> res "string")
-    <|> (uncurry BoolLiteral <$> res' "false" False)
-    <|> (uncurry BoolLiteral <$> res' "true" True)
-    <|> (do
-          (a, (t, mSalt)) <- withPosition $ do
-            reserved "new"
-            t' <- simpleTypeExpression
-            mSalt' <- optionMaybe . braces $ do
-              reserved "salt"
-              void colon
-              expression
-            pure (t', mSalt')
-          pure $ NewExpression a t mSalt
-        )
-    <|> ( try $ do
-            ~(a, decimalNum) <- withPosition $ do
-              num <- lexeme $ integer
-              period <- string "."
-              fraction <- many1 digit
-              skipMany space
-              let decimalNum = read (show num ++ period ++ fraction) :: Decimal
-              pure (decimalNum)
-            pure $ DecimalLiteral a $ WrappedDecimal decimalNum
-          )
-    <|> (uncurry Variable <$> withPosition (stringToLabel <$> identifier))
+    <|> choice (map keywordVariable keywordVariables)
+    <|> boolLiteral "false" False
+    <|> boolLiteral "true" True
+    <|> newExpression
+    <|> decimalLiteral
+    <|> variableExpression
     <|> ( do
             ~(a, (val, nu)) <- withPosition $ do
               val <- scientificInteger
@@ -466,6 +607,38 @@ primaryExpression = do
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
     <|> (uncurry AddressLiteral <$> withPosition accountLiteral)
 
+keywordVariable :: String -> SolidityParser Expression
+keywordVariable kw = uncurry Variable . fmap stringToLabel <$> withPosition (kw <$ reserved kw)
+
+boolLiteral :: String -> Bool -> SolidityParser Expression
+boolLiteral kw b = uncurry BoolLiteral <$> withPosition (b <$ reserved kw)
+
+variableExpression :: SolidityParser Expression
+variableExpression = uncurry Variable <$> withPosition identifier
+
+newExpression :: SolidityParser Expression
+newExpression = do
+  (a, (t, mSalt)) <- withPosition $ do
+    reserved "new"
+    t' <- simpleTypeExpression
+    mSalt' <- optionMaybe . braces $ do
+      reserved "salt"
+      void colon
+      expression
+    pure (t', mSalt')
+  pure $ NewExpression a t mSalt
+
+decimalLiteral :: SolidityParser Expression
+decimalLiteral = try $ do
+  ~(a, decimalNum) <- withPosition $ do
+    num <- lexeme $ integer
+    period <- string "."
+    fraction <- many1 digit
+    skipMany space
+    let decimalNum = read (show num ++ period ++ fraction) :: Decimal
+    pure (decimalNum)
+  pure $ DecimalLiteral a $ WrappedDecimal decimalNum
+
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
   ~(a, val) <- withPosition $ do
@@ -473,7 +646,7 @@ myHexParser = try $ do
     val' <- (between (symbol "\'") (symbol "\'") $ many1 hexDigit) <|> (between (symbol "\"") (symbol "\"") $ many1 hexDigit) --make this work with double quotes as well
     when (Prelude.length val' `mod` 2 /= 0) $ fail "hex digit must be even number"
     pure val'
-  return $ HexaLiteral a val
+  return $ HexaLiteral a (stringToLabel val)
 
 scientific :: SolidityParser Integer
 scientific = do
@@ -564,7 +737,7 @@ castLiteral =
       cast "int" (\a n -> NumberLiteral a n Nothing) integer,
       cast "bool" BoolLiteral boolContent,
       cast "decimal" (\a d -> DecimalLiteral a (WrappedDecimal d)) decimalContent,
-      cast "bytes" HexaLiteral bytesContent
+      cast "bytes" HexaLiteral (stringToLabel <$> bytesContent)
     ]
   where
     cast name f p = try $ do
@@ -644,5 +817,5 @@ inlineAssembly = do
           void comma
           match "32"
           return src
-      return $ MloadAdd32 (T.pack dst) (T.pack src)
+      return $ MloadAdd32 dst src
   pure $ AssemblyStatement e a

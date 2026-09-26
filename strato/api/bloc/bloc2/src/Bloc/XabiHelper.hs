@@ -13,8 +13,8 @@ import qualified BlockApps.Solidity.Xabi as EVMXabi
 import qualified BlockApps.Solidity.Xabi.Type as XabiType
 import Data.Int (Int32)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
+import SolidVM.Model.SolidString (labelToString, labelToText)
 import SolidVM.Model.CodeCollection.Contract
 import qualified SolidVM.Model.CodeCollection.Event as SolidEv
 import qualified SolidVM.Model.CodeCollection.Function as SolidF
@@ -31,7 +31,7 @@ import Text.Parsec hiding (parse)
 parseSolidXabi :: SourceName -> SourceCode -> Either String (EVMParseT.SolcVersion, [(T.Text, EVMXabi.Xabi)])
 parseSolidXabi sName sCode = do
   fi@(File parsedFile) <- showError $ runParser solidityFile initialParserState sName sCode
-  let nameXabi = [(T.pack $ _contractName contr, transFormXabi contr) | FLContract contr <- parsedFile]
+  let nameXabi = [(labelToText $ _contractName contr, transFormXabi contr) | FLContract contr <- parsedFile]
   let associatedEVMVersion = case decideVersion fi of
         SolidParseT.ZeroPointFour -> EVMParseT.ZeroPointFour
         SolidParseT.ZeroPointFive -> EVMParseT.ZeroPointFive
@@ -40,14 +40,14 @@ parseSolidXabi sName sCode = do
 transFormXabi :: Contract -> EVMXabi.Xabi
 transFormXabi Contract{..} =
   EVMXabi.Xabi
-    { xabiFuncs = M.map tFormFunc $ M.mapKeysMonotonic T.pack _functions,
+    { xabiFuncs = M.map tFormFunc $ M.mapKeysMonotonic labelToText _functions,
       xabiConstr = tFormFunc <$> _constructor,
-      xabiVars = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic T.pack _storageDefs,
+      xabiVars = M.map tFormVarDeclToVartype $ M.mapKeysMonotonic labelToText _storageDefs,
       xabiTypes = M.empty,
-      xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic T.pack _modifiers,
-      xabiEvents = M.map tFormEv $ M.mapKeysMonotonic T.pack _events,
+      xabiModifiers = M.map tFormModifer $ M.mapKeysMonotonic labelToText _modifiers,
+      xabiEvents = M.map tFormEv $ M.mapKeysMonotonic labelToText _events,
       xabiKind = case _contractType of ContractType -> EVMXabi.ContractKind; InterfaceType -> EVMXabi.InterfaceKind; AbstractType -> EVMXabi.AbstractKind; LibraryType -> EVMXabi.LibraryKind,
-      xabiUsing = M.fromList $ map (\u@(SVMXabi.Using c _ _ _) -> (T.pack c, tFormUs u)) _usings
+      xabiUsing = M.fromList $ map (\u@(SVMXabi.Using c _ _ _) -> (labelToText c, tFormUs u)) _usings
     }
 
 ----------------------------------
@@ -56,8 +56,8 @@ transFormXabi Contract{..} =
 tFormFunc :: SolidF.Func -> EVMXabi.Func
 tFormFunc SolidF.Func {..} =
   EVMXabi.Func
-    { funcArgs = M.fromList [(T.pack $ fromMaybe "" a, tFormIndexedType b) | (a, b) <- (_funcArgs)], --Map Text Xabi.IndexedType
-      funcVals = M.fromList [(T.pack $ fromMaybe "" a, tFormIndexedType b) | (a, b) <- (_funcVals)], --Map Text Xabi.IndexedType
+    { funcArgs = M.fromList [(maybe T.empty labelToText a, tFormIndexedType b) | (a, b) <- (_funcArgs)], --Map Text Xabi.IndexedType
+      funcVals = M.fromList [(maybe T.empty labelToText a, tFormIndexedType b) | (a, b) <- (_funcVals)], --Map Text Xabi.IndexedType
       funcStateMutability = case _funcStateMutability of
         Nothing -> Nothing
         Just SolidF.Pure -> Just EVMXabi.Pure
@@ -130,15 +130,15 @@ tFormTypeToType = \case
   (SolidType.Int maybeBool maybeBytes) -> (XabiType.Int maybeBool maybeBytes)
   (SolidType.String maybeBool) -> (XabiType.String maybeBool)
   (SolidType.Bytes maybeBool maybeBytes) -> (XabiType.Bytes maybeBool maybeBytes)
-  (SolidType.UnknownLabel a) -> (XabiType.UnknownLabel a)
-  (SolidType.Struct maybeInt typeD) -> (XabiType.Struct maybeInt $ T.pack typeD)
-  (SolidType.Enum maybeInt typeD nams) -> (XabiType.Enum maybeInt (T.pack typeD) ((map T.pack) <$> nams))
+  (SolidType.UnknownLabel a) -> (XabiType.UnknownLabel (labelToString a))
+  (SolidType.Struct maybeInt typeD) -> (XabiType.Struct maybeInt $ labelToText typeD)
+  (SolidType.Enum maybeInt typeD nams) -> (XabiType.Enum maybeInt (labelToText typeD) ((map labelToText) <$> nams))
   (SolidType.Array typ len) -> (XabiType.Array (tFormTypeToType typ) len)
-  (SolidType.Contract s) -> (XabiType.Contract $ T.pack s)
+  (SolidType.Contract s) -> (XabiType.Contract $ labelToText s)
   (SolidType.Mapping maybeBoo k v _ _) -> (XabiType.Mapping maybeBoo (tFormTypeToType k) (tFormTypeToType v))
   (SolidType.UserDefined _ t) -> tFormTypeToType t
   (SolidType.Bool) -> (XabiType.Bool)
   (SolidType.Address _) -> (XabiType.Address)
   SolidType.Decimal -> XabiType.Decimal
-  (SolidType.Error _ ss) -> (XabiType.UnknownLabel ss) --Questionable at best
+  (SolidType.Error _ ss) -> (XabiType.UnknownLabel (labelToString ss)) --Questionable at best
   SolidType.Variadic -> XabiType.Variadic

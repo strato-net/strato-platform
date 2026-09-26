@@ -26,7 +26,6 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Control.DeepSeq (NFData)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import GHC.Generics (Generic)
 import SolidVM.Model.TypedArg (TypedArg)
 
@@ -49,7 +48,7 @@ instance RLPSerializable ReceiptStatus where
 
 data ReceiptLog = ReceiptLog
   { rlogContractAddress :: Address,
-    rlogEventName :: String,
+    rlogEventName :: T.Text,
     rlogArgs :: [TypedArg]
   }
   deriving (Eq, Show, Generic, NFData)
@@ -58,13 +57,13 @@ instance RLPSerializable ReceiptLog where
   rlpEncode (ReceiptLog addr name args) =
     RLPArray
       [ rlpEncode addr,
-        rlpEncode (encodeUtf8 (T.pack name)),
+        rlpEncode name,
         RLPArray (map rlpEncode args)
       ]
   rlpDecode (RLPArray [a, n, RLPArray as]) =
     ReceiptLog
       (rlpDecode a)
-      (T.unpack . decodeUtf8 . rlpDecode $ n)
+      (rlpDecode n)
       (map rlpDecode as)
   rlpDecode x = error $ "rlpDecode ReceiptLog: bad RLP shape: " ++ show x
 

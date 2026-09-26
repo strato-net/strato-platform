@@ -89,6 +89,11 @@ if [[ -f .strato.pid ]]; then
 fi
 
 echo "Starting convoke..."
+# glibc malloc arenas: the threaded RTS otherwise grows one per OS thread;
+# measured ~0.5GB of fragmented RSS on vm-runner during a full sync (3.65GB →
+# 3.12GB, same sync time). Inherited by every process convoke starts.
+# Mirrors the ENV in Dockerfile.multi.
+export MALLOC_ARENA_MAX=2
 # stdout and stderr both go to the log; stderr also goes to the terminal.
 # Both streams go through "tee -a" (append mode) so the two writers share the
 # file's end position and can't overwrite each other's bytes. Truncate first,

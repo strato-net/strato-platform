@@ -28,7 +28,6 @@ library:
     - Blockchain.Stream.VMEvent
     - Blockchain.Timing
     - Blockchain.TxRunResultCache
-    - Blockchain.MemVMContext
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.VMException
@@ -67,6 +66,7 @@ library:
     - lrucache
     - merkle-patricia-db
     - monad-alter
+    - nodedb-monad
     - mtl
     - nibblestring
     - ordered-containers

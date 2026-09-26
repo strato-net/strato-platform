@@ -18,6 +18,7 @@ executables:
     main: StratoP2PMain.hs
     dependencies:
       - blockapps-init
+      - composable-monads-base
       - ethereum-discovery
       - hflags
       - streaming
@@ -46,6 +47,7 @@ library:
     - blockstanbul
     - bytestring
     - composable-monads-base
+    - exceptions
     - conduit
     - conduit-extra
     - containers

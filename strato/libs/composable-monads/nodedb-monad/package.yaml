@@ -1,0 +1,19 @@
+name:                nodedb-monad
+version:             0.1.0.0
+license:             Apache-2.0
+
+dependencies:
+- base >= 4.7 && < 5
+
+library:
+  source-dirs: src
+  dependencies:
+  - bytestring
+  - composable-monads-base
+  - containers
+  - data-default
+  - ethereum-rlp
+  - kv-cache
+  - leveldb-haskell
+  - merkle-patricia-db
+  - monad-alter

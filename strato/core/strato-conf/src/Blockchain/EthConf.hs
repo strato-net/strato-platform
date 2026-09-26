@@ -15,6 +15,7 @@ where
 
 import Blockchain.EthConf.Model
 import Control.Exception (catch, IOException)
+import Control.Monad.Composable.Base (Eff)
 import Control.Monad.Composable.Streaming
 import qualified Data.ByteString as B
 import Data.Default
@@ -42,8 +43,7 @@ connStr = postgreSQLConnectionString . sqlConfig $ ethConf
 cirrusConnStr :: B.ByteString
 cirrusConnStr = postgreSQLConnectionString . cirrusConfig $ ethConf
 
-runStreamMConfigured :: MonadUnliftIO m =>
-                        ClientId -> StreamM m a -> m a
+runStreamMConfigured :: ClientId -> StreamM es a -> Eff es a
 runStreamMConfigured name =
   let k = streamingConfig ethConf
   in runStreamM name (fromString $ streamingHost k, fromIntegral $ streamingPort k)

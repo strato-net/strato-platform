@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -50,6 +51,8 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Map.Strict (Map)
 import Data.OpenApi
 import Data.Source
@@ -90,6 +93,8 @@ tRead "payable" = Just Payable
 tRead _ = Nothing
 
 instance Binary StateMutability
+
+makeStore ''StateMutability
 
 instance ToJSON StateMutability where
   toJSON = String . tShow
@@ -150,6 +155,8 @@ makeLenses ''FuncF
 
 instance Binary a => Binary (FuncF a)
 
+makeStore ''FuncF
+
 instance ToJSON a => ToJSON (FuncF a)
 
 instance FromJSON a => FromJSON (FuncF a)
@@ -169,6 +176,8 @@ makeLenses ''ModifierF
 type Modifier = Positioned ModifierF
 
 instance Binary a => Binary (ModifierF a)
+
+makeStore ''ModifierF
 
 instance ToJSON a => ToJSON (ModifierF a) where
   toJSON = genericToJSON (aesonPrefix camelCase)
@@ -192,6 +201,8 @@ makeLenses ''UsingF
 type Using = Positioned UsingF
 
 instance Binary a => Binary (UsingF a)
+
+makeStore ''UsingF
 
 instance ToJSON a => ToJSON (UsingF a) where
   toJSON (Using dec typ g ctx) =

@@ -53,7 +53,7 @@ data AggregateEvent = AggregateEvent
 instance ShortDescription AggregateEvent where
   shortDescription agEv =
     let ev = eventEvent agEv
-     in "event " ++ evName ev
+     in "event " ++ T.unpack (evName ev)
           ++ " @" ++ formatAddressWithoutColor (evContractAddress ev)
           ++ " block " ++ show (eventBlockNumber agEv)
           ++ " idx " ++ show (eventIndex agEv)

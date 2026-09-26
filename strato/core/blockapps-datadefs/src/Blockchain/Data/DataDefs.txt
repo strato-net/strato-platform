@@ -113,17 +113,17 @@ Storage json
 TransactionResult json
     blockHash Keccak256
     transactionHash Keccak256
-    message String
+    message Text
     response (Maybe Value)
-    trace String
+    trace Text
     gasUsed Word256
     etherUsed Word256
     contractsCreated [Address]
     contractsDeleted [Address]
-    stateDiff String
+    stateDiff Text
     time Double
-    newStorage String
-    deletedStorage String
+    newStorage Text
+    deletedStorage Text
     status TransactionResultStatus Maybe
     deriving Eq Show Generic
 

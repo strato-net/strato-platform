@@ -1,5 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -12,7 +14,9 @@ module Control.Monad.Composable.Vault
   , runVaultM
   ) where
 
-import Control.Monad.Reader
+import Control.Monad.Composable.Base
+import Control.Monad.IO.Class
+import Control.Monad.Trans (MonadTrans (..))
 import Data.ByteString (ByteString)
 import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
@@ -20,7 +24,7 @@ import qualified Strato.Strato23.Client as VC
 
 type VaultData = AuthEnv
 
-type VaultM = ReaderT VaultData
+type VaultM es = Eff (VaultData ': es)
 
 -------------------------------------------------------------------
 ------------------------- TYPECLASSES -----------------------------
@@ -36,29 +40,29 @@ class Monad m => HasVault m where
   postKey :: m VC.PublicKey
   getShared :: VC.PublicKey -> m VC.SharedKey
 
-runVaultM :: MonadIO m => String -> VaultM m a -> m a
+runVaultM :: String -> VaultM es a -> Eff es a
 runVaultM url f = do
   env <- liftIO $ newAuthEnv url
-  runReaderT f env
+  provide env f
 
-instance {-# OVERLAPPING #-} MonadIO m => HasVault (VaultM m) where
+instance (VaultData :> es) => HasVault (Eff es) where
   sign bs = do
-    env <- ask
+    env <- accessEnv
     result <- liftIO $ runWithAuth env (VC.postSignature Nothing (VC.MsgHash bs))
     either (error . show) return result
 
   getPub = do
-    env <- ask
+    env <- accessEnv
     result <- liftIO $ runWithAuth env (VC.getKey Nothing Nothing)
     either (error . show) return (fmap VC.unPubKey result)
 
   postKey = do
-    env <- ask
+    env <- accessEnv
     result <- liftIO $ runWithAuth env (VC.postKey Nothing)
     either (error . show) return (fmap VC.unPubKey result)
 
   getShared pub = do
-    env <- ask
+    env <- accessEnv
     result <- liftIO $ runWithAuth env (VC.getSharedKey Nothing True pub)
     either (error . show) return result
 

@@ -37,13 +37,13 @@ unparse :: File -> String
 unparse (File units) = List.concat $ List.map unparseSourceUnit units
 
 unparseSourceUnit :: SourceUnit -> String
-unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ ident ++ " " ++ contents ++ ";\n"
+unparseSourceUnit (Pragma _ ident contents) = "pragma " ++ labelToString ident ++ " " ++ contents ++ ";\n"
 unparseSourceUnit (Import _ imp) = "import \"" ++ unparseFileImport imp ++ "\";\n"
-unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (Text.unpack name, conDecl)
-unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
-unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (Text.unpack name, decl)
-unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (Text.unpack name, args)
-unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ ident ++ " " ++ orignal ++ "\";\n"
+unparseSourceUnit (FLConstant name conDecl) = (("\n    " <>) . unparseConstant) (name, conDecl)
+unparseSourceUnit (FLStruct name decl) = (("\n    " <>) . unparseTypes) (name, decl)
+unparseSourceUnit (FLEnum name decl) = (("\n    " <>) . unparseTypes) (name, decl)
+unparseSourceUnit (FLError name args) = (("\n    " <>) . unparseTypes) (name, args)
+unparseSourceUnit (Alias _ ident orignal) = "type \"" ++ labelToString ident ++ " " ++ orignal ++ "\";\n"
 unparseSourceUnit (DummySourceUnit) = "DummySourceUnit"
 unparseSourceUnit (FLContract contract) = unparseContract contract
 unparseSourceUnit (FLUsing using) = unparseUsing using
@@ -142,7 +142,7 @@ unparseVarType (SVMType.UnknownLabel str) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
-unparseVarType (SVMType.Mapping _ key val kn vn) = "mapping (" <> (unparseVarType key) <> (maybe "" (" " <>) kn) <> " => " <> (unparseVarType val) <> (maybe "" (" " <>) vn) <> ")"
+unparseVarType (SVMType.Mapping _ key val kn vn) = "mapping (" <> (unparseVarType key) <> (maybe "" ((" " <>) . labelToString) kn) <> " => " <> (unparseVarType val) <> (maybe "" ((" " <>) . labelToString) vn) <> ")"
 unparseVarType (SVMType.Contract contractName') = labelToString contractName'
 unparseVarType (SVMType.Struct _ n) = "struct " ++ labelToString n
 unparseVarType (SVMType.Decimal) = "decimal"
@@ -256,9 +256,9 @@ unparseStatementWith f (Block a) = f a $ "{ }"
 unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf "assembly { %s := mload(add(%s, 32)) }" dst src
 unparseStatementWith f (EmitStatement eventName extups a) =
   let expVals = map (unparseExpression . snd) extups
-   in f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
+   in f a $ "emit " ++ labelToString eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
 unparseStatementWith f (RevertStatement customErr argList a) =
-  f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression argList)) ++ ");\n"
+  f a $ "revert " ++ maybe "" labelToString customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression argList)) ++ ");\n"
 unparseStatementWith f (UncheckedStatement code a) =
   f a $
     "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
@@ -269,7 +269,7 @@ unparseStatementWith f (TryCatchStatement tryBlock catchBlockMap a) =
              " "
              ( map
                  ( \(name, (params, block)) ->
-                     "catch " ++ name
+                     "catch " ++ labelToString name
                        ++ (show (fromMaybe [] params))
                        ++ " {\n"
                        ++ tab (unlines $ map (unparseStatementWith f) block)
@@ -366,7 +366,7 @@ unparseEvent (name, Event {..}) =
       <> ";"
 
 unparseUsing :: UsingF a -> String
-unparseUsing (Using lib typ g _) = mconcat ["using ", lib, " for ", maybe "*" unparseVarType typ, bool "" " global" g, ";\n"]
+unparseUsing (Using lib typ g _) = mconcat ["using ", labelToString lib, " for ", maybe "*" unparseVarType typ, bool "" " global" g, ";\n"]
 
 unparseTypes :: (SolidString, SolidVM.DefF a) -> String
 unparseTypes (name, SolidVM.Enum {names = names'}) =

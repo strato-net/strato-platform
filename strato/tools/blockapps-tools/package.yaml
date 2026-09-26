@@ -16,6 +16,7 @@ dependencies:
 library:
   source-dirs: src/
   dependencies:
+    - composable-monads-base
     - aeson
     - blockapps-data
     - blockapps-datadefs

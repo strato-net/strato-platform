@@ -20,14 +20,18 @@ where
 
 import BlockApps.Logging
 import Blockchain.BlockChain (addTransaction, recoverProposer)
-import Blockchain.DB.ChainDB (getChainStateRoot, putBlockHeaderInChainDB)
+import Blockchain.Data.BlockSummary (BlockSummary, bSumStateRoot)
+import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Strato.Model.ExtendedWord (Word256)
+import qualified Control.Monad.Change.Alter as A
 import Blockchain.Data.BlockHeader (BlockHeader, getBlockGasLimit, parentHash)
 import Blockchain.Data.VmTrace (cfTo, newVmTracer, takeTraceRoots, VmTracer)
 import Blockchain.Data.ExecResults (calculateReturned)
 import Blockchain.Data.TransactionDef (Transaction)
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.JsonRpcCommand (runJsonRpcCommandSandboxed, traceToJson)
-import Blockchain.MemVMContext (MemContextM, VMType (..), evalSandboxedContextM)
+import Blockchain.VMContext (ContextM, evalSandboxedContextM)
+import Blockchain.Wiring ()
 import Blockchain.Model.WrappedBlock (OutputTx (..), wrapIngestBlockTransaction)
 import Blockchain.Sequencer.CallSpec (TraceOptions (..))
 import Blockchain.Sequencer.Event
@@ -36,7 +40,6 @@ import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex)
 import Blockchain.VMContext (CurrentBlockHash (..), VMBase)
 import Control.Monad (when)
-import Control.Monad.Trans.Except (runExceptT)
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Data.Aeson as Aeson
 import Data.Aeson ((.=))
@@ -49,9 +52,9 @@ import Text.Format (format)
 
 -- | Like runJsonRpcCommandSandboxed, but additionally handles the
 -- block-replay trace command, which needs the block-processing machinery.
-runJsonRpcCommandTraced :: forall m. (VMBase m, MonadMonitor m) => JsonRpcCommand -> m JsonRpcResponse
+runJsonRpcCommandTraced :: JsonRpcCommand -> ContextM JsonRpcResponse
 runJsonRpcCommandTraced (JRCTraceBlockTxs header txs mTarget opts id) =
-  evalSandboxedContextM (traceBlockTxs header txs mTarget opts id :: MemContextM 'Sandboxed m JsonRpcResponse)
+  evalSandboxedContextM (traceBlockTxs header txs mTarget opts id)
 runJsonRpcCommandTraced c = runJsonRpcCommandSandboxed c
 
 traceBlockTxs ::
@@ -67,15 +70,15 @@ traceBlockTxs header txs mTarget opts id = do
   case recoverProposer header of
     Left err -> return $ Error id err
     Right proposer ->
-      getChainStateRoot Nothing (parentHash header) >>= \case
+      A.lookup (A.Proxy @BlockSummary) (parentHash header) >>= \case
         Nothing ->
           return . Error id $
             "parent state not available for block " ++ format (parentHash header)
-        Just _ -> do
+        Just parentSum -> do
           -- Anchor this block at its parent's post-state root; all writes stay
           -- in the sandbox overlay.
-          putBlockHeaderInChainDB header
           Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
+          A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (bSumStateRoot parentSum)
           let otxs = mapMaybe (wrapIngestBlockTransaction bh) txs
               dropped = length txs - length otxs
           when (dropped > 0) $
@@ -100,7 +103,7 @@ traceBlockTxs header txs mTarget opts id = do
           then Just <$> newVmTracer (traceStatements opts)
           else pure Nothing
       Mod.put (Mod.Proxy @(Maybe VmTracer)) mTracer
-      eRes <- runExceptT $ addTransaction header remGas t proposer
+      eRes <- addTransaction header remGas t proposer
       Mod.put (Mod.Proxy @(Maybe VmTracer)) Nothing
       acc' <- case mTracer of
         Nothing -> pure acc

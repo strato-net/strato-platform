@@ -126,7 +126,7 @@ resolveLabelsInContract :: CodeCollection -> Contract -> Contract
 resolveLabelsInContract cc c =
   c {_storageDefs = fmap (resolveLabelsInDef (cc ^. contracts) (c ^. userDefined) (c ^. enums) (c ^. structs)) $ c ^. storageDefs}
 
-resolveLabelsInDef :: Map SolidString Contract -> Map String String -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
+resolveLabelsInDef :: Map SolidString Contract -> Map SolidString SolidString -> Map SolidString a -> Map SolidString b -> VariableDecl -> VariableDecl
 resolveLabelsInDef contractDefs userDefineDefs enumDefs structDefs x@VariableDecl {_varType = SVMType.UnknownLabel labelName} =
   case ( labelName `M.member` contractDefs,
          labelName `M.member` userDefineDefs,

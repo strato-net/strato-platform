@@ -9,10 +9,10 @@ import Blockchain.Strato.Discovery.ContextLite
 import Blockchain.Strato.Discovery.Data.Peer (UDPPort(..), TCPPort(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Discovery.UDPServer
+import Control.Monad.Composable.Base
 import Control.Monad.Composable.Vault (runVaultM)
 import Control.Monad.IO.Class
 import Control.Monad.Reader
-import Control.Monad.Trans.Resource
 import qualified Data.Text as T
 import Executable.EthDiscoverySetup (setup)
 import Executable.EthereumDiscovery
@@ -38,7 +38,7 @@ main = do
   putStrLn $ "ethereum-discover: Using bootnodes: " ++ show bootnodes
 
   putStrLn "ethereum-discover: Running peer database setup..."
-  runStdoutLoggingT $ setup bootnodes
+  runEff . withStdoutLogger $ setup bootnodes
   putStrLn "ethereum-discover: Peer database setup complete"
 
   let runner f = do
@@ -49,9 +49,9 @@ main = do
             tcpPort = TCPPort port' -- TODO: where do we get the TCP port from?
             minPeers = minAvailablePeers (discoveryConfig ethConf)
         cxt <- initContextLite udpPort tcpPort
-        runVaultM vaultUrl' . runResourceT . flip runReaderT cxt $
+        runVaultM vaultUrl' . withResources . runDiscoveryM cxt $
           bracket
             (connectMe udpPort)
             (liftIO . S.close)
             (\s -> local (\c -> c {sock = s}) $ f minPeers)
-  S.withSocketsDo . runLoggingT $ ethereumDiscovery runner
+  S.withSocketsDo . runEff . runLogging $ ethereumDiscovery runner

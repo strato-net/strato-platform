@@ -18,7 +18,6 @@ library
   exposed-modules:
       Blockchain.Data.AddressStateDB
       Blockchain.DB.AddressStateDB
-      Blockchain.DB.ChainDB
       Blockchain.DB.CodeDB
       Blockchain.DB.HashDB
       Blockchain.DB.MemAddressStateDB
@@ -45,6 +44,7 @@ library
     , ethereum-rlp
     , fastMP
     , format
+    , hashable
     , leveldb-haskell
     , merkle-patricia-db
     , monad-alter
@@ -55,6 +55,7 @@ library
     , strato-model
     , transformers
     , unliftio-core
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite blockapps-mpdbs-test

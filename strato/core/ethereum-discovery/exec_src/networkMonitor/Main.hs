@@ -8,6 +8,7 @@
 module Main (main) where
 
 import BlockApps.Logging
+import Control.Monad.Composable.Base (runEff)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Control.Applicative ((<|>))
@@ -39,7 +40,7 @@ tryResetPeerTimeouts = do
 main :: IO ()
 main = do
   _ <- $initHFlags "Strato Network Monitor"
-  runLoggingT $ loop Map.empty   -- start with no network interfaces
+  runEff . runLogging $ loop Map.empty   -- start with no network interfaces
   where
     loop :: (MonadIO m, MonadLogger m) => Map String NetworkInterface -> m ()
     loop old = forever $ do

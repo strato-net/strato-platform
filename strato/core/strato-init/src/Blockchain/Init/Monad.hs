@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -29,12 +30,10 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans.Resource
 import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
@@ -47,22 +46,21 @@ data SetupDBs = SetupDBs
     stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
     hashDB :: HashDB,
     codeDB :: CodeDB,
-    localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
-    localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
+    localStorageBlock :: IORef (BlockMap (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
+    localAddressStateBlock :: IORef (BlockMap Address AddressStateModification)
   }
 
 type HasDBs m = Mod.Accessible SetupDBs m
 
-runSetupDBM :: (MonadResource m, MonadFail m) =>
-               ReaderT SetupDBs m b -> m b
+runSetupDBM :: (InternalState :> es) =>
+               Eff (SetupDBs ': es) b -> Eff es b
 runSetupDBM = runSetupDBMInDir ".ethereumH"
 
 -- | Run setup with databases in a specified directory.
 -- Useful for genesis-builder which needs its own temp database to avoid locking conflicts.
-runSetupDBMInDir :: (MonadResource m, MonadFail m) =>
-                    FilePath -> ReaderT SetupDBs m b -> m b
+runSetupDBMInDir :: (InternalState :> es) =>
+                    FilePath -> Eff (SetupDBs ': es) b -> Eff es b
 runSetupDBMInDir baseDir mv = do
   liftIO $ createDirectoryIfMissing True baseDir
   let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
@@ -70,9 +68,10 @@ runSetupDBMInDir baseDir mv = do
   srRef <- liftIO $ newIORef M.empty
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
-  [m1, m2] <- liftIO . replicateM 2 . newIORef $ M.empty
-  [m3, m4] <- liftIO . replicateM 2 . newIORef $ M.empty
-  runReaderT mv $ SetupDBs sdb srRef hdb cdb m1 m2 m3 m4
+  m2 <- liftIO $ newIORef emptyBlockMap
+  m3 <- liftIO $ newIORef M.empty
+  m4 <- liftIO $ newIORef emptyBlockMap
+  provide (SetupDBs sdb srRef hdb cdb m2 m3 m4) mv
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
   lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)
@@ -85,10 +84,6 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (MP.StateRoot `A.Alters` MP.Nod
   delete _ = MP.genericDeleteDB $ fmap stateDB $ Mod.access Mod.Proxy
 
 instance (Monad m, MonadIO m, HasDBs m) => HasMemRawStorageDB m where
-  getMemRawStorageTxDB = liftIO . readIORef . localStorageTx =<<  Mod.access Mod.Proxy
-  putMemRawStorageTxMap theMap = do
-    lstref <- fmap localStorageTx $ Mod.access Mod.Proxy
-    liftIO $ atomicWriteIORef lstref theMap
   getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< Mod.access Mod.Proxy
   putMemRawStorageBlockMap theMap = do
     lsbref <- fmap localStorageBlock $ Mod.access Mod.Proxy
@@ -114,7 +109,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressStat
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` AddressState) (ReaderT SetupDBs m) where
+instance {-# OVERLAPPING #-} (SetupDBs :> es, Logger :> es) => (Address `A.Selectable` AddressState) (Eff es) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where
@@ -122,7 +117,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
   insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
 
-instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
+instance {-# OVERLAPPING #-} (SetupDBs :> es) => A.Selectable FilePath (Either String String) (Eff es) where
   select _ _ = pure Nothing
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (N.NibbleString `A.Alters` N.NibbleString) m where

@@ -30,6 +30,7 @@ executable strato-api
     , cache
     , clock
     , common-log
+    , composable-monads-base
     , containers
     , core-api2
     , ethereum-discovery
@@ -41,6 +42,7 @@ executable strato-api
     , monad-alter
     , openapi3
     , process-monitor
+    , seqevents
     , servant-multipart
     , servant-openapi3
     , servant-server

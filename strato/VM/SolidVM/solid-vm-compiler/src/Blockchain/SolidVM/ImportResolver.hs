@@ -214,7 +214,7 @@ codeCollectionToFileUnits from CodeCollection {..} =
           <> (FUStruct <$> _flStructs)
           <> (FUEnum <$> _flEnums)
           <> (FUFunction <$> _flFuncs)
-          <> (M.fromList $ (show &&& FUUsing) <$> _flUsings)
+          <> (M.fromList $ (stringToLabel . show &&& FUUsing) <$> _flUsings)
           <> (FUError <$> _flErrors)
    in FileUnits (M.fromList _pragmas) $ M.singleton Nothing units
 

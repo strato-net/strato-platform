@@ -30,7 +30,8 @@ RUN apt -y update && apt install -y \
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
-    LC_ALL="en_US.UTF-8"
+    LC_ALL="en_US.UTF-8" \
+    MALLOC_ARENA_MAX=2
 
 FROM base as strato
 COPY \

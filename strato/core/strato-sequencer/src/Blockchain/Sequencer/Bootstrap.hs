@@ -15,6 +15,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
+import Control.Monad.Composable.Base (runEff)
 import qualified Data.Text as T
 
 -- | Bootstrap genesis block into LevelDB and Kafka.
@@ -42,7 +43,7 @@ initLevelDB hash' = do
 
 initKafka :: OutputBlock -> IO ()
 initKafka shortCircuit = do
-        runStreamMConfigured (T.pack defaultKafkaClientId') $ do
+        runEff . runStreamMConfigured (T.pack defaultKafkaClientId') $ do
           _ <- assertSequencerTopicsCreation
           _ <- writeSeqVmTasks [VmBlock shortCircuit]
           _ <- writeSeqP2pEvents [P2pBlock shortCircuit]

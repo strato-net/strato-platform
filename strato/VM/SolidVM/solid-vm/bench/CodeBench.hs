@@ -11,7 +11,9 @@
 --import SolidVM.CodeCollectionTools
 
 import BlockApps.Logging
-import Blockchain.MemVMContext
+import Blockchain.VMContext (runMemContextM)
+import Control.Monad.Composable.Base (runEff)
+import Blockchain.Wiring ()
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Simple
 import Blockchain.Strato.Model.Address
@@ -65,7 +67,7 @@ createContract =
           & createArgs . argsMetadata ?~ M.empty
           & createArgs . argsMetadata . _Just . at "name" ?~ "TicketManager"
           & createArgs . argsMetadata . _Just . at "args" ?~ "(0xfeedbeef,0xc001d00d)"
-   in bench "time to create a contract" $ nfIO . runLoggingT . runMemContextM Nothing $ create txArgs
+   in bench "time to create a contract" $ nfIO . runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ create txArgs
 
 callFunc :: Benchmark
 callFunc =
@@ -82,7 +84,7 @@ callFunc =
           & callArgs . argsMetadata . _Just . at "funcName" ?~ "createTicket"
           & callArgs . argsMetadata . _Just . at "args" ?~ "([\"00\",\"01\",\"02\",\"03\",\"04\",\"05\",\"06\",\"07\",\"08\",\"09\",\"0a\",\"0b\",\"0c\",\"0d\"],[14,15,16,17],[\"18\"],[19])"
    in bench "time to call a function" $
-        nfIO . runLoggingT . runMemContextM Nothing $ do
+        nfIO . runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
           _ <- create txArgs
           call txArgs'
 

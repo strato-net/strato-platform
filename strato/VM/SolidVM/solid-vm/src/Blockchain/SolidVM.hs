@@ -122,18 +122,20 @@ import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value
 import SolidVM.Solidity.Parse.ParserTypes
-import SolidVM.Solidity.Parse.Statement
+import qualified SolidVM.Solidity.Parse.Fast.Parser as Fast
 import SolidVM.Solidity.Parse.UnParser hiding (sortWith)
+import System.Environment (lookupEnv)
+import System.IO.Unsafe (unsafePerformIO)
 import qualified Text.Colors as C
 import Text.Format
-import Text.Parsec (runParser)
 import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
 
 
-type SolidVMBase m = VMBase m
+-- | The evaluator runs in the node monad and nowhere else.
+type SolidVMBase m = (m ~ ContextM)
 
 onTraced :: Monad m => m () -> m ()
 onTraced = when (Conf.svmTrace (Conf.debugConfig ethConf))
@@ -162,7 +164,7 @@ withSrcPos pos str =
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withStaticCallInfo $ do
   -- TODO: allow write access once we figure out how to discard changes
-  let eExpr = runParser expression initialParserState "" (T.unpack exprText)
+  let eExpr = Fast.parseExpression initialParserState "" exprText
   case eExpr of
     Left pe -> pure . Left . T.pack $ show pe
     Right expr -> do
@@ -260,11 +262,11 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
     opts <- parseOptionsForCurrentBlock
     (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
-    let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
+    let eArgExps = traverse (Fast.parseArg initialParserState "") argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
     argVals <- argsToVals argExps
 
-    create' sender' newAddress hsh cc (T.unpack contractName) argVals
+    create' sender' newAddress hsh cc (textToLabel contractName) argVals
 
 create' :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
 create' creator newAddress ch cc contractName' valList = do
@@ -306,7 +308,7 @@ create' creator newAddress ch cc contractName' valList = do
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
+  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow (labelToString contractName'))]
 
   stakeEventSource <- Conf.stakeEventSourceAt (Conf.networkConfig ethConf) . BlockHeader.number . Env.blockHeader <$> getEnv
 
@@ -330,6 +332,21 @@ create' creator newAddress ch cc contractName' valList = do
         erRemovedValidators = remV,
         erStakeUpdates = getStakeDeltasFromEvents stakeEventSource $ toList finalEvs
       }
+
+-- | Helium transactions sealed as failed by the old parser's rejection of hex"" (see 'callReturnEnv').
+heliumLegacyArgFailures :: [(Integer, Keccak256)]
+heliumLegacyArgFailures =
+    [ (573497, keccak256FromHex "0ca46ee0eaee987ad33e49f15c57e2c2d16c1efa26d5629b5d97a76e0efdda61")
+    , (573498, keccak256FromHex "d22543e2cf262434b5f03120454a7e3b958b175618c54b92e041b3e392a39a64")
+    , (573511, keccak256FromHex "ca5498b51a3a92400f5187a1352b0be128c42dfd2de2a32e470cfe27efce3666")
+    , (573512, keccak256FromHex "435ae29c6defec0011db4c645e764375f493c41e7255f413538fd61cb6427578")
+    , (573526, keccak256FromHex "c5d24c8a28c0bf693d17a391e98525e153360b24e9b7f2d8923c617706f23015")
+    , (573527, keccak256FromHex "79594488e567d1d18f3b3e5a490659331617c42903c009c8c99f7108b8e867f0")
+    , (573531, keccak256FromHex "1754c60122996a6e824449a041e1637bc8dfc245550fc591a25e2f72cd598a4b")
+    , (573532, keccak256FromHex "540b0ddd9d8637ef5baab2954aaa14a1dab73b30b74a4312efc2fd213f204c16")
+    , (573543, keccak256FromHex "c07fdec6ce3112c043281a0fdbc6e32c4399e901e382e4364e20da7f1782de65")
+    , (573544, keccak256FromHex "02f0ed301bc40e4a3bed332a10bd70dbda3db7cf5f0cc9b97bdb2f7015b40a86")
+    ]
 
 call ::
   SolidVMBase m =>
@@ -391,11 +408,20 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
     let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
         srcLength = 0
-        !argExps =
-          if null argsStrings
-            then []
-            else either (parseError "call arguments") id $
-              traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
+        -- Helium network ID = 114784819836269
+        -- These helium blocks hold settleDeposit calls whose last argument is hex"", which the
+        -- parser of the time rejected, so the chain has them sealed as failed transactions.
+        -- The parser now accepts hex""; fail exactly those transactions the old way to
+        -- compensate for the old bug already hardcoded in the chain.
+        isHeliumLegacyArgFailure =
+          Conf.networkID (networkConfig ethConf) == 114784819836269
+            && (BlockHeader.number blockData, txHash') `elem` heliumLegacyArgFailures
+        !argExps
+          | null argsStrings = []
+          | isHeliumLegacyArgFailure = parseError "call arguments" ("hex\"\" rejected by the parser that sealed this block" :: String)
+          | otherwise =
+              either (parseError "call arguments") id $
+                traverse (Fast.parseArg (initialParserStateWithLength srcLength) "") argsStrings
     argVals <- argsToVals argExps
 
     maybeVal <-
@@ -477,8 +503,8 @@ call' from to' fnCalltype functionName valList = do
         case fnCalltype of
           CC.DefaultCall -> functionName
           _
-            | '(' `notElem` functionName -> functionName
-            | otherwise -> case runParser parseExternalCallArgs initialParserState "" functionName of
+            | not (T.any (== '(') functionName) -> functionName
+            | otherwise -> case Fast.parseExternalCallArgs initialParserState "" (labelToText functionName) of
                 Right (funcToCall, _) -> funcToCall
                 _ -> functionName
       nullifyRefs (ts, v) = case v of
@@ -712,7 +738,7 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
           argVals <- mapM (getVar <=< expToVar) theArgs
           let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
 
-          return $ customError "Reverting based on  Error Method:" name listOfVals
+          return $ customError "Reverting based on  Error Method:" (labelToString name) listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
       pure $ err
     Nothing -> do
@@ -969,7 +995,7 @@ runStatement (CC.Throw expr pos) = do
   argVals <- mapM (getVar <=< expToVar) args
   currentBlockNum <- BlockHeader.number . Env.blockHeader <$> getEnv
   let listOfVals = mapMaybe (\x -> toBasic currentBlockNum x) argVals
-  customError "Custom user error thrown" name listOfVals
+  customError "Custom user error thrown" (labelToString name) listOfVals
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar (CC.Variable pos $ textToLabel src)
@@ -990,7 +1016,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   curInfo <- getCurrentCallInfo
   curCnct <- getCurrentContract
   let evs = CC._events curCnct
-      mEv = M.lookup (stringToLabel eventName) evs
+      mEv = M.lookup eventName evs
   case mEv of
     Nothing ->
       missingType "no corresponding event has been declared for the following emit statement: " (unparseStatement st)
@@ -1004,13 +1030,13 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
 
           let evArgs = zipWith3
                         (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
-                          (T.unpack name, value, valStr, idxType))
+                          (name, value, valStr, idxType))
                         (CC._eventLogs ev) expVals expStrs
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
-          let contractName' = labelToString $ CC._contractName curCnct
+          let contractName' = labelToText $ CC._contractName curCnct
           -- Derive the Ethereum log topics (topic0 + indexed args) from the event
           -- ABI now, while the CodeCollection is in hand, so the block producer can
           -- build a real logsBloom without re-deriving them. Uses the same encoder
@@ -1018,9 +1044,9 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- reconstructs from Cirrus, so producer and RPC blooms agree.
           let (evTopicBytes, _) =
                 encodeEventToLog
-                  (stringToLabel eventName)
+                  eventName
                   ev
-                  (M.fromList [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs])
+                  (M.fromList [(n, v) | (n, _, v, _) <- evArgs])
           addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
@@ -1131,7 +1157,7 @@ expToVar' (CC.StringLiteral _ s) = return $ Constant $ SString s
 expToVar' (CC.DecimalLiteral _ v) = return $ Constant $ SDecimal $ CC.unwrapDecimal v
 expToVar' (CC.AddressLiteral _ a) = return $ Constant $ SAddress a False
 expToVar' (CC.BoolLiteral _ b) = return $ Constant $ SBool b
-expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SBytes $ either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
+expToVar' (CC.HexaLiteral _ a) = return $ Constant $ SBytes $ either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ DT.encodeUtf8 (labelToText a)
 expToVar' (CC.ObjectLiteral _ fields) = do
   -- Convert each field expression to a variable
   fieldVars <- mapM expToVar fields
@@ -1257,7 +1283,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       return . Constant $ SVariadic argVals
     (SBuiltinVariable "msg", "sig") -> do
       functionName <- getCurrentFunctionName
-      return . Constant $ SString functionName
+      return . Constant $ SString (labelToString functionName)
     (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAddress) False) . Env.origin) <$> getEnv
     (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
       Nothing -> missingField "struct member access" fieldName
@@ -1312,7 +1338,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         (p:_) -> case M.lookup method $ CC._functions p of
           Nothing -> internalError (concat
             [ "Haskell has duped us - could not find "
-            , method
+            , labelToString method
             , " inside parent contract: "
             ]) (p ^. CC.functions)
           Just _ -> pure . Constant . SFunction method $ Just p
@@ -1515,7 +1541,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   salt <- getVar =<< expToVar saltExpression
   argVals <- argsToVals args
-  newAddress <- getNewAddressWithSalt creator salt hsh (SString contractName' : argVals)
+  newAddress <- getNewAddressWithSalt creator salt hsh (SString (labelToString contractName') : argVals)
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' argVals
   onTraced $ do
@@ -1536,9 +1562,9 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
             erNewContractAddress execResults
 -- Handle type cast function calls like uint256(x), int128(x), bytes32(x), etc.
 expToVar' (CC.FunctionCall _ (CC.Variable _ name) args)
-  | ("uint" `isPrefixOf` name && all isDigit (drop 4 name)) ||
-    ("int" `isPrefixOf` name && all isDigit (drop 3 name)) ||
-    ("bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name)) = do
+  | ("uint" `T.isPrefixOf` name && T.all isDigit (T.drop 4 name)) ||
+    ("int" `T.isPrefixOf` name && T.all isDigit (T.drop 3 name)) ||
+    ("bytes" `T.isPrefixOf` name && not (T.null (T.drop 5 name)) && T.all isDigit (T.drop 5 name)) = do
       argVals <- argsToVals args
       case name of
         "bytes32" -> do
@@ -1601,7 +1627,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     (SString fname : a) -> (fname, a)
                     _ -> typeError "delegate call needs first argument to be a string" $ show args
               fromAddress <- getCurrentAddress
-              res <- callWithResult fromAddress toAddress CC.DelegateCall funcName args'
+              res <- callWithResult fromAddress toAddress CC.DelegateCall (stringToLabel funcName) args'
               case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
@@ -1610,7 +1636,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     (SString fname : as) -> (fname, as)
                     _ -> typeError "call needs first argument to be a string" $ show args
               fromAddress <- getCurrentAddress
-              res <- callWithResult fromAddress toAddress CC.RawCall funcName args'
+              res <- callWithResult fromAddress toAddress CC.RawCall (stringToLabel funcName) args'
               case res of
                 -- TODO: call() should return (bool, variadic)... (Constant BBool , Constant a)
                 Just a -> return $ Constant a
@@ -1620,7 +1646,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                     (SString fname : a) -> (fname, a)
                     _ -> typeError "staticcall needs first argument to be a string" $ show args
               fromAddress <- getCurrentAddress
-              res <- withStaticCallInfo $ callWithResult fromAddress toAddress CC.RawCall funcName args'
+              res <- withStaticCallInfo $ callWithResult fromAddress toAddress CC.RawCall (stringToLabel funcName) args'
               case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
@@ -1762,44 +1788,45 @@ expToVar' (CC.FunctionCall _ e args) = do
                       term ->
                         --Search the full contract for the search term, retrieving the sourceAnnotation location of the part that was found
                         -- Check for and get the different parts of the contract
-                        let contrString =
-                              case ((contract ^. CC.contractName) == term) of
+                        let termL = stringToLabel term
+                            contrString =
+                              case ((contract ^. CC.contractName) == termL) of
                                 True -> Just $ unparseContract contract
                                 False -> Nothing
 
                             constString =
-                              case ((contract ^. CC.constants) M.!? term) of
-                                Just constF -> Just $ unparseConstant (term, constF)
+                              case ((contract ^. CC.constants) M.!? termL) of
+                                Just constF -> Just $ unparseConstant (termL, constF)
                                 Nothing -> Nothing
 
                             storjString =
-                              case ((contract ^. CC.storageDefs) M.!? term) of
-                                Just storjF -> Just $ unparseVar (term, storjF)
+                              case ((contract ^. CC.storageDefs) M.!? termL) of
+                                Just storjF -> Just $ unparseVar (termL, storjF)
                                 Nothing -> Nothing
 
                             enumString =
-                              case ((contract ^. CC.enums) M.!? term) of
-                                Just enumF -> Just $ unparseEnum (term, fst enumF)
+                              case ((contract ^. CC.enums) M.!? termL) of
+                                Just enumF -> Just $ unparseEnum (termL, fst enumF)
                                 Nothing -> Nothing
 
                             structString =
-                              case ((contract ^. CC.structs) M.!? term) of
-                                Just structF -> Just $ unparseStruct (term, structF)
+                              case ((contract ^. CC.structs) M.!? termL) of
+                                Just structF -> Just $ unparseStruct (termL, structF)
                                 Nothing -> Nothing
 
                             eventString =
-                              case ((contract ^. CC.events) M.!? term) of
-                                Just eventF -> Just $ unparseEvent (term, eventF)
+                              case ((contract ^. CC.events) M.!? termL) of
+                                Just eventF -> Just $ unparseEvent (termL, eventF)
                                 Nothing -> Nothing
 
                             funcString =
-                              case ((contract ^. CC.functions) M.!? term) of
-                                Just funcF -> Just $ unparseFunc (term, funcF)
+                              case ((contract ^. CC.functions) M.!? termL) of
+                                Just funcF -> Just $ unparseFunc (termL, funcF)
                                 Nothing -> Nothing
 
                             modString =
-                              case ((contract ^. CC.modifiers) M.!? term) of
-                                Just modF -> Just $ unparseModifier (term, modF)
+                              case ((contract ^. CC.modifiers) M.!? termL) of
+                                Just modF -> Just $ unparseModifier (termL, modF)
                                 Nothing -> Nothing
                          in --Remove all of the items that were found to contain nothing, this should leave just the items that we found
                             catMaybes [contrString, funcString, constString, storjString, enumString, eventString, structString, modString]
@@ -2543,13 +2570,13 @@ callBuiltin "uint" args = return $ intBuiltin False Nothing args
 callBuiltin "int" args = return $ intBuiltin True Nothing args
 -- Handle sized integer type casts (uint256, uint128, uint120, int256, etc.)
 callBuiltin name args
-  | "uint" `isPrefixOf` name && all isDigit (drop 4 name) = return $ intBuiltin False (Just $ read $ drop 4 name) args
-  | "int" `isPrefixOf` name && all isDigit (drop 3 name) = return $ intBuiltin True (Just $ read $ drop 3 name) args
+  | "uint" `T.isPrefixOf` name && T.all isDigit (T.drop 4 name) = return $ intBuiltin False (Just $ read $ T.unpack $ T.drop 4 name) args
+  | "int" `T.isPrefixOf` name && T.all isDigit (T.drop 3 name) = return $ intBuiltin True (Just $ read $ T.unpack $ T.drop 3 name) args
 -- Handle sized bytes type casts (bytes1, bytes2, ..., bytes32)
 -- bytes32(integer) - convert to bytes representation, padded to correct size
 callBuiltin name [arg]
-  | "bytes" `isPrefixOf` name && not (null (drop 5 name)) && all isDigit (drop 5 name) =
-      let mSize = readMaybe (drop 5 name) :: Maybe Int
+  | "bytes" `T.isPrefixOf` name && not (T.null (T.drop 5 name)) && T.all isDigit (T.drop 5 name) =
+      let mSize = readMaybe (T.unpack $ T.drop 5 name) :: Maybe Int
        in case arg of
             SInteger i ->
               let size = fromMaybe 32 mSize
@@ -2561,9 +2588,28 @@ callBuiltin name [arg]
               in return $ SBytes paddedBytes
             SString s -> return $ SBytes $ DT.encodeUtf8 $ T.pack $ maybe s (flip take s) mSize
             SBytes s -> return $ SBytes $ maybe s (flip B.take s) mSize
-            _ -> invalidArguments ("Could not convert to " ++ name) arg
+            _ -> invalidArguments ("Could not convert to " ++ labelToString name) arg
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
+callBuiltin "__solidvm_b16encode" [SBytes input] =
+  pure . SBytes $ B16.encode input
+callBuiltin "__solidvm_b16encode" args = typeError "b16encode" $ show args
+callBuiltin "__solidvm_b16decode" [SBytes input] =
+  let padded = if odd (B.length input) then B.cons 48 input else input
+   in case B16.decode padded of
+        Right decoded -> pure $ SBytes decoded
+        Left _ -> invalidArguments "b16decode: invalid hex string" input
+callBuiltin "__solidvm_b16decode" args = typeError "b16decode" $ show args
+callBuiltin "__solidvm_normalizeHex" [SString input] =
+  let hexPart = case input of
+        '0' : 'x' : rest -> rest
+        _ -> input
+      encoded = DT.encodeUtf8 $ T.pack hexPart
+      padded = if odd (B.length encoded) then B.cons 48 encoded else encoded
+   in case B16.decode padded of
+        Right decoded -> pure . SString $ "0x" ++ BC.unpack (B16.encode decoded)
+        Left _ -> invalidArguments "normalizeHex: invalid hex string" input
+callBuiltin "__solidvm_normalizeHex" args = typeError "normalizeHex" $ show args
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" [SBytes bs] = pure . SBytes . keccak256ToByteString $ hash bs
 callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
@@ -2780,7 +2826,7 @@ callBuiltin "create" args@(cName : src : argVals) = do
   (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
-  execResults <- create' creator newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
 
   --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
 
@@ -2805,7 +2851,7 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
-  execResults <- create' creator newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc (stringToLabel contractName') argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2844,7 +2890,7 @@ callBuiltin "abiEncodePacked" args = SBytes <$> Builtins.abiEncodePacked args
 callBuiltin "abiDecode" (SBytes bs : typeArgs) = return $ abiDecode bs typeArgs
 callBuiltin "abiDecode" args = invalidArguments "abi.decode expects (bytes, types...)" args
 
-callBuiltin x args = unknownFunction (formatBuiltinError x args) x
+callBuiltin x args = unknownFunction (formatBuiltinError (labelToString x) args) x
 
 -- Format a helpful error message for builtin function calls
 formatBuiltinError :: String -> [Value] -> String
@@ -2955,7 +3001,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
-    addDelegatecall to hsh $ T.pack contractName'
+    addDelegatecall to hsh $ labelToText contractName'
 
   return ()
 
@@ -3093,6 +3139,51 @@ validatedCallMode original vals
     isReference SReference{} = True
     isReference _ = False
 
+{-# NOINLINE astIntrinsicsEnabled #-}
+astIntrinsicsEnabled :: Bool
+astIntrinsicsEnabled = unsafePerformIO $ (== Just "1") <$> lookupEnv "SOLIDVM_AST_INTRINSICS"
+
+-- Mirrors FastUIntIR's compileCanonicalNormalizeHex / compileCanonicalBytesHex:
+-- contract name, function name, signature and statement shape must all match.
+canonicalHostBuiltin :: CC.Contract -> SolidString -> CC.Func -> Maybe SolidString
+canonicalHostBuiltin contract' funcName theFunction
+  | not (null (CC._funcModifiers theFunction)) = Nothing
+  | otherwise = case (labelToString (contract' ^. CC.contractName), labelToString funcName) of
+      ("StringUtils", "normalizeHex") ->
+        case (CC._funcArgs theFunction, CC._funcVals theFunction, CC._funcContents theFunction) of
+          ( [(Just "s", CC.IndexedType _ SVMType.String {} _)],
+            [(Nothing, CC.IndexedType _ SVMType.String {} _)],
+            Just
+              [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "hexPart" _] (Just _)) _,
+                CC.Return (Just _) _
+                ]
+            ) -> Just "__solidvm_normalizeHex"
+          _ -> Nothing
+      ("BytesUtils", "b16encode") -> bytesBody $ \case
+        [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "dst" _] (Just _)) _,
+          CC.ForStatement {},
+          CC.Return (Just (CC.Variable _ "dst")) _
+          ] -> Just "__solidvm_b16encode"
+        _ -> Nothing
+      ("BytesUtils", "b16decode") -> bytesBody $ \case
+        [ CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "isEven" _] (Just _)) _,
+          CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "offset" _] (Just _)) _,
+          CC.SimpleStatement (CC.VariableDefinition [CC.VarDefEntry _ _ "dst" _] (Just _)) _,
+          CC.IfStatement {},
+          CC.ForStatement {},
+          CC.Return (Just (CC.Variable _ "dst")) _
+          ] -> Just "__solidvm_b16decode"
+        _ -> Nothing
+      _ -> Nothing
+  where
+    bytesBody match =
+      case (CC._funcArgs theFunction, CC._funcVals theFunction, CC._funcContents theFunction) of
+        ( [(Just "b", CC.IndexedType _ SVMType.Bytes {} _)],
+          [(Nothing, CC.IndexedType _ SVMType.Bytes {} _)],
+          Just body
+          ) -> match body
+        _ -> Nothing
+
 -- | Like runTheCall but accepts optional Variables for pass-by-reference semantics.
 -- For memory arrays/structs, if a Variable is provided, it's used directly instead
 -- of creating a new IORef wrapper. This allows modifications to propagate to caller.
@@ -3111,6 +3202,14 @@ runTheCallWithVars ::
   Bool ->
   Bool ->
   m (Maybe Value)
+-- EXPERIMENT (SOLIDVM_AST_INTRINSICS=1): the same canonical hex-helper
+-- substitution FastUIntIR performs, applied on the interpreted path.
+runTheCallWithVars _ _ contract' funcName _ _ theFunction argVals' _ _ _ _
+  | astIntrinsicsEnabled,
+    not (Conf.svmTrace (Conf.debugConfig ethConf)),
+    Just builtin <- canonicalHostBuiltin contract' funcName theFunction = do
+      decrementGas 5
+      Just <$> callBuiltin builtin argVals'
 runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVals' argVars validation ro ff = do
   decrementGas 5
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t _) <- CC._funcVals theFunction]
@@ -3130,7 +3229,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
       Just (_, av) -> pure av
       Nothing ->
         let mismatchInfo = formatArgMismatch $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction))
-        in typeError ("argument type mismatch in '" ++ funcName ++ "'") mismatchInfo
+        in typeError ("argument type mismatch in '" ++ labelToString funcName ++ "'") mismatchInfo
 
   -- Extract args with location info: (name, Maybe Location, value)
   let !argsWithLoc =
@@ -3184,7 +3283,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
               fromMaybe []
-              $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
+              $ M.lookup (textToLabel (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
       vs <- argsToVals margList
       let argMeta = fst <$> CC._modifierArgs modi
       return $ zip argMeta vs
@@ -3199,7 +3298,7 @@ runTheCallWithVars address' codeAddr contract' funcName hsh cc theFunction argVa
     --       newVar <- liftIO $ fmap Variable $ newIORef v
     --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
 
-    forM_ (map (\(x, y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, v) -> do
+    forM_ (concat matchedArgvals) $ \(n, v) -> do
       addLocalVariable n v
 
     -- theCallInfo <- getCurrentCallInfo
@@ -3365,7 +3464,7 @@ solidityExceptionHandlerHelperAssert cbm  = do
               res <- runStatementBlock block
               return res
 {- BEN WILL REFACTOR THIS SOMEDAY -}
-solidityExceptionHandler :: MonadSM m => (M.Map String (Maybe (String, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
+solidityExceptionHandler :: MonadSM m => (M.Map SolidString (Maybe (SolidString, SVMType.Type), [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidityExceptionHandler catchBlockMap ex =
   case ex of
     (InternalError s1 s2) -> do
@@ -3471,10 +3570,10 @@ solidityExceptionHandler catchBlockMap ex =
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 33 revertError
       return res
     (CustomError s1 s2 vals) -> do
-      let name = T.unpack $ T.replace "\"" "" $ T.pack s2
+      let name = T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
-        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError
+        Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 (labelToString name) vals 34 customError
+        Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 (labelToString name) vals 34 customError
         Just (Just (name', _), block) -> do
           mapM_ (\x -> addLocalVariable name' x) $ map fromBasic vals
           res <- runStatementBlock block
@@ -3486,14 +3585,14 @@ solidityExceptionHandler catchBlockMap ex =
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 36 oldForeignPragmaError
       return res
 
-solidVMExceptionHelper :: (MonadSM m) => M.Map String (Maybe [String], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
+solidVMExceptionHelper :: (MonadSM m) => M.Map SolidString (Maybe [SolidString], [CC.Statement]) -> m (Maybe Value) -> m (Maybe Value)
 solidVMExceptionHelper x y = case M.lookup "" x of
   Nothing -> y
   Just (_, block) -> do
     res <- runStatementBlock block
     return res
 
-solidVMExceptionHandler :: (MonadSM m) => (M.Map String (Maybe [String], [CC.Statement])) -> SolidException -> m (Maybe Value)
+solidVMExceptionHandler :: (MonadSM m) => (M.Map SolidString (Maybe [SolidString], [CC.Statement])) -> SolidException -> m (Maybe Value)
 solidVMExceptionHandler catchBlockMap ex =
   case ex of
     (InternalError s1 s2) -> do
@@ -3643,9 +3742,9 @@ solidVMExceptionHandler catchBlockMap ex =
           res <- runStatementBlock block
           return res
     (CustomError s1 s2 vals) -> do
-      let name = T.unpack $ T.replace "\"" "" $ T.pack s2
+      let name = T.replace "\"" "" $ T.pack s2
       case M.lookup name catchBlockMap of
-        Nothing -> solidVMExceptionHelper catchBlockMap $ customError s1 name vals
+        Nothing -> solidVMExceptionHelper catchBlockMap $ customError s1 (labelToString name) vals
         Just (args, block) -> do
           ctract <- getCurrentContract
           (_, cc) <- getCurrentCodeCollection
@@ -3655,9 +3754,7 @@ solidVMExceptionHandler catchBlockMap ex =
                 Nothing -> case M.lookup name $ CC._flErrors cc of
                   Just e -> zip e basicToVals
                   Nothing -> invalidArguments "Invalid error type." name
-              argsToSolidString = case args of
-                Just a -> map stringToLabel a
-                Nothing -> []
+              argsToSolidString = fromMaybe [] args
           _ <-
             if length args > 0
               then mapM (\(x, (_, z)) -> addLocalVariable x z) $ zip argsToSolidString zipped

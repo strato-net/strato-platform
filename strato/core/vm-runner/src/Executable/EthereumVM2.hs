@@ -38,14 +38,15 @@ import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
 import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.Model.MicroTime
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import Blockchain.VMContext
+import Blockchain.VMOut
+import Blockchain.Wiring ()
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import Conduit hiding (Flush)
-import Control.Arrow ((&&&), (***))
+import Control.Arrow ((&&&))
 import Control.Monad
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Data.Foldable hiding (fold)
@@ -53,7 +54,6 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import Data.Traversable (for)
-import Prometheus
 import qualified Text.Colors as CL
 import Text.Format (format)
 import Text.Printf
@@ -63,18 +63,16 @@ microtimeCutoff :: Microtime
 microtimeCutoff = secondsToMicrotime (Conf.mempoolLivenessCutoff (quarryConfig ethConf))
 {-# NOINLINE microtimeCutoff #-}
 
-handleVmTasks ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m) =>
-  ConduitT VmInEventBatch VmOutEvent m ()
-handleVmTasks = awaitForever $ \InBatch {..} -> do
-  mpResps <- lift $ for mpNodesReqs $ \(o, srs) -> do
+handleVmTasks :: VmInEventBatch -> ContextM [BlockVerificationFailure]
+handleVmTasks InBatch {..} = do
+  mpResps <- for mpNodesReqs $ \(o, srs) -> do
     nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
     pure $! OutMPNodesResponse o nds
-  yieldMany $! mpResps
+  mapM_ emitOut mpResps
   let toSR = MP.StateRoot . Keccak256.keccak256ToByteString . Keccak256.rlpHash
-  lift . for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
+  for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
 
-  rpcResps <- lift $ do
+  rpcResps <- do
     bbHash <- do
       bbi <- getContextBestBlockInfo
       case bbi of
@@ -83,12 +81,13 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
     resps <- withCurrentBlockHashNoCommit bbHash $ traverse runJsonRpcCommandTraced rpcCommands
     recordSeqEventCount bLen tLen
     pure resps
-  yieldMany $! OutJSONRPC <$> rpcResps
+  mapM_ (emitOut . OutJSONRPC) rpcResps
 
-  numPoolable <- uncurry (*>) . (yieldMany *** pure) =<< lift (processTransactions txPairs)
-  processBlocks blocks
+  (txEvents, numPoolable) <- processTransactions txPairs
+  mapM_ emitOut txEvents
+  failures <- processBlocks blocks
 
-  mPreDec <- lift $ do
+  mPreDec <- do
     case preprepareBlock of
       Nothing -> pure Nothing
       Just block -> do
@@ -157,10 +156,10 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
                     pure $ Just RejectPreprepare
               _ -> pure $ Just RejectPreprepare
   $logDebugS "handleVmEvents/mPreDec" . T.pack $ format mPreDec
-  traverse_ (yield . OutPreprepareResponse) mPreDec
+  traverse_ (emitOut . OutPreprepareResponse) mPreDec
 
   mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
-  mNewBlock <- lift $ do
+  mNewBlock <- do
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     bState <- Bagger.getBaggerState
@@ -190,12 +189,10 @@ handleVmTasks = awaitForever $ \InBatch {..} -> do
           else pure Nothing
       else pure Nothing
 
-  for_ mNewBlock $ yield . OutBlock
+  for_ mNewBlock $ emitOut . OutBlock
+  pure failures
 
-processBlocks ::
-  (MonadFail m, Bagger.MonadBagger m, MonadMonitor m, Mod.Accessible RBDB.RedisConnection m) =>
-  [OutputBlock] ->
-  ConduitT a VmOutEvent m ()
+processBlocks :: [OutputBlock] -> ContextM [BlockVerificationFailure]
 processBlocks blocks = do
   $logInfoS "evm/processBlocks" $ T.pack $ "Running " ++ show (length blocks) ++ " blocks"
   processBlockSummaries blocks
@@ -223,17 +220,13 @@ processBlockSummaries = mapM_ $ \b -> do
   writeBlockSummary b
 
 processTransactions ::
-  ( Bagger.MonadBagger m
-  ) =>
   [(Timestamp, OutputTx)] ->
-  m ([VmOutEvent], Int)
+  ContextM ([VmOutEvent], Int)
 processTransactions = uncurry (fmap . (,)) . (outputTransactions &&& getNumPoolable)
 
 getNumPoolable ::
-  ( Bagger.MonadBagger m
-  ) =>
   [(Timestamp, OutputTx)] ->
-  m Int
+  ContextM Int
 getNumPoolable txPairs = do
   $logDebugS "evm/getNumPoolable" $ T.pack $ "allTxs :: " ++ show txPairs
   let allNewTxs = txPairs -- PrivateHashTXs have chainId = Nothing

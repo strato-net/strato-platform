@@ -1013,7 +1013,8 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
       Right _ -> do
         vmState'@VMState {..} <- readIORef vmStateRef
         traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ vmMemDBs ^. stateRoots
-        putMemRawStorageTxMap $ vmMemDBs ^. storageTxMap
+        putMemRawStorageBlockMap $ vmMemDBs ^. storageBlockMap
+        putAddressStateBlockDBMap $ vmMemDBs ^. stateBlockMap
         putAddressStateTxDBMap $ vmMemDBs ^. stateTxMap
         when flags_debug $ $logInfoS "runVMM/Right" "VM has finished running"
         vmStateToExecResults vmState'
@@ -1332,7 +1333,8 @@ create_debugWrapper block owner value initCodeBytes = do
         pure (ers, mdbs')
 
       traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ finalDBs ^. stateRoots
-      putMemRawStorageTxMap $ finalDBs ^. storageTxMap
+      putMemRawStorageBlockMap $ finalDBs ^. storageBlockMap
+      putAddressStateBlockDBMap $ finalDBs ^. stateBlockMap
       putAddressStateTxDBMap $ finalDBs ^. stateTxMap
       setGasRemaining $ fromIntegral $ erRemainingTxGas execResults
 
@@ -1383,7 +1385,8 @@ nestedRun_debugWrapper noValueTransfer gas receiveAddress owner sender value inp
     pure (ers, mdbs')
 
   traverse_ (uncurry (setStateDBStateRoot . snd)) . M.toList $ finalDBs ^. stateRoots
-  putMemRawStorageTxMap $ finalDBs ^. storageTxMap
+  putMemRawStorageBlockMap $ finalDBs ^. storageBlockMap
+  putAddressStateBlockDBMap $ finalDBs ^. stateBlockMap
   putAddressStateTxDBMap $ finalDBs ^. stateTxMap
 
   case erException execResults of

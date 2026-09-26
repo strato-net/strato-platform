@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.39.6.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 
@@ -29,7 +29,6 @@ library
       Blockchain.Stream.VMEvent
       Blockchain.Timing
       Blockchain.TxRunResultCache
-      Blockchain.MemVMContext
       Blockchain.VMContext
       Blockchain.VMOptions
       Blockchain.VM.VMException
@@ -76,6 +75,7 @@ library
     , monad-alter
     , mtl
     , nibblestring
+    , nodedb-monad
     , ordered-containers
     , persistent-sqlite
     , prometheus-client

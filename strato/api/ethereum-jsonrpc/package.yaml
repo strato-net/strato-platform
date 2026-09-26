@@ -13,6 +13,7 @@ executables:
     # anyway); -rtsopts: allows GC-tuning flags (-A etc.) from commands.txt.
     ghc-options:      -threaded -rtsopts
     dependencies:
+      - composable-monads-base
       - base
       - aeson
       - base16-bytestring

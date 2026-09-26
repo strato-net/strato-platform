@@ -14,6 +14,14 @@ library:
     - SolidVM.Solidity.Parse.ParserTypes
     - SolidVM.Solidity.Parse.UnParser
     - SolidVM.Solidity.Parse.Declarations
+    - SolidVM.Solidity.Parse.Fast.Lexer
+    - SolidVM.Solidity.Parse.Fast.Monad
+    - SolidVM.Solidity.Parse.Fast.Types
+    - SolidVM.Solidity.Parse.Fast.Expression
+    - SolidVM.Solidity.Parse.Fast.Statement
+    - SolidVM.Solidity.Parse.Fast.Declarations
+    - SolidVM.Solidity.Parse.Fast.File
+    - SolidVM.Solidity.Parse.Fast.Parser
     - SolidVM.Solidity.Xabi
   ghc-options: -Wall -O2
   dependencies:
@@ -33,6 +41,7 @@ library:
   - strato-model
   - openapi3
   - text
+  - vector
   - deepseq
 
 
@@ -62,4 +71,5 @@ tests:
       - solid-vm-parser
       - source-tools
       - strato-model
+      - text
       - vm-tools

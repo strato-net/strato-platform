@@ -305,13 +305,13 @@ writeBlockSummary block =
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header txCnt)
 
-instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT Context m) where
+instance AccessibleEnv SQLDB ContextM where
   accessEnv = fmap (view $ dbs . sqldb) accessEnv
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $
-    runLoggingT . runTestContextM $ do
+    runEff . runLogging . runTestContextM $ do
       let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [Address]
           !admins = either error id eAdmins
           eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [Validator]

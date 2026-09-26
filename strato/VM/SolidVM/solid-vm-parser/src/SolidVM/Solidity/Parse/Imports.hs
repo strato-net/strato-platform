@@ -55,14 +55,14 @@ itemImport = try aliasedImport <|> namedImport
 
 namedImport :: SolidityParser ItemImport
 namedImport = do
-  ~(a, path) <- withPosition $ T.pack <$> identifier
+  ~(a, path) <- withPosition identifier
   pure $ Named path a
 
 aliasedImport :: SolidityParser ItemImport
 aliasedImport = do
   ~(a, (item, alias)) <- withPosition $ do
-    item <- T.pack <$> identifier
+    item <- identifier
     reserved "as"
-    alias <- T.pack <$> identifier
+    alias <- identifier
     pure (item, alias)
   pure $ Aliased item alias a
