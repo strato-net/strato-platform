@@ -1,4 +1,4 @@
-site_name: STRATO Technical Docs
+site_name: Docs
 site_description: STRATO platform technical documentation (use-case first, end-user + developer)
 site_url: https://docs.strato.nexus
 site_author: BlockApps
@@ -6,6 +6,12 @@ copyright: Copyright &copy; 2026 BlockApps - STRATO Platform
 
 theme:
   name: material
+  custom_dir: techdocs-overrides
+  logo: assets/strato-logo.svg
+  favicon: assets/favicon.png
+  font:
+    text: Poppins
+    code: Geist Mono
   features:
     - navigation.sections
     - navigation.indexes
@@ -20,17 +26,19 @@ theme:
     - content.action.edit
     - content.action.view
   palette:
-    - scheme: default
-      primary: indigo
-      accent: indigo
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: lucide/sun
         name: Switch to dark mode
-    - scheme: slate
-      primary: indigo
-      accent: indigo
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
+        icon: lucide/moon
         name: Switch to light mode
 
 extra_css:
@@ -112,12 +120,20 @@ nav:
       - Arbitrage & Market Making: scenarios/arbitrage-market-making.md
       - Withdrawals: scenarios/withdrawals.md
   
+  # === RUNNING A NODE ===
+  - Run a Node:
+      - Overview: node/index.md
+      - Requirements: node/requirements.md
+      - Install & Run: node/install.md
+      - Configuration: node/configuration.md
+      - Operations: node/operations.md
+
   # === CONTRIBUTING TO STRATO ===
   - Contributing to STRATO:
       - Setup: contribute/setup.md
       - Architecture: contribute/architecture.md
       - Contributing Guidelines: contribute/contributing.md
-  
+
   # === BUILDING APPS ON STRATO ===
   - Building Apps on STRATO:
       - Getting Started:
@@ -136,9 +152,28 @@ nav:
       - App API (Getting Started): reference/api.md
       - Interactive Reference (Swagger): reference/interactive-api.md
       - Core Platform API (Advanced): reference/strato-node-api.md
-  
-  # === SAFETY & FAQ ===
+      - Cirrus (Indexed Data): reference/cirrus.md
+      - Ethereum JSON-RPC: reference/json-rpc.md
+
+  # === PLATFORM ===
+  - Platform:
+      - Networks: platform/networks.md
+      - Consensus & Staking: platform/consensus.md
+      - Identity & Vault: platform/identity-and-vault.md
+      - Transactions & Fees: platform/transactions-and-fees.md
+
+  # === SOLIDVM ===
+  - SolidVM:
+      - Overview: solidvm/index.md
+      - Language Reference: solidvm/language.md
+      - Error Handling: solidvm/errors.md
+      - Differences from Solidity: solidvm/differences.md
+      - Upgradeable Contracts: solidvm/upgrades.md
+      - Testing with solid-vm-cli: solidvm/testing.md
+
+  # === SAFETY, FAQ & RELEASES ===
   - Safety & Risk: safety.md
   - FAQ: faq.md
+  - Release Notes: release-notes.md
 
 

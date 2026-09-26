@@ -6,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 import           Control.Monad.IO.Class
-import           Control.Concurrent.Async.Lifted.Safe
 import           Control.Exception (SomeException, try)
 import           Blockchain.VMOptions       ()
 
@@ -30,6 +29,7 @@ import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
+import           Data.String (fromString)
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
@@ -55,6 +55,7 @@ initP2P = labelTheThread "initP2P" $ do
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
+  bcast <- newSeqEventBroadcast
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
       streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
       runner f = runEff . runLogging $ runVaultM vaultUrl' $ do
@@ -70,8 +71,18 @@ initP2P = labelTheThread "initP2P" $ do
         env <- createStreamEnv "strato-p2p" streamAddr
         envVar <- liftIO $ newMVar env
         let cfg' = cfg { configContext = ctx, configStreamEnv = envVar }
-        runContextM cfg' . f $ seqEventNotificationSource
+        -- Sequencer events are consumed once per process by
+        -- runSeqEventBroadcaster below and fanned out in memory. Each
+        -- connection subscribes here, at its start, and sees the events
+        -- published from then on, like the Kafka-era latest-offset source.
+        -- Running one topic consumer per connection is not an option on the
+        -- JLog backend, where all consumers with the same client id share a
+        -- single checkpoint and would each get only a slice of the events.
+        seqSrc <- subscribeSeqEvents bcast
+        runContextM cfg' . f $ seqSrc
   liftIO $
-    race_
-      (run 10248 $ prometheus def p2pApp)
-      (stratoP2P runner)
+    raceAll
+      [ runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 10248 defaultSettings) $ prometheus def p2pApp
+      , runSeqEventBroadcaster bcast
+      , stratoP2P runner
+      ]

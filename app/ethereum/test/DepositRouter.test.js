@@ -78,6 +78,8 @@ describe("DepositRouter", function () {
       "DepositRouted",
     ]);
     expect(standardEvents[0].args.depositId).to.equal(2);
-    expect(await router.version()).to.equal("3.0.0");
+    // 4.0.0 is the solver fast path: fee-bearing deposits, the withdrawal
+    // claim ladder, and the static custody settlement.
+    expect(await router.version()).to.equal("4.0.0");
   });
 });

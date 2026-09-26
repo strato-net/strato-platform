@@ -1,5 +1,8 @@
-// Staking activation steps, each a registry vote (run once per admin):
-//   node staking-setup.js <init|setvreg|params|setparams|operators|mint>
+// Staking setup steps, each a registry vote (run once per admin) unless marked direct:
+//   node staking-setup.js <init|usdst|govstaking|setvreg|params|setparams|validators|mint|fundrouter>
+//   node staking-setup.js grace <unixSeconds>              end of the self-bond grace period
+//   node staking-setup.js setoperator <validator> <operator>
+//   node staking-setup.js index                            (direct) index helium's existing set
 require('dotenv').config();
 const config = require('./config');
 const auth = require('./auth');
@@ -12,7 +15,8 @@ const VREG = 'bfbb75bb6bd0bafa2f5c5b735fe518ade76808dd';
 const TOKEN = '8ee9a3391e38176feebf5d43cb2c1d6c4f728b04';
 const USDST = '937efa7e3a77e20bbdbd7c0d32b6514f368c1010';
 const FUNDER = '7b1f8cd02cd09ab9510e30fc8e15ff898a639771'; // blockapps_test_1
-const FEE_ROUTER = '44769a27b4339f1dbdab8920be9b5689b6652178'; // HeliumFeeRouter (payFees + payBlockRewards)
+// HeliumFeeRouter (payFees + payBlockRewards); set FEE_ROUTER to fund a newer router.
+const FEE_ROUTER = (process.env.FEE_ROUTER || '44769a27b4339f1dbdab8920be9b5689b6652178').replace(/^0x/, '');
 const VALIDATORS = [
   '0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82',
   'bdd3fe1b9a87a88cff8259528c0a4d6464625713',
@@ -23,8 +27,9 @@ const TEN_K = '10000000000000000000000';       // 10,000 * 1e18
 const FORTY_K = '40000000000000000000000';
 
 const STEPS = {
+  // Fresh deployments only; helium's proxy was initialized long ago.
   init:      { target: STAKING, func: 'initialize',
-               args: [TOKEN, USDST, 86400, 500, 2000, 50] },
+               args: [TOKEN, USDST, 86400, 2000, 50] },
   // This deployment was initialized before USDST joined the fee path, so initialize()
   // can no longer reach it; setUsdstToken is the in-place route.
   usdst:     { target: STAKING, func: 'setUsdstToken',
@@ -35,15 +40,37 @@ const STEPS = {
   govstaking: { target: GOVERNANCE, func: 'setStakingContract',
                 args: [{ type: 'address', value: STAKING }] },
   setvreg:   { target: STAKING, func: 'setValidatorRegistry', args: [VREG] },
+  // minStake (self-bond, see setSelfBondGraceUntil), proposerFeeBps, maxConsecutiveMisses, jailCooldown
   params:    { target: STAKING, func: 'setValidatorParams',
-               args: [TEN_K, 0, 1000, 100, 3600] },
+               args: [TEN_K, 1000, 100, 3600] },
   setparams: { target: STAKING, func: 'setSetParams',
                args: ['50', '50', '500', '4', '86400', '86400', '10000', false] },
-  operators: { target: VREG, func: 'addOperators',
-               args: [VALIDATORS, [0,0,0,0],
-                      ['node1-validator','node2-validator','node3-validator','node4-validator'],
-                      ['genesis validator','genesis validator','genesis validator','genesis validator'],
-                      ['','','',''], ['','','',''], VALIDATORS] },
+  // Genesis validators, each listed as its own operator (admin listing needs no key signature).
+  validators: { target: VREG, func: 'addValidators',
+                args: [VALIDATORS, VALIDATORS, [0,0,0,0],
+                       ['node1-validator','node2-validator','node3-validator','node4-validator'],
+                       ['genesis validator','genesis validator','genesis validator','genesis validator'],
+                       ['','','',''], ['','','','']] },
+  // From this time on minStake must be met by self-bond alone. A time in the past applies
+  // that immediately and removes validators without enough self-bond, so bond first.
+  grace:     ([until]) => {
+    if (!/^[0-9]+$/.test(String(until || ''))) throw new Error('usage: grace <unixSeconds>');
+    return { target: STAKING, func: 'setSelfBondGraceUntil', args: [until] };
+  },
+  // Hand a validator to an operator account. The outgoing operator's accrued rewards are
+  // paid to it and its self-bond starts unbonding to it.
+  setoperator: ([validator, operator]) => {
+    const hex = (v) => String(v || '').replace(/^0x/, '');
+    if (!/^[0-9a-fA-F]{40}$/.test(hex(validator)) || !/^[0-9a-fA-F]{40}$/.test(hex(operator))) {
+      throw new Error('usage: setoperator <validator> <operator>');
+    }
+    return { target: VREG, func: 'adminSetOperator',
+             args: [{ type: 'address', value: hex(validator) }, { type: 'address', value: hex(operator) }] };
+  },
+  // Permissionless, so a direct call rather than a vote: indexes the consensus set that
+  // predates StratoStaking.activeValidators. Idempotent.
+  index:     { direct: true, target: STAKING, name: 'StratoStaking', func: 'indexValidatorSet',
+               args: { validators: VALIDATORS } },
   mint:      { target: TOKEN, func: 'mint', args: [FUNDER, FORTY_K] },
   // Fund the fee router so it can pay the flat per-block reward. It pays 0.01
   // STRATO per block (~230/day at the current rate) and silently pays nothing
@@ -67,10 +94,21 @@ async function callAsync(tokenObj, callArgs) {
 }
 
 (async () => {
-  const step = STEPS[process.argv[2]];
-  if (!step) throw new Error('unknown step: ' + process.argv[2]);
+  const entry = STEPS[process.argv[2]];
+  if (!entry) throw new Error('unknown step: ' + process.argv[2]);
+  const step = typeof entry === 'function' ? entry(process.argv.slice(3)) : entry;
   const username = process.env.GLOBAL_ADMIN_NAME;
   const token = await auth.getUserToken(username, process.env.GLOBAL_ADMIN_PASSWORD);
+  if (step.direct) {
+    const final = await callAsync({ token }, {
+      contract: { address: step.target, name: step.name },
+      method: step.func,
+      args: step.args,
+      txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
+    });
+    console.log(`${process.argv[2]} call by ${username}: ${final.status}`);
+    return;
+  }
   const final = await callAsync({ token }, {
     contract: { address: REGISTRY, name: 'AdminRegistry' },
     method: 'castVoteOnIssue',

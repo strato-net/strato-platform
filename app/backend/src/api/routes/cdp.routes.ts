@@ -531,6 +531,7 @@ router.post("/asset-debt-info", walletAuth, CDPController.getAssetDebtInfo);
  * /cdp/admin/set-collateral-config:
  *   post:
  *     summary: Update collateral parameters (admin)
+ *     description: unitScale is not accepted. CDPEngine derives it from the token's decimals() at first listing and it cannot be changed through this call.
  *     tags: [CDP]
  *     requestBody:
  *       required: true
@@ -546,7 +547,6 @@ router.post("/asset-debt-info", walletAuth, CDPController.getAssetDebtInfo);
  *               - stabilityFeeRate
  *               - debtFloor
  *               - debtCeiling
- *               - unitScale
  *               - isPaused
  *             properties:
  *               asset:
@@ -564,8 +564,6 @@ router.post("/asset-debt-info", walletAuth, CDPController.getAssetDebtInfo);
  *               debtFloor:
  *                 type: string
  *               debtCeiling:
- *                 type: string
- *               unitScale:
  *                 type: string
  *               isPaused:
  *                 type: boolean

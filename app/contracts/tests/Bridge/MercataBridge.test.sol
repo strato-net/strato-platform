@@ -115,6 +115,7 @@ contract Describe_MercataBridge is Authorizable {
         adminRegistry.addWhitelist(address(bridge), "depositBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "depositWithAction", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "depositBatchWithAction", address(relayer));
+        adminRegistry.addWhitelist(address(bridge), "recordDepositWindow", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDeposit", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "confirmDepositBatch", address(relayer));
         adminRegistry.addWhitelist(address(bridge), "reviewDeposit", address(relayer));
@@ -501,6 +502,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = [uint256(2)];
         address[] memory actionTokens = [address(goldToken)];
         uint256[] memory minFinalOuts = [uint256(123)];
+        uint256[] memory noFees = [uint256(0)];
 
         relayer.do(
             address(bridge),
@@ -2269,5 +2271,545 @@ contract Describe_MercataBridge is Authorizable {
         require(status == BridgeStatus.SWEPT, "status should be SWEPT");
         require(usdstToken.balanceOf(triage) == amount, "triage wallet should hold the USDST escrow");
         require(usdstToken.balanceOf(address(user1)) == 0, "sender must not be refunded");
+    }
+    // ============ DEPOSIT WINDOW TESTS ============
+
+    function recordWindow(
+        uint256 lastBlock,
+        uint256[] ids,
+        address[] tokens,
+        uint256[] amounts,
+        string[] hashes,
+        address[] recipients,
+        address[] targets
+    ) internal {
+        uint256 n = ids.length;
+        address[] memory senders = new address[](n);
+        uint256[] memory actions = new uint256[](n);
+        address[] memory actionTokens = new address[](n);
+        uint256[] memory minFinalOuts = new uint256[](n);
+        uint256[] memory maxFees = new uint256[](n);
+        uint256[] memory requestedAts = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            senders[i] = externalSender;
+        }
+        relayer.do(address(bridge), "recordDepositWindow", externalChainId, lastBlock, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, maxFees, requestedAts);
+    }
+
+    function recordOne(uint256 lastBlock, uint256 id, address token, uint256 amount, string hash, address recipient, address target) internal {
+        uint256[] memory ids = new uint256[](1);
+        address[] memory tokens = new address[](1);
+        uint256[] memory amounts = new uint256[](1);
+        string[] memory hashes = new string[](1);
+        address[] memory recipients = new address[](1);
+        address[] memory targets = new address[](1);
+        ids[0] = id;
+        tokens[0] = token;
+        amounts[0] = amount;
+        hashes[0] = hash;
+        recipients[0] = recipient;
+        targets[0] = target;
+        recordWindow(lastBlock, ids, tokens, amounts, hashes, recipients, targets);
+    }
+
+    function recordNone(uint256 lastBlock) internal {
+        recordWindow(lastBlock, new uint256[](0), new address[](0), new uint256[](0), new string[](0), new address[](0), new address[](0));
+    }
+
+    function windowReverts(uint256 lastBlock, uint256 id, address token, uint256 amount, string hash, address recipient, address target) internal returns (bool) {
+        bool reverted = false;
+        try {
+            recordOne(lastBlock, id, token, amount, hash, recipient, target);
+        } catch {
+            reverted = true;
+        }
+        return reverted;
+    }
+
+    function depositStatus(string key) internal returns (BridgeStatus) {
+        (BridgeStatus status,,,,,,,) = bridge.deposits(externalChainId, key);
+        return status;
+    }
+
+    function checkpoint() internal returns (uint256) {
+        (,,,,, uint lastProcessedBlock) = bridge.chains(externalChainId);
+        return lastProcessedBlock;
+    }
+
+    function it_bridge_window_records_deposits_and_advances_checkpoint() {
+        uint256[] memory ids = new uint256[](2);
+        address[] memory tokens = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        string[] memory hashes = new string[](2);
+        address[] memory recipients = new address[](2);
+        address[] memory targets = new address[](2);
+        ids[0] = 1;
+        ids[1] = 2;
+        tokens[0] = address(0x5555);
+        tokens[1] = address(0x6666);
+        amounts[0] = 1000e18;
+        amounts[1] = 2000e18;
+        hashes[0] = "0xa11ce001";
+        hashes[1] = "0xa11ce002";
+        recipients[0] = address(0x1111);
+        recipients[1] = address(0x2222);
+        targets[0] = address(testToken);
+        targets[1] = address(usdstToken);
+
+        recordWindow(1100, ids, tokens, amounts, hashes, recipients, targets);
+
+        (BridgeStatus status1,,,,, address token1, uint256 amount1,) = bridge.deposits(externalChainId, "0xa11ce001");
+        (BridgeStatus status2,,,,, address token2,,) = bridge.deposits(externalChainId, "0xa11ce002");
+        require(status1 == BridgeStatus.INITIATED, "first deposit should be INITIATED");
+        require(status2 == BridgeStatus.INITIATED, "second deposit should be INITIATED");
+        require(token1 == address(testToken) && token2 == address(usdstToken), "target tokens should be recorded");
+        require(amount1 == 1000e18, "strato amount should be converted");
+        require(checkpoint() == 1100, "checkpoint should advance with the deposits");
+        require(bridge.depositIdsByKey(externalChainId, "0xa11ce002") == 2, "deposit id should be recorded");
+        string keyForId = bridge.depositKeysById(externalChainId, depositRouter, 1);
+        require(keyForId == "0xa11ce001", "deposit key should be indexed by id");
+        require(bridge.depositExternalAmounts(externalChainId, "0xa11ce002") == 2000e18, "external amount should be recorded");
+    }
+
+    function it_bridge_window_with_no_deposits_only_advances_checkpoint() {
+        recordNone(1200);
+        require(checkpoint() == 1200, "empty window should advance the checkpoint");
+    }
+
+    function it_bridge_window_never_rolls_checkpoint_back() {
+        recordNone(1100);
+        recordNone(1050);
+        require(checkpoint() == 1100, "a lower checkpoint must not roll back");
+        recordOne(0, 1, address(0x5555), 1e18, "0xa11ce003", address(0x1111), address(testToken));
+        require(checkpoint() == 1100, "checkpoint 0 must leave it unchanged");
+        require(depositStatus("0xa11ce003") == BridgeStatus.INITIATED, "deposit should still be recorded");
+    }
+
+    function it_bridge_window_replay_is_idempotent() {
+        address recipient = address(0xBEEF);
+        recordOne(1100, 1, address(0x5555), 1000e18, "0xa11ce004", recipient, address(testToken));
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xa11ce004");
+        require(IERC20(address(testToken)).balanceOf(recipient) == 1000e18, "deposit should be minted once");
+
+        uint256[] memory ids = new uint256[](2);
+        address[] memory tokens = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        string[] memory hashes = new string[](2);
+        address[] memory recipients = new address[](2);
+        address[] memory targets = new address[](2);
+        ids[0] = 1;
+        ids[1] = 2;
+        tokens[0] = address(0x5555);
+        tokens[1] = address(0x5555);
+        amounts[0] = 1000e18;
+        amounts[1] = 3e18;
+        hashes[0] = "0xA11CE004";
+        hashes[1] = "0xa11ce005";
+        recipients[0] = recipient;
+        recipients[1] = recipient;
+        targets[0] = address(testToken);
+        targets[1] = address(testToken);
+        recordWindow(1150, ids, tokens, amounts, hashes, recipients, targets);
+
+        require(depositStatus("0xa11ce004") == BridgeStatus.COMPLETED, "replayed deposit must keep its state");
+        require(depositStatus("0xa11ce005") == BridgeStatus.INITIATED, "new deposit in the replayed window should be recorded");
+        require(IERC20(address(testToken)).balanceOf(recipient) == 1000e18, "replay must not mint");
+        require(checkpoint() == 1150, "replayed window should still advance the checkpoint");
+    }
+
+    function it_bridge_window_adopts_id_for_legacy_deposit() {
+        relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 7e18, "0xa11ce006", address(0x1111), address(testToken));
+        recordOne(1100, 5, address(0x5555), 7e18, "0xa11ce006", address(0x1111), address(testToken));
+
+        require(bridge.depositIdsByKey(externalChainId, "0xa11ce006") == 5, "legacy deposit should adopt the id");
+        string keyForId = bridge.depositKeysById(externalChainId, depositRouter, 5);
+        require(keyForId == "0xa11ce006", "id should point at the legacy deposit");
+        require(depositStatus("0xa11ce006") == BridgeStatus.INITIATED, "legacy deposit state must not change");
+        require(checkpoint() == 1100, "checkpoint should advance");
+    }
+
+    function it_bridge_window_reverts_on_deposit_id_mismatch() {
+        recordOne(1100, 1, address(0x5555), 1e18, "0xa11ce007", address(0x1111), address(testToken));
+        require(windowReverts(1200, 2, address(0x5555), 1e18, "0xa11ce007", address(0x1111), address(testToken)), "same key with another id should revert");
+        require(checkpoint() == 1100, "reverted window must not advance the checkpoint");
+    }
+
+    function it_bridge_window_reverts_on_reused_deposit_id() {
+        recordOne(1100, 1, address(0x5555), 1e18, "0xa11ce008", address(0x1111), address(testToken));
+        require(windowReverts(1200, 1, address(0x5555), 1e18, "0xa11ce009", address(0x1111), address(testToken)), "reused id should revert");
+        require(depositStatus("0xa11ce009") == BridgeStatus.NONE, "second key must not be recorded");
+    }
+
+    function it_bridge_window_quarantines_disabled_route_without_blocking_others() {
+        uint256[] memory ids = new uint256[](3);
+        address[] memory tokens = new address[](3);
+        uint256[] memory amounts = new uint256[](3);
+        string[] memory hashes = new string[](3);
+        address[] memory recipients = new address[](3);
+        address[] memory targets = new address[](3);
+        ids[0] = 10;
+        ids[1] = 11;
+        ids[2] = 12;
+        tokens[0] = address(0x5555);
+        tokens[1] = address(0x5555);
+        tokens[2] = address(0x6666);
+        amounts[0] = 4e18;
+        amounts[1] = 3e18;
+        amounts[2] = 1e18;
+        hashes[0] = "0xb0000010";
+        hashes[1] = "0xb0000011";
+        hashes[2] = "0xb0000012";
+        recipients[0] = address(0x1111);
+        recipients[1] = address(0x2222);
+        recipients[2] = address(0x2222);
+        targets[0] = address(usdstToken);
+        targets[1] = address(testToken);
+        targets[2] = address(usdstToken);
+
+        recordWindow(1100, ids, tokens, amounts, hashes, recipients, targets);
+
+        require(depositStatus("0xb0000010") == BridgeStatus.QUARANTINED, "disabled route should be quarantined");
+        string reason = bridge.depositQuarantineReasons(externalChainId, "0xb0000010");
+        require(reason == "route not enabled", "quarantine reason should be recorded");
+        require(depositStatus("0xb0000011") == BridgeStatus.INITIATED, "valid deposit should be recorded");
+        require(depositStatus("0xb0000012") == BridgeStatus.INITIATED, "valid deposit should be recorded");
+        string noReason = bridge.depositQuarantineReasons(externalChainId, "0xb0000011");
+        require(noReason == "", "valid deposit should have no reason");
+        require(checkpoint() == 1100, "quarantine must not hold the checkpoint back");
+    }
+
+    function it_bridge_window_quarantines_unmintable_deposits() {
+        TestERC20 inactiveToken = TestERC20(tokenFactory.createToken("Inactive Token", "INACTIVE", [], [], [], "INACTIVE", 0, 18));
+        bridge.setAsset(true, externalChainId, 18, "Inactive External Token", "IEXT", address(0x7777), 1000000e18, address(inactiveToken));
+
+        recordOne(0, 20, address(0x8888), 5e6, "0xb0000020", address(0x1111), address(testToken));
+        recordOne(0, 21, address(0x5555), 5e18, "0xb0000021", address(0), address(testToken));
+        recordOne(0, 22, address(0x7777), 5e18, "0xb0000022", address(0x1111), address(inactiveToken));
+        recordOne(0, 23, address(0x5555), 0, "0xb0000023", address(0x1111), address(testToken));
+        recordOne(0, 24, address(0x5555), 5e18, "0xb0000024", address(0x1111), address(0));
+
+        string reason20 = bridge.depositQuarantineReasons(externalChainId, "0xb0000020");
+        string reason21 = bridge.depositQuarantineReasons(externalChainId, "0xb0000021");
+        string reason22 = bridge.depositQuarantineReasons(externalChainId, "0xb0000022");
+        string reason23 = bridge.depositQuarantineReasons(externalChainId, "0xb0000023");
+        string reason24 = bridge.depositQuarantineReasons(externalChainId, "0xb0000024");
+        require(reason20 == "asset missing", "unknown asset should be quarantined");
+        require(reason21 == "invalid strato recipient", "zero recipient should be quarantined");
+        require(reason22 == "inactive token", "inactive token should be quarantined");
+        require(reason23 == "invalid external token amount", "zero amount should be quarantined");
+        require(reason24 == "invalid target token", "zero target should be quarantined");
+
+        (BridgeStatus status,,,,,, uint256 stratoAmount,) = bridge.deposits(externalChainId, "0xb0000020");
+        require(status == BridgeStatus.QUARANTINED, "unknown asset should be quarantined");
+        require(stratoAmount == 0, "unknown decimals must not produce a strato amount");
+        require(bridge.depositExternalAmounts(externalChainId, "0xb0000020") == 5e6, "raw external amount should be kept");
+    }
+
+    function it_bridge_quarantine_status_keeps_existing_status_numbers() {
+        require(uint(BridgeStatus.PENDING_REVIEW) == 2, "PENDING_REVIEW must stay 2");
+        require(uint(BridgeStatus.SWEPT) == 5, "SWEPT must stay 5");
+        require(uint(BridgeStatus.QUARANTINED) == 6, "QUARANTINED must be appended as 6");
+    }
+
+    function it_bridge_quarantined_deposit_is_only_released_by_governance() {
+        address recipient = address(0xCAFE);
+        recordOne(1100, 30, address(0x5555), 4e18, "0xb0000030", recipient, address(usdstToken));
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xb0000030");
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "quarantined deposit must not be confirmed");
+
+        reverted = false;
+        try {
+            relayer.do(address(bridge), "reviewDeposit", externalChainId, "0xb0000030");
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "quarantined deposit must not move to review");
+
+        // Re-enabling the route does not release it on its own
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        reverted = false;
+        try {
+            relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xb0000030");
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "quarantined deposit needs an explicit release");
+        require(depositStatus("0xb0000030") == BridgeStatus.QUARANTINED, "deposit should stay quarantined");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "nothing should be minted");
+
+        // Rerouting to the original token releases it once the route is live
+        bridge.rerouteDeposit(externalChainId, "0xb0000030", address(usdstToken), 4e18);
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xb0000030");
+        require(depositStatus("0xb0000030") == BridgeStatus.COMPLETED, "released deposit should complete");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 4e18, "recipient should be minted");
+    }
+
+    function it_bridge_can_abort_quarantined_deposit() {
+        address recipient = address(0xFACE);
+        recordOne(1100, 34, address(0x5555), 4e18, "0xb0000034", recipient, address(usdstToken));
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "abortDeposit", externalChainId, "0xb0000034");
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "relayer must not abort quarantined deposits");
+
+        bridge.abortDeposit(externalChainId, "0xb0000034");
+        require(depositStatus("0xb0000034") == BridgeStatus.ABORTED, "quarantined deposit should abort");
+        string reason = bridge.depositQuarantineReasons(externalChainId, "0xb0000034");
+        require(reason == "route not enabled", "abort should keep the quarantine reason");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "abort must not mint");
+
+        reverted = false;
+        try {
+            bridge.rerouteDeposit(externalChainId, "0xb0000034", address(testToken), 4e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "aborted deposit must not be rerouted");
+    }
+
+    function it_bridge_quarantined_deposit_blocks_duplicate_recording() {
+        recordOne(1100, 35, address(0x5555), 4e18, "0xb0000035", address(0x1111), address(usdstToken));
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 4e18, "0xb0000035", address(0x1111), address(testToken));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "legacy entry point must treat a quarantined deposit as recorded");
+
+        bridge.setAssetRoute(address(0x5555), externalChainId, address(usdstToken), true);
+        recordOne(1200, 35, address(0x5555), 4e18, "0xb0000035", address(0x1111), address(usdstToken));
+        require(depositStatus("0xb0000035") == BridgeStatus.QUARANTINED, "a replayed window must not release a quarantined deposit");
+        require(checkpoint() == 1200, "replayed window should still advance the checkpoint");
+    }
+
+    function it_bridge_reroute_returns_quarantined_deposit_to_initiated() {
+        address recipient = address(0xD00D);
+        recordOne(1100, 31, address(0x5555), 4e18, "0xb0000031", recipient, address(usdstToken));
+
+        bridge.rerouteDeposit(externalChainId, "0xB0000031", address(testToken), 4e18);
+
+        (BridgeStatus status,,,,, address stratoToken, uint256 stratoAmount,) = bridge.deposits(externalChainId, "0xb0000031");
+        require(status == BridgeStatus.INITIATED, "rerouted deposit should return to INITIATED");
+        require(stratoToken == address(testToken), "target token should change");
+        require(stratoAmount == 4e18, "amount should be set");
+        string reason = bridge.depositQuarantineReasons(externalChainId, "0xb0000031");
+        require(reason == "", "quarantine reason should be cleared");
+
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xb0000031");
+        require(IERC20(address(testToken)).balanceOf(recipient) == 4e18, "rerouted deposit should mint the new token");
+        require(IERC20(address(usdstToken)).balanceOf(recipient) == 0, "retired route token must not be minted");
+    }
+
+    function it_bridge_reroute_requires_quarantine_live_route_and_governance() {
+        recordOne(1100, 32, address(0x5555), 4e18, "0xb0000032", address(0x1111), address(testToken));
+        bool reverted = false;
+        try {
+            bridge.rerouteDeposit(externalChainId, "0xb0000032", address(testToken), 4e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "reroute should reject an INITIATED deposit");
+
+        relayer.do(address(bridge), "reviewDeposit", externalChainId, "0xb0000032");
+        reverted = false;
+        try {
+            bridge.rerouteDeposit(externalChainId, "0xb0000032", address(testToken), 4e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "reroute should reject a deposit that failed verification");
+        require(depositStatus("0xb0000032") == BridgeStatus.PENDING_REVIEW, "reviewed deposit should be untouched");
+
+        recordOne(1100, 33, address(0x5555), 4e18, "0xb0000033", address(0x1111), address(usdstToken));
+        reverted = false;
+        try {
+            bridge.rerouteDeposit(externalChainId, "0xb0000033", address(usdstToken), 4e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "reroute should require an enabled route");
+
+        reverted = false;
+        try {
+            bridge.rerouteDeposit(externalChainId, "0xb0000033", address(testToken), 0);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "reroute should require a positive amount");
+
+        reverted = false;
+        try {
+            relayer.do(address(bridge), "rerouteDeposit", externalChainId, "0xb0000033", address(testToken), 4e18);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "relayer must not reroute deposits");
+        require(depositStatus("0xb0000033") == BridgeStatus.QUARANTINED, "failed reroutes must not change state");
+    }
+
+    function it_bridge_window_keys_multi_deposit_transactions_by_id() {
+        uint256[] memory ids = new uint256[](2);
+        address[] memory tokens = new address[](2);
+        uint256[] memory amounts = new uint256[](2);
+        string[] memory hashes = new string[](2);
+        address[] memory recipients = new address[](2);
+        address[] memory targets = new address[](2);
+        ids[0] = 40;
+        ids[1] = 41;
+        tokens[0] = address(0x5555);
+        tokens[1] = address(0x5555);
+        amounts[0] = 1e18;
+        amounts[1] = 2e18;
+        hashes[0] = "0xABCDEF01#40";
+        hashes[1] = "0xabcdef01#41";
+        recipients[0] = address(0x1111);
+        recipients[1] = address(0x2222);
+        targets[0] = address(testToken);
+        targets[1] = address(testToken);
+
+        recordWindow(1100, ids, tokens, amounts, hashes, recipients, targets);
+
+        require(depositStatus("0xabcdef01#40") == BridgeStatus.INITIATED, "first deposit of the tx should be recorded");
+        require(depositStatus("0xabcdef01#41") == BridgeStatus.INITIATED, "second deposit of the tx should be recorded");
+        require(depositStatus("0xabcdef01") == BridgeStatus.NONE, "bare hash must not be used for a multi-deposit tx");
+        string keyForId = bridge.depositKeysById(externalChainId, depositRouter, 40);
+        require(keyForId == "0xabcdef01#40", "id index should hold the canonical key");
+
+        relayer.do(address(bridge), "confirmDeposit", externalChainId, "0xABCDEF01#40");
+        relayer.do(address(bridge), "reviewDeposit", externalChainId, "0xabcdef01#041");
+        bridge.abortDeposit(externalChainId, "0xabcdef01#41");
+        require(depositStatus("0xabcdef01#40") == BridgeStatus.COMPLETED, "suffixed key should confirm");
+        require(depositStatus("0xabcdef01#41") == BridgeStatus.ABORTED, "suffixed key should review and abort");
+        require(IERC20(address(testToken)).balanceOf(address(0x1111)) == 1e18, "confirmed deposit should mint");
+    }
+
+    function it_bridge_window_rejects_malformed_or_mismatched_keys() {
+        require(windowReverts(1100, 42, address(0x5555), 1e18, "0xabcdef02#43", address(0x1111), address(testToken)), "suffix must match the deposit id");
+        require(windowReverts(1100, 42, address(0x5555), 1e18, "0xabcdef02#", address(0x1111), address(testToken)), "empty suffix should revert");
+        require(windowReverts(1100, 42, address(0x5555), 1e18, "#42", address(0x1111), address(testToken)), "missing hash should revert");
+        require(windowReverts(1100, 42, address(0x5555), 1e18, "0xabcdef02#4x", address(0x1111), address(testToken)), "non-digit suffix should revert");
+        require(windowReverts(1100, 0, address(0x5555), 1e18, "0xabcdef02", address(0x1111), address(testToken)), "zero deposit id should revert");
+        require(windowReverts(1100, 42, address(0x5555), 1e18, "", address(0x1111), address(testToken)), "empty hash should revert");
+        require(checkpoint() == 1000, "rejected windows must not advance the checkpoint");
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "deposit", externalChainId, externalSender, address(0x5555), 1e18, "0xabcdef02#42", address(0x1111), address(testToken));
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "legacy deposit entry point should reject suffixed keys");
+    }
+
+    function it_bridge_window_records_action_intents() {
+        uint256[] memory ids = [uint256(50)];
+        address[] memory senders = [externalSender];
+        address[] memory tokens = [address(0x6666)];
+        uint256[] memory amounts = [uint256(1000e18)];
+        string[] memory hashes = ["0xb0000050"];
+        address[] memory recipients = [externalRecipient];
+        address[] memory targets = [address(usdstToken)];
+        uint256[] memory actions = [uint256(2)];
+        address[] memory actionTokens = [address(goldToken)];
+        uint256[] memory minFinalOuts = [uint256(123)];
+        uint256[] memory noFees = [uint256(0)];
+
+        relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+
+        (uint256 action, address actionToken, uint256 minFinalOut) = bridge.depositActions(externalChainId, "0xb0000050");
+        require(action == 2, "action should be recorded");
+        require(actionToken == address(goldToken), "action token should be recorded");
+        require(minFinalOut == 123, "minimum output should be recorded");
+    }
+
+    function it_bridge_window_reverts_for_disabled_chain_paused_deposits_and_non_relayer() {
+        uint256[] memory ids = [uint256(60)];
+        address[] memory senders = [externalSender];
+        address[] memory tokens = [address(0x5555)];
+        uint256[] memory amounts = [uint256(1e18)];
+        string[] memory hashes = ["0xb0000060"];
+        address[] memory recipients = [externalRecipient];
+        address[] memory targets = [address(testToken)];
+        uint256[] memory actions = [uint256(0)];
+        address[] memory actionTokens = [address(0)];
+        uint256[] memory minFinalOuts = [uint256(0)];
+        uint256[] memory noFees = [uint256(0)];
+
+        bool reverted = false;
+        try {
+            user1.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "non-relayer should be rejected");
+
+        bridge.setPause(true, false);
+        reverted = false;
+        try {
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "paused deposits should be rejected");
+        bridge.setPause(false, false);
+
+        bridge.toggleChain(externalChainId, false);
+        reverted = false;
+        try {
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "disabled chain should be rejected");
+        require(depositStatus("0xb0000060") == BridgeStatus.NONE, "nothing should be recorded");
+        require(checkpoint() == 1000, "checkpoint should not move");
+    }
+
+    function it_bridge_window_reverts_on_length_mismatch() {
+        uint256[] memory ids = [uint256(61), uint256(62)];
+        address[] memory senders = [externalSender];
+        address[] memory tokens = [address(0x5555)];
+        uint256[] memory amounts = [uint256(1e18)];
+        string[] memory hashes = ["0xb0000061"];
+        address[] memory recipients = [externalRecipient];
+        address[] memory targets = [address(testToken)];
+        uint256[] memory actions = [uint256(0)];
+        address[] memory actionTokens = [address(0)];
+        uint256[] memory minFinalOuts = [uint256(0)];
+        uint256[] memory noFees = [uint256(0)];
+
+        bool reverted = false;
+        try {
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "mismatched arrays should revert");
+    }
+
+    function it_bridge_window_deposit_ids_are_scoped_to_the_router() {
+        recordOne(1100, 1, address(0x5555), 1e18, "0xb0000070", address(0x1111), address(testToken));
+
+        address newRouter = address(0x4445);
+        bridge.setChain(chainName, custody, custodyHotWallet, true, externalChainId, 1100, newRouter);
+        recordOne(1200, 1, address(0x5555), 1e18, "0xb0000071", address(0x1111), address(testToken));
+
+        require(depositStatus("0xb0000071") == BridgeStatus.INITIATED, "a new router may reuse deposit ids");
+        string oldKey = bridge.depositKeysById(externalChainId, depositRouter, 1);
+        string newKey = bridge.depositKeysById(externalChainId, newRouter, 1);
+        require(oldKey == "0xb0000070", "old router id should keep its key");
+        require(newKey == "0xb0000071", "new router id should have its own key");
     }
 }

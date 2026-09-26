@@ -48,6 +48,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Streaming
 import Blockchain.Strato.RedisBlockDB (RedisConnection, withRedisBlockDB)
 import Data.Foldable (for_)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
@@ -164,9 +165,15 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
 bootstrapIndexer :: HasStreaming m => OutputBlock -> m ()
 bootstrapIndexer obGB = do
   liftIO $ putStrLn "About to bootstrap index events"
-  res <- IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
-  liftIO $ print res
-  liftIO $ putStrLn "bootstrapIndex genesis seed successful!"
+  rejections <- IdxKafka.produceIndexEvents [IdxModel.RanBlock obGB []]
+
+  -- Index-event production is best-effort everywhere else, but the genesis
+  -- RanBlock is the indexer's starting point: without it every later block
+  -- indexes against a chain the indexer never saw begin. Nothing downstream
+  -- can repair that on its own, so refuse to report success.
+  if null rejections
+    then liftIO $ putStrLn "bootstrapIndex genesis seed successful!"
+    else error $ "Could not seed the indexer with the genesis block: " ++ intercalate "; " rejections
 
 seedDatabases ::
   ( MonadIO m,

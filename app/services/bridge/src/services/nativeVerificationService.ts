@@ -1,21 +1,30 @@
+import { Interface } from "ethers";
 import { getTransactionReceiptsBatch } from "./rpcService";
-import { getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE } from "../config";
+import {
+  getNativeRepresentationBridgeAddress,
+  NATIVE_REDEMPTION_EVENT_SIGNATURES,
+} from "../config";
+import { NATIVE_REDEMPTION_EVENTS_ABI } from "../polling/nativeRedemptionPolling";
 import { NativeDepositInfo } from "../types";
 import { logError } from "../utils/logger";
+
+const redemptionEvents = new Interface(NATIVE_REDEMPTION_EVENTS_ABI);
 
 const normalizeAddress = (value: string) =>
   value.toLowerCase().replace(/^0x/, "");
 
-const decodeNativeRedemptionData = (
-  data: string,
+/// Decoded by ABI, not by slicing: the fee-bearing variant appends three words,
+/// and reading a fixed two out of five would misverify every such redemption.
+const decodeNativeRedemption = (
+  log: { topics: string[]; data: string },
 ): { amount: bigint; redemptionId: bigint } => {
-  if (!data.startsWith("0x") || data.length < 130) {
-    throw new Error(`Invalid log data: ${data}`);
+  const parsed = redemptionEvents.parseLog({ topics: log.topics, data: log.data });
+  if (!parsed) {
+    throw new Error("Log does not match a supported redemption event");
   }
-
   return {
-    amount: BigInt(`0x${data.slice(2, 66)}`),
-    redemptionId: BigInt(`0x${data.slice(66, 130)}`),
+    amount: BigInt(parsed.args.amount.toString()),
+    redemptionId: BigInt(parsed.args.redemptionId.toString()),
   };
 };
 
@@ -73,7 +82,9 @@ export const verifyNativeRedemptionsBatch = async (
 
           return (
             log.topics.length >= 4 &&
-            log.topics[0].toLowerCase() === NATIVE_REDEMPTION_EVENT_SIGNATURE.toLowerCase()
+            NATIVE_REDEMPTION_EVENT_SIGNATURES.some(
+              (signature) => log.topics[0].toLowerCase() === signature.toLowerCase(),
+            )
           );
         });
 
@@ -85,7 +96,7 @@ export const verifyNativeRedemptionsBatch = async (
         const representationToken = normalizeAddress(decodeIndexedAddress(matchingLog.topics[1]));
         const externalSender = normalizeAddress(decodeIndexedAddress(matchingLog.topics[2]));
         const stratoRecipient = normalizeAddress(decodeIndexedAddress(matchingLog.topics[3]));
-        const { amount, redemptionId } = decodeNativeRedemptionData(matchingLog.data);
+        const { amount, redemptionId } = decodeNativeRedemption(matchingLog);
 
         const verified =
           normalizeAddress(matchingLog.address) === normalizeAddress(deposit.externalBridge) &&

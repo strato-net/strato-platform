@@ -2,7 +2,7 @@
 // MercataGovernance, so governance's validatorStake matches staking's view and
 // each one emits ValidatorStakeUpdated.
 //
-// syncValidator is permissionless (it only requires the operator to exist), so
+// syncValidator is permissionless (it only requires the validator to be listed), so
 // this needs no admin vote. It is idempotent: governance drops a no-op update
 // without emitting, so re-running it is free.
 require('dotenv').config();
@@ -23,11 +23,11 @@ const VALIDATORS = [
   const token = await auth.getUserToken(user, process.env.GLOBAL_ADMIN_PASSWORD);
   const tokenObj = { token };
 
-  for (const operator of VALIDATORS) {
+  for (const validator of VALIDATORS) {
     const resp = await rest.call(tokenObj, {
       contract: { address: STAKING, name: 'StratoStaking' },
       method: 'syncValidator',
-      args: { operator: { type: 'address', value: operator } },
+      args: { validator: { type: 'address', value: validator } },
       txParams: { gasPrice: config.gasPrice, gasLimit: config.gasLimit },
     }, { config, isAsync: true, cacheNonce: true });
 
@@ -37,7 +37,7 @@ const VALIDATORS = [
       opts => rest.getBlocResults(tokenObj, hashes, opts),
       { config, isAsync: true }, 180000);
     const final = Array.isArray(results) ? results[0] : results;
-    console.log(`syncValidator(${operator.slice(0, 10)}…): ${final && final.status}` +
+    console.log(`syncValidator(${validator.slice(0, 10)}…): ${final && final.status}` +
       (final && final.status !== 'Success' ? ` | ${JSON.stringify(final).slice(0, 200)}` : ''));
   }
 })().catch(e => { console.error('FAILED:', e.message.slice(0, 250)); process.exit(1); });

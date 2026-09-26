@@ -40,8 +40,23 @@ brokerConfig = BrokerConfig
       , ("KAFKA_LOG_RETENTION_HOURS", "168")
       , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
       , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-      , ("KAFKA_MAX_REQUEST_SIZE", "2500000")
-      , ("KAFKA_MESSAGE_MAX_BYTES", "2500000")
+      -- Largest record the broker will accept. Raised from 2500000 after helium
+      -- block 595971, where two ~655KB contract deploys produced a 2,720,457 B
+      -- CodeCollectionAdded VMEvent; the broker refused it and the uncaught
+      -- rejection took every validator down. That record is a single
+      -- indivisible event on a topic whose producer still throws, so this limit
+      -- -- not any resilience in the producer -- is what keeps such a block
+      -- from halting the chain. Note the effective ceiling appears to be about
+      -- HALF this value, so budget accordingly.
+      --
+      -- Upper bound, do not exceed: milena's 'defaultMaxBytes' fetch ceiling.
+      -- It consumes with Fetch v0, which returns *nothing* for a partition
+      -- whose next record is larger than the request's maxBytes, so a record
+      -- the broker accepts but the client cannot fetch stalls the consumer at
+      -- that offset silently and permanently -- a worse failure than the
+      -- rejection this raise is meant to avoid.
+      , ("KAFKA_MAX_REQUEST_SIZE", "8000000")
+      , ("KAFKA_MESSAGE_MAX_BYTES", "8000000")
       , ("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")
       , ("KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR", "1")
       , ("KAFKA_TRANSACTION_STATE_LOG_MIN_ISR", "1")

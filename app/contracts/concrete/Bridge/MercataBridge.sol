@@ -5,6 +5,7 @@ import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
+import "../../libraries/Bridge/BridgeFees.sol";
 import "../Lending/LendingRegistry.sol";
 import "../Metals/MetalForge.sol";
 import "../Pools/DirectMintPSM.sol";
@@ -16,11 +17,52 @@ import "../Savings/SaveUSDSTVault.sol";
  * @notice Manages deposit and withdrawal workflows with decimal conversion
  * @notice Implements the core logic for cross-chain token bridging
  * @notice Supports multiple external chains and token configurations
+ *
+ * @notice SOLVER FAST PATH. Both directions normally wait for the relayer's
+ *         review and, outbound, for the custody multisig. A solver can front
+ *         either leg for a fee the user names as a ceiling:
+ *
+ *         INBOUND (an external deposit becoming STRATO tokens) is filled here.
+ *         {fillDeposit} moves the SOLVER's own tokens to the recipient, and
+ *         {confirmDeposit} then mints to the solver instead. Both halves happen
+ *         on this chain, so the redirect is enforced on chain.
+ *
+ *         OUTBOUND (a STRATO withdrawal becoming external tokens) is filled on
+ *         the external chain, against the schedule this contract commits at
+ *         request time. {recordWithdrawalClaim} mirrors that claim back here
+ *         so the UI can see it and -- more importantly -- so the user cannot
+ *         abort a withdrawal a solver has already paid out.
+ *
+ * @notice THE FEE DECAYS EXPONENTIALLY TO ZERO OVER THREE DAYS from the
+ *         request. A fast fill costs close to the ceiling, a slow one costs
+ *         proportionally less, and one that never comes costs nothing. There
+ *         is no refund step because the fee is never taken: the solver simply
+ *         has to deliver more the longer they wait.
+ *
+ * @notice CLAIMS ARE A LADDER, and the holder controls the rung above them.
+ *         Rung zero pays the user at their committed schedule. After that a
+ *         claim changes hands only if its holder marked it transferable, at
+ *         the holder's own asking price -- which may be higher than they
+ *         earned, so a solver who decides a transfer looks fraudulent can pay
+ *         someone else to carry it. The user is paid once and the bridge mints
+ *         or pays out once, whatever happens in between.
+ *
+ * @notice ANNOUNCEMENTS let anyone post an external deposit here before the
+ *         relayer has seen it, against a bond, so a solver can fill it
+ *         immediately. An ANNOUNCED deposit can never be confirmed -- only the
+ *         relayer's own record moves it to INITIATED -- so a fabricated
+ *         announcement costs the bridge nothing and its author a bond.
+ *
+ * @dev WHAT THE FAST PATH DOES NOT DO: it does not skip a review, a time lock,
+ *      or a multisig vote. A solver waits for all of it and carries the risk
+ *      that the deposit is aborted, the withdrawal rejected, or the escrow
+ *      swept -- which is what turns that risk into a quoted fee.
  */
 contract record MercataBridge is Ownable {
     /// @notice Enables BridgeTypes library functions for all types
     /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
     using BridgeTypes for *;
+    using BridgeFees for *;
     using StringUtils for string;
 
     /* ===================================================================== */
@@ -74,7 +116,18 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when a deposit requires manual review
     event DepositPendingReview(uint256 srcChainId, string srcTxHash);
 
+    /// @notice Emitted when a relayer-reported deposit cannot be minted as requested
+    /// @dev The deposit is stored as QUARANTINED so the obligation stays on-chain; governance
+    ///      resolves it with rerouteDeposit or abortDeposit
+    event DepositQuarantined(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address targetStratoToken, uint256 externalTokenAmount, uint256 depositId, string reason);
+
+    /// @notice Emitted when governance points a quarantined deposit at a different STRATO token
+    event DepositRerouted(uint256 externalChainId, string externalTxHash, address oldStratoToken, address newStratoToken, uint256 oldStratoTokenAmount, uint256 newStratoTokenAmount);
+
     /// @notice Emitted when a withdrawal is aborted and funds are refunded
+    /// @notice An aborted withdrawal's escrow went to the solver holding its claim,
+    ///         because that solver had already paid the recipient externally.
+    event WithdrawalEscrowReleasedToClaimant(uint256 indexed withdrawalId, address indexed claimant, uint256 amount);
     event WithdrawalAborted(uint256 withdrawalId);
 
     /// @notice Emitted when a withdrawal is completed and tokens are burned
@@ -177,6 +230,102 @@ contract record MercataBridge is Ownable {
         uint256 fallbackAmount
     );
 
+    // ───────────── Solver fast-path events ─────────────
+    /// @notice The fee schedule a request committed to. Emitted separately from
+    ///         the request event rather than widening it: Cirrus tables and the
+    ///         relayer both key off the existing shapes, and changing one would
+    ///         orphan every consumer at the same instant.
+    event DepositFeeTermsSet(
+        uint256 externalChainId,
+        string externalTxHash,
+        uint256 maxFee,
+        uint256 requestedAt,
+        uint256 feeHalfLife
+    );
+    event WithdrawalFeeTermsSet(
+        uint256 withdrawalId,
+        uint256 maxFeeStrato,
+        uint256 maxFeeExternal,
+        uint256 requestedAt,
+        uint256 feeHalfLife
+    );
+    /// @notice A solver took over a deposit's claim. `paidTo` is the party they
+    ///         displaced: the recipient on claim 0, the previous claimant after
+    ///         that.
+    event DepositFilled(
+        uint256 externalChainId,
+        string externalTxHash,
+        address claimant,
+        address paidTo,
+        uint256 claimIndex,
+        address stratoToken,
+        uint256 stratoTokenAmount,
+        uint256 feeCharged,
+        uint256 netPaid
+    );
+    /// @notice A claim holder changed whether, and at what price, they are
+    ///         willing to be displaced.
+    event DepositClaimOfferUpdated(
+        uint256 externalChainId,
+        string externalTxHash,
+        address claimant,
+        bool transferable,
+        uint256 exitFee
+    );
+    /// @notice The mint was redirected to a claimant who had already paid the
+    ///         recipient.
+    event DepositClaimSettled(
+        uint256 externalChainId,
+        string externalTxHash,
+        address claimant,
+        uint256 claimIndex,
+        uint256 feeCharged
+    );
+    /// @notice A claim existed but was priced against a record that no longer
+    ///         matches, so it was ignored and the recipient was paid. An event
+    ///         rather than a revert: a bogus claim must never be able to hold a
+    ///         real deposit hostage.
+    event DepositClaimVoided(
+        uint256 externalChainId,
+        string externalTxHash,
+        address claimant,
+        string reason
+    );
+    event WithdrawalClaimRecorded(
+        uint256 withdrawalId,
+        address claimant,
+        uint256 claimIndex,
+        uint256 feeCharged,
+        uint256 netPaid,
+        string externalFillTxHash
+    );
+    event DepositAnnounced(
+        uint256 externalChainId,
+        string externalTxHash,
+        address announcer,
+        address externalSender,
+        address externalToken,
+        address stratoRecipient,
+        address stratoToken,
+        uint256 stratoTokenAmount,
+        uint256 maxFee,
+        uint256 requestedAt,
+        uint256 feeHalfLife,
+        address bondToken,
+        uint256 bondAmount
+    );
+    event AnnouncementBondReturned(uint256 externalChainId, string externalTxHash, address announcer, uint256 amount);
+    event AnnouncementBondSlashed(uint256 externalChainId, string externalTxHash, address announcer, uint256 amount, address recipient);
+    event AnnouncementSuperseded(uint256 externalChainId, string externalTxHash, address announcer);
+    event FeeConfigUpdated(uint256 feeHalfLifeSeconds, uint256 maxFeeBps, bool fillsEnabled);
+    event AnnouncementConfigUpdated(
+        bool enabled,
+        address bondToken,
+        uint256 bondAmount,
+        address slashRecipient,
+        uint256 ttlSeconds
+    );
+
     /* ===================================================================== */
     /*                            STATE VARIABLES                            */
     /* ===================================================================== */
@@ -239,6 +388,79 @@ contract record MercataBridge is Ownable {
         uint256 minFinalOut;
     }
 
+    /// @notice The solver fee schedule a request committed to, in STRATO
+    ///         units. Written once and never updated: an admin who changes the
+    ///         configured half-life must not be able to re-price a request
+    ///         already in flight.
+    struct BridgeFeeTerms {
+        bool set;
+        uint256 maxFee;
+        uint256 requestedAt;
+        uint256 feeHalfLife;
+    }
+
+    /**
+     * @notice The head of a deposit's claim ladder, plus the SNAPSHOT of the
+     *         record it was priced against.
+     *
+     * @dev THE SNAPSHOT IS THE BINDING. A claim may be made against an
+     *      announced (unverified) deposit, and the relayer's own record can
+     *      later disagree with it. {confirmDeposit} re-compares these fields to
+     *      the live record and mints to the claimant only on an exact match --
+     *      otherwise the claim is void, the recipient is minted to as if no
+     *      solver had appeared, and the solver has given a stranger money.
+     *      Stored field by field rather than as a hash so an indexer can see
+     *      exactly what was claimed.
+     *
+     * @dev `action` is in the snapshot because a deposit carrying an
+     *      auto-forge or auto-save intent is NOT fillable: a solver cannot
+     *      reproduce the action, and handing them the mint would leave the
+     *      depositor without the thing they asked for. A fill requires it to
+     *      be zero, and a relayer who later adds one voids the claim.
+     */
+    struct DepositClaim {
+        address claimant;
+        uint256 claimIndex;
+        uint256 claimedAt;
+        uint256 feeCharged;
+        uint256 netPaid;
+        bool voided;
+        // The claimant's own exit terms. See {setDepositClaimExitOffer}.
+        bool transferable;
+        uint256 exitFee;
+        address stratoRecipient;
+        address stratoToken;
+        uint256 stratoTokenAmount;
+        uint256 maxFee;
+        uint256 requestedAt;
+        uint256 feeHalfLife;
+        uint256 action;
+    }
+
+    /// @notice A claim on an outbound withdrawal, as verified on the external
+    ///         chain and mirrored here by the relayer. Advisory for settlement
+    ///         -- the external chain pays the solver -- but binding for abort:
+    ///         see {abortWithdrawal}.
+    struct WithdrawalClaim {
+        address claimant;
+        uint256 claimIndex;
+        uint256 claimedAt;
+        uint256 feeCharged;
+        uint256 netPaid;
+        string externalFillTxHash;
+    }
+
+    /// @notice A bonded, unverified claim that an external deposit exists.
+    ///         `state` is 1 while live, 2 once the bond has been returned, 3
+    ///         once it has been slashed.
+    struct DepositAnnouncement {
+        address announcer;
+        address bondToken;
+        uint256 bondAmount;
+        uint256 announcedAt;
+        uint256 state;
+    }
+
     struct DepositActionConfig {
         bool autoForge;
         bool autoSave;
@@ -246,6 +468,21 @@ contract record MercataBridge is Ownable {
 
     /// @notice Deposit-keyed action intent recorded atomically by the relayer
     mapping(uint256 => mapping(string => DepositActionIntent)) public record depositActions;
+
+    /// @notice Deposit key recorded for each source-router deposit id
+    /// @dev Key: (externalChainId, depositRouter, depositId) -> deposit key. Routers number deposits
+    ///      sequentially, so a gap in this table is a deposit that has not been recorded yet
+    mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositKeysById;
+
+    /// @notice Source-router deposit id for each deposit key recorded by recordDepositWindow
+    mapping(uint256 => mapping(string => uint256)) public record depositIdsByKey;
+
+    /// @notice External-token amount the relayer reported (after any rebase adjustment) for each
+    ///         deposit recorded by recordDepositWindow; kept so a quarantined deposit can be resolved
+    mapping(uint256 => mapping(string => uint256)) public record depositExternalAmounts;
+
+    /// @notice Why recordDepositWindow quarantined a deposit; empty for deposits recorded normally
+    mapping(uint256 => mapping(string => string)) public record depositQuarantineReasons;
 
     /// @notice Registry of withdrawal requests by withdrawal ID
     /// @dev Maps withdrawal ID to withdrawal information
@@ -280,6 +517,52 @@ contract record MercataBridge is Ownable {
     /// @notice Action allowlist for each external-to-STRATO route
     /// @dev Key: (externalToken, externalChainId, targetStratoToken) -> action flags
     mapping(address => mapping(uint256 => mapping(address => DepositActionConfig))) public record depositActionConfigs;
+
+    // ───────────── Solver fast-path state ─────────────
+    /// @notice Half-life, in seconds, of an offered solver fee. Committed into
+    ///         each request, so changing it never re-prices one in flight.
+    uint256 public feeHalfLifeSeconds;
+
+    /// @notice Ceiling on any offered fee, in basis points of the amount. The
+    ///         anti-grief bound on claims: a solver who inflates the schedule
+    ///         underpays the recipient and occupies the ladder, so occupying it
+    ///         has to cost nearly the whole amount, paid to the user. Zero
+    ///         refuses every fee and disables the fast path outright.
+    uint256 public maxFeeBps;
+
+    /// @notice Master switch for {fillDeposit}, separate from the deposit
+    ///         circuit breaker: stopping solvers is not the same decision as
+    ///         stopping the bridge.
+    bool public fillsEnabled;
+
+    /// @notice Master switch for {announceDeposit}.
+    bool public announcementsEnabled;
+
+    /// @notice Announcement bond configuration: what is posted, where a slashed
+    ///         bond goes, and how long before an unconfirmed bond can be
+    ///         reclaimed.
+    address public announcementBondToken;
+    uint256 public announcementBondAmount;
+    address public announcementSlashRecipient;
+    uint256 public announcementTtlSeconds;
+
+    /// @notice Bonds this contract is holding, per token. Tracked separately
+    ///         from escrow so a bond is never mistaken for a withdrawal's
+    ///         backing.
+    mapping(address => uint256) public record bondedBalance;
+
+    /// @notice The committed fee schedule, keyed exactly as the record it
+    ///         belongs to: (externalChainId, externalTxHash) for deposits,
+    ///         withdrawalId for withdrawals.
+    mapping(uint256 => mapping(string => BridgeFeeTerms)) public record depositFeeTerms;
+    mapping(uint256 => BridgeFeeTerms) public record withdrawalFeeTerms;
+
+    /// @notice The head of each claim ladder.
+    mapping(uint256 => mapping(string => DepositClaim)) public record depositClaims;
+    mapping(uint256 => WithdrawalClaim) public record withdrawalClaims;
+
+    /// @notice Permissionless announcements of external deposits.
+    mapping(uint256 => mapping(string => DepositAnnouncement)) public record depositAnnouncements;
 
 
     /* ===================================================================== */
@@ -688,17 +971,91 @@ contract record MercataBridge is Ownable {
         require(actualAmount > 0, "MB: no tokens sent");
     }
 
+    function _isRouteEnabled(
+        address externalToken,
+        uint256 externalChainId,
+        address targetStratoToken
+    ) internal view returns (bool) {
+        AssetInfo a = assets[externalToken][externalChainId];
+        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
+        bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
+        return isDefaultRoute || isExplicitRoute;
+    }
+
     function _requireRouteEnabled(
         address externalToken,
         uint256 externalChainId,
         address targetStratoToken
     ) internal view {
         require(targetStratoToken != address(0), "MB: invalid target token");
-        AssetInfo a = assets[externalToken][externalChainId];
-        require(a.stratoToken != address(0), "MB: asset missing");
-        bool isDefaultRoute = targetStratoToken == a.stratoToken && a.enabled;
-        bool isExplicitRoute = assetRouteEnabled[externalToken][externalChainId][targetStratoToken];
-        require(isDefaultRoute || isExplicitRoute, "MB: route not enabled");
+        require(assets[externalToken][externalChainId].stratoToken != address(0), "MB: asset missing");
+        require(_isRouteEnabled(externalToken, externalChainId, targetStratoToken), "MB: route not enabled");
+    }
+
+    /// @dev Why a deposit cannot be minted as requested, or "" when it can
+    function _depositQuarantineReason(
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        address stratoRecipient,
+        address targetStratoToken
+    ) internal returns (string) {
+        if (externalSender == address(0)) return "invalid external sender";
+        if (externalTokenAmount == 0) return "invalid external token amount";
+        if (stratoRecipient == address(0)) return "invalid strato recipient";
+        if (targetStratoToken == address(0)) return "invalid target token";
+        if (assets[externalToken][externalChainId].stratoToken == address(0)) return "asset missing";
+        if (!_isRouteEnabled(externalToken, externalChainId, targetStratoToken)) return "route not enabled";
+        bool active = false;
+        try {
+            active = TokenFactory(tokenFactory).isTokenActive(targetStratoToken);
+        } catch {
+        }
+        if (!active) return "inactive token";
+        return "";
+    }
+
+    /// @dev Splits a deposit key "<txHash>#<depositId>" into its parts; a key without '#' carries no id
+    function _splitDepositKey(string key) internal pure returns (string, bool, uint256) {
+        bytes b = bytes(key);
+        for (uint256 i = 0; i < b.length; i++) {
+            if (b[i] == 0x23) {
+                require(i > 0 && i + 1 < b.length, "MB: invalid deposit key");
+                uint256 id = 0;
+                for (uint256 j = i + 1; j < b.length; j++) {
+                    require(b[j] >= 0x30 && b[j] <= 0x39, "MB: invalid deposit key");
+                    id = id * 10 + (b[j] - 0x30);
+                }
+                require(id > 0, "MB: invalid deposit key");
+                bytes hashPart = new bytes(i);
+                for (uint256 k = 0; k < i; k++) {
+                    hashPart[k] = b[k];
+                }
+                return (string(hashPart), true, id);
+            }
+        }
+        return (key, false, 0);
+    }
+
+    /// @dev Canonical deposit key: the normalized source tx hash, followed by "#<depositId>" when
+    ///      one source transaction emitted more than one deposit
+    function _joinDepositKey(string hashPart, bool hasId, uint256 id) internal pure returns (string) {
+        string normalized = hashPart.normalizeHex();
+        if (!hasId) return normalized;
+        return normalized + "#" + string(id);
+    }
+
+    function _normalizeDepositKey(string key) internal pure returns (string) {
+        (string hashPart, bool hasId, uint256 id) = _splitDepositKey(key);
+        return _joinDepositKey(hashPart, hasId, id);
+    }
+
+    /// @dev Canonical key for a deposit reported together with its router deposit id
+    function _depositKey(string externalTxHash, uint256 depositId) internal pure returns (string) {
+        (string hashPart, bool hasId, uint256 id) = _splitDepositKey(externalTxHash);
+        require(!hasId || id == depositId, "MB: deposit key id mismatch");
+        return _joinDepositKey(hashPart, hasId, id);
     }
 
     function _isDepositActionEnabled(
@@ -855,7 +1212,29 @@ contract record MercataBridge is Ownable {
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
         normalizedTxHash = externalTxHash.normalizeHex();
-        require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
+        BridgeStatus existingStatus = deposits[externalChainId][normalizedTxHash].bridgeStatus;
+        require(
+            existingStatus == BridgeStatus.NONE || existingStatus == BridgeStatus.ANNOUNCED,
+            "MB: duplicate deposit"
+        );
+
+        // An announcement is a stranger's unverified claim about this deposit.
+        // The relayer's record always wins; the only question is whether the
+        // announcer's bond comes back now or has to be reclaimed. An exact
+        // match is returned immediately; a mismatch is superseded and left
+        // reclaimable, because the honest reasons to disagree are real (a
+        // rebase adjustment, a race with a reorg) and slashing is reserved for
+        // announcements governance rules fake.
+        if (existingStatus == BridgeStatus.ANNOUNCED) {
+            _resolveAnnouncementOnAdoption(
+                externalChainId,
+                normalizedTxHash,
+                externalSender,
+                externalToken,
+                stratoRecipient,
+                targetStratoToken
+            );
+        }
 
         AssetInfo a = assets[externalToken][externalChainId];
         _requireRouteEnabled(externalToken, externalChainId, targetStratoToken);
@@ -870,6 +1249,133 @@ contract record MercataBridge is Ownable {
         );
 
         emit DepositInitiated(externalChainId, externalSender, normalizedTxHash, stratoRecipient, targetStratoToken, stratoTokenAmount);
+    }
+
+    /**
+     * @notice {deposit}, plus the `maxFee` the depositor offered on the
+     *         external chain for immediate delivery here.
+     *
+     * @dev The relayer reads the fee out of the external `DepositRoutedWithFee`
+     *      log and passes it through unchanged, along with the ORIGIN
+     *      timestamp -- not this chain's -- so the decay measures from when the
+     *      user actually asked, not from when the relayer got round to it. A
+     *      relayer an hour behind therefore hands the user an hour of decay,
+     *      which is exactly the refund the schedule promises.
+     *
+     * @param maxFee The ceiling in EXTERNAL token units, as the deposit log
+     *               carries it. It is scaled to STRATO units here with the same
+     *               factor as the amount.
+     * @param requestedAt The external chain's timestamp of the deposit.
+     */
+    function depositWithFee(
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken,
+        uint256 maxFee,
+        uint256 requestedAt
+    ) public onlyOwner whenDepositsOpen {
+        string normalizedTxHash = _recordDeposit(
+            externalChainId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            externalTxHash,
+            stratoRecipient,
+            targetStratoToken
+        );
+        _commitDepositFeeTerms(
+            externalChainId,
+            normalizedTxHash,
+            externalToken,
+            maxFee,
+            requestedAt
+        );
+    }
+
+    /// @notice Batch {depositWithFee}. Same per-item rules; one bad item
+    ///         reverts the batch, exactly as the existing batches do.
+    function depositBatchWithFee(
+        uint256[] externalChainIds,
+        address[] externalSenders,
+        address[] externalTokens,
+        uint256[] externalTokenAmounts,
+        string[] externalTxHashes,
+        address[] stratoRecipients,
+        address[] targetStratoTokens,
+        uint256[] maxFees,
+        uint256[] requestedAts
+    ) external onlyOwner whenDepositsOpen {
+        uint256 n = externalChainIds.length;
+        require(
+            n > 0 &&
+            n == externalSenders.length &&
+            n == externalTokens.length &&
+            n == externalTokenAmounts.length &&
+            n == externalTxHashes.length &&
+            n == stratoRecipients.length &&
+            n == targetStratoTokens.length &&
+            n == maxFees.length &&
+            n == requestedAts.length,
+            "MB: len"
+        );
+        for (uint256 i = 0; i < n; i++) {
+            depositWithFee(
+                externalChainIds[i],
+                externalSenders[i],
+                externalTokens[i],
+                externalTokenAmounts[i],
+                externalTxHashes[i],
+                stratoRecipients[i],
+                targetStratoTokens[i],
+                maxFees[i],
+                requestedAts[i]
+            );
+        }
+    }
+
+    /**
+     * @dev Write the schedule a deposit will be settled under, scaling the
+     *      external-unit ceiling into STRATO units exactly as the amount was
+     *      scaled. A zero fee still writes a schedule, so the record always
+     *      says explicitly whether the fast path was on offer.
+     */
+    function _commitDepositFeeTerms(
+        uint256 externalChainId,
+        string normalizedTxHash,
+        address externalToken,
+        uint256 maxFee,
+        uint256 requestedAt
+    ) internal {
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        AssetInfo a = assets[externalToken][externalChainId];
+
+        uint256 maxFeeStrato = 0;
+        uint256 halfLife = 0;
+        if (maxFee > 0) {
+            maxFeeStrato = maxFee * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+            require(
+                BridgeFees.isFeeCapAllowed(maxFeeStrato, d.stratoTokenAmount, maxFeeBps),
+                "MB: fee too large"
+            );
+            halfLife = feeHalfLifeSeconds;
+            require(BridgeFees.isHalfLifeAllowed(halfLife), "MB: fee half-life not configured");
+        }
+
+        uint256 startsAt = requestedAt;
+        if (startsAt == 0 || startsAt > block.timestamp) {
+            // A missing or future origin timestamp would hand a solver the full
+            // fee forever. Fall back to now: strictly worse for the solver and
+            // strictly safer for the user.
+            startsAt = block.timestamp;
+        }
+
+        depositFeeTerms[externalChainId][normalizedTxHash] =
+            BridgeFeeTerms(true, maxFeeStrato, startsAt, halfLife);
+        emit DepositFeeTermsSet(externalChainId, normalizedTxHash, maxFeeStrato, startsAt, halfLife);
     }
 
     function depositWithAction(
@@ -996,6 +1502,189 @@ contract record MercataBridge is Ownable {
     }
 
     /**
+     * @dev Records every deposit the relayer found in one source-chain block window and advances
+     *      that chain's lastProcessedBlock in the same transaction
+     * @notice The checkpoint can never get ahead of the deposits it covers: both land together or not at all
+     * @notice Idempotent: a deposit already recorded under the same router deposit id is skipped, and
+     *         the checkpoint only moves forward, so replaying a window is safe
+     * @notice A deposit that cannot be minted as requested (disabled route, unknown asset, inactive token,
+     *         zero recipient) is recorded as QUARANTINED instead of reverting the whole window
+     * @notice externalTxHashes[i] is the source transaction hash, or "<hash>#<depositId>" when that
+     *         source transaction emitted more than one deposit
+     * @param externalChainId The source chain of every deposit in the window
+     * @param lastProcessedBlock The last source block the window covers; a value at or below the
+     *        current checkpoint leaves it unchanged
+     * @notice A deposit a stranger ANNOUNCED against a bond is adopted exactly as {deposit} adopts it:
+     *         the relayer's record replaces the announcement and the bond is returned or left reclaimable
+     * @notice A fee-bearing deposit (DepositRoutedWithFee) has requestedAts[i] != 0 and its schedule is
+     *         committed with the record, as {depositWithFee} does; a fee the bridge cannot honour
+     *         quarantines the deposit rather than reverting the window
+     * @param depositIds Router deposit ids (DepositRouted.depositId)
+     * @param actions Post-deposit action per deposit; 0 for a plain deposit
+     * @param maxFees Solver fee ceiling in EXTERNAL units per deposit; 0 for none
+     * @param requestedAts Origin-chain timestamp per deposit; 0 marks a deposit with no fee schedule
+     */
+    function recordDepositWindow(
+        uint256 externalChainId,
+        uint256 lastProcessedBlock,
+        uint256[] depositIds,
+        address[] externalSenders,
+        address[] externalTokens,
+        uint256[] externalTokenAmounts,
+        string[] externalTxHashes,
+        address[] stratoRecipients,
+        address[] targetStratoTokens,
+        uint256[] actions,
+        address[] actionTokens,
+        uint256[] minFinalOuts,
+        uint256[] maxFees,
+        uint256[] requestedAts
+    ) external onlyOwner whenDepositsOpen {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        ChainInfo chainInfo = chains[externalChainId];
+        require(chainInfo.enabled, "MB: chain not enabled");
+        uint256 n = depositIds.length;
+        require(
+            n == externalSenders.length &&
+            n == externalTokens.length &&
+            n == externalTokenAmounts.length &&
+            n == externalTxHashes.length &&
+            n == stratoRecipients.length &&
+            n == targetStratoTokens.length &&
+            n == actions.length &&
+            n == actionTokens.length &&
+            n == minFinalOuts.length &&
+            n == maxFees.length &&
+            n == requestedAts.length,
+            "MB: len"
+        );
+        for (uint256 i = 0; i < n; i++) {
+            _recordWindowDeposit(
+                externalChainId,
+                chainInfo.depositRouter,
+                depositIds[i],
+                externalSenders[i],
+                externalTokens[i],
+                externalTokenAmounts[i],
+                externalTxHashes[i],
+                stratoRecipients[i],
+                targetStratoTokens[i],
+                actions[i],
+                actionTokens[i],
+                minFinalOuts[i],
+                maxFees[i],
+                requestedAts[i]
+            );
+        }
+        if (lastProcessedBlock > chainInfo.lastProcessedBlock) {
+            chainInfo.lastProcessedBlock = lastProcessedBlock;
+            emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+        }
+    }
+
+    function _recordWindowDeposit(
+        uint256 externalChainId,
+        address depositRouter,
+        uint256 depositId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken,
+        uint256 action,
+        address actionToken,
+        uint256 minFinalOut,
+        uint256 maxFee,
+        uint256 requestedAt
+    ) internal {
+        require(depositId > 0, "MB: invalid deposit id");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        string key = _depositKey(externalTxHash, depositId);
+        string keyForId = depositKeysById[externalChainId][depositRouter][depositId];
+
+        BridgeStatus existingStatus = deposits[externalChainId][key].bridgeStatus;
+        if (existingStatus == BridgeStatus.ANNOUNCED) {
+            // A stranger's unverified claim about this deposit. The relayer's
+            // record always wins; see {_recordDeposit} for why a mismatch is
+            // superseded rather than slashed.
+            require(bytes(keyForId).length == 0, "MB: deposit id reused");
+            _resolveAnnouncementOnAdoption(
+                externalChainId,
+                key,
+                externalSender,
+                externalToken,
+                stratoRecipient,
+                targetStratoToken
+            );
+        } else if (existingStatus != BridgeStatus.NONE) {
+            uint256 recordedId = depositIdsByKey[externalChainId][key];
+            if (recordedId == 0) {
+                // Recorded by an entry point that did not track ids: adopt the id this window reports
+                require(bytes(keyForId).length == 0 || keyForId == key, "MB: deposit id reused");
+                depositKeysById[externalChainId][depositRouter][depositId] = key;
+                depositIdsByKey[externalChainId][key] = depositId;
+                return;
+            }
+            require(recordedId == depositId, "MB: deposit id mismatch");
+            return;
+        }
+        require(bytes(keyForId).length == 0, "MB: deposit id reused");
+
+        depositKeysById[externalChainId][depositRouter][depositId] = key;
+        depositIdsByKey[externalChainId][key] = depositId;
+        depositExternalAmounts[externalChainId][key] = externalTokenAmount;
+
+        AssetInfo a = assets[externalToken][externalChainId];
+        uint256 stratoTokenAmount = 0;
+        if (a.stratoToken != address(0)) {
+            // Example: 1e6 USDC * 10^(18-6) = 1e18 USDCST tokens
+            stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        }
+
+        string reason = _depositQuarantineReason(
+            externalChainId,
+            externalSender,
+            externalToken,
+            externalTokenAmount,
+            stratoRecipient,
+            targetStratoToken
+        );
+        if (reason.length == 0 && maxFee > 0) {
+            // The same checks {_commitDepositFeeTerms} enforces, as a quarantine
+            // reason instead of a revert: one deposit's unhonourable fee must not
+            // hold back the rest of the window
+            uint256 maxFeeStrato = maxFee * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+            if (!BridgeFees.isFeeCapAllowed(maxFeeStrato, stratoTokenAmount, maxFeeBps)) {
+                reason = "fee too large";
+            } else if (!BridgeFees.isHalfLifeAllowed(feeHalfLifeSeconds)) {
+                reason = "fee half-life not configured";
+            }
+        }
+        if (reason.length == 0) {
+            deposits[externalChainId][key] = DepositInfo(
+                BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, targetStratoToken, stratoTokenAmount, block.timestamp
+            );
+            emit DepositInitiated(externalChainId, externalSender, key, stratoRecipient, targetStratoToken, stratoTokenAmount);
+            // Only a fee-bearing deposit carries an origin timestamp (or a fee);
+            // a plain one gets no schedule at all, exactly as {deposit} leaves none
+            if (maxFee != 0 || requestedAt != 0) {
+                _commitDepositFeeTerms(externalChainId, key, externalToken, maxFee, requestedAt);
+            }
+        } else {
+            deposits[externalChainId][key] = DepositInfo(
+                BridgeStatus.QUARANTINED, externalSender, externalToken, block.timestamp, stratoRecipient, targetStratoToken, stratoTokenAmount, block.timestamp
+            );
+            depositQuarantineReasons[externalChainId][key] = reason;
+            emit DepositQuarantined(externalChainId, externalSender, key, stratoRecipient, targetStratoToken, externalTokenAmount, depositId, reason);
+        }
+
+        if (action != 0) {
+            depositActions[externalChainId][key] = DepositActionIntent(action, actionToken, minFinalOut);
+        }
+    }
+
+    /**
      * @dev Legacy lending-era action request retained for storage and ABI compatibility
      * @notice New confirmation logic intentionally ignores this sideband request
      * @param user The address requesting the action (must match the deposit recipient to be honored)
@@ -1012,7 +1701,7 @@ contract record MercataBridge is Ownable {
         require(action != uint(DepositAction.NONE), "MB: invalid action");
         DepositAction _action = DepositAction(action);
 
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
 
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus != BridgeStatus.COMPLETED, "MB: Already completed");
         depositActionRequests[user][externalChainId][normalizedTxHash] = DepositActionRequest(_action, targetToken);
@@ -1037,11 +1726,32 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
+
+        // A solver who already handed the recipient their tokens takes the
+        // recipient's place, and takes the FULL mint: the net they fronted
+        // plus the fee they earned is exactly what they are owed. Their
+        // payment is in this chain's own history -- better evidence than any
+        // attestation could be. Checked before the action branch because a
+        // filled deposit has no action to run: the recipient already holds
+        // plain tokens, and a fill is only ever allowed on an action-free
+        // deposit.
+        address claimant = _resolveDepositClaimant(externalChainId, normalizedTxHash, d);
+        if (claimant != address(0)) {
+            uint256 claimMintedAmount = _mintFunds(d.stratoToken, claimant, d.stratoTokenAmount);
+            require(claimMintedAmount > 0, "MB: no tokens minted");
+
+            _deleteDepositAction(externalChainId, normalizedTxHash);
+            d.bridgeStatus = BridgeStatus.COMPLETED;
+            d.timestamp = block.timestamp;
+            emit DepositCompleted(externalChainId, d.externalSender, normalizedTxHash, claimant, d.stratoToken, d.stratoTokenAmount);
+            return;
+        }
+
         bool isExecutableAction = (
             intent.action == uint256(DepositAction.AUTO_FORGE) ||
             intent.action == uint256(DepositAction.AUTO_SAVE)
@@ -1103,7 +1813,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
@@ -1133,10 +1843,11 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * @dev Aborts a deposit that was marked for manual review
+     * @dev Aborts a deposit that was marked for manual review or quarantined
      * @notice Step-2.3 of the deposit flow - cancel a deposit that was marked for review
-     * @notice Only deposits in PENDING_REVIEW status can be aborted
-     * @notice Only the owner can abort deposits, preventing token minting
+     * @notice Only deposits in PENDING_REVIEW or QUARANTINED status can be aborted
+     * @notice Only the owner can abort deposits, preventing token minting; any refund of the
+     *         custodied funds happens on the external chain
      * @param externalChainId The external chain identifier where the deposit occurred
      * @param externalTxHash The transaction hash on the external chain
      */
@@ -1149,12 +1860,21 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = externalTxHash.normalizeHex();
+        string normalizedTxHash = _normalizeDepositKey(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW || d.bridgeStatus == BridgeStatus.QUARANTINED, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.ABORTED;
         d.timestamp = block.timestamp;
+
+        // An aborted deposit is the risk a solver priced. Mark the claim void
+        // so the loss is explicit on chain rather than an unresolved claim
+        // that still looks owed something.
+        DepositClaim claim = depositClaims[externalChainId][normalizedTxHash];
+        if (claim.claimant != address(0) && !claim.voided) {
+            claim.voided = true;
+            emit DepositClaimVoided(externalChainId, normalizedTxHash, claim.claimant, "deposit aborted");
+        }
 
         _deleteDepositAction(externalChainId, normalizedTxHash);
         emit DepositAborted(externalChainId, normalizedTxHash);
@@ -1179,6 +1899,37 @@ contract record MercataBridge is Ownable {
         }
     }
 
+    /**
+     * @dev Points a quarantined deposit at a STRATO token it can be minted as and returns it to INITIATED
+     * @notice Governance resolution for a quarantined deposit, e.g. one that requested a retired route.
+     *         Rerouting to the original token is how a deposit is released once its route is live again
+     * @notice The relayer re-verifies the source transfer before confirming, so newStratoTokenAmount must
+     *         equal what the source transfer converts to for the new token or the deposit returns to review
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The deposit key: the source tx hash, or "<hash>#<depositId>"
+     * @param newTargetStratoToken The STRATO token to mint instead; its route must be enabled
+     * @param newStratoTokenAmount The amount of newTargetStratoToken to mint
+     */
+    function rerouteDeposit(
+        uint256 externalChainId, string externalTxHash, address newTargetStratoToken, uint256 newStratoTokenAmount
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(newStratoTokenAmount > 0, "MB: invalid strato token amount");
+        string key = _normalizeDepositKey(externalTxHash);
+        DepositInfo d = deposits[externalChainId][key];
+        require(d.bridgeStatus == BridgeStatus.QUARANTINED, "MB: bad state");
+        require(d.stratoRecipient != address(0), "MB: invalid strato recipient");
+        _requireRouteEnabled(d.externalToken, externalChainId, newTargetStratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(newTargetStratoToken), "MB: inactive token");
+
+        emit DepositRerouted(externalChainId, key, d.stratoToken, newTargetStratoToken, d.stratoTokenAmount, newStratoTokenAmount);
+        d.stratoToken = newTargetStratoToken;
+        d.stratoTokenAmount = newStratoTokenAmount;
+        d.bridgeStatus = BridgeStatus.INITIATED;
+        d.timestamp = block.timestamp;
+        depositQuarantineReasons[externalChainId][key] = "";
+    }
+
     // ───────────── Withdrawal flow functions ─────────────
     /**
      * @dev Initiates a withdrawal request by escrowing tokens and creating a withdrawal record
@@ -1201,6 +1952,65 @@ contract record MercataBridge is Ownable {
         address stratoToken,
         uint256 stratoTokenAmount
     ) external whenWithdrawalsOpen returns (uint256 id) {
+        return _requestWithdrawal(
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            stratoToken,
+            stratoTokenAmount,
+            0
+        );
+    }
+
+    /**
+     * @notice {requestWithdrawal}, plus a `maxFee` the user will pay a solver
+     *         who hands them their external tokens before the custody multisig
+     *         has finished.
+     *
+     * @notice The fee a solver can actually keep decays exponentially to zero
+     *         over three days from this moment, so a fast fill costs close to
+     *         `maxFee` and a slow one proportionally less. Nothing is held
+     *         back and there is no refund step: the fee is simply never taken
+     *         unless somebody earns it.
+     *
+     * @dev The schedule is COMMITTED here, in storage and in the event, and
+     *      never read live afterwards. The external chain's settlement
+     *      recomputes the fee from these three numbers, so an admin who
+     *      changes {feeHalfLifeSeconds} cannot re-price a withdrawal already
+     *      in flight.
+     *
+     * @param maxFee The ceiling in STRATO units -- the same units as
+     *               `stratoTokenAmount`, so a user names it in the token they
+     *               are spending. It is converted to external units with the
+     *               same rounding as the amount, because the solver pays on
+     *               the external chain.
+     */
+    function requestWithdrawalWithFee(
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken,
+        address stratoToken,
+        uint256 stratoTokenAmount,
+        uint256 maxFee
+    ) external whenWithdrawalsOpen returns (uint256 id) {
+        return _requestWithdrawal(
+            externalChainId,
+            externalRecipient,
+            externalToken,
+            stratoToken,
+            stratoTokenAmount,
+            maxFee
+        );
+    }
+
+    function _requestWithdrawal(
+        uint256 externalChainId,
+        address externalRecipient,
+        address externalToken,
+        address stratoToken,
+        uint256 stratoTokenAmount,
+        uint256 maxFee
+    ) internal returns (uint256 id) {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(externalRecipient != address(0), "MB: invalid external recipient");
         require(stratoToken != address(0), "MB: invalid strato token");
@@ -1236,6 +2046,139 @@ contract record MercataBridge is Ownable {
         );
 
         emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, stratoToken, msg.sender, id, useHotWallet);
+
+        // Bounded against the ESCROWED amount, not the requested one: the
+        // escrow is what the withdrawal is worth, and a rebasing or
+        // fee-on-transfer token can make the two differ.
+        _commitWithdrawalFeeTerms(
+            id,
+            stratoTokenAmount,
+            externalTokenAmount,
+            maxFee,
+            10 ** (DECIMAL_PLACES - a.externalDecimals)
+        );
+    }
+
+    /**
+     * @dev Write the schedule a withdrawal will be settled under.
+     *
+     *      THE COMMITTED FEE IS IN EXTERNAL UNITS, because that is the chain
+     *      the solver pays on and the units its settlement works in. It is
+     *      converted with the same truncating division as the amount, so a fee
+     *      that rounds away to nothing becomes a zero-fee schedule rather than
+     *      a schedule nobody can satisfy.
+     */
+    function _commitWithdrawalFeeTerms(
+        uint256 id,
+        uint256 stratoTokenAmount,
+        uint256 externalTokenAmount,
+        uint256 maxFeeStrato,
+        uint256 scale
+    ) internal {
+        uint256 maxFeeExternal = 0;
+        uint256 halfLife = 0;
+
+        if (maxFeeStrato > 0) {
+            require(
+                BridgeFees.isFeeCapAllowed(maxFeeStrato, stratoTokenAmount, maxFeeBps),
+                "MB: fee too large"
+            );
+            maxFeeExternal = maxFeeStrato / scale;
+            if (maxFeeExternal > 0) {
+                halfLife = feeHalfLifeSeconds;
+                require(BridgeFees.isHalfLifeAllowed(halfLife), "MB: fee half-life not configured");
+                require(maxFeeExternal < externalTokenAmount, "MB: fee too large");
+            }
+        }
+
+        withdrawalFeeTerms[id] = BridgeFeeTerms(true, maxFeeExternal, block.timestamp, halfLife);
+        emit WithdrawalFeeTermsSet(id, maxFeeStrato, maxFeeExternal, block.timestamp, halfLife);
+    }
+
+    /**
+     * @notice Mirror an external-chain claim on an outbound withdrawal back
+     *         onto this chain.
+     *
+     *         The solver is paid on the external chain, by that chain's own
+     *         settlement, so this record does not move money. It does two
+     *         things that matter: it makes the claim visible on the chain that
+     *         holds the escrow, and it closes the user's 48-hour abort hatch --
+     *         without it, a user could take a solver's tokens on one chain and
+     *         their own escrow back on this one.
+     *
+     * @dev THE FEE IS CHECKED, not taken on trust, on the rung that pays the
+     *      user. `feeCharged` must be within the schedule this contract
+     *      committed, evaluated at the external chain's fill timestamp, and
+     *      `netPaid` must be the remainder. The relayer is otherwise trusted,
+     *      but these numbers are checkable, so they are checked.
+     *
+     * @dev LATER RUNGS ARE NOT BOUNDED BY THE USER'S SCHEDULE. They are solvers
+     *      buying and selling the position among themselves at prices they set,
+     *      and a solver shedding a claim they have come to distrust may well
+     *      pay MORE than they earned. The user's leg is already settled by
+     *      then, so bounding it would only forbid the trade the ladder exists
+     *      to allow.
+     *
+     * @param claimedAt The external chain's block timestamp at the fill. Clock
+     *                  skew between chains is real but small; a timestamp in
+     *                  this chain's future is refused rather than trusted.
+     */
+    function recordWithdrawalClaim(
+        uint256 id,
+        address claimant,
+        uint256 claimIndex,
+        uint256 feeCharged,
+        uint256 netPaid,
+        uint256 claimedAt,
+        string externalFillTxHash
+    ) external onlyOwner {
+        require(id > 0, "MB: invalid withdrawal id");
+        require(claimant != address(0), "MB: invalid claimant");
+        require(externalFillTxHash.length > 0, "MB: invalid fill tx hash");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(
+            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+            "MB: bad state"
+        );
+
+        BridgeFeeTerms terms = withdrawalFeeTerms[id];
+        require(terms.set, "MB: no fee terms");
+        require(claimedAt <= block.timestamp, "MB: fill in the future");
+        require(netPaid == w.externalTokenAmount - feeCharged, "MB: net does not match");
+
+        WithdrawalClaim existing = withdrawalClaims[id];
+        if (existing.claimant != address(0)) {
+            require(claimIndex > existing.claimIndex, "MB: claim index not advancing");
+        } else {
+            require(claimIndex == 0, "MB: first claim must be index zero");
+            uint256 allowedFee = BridgeFees.decayedFee(
+                terms.maxFee,
+                terms.requestedAt,
+                terms.feeHalfLife,
+                claimedAt
+            );
+            require(feeCharged <= allowedFee, "MB: fee above schedule");
+        }
+
+        string normalizedFillTxHash = externalFillTxHash.normalizeHex();
+        withdrawalClaims[id] = WithdrawalClaim(
+            claimant,
+            claimIndex,
+            claimedAt,
+            feeCharged,
+            netPaid,
+            normalizedFillTxHash
+        );
+
+        emit WithdrawalClaimRecorded(
+            id,
+            claimant,
+            claimIndex,
+            feeCharged,
+            netPaid,
+            normalizedFillTxHash
+        );
     }
 
     /**
@@ -1350,16 +2293,47 @@ contract record MercataBridge is Ownable {
         else {
             require(msg.sender == w.stratoSender, "MB: not sender");
             require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
+            // A solver has already handed this user their tokens on the
+            // external chain. Refunding the escrow now would pay them twice
+            // and leave the solver holding nothing, so the timeout escape
+            // hatch closes once a claim is on record. Governance can still
+            // abort or sweep -- that is the admin-rejection risk a solver
+            // prices -- but the beneficiary of the fill cannot.
+            //
+            // Checked BEFORE the timeout: it is the more fundamental reason
+            // this abort is refused, and "a solver already paid you" is a far
+            // more useful thing to tell a caller than "wait 48h".
+            require(withdrawalClaims[id].claimant == address(0), "MB: claimed by solver");
             require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait 48h");
         }
 
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
 
-        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        // WHO GETS THE ESCROW. Normally the sender -- it is their money and the
+        // withdrawal did not happen. But if a solver holds the claim, the
+        // sender has ALREADY been paid on the external chain, out of the
+        // solver's own pocket, and the escrow is what was going to reimburse
+        // that solver. Returning it to the sender would pay them twice and
+        // leave the solver with nothing: the abort would convert an honest
+        // fill into a loss. So the escrow follows the claim. The record that
+        // proves the solver's entitlement is the one {recordWithdrawalClaim}
+        // mirrored here from the external chain. The claimant is an
+        // external-chain address; for a key-based solver the same key controls
+        // the same address on STRATO.
+        address payee = w.stratoSender;
+        address claimant = withdrawalClaims[id].claimant;
+        if (claimant != address(0)) {
+            payee = claimant;
+        }
+
+        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, payee, w.stratoTokenAmount);
         require(actualRefundedAmount > 0, "MB: no tokens refunded");
 
         emit WithdrawalAborted(id);
+        if (claimant != address(0)) {
+            emit WithdrawalEscrowReleasedToClaimant(id, claimant, actualRefundedAmount);
+        }
     }
 
     /**
@@ -1435,5 +2409,558 @@ contract record MercataBridge is Ownable {
         for (uint256 i = 0; i < n; i++) {
             cancelAndSweepWithdrawal(ids[i], triageWallet);
         }
+    }
+
+    // ───────────── Solver fast path: filling inbound deposits ─────────────
+
+    /**
+     * @dev Who this deposit's mint belongs to, or zero for the recipient.
+     *
+     *      A MISMATCH IS VOIDED, NOT REVERTED. A claim can be made against an
+     *      announced deposit that the relayer later contradicts; refusing to
+     *      confirm would let one bad claim strand a real deposit forever, while
+     *      voiding leaves the solver's payment as a gift to the recipient and
+     *      the bridge's accounting exact.
+     */
+    function _resolveDepositClaimant(
+        uint256 externalChainId,
+        string normalizedTxHash,
+        DepositInfo d
+    ) internal returns (address) {
+        DepositClaim claim = depositClaims[externalChainId][normalizedTxHash];
+        if (claim.claimant == address(0) || claim.voided) {
+            return address(0);
+        }
+
+        BridgeFeeTerms terms = depositFeeTerms[externalChainId][normalizedTxHash];
+        DepositActionIntent intent = depositActions[externalChainId][normalizedTxHash];
+
+        bool matches = claim.stratoRecipient == d.stratoRecipient
+            && claim.stratoToken == d.stratoToken
+            && claim.stratoTokenAmount == d.stratoTokenAmount
+            && claim.maxFee == terms.maxFee
+            && claim.requestedAt == terms.requestedAt
+            && claim.feeHalfLife == terms.feeHalfLife
+            && claim.action == intent.action;
+
+        if (!matches) {
+            claim.voided = true;
+            emit DepositClaimVoided(
+                externalChainId,
+                normalizedTxHash,
+                claim.claimant,
+                "terms no longer match record"
+            );
+            return address(0);
+        }
+
+        emit DepositClaimSettled(
+            externalChainId,
+            normalizedTxHash,
+            claim.claimant,
+            claim.claimIndex,
+            claim.feeCharged
+        );
+        return claim.claimant;
+    }
+
+    /// @notice What a solver would keep by filling this deposit right now, what
+    ///         they must pay out to get it, and to whom. On rung zero that is
+    ///         the user's decayed schedule; after that it is the current
+    ///         holder's asking price, and `forSale` is false if they are not
+    ///         selling.
+    function quoteDepositFill(
+        uint256 externalChainId,
+        string externalTxHash
+    ) public returns (address payTo, uint256 feeCharged, uint256 netToPay, bool forSale) {
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(d.stratoTokenAmount > 0, "MB: unknown deposit");
+        BridgeFeeTerms terms = depositFeeTerms[externalChainId][normalizedTxHash];
+        DepositClaim claim = depositClaims[externalChainId][normalizedTxHash];
+
+        if (claim.claimant == address(0)) {
+            payTo = d.stratoRecipient;
+            feeCharged = BridgeFees.decayedFee(
+                terms.maxFee,
+                terms.requestedAt,
+                terms.feeHalfLife,
+                block.timestamp
+            );
+            forSale = true;
+        } else {
+            payTo = claim.claimant;
+            feeCharged = claim.exitFee;
+            forSale = claim.transferable && !claim.voided;
+        }
+        netToPay = d.stratoTokenAmount - feeCharged;
+    }
+
+    /**
+     * @notice Hand an inbound deposit's recipient their STRATO tokens out of
+     *         your own balance, ahead of the relayer's review, and take over
+     *         the claim on the eventual mint.
+     *
+     *         The transfer runs HERE, solver to payee, so by the time
+     *         {confirmDeposit} runs the bridge KNOWS the recipient was paid --
+     *         it happened on this chain, in this call. Nothing is fronted by
+     *         the bridge, so there is no reclaim path and no new custody.
+     *
+     *         THE FIRST RUNG IS THE USER'S. Claim zero pays the recipient
+     *         `amount - decayedFee(...)`, and that fee is the schedule the user
+     *         committed to -- not negotiable by anyone.
+     *
+     *         EVERY RUNG AFTER THAT IS BETWEEN SOLVERS. A claim changes hands
+     *         only if its holder marked it transferable, at the holder's own
+     *         `exitFee`: the taker pays them `amount - exitFee` and keeps
+     *         `exitFee` at settlement. The holder may ask MORE than they
+     *         earned, and that is the point -- a solver who has come to believe
+     *         a deposit will be aborted can pay someone else to carry it. The
+     *         user's leg is untouched and the bridge still mints `amount`
+     *         exactly once.
+     *
+     * @dev THE EXPECTED VALUES ARE NOT DECORATION. A solver passes the record
+     *      and the fee they believe they are buying, and a mismatch reverts
+     *      rather than filling something else -- because this deposit may be a
+     *      stranger's unverified announcement, the relayer may overwrite it,
+     *      and the holder may have repriced their exit, all between the solver
+     *      reading and this transaction landing.
+     *
+     * @dev AN ACTION DEPOSIT IS NOT FILLABLE. A solver cannot reproduce an
+     *      auto-forge or an auto-save, and handing them the mint would leave
+     *      the depositor holding plain tokens instead of the thing they asked
+     *      for. The intent must be NONE to fill, and a relayer who later adds
+     *      one voids the claim.
+     *
+     * @dev A CLAIM ON AN ANNOUNCED DEPOSIT IS A BET. Nothing here verifies the
+     *      external deposit happened; this contract cannot. If the relayer
+     *      never confirms it, or confirms different numbers, the claim is void
+     *      and the solver has given a stranger money. That is the risk the fee
+     *      prices, and the reason a solver should read the external chain
+     *      rather than trust an announcement.
+     *
+     * @param expectedFee What the caller expects to keep: the decayed schedule
+     *                    fee on rung zero, the holder's `exitFee` after that.
+     * @param transferable Whether the caller is willing to be displaced in
+     *                     turn. False locks the position to them until
+     *                     settlement.
+     * @param exitFee The price the caller asks to be displaced at, ignored
+     *                unless `transferable`.
+     */
+    function fillDeposit(
+        uint256 externalChainId,
+        string externalTxHash,
+        address expectedStratoRecipient,
+        address expectedStratoToken,
+        uint256 expectedStratoTokenAmount,
+        uint256 expectedFee,
+        bool transferable,
+        uint256 exitFee
+    ) external whenDepositsOpen returns (uint256 netPaid) {
+        require(fillsEnabled, "MB: fills disabled");
+
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(
+            d.bridgeStatus == BridgeStatus.ANNOUNCED
+                || d.bridgeStatus == BridgeStatus.INITIATED
+                || d.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+            "MB: not fillable"
+        );
+        require(d.stratoRecipient == expectedStratoRecipient, "MB: recipient mismatch");
+        require(d.stratoToken == expectedStratoToken, "MB: token mismatch");
+        require(d.stratoTokenAmount == expectedStratoTokenAmount, "MB: amount mismatch");
+        require(exitFee < d.stratoTokenAmount, "MB: exit fee too large");
+        require(
+            depositActions[externalChainId][normalizedTxHash].action == uint256(DepositAction.NONE),
+            "MB: action deposits are not fillable"
+        );
+
+        BridgeFeeTerms terms = depositFeeTerms[externalChainId][normalizedTxHash];
+        require(terms.set, "MB: no fee terms");
+        require(
+            BridgeFees.isFeeCapAllowed(terms.maxFee, d.stratoTokenAmount, maxFeeBps),
+            "MB: fee above ceiling"
+        );
+
+        DepositClaim claim = depositClaims[externalChainId][normalizedTxHash];
+        address payTo = claim.claimant;
+        uint256 nextIndex = 0;
+        uint256 feeCharged = 0;
+
+        if (payTo == address(0)) {
+            payTo = d.stratoRecipient;
+            feeCharged = BridgeFees.decayedFee(
+                terms.maxFee,
+                terms.requestedAt,
+                terms.feeHalfLife,
+                block.timestamp
+            );
+        } else {
+            require(!claim.voided, "MB: claim voided");
+            // The holder's consent is the whole gate. A solver who knows a
+            // deposit is good must be able to keep their position; without
+            // this, anyone could take it from them for a penny of decay.
+            require(claim.transferable, "MB: claim not transferable");
+            nextIndex = claim.claimIndex + 1;
+            feeCharged = claim.exitFee;
+        }
+        require(payTo != msg.sender, "MB: already the claimant");
+        // A FLOOR, NOT AN EXACT MATCH. `expectedFee` is the least the caller
+        // will accept, and the fee only ever decays, so a solver quotes
+        // slightly under what it expects and ordinary latency cannot trip it.
+        // Exact equality would have required landing in one predicted second
+        // and made rung-zero fills unusable in practice.
+        //
+        // It is purely the caller's own guard: the contract still computes
+        // `feeCharged` from the committed schedule, so nothing here lets a
+        // caller take more than the user agreed to. On a later rung a higher
+        // price is strictly better for the taker -- they pay `amount - exitFee`
+        // and keep `exitFee` -- so a floor is the right protection there too,
+        // against a holder cutting their price after the taker committed.
+        require(feeCharged >= expectedFee, "MB: fee below your minimum");
+
+        netPaid = d.stratoTokenAmount - feeCharged;
+        require(netPaid > 0, "MB: nothing to pay");
+
+        depositClaims[externalChainId][normalizedTxHash] = DepositClaim(
+            msg.sender,
+            nextIndex,
+            block.timestamp,
+            feeCharged,
+            netPaid,
+            false,
+            transferable,
+            transferable ? exitFee : 0,
+            d.stratoRecipient,
+            d.stratoToken,
+            d.stratoTokenAmount,
+            terms.maxFee,
+            terms.requestedAt,
+            terms.feeHalfLife,
+            uint256(DepositAction.NONE)
+        );
+
+        uint256 delivered = _transferFromMeasured(d.stratoToken, msg.sender, payTo, netPaid);
+        require(delivered == netPaid, "MB: short delivery");
+
+        emit DepositFilled(
+            externalChainId,
+            normalizedTxHash,
+            msg.sender,
+            payTo,
+            nextIndex,
+            d.stratoToken,
+            d.stratoTokenAmount,
+            feeCharged,
+            netPaid
+        );
+    }
+
+    /**
+     * @notice Change whether your claim can be taken over, and at what price.
+     *
+     *         Callable by the current holder at any time before the deposit
+     *         settles, as often as they like. A solver's read on a deposit
+     *         changes -- a route starts looking shaky, a sender starts looking
+     *         like a thief -- and the position they hold should be repriceable
+     *         when it does. Setting `transferable` false takes it off the
+     *         market entirely.
+     *
+     * @dev A taker passes the price they expect, so repricing cannot front-run
+     *      one: a raise that lands first makes their fill revert rather than
+     *      execute at the new number.
+     */
+    function setDepositClaimExitOffer(
+        uint256 externalChainId,
+        string externalTxHash,
+        bool transferable,
+        uint256 exitFee
+    ) external {
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositClaim claim = depositClaims[externalChainId][normalizedTxHash];
+        require(claim.claimant == msg.sender, "MB: not the claimant");
+        require(!claim.voided, "MB: claim voided");
+
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(
+            d.bridgeStatus == BridgeStatus.ANNOUNCED
+                || d.bridgeStatus == BridgeStatus.INITIATED
+                || d.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+            "MB: deposit not open"
+        );
+        require(exitFee < d.stratoTokenAmount, "MB: exit fee too large");
+
+        claim.transferable = transferable;
+        claim.exitFee = transferable ? exitFee : 0;
+
+        emit DepositClaimOfferUpdated(
+            externalChainId,
+            normalizedTxHash,
+            msg.sender,
+            transferable,
+            claim.exitFee
+        );
+    }
+
+    /// @dev Move tokens between two third parties and MEASURE what arrived. A
+    ///      solver must not be credited with a full claim for a partial
+    ///      delivery, which a fee-on-transfer or paused token could produce.
+    function _transferFromMeasured(
+        address token,
+        address from,
+        address to,
+        uint256 amount
+    ) internal returns (uint256 actualAmount) {
+        uint256 balanceBefore = IERC20(token).balanceOf(to);
+        require(IERC20(token).transferFrom(from, to, amount), "MB: transfer failed");
+        actualAmount = IERC20(token).balanceOf(to) - balanceBefore;
+        require(actualAmount > 0, "MB: no tokens delivered");
+    }
+
+    // ───────────── Solver fast path: permissionless announcements ─────────────
+
+    /**
+     * @notice Post an external deposit here before the relayer has seen it, so
+     *         a solver can fill it immediately.
+     *
+     *         The announcement records the deposit in the ANNOUNCED state,
+     *         which can be filled but can NEVER be confirmed: only the
+     *         relayer's own {deposit} moves it to INITIATED, and only INITIATED
+     *         or PENDING_REVIEW deposits mint. So an announcement moves no
+     *         bridge funds and costs the bridge nothing even if it is a
+     *         complete fabrication.
+     *
+     *         It costs the ANNOUNCER a bond, because storage is not free and
+     *         because an announcement that misleads a careless solver should
+     *         have a price. The bond comes back when the relayer adopts it, is
+     *         reclaimable if the relayer never does, and is slashed only when
+     *         governance rules it fake.
+     *
+     * @dev This is a coordination surface, not evidence. It exists so the
+     *      relayer stops being the starting gun and becomes a confirmation bot;
+     *      a solver who fills against it without checking the external chain is
+     *      trusting a stranger.
+     *
+     * @param requestedAt The external chain's timestamp of the deposit, where
+     *                    the fee decay starts.
+     */
+    function announceDeposit(
+        uint256 externalChainId,
+        address externalSender,
+        address externalToken,
+        uint256 externalTokenAmount,
+        string externalTxHash,
+        address stratoRecipient,
+        address targetStratoToken,
+        uint256 maxFee,
+        uint256 requestedAt
+    ) external whenDepositsOpen returns (string normalizedTxHash) {
+        require(announcementsEnabled, "MB: announcements disabled");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalSender != address(0), "MB: invalid external sender");
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        require(stratoRecipient != address(0), "MB: invalid strato recipient");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+
+        normalizedTxHash = externalTxHash.normalizeHex();
+        require(
+            deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE,
+            "MB: already known"
+        );
+        require(
+            depositAnnouncements[externalChainId][normalizedTxHash].state == 0,
+            "MB: already announced"
+        );
+
+        AssetInfo a = assets[externalToken][externalChainId];
+        _requireRouteEnabled(externalToken, externalChainId, targetStratoToken);
+        require(TokenFactory(tokenFactory).isTokenActive(targetStratoToken), "MB: inactive token");
+
+        uint256 stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
+
+        address bondToken = announcementBondToken;
+        uint256 bondAmount = announcementBondAmount;
+        require(bondToken != address(0) && bondAmount > 0, "MB: bond not configured");
+
+        depositAnnouncements[externalChainId][normalizedTxHash] = DepositAnnouncement(
+            msg.sender,
+            bondToken,
+            bondAmount,
+            block.timestamp,
+            1
+        );
+
+        deposits[externalChainId][normalizedTxHash] = DepositInfo(
+            BridgeStatus.ANNOUNCED,
+            externalSender,
+            externalToken,
+            block.timestamp,
+            stratoRecipient,
+            targetStratoToken,
+            stratoTokenAmount,
+            block.timestamp
+        );
+
+        _commitDepositFeeTerms(
+            externalChainId,
+            normalizedTxHash,
+            externalToken,
+            maxFee,
+            requestedAt
+        );
+
+        bondedBalance[bondToken] += bondAmount;
+        uint256 bonded = _transferFromMeasured(bondToken, msg.sender, address(this), bondAmount);
+        require(bonded == bondAmount, "MB: short bond");
+
+        emit DepositAnnounced(
+            externalChainId,
+            normalizedTxHash,
+            msg.sender,
+            externalSender,
+            externalToken,
+            stratoRecipient,
+            targetStratoToken,
+            stratoTokenAmount,
+            depositFeeTerms[externalChainId][normalizedTxHash].maxFee,
+            depositFeeTerms[externalChainId][normalizedTxHash].requestedAt,
+            depositFeeTerms[externalChainId][normalizedTxHash].feeHalfLife,
+            bondToken,
+            bondAmount
+        );
+    }
+
+    /// @dev Return an adopted announcement's bond, or mark it superseded and
+    ///      leave it reclaimable. Never slashes: that is governance's call.
+    function _resolveAnnouncementOnAdoption(
+        uint256 externalChainId,
+        string normalizedTxHash,
+        address externalSender,
+        address externalToken,
+        address stratoRecipient,
+        address targetStratoToken
+    ) internal {
+        DepositInfo announced = deposits[externalChainId][normalizedTxHash];
+        bool matches = announced.externalSender == externalSender
+            && announced.externalToken == externalToken
+            && announced.stratoRecipient == stratoRecipient
+            && announced.stratoToken == targetStratoToken;
+
+        if (matches) {
+            _returnAnnouncementBond(externalChainId, normalizedTxHash);
+        } else {
+            emit AnnouncementSuperseded(
+                externalChainId,
+                normalizedTxHash,
+                depositAnnouncements[externalChainId][normalizedTxHash].announcer
+            );
+        }
+    }
+
+    /// @notice Reclaim your own bond once the relayer has had long enough to
+    ///         adopt the announcement and has not. Permissionless: an announcer
+    ///         should never need an admin to get their own money back, and a
+    ///         relayer outage must not read as fraud.
+    function reclaimAnnouncementBond(uint256 externalChainId, string externalTxHash) external {
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositAnnouncement a = depositAnnouncements[externalChainId][normalizedTxHash];
+        require(a.state == 1, "MB: bond already resolved");
+        require(
+            block.timestamp >= a.announcedAt + announcementTtlSeconds,
+            "MB: bond not yet reclaimable"
+        );
+        _returnAnnouncementBond(externalChainId, normalizedTxHash);
+    }
+
+    /// @notice Slash a fake announcement's bond. The only path that takes
+    ///         someone's bond, and owner-gated for that reason: an announcement
+    ///         that merely disagrees with the relayer's numbers is superseded,
+    ///         not fraudulent, and its bond stays reclaimable.
+    function rejectAnnouncement(uint256 externalChainId, string externalTxHash) external onlyOwner {
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositAnnouncement a = depositAnnouncements[externalChainId][normalizedTxHash];
+        require(a.state == 1, "MB: bond already resolved");
+        require(announcementSlashRecipient != address(0), "MB: no slash recipient");
+
+        a.state = 3;
+        uint256 amount = a.bondAmount;
+        if (amount > 0) {
+            bondedBalance[a.bondToken] -= amount;
+            uint256 slashed = _refundFunds(a.bondToken, announcementSlashRecipient, amount);
+            require(slashed == amount, "MB: short slash");
+        }
+
+        // An announcement ruled fake should stop being a fillable record, and
+        // the deposit must stop looking like something that could still settle.
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        if (d.bridgeStatus == BridgeStatus.ANNOUNCED) {
+            d.bridgeStatus = BridgeStatus.ABORTED;
+            d.timestamp = block.timestamp;
+        }
+
+        emit AnnouncementBondSlashed(
+            externalChainId,
+            normalizedTxHash,
+            a.announcer,
+            amount,
+            announcementSlashRecipient
+        );
+    }
+
+    function _returnAnnouncementBond(uint256 externalChainId, string normalizedTxHash) internal {
+        DepositAnnouncement a = depositAnnouncements[externalChainId][normalizedTxHash];
+        require(a.state == 1, "MB: bond already resolved");
+
+        a.state = 2;
+        uint256 amount = a.bondAmount;
+        if (amount > 0) {
+            bondedBalance[a.bondToken] -= amount;
+            uint256 returned = _refundFunds(a.bondToken, a.announcer, amount);
+            require(returned == amount, "MB: short bond return");
+        }
+
+        emit AnnouncementBondReturned(externalChainId, normalizedTxHash, a.announcer, amount);
+    }
+
+    // ───────────── Solver fast-path configuration ─────────────
+
+    /// @notice Set the decay rate and the fee ceiling, and turn fills on or
+    ///         off. A half-life of zero is refused: the schedule would be a
+    ///         cliff rather than a decay.
+    function setFeeConfig(
+        uint256 halfLifeSeconds,
+        uint256 feeBpsCeiling,
+        bool enableFills
+    ) external onlyOwner {
+        require(BridgeFees.isHalfLifeAllowed(halfLifeSeconds), "MB: invalid half-life");
+        require(feeBpsCeiling <= BridgeFees.BPS_DENOMINATOR, "MB: invalid fee ceiling");
+        feeHalfLifeSeconds = halfLifeSeconds;
+        maxFeeBps = feeBpsCeiling;
+        fillsEnabled = enableFills;
+        emit FeeConfigUpdated(halfLifeSeconds, feeBpsCeiling, enableFills);
+    }
+
+    function setAnnouncementConfig(
+        bool enabled,
+        address bondToken,
+        uint256 bondAmount,
+        address slashRecipient,
+        uint256 ttlSeconds
+    ) external onlyOwner {
+        if (enabled) {
+            require(bondToken != address(0), "MB: invalid bond token");
+            require(bondAmount > 0, "MB: invalid bond amount");
+            require(slashRecipient != address(0), "MB: invalid slash recipient");
+            require(ttlSeconds > 0, "MB: invalid bond ttl");
+        }
+        announcementsEnabled = enabled;
+        announcementBondToken = bondToken;
+        announcementBondAmount = bondAmount;
+        announcementSlashRecipient = slashRecipient;
+        announcementTtlSeconds = ttlSeconds;
+        emit AnnouncementConfigUpdated(enabled, bondToken, bondAmount, slashRecipient, ttlSeconds);
     }
 }

@@ -1,306 +1,105 @@
 # Safety & Best Practices
 
-Essential security and risk management guidelines for using STRATO safely.
+How to use STRATO safely, and the risks the protocol carries.
 
-## Security Checklist
+---
 
-### Wallet Security
+## Protect Your Account
 
-- [ ] **Never share seed phrase** - Not with support, not with anyone
-- [ ] **Verify URLs** - Bookmark official STRATO URL, watch for phishing
-- [ ] **Check transaction details** - Review before signing in wallet
-- [ ] **Keep backups** - Secure seed phrase backup in multiple locations
-- [ ] **Use hardware wallet** - For large amounts (Ledger, Trezor)
+- **Bookmark the official app:** [app.strato.nexus](https://app.strato.nexus) (testnet: [app.testnet.strato.nexus](https://app.testnet.strato.nexus)). Check the URL before signing in.
+- **STRATO account sign-in:** your STRATO key is held for you by the STRATO Vault service, so anyone who gets into your login can act as you. Use a strong, unique password and never share it.
+- **External wallets** (MetaMask, the STRATO wallet extension, or any wallet you connect to bridge): never share your seed phrase or private key. Consider a hardware wallet for large amounts.
+- **Read what you sign.** Check the amount, token and destination in every confirmation dialog.
+- **Scams:** the team will never ask for your password, seed phrase or private key, and won't DM you first. Ignore unsolicited links.
 
-### Transaction Security
+---
 
-- [ ] **Start small** - Test with small amounts first
-- [ ] **Double-check addresses** - Verify recipient addresses carefully
-- [ ] **Review gas fees** - Check Ethereum gas before bridging
-- [ ] **Monitor confirmations** - Wait for full transaction confirmation
+## Protocol Risks
 
-### Account Security
+### Liquidation Risk
 
-- [ ] **Enable 2FA** - On centralized services (exchanges, email)
-- [ ] **Use strong passwords** - Unique password for each service
-- [ ] **Beware of scams** - Never click suspicious links in Telegram or DMs
-- [ ] **Verify support** - STRATO team will never DM you first
+CDP vaults (the Borrow page) are liquidated per asset once a vault's collateralization ratio falls below that asset's liquidation ratio, which the app shows as health factor below 1. Any user can then repay part of the debt and take collateral worth that amount **plus a liquidation penalty** (5% to 30%, set per asset). Stability fees raise your debt over time, so health factor falls slowly even when prices don't move.
 
-## Risk Management
+- Don't mint up to the maximum. Leave room for price drops.
+- Check the Portfolio page's warnings and each vault's health factor on **Borrow > Your Vaults**.
+- If health factor drops, **deposit collateral** or **repay** before it reaches 1.
 
-### For Borrowing/Minting
+Details: [Mint USDST via CDP](guides/mint-cdp.md#liquidation).
 
-**Keep Health Factor / CR Safe:**
+### Oracle Risk
 
-- Maintain health factor > 2.0 or CR > 200%
-- Set price alerts for collateral assets
-- Don't borrow maximum - leave buffer
-- Monitor positions daily during volatility
+Collateral values, health factors and liquidations use prices from the on-chain `PriceOracle` contract. An off-chain oracle service posts those prices, and only authorized accounts can update them.
 
-**Add Safety Margins:**
-```
-Example Safe Position:
+- If a posted price is wrong or delayed, positions can be liquidated at that price, or fail to be liquidated in time.
+- The CDP engine and lending pool use the latest posted price and do not reject old prices.
 
-- Collateral: 2 ETHST ($6,000)
-- Borrow: Only 2,000 USDST (not max $4,200)
-- Health Factor: ~2.4 (very safe)
-- Can withstand 58% ETHST price drop
-```
+### Smart Contract Risk
 
-**Monitor and React:**
+- Contracts can contain bugs. Most protocol contracts sit behind upgradeable proxies, so fixes can be deployed, but the logic behind an address can also change.
+- **Security reviews in the repository:** the StablePool contract has an internal security review report ([StablePoolAudit2.md](https://github.com/strato-net/strato-platform/blob/develop/app/contracts/tests/Pool/StablePoolAudit2.md), September 2026). It records all findings as fixed and includes regression tests. The repository contains no third-party audit reports.
+- Report vulnerabilities privately to **security@strato.nexus**.
 
-1. Check health factor daily
-2. Set alerts at liquidation prices
-3. Have plan to add collateral or repay
-4. Act quickly during market volatility
+### Admin and Governance Controls
 
-### For Liquidity Provision
+Protocol contracts are owned by `AdminRegistry`, a multi-admin contract. An owner-only action runs once enough admins vote for it (by default 60% of admins; thresholds can be set per function), or when an account the admins have whitelisted for that specific function calls it. Operator services such as the oracle and the bridge relayer use whitelists. Through this contract, admins can:
 
-**Understand Impermanent Loss:**
+- change risk parameters (collateral ratios, fees, debt ceilings, emission rates)
+- pause assets, pools, the CDP engine, bridge deposits or withdrawals, and tokens
+- upgrade proxied contracts
+- set oracle and bridge operator accounts
 
-- Start with stablecoin pairs (minimal IL)
-- Calculate potential IL before depositing
-- Track fees earned vs. IL regularly
-- Only use funds you can afford to hold long-term
+These controls protect users during incidents, but they also mean you trust the admin set.
 
-**Choose Pools Wisely:**
+### Bridge Risk
 
-- High volume = more fees to offset IL
-- Check pool size (larger = less slippage)
-- Verify both tokens are legitimate
-- Start with well-known pairs (ETH-USDC)
+- The bridge depends on an **off-chain relayer** to verify deposits and execute payouts. There is no on-chain light client.
+- Funds on external chains sit in a **Safe multisig** custody wallet, plus an optional hot wallet for small payouts on some chains. Large withdrawals need the Safe's signers to approve.
+- Withdrawals can take days and depend on liquidity. Admins can pause the bridge, and in an incident can move in-flight withdrawal escrow to a triage wallet.
 
-**Example Calculation:**
-```
-Pool: ETH-USDC
-Deposit: $10,000
-Daily volume: $100,000
-Fee tier: 0.3%
+See [Bridge Assets](guides/bridge.md#trust-model).
 
-Daily fees: $100,000 × 0.003 = $300
-Your share (1%): $3/day = $90/month
+### Liquidity Pool Risk
 
-If IL is $50/month: Net +$40/month
-```
+- **Impermanent loss** when pooled token prices move apart ([Provide Liquidity](guides/liquidity.md#impermanent-loss)).
+- **Concentrated positions** stop earning fees once price leaves your range.
+- **Paused pools** stop swaps and deposits.
 
-### For Bridging
+### Stablecoin Risk
 
-**Minimize Risks:**
+USDST is minted against CDP collateral and through the PSM. If liquidations can't cover a vault's debt, the shortfall is recorded as bad debt (**Advanced > Bad Debt**). Stablecoins held in pools or vaults can lose their peg.
 
-- Double-check destination address
-- Bridge during low gas times
-- Keep transaction hashes
-- Wait for full confirmations (12+ blocks Ethereum)
-- Start with test amount
+---
 
-**Gas Optimization:**
-```
-High gas time: 8am-5pm UTC weekdays ($30-50)
-Low gas time: Weekends/late night UTC ($5-15)
+## Practical Checklist
 
-Savings on $10k bridge: $20-35 in gas fees
-```
+- [ ] Start with a small amount the first time you use a feature.
+- [ ] Keep some USDST or vouchers for fees. Each transaction costs 0.01 USDST or one voucher, even if it reverts.
+- [ ] Double-check external addresses before bridging out.
+- [ ] Watch health factors when markets move.
+- [ ] Save transaction hashes for support requests.
 
-## Common Mistakes to Avoid
+---
 
-### 1. Borrowing Too Much ❌
+## If Something Goes Wrong
 
-**Mistake:** Borrowing maximum allowed amount
+- **Account or wallet compromised:** move remaining assets to a wallet you control, change your password, and contact support.
+- **Sent to the wrong address:** blockchain transfers can't be reversed.
+- **Bridge transfer stuck:** see [Bridge Assets](guides/bridge.md#common-issues), then contact support with transaction details.
 
-**Risk:** No buffer for price volatility, instant liquidation risk
-
-**Fix:** Borrow 50-70% of max, keep health factor > 2.0
-
-### 2. Ignoring Gas Fees ❌
-
-**Mistake:** Bridging small amounts when gas is high
-
-**Risk:** Fees eat into capital
-
-**Fix:** Check gas prices, bridge larger amounts, use low-gas times
-
-### 3. Not Monitoring Positions ❌
-
-**Mistake:** Set and forget
-
-**Risk:** Liquidation during market moves
-
-**Fix:** Check daily, set alerts, have action plan
-
-### 4. Panic Selling ❌
-
-**Mistake:** Selling collateral at a loss during volatility
-
-**Risk:** Realizing losses unnecessarily
-
-**Fix:** Have plan before volatility, maintain high health factor to weather storms
-
-### 5. Skipping Approvals ❌
-
-**Mistake:** Not understanding approve + transaction flow
-
-**Risk:** Confusion, failed transactions
-
-**Fix:** Expect 2-step process (approve then execute)
-
-### 6. Withdrawing Too Much ❌
-
-**Mistake:** Withdrawing collateral without checking health factor
-
-**Risk:** Triggering liquidation
-
-**Fix:** Use "max safe withdrawal" in UI, leave buffer
-
-### 7. Using Full Balance ❌
-
-**Mistake:** Not keeping USDST for fees
-
-**Risk:** Can't execute transactions
-
-**Fix:** Always keep 5-10 USDST reserve
-
-## Liquidation Prevention
-
-### Watch These Metrics
-
-**Daily checks:**
-
-- Current health factor / CR
-- Collateral asset prices
-- Distance to liquidation price
-
-**Set alerts at:**
-
-- Health factor < 1.5 or CR < 180%
-- Collateral price drops 10% from deposit
-- Liquidation price approaching
-
-### Action Plan
-
-**If health factor drops below 1.5:**
-
-**Option 1: Add Collateral**
-- Fastest way to improve health factor
-- No need to have extra USDST
-- Immediately improves position
-
-**Option 2: Repay Debt**
-- Reduces risk permanently
-- Requires having USDST available
-- May trigger tax event
-
-**Option 3: Do Nothing**
-- Only if you're confident price will recover
-- Very risky below 1.2
-- Have plan ready if continues dropping
-
-### Example Prevention
-
-```
-Starting position:
-
-- 10 ETH @ $3,000 = $30,000
-- Borrowed: 15,000 USDST
-- Health factor: 1.6
-
-ETHST drops to $2,700:
-
-- Collateral now: $27,000
-- Health factor: 1.44 ⚠️
-
-Action: Add 2 ETH collateral
-- New collateral: $32,400
-- Health factor: 1.73 ✅ Safe again
-```
-
-## Getting Help
-
-### Before Asking
-
-1. Check this documentation
-2. Search community Telegram or FAQ
-3. Review FAQ (if available)
-
-### When Asking for Help
-
-**Provide:**
-
-- Clear description of issue
-- Steps you've taken
-- Transaction hashes (if applicable)
-- Screenshots (crop out sensitive info)
-
-**Never share:**
-
-- Seed phrase / private keys
-- Password
-- Full wallet address publicly
+When asking for help, include the transaction hash, what you did and any error message. **Never** share your password, seed phrase or private key.
 
 ### Official Channels
 
-- **Documentation**: [docs.strato.nexus](https://docs.strato.nexus)
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
+- **Documentation:** [docs.strato.nexus](https://docs.strato.nexus)
+- **Support:** [support.blockapps.net](https://support.blockapps.net)
+- **Telegram:** [t.me/strato_net](https://t.me/strato_net)
+- **Security reports:** security@strato.nexus
 
-!!! warning "Beware of Scammers"
-    - Official team will NEVER DM you first
-    - Never click links in unsolicited DMs
-    - Always verify you're on official channels
-    - If something seems too good to be true, it is
+---
 
-## Emergency Procedures
+## Related Guides
 
-### If You Think You're Compromised
-
-**Immediate actions:**
-
-1. **Transfer assets** to new wallet immediately
-2. **Revoke approvals** on compromised wallet
-3. **Change passwords** on all connected services
-4. **Enable 2FA** on new accounts
-5. **Report** to STRATO team and community
-
-### If Transaction Stuck
-
-**Causes:**
-
-- Low gas price (Ethereum)
-- Network congestion
-- Nonce issues
-
-**Fixes:**
-
-- Speed up transaction (if wallet supports)
-- Wait for network to clear
-- Cancel and resubmit with higher gas
-
-### If Wrong Address
-
-**Unfortunately:**
-
-- Blockchain transactions are irreversible
-- Funds sent to wrong address are likely lost
-- Always double-check addresses
-
-**Prevention:**
-
-- Copy-paste addresses (don't type)
-- Verify first and last 6 characters
-- Send test transaction first
-
-## Resources
-
-- **[Core Concepts](concepts.md)** - Understand the fundamentals
-- **[Borrow Guide](guides/borrow.md)** - Lending pool guide
-- **[CDP Guide](guides/mint-cdp.md)** - CDP guide
-- **[Bridge Guide](guides/bridge.md)** - Bridging guide
-
-## Ready to Start?
-
-With safety practices in mind, choose your path:
-
-- **[Borrow USDST Guide](guides/borrow.md)**
-- **[Mint USDST via CDP Guide](guides/mint-cdp.md)**
-
-
-
+- **[Borrow USDST](guides/borrow.md)**
+- **[Mint USDST via CDP](guides/mint-cdp.md)**
+- **[Bridge Assets](guides/bridge.md)**
+- **[Core Concepts](concepts.md)**

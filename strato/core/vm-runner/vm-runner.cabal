@@ -124,6 +124,7 @@ executable vm-runner
     , composable-monads-base
     , hflags
     , process-monitor
+    , strato-conf
     , strato-model
     , vm-runner
     , vm-tools

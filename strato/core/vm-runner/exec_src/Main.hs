@@ -11,13 +11,15 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging (runLogging)
-import Control.Monad.Composable.Base (runEff)
+import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf)
 import Blockchain.VMContext (evalContextM, initContext)
+import Control.Monad.Composable.Base (runEff)
 -- HFlags
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
 import Control.Concurrent.Async as Async
 import Control.Monad
+import Data.String (fromString)
 import Executable.EVMFlags ()
 import Executable.EthereumVM
 import HFlags
@@ -31,6 +33,6 @@ main = do
   blockappsInit "vm_main"
   runInstrumentation "vm-runner"
   void $ $initHFlags "Ethereum VM"
-  let metricsRunner = run 8009 metricsApp
+  let metricsRunner = runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 8009 defaultSettings) metricsApp
       runVM = runEff . runLogging $ evalContextM "ethereum-vm" initContext ethereumVM
   race_ metricsRunner runVM

@@ -9,6 +9,8 @@ import { validateBridgeConfig } from "./utils/configValidator";
 import { startMultiChainDepositPolling } from "./polling/alchemyPolling";
 import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
 import { initializeStratoPolling } from "./polling/stratoPolling";
+import { startWithdrawalClaimPolling } from "./polling/withdrawalClaimPolling";
+import { startAnnouncementPolling } from "./polling/announcementPolling";
 import { initOpenIdConfig} from "./auth";
 import { healthMonitor } from "./utils/healthMonitor";
 
@@ -61,6 +63,14 @@ app.listen(port, async () => {
     startMultiChainDepositPolling();
     startNativeRedemptionPolling();
     await initializeStratoPolling();
+
+    // The solver fast path turns the relayer into a confirmation bot as well
+    // as a starting gun: mirror solver claims back to the chain holding the
+    // escrow, and review deposits strangers announced against a bond. Neither
+    // moves money, and neither is on the critical path for an ordinary bridge
+    // transfer -- if they stall, the bridge keeps working at its old speed.
+    startWithdrawalClaimPolling();
+    startAnnouncementPolling();
 
     logInfo(
       "BridgeService",

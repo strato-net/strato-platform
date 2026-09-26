@@ -269,7 +269,7 @@ This batch does:
 - on `StratoNativeRepresentationBridge`, optionally `setMaxAttestationValiditySeconds(<seconds>)` if the default 7 day maximum validity should change
 - on `StratoNativeRepresentationBridge`, `registerTokenMapping(<STRATO_TOKEN>, <SEPOLIA_REPRESENTATION_TOKEN_PROXY>, false)`
 
-Normal instant mint execution submits vault-signed `NativeMintAttestation` payloads through `mintRepresentationWithAttestation`. The Sepolia representation bridge does not need a hot mint operator role.
+`mintRepresentationWithAttestation` requires both valid `NativeMintAttestation` signatures and `MINT_EXECUTOR_ROLE` on the caller. Grant `MINT_EXECUTOR_ROLE` only to the custody Safe, so no single attestation signer or relayer key can mint on its own. `initialize` grants it to the admin Safe on fresh deployments.
 
 `StratoNativeRepresentationBridge.initialize(<SEPOLIA_ADMIN_SAFE>)` bootstraps all bridge roles to the Safe. For production, the Safe should explicitly grant operational roles to the intended addresses and optionally revoke those roles from itself while keeping `DEFAULT_ADMIN_ROLE`.
 
@@ -530,6 +530,19 @@ args:
   newImplementation: <NEW_IMPLEMENTATION_ADDRESS>
   data: 0x
 ```
+
+Upgrading a representation bridge proxy from `version()` `1.0.0` to `1.1.0` adds `MINT_EXECUTOR_ROLE`, which `mintRepresentationWithAttestation` requires. Grant it to the custody Safe inside the upgrade transaction so mints never run unguarded or stall between two Safe transactions:
+
+```text
+target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+method: upgradeToAndCall(address newImplementation, bytes data)
+args:
+  newImplementation: <NEW_IMPLEMENTATION_ADDRESS>
+  data: grantRole(MINT_EXECUTOR_ROLE, <SEPOLIA_ADMIN_SAFE>)
+        = 0x2f2ff15d0e2c8d3d0c799879e89202bcf76344a42c099a15051a57a3db48ed0284ab6517<SEPOLIA_ADMIN_SAFE padded to 32 bytes>
+```
+
+After the upgrade, the bridge service's instant lane (a direct `mintRepresentationWithAttestation` call from the native bridge signer key) reverts with `AccessControlUnauthorizedAccount`; mints must be executed through the Safe. The role only helps if no single relayer-held key can execute Safe transactions alone: a Safe owner key held by the relayer on a threshold-1 Safe is still a single-key mint path.
 
 After deploying or upgrading `StratoNativeRepresentationBridge`, verify the EIP-712 domain on the proxy before testing native withdrawals:
 

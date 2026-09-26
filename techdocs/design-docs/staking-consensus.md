@@ -106,11 +106,31 @@ implementation (`Decider 0xDEC1DE` → `DeciderState.currentFeeContract`) for ev
 1. burn one voucher, else charge $0.01 USDST: `proposerFeeBps` (read from the staking contract) to
    the staking contract, the rest to `FeeCollector 0x100d`;
 2. `StratoStaking.processBlock()` (always, in a try/catch): attributes the USDST received since the
-   last call to `operatorOf[block.proposer]` (self-bond share to the operator, delegated share
-   net of commission to delegators via a per-stake index — same shape as STRATO rewards, but a
-   separate USDST claim path `claimFeeRewards` / `claimOperatorFeeRewards`; unknown proposers
-   accumulate in `unattributedFees`), and once per `block.number` updates the liveness counters
-   below.
+   last call to the `block.proposer` validator's record (self-bond share to its operator,
+   delegated share net of commission to delegators via a per-stake index — same shape as STRATO
+   block rewards, but a separate USDST claim path `claimFeeRewards` / `claimOperatorFeeRewards`;
+   unlisted proposers accumulate in `unattributedFees`), and once per `block.number` updates the
+   liveness counters below.
+
+**Block rewards** take the other hook: once per block the platform calls
+`FeeRouter.payBlockRewards()`, which approves a flat 0.01 STRATO from the router's own balance and
+calls `StratoStaking.creditBlockReward(block.proposer, amount)`. Staking pulls the approved amount
+(so it can only credit what was paid) and splits it exactly like fees; `claimRewards` /
+`claimOperatorRewards` pay it out. A proposer staking will not credit (unlisted, delisted) is not
+paid and the reward stays in the router. The Phase 1 funded reward schedule was removed from V2
+(an upgraded proxy settles what the schedule had already allocated to each record once, on its
+next touch).
+
+**Discretionary rewards** are the third source of income, open to anyone with tokens to give.
+`distributeRewards(tokens, amounts, validators)` splits each amount across the listed validators by
+stake weight (an empty list means the consensus set; division dust goes to the last recipient with
+stake), and `distributeRewardsTo(tokens, amounts, validators)` credits each amount in full to the
+matching validator. The caller approves staking and staking pulls each token, so a credit is always
+what actually arrived. STRATO joins block-reward accounting and USDST joins fee accounting, split
+and claimed the same way. Any other token goes wholly to the validator's operator, owed to that
+operator account (`pendingOperatorTokenRewards[operator][token]`, claimed with
+`claimOperatorTokenRewards`), because sharing it with delegators would mean settling every such
+token on every stake change. `recoverStrayToken` never takes a token's unclaimed rewards.
 
 `FeeRouter` runs in the signer's storage context and therefore keeps no storage; its addresses are
 genesis constants behind internal getters. `StratoStaking.processBlock` trusts only `block.*`
@@ -127,9 +147,12 @@ slashing waits for provable round changes (Phase 4). Optional knob: after
 removed from the set, stake untouched; `syncValidator` re-adds it after the cooldown). Notable
 downtime is an admin kick (`removeOperator` / governance vote).
 
-Eligibility: `selfBond + delegatedStake >= minStake` (10k), `selfBond >= minSelfBond` (0 until
-slashing), a validator address, not jailed. Below the threshold ⇒ `removeValidatorFromStaking`
-(governance never drops its last validator); topping up re-adds automatically.
+Eligibility: `selfBond >= minStake` (10k) — a validator must have its own stake at risk; delegated
+stake adds weight but cannot qualify it. `selfBondGraceUntil` phases this in for validators admitted
+on delegated stake: while it is unset (0, as on an upgraded proxy) or in the future,
+`selfBond + delegatedStake >= minStake` still qualifies. Also: listed, not jailed, no exit due.
+Below the threshold ⇒ `removeValidatorFromStaking` (governance never drops its last validator);
+re-joining is an explicit `tryActivate`.
 
 ## Governance
 
@@ -139,19 +162,27 @@ entrypoints `addValidatorFromStaking(validator, stake)` (idempotent),
 `updateValidatorStake`, `removeValidatorFromStaking` (returns `false` for non-managed or last
 validators). Admin voting is unchanged.
 
-`StratoStaking` calls governance whenever an operator's self-bond, delegated stake, activity or
-validator address changes (`governanceSyncEnabled` is the ops kill switch); the operator ↔
-validator-address binding is set in `ValidatorRegistry` (`addOperator(s)` / `register` /
-`setValidatorAddress`, unique per validator address).
+`StratoStaking` calls governance whenever a validator's self-bond, delegated stake or activity
+changes (`governanceSyncEnabled` is the ops kill switch). Both `StratoStaking` and
+`ValidatorRegistry` are keyed by validator address; the operator (the account that self-bonds,
+sets commission and collects the operator share) is a field of the record. Binding a validator to
+an operator needs the validator key's consent: `ValidatorRegistry.register(validator, …, v, r, s)`
+/ `setOperator` verify a secp256k1 signature by the validator key over
+`keccak256(abi.encodePacked("STRATO validator operator authorization", registry, validator,
+operator, authorizationNonce[validator]))` (raw digest, since node vaults sign raw hashes; the
+nonce makes each consent single use), or the validator key sends the transaction itself. Admin
+listing (`addValidator(s)`) and `adminSetOperator` are the only unsigned paths.
+`deploy/sign-validator-authorization.js` produces the signature from a node's vault.
 
 ## Validator lifecycle (permissionless eligibility, bounded set)
 
 Status is derived, not stored: **Missing** (no record) → **Registered** (listed; may self-bond and
-receive stake; `ValidatorRegistry.register(...)` is permissionless, admin `addOperator` still works)
-→ **Active** (in the consensus set) → **Kicked** (owner `removeOperator`; self-bond force-unbonded;
-re-listing after `unkickCooldown`). `StratoStaking.status(op)` / `eligible(op)` / `isWaiter(op)`.
+receive stake; `ValidatorRegistry.register(...)` is permissionless given the validator key's
+consent, admin `addValidator` still works) → **Active** (in the consensus set) → **Kicked** (owner
+`removeValidator`; self-bond force-unbonded to the operator; re-listing after `unkickCooldown`).
+`StratoStaking.status(v)` / `eligible(v)` / `isWaiter(v)`, all by validator address.
 
-* `eligible = listed ∧ validator address ∧ selfBond+delegated ≥ minStake ∧ selfBond ≥ minSelfBond ∧ not jailed ∧ no exit due`
+* `eligible = listed ∧ meets minStake (self-bond; see selfBondGraceUntil) ∧ not jailed ∧ no exit due`
 * **Leaving is automatic and same-tx** (`_syncValidator` at the end of every stake mutation): an
   Active operator that stops being eligible is removed from governance (counts one set mutation;
   if the per-block budget is exhausted the stake mutation reverts — fail closed). Weight changes
@@ -160,13 +191,15 @@ re-listing after `unkickCooldown`). `StratoStaking.status(op)` / `eligible(op)` 
   needs eligibility and either a free slot below `effectiveCap = min(maxActiveValidators,
   hardCapActiveValidators)` or the lowest validator (weight asc, address asc) beaten by
   `evictionMarginBps`; an eviction sends the loser back to Registered (self-bond stays bonded).
-  `reconcileSet()` promotes waiters by (weight desc, address asc) within `maxSetMutationsPerBlock`.
-  Kicks bypass the mutation budget. `requestExit()` keeps the validator serving for
-  `exitNoticeSeconds`, then any sync removes it; `cancelExit()` undoes it.
+  `reconcileSet(candidates)` promotes the named waiters by (weight desc, address asc) within
+  `maxSetMutationsPerBlock`; set-wide passes (eviction, resyncs) walk only the consensus set
+  (`activeValidators`), never every record, so cheap sybil registrations cannot make them
+  unaffordable. Kicks bypass the mutation budget. `requestExit(v)` keeps the validator serving for
+  `exitNoticeSeconds`, then any sync removes it; `cancelExit(v)` undoes it.
 * `maxOperatorStakeBps` caps **inbound** stake (stake / selfBond / moveStake target) at that share
   of `totalRewardableStake`; unstaking is never capped; 0 = off (switch it on after bootstrap).
-* Params: `setValidatorParams(minStake, minSelfBond, proposerFeeBps, maxConsecutiveMisses,
-  jailCooldown)`, `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
+* Params: `setValidatorParams(minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown)`,
+  `setSelfBondGraceUntil(t)`, `setSetParams(maxActiveValidators, hardCapActiveValidators [only lowers],
   evictionMarginBps, maxSetMutationsPerBlock, exitNoticeSeconds, unkickCooldown,
   maxOperatorStakeBps, joinsPaused)`; `initialize` seeds 50 / 50 / 500 / 2 / unbonding / unbonding /
   0 / paused.

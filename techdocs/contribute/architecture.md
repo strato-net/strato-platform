@@ -1,551 +1,232 @@
 # Architecture - STRATO Platform
 
-Understanding the STRATO platform monorepo structure and how components work together.
+How the `strato-platform` monorepo is organized and how its parts fit together at runtime.
 
 ---
 
-## Monorepo Overview
+## Repository Layout
 
-The STRATO platform is a **monorepo** containing:
-
-1. **Layer 1: Blockchain** (`strato/`) - Core blockchain (Haskell)
-2. **Layer 2: DeFi Application** (`app/`) - Application layer (Solidity, TypeScript, React)
-3. **Supporting Infrastructure** - Deployment, proxies, documentation
-
-```
-strato-platform/
-├── strato/              # Blockchain core (Haskell)
-├── app/             # DeFi application (TypeScript, Solidity, React)
-├── bootstrap-docker/    # Production deployment scripts
-├── nginx-packager/      # Reverse proxy & Swagger docs
-├── docs/                # Additional documentation
-└── techdocs/            # User & developer documentation (this site!)
-```
-
----
-
-## Layer 1: Blockchain Core (`strato/`)
-
-### Purpose
-
-Custom EVM-compatible blockchain built on Haskell for security and performance.
-
-### Key Components
-
-#### strato-core
-
-**What:** Main blockchain node (consensus, state, networking)
-
-**Language:** Haskell
-
-**Location:** `strato/core/`
-
-**Responsibilities:**
-
-- Block production and validation
-- Consensus mechanism
-- P2P networking
-- State management
-- Transaction pool
-
-**Key modules:**
-
-- `BlockApps.Blockchain` - Block processing
-- `BlockApps.Network` - P2P networking
-- `BlockApps.VM` - VM interface
-- `BlockApps.State` - World state management
-
-#### vm-runner
-
-**What:** EVM (Ethereum Virtual Machine) executor
-
-**Language:** Haskell
-
-**Location:** `strato/vm-runner/`
-
-**Responsibilities:**
-
-- Execute smart contract bytecode
-- Gas metering
-- State transitions
-- Opcode implementations
-
-#### strato-api
-
-**What:** JSON-RPC API server (Ethereum-compatible)
-
-**Language:** Haskell
-
-**Location:** `strato/api/`
-
-**Responsibilities:**
-
-- HTTP/WebSocket API endpoints
-- Ethereum JSON-RPC compatibility
-- Transaction submission
-- Query interface
-
-**API endpoints:**
-
-- `/strato-api/eth/v1.2/account` - Account management
-- `/strato-api/eth/v1.2/transaction` - Transaction submission
-- `/strato-api/eth/v1.2/block` - Block queries
-- `/strato-api/eth/v1.2/contract` - Contract interactions
-
-#### cirrus
-
-**What:** Blockchain indexer (PostgreSQL-based)
-
-**Language:** Haskell
-
-**Location:** `strato/cirrus/`
-
-**Responsibilities:**
-
-- Index blockchain data into PostgreSQL
-- Fast queries for transactions, events, balances
-- Block explorer data
-- Historical data access
-
-**Database schema:**
-
-- `blocks` - Block data
-- `transactions` - Transaction data
-- `events` - Smart contract events
-- `accounts` - Account balances
-
-### Data Flow (Layer 1)
-
-```
-User → JSON-RPC API → strato-core → vm-runner → State
-                           ↓
-                        cirrus → PostgreSQL
-```
-
-1. User submits transaction via JSON-RPC
-2. `strato-core` validates and adds to mempool
-3. Block produced, transactions executed in `vm-runner`
-4. State updated
-5. `cirrus` indexes results to PostgreSQL
+| Path | Contents |
+|------|----------|
+| `strato/` | Blockchain core in Haskell: `core/`, `api/`, `VM/`, `indexer/`, `vault/`, `highway/`, `tools/`, `libs/` |
+| `app/` | App layer: `contracts/`, `backend/`, `ui/`, `services/`, `nginx/`, `packages/shared-types/`, `ethereum/`, `adapters/`, `scripts/`, `docs/` |
+| `apex/` | apex, the backend for the STRATO Management Dashboard (Node.js/Express) |
+| `smd-ui/` | STRATO Management Dashboard UI (Vite/React/TypeScript), served at `/smd/` |
+| `nginx-packager/` | The node's edge proxy image (OpenResty with OIDC and CSRF handling) |
+| `postgrest-packager/`, `prometheus-packager/` | PostgREST and Prometheus images for the node |
+| `local-auth/` | Bundled Ory Kratos + Hydra identity provider, used with `--localAuth` |
+| `vault-nginx/`, `highway-nginx/` | Proxies for the separately deployed Vault and Highway file server |
+| `bin/` | Node lifecycle scripts: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-snapshot`, `strato-patch-app`, `strato-user-add`, `strato-logrotate` |
+| `pipelines/` | Jenkins pipelines |
+| `scripts/` | Repository scripts, including the `pre-commit` hook |
+| `strato-vscode/` | VS Code extension |
+| `design-documents/`, `load-testing/` | Design notes and load tests |
+| `techdocs/` + `mkdocs.yml` | This documentation site |
+| `Makefile`, `install_deps.sh`, `Dockerfile.multi` | Build entry points |
 
 ---
 
-## Layer 2: DeFi Application (`app/`)
+## How a Node Runs
 
-### Purpose
+A node is a mix of **native host processes** (the Haskell binaries installed by `make`) and **Docker services**.
 
-Full-stack DeFi application built on top of STRATO blockchain.
-
-### Key Components
-
-#### Smart Contracts (`app/contracts/`)
-
-**What:** Solidity smart contracts for DeFi protocols
-
-**Language:** Solidity 0.8.22
-
-**Location:** `app/contracts/concrete/`
-
-**Core Protocols:**
-
-1. **Lending** (`Lending/`)
-   - `LendingPool.sol` - Main lending logic
-   - `CollateralVault.sol` - Collateral storage
-   - Health factor calculations, liquidations
-
-2. **CDP (Collateralized Debt Position)** (`CDP/`)
-   - `CDPEngine.sol` - Mint USDST stablecoin
-   - `CDPVault.sol` - Collateral storage
-   - Stability fees, liquidation ratios
-
-3. **AMM Pools** (`Pools/`)
-   - `Pool.sol` - Automated market maker
-   - `PoolFactory.sol` - Pool creation
-   - Swap, add/remove liquidity
-
-4. **Bridge** (`Bridge/`)
-   - `MercataBridge.sol` - Cross-chain transfers
-   - Deposit/withdrawal workflows
-
-5. **Rewards** (`Rewards/`)
-   - `Rewards.sol` - Incentives controller for distributing Reward Points
-   - Tracks user activities (borrowing, liquidity, swaps, etc.)
-   - Calculates and distributes rewards based on emission rates
-   - Activity-based incentive system
-
-6. **Tokens** (`Tokens/`)
-   - `Token.sol` - Base token implementation
-   - `TokenFactory.sol` - Token creation (USDST, Reward Points, wrapped assets)
-   - `TokenMetadata.sol` - Token metadata management
-
-**Build:**
-
-```bash
-cd app/contracts
-npm install
-npm run compile
-npm test
+```mermaid
+flowchart LR
+  up["strato-up mynode"] --> setup["strato-setup<br/>(strato/core/strato-init)"]
+  setup --> dir["mynode/<br/>.ethereumH/ethconf.yaml<br/>docker-compose.yml<br/>commands.txt, genesis.json<br/>secrets/, logs/"]
+  up --> convoke["convoke<br/>(strato/tools/convoke)"]
+  convoke --> dc["docker compose -p strato up -d --wait"]
+  convoke --> procs["native processes<br/>from commands.txt"]
 ```
 
-**Test:**
+`strato-setup` generates the node directory:
 
-```bash
-npm test                    # All tests
-npm run test:coverage       # With coverage
-```
+- `.ethereumH/ethconf.yaml` is the node's configuration source of truth.
+- `docker-compose.yml` is generated by `strato/core/strato-init/src/Blockchain/Init/DockerCompose.hs`.
+- `commands.txt` lists the native processes to run.
 
-#### Backend API (`app/backend/`)
+`convoke` then starts the containers and the native processes. If any one of them exits, it tears the whole node down. The `docker-compose*.yml` files in the repository root are not used by `strato-up`.
 
-**What:** Node.js REST API for DeFi operations
+### Native processes
 
-**Language:** TypeScript (Node.js + Express)
+| Process | Source | Role |
+|---------|--------|------|
+| `ethereum-discover` | `strato/core/ethereum-discovery` | Peer discovery (port 30303) |
+| `strato-p2p` | `strato/core/strato-p2p` | Peer connections; exchanges blocks and transactions (port 30303) |
+| `strato-sequencer` | `strato/core/strato-sequencer`, `strato/core/blockstanbul` | PBFT (blockstanbul) ordering and block commit |
+| `vm-runner` | `strato/core/vm-runner`, `strato/VM/SolidVM` | Executes transactions with SolidVM |
+| `strato-indexer` | `strato/indexer/strato-index` | Indexes chain data into Postgres and Redis |
+| `slipstream` | `strato/indexer/slipstream` | Writes contract state and events into the Postgres `cirrus` database |
+| `strato-api` | `strato/api/strato-api`, `strato/api/core`, `strato/api/bloc` | Core API (`/eth/v1.2`) and Bloc API (`/bloc/v2.2`); Bloc is a library inside `strato-api` |
+| `ethereum-jsonrpc` | `strato/api/ethereum-jsonrpc` | Ethereum JSON-RPC; on by default (`--jsonrpc`) |
+| `strato-network-monitor` | `strato/core/ethereum-discovery` | Network monitoring |
+| `strato-logrotate` | `bin/strato-logrotate` | Rotates files in `logs/` |
+| `blockapps-vault-wrapper-server` | `strato/vault` | Node-local Vault; only with `--localAuth` |
 
-**Location:** `app/backend/src/`
+Each native process writes to `logs/<process>` in the node directory.
 
-**Responsibilities:**
+### Docker services
 
-- High-level DeFi API endpoints
-- User authentication (OAuth 2.0)
-- Transaction bundling (e.g., approve + supply)
-- Event monitoring
-- Database queries (Cirrus)
+| Service | Source | Role |
+|---------|--------|------|
+| `nginx` | `nginx-packager/` | Edge proxy: routing, OIDC login, CSRF |
+| `app-backend` | `app/backend/` | App REST API (port 3001 inside the compose network) |
+| `app-ui` | `app/ui/` | App web UI (port 8080 inside the compose network) |
+| `smd` | `smd-ui/` | STRATO Management Dashboard |
+| `apex` | `apex/api/` | Dashboard backend; also serves `/health` |
+| `postgres` | `postgres:14.18` | Databases for the indexer and Cirrus |
+| `postgrest` | `postgrest-packager/` | Read-only REST over the `cirrus` database (`/cirrus/search`) |
+| `redis` | `redis:3.2` | Redis BlockDB used by core processes (p2p, sequencer, vm-runner, indexer, API) |
+| `prometheus` | `prometheus-packager/` | Metrics scraping |
+| `docs` | `swaggerapi/swagger-ui` | Swagger UI container |
+| `local-auth` | `local-auth/` | Ory Hydra + Kratos; only with `--localAuth` |
 
-**Key modules:**
+Postgres (5432) and Redis (6379) are published on `127.0.0.1` only. nginx is the only service exposed publicly.
 
-- `api/routes/` - Express routes
-- `api/services/` - Business logic
-  - `lending.service.ts` - Lending operations
-  - `cdp.service.ts` - CDP operations
-  - `swapping.service.ts` - Swap/liquidity
-  - `bridge.service.ts` - Bridge operations
-- `api/middleware/` - Auth, validation
-- `db/` - Database client (PostgreSQL via Cirrus)
+### Streaming
 
-**API endpoints:** (Available at `/api/docs`)
+Node processes pass events to each other through an embedded streaming layer.
 
-- `POST /api/lending/supply` - Supply collateral
-- `POST /api/lending/borrow` - Borrow USDST
-- `POST /api/cdp/deposit` - Deposit for CDP
-- `POST /api/cdp/mint` - Mint USDST
-- `POST /api/swap/execute` - Swap tokens
-- `POST /api/pool/add-liquidity` - Add liquidity
+- **19.1 and later:** embedded **JLog** (`strato/libs/jlog-c`, `strato/libs/composable-monads/streaming-jlog`). It needs no broker container.
+- **Before 19.1:** the node ran Kafka.
 
-**Run:**
+The Kafka, Redpanda and RabbitMQ streaming backends are still in `strato/libs/composable-monads/` and in the Stack build.
 
-```bash
-cd app/backend
-npm install
-npm run dev              # Development mode
-npm run build            # Production build
-npm start                # Start production server
-```
+### Cirrus
 
-**Test:**
+There is no `cirrus` binary. "Cirrus" is three parts working together:
 
-```bash
-npm test                 # Unit tests
-npm run test:integration # Integration tests
-npm run test:e2e         # E2E tests
-```
+- **slipstream** indexes contract state and events.
+- **The `cirrus` Postgres database** stores them.
+- **PostgREST** serves them read-only at `/cirrus/search`.
 
-#### Frontend UI (`app/ui/`)
+See [Cirrus](../reference/cirrus.md).
 
-**What:** React web application for DeFi interactions
+### Virtual machine
 
-**Language:** TypeScript (React + Vite)
+STRATO executes contracts with **SolidVM** only (`strato/VM/SolidVM`).
 
-**Location:** `app/ui/src/`
+- The EVM execution engine was removed in 15.0.
+- `strato/VM/evm-solidity` is an ABI library.
+- `strato/VM/EVM/ethereum-vm` is still in the tree, but it is commented out of `strato/stack.yaml` and is not built.
 
-**Responsibilities:**
+See [SolidVM](../solidvm/index.md).
 
-- User interface for DeFi operations
-- Wallet connection (MetaMask, WalletConnect)
-- Transaction submission
-- Real-time updates
-- Data visualization
+### Other core packages
 
-**Key modules:**
+| Path | Purpose |
+|------|---------|
+| `strato/core/strato-init` | `strato-setup`: node directory, `ethconf.yaml`, compose file and `commands.txt` generation |
+| `strato/core/strato-genesis` | Genesis block templates and pre-deployed system contracts (`resources/`) |
+| `strato/core/strato-networks` | Network definitions (upquark, helium, ...) |
+| `strato/core/strato-conf` | `ethconf.yaml` schema |
+| `strato/core/blockstanbul` | PBFT consensus |
+| `strato/vault` | Vault server that holds custodial user keys |
+| `strato/highway` | Highway file server (deployed separately) |
+| `strato/tools/airlock` | Wallet CLI |
 
-- `pages/` - Main pages
-  - `Borrow.tsx` - Lending interface
-  - `Advanced.tsx` - CDP minting, pools
-  - `SwapAsset.tsx` - Token swaps
-  - `DepositsPage.tsx` - Bridge in
-  - `WithdrawalsPage.tsx` - Bridge out
-  - `Rewards.tsx` - Rewards management
-- `components/` - Reusable components
-- `hooks/` - React hooks (API calls, wallet)
-- `contexts/` - State management
-- `utils/` - Helpers, formatters
-
-**Tech stack:**
-
-- React 18
-- TypeScript
-- Vite (build tool)
-- ethers.js (Web3 library)
-- Material-UI (components)
-
-**Run:**
-
-```bash
-cd app/ui
-npm install
-npm run dev              # Development server (port 3001)
-npm run build            # Production build
-npm run preview          # Preview production build
-```
-
-**Test:**
-
-```bash
-npm test                 # Component tests
-npm run test:e2e         # E2E tests (Playwright)
-```
-
-#### Background Services (`app/services/`)
-
-**What:** Long-running services for async operations
-
-**Language:** TypeScript (Node.js)
-
-**Key services:**
-
-1. **Bridge Service** (`bridge/`)
-   - Monitors Ethereum for deposits
-   - Processes withdrawals
-   - Mints wrapped assets
-   - Issues transaction vouchers (10 per bridge-in)
-
-2. **Oracle Service** (`oracle/`)
-   - Fetches external price feeds
-   - Updates on-chain prices
-   - Data sources (Chainlink, CoinGecko, etc.)
-
-3. **Voucher Service** (`voucher/`)
-   - Manages transaction vouchers
-   - Mints vouchers on bridge-in
-   - Tracks voucher usage
-
-**Run:**
-
-```bash
-cd app/services/bridge
-npm install
-npm run dev
-```
-
-### Data Flow (Layer 2)
-
-```
-User (Browser)
-    ↓
-Frontend UI (React) → Wallet (MetaMask)
-    ↓                       ↓
-Backend API (Node.js) ← Blockchain (via ethers.js)
-    ↓
-Smart Contracts (Solidity)
-    ↓
-STRATO Blockchain (Layer 1)
-```
-
-**Example: Borrow USDST**
-
-1. User clicks "Borrow" in UI
-2. Frontend calls `POST /api/lending/borrow`
-3. Backend bundles transactions:
-   - Approve token spending
-   - Call `LendingPool.borrow()`
-4. Backend submits to STRATO blockchain
-5. `vm-runner` executes contract
-6. State updated, event emitted
-7. `cirrus` indexes transaction
-8. Backend returns result to frontend
-9. UI updates with new balance
+The Haskell build uses Stack (resolver in `strato/stack.yaml`). All local packages compile with `-Wall -Werror`.
 
 ---
 
-## Supporting Infrastructure
+## App Layer (`app/`)
 
-### bootstrap-docker
+### Smart contracts (`app/contracts/`)
 
-**What:** Production deployment scripts
+| Directory | Contents |
+|-----------|----------|
+| `abstract/` | Base contracts: ERC20, access control, utilities |
+| `concrete/` | Deployable contracts, one directory per area (listed below) |
+| `libraries/` | Shared libraries |
+| `deploy/` | Deploy and upgrade scripts (`npm run deploy`, `npm run upgrade`, ...); see `deploy/README.md` |
+| `tests/` | SolidVM tests (`*.test.sol`) |
 
-**Location:** `bootstrap-docker/`
+The `concrete/` directories are Admin, Bridge, CDP, Enums, Escrow, Flash, Governance, Lending, Metals, NFTs, Pools, Proxy, Rewards, Savings, Staking, Tokens, User, Vault, Voucher and YieldVault. `concrete/BaseCodeCollection.sol` imports the full collection that `deploy.js` deploys.
 
-**Contains:**
+**Language.** The contracts are written in Solidity syntax and compiled and executed by SolidVM, not `solc`. Most files have no `pragma` line. The only exceptions are ten ERC20 extension files under `abstract/ERC20/extensions/`, derived from OpenZeppelin, which declare `pragma solidity ^0.8.20` or `^0.8.24`. See [SolidVM](../solidvm/index.md) for how SolidVM's dialect differs from Solidity.
 
-- `strato-run.sh` - Main deployment script
-- `docker-compose.yml` - Service definitions
-- `strato` - CLI wrapper
+**Tests.** Tests run with `solid-vm-cli test <File>.test.sol` from the test file's directory. A test file declares `Describe_*` contracts with `beforeAll`, `beforeEach` and `it_*` functions. The `npm test` script in `app/contracts/package.json` is a placeholder that always fails. Use `solid-vm-cli` instead.
 
-**Usage:**
+**Genesis copies.** `strato/core/strato-genesis/resources/contracts/` holds a separate copy of these contracts, used for genesis. It is not generated from `app/contracts/`, and the two currently differ.
 
-```bash
-cd bootstrap-docker
-sudo ./strato-run.sh
-```
+### Backend (`app/backend/`)
 
-### nginx-packager
+Express 5 + TypeScript.
 
-**What:** Reverse proxy and API gateway
+- **Code:** `src/api/` holds `routes/`, `controllers/`, `services/`, `validators/`, `middleware/` and `helpers/`. Configuration is in `src/config/`.
+- **Node access:** it calls the node at `NODE_URL`:
+    - `/bloc/v2.2` builds and submits transactions with the user's token
+    - `/strato-api/eth/v1.2` provides metadata and signed transaction submission
+    - `/cirrus/search` provides indexed queries
+- **Database:** it also opens a read-only Postgres connection to the `cirrus` database for heavier queries.
+- **Docs:** Swagger UI is served at `/api/docs`.
+- **Commands:**
+    - `npm run dev`: `ts-node-dev`
+    - `npm run build`: `tsc`
+    - `npm test`: builds, then runs `node --test` on `dist/api/services/*.test.js`
 
-**Location:** `nginx-packager/`
+### UI (`app/ui/`)
 
-**Responsibilities:**
+Vite + React 18 + TypeScript.
 
-- Route `/strato-api/*` → strato-api (Layer 1)
-- Route `/api/*` → app-backend (Layer 2)
-- Route `/` → app-ui (frontend)
-- Serve Swagger UI at `/docs` and `/api/docs`
+- **Styling:** Tailwind CSS with shadcn/ui (Radix) components. Some screens use Ant Design.
+- **Routing and data:** React Router and TanStack Query.
+- **Wallets:** wagmi, viem and RainbowKit for external wallets. ethers v6 is also used.
+- **Code:** `src/pages/`, `src/components/`, `src/context/`, `src/hooks/`, `src/lib/`, `src/services/`.
+- **Scripts:** `dev` (port 8080), `build`, `build:dev`, `lint` and `preview`. There is no `test` script.
 
-**Configuration:**
+### Services (`app/services/`)
 
-- `nginx.conf` - Main config
+All services are TypeScript, and each has a `README.md`.
 
----
+| Service | Purpose |
+|---------|---------|
+| `bridge` | Bridges assets between external EVM chains and STRATO using a Safe multisig |
+| `oracle` | Fetches asset prices from external sources and pushes them on-chain |
+| `rewards-poller` | Reads protocol events from Cirrus and posts activity batches to the Rewards contract |
+| `card-top-up` | Watches crypto card wallet balances and calls `topUpCard` |
+| `referral` | Referral service |
+| `tracking` | Tracking-link service and dashboard (`/t/`, `/tracking-api/`) |
+| `tracking-bot` | CI/CD bot for the tracking service |
+| `rwa-io` | Pushes STRATO metrics to the RWA.io API |
+| `v3LiquidityManager` | Monitors V3 liquidity positions and alerts when they need repositioning |
 
-## Build System
+Each service has `dev`, `build` and `start` scripts. Only `bridge` and `tracking-bot` define `npm test`. `tracking` runs its tests with `docker-compose.test.yml`.
 
-### Makefiles
+These services are not part of the node's generated compose file. They are deployed separately.
 
-**Root Makefile:** `Makefile`
+### Other app directories
 
-**Targets:**
-
-```bash
-make                     # Build everything
-```
-
-### Stack (Haskell)
-
-**What:** Build tool for Haskell components
-
-**Configuration:** `stack.yaml`
-
-**Usage:**
-
-```bash
-stack build              # Build Haskell code
-stack test               # Run Haskell tests
-stack exec strato-core   # Run compiled binary
-```
-
-### npm (Node.js)
-
-**What:** Package manager for JavaScript/TypeScript
-
-**Usage:**
-
-```bash
-cd app/backend
-npm install              # Install dependencies
-npm run build            # Compile TypeScript
-npm test                 # Run tests
-
-cd app/ui
-npm install
-npm run dev              # Start dev server
-```
+| Path | Purpose |
+|------|---------|
+| `app/nginx/` | Standalone nginx for the app development loop (see [Setup](setup.md#app-backend-and-ui-outside-docker)) |
+| `app/packages/shared-types/` | Types shared by the backend and UI; built by their `postinstall` hooks |
+| `app/ethereum/` | Hardhat project for the Ethereum-side contracts |
+| `app/adapters/defillama/` | DefiLlama adapter |
+| `app/scripts/` | Operational and data scripts |
+| `app/docs/` | Component notes (Lending, CDP, Pools, Bridge, ...) |
 
 ---
 
-## Technology Stack Summary
+## Technology Stack
 
-| Component | Language | Framework | Purpose |
-|-----------|----------|-----------|---------|
-| strato-core | Haskell | Stack | Blockchain core |
-| vm-runner | Haskell | Stack | EVM executor |
-| cirrus | Haskell | Stack + PostgreSQL | Indexer |
-| Smart Contracts | Solidity 0.8.22 | Hardhat | DeFi protocols |
-| Backend API | TypeScript | Node.js + Express | REST API |
-| Frontend UI | TypeScript | React + Vite | Web app |
-| Services | TypeScript | Node.js | Background tasks |
-| Deployment | Bash + Docker | Docker Compose | Infrastructure |
-
----
-
-## Component Communication
-
-### Internal Communication
-
-**Blockchain → API:**
-
-- Direct function calls (Haskell)
-
-**Blockchain → Cirrus:**
-
-- Database writes (PostgreSQL)
-
-**Backend → Blockchain:**
-
-- HTTP (JSON-RPC API)
-- Port: 8080
-
-**Frontend → Backend:**
-
-- HTTP (REST API)
-- Port: 3000
-
-**Frontend → Blockchain:**
-
-- Direct via ethers.js (JSON-RPC)
-- For read operations, gas estimation
-
-### External Communication
-
-**User → Frontend:**
-
-- HTTPS (web browser)
-- Port: 443 (production) or 3001 (dev)
-
-**Bridge Service → Ethereum L1:**
-
-- JSON-RPC (Infura, Alchemy)
-- Monitors events, submits transactions
-
-**Oracle Service → Price Feeds:**
-
-- HTTPS (Chainlink, CoinGecko APIs)
-
----
-
-## Development Workflow
-
-### Choose Your Focus Area
-
-Detailed component-specific guides are coming soon. For now, see:
-
-1. **Blockchain Core** - Haskell codebase (`strato/core/`, `strato/api/`)
-2. **Smart Contracts** - Solidity contracts (`app/contracts/`)
-3. **Backend API** - Node.js/TypeScript (`app/backend/`)
-4. **Frontend UI** - React/TypeScript (`app/ui/`)
-5. **Services** - Background services (`app/services/`)
-
-### General Workflow
-
-1. **Make changes** in your area
-2. **Build** your component
-3. **Run tests** (unit, integration)
-4. **Test locally** (full stack)
-5. **Submit PR** (see [Contributing](contributing.md))
+| Component | Language | Framework / tooling |
+|-----------|----------|---------------------|
+| Core node processes | Haskell | Stack |
+| Contract execution | Haskell | SolidVM |
+| Smart contracts | Solidity syntax (SolidVM dialect) | `solid-vm-cli` tests; Node.js deploy scripts (`blockapps-rest`, ethers) |
+| Edge proxy | Lua | OpenResty, lua-resty-openidc |
+| App backend | TypeScript | Node.js 22, Express 5 |
+| App UI | TypeScript | React 18, Vite, Tailwind/shadcn-ui, wagmi/viem |
+| Dashboard | TypeScript / JavaScript | smd-ui (React, Vite), apex (Express) |
+| Off-chain services | TypeScript | Node.js |
+| Data | SQL | PostgreSQL 14, PostgREST, Redis |
+| Packaging | Docker | Docker Compose (generated per node) |
 
 ---
 
 ## Next Steps
 
-Now that you understand the architecture:
-
-1. **Choose your area of interest** (blockchain, contracts, backend, frontend, services)
-2. **Read the component-specific guide**
-3. **Set up your development environment** (see [Setup](setup.md))
-4. **Make your first contribution** (see [Contributing](contributing.md))
-
----
-
-## Need Help?
-
-- **Documentation:** [docs.strato.nexus](https://docs.strato.nexus)
-- **Support:** [support.blockapps.net](https://support.blockapps.net)
-- **Telegram:** [t.me/strato_net](https://t.me/strato_net)
-
+- Set up your environment: [Setup](setup.md)
+- Contribution process: [Contributing Guidelines](contributing.md)
+- Request routing and security model: [System Architecture](../reference/architecture.md)

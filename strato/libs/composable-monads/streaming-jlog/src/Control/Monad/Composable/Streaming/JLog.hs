@@ -35,6 +35,7 @@ module Control.Monad.Composable.Streaming.JLog (
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBestEffort,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -153,6 +154,14 @@ produceItems topicName events = do
     ctx <- getOrCreateWriter env topicName topicPath
     mapM_ (writeRawMessage ctx . LBS.toStrict . encode) events
   return [ProduceResponse]
+
+-- | Interface parity with the Kafka backend's 'produceItemsBestEffort', which
+-- exists because a broker can reject an oversized record and must not be
+-- allowed to kill the producer (see helium block 595971). A JLog write is a
+-- local append with no broker to refuse it, so there is nothing to report and
+-- the result is always empty.
+produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
+produceItemsBestEffort topicName events = [] <$ produceItems topicName events
 
 -- | Append an already-serialized payload to an open writer.
 writeRawMessage :: Ptr JLogCtx -> BS.ByteString -> IO ()
@@ -391,6 +400,17 @@ consumeFromLatest topicName initAction f = do
   initAction
   runConsume (T.pack subscriber) topicName f
 
+-- | Stream batches from a topic under the shared, durable subscriber named by
+-- the 'ClientId'.
+--
+-- Every 'conduitBatchSource' (and 'consume') instance that uses the same
+-- 'ClientId' on the same topic shares ONE checkpoint, so concurrent instances
+-- compete for messages (work-queue semantics), and a batch is checkpointed
+-- before it is yielded downstream. This differs from the Kafka backend's
+-- 'conduitBatchSource', which gave every instance its own in-memory offset
+-- starting at the latest message (broadcast semantics). A caller that needs
+-- every instance to see every message must run a single source and fan the
+-- items out in process (see strato-p2p's "Blockchain.SeqEventNotify").
 conduitBatchSource :: (Binary a, MonadIO m) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do

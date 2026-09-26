@@ -1,93 +1,51 @@
 # Interactive API Reference
 
-Explore and test the STRATO API interactively with Swagger UI.
+OpenAPI specs and Swagger UI for the STRATO HTTP APIs.
 
-## Access Interactive Documentation
+## App API
 
-### App API (DeFi Operations)
+The App API is the backend for lending, CDP, swaps, pools, bridge, rewards and vaults. See [App API](api.md).
 
-High-level API for DeFi operations: lending, CDP, swaps, liquidity, bridge, rewards.
+| | Mainnet | Testnet |
+|---|---------|---------|
+| Swagger UI | [app.strato.nexus/api/docs](https://app.strato.nexus/api/docs) | [app.testnet.strato.nexus/api/docs](https://app.testnet.strato.nexus/api/docs) |
+| OpenAPI JSON | [app.strato.nexus/api/public/api-docs.json](https://app.strato.nexus/api/public/api-docs.json) | [app.testnet.strato.nexus/api/public/api-docs.json](https://app.testnet.strato.nexus/api/public/api-docs.json) |
 
-!!! example "App API - Mainnet"
-    [https://app.strato.nexus/api/docs](https://app.strato.nexus/api/docs)
+- **Swagger UI requires sign-in.** Opening it redirects you to the STRATO login first.
+- **The OpenAPI JSON is public.** Import it into Postman, Insomnia or a client generator. Its server base path is `/api`.
 
-!!! example "App API - Testnet"
-    [https://app.testnet.strato.nexus/api/docs](https://app.testnet.strato.nexus/api/docs)
+## Core and Bloc API
 
----
+The node's Core API (`/eth/v1.2`) and Bloc API (`/bloc/v2.2`) share one OpenAPI 3.0 spec, served by `strato-api`. See [Core Platform API](strato-node-api.md).
 
-### Core Platform API
+| | Mainnet | Testnet |
+|---|---------|---------|
+| Swagger UI | [app.strato.nexus/strato-api/openapi-ui/](https://app.strato.nexus/strato-api/openapi-ui/) | [app.testnet.strato.nexus/strato-api/openapi-ui/](https://app.testnet.strato.nexus/strato-api/openapi-ui/) |
+| OpenAPI JSON | [app.strato.nexus/strato-api/openapi.json](https://app.strato.nexus/strato-api/openapi.json) | [app.testnet.strato.nexus/strato-api/openapi.json](https://app.testnet.strato.nexus/strato-api/openapi.json) |
 
-Low-level blockchain API: users, transactions, contracts, blocks.
+Neither needs a login.
 
-!!! info "Core API - Mainnet"
-    [https://app.strato.nexus/docs](https://app.strato.nexus/docs)
+!!! note "Base path"
+    The spec's paths start at `/eth/v1.2/...` and `/bloc/v2.2/...`, and the spec doesn't declare a server. To call them through a node, prefix the paths with `https://<host>/strato-api`, or use the public `/bloc/v2.2` path for Bloc. "Try it out" requests sent without that prefix won't reach the API.
 
-!!! info "Core API - Testnet"
-    [https://app.testnet.strato.nexus/docs](https://app.testnet.strato.nexus/docs)
+## Other Interfaces
 
----
+These have no Swagger page:
 
-## What You Can Do
-
-These interactive docs let you:
-
-- ✅ Browse all API endpoints
-- ✅ See request/response schemas
-- ✅ Try endpoints with "Try it out" functionality
-- ✅ Test with your own authentication tokens
-- ✅ Download the OpenAPI spec
-
----
-
-## About This API
-
-This is the **STRATO Core API** reference. The API provides access to:
-
-- **Key Management** - Address management (`/strato/v2.3/key`)
-- **Transactions** - Submit and track blockchain transactions (`/strato/v2.3/transaction`)
-- **Smart Contracts** - Deploy and interact with contracts (`/bloc/v2.2/contracts`)
-- **Blockchain Queries** - Account data, metadata (`/strato-api/eth/v1.2/*`)
-- **Health Checks** - System status (`/health`, `/apex-api/status`)
-
-!!! note "DeFi Operations"
-    For higher-level DeFi operations (lending, CDP, swaps, etc.), see the **[App API Getting Started](api.md)** guide.
-
-!!! tip "Quick Links"
-    - **[API Integration Guide](../build-apps/integration.md)** - Complete integration walkthrough
-    - **[Quick Reference](../build-apps/quick-reference.md)** - Code snippets for common operations
-    - **[E2E Examples](../build-apps/e2e.md)** - Full end-to-end integration examples
-
----
+- **[Cirrus](cirrus.md)** (`/cirrus/search`): PostgREST queries over indexed contract data
+- **[JSON-RPC](json-rpc.md)** (`/rpc`): Ethereum-compatible JSON-RPC
 
 ## Authentication
 
-All API requests require authentication via **OAuth 2.0 Bearer token**.
+Reads don't need a token. Endpoints that act as a user, such as App API writes and Bloc server-side signing, need an OAuth 2.0 bearer token from Keycloak:
 
-**Quick setup:**
+```http
+Authorization: Bearer <access_token>
+```
 
-1. Register at [app.strato.nexus](https://app.strato.nexus)
-2. Get OAuth token (see [Developer Quick Start](../build-apps/quickstart.md))
-3. Include in requests: `Authorization: Bearer YOUR_TOKEN`
-
-**Base URLs:**
-
-- **Mainnet**: `https://app.strato.nexus`
-- **Testnet**: `https://app.testnet.strato.nexus`
-
----
-
-## Rate Limits
-
-- **Default**: 100 requests/second per IP
-- **Authenticated**: 1000 requests/second per user
-- **429 response** if exceeded (includes `Retry-After` header)
-
----
+See [App API authentication](api.md#authentication) and [Core Platform API authentication](strato-node-api.md#authentication).
 
 ## Support
 
-- **[API Overview](api.md)** - High-level API documentation
-- **[Support Portal](https://support.blockapps.net)**
-- **[Telegram Community](https://t.me/strato_net)**
-
+- [Support Portal](https://support.blockapps.net)
+- [Telegram Community](https://t.me/strato_net)

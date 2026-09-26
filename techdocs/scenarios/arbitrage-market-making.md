@@ -1,656 +1,138 @@
 # Arbitrage & Market Making
 
-Profit from price differences and provide liquidity to earn trading fees.
+Capture price differences on STRATO, or earn trading fees by providing liquidity.
 
 ---
 
-## The Strategy
+!!! info "What's available"
+    STRATO trading runs through AMM pools. There's **no** order book, limit order, perpetual futures market or built-in trading bot. Everything below is either an app feature or a contract that developers can call.
 
-Two complementary strategies:
-
-1. **Arbitrage**: Buy low on one venue, sell high on another
-2. **Market Making**: Provide liquidity to earn fees from traders
-
-**Skills needed:** Moderate-Advanced  
-**Capital required:** $5k+ minimum  
-**Time commitment:** Active monitoring or automation
+**Costs on every action:** 0.01 USDST or one voucher per transaction, and approval plus action costs 0.02 USDST. The fee is charged even when a transaction reverts, so failed attempts still cost you. Swaps also pay the pool's swap fee and price impact.
 
 ---
 
-## Strategy 1: Cross-DEX Arbitrage
+## Part 1: Arbitrage
 
-### The Concept
+### Pool vs pool, and pool vs oracle
 
-**Price differences exist between platforms:**
+The **Trade** page quotes every pool that holds your pair: constant-product pools, stable pools and each V3 fee tier. It auto-selects the best rate. The trade details also show the **oracle spot price** for reference.
 
-- STRATO DEX: ETHST = $3,000
-- Uniswap: ETH = $3,015
-- **Opportunity:** Buy on STRATO, sell on Uniswap, profit $15
+Price gaps show up between pools of the same pair, and between pool prices and the oracle. To act on one:
 
-**Why it exists:**
+1. On **Trade**, open the pool selector and choose the cheaper pool to buy.
+2. Swap back through the other pool.
 
-- Different liquidity depths
-- Trading activity imbalances
-- Bridge delays
-- Market inefficiencies
-
----
-
-### Complete Example: ETHST Arbitrage
-
-**Setup:**
-
-- Capital: $10,000 USDST - Split: $5k on STRATO, $5k on Uniswap (Ethereum)
-- Assets: USDST on both chains
-
-**Opportunity spotted:**
-
-- STRATO: 1 ETHST = $2,990 USDST
-- Uniswap: 1 ETH = $3,010 USDC
-- **Spread:** $20 (0.67%)
-
-**Execution:**
-
-1. **Buy on STRATO:**
-
-   - Swap $2,990 USDST → 1 ETHST
-   - Fee: 0.3% = $9
-   - Cost: $2,999 per ETHST
-
-2. **Bridge ETH to Ethereum:**
-
-   - Bridge 1 ETH to Ethereum
-   - Time: 15 minutes
-   - Cost: ~$15
-
-3. **Sell on Uniswap:**
-
-   - Swap 1 ETHST → $3,010 USDST    - Fee: 0.3% = $9
-   - Receive: $3,001 USDST 
-4. **Bridge USDC back:**
-
-   - Optional: Keep capital balanced
-   - Or accumulate on one side
-
-**Result:**
-```
-Bought: $2,999
-Sold: $3,001
-Bridge: $15
-Net: -$13 ❌
-```
-
-**Wait, we lost money!**
-
----
-
-### When Arbitrage is Profitable
-
-**Break-even calculation:**
+Each swap executes against a single pool and is its own transaction, so the round trip isn't atomic. Prices can move between your transactions.
 
 ```
-Profit = Spread - (Swap fees + Bridge costs)
-$20 - ($9 + $15 + $9) = -$13
-
-Minimum profitable spread:
-$33 / $3,000 = 1.1%
-
-Need at least 1.1% price difference
+Profit ≈ price gap × size
+       − swap fee of each pool
+       − price impact of each swap
+       − transaction fees (0.01 USDST or one voucher each)
 ```
 
-**Profitable opportunities:**
+### USDST peg via the PSM
 
-- High volatility (spreads widen)
-- Large trades (better $/tx ratio)
-- Lower bridge costs (L2s, not Ethereum)
-- Flash opportunities (> 2% spreads)
+**Advanced** → **PSM** uses the `DirectMintPSM` contract:
 
-**Reality:** Most arbitrage is done by bots that:
+- **Mint:** deposit an eligible token and receive USDST 1:1 minus that token's mint fee. Minting is capped by a per-token balance limit.
+- **Redeem:** burn USDST and receive the chosen eligible token 1:1 minus that token's redeem fee, limited to the PSM's balance above a minimum reserve.
 
-- Execute in milliseconds
-- Use flash loans (no capital needed)
-- Have lower fees (market makers)
-- Can capture 0.1-0.5% spreads profitably
+If USDST trades below the eligible token in a pool, buying USDST there and redeeming it can close the gap. If it trades above, minting and selling can. Fees and limits are set per token, and the PSM tab applies them when it calculates what you'll receive.
+
+### CDP liquidations
+
+**Advanced** → **Liquidations** lists USDST vaults whose collateralization ratio has fallen below the asset's liquidation ratio. As a liquidator:
+
+- You repay part of the vault's debt in USDST, which is burned. The repayment is capped by the asset's close factor and by the collateral left.
+- You receive collateral worth the repaid debt **plus the liquidation penalty**, valued at the **oracle price**.
+
+It's only profitable if you can sell the collateral near the oracle price after fees and price impact. Other liquidators compete for the same vaults.
+
+### Cross-chain
+
+Price differences between STRATO and other chains require bridging, which isn't atomic and has its own time and fees. See the [Bridge Guide](../guides/bridge.md).
+
+### For developers: atomic strategies
+
+Contracts can make multi-step arbitrage atomic:
+
+- **`FlashMint`** mints USDST to your contract, calls `onFlashMint(token, amount, fee, data)`, and burns `amount + fee` in the same transaction. Your contract must be the caller, return the string `"FlashMint.onFlashMint"`, and hold `amount + fee` when the callback returns, or everything reverts. The owner controls the per-loan maximum (`maxLoan`, 0 = disabled), `feeBps` (waived for whitelisted borrowers), a pause switch, and an optional whitelist. Check `maxFlashLoan()` and `canBorrow(address)` before relying on it. There's no app UI or API for FlashMint.
+- **`PoolV3.flash`** lends a V3 pool's tokens through a callback; the fee is the pool's fee tier.
 
 ---
 
-## Strategy 2: On-Chain Arbitrage (No Bridge)
+## Part 2: Market Making (Providing Liquidity)
 
-### The Concept
+Step-by-step UI walkthrough: [Provide Liquidity](../guides/liquidity.md).
 
-**Find price differences within STRATO:**
+### Constant-product pools
 
-**Example routes:**
+**Advanced** → **Swap Pools**.
 
-- Direct: USDST → ETHST (one swap)
-- Routed: USDST → USDST → ETHST (two swaps)
+- Pricing is `x × y = k`. Each swap pays `amount in × pool swap fee`. The pool keeps its LP share of that fee for liquidity providers, and the rest goes to the protocol fee collector. Both are set per pool. The factory defaults are a 0.3% swap fee, with 70% of it going to LPs.
+- Add both tokens in proportion, or add a single token. With a single token the pool swaps part of it internally, and that internal swap can be charged the swap fee.
 
-**If routing is cheaper, arbitrage exists!**
+### Stable pools
 
----
+Also under **Advanced** → **Swap Pools**.
 
-### Complete Example: Routing Arbitrage
+- A stableswap curve for assets that should trade near a fixed ratio; some pools hold more than two tokens.
+- Swaps, and liquidity changes that unbalance the pool, pay a fee. When the pool's off-peg fee multiplier is set, that fee rises as the pool's balances move away from the peg. Half of collected fees go to the protocol.
 
-**Scenario:**
+### V3 concentrated liquidity
 
-Direct swap:
+**V3 Liquidity** (PRO section).
 
-- USDST → ETHST: Rate = $3,000 per ETHST
+1. **Pools** tab: pick a pair and a **fee tier**. The factory enables 0.05%, 0.3% and 1% tiers by default; the owner can enable more.
+2. Choose a price range, or a preset: **Stable** (±0.1%), **Tight** (±5%), **Wide** (−50% / +100%), **One-sided lower** (−50%), **One-sided upper** (+100%).
+3. Enter an amount and deposit. Positions are held as NFTs.
+4. **My Positions** tab: add liquidity, remove a percentage, or collect fees.
 
-Routed swap:
+Key behavior:
 
-- USDST → USDST: Rate = 1:1 (stable pair, low fee)
-- USDST → ETHST: Rate = $2,985 per ETHST (lower price!)
+- A position earns fees **only while the pool price is inside its range**.
+- When the price leaves the range, the position holds only one of the two tokens and earns nothing until the price returns or you move it.
+- A narrow range earns more per dollar while in range, but leaves the range more often. Moving a range means remove, swap and re-deposit, each at full cost.
+- A pool may have a protocol fee that takes a share of swap fees.
 
-**Opportunity:**
+### Impermanent loss
 
-- Buy via route: $2,985 + fees
-- Sell direct: $3,000
-- Profit: ~$12 per ETHST
+For a 50/50 constant-product position, when one token's price changes by a factor `r` relative to the other:
 
-**Execution:**
-
-1. **Buy ETHST via route:**
-
-   - Swap $2,985 USDST → USDST (0.05% fee = $1.50)
-   - Swap $2,985 USDST → 1 ETHST (0.3% fee = $9)
-   - Total cost: $2,995.50
-
-2. **Sell ETHST direct:**
-
-   - Swap 1 ETHST → $3,000 USDST (0.3% fee = $9)
-   - Receive: $2,991 USDST
-
-**Result:**
 ```
-Bought: $2,995.50
-Sold: $2,991.00
-Loss: -$4.50 ❌
-```
-
-**Still not profitable!**
-
-**Why:**
-
-- Fees eat the spread
-- Need larger price differences
-- Or market maker fee tier (< 0.3%)
-
----
-
-## Strategy 3: Liquidity Providing (Market Making)
-
-### The Concept
-
-**Instead of chasing arbitrage:**
-
-- Provide liquidity
-- Earn fees from OTHER people's trades
-- More passive, more reliable
-
-**Your role:** Be the "house" not the "gambler"
-
----
-
-### Complete Example: Concentrated Liquidity
-
-**Starting capital:** $10,000 (5 ETHST @ $2,000 or equivalent)
-
-**Choose pool:** ETHST-USDST (high volume)
-
-**Strategy decision:**
-
-**Option A: Wide range (passive)**
-- Provide liquidity: $1,500-$3,500 ETHST price range
-- Always in range
-- Lower fees but consistent
-- APR: 8-12%
-
-**Option B: Narrow range (active)**
-- Provide liquidity: $1,950-$2,050 (±2.5%)
-- Higher fees when in range
-- Must rebalance frequently
-- APR: 20-40% when in range
-
----
-
-### Implementation: Narrow Range Strategy
-
-**Starting position:**
-
-- Price: $2,000
-- Range: $1,950-$2,050
-- Capital: 2.5 ETHST + $5,000 USDST
-
-**Deploy liquidity:**
-
-1. **Go to Advanced** (in sidebar) → **Swap Pools** tab
-2. Select **ETHST-USDST** pool
-3. **Choose concentrated range:**
-
-   - Min: $1,950
-   - Max: $2,050
-4. **Deposit:**
-
-   - 2.5 ETHST
-   - $5,000 USDST
-5. **Click "Add Liquidity"** (~$0.10 gas, approvals automatic)
-
-**Result:**
-```
-✅ Providing liquidity: $10,000
-✅ Active range: $1,950-$2,050
-✅ Expected daily volume: $500k
-✅ Your share: ~2%
-✅ Daily fees: ~$30 (0.3% daily = ~110% APR)
+LP value / value of just holding = 2 × √r / (1 + r)
 ```
 
-**Too good to be true?**
+For example, `r = 2` (one token doubles) gives about 0.943, a 5.7% shortfall before fees. Concentrated positions magnify this within their range. Fees earned have to exceed this loss for providing liquidity to beat holding.
+
+### Rewards
+
+Some activity earns Reward Points. The app's swap rewards are registered per pool for constant-product and stable pools. See the [Rewards Guide](../guides/rewards.md) for what currently qualifies.
 
 ---
 
-### Managing Concentrated Liquidity
-
-**Scenario 1: Price Stays in Range**
-
-**Days 1-5: ETHST = $1,980-$2,020**
-- Your liquidity is active
-- Earn fees: ~$30/day × 5 = $150
-- No action needed ✅
-
-**Weekly return:** $150 on $10k = 1.5% (78% APR)
-
----
-
-**Scenario 2: Price Moves Out of Range**
-
-**Day 6: ETHST pumps to $2,100**
-
-**Your position:**
-
-- All converted to USDST (sold ETHST automatically)
-- Now have: ~$10,150 USDST, 0 ETHST
-- Out of range = no fees earned ❌
-
-**Action needed:**
-
-1. Remove liquidity
-2. Rebalance: Buy some ETHST back
-3. Set new range: $2,050-$2,150
-4. Re-provide liquidity
-
-**Costs:**
-
-- Remove + re-add: ~$0.60 gas
-- Swap fee: ~$30
-- Time: 10 minutes
-
-**Was it worth it?**
-- Earned: $150 in 5 days
-- Rebalancing cost: ~$31
-- Net: $119 ✅
-
----
-
-**Scenario 3: Price Whipsaws**
-
-**Week 1:**
-
-- Price: $1,900 → $2,100 → $1,950 → $2,080
-
-**Your experience:**
-
-- Out of range 3 times
-- Rebalanced 3 times
-- Fees earned: $200
-- Rebalancing costs: $90
-- Net: $110
-
-**vs Wide Range:**
-
-- Would have earned: $80
-- No rebalancing: $0 cost
-- Net: $80
-
-**Narrow range still better, but more work**
-
----
-
-## Impermanent Loss Reality Check
-
-### What is IL?
-
-**When you provide liquidity:**
-
-- You hold equal value of both assets
-- As prices change, your holdings rebalance automatically
-- vs just holding assets, you may have less
-
-**Example:**
-
-**Start:**
-
-- Provide 1 ETHST ($2,000) + $2,000 USDST
-- Total: $4,000
-
-**ETH doubles to $4,000:**
-
-**If you just held:**
-
-- 1 ETHST = $4,000
-- $2,000 USDST
-- Total: $6,000
-
-**As LP:**
-
-- 0.707 ETHST = $2,828
-- $2,828 USDST
-- Total: $5,656
-- **IL: $344 (5.7%)**
-
-**But you earned fees:**
-
-- Trading fees: $450 (over time)
-- Net: $450 - $344 = $106 profit ✅
-
-**IL is offset by fees**
-
----
-
-## Comparing Strategies
-
-| Strategy | Capital | Time | Skill | Annual Return | Risk |
-|----------|---------|------|-------|---------------|------|
-| **Cross-DEX Arb** | $10k+ | Active | High | 5-20% | Medium |
-| **On-Chain Arb** | $5k+ | Very Active | High | 10-30% | Low |
-| **Wide LP** | $1k+ | Passive | Low | 8-15% | Low |
-| **Narrow LP** | $10k+ | Active | Medium | 20-50% | Medium |
-| **Market Making Bot** | $50k+ | Automated | Very High | 30-80% | Medium |
-
-**Recommendation for most users: Wide range LP**
-- Passive income
-- Reliable returns
-- Low maintenance
-
----
-
-## Advanced: Automated Market Making
-
-### Bot Strategy
-
-**Components:**
-
-1. Monitor prices across all pools
-2. Detect price imbalances
-3. Execute swaps automatically
-4. Rebalance LP positions when needed
-
-**Requirements:**
-
-- Programming skills (Python/TypeScript)
-- Server to run bot 24/7
-- Smart contract integration
-- Risk management logic
-
-**Expected returns:**
-
-- Manual active LP: 20-30% APR
-- Semi-automated: 30-50% APR
-- Fully automated bot: 50-100% APR (but requires expertise)
-
-**Risks:**
-
-- Smart contract bugs
-- Bot logic errors
-- Flash loan attacks
-- Rug pulls in new pools
-
-**Not recommended unless experienced developer**
-
----
-
-## Risk Management
-
-### For Arbitrage
-
-**Risks:**
-
-1. **Execution risk:** Price moves during trade
-2. **Bridge risk:** Assets stuck or lost
-3. **Gas spikes:** Ethereum fees eat profit
-4. **Slippage:** Large trades have price impact
-
-**Mitigations:**
-
-- Use small positions first
-- Set slippage limits
-- Monitor bridge status
-- Check gas before bridging
-
-### For Market Making
-
-**Risks:**
-
-1. **Impermanent loss:** Price movements reduce value
-2. **Smart contract risk:** Protocol exploits
-3. **Pool rug pulls:** Fake tokens or exit scams
-4. **Low liquidity:** Can't exit position
-
-**Mitigations:**
-
-- Stick to major pairs (ETHST-USDST, etc.)
-- Use audited protocols only
-- Diversify across pools
-- Monitor IL regularly
-
----
-
-## Tax Implications
-
-**Every swap is taxable:**
-
-**Arbitrage:**
-
-- May execute 10-50 trades/day
-- Each swap = taxable event
-- Complex record keeping
-- Consider tax software (Koinly, etc.)
-
-**Market Making:**
-
-- LP fees = taxable income (continuously)
-- Adding/removing liquidity = swaps (taxable)
-- Impermanent loss ≠ realized loss (until exit)
-- Track cost basis carefully
-
-**Recommendation:**
-
-- Use automated tax tools
-- Consult crypto tax specialist
-- Keep detailed logs
-- Consider tax-deferred accounts if possible
-
----
-
-## Real Example: Professional LP
-
-**User: Carlos**
-
-**Strategy:** Active narrow-range LP
-
-**Capital:** $50,000
-
-**Pairs:**
-
-- ETHST-USDST: $25k
-- WBTCST-USDST: $15k
-- USDST-USDST: $10k
-
-**Time commitment:** 30 min/day
-
-**Results over 3 months:**
-
-| Pool | Fees Earned | IL | Net | APR |
-|------|-------------|----|----|-----|
-| ETHST-USDST | $2,100 | -$350 | $1,750 | 28% |
-| WBTCST-USDST | $1,350 | -$180 | $1,170 | 31% |
-| USDST-USDST | $280 | -$5 | $275 | 11% |
-| **Total** | **$3,730** | **-$535** | **$3,195** | **26%** |
-
-**Carlos's routine:**
-
-- Morning: Check positions, rebalance if needed
-- Evening: Claim fees, compound
-- Weekly: Adjust ranges based on volatility
-
-**His takeaway:** "Treat it like a job, it pays like one"
-
----
-
-## Getting Started
-
-### Week 1: Learn
-
-- [ ] Read all LP documentation
-- [ ] Understand IL concept
-- [ ] Study pool mechanics
-- [ ] Watch prices for a week
-- [ ] Identify opportunities
-
-### Week 2: Test
-
-- [ ] Start with $500-1,000
-- [ ] Choose stable pair (USDST-USDST)
-- [ ] Wide range (low risk)
-- [ ] Track daily performance
-- [ ] Learn the UI
-
-### Week 3: Scale
-
-- [ ] If comfortable, add capital
-- [ ] Try volatile pair
-- [ ] Experiment with ranges
-- [ ] Set up tracking spreadsheet
-- [ ] Optimize based on data
-
-### Month 2+: Optimize
-
-- [ ] Analyze best pools
-- [ ] Refine range strategy
-- [ ] Consider automation
-- [ ] Compound earnings
-- [ ] Scale to target size
-
----
-
-## Tools & Resources
-
-### Tracking Tools
-
-**Portfolio dashboards:**
-
-- DeBank
-- Zapper.fi
-- APY.vision (advanced IL tracking)
-
-**Pool analytics:**
-
-- STRATO pool stats page
-- Volume charts
-- Fee tier analysis
-
-**Price monitoring:**
-
-- TradingView
-- CoinGecko
-- Telegram price bots
-
-### Calculators
-
-**LP profitability:**
-
-- dailydefi.org/tools/impermanent-loss-calculator
-- defi-lab.xyz/uniswapv3simulator
-
-**Arbitrage:**
-
-- Custom spreadsheets
-- Real-time price feeds
-- Profit calculators (build your own)
-
----
-
-## Common Mistakes
-
-### ❌ Providing to Low-Volume Pools
-
-**Problem:** No trades = no fees
-
-**Fix:**
-
-- Check 24h volume
-- Minimum $100k daily volume
-- Stick to major pairs
-
-### ❌ Ignoring Impermanent Loss
-
-**Problem:** Price moves, but you focus only on fees
-
-**Fix:**
-
-- Calculate IL regularly
-- Ensure fees > IL
-- Exit if losing money
-
-### ❌ Over-Concentrating Range
-
-**Problem:** Price moves out of range constantly
-
-**Fix:**
-
-- Start wide
-- Narrow gradually based on data
-- Balance active time vs fees
-
----
-
-## Summary
-
-**Arbitrage:**
-
-- High skill, active management
-- Profit opportunities exist but small
-- Better suited for bots
-- 5-20% APR for retail
-
-**Market Making (LP):**
-
-- More accessible
-- Passive to semi-active
-- Reliable income
-- 8-50% APR depending on strategy
-
-**Recommendation: Start with wide-range LP**
+## Risks
+
+| Strategy | Main risks |
+|----------|------------|
+| Pool arbitrage | Non-atomic legs, price impact, competition |
+| PSM | Fee changes, mint caps, redemption liquidity limits, pauses |
+| Liquidations | Collateral price falls before you sell; oracle and pool prices differ |
+| Cross-chain | Bridge delays, fees and bridge risk |
+| Flash strategies | Contract bugs in your code; facility limits or pauses |
+| Liquidity provision | Impermanent loss, out-of-range V3 positions, thin volume, smart contract risk |
 
 ---
 
 ## Next Steps
 
-### Related Strategies
-
-- **[Maximize Yield](maximize-yield.md)** - Combine with other strategies
-- **[Multi-Asset Strategy](multi-asset-strategy.md)** - LP in multiple pools
-- **[DCA Strategy](dca-strategy.md)** - Regular LP additions
-
-### Learn More
-
-- **[Liquidity Guide](../guides/liquidity.md)** - Detailed LP walkthrough
-- **[Swap Guide](../guides/swap.md)** - Understand trading mechanics
-- **[Safety Guide](../safety.md)** - Risk management
+- **[Provide Liquidity](../guides/liquidity.md)** - Detailed LP walkthrough
+- **[Swap Guide](../guides/swap.md)** - Pool types, price impact, slippage
+- **[Multi-Asset Strategy](multi-asset-strategy.md)** - LP alongside vaults and Earn
+- **[Safety Guide](../safety.md)**
 
 ### Need Help?
 
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-

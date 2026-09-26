@@ -7,6 +7,7 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 router.get("/info", authHandler.authorizeRequest(), StakingController.getInfo);
 router.get("/info/public", authHandler.authorizeRequest(true), StakingController.getPublicInfo);
+router.get("/authorization-digest", authHandler.authorizeRequest(), StakingController.getAuthorizationDigest);
 
 router.post("/stake", walletAuth, StakingController.stake);
 router.post("/move", walletAuth, StakingController.moveStake);
@@ -36,7 +37,9 @@ router.post("/exit/cancel", walletAuth, StakingController.cancelExit);
 
 // admin (owner votes)
 router.patch("/admin/operators/validator-address", walletAuth, StakingController.setValidatorAddress);
+router.patch("/admin/operators/operator", walletAuth, StakingController.setValidatorOperator);
 router.patch("/admin/validator-params", walletAuth, StakingController.setValidatorParams);
+router.patch("/admin/self-bond-grace", walletAuth, StakingController.setSelfBondGrace);
 router.patch("/admin/set-params", walletAuth, StakingController.setSetParams);
 router.patch("/admin/governance", walletAuth, StakingController.setGovernance);
 router.post("/admin/recover-fees", walletAuth, StakingController.recoverUnattributedFees);
