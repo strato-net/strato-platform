@@ -180,6 +180,9 @@ pipeline {
             script{
               lib.checkNodeStatusHealth()
               lib.checkNodeIsGettingBlocks()
+              // With blocks flowing, the JSON-RPC (nginx /rpc -> ethereum-jsonrpc) must
+              // serve Postgres-backed and vm-runner-backed methods, also concurrently.
+              lib.checkNodeRpc()
             }
           }
         }

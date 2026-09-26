@@ -93,10 +93,16 @@ module.exports = {
             latestCheckTimestamp: null,
             lastFailureTimestamp: null,
           },
+          jsonRpc: {
+            enabled: null,
+            health: null,
+            latestCheckTimestamp: null,
+            lastFailureTimestamp: null,
+          },
         },
       };
 
-      const [[healthInfo, stallInfo, systemInfo, syncInfo], pbftData, nodeAddress] = await Promise.all([
+      const [[healthInfo, stallInfo, systemInfo, syncInfo, , jsonRpcInfo], pbftData, nodeAddress] = await Promise.all([
         utils.getLatestHealth(),
         getPbftData(),
         getNodeAddress(),
@@ -107,7 +113,8 @@ module.exports = {
           healthInfo,
           stallInfo,
           systemInfo,
-          syncInfo
+          syncInfo,
+          jsonRpcInfo
         );
       } else {
         winston.warn(
@@ -141,7 +148,7 @@ module.exports = {
     try {
       let health = null, uptime = null, healthStatus = null, healthIssues = [], healthData = null;
       const [
-        [healthInfo, stallInfo, systemInfo, syncInfo],
+        [healthInfo, stallInfo, systemInfo, syncInfo, , jsonRpcInfo],
         lastBlock,
         bestBlockNumber,
         pbftData,
@@ -185,7 +192,8 @@ module.exports = {
           healthInfo,
           stallInfo,
           systemInfo,
-          syncInfo
+          syncInfo,
+          jsonRpcInfo
         ));
       } else {
         winston.warn(
@@ -211,6 +219,7 @@ module.exports = {
         healthIssues: healthIssues,
         nodeSync: healthData && healthData.nodeSync,
         stallHealth: healthData && healthData.stallHealth,
+        jsonRpc: healthData && healthData.jsonRpc,
         uptime: uptime,
       });
     } catch (error) {

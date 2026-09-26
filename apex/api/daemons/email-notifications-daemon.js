@@ -41,7 +41,7 @@ async function singleCheck() {
 async function executeCheck() {
   let health = true;
   try {
-    const [healthInfo, stallInfo, systemInfo, syncInfo] =
+    const [healthInfo, stallInfo, systemInfo, syncInfo, , jsonRpcInfo] =
         await utils.getLatestHealth();
     
     if (healthInfo && stallInfo && systemInfo && syncInfo) {
@@ -49,7 +49,8 @@ async function executeCheck() {
           healthInfo,
           stallInfo,
           systemInfo,
-          syncInfo
+          syncInfo,
+          jsonRpcInfo
       ));
     } else {
       winston.warn(`Health table has no entries yet; Health endpoint is called too early. Wait until the next iteration.`);

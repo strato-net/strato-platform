@@ -23,6 +23,12 @@ const neededJobs = {
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
+// ethereum-jsonrpc liveness. The service is optional (strato-init --jsonrpc), so the
+// probe only runs when the container is told it is enabled; a missing variable
+// (compose files generated before this check existed) disables the probe.
+const JSONRPC_ENABLED = process.env.JSONRPC_ENABLED === "true";
+const RPC_PORT = process.env.RPC_PORT || "8545";
+
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 async function singleCheck() {
@@ -41,6 +47,8 @@ function queryHealthStatus() {
 
       await checkHealthIsFresh();
 
+      // Independent of the Prometheus data; started here so it runs alongside it.
+      const jsonRpcCheck = checkJsonRpc();
       const prometheusData = await getPrometheusMetrics();
       const prometheusMetrics = reformatPrometheusMetrics(prometheusData);
 
@@ -48,6 +56,7 @@ function queryHealthStatus() {
         prometheusMetrics
       );
       await updateNodeHealthStatus(nodeHealthData);
+      await updateJsonRpcStatus(await jsonRpcCheck);
       return resolve();
     } catch (error) {
       winston.error(
@@ -366,6 +375,78 @@ async function updateNodeHealthStatus(nodeHealthData) {
   return;
 }
 
+// Probes the JSON-RPC server with eth_blockNumber. Returns [isUp, details]; a
+// disabled service is reported as up so it never affects the node health.
+async function checkJsonRpc() {
+  if (!JSONRPC_ENABLED) {
+    return [true, { enabled: false }];
+  }
+  const url = `http://${process.env["STRATO_HOSTNAME"]}:${RPC_PORT}/`;
+  try {
+    const { data } = await axios({
+      method: "POST",
+      url,
+      maxRedirects: 0,
+      timeout: config.healthCheck.requestTimeout - 100,
+      headers: { "Content-Type": "application/json" },
+      data: { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] },
+    });
+    if (!data || data.error || !/^0x[0-9a-fA-F]+$/.test(String(data.result))) {
+      return [
+        false,
+        { enabled: true, url, error: `unexpected eth_blockNumber response: ${JSON.stringify(data).slice(0, 200)}` },
+      ];
+    }
+    return [true, { enabled: true, url, blockNumber: parseInt(data.result, 16) }];
+  } catch (error) {
+    return [false, { enabled: true, url, error: error.message }];
+  }
+}
+
+function parseAdditionalInfo(value) {
+  if (!value) return {};
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch (_) {
+    return {};
+  }
+}
+
+// Stores the probe result as the "JsonRpcStat" row. Like the Prometheus based
+// check, the service is only reported unhealthy after pollTimeoutsForUnhealthy
+// failed polls in a row, so a single slow answer does not flip the node status.
+async function updateJsonRpcStatus([isUp, details]) {
+  const currentTime = Date.now();
+  const [stat] = await models.CurrentHealth.findOrCreate({
+    where: { processName: "JsonRpcStat" },
+    defaults: {
+      latestHealthStatus: true,
+      latestCheckTimestamp: currentTime,
+      lastFailureTimestamp: currentTime,
+      additionalInfo: JSON.stringify({ ...details, consecutiveFailures: 0 }),
+    },
+  });
+  const previous = parseAdditionalInfo(stat.additionalInfo);
+  const consecutiveFailures = isUp ? 0 : (previous.consecutiveFailures || 0) + 1;
+  const healthy =
+    !details.enabled || consecutiveFailures < config.healthCheck.pollTimeoutsForUnhealthy;
+  if (!isUp) {
+    winston.warn(`JSON-RPC check failed (${consecutiveFailures} in a row): ${details.error}`);
+  }
+  await stat.update(
+    {
+      latestCheckTimestamp: currentTime,
+      latestHealthStatus: healthy,
+      additionalInfo: JSON.stringify({ ...details, consecutiveFailures }),
+      lastFailureTimestamp: healthy ? stat.lastFailureTimestamp : currentTime,
+    },
+    {
+      where: { processName: "JsonRpcStat" },
+    }
+  );
+}
+
 async function checkHealthIsFresh() {
   try {
     const healthInfo = await models.CurrentHealth.findOne({
@@ -569,6 +650,8 @@ async function checkSystemInfo() {
 }
 
 module.exports = {
+  checkJsonRpc,
+  updateJsonRpcStatus,
   singleCheck,
   updateNodeHealthStatus,
   calcNodeHealthAndSaveVitalStats,
