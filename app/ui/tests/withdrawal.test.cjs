@@ -197,7 +197,7 @@ test('withdrawal summary and confirmation render exact preview amounts and the p
   }
   const empty = widgetHarness(native);
   const summary = renderToStaticMarkup(React.createElement(Summary, empty.find(p => p.balanceImpact).props));
-  assert.ok(summary.includes('— wGOLDST'));
+  assert.ok(summary.includes('Enter an amount to see what you’ll receive.'));
 });
 
 for (const route of [standard, native]) {

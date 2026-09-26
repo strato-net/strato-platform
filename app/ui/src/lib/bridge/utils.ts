@@ -264,7 +264,7 @@ export const BRIDGE_STATUS_OPTIONS = [
   { value: ExternalBridgeStatus.PENDING_REVIEW, label: "Pending Review" },
   { value: ExternalBridgeStatus.READY, label: "Ready" },
   { value: ExternalBridgeStatus.COMPLETED, label: "Completed" },
-  { value: ExternalBridgeStatus.CANCELLED, label: "Cancelled" },
+  { value: ExternalBridgeStatus.CANCELLED, label: "Canceled" },
   { value: ExternalBridgeStatus.REFUNDED, label: "Refunded" },
   { value: ExternalBridgeStatus.ABORTED, label: "Aborted" },
 ];
@@ -272,6 +272,21 @@ export const BRIDGE_STATUS_OPTIONS = [
 export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
   [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.PENDING_REVIEW, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
 );
+
+export const WITHDRAWAL_STATUS_LABELS: Record<number, string> = {
+  [ExternalBridgeStatus.INITIATED]: "Requested",
+  [ExternalBridgeStatus.PENDING_REVIEW]: "Pending Review",
+  [ExternalBridgeStatus.READY]: "Processing",
+  [ExternalBridgeStatus.COMPLETED]: "Completed",
+  [ExternalBridgeStatus.CANCELLED]: "Canceled",
+  [ExternalBridgeStatus.REFUNDED]: "Refunded",
+  [ExternalBridgeStatus.ABORTED]: "Canceled",
+};
+
+// CANCELLED is reserved; the bridge contracts use ABORTED for cancellations.
+export const WITHDRAWAL_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS
+  .filter(({ value }) => value !== ExternalBridgeStatus.CANCELLED)
+  .map(({ value, label }) => ({ value, label: WITHDRAWAL_STATUS_LABELS[value] ?? label }));
 
 /**
  * Chain options for filter dropdowns

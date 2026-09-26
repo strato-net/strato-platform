@@ -4,6 +4,7 @@ dotenv.config();
 import axios from "axios";
 import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
+import { WithdrawalReleasePendingError } from "../types";
 import { ConsensusProvider } from "./consensusProvider";
 import { depositSettlementDigest } from "./authorizationValidation";
 import { verifierAccessControl } from "./accessControl";
@@ -800,20 +801,20 @@ app.post("/v1/attest-release", async (req, res) => {
     await Promise.all([
       validateSourceWithdrawal(authorization, [3], false),
       validateReleasedDestination(authorization, reservationId),
-      validateWithdrawalRelease(
-        provider,
-        {
-          withdrawalId: authorization.sourceWithdrawalId,
-          reservationId,
-          externalTxHash,
-          token: authorization.token,
-          recipient: authorization.recipient,
-          amount: authorization.amount,
-        },
-        authorization.destinationVault,
-        verifierConfirmations,
-      ),
     ]);
+    await validateWithdrawalRelease(
+      provider,
+      {
+        withdrawalId: authorization.sourceWithdrawalId,
+        reservationId,
+        externalTxHash,
+        token: authorization.token,
+        recipient: authorization.recipient,
+        amount: authorization.amount,
+      },
+      authorization.destinationVault,
+      verifierConfirmations,
+    );
     const transactionHash = await submitStratoAttestation(
       "attestWithdrawalRelease",
       {
@@ -824,6 +825,10 @@ app.post("/v1/attest-release", async (req, res) => {
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
   } catch (error) {
+    if (error instanceof WithdrawalReleasePendingError) {
+      res.status(409).json({ decision: "pending_confirmations", error: error.message });
+      return;
+    }
     console.error("Withdrawal release attestation rejected", (error as Error).message);
     res.status(422).json({ error: (error as Error).message });
   }

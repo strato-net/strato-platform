@@ -1,6 +1,7 @@
 import { verifyEthTransactionCustody } from "../utils/custodyValidation";
 import { normalizeAddress, normalizeHex as normalize } from "../utils/utils";
 import { Interface, JsonRpcProvider, ZeroAddress, getAddress } from "ethers";
+import { WithdrawalReleasePendingError } from "../types";
 
 export interface DepositSettlementAttestation {
   externalChainId: string;
@@ -172,10 +173,6 @@ export const validateWithdrawalRelease = async (
   if (!receipt || receipt.status !== 1) {
     throw new Error("Withdrawal release receipt is missing or failed");
   }
-  const latestBlock = await provider.getBlockNumber();
-  if (latestBlock - receipt.blockNumber < confirmations) {
-    throw new Error("Withdrawal release has insufficient confirmations");
-  }
   const matchingEvents = receipt.logs.filter((log) => {
     if (normalize(log.address) !== normalize(vaultAddress)) return false;
     try {
@@ -194,5 +191,9 @@ export const validateWithdrawalRelease = async (
   });
   if (matchingEvents.length !== 1) {
     throw new Error("Withdrawal release event does not match settlement");
+  }
+  const latestBlock = await provider.getBlockNumber();
+  if (latestBlock - receipt.blockNumber < confirmations) {
+    throw new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations");
   }
 };

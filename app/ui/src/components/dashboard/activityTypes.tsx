@@ -654,7 +654,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Deposit": {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
-    displayName: "Non-native Deposit",
+    displayName: "Bridge In",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -718,10 +718,10 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       return {
         title: isRouted
-          ? "Deposit & Trade"
+          ? "Bridge & Trade"
           : isFallback
-            ? "Deposit (Fallback)"
-            : "Non-native Deposit",
+            ? "Bridge In (Fallback)"
+            : "Bridge In",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -742,7 +742,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "ExternalDeposit": {
     contract_name: "ExternalAssetBridge",
     event_name: "DepositCompleted",
-    displayName: "Non-native Deposit",
+    displayName: "Bridge In",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) =>
       activityTypes.Deposit.getTokenAddress(event),
@@ -752,7 +752,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "RoutedTrade": {
     contract_name: "TokenRouter",
     event_name: "RouteExecuted",
-    displayName: "Routed Trade",
+    displayName: "Trade",
     iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
     getTokenAddress: (event: Event) =>
       [event.attributes.tokenIn, event.attributes.tokenOut].filter(
@@ -769,7 +769,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const caller = event.attributes.caller || "";
       const recipient = event.attributes.recipient || "";
       return {
-        title: "Routed Trade",
+        title: "Trade",
         fields: [
           addImageToField(
             {
@@ -815,21 +815,19 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "NativeDeposit": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeDepositCompleted",
-    displayName: "Native Deposit",
+    displayName: "Bridge In",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => ({
-      ...activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
-      title: "Native Deposit",
-    }),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
   },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Non-native Bridge Out",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
@@ -900,7 +898,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       return {
-        title: "Non-native Bridge Out",
+        title: "Bridge Out",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -921,7 +919,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "ExternalWithdraw": {
     contract_name: "ExternalAssetBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Non-native Bridge Out",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -948,7 +946,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "NativeWithdraw": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeWithdrawalRequested",
-    displayName: "Native Bridge Out",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
@@ -972,7 +970,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
 
       return {
         ...activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages),
-        title: "Native Bridge Out",
+        title: "Bridge Out",
       };
     },
   },

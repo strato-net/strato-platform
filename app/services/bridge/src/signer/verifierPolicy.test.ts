@@ -505,3 +505,50 @@ test("deposit handler validates custody and route before submitting fallback-onl
   assert.equal((await invoke({ ...routed, externalTokenAmount: "101" })).result.fallbackOnly, true);
   assert.equal(calls[2].method, "attestDepositFallback");
 });
+
+test("release handler returns pending confirmations without logging or submitting an attestation", async () => {
+  const { WithdrawalReleasePendingError } = await import("../types");
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-release"');
+  assert.ok(endpoint);
+  let handler: any;
+  let validationError: Error | null = new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations");
+  let sourceError: Error | null = null;
+  let submitted = 0;
+  let errors = 0;
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    WithdrawalReleasePendingError, provider: {}, verifierConfirmations: 12,
+    validateSourceWithdrawal: async () => { if (sourceError) throw sourceError; }, validateReleasedDestination: async () => {},
+    validateWithdrawalRelease: async () => { if (validationError) throw validationError; },
+    submitStratoAttestation: async () => { submitted++; return "tx"; },
+    settlementAttestorAddress: "attestor", console: { error: () => { errors++; } },
+  });
+  const invoke = async () => {
+    let status = 200;
+    let result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body: { authorization: { destinationVault: "vault" }, reservationId: "reservation", externalTxHash: "release" } }, response);
+    return { status, result };
+  };
+  const pending = await invoke();
+  assert.equal(pending.status, 409);
+  assert.equal(pending.result.decision, "pending_confirmations");
+  assert.equal(submitted, 0);
+  assert.equal(errors, 0);
+  sourceError = new Error("source mismatch");
+  assert.equal((await invoke()).status, 422);
+  assert.equal(errors, 1);
+  assert.equal(submitted, 0);
+  sourceError = null;
+  validationError = new Error("release proof mismatch");
+  assert.equal((await invoke()).status, 422);
+  assert.equal(errors, 2);
+  assert.equal(submitted, 0);
+  validationError = null;
+  assert.equal((await invoke()).status, 200);
+  assert.equal(submitted, 1);
+});

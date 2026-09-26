@@ -1,5 +1,5 @@
 import { cirrus } from "../utils/api";
-import { ensureHexPrefix } from "../utils/utils";
+import { ensureHexPrefix, normalizeOptionalHash } from "../utils/utils";
 import { config, CIRRUS_PAGE_SIZE, CIRRUS_FILTER_BATCH_SIZE } from "../config";
 import { logInfo } from "../utils/logger";
 import {
@@ -275,6 +275,10 @@ export const getExternalWithdrawalsByStatus = async (
       bridgeStatus: item.value.status,
       withdrawalId: item.key,
       vault,
+      reservationId: normalizeOptionalHash(item.value.reservationId) ?? undefined,
+      reservationTxHash: normalizeOptionalHash(item.value.reservationTxHash) ?? undefined,
+      cancellationTxHash: normalizeOptionalHash(item.value.cancellationTxHash) ?? undefined,
+      externalTxHash: normalizeOptionalHash(item.value.externalTxHash) ?? undefined,
       authorizationNotBefore: authorizations.get(String(item.key))?.notBefore,
       signerSetVersion: authorizations.get(String(item.key))?.signerSetVersion,
       reviewApprovalDeadline: reviews.get(String(item.key))?.approvalDeadline,

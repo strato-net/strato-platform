@@ -103,6 +103,61 @@ test("withdrawal enrichment batches long IDs and reads capped authorization/revi
   }
 });
 
+test("withdrawal reads normalize unset Cirrus hashes and preserve real reservation records", async (t) => {
+  const hashes = [undefined, null, "", "0".repeat(40), `0x${"0".repeat(64)}`, `0X${"0".repeat(64)}`, `0x${"a".repeat(64)}`];
+  const rows = hashes.map((hash, i) => ({ ...withdrawal(i), value: {
+    ...withdrawal(i).value, reservationId: hash, reservationTxHash: hash,
+    cancellationTxHash: hash, externalTxHash: hash,
+  } }));
+  await mockCirrus(t, { [`${external}-withdrawals`]: rows });
+  const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const result = await getExternalWithdrawalsByStatus("1");
+  for (const [i, row] of result.entries()) {
+    for (const field of ["reservationId", "reservationTxHash", "cancellationTxHash", "externalTxHash"]) {
+      assert.equal((row as any)[field], i === hashes.length - 1 ? hashes[i] : undefined, field);
+    }
+  }
+});
+
+test("READY withdrawal with Cirrus zero hashes reserves and releases instead of reporting a mismatch", async (t) => {
+  await mockCirrus(t, { [`${external}-withdrawals`]: [{ ...withdrawal(1), value: {
+    ...withdrawal(1).value, status: "3", reservationId: "0".repeat(40), cancellationTxHash: "0".repeat(40),
+  } }] });
+  const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  const { eth } = await import("../utils/api");
+  const vault = await import("./externalWithdrawalService");
+  const strato = await import("../utils/stratoHelper");
+  const attestation = await import("./settlementAttestationService");
+  const trace: string[] = [];
+  t.mock.method(eth, "get", async () => ({ networkID: "9001" }));
+  t.mock.method(vault, "buildWithdrawalAuthorization", async () => ({ deadline: "2800", signerSetVersion: "1" } as any));
+  t.mock.method(vault, "getReservationState", async (_authorization, includeHash) => {
+    assert.equal(includeHash, true);
+    return { reservationId: "reservation", status: 0, latestTimestamp: 1000n, signerSetVersion: 1n };
+  });
+  t.mock.method(vault, "reserveWithdrawal", async () => {
+    trace.push("reserve");
+    return { reservationId: "reservation", transactionHash: "reserve-hash" };
+  });
+  t.mock.method(strato, "execute", async (input: any) => {
+    trace.push(input.method);
+    assert.equal(input.args.reservationId, "reservation");
+    assert.equal(input.args.reservationTxHash, "reserve-hash");
+    return { status: "Success" } as any;
+  });
+  t.mock.method(vault, "releaseWithdrawal", async () => { trace.push("release"); return "release-hash"; });
+  t.mock.method(attestation, "attestWithdrawalRelease", async () => { trace.push("attest"); });
+  t.mock.method(strato, "executeAsRelayer", async (input: any) => {
+    trace.push(input.method);
+    assert.equal(input.args.externalTxHash, "release-hash");
+    return { status: "Success" } as any;
+  });
+  const [row] = await getExternalWithdrawalsByStatus("3");
+  await processExternalWithdrawal(row);
+  assert.deepEqual(trace, ["reserve", "recordWithdrawalReservation", "release", "attest", "finalizeWithdrawal"]);
+});
+
 test("capacity-stalled withdrawals do not hide later withdrawals from a polling pass", async (t) => {
   await mockCirrus(t, { [`${external}-withdrawals`]: Array.from({ length: 7 }, (_, i) => withdrawal(i)) });
   const bridge = await import("./bridgeService");

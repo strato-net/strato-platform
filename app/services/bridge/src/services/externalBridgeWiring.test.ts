@@ -647,7 +647,7 @@ test("pre-flight requires every verifier and surfaces dissent as manual review",
   }
 });
 
-test("reserves and releases before finalizing a routine withdrawal", async () => {
+test("reserves and releases before finalizing a routine withdrawal", async (t) => {
   const stratoHelper = await import("../utils/stratoHelper");
   const api = await import("../utils/api");
   const vaultService = await import("./externalWithdrawalService");
@@ -695,7 +695,7 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
   };
 
   const { processExternalWithdrawal } = await import("./bridgeService");
-  await processExternalWithdrawal({
+  const withdrawal = {
     bridgeStatus: "1",
     custodyTxHash: "",
     externalChainId: 1,
@@ -709,7 +709,8 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
     timestamp: "1",
     withdrawalId: "7",
     vault: "vault",
-  });
+  };
+  await processExternalWithdrawal(withdrawal);
 
   assert.deepEqual(trace, [
     "verifier:check",
@@ -719,6 +720,32 @@ test("reserves and releases before finalizing a routine withdrawal", async () =>
     "vault:release",
     "relayer:finalizeWithdrawal",
   ]);
+
+  const attestation = await import("./settlementAttestationService");
+  const { WithdrawalReleasePendingError } = await import("../types");
+  const logger = await import("../utils/logger");
+  const info = t.mock.method(logger, "logInfo", () => undefined);
+  let attestationError: Error | null = new WithdrawalReleasePendingError("pending confirmations");
+  t.mock.method(attestation, "attestWithdrawalRelease", async () => {
+    if (attestationError) throw attestationError;
+  });
+  t.mock.method(vaultService, "getReservationId", () => "reservation");
+  t.mock.method(vaultService, "getReservationState", async () => ({
+    reservationId: "reservation", status: 2, latestTimestamp: 1000n, signerSetVersion: 1n,
+  } as any));
+  const ready = { ...withdrawal, bridgeStatus: "3", reservationId: "reservation" };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    trace.length = 0;
+    await processExternalWithdrawal(ready);
+    assert.deepEqual(trace, ["vault:release"]);
+  }
+  assert.equal(info.mock.callCount(), 2);
+  attestationError = new Error("invalid release proof");
+  await assert.rejects(processExternalWithdrawal(ready), /invalid release proof/);
+  attestationError = null;
+  trace.length = 0;
+  await processExternalWithdrawal(ready);
+  assert.deepEqual(trace, ["vault:release", "relayer:finalizeWithdrawal"]);
 });
 
 test("records a verifier-demanded review instead of starting the authorization clock", async () => {

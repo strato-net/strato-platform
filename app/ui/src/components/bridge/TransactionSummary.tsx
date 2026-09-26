@@ -38,7 +38,7 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
 }) => {
   const isRebasing = !!selectedToken?.rebaseFactor;
   const outcomeAmount = preview !== undefined
-    ? preview && selectedToken ? formatUnits(preview.externalAmount, Number(selectedToken.externalDecimals)) : "—"
+    ? preview && selectedToken ? formatUnits(preview.externalAmount, Number(selectedToken.externalDecimals)) : null
     : isRebasing && amount
     ? computeRebasedOutcome(amount, selectedToken.rebaseFactor!)
     : (amount || "0.00");
@@ -80,8 +80,9 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
         <span>Outcome</span>
         <span className="font-medium text-foreground">
-          {outcomeAmount} {selectedToken?.externalSymbol || ""} to{" "}
-          {selectedNetwork || "external network"}
+          {outcomeAmount === null
+            ? "Enter an amount to see what you’ll receive."
+            : `${outcomeAmount} ${selectedToken?.externalSymbol || ""} to ${selectedNetwork || "external network"}`}
         </span>
       </div>
       {isRebasing && (

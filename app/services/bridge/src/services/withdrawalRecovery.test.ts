@@ -164,7 +164,7 @@ if (process.argv[2] === "--recovery-worker") {
     };
     try {
       writeFileSync(file, JSON.stringify({ vaultStatus: 1, payments: 0, settlements: 0,
-        completed: false, reservationId: "", recoveredEvents: [] }));
+        completed: false, reservationId: "0".repeat(40), recoveredEvents: [] }));
       run("release", 73);
       assert.equal(read().payments, 1);
       assert.equal(read().settlements, 0);
@@ -187,7 +187,7 @@ if (process.argv[2] === "--recovery-worker") {
       assert.ok(result.recoveredEvents.includes("release"));
       // An external relayer paid before the source reservation was recorded.
       writeFileSync(file, JSON.stringify({ vaultStatus: 2, payments: 1, settlements: 0,
-        completed: false, reservationId: "", recoveredEvents: [] }));
+        completed: false, reservationId: `0x${"0".repeat(64)}`, recoveredEvents: [] }));
       run("settle", 74);
       run("restart", 0);
       assert.equal(read().payments, 1);

@@ -3,7 +3,7 @@ import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Table, Select, Space, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import { useBridgeContext } from '@/context/BridgeContext';
-import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
+import { formatDate, getChainName, WITHDRAWAL_STATUS_LABELS, WITHDRAWAL_STATUS_OPTIONS, CHAIN_OPTIONS, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
 import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiToDecimalHP } from '@/utils/numberUtils';
@@ -179,43 +179,41 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         const statusStr = record?.WithdrawalInfo?.bridgeStatus || '0';
         const statusNum = parseInt(statusStr);
+        const statusLabel = WITHDRAWAL_STATUS_LABELS[statusNum];
         if (statusNum === ExternalBridgeStatus.INITIATED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
-              Initiated
+              {statusLabel}
             </span>
           );
         } else if (statusNum === ExternalBridgeStatus.PENDING_REVIEW) {
           return (
             <span
               className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
-              title={record?.WithdrawalInfo?.reviewApprovalDeadline
-                ? `Safe review expires ${new Date(Number(record.WithdrawalInfo.reviewApprovalDeadline) * 1000).toLocaleString()}`
-                : undefined}
             >
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Safe Review
+              {statusLabel}
             </span>
           );
         } else if (statusNum === ExternalBridgeStatus.READY) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
-              Ready
+              {statusLabel}
             </span>
           );
         } else if (statusNum === ExternalBridgeStatus.COMPLETED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Completed
+              {statusLabel}
             </span>
           );
         } else if (statusNum === ExternalBridgeStatus.REFUNDED) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Refunded
+              {statusLabel}
             </span>
           );
         } else if (
@@ -224,7 +222,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         ) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              {statusNum === ExternalBridgeStatus.CANCELLED ? 'Cancelled' : 'Aborted'}
+              {statusLabel}
             </span>
           );
         }
@@ -284,7 +282,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
-              options={BRIDGE_STATUS_OPTIONS}
+              options={WITHDRAWAL_STATUS_OPTIONS}
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>

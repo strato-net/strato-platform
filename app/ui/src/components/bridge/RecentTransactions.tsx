@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
-import { ExternalBridgeStatus, mergePendingDeposits } from '@/lib/bridge/utils';
+import { ExternalBridgeStatus, WITHDRAWAL_STATUS_LABELS, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenMetadata, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<number, { text: string; color: string }> = {
   [ExternalBridgeStatus.PENDING_REVIEW]: { text: "Pending Review", color: "bg-amber-500/15 text-amber-500" },
   [ExternalBridgeStatus.READY]: { text: "Ready", color: "bg-blue-500/15 text-blue-500" },
   [ExternalBridgeStatus.COMPLETED]: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
-  [ExternalBridgeStatus.CANCELLED]: { text: "Cancelled", color: "bg-red-500/15 text-red-500" },
+  [ExternalBridgeStatus.CANCELLED]: { text: "Canceled", color: "bg-red-500/15 text-red-500" },
   [ExternalBridgeStatus.REFUNDED]: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
   [ExternalBridgeStatus.ABORTED]: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
 };
@@ -192,7 +192,9 @@ const RecentTransactions = ({
     const params = { limit: String(recentLimit), offset: "0", order: "block_timestamp.desc" };
     Promise.all([
       fetchDepositTransactions(params, "deposits"),
-      fetchWithdrawTransactions(params, "deposits"),
+      includeRoutes
+        ? Promise.resolve({ data: [] })
+        : fetchWithdrawTransactions(params, "deposits"),
       includeRoutes
         ? activityFeedApi.getActivities(
             [{ contract_name: "TokenRouter", event_name: "RouteExecuted" }],
@@ -270,7 +272,10 @@ const RecentTransactions = ({
         const isW = tx._type === 'withdrawal';
         const isFallback = !isW && tx.depositOutcome === "fallback";
         const isRouted = !isW && tx.depositOutcome === "route";
-        const status = getStatusLabel(tx.status);
+        const status = {
+          ...getStatusLabel(tx.status),
+          ...(isW && { text: WITHDRAWAL_STATUS_LABELS[Number(tx.status)] || UNKNOWN_STATUS.text }),
+        };
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
         const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);
         const externalAmt = isW && tx.externalAmount && Number.isInteger(tx.externalDecimals)

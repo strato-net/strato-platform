@@ -303,3 +303,5 @@ export interface PollHealthState {
   failed: boolean;
   runFailed: boolean;
 }
+
+export class WithdrawalReleasePendingError extends Error {}

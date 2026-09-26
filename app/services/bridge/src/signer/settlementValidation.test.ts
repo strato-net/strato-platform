@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Interface, JsonRpcProvider } from "ethers";
+import { WithdrawalReleasePendingError } from "../types";
 import {
   DepositSettlementAttestation,
   validateDepositSettlement,
@@ -177,13 +178,13 @@ test("accepts wrapper releases only with a confirmed, unique matching vault even
   await validateWithdrawalRelease(provider, request, vault, 5);
   await assert.rejects(
     validateWithdrawalRelease(provider, request, vault, 6),
-    /insufficient confirmations/,
+    WithdrawalReleasePendingError,
   );
   for (const mismatch of [
     { reservationId: txHash }, { token: sender }, { recipient: sender }, { amount: "101" },
   ]) {
     await assert.rejects(
-      validateWithdrawalRelease(provider, { ...request, ...mismatch }, vault, 5),
+      validateWithdrawalRelease(provider, { ...request, ...mismatch }, vault, 6),
       /event does not match/,
     );
   }

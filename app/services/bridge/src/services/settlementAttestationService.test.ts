@@ -301,3 +301,44 @@ test("waits for the existing deadline before using a mixed quorum when the last 
   for (const deadline of deadlines) deadline.abort(new Error("verifier deadline exceeded"));
   assert.equal(await pending, true);
 });
+
+test("release confirmation waits stay pending without hiding real verifier failures", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const logger = await import("../utils/logger");
+  const { WithdrawalReleasePendingError } = await import("../types");
+  const { attestWithdrawalRelease, attestDepositSettlement } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two,token-three";
+  const errors = t.mock.method(logger, "logError", () => undefined);
+  const authorization = { destinationChainId: "1" } as any;
+  let mode = "pending";
+  t.mock.method(axios, "post", async (url: string) => {
+    const identity = url.split("/")[2];
+    if (mode === "accepted" && identity !== "three") {
+      return { data: { transactionHash: `tx-${identity}`, settlementAttestor: identity } };
+    }
+    const error: any = new Error("verifier response");
+    error.isAxiosError = true;
+    error.response = identity === "one"
+      ? { status: 409, data: { decision: "pending_confirmations" } }
+      : { status: 422, data: { error: "Withdrawal release has insufficient confirmations" } };
+    if (mode === "failure" && identity === "three") {
+      error.response = { status: 422, data: { error: "Withdrawal release event does not match settlement" } };
+    }
+    throw error;
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await assert.rejects(attestWithdrawalRelease(authorization, "reservation", "tx"), WithdrawalReleasePendingError);
+  }
+  assert.equal(errors.mock.callCount(), 0);
+  mode = "failure";
+  await assert.rejects(attestWithdrawalRelease(authorization, "reservation", "tx"), (error) =>
+    error instanceof Error && !(error instanceof WithdrawalReleasePendingError) && /threshold not reached/.test(error.message));
+  assert.equal(errors.mock.callCount(), 1);
+  mode = "pending";
+  await assert.rejects(attestDepositSettlement(deposit), /threshold not reached/);
+  assert.equal(errors.mock.callCount(), 4);
+  mode = "accepted";
+  await attestWithdrawalRelease(authorization, "reservation", "tx");
+});

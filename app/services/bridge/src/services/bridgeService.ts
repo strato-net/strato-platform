@@ -7,9 +7,10 @@ import {
 import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
+import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData, WithdrawalReleasePendingError } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
+import { normalizeOptionalHash } from "../utils/utils";
 import { mintVouchersForDeposits } from "./voucherService";
 import { eth } from "../utils/api";
 import {
@@ -56,13 +57,6 @@ let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
 const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
 const inFlightSafeProposalWithdrawals = new Set<string>();
-
-const normalizeOptionalHash = (value?: string | null): string | null => {
-  const normalized = value?.trim();
-  if (!normalized) return null;
-  const withoutPrefix = normalized.replace(/^0x/i, "");
-  return /^0+$/.test(withoutPrefix) ? null : normalized;
-};
 
 export const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
@@ -838,11 +832,19 @@ export const processExternalWithdrawal = async (
   }
 
   const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
-  await attestWithdrawalRelease(
-    authorization,
-    reservationId,
-    releaseTxHash,
-  );
+  try {
+    await attestWithdrawalRelease(
+      authorization,
+      reservationId,
+      releaseTxHash,
+    );
+  } catch (error) {
+    if (!(error instanceof WithdrawalReleasePendingError)) throw error;
+    logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is awaiting external release confirmations`, {
+      externalTxHash: releaseTxHash,
+    });
+    return;
+  }
   await executeAsRelayer({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
