@@ -38,7 +38,23 @@ export const getAdminBridgeReviews = async (accessToken: string): Promise<Bridge
       key: `in.(${ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).join(",")})`,
     }));
   }
-  return buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals });
+  const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals });
+  const depositReviews = items.filter(item => item.source === "eab" && item.kind === "deposit_review");
+  for (let offset = 0; offset < depositReviews.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+    await Promise.all(depositReviews.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).map(async item => {
+      const [, , chainId, router, depositId] = item.id.split(":");
+      const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];
+      let approved = false;
+      try {
+        const approval = await getReviewDigest(accessToken, "depositReviewApprovals(uint256,address,uint256)", args);
+        approved = BigInt(approval) !== 0n && approval === await getReviewDigest(accessToken, "getReviewedDepositDigest(uint256,address,uint256)", args);
+      } catch {
+        // Keep the review visible, but never offer settlement on an unverified approval.
+      }
+      if (!approved) item.actions = item.actions.filter(action => action !== "settle");
+    }));
+  }
+  return items;
 };
 
 // Read the contract's digest so the app need not duplicate bridge cryptography.
@@ -69,6 +85,9 @@ const hasRefundQuorum = async (accessToken: string, digest: string): Promise<boo
 
 export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote | { transactionHash: string }> => {
   const item = (await getAdminBridgeReviews(accessToken)).find(entry => entry.id === id);
+  if (item?.kind === "deposit_review" && action === "settle" && !item.actions.includes("settle")) {
+    throw new StratoError("Settlement requires a matching governance approval; refresh the queue after approval completes", 409);
+  }
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
   const target = constants.externalAssetBridge;
   if (item.kind === "deposit_review") {

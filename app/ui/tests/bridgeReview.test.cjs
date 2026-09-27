@@ -5,10 +5,11 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, unavailable = false } = {}) {
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, unavailable = false, approved = true } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
+  if (!approved) item.actions = item.actions.filter(action => action !== 'settle');
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   const source = fs.readFileSync(path.join(__dirname, '../src/components/admin/BridgeReviewQueue.tsx'), 'utf8');
@@ -29,7 +30,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
   const text = tree => !tree || typeof tree !== 'object' ? String(tree ?? '') : Array.isArray(tree) ? tree.map(text).join(' ') : text(tree.props?.children);
   const select = () => nodes(render()).find(node => node.props?.children === (action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : 'Prepare refund / vote')).props.onClick();
   const confirm = () => nodes(render()).find(node => node.type === 'Button' && text(node).includes(action === 'settle' ? 'Confirm settlement' : 'Confirm vote')).props.onClick();
-  return { select, confirm, render, text, votes, requests };
+  return { select, confirm, render, text, nodes, votes, requests };
 }
 
 test('admin refund UI submits a vote only after successful evidence preparation', async () => {
@@ -72,4 +73,14 @@ test('STRATO shows withdrawals pending review with approval handled in Safe', ()
   assert.doesNotMatch(text, /Reject \/ vote|Prepare refund \/ vote/);
   assert.equal(h.requests.length, 0);
   assert.equal(h.votes.length, 0);
+});
+
+test('deposit settlement stays disabled until matching governance approval exists', () => {
+  const h = harness({ kind: 'deposit_review', action: 'settle', approved: false });
+  const tree = h.render();
+  const button = h.nodes(tree).find(node => node.type === 'Button' && node.props.children === 'Settle approved deposit');
+  assert.equal(button.props.disabled, true);
+  assert.equal(button.props.onClick, undefined);
+  assert.match(h.text(tree), /Matching governance approval required/);
+  assert.equal(h.requests.length, 0);
 });

@@ -69,6 +69,10 @@ const BridgeReviewQueue = () => {
           {item.kind === 'withdrawal_review' && <span className="text-sm text-muted-foreground">Approval handled in Safe</span>}
           {item.safeProposalHash && <span className="inline-flex items-center gap-2 text-sm">Proposal: {truncateAddress(item.safeProposalHash)}<CopyButton address={item.safeProposalHash} /></span>}
           {item.actions.map(action => <Button key={action} variant={action === 'reject' ? 'destructive' : 'outline'} size="sm" onClick={() => { setError(''); setSelected({ item, action }); }}>{actionLabels[action]}</Button>)}
+          {item.source === 'eab' && item.kind === 'deposit_review' && !item.actions.includes('settle') && <>
+            <Button variant="outline" size="sm" disabled>Settle approved deposit</Button>
+            <span className="text-sm text-muted-foreground self-center">Matching governance approval required</span>
+          </>}
         </div>
       </div>)}
     </CardContent>
