@@ -113,6 +113,13 @@ test("refund votes require indexed attestations; subsequent voters reuse the sam
   const attestations = await import("./settlementAttestationService");
   t.mock.method(cirrus, "getWithdrawalRefundEvidence", async () => ({ withdrawal: withdrawal("2").value, authorization, verifierVersion: "3" }));
   t.mock.method(cirrus, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: [address] }));
+  const { rpc } = await import("../utils/api");
+  const digest = "0xbe620f2a844e6b18a371d579311e6e4c28075c0b7292146b43954623110fde7f";
+  t.mock.method(rpc, "post", async (_path: string, request: any) => {
+    assert.equal(request.method, "eth_call");
+    assert.equal(request.params[0].data, "0x49a7c4f5" + "2".padStart(64, "0"));
+    return { result: digest };
+  });
   let count = 0, requests = 0, rejected = true;
   t.mock.method(cirrus, "getSettlementAttestationCount", async () => count);
   t.mock.method(attestations, "attestWithdrawalRefund", async (_authorization: any, digest: string) => {
@@ -126,7 +133,7 @@ test("refund votes require indexed attestations; subsequent voters reuse the sam
   count = 2;
   const vote = await service.prepareBridgeOperation("eab:withdrawal:2", "refund");
   assert.ok("digest" in vote);
-  assert.match(vote.digest, /^0x[0-9a-f]{64}$/);
+  assert.equal(vote.digest, digest);
   assert.equal("func" in vote, false, "the operator never constructs governance votes");
   assert.equal(requests, 2, "existing quorum must not spend more attestor fees");
 });

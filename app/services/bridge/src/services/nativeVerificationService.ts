@@ -1,5 +1,5 @@
-import { getTransactionReceiptsBatch } from "./rpcService";
-import { getNativeRepresentationBridgeAddress, ZERO_ADDRESS } from "../config";
+import { getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
+import { getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, ZERO_ADDRESS } from "../config";
 import { NativeDepositInfo } from "../types";
 import { parseNativeDepositLog } from "../utils/nativeRedemption";
 import { logError } from "../utils/logger";
@@ -25,10 +25,17 @@ export const verifyNativeRedemptionsBatch = async (
   }
 
   for (const [externalChainId, chainDeposits] of depositsByChain) {
-    const receipts = await getTransactionReceiptsBatch(
-      externalChainId,
-      [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))],
-    );
+    const confirmations = getDepositConfirmationPolicy(externalChainId);
+    let receipts: Map<string, any>, latestBlock: number;
+    try {
+      [receipts, latestBlock] = await Promise.all([
+        getTransactionReceiptsBatch(externalChainId, [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))]),
+        getVerificationBlockNumber(externalChainId),
+      ]);
+    } catch (error) {
+      logError("NativeVerificationService", error as Error, { externalChainId });
+      continue;
+    }
 
     for (const deposit of chainDeposits) {
       try {
@@ -41,7 +48,11 @@ export const verifyNativeRedemptionsBatch = async (
         }
 
         const receipt = receipts.get(deposit.externalTxHash);
-        if (!receipt || receipt.status !== "0x1") {
+        // Missing, disputed or immature evidence stays pending; it is not a failed deposit.
+        if (!receipt || receipt.__rpcDisagreement ||
+            typeof receipt.blockNumber !== "string" || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber) ||
+            BigInt(receipt.blockNumber) + BigInt(confirmations) > BigInt(latestBlock)) continue;
+        if (receipt.status !== "0x1") {
           results.set(deposit.depositId, false);
           continue;
         }

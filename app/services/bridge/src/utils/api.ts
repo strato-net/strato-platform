@@ -128,6 +128,7 @@ const createClient = (
 export const cirrus = createClient(`${config.api.nodeUrl}/cirrus/search`, {
   logPrefix: "Cirrus",
 });
+export const rpc = createClient(`${config.api.nodeUrl}/rpc`, { logPrefix: "StratoRPC" });
 export const strato = createClient(`${config.api.nodeUrl}/strato/v2.3`, {
   logPrefix: "Strato",
 });

@@ -1,5 +1,5 @@
-import { config, getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "../config";
-import { getCurrentBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
+import { config, getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "../config";
+import { getVerificationBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
 import { getEnabledChains } from "../services/cirrusService";
 import { recordNativeDepositBatch } from "../services/bridgeService";
 import { nativeBlockTrackingService } from "../services/nativeBlockTrackingService";
@@ -18,7 +18,7 @@ const pollChainNativeRedemptions = async (chainId: number) => {
     return;
   }
 
-  const currentBlock = await getCurrentBlockNumber(chainId);
+  const currentBlock = Math.max(0, await getVerificationBlockNumber(chainId) - getDepositConfirmationPolicy(chainId));
   const lastProcessedBlock = await nativeBlockTrackingService.getLastProcessedBlock(chainId);
 
   if (lastProcessedBlock >= currentBlock) {

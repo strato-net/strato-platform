@@ -199,6 +199,7 @@ export interface NativeDepositInfo {
 
 
 export interface WithdrawalInfo {
+  recoveryOnly?: boolean;
   bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
   custodyTxHash?: string;
   authorizationNotBefore?: string;

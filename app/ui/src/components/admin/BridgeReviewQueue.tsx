@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { BridgeReviewItem, BridgeReviewVote } from '@strato/shared-types';
-import { api } from '@/lib/axios';
+import { api, extractApiErrorMessage } from '@/lib/axios';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,8 +39,8 @@ const BridgeReviewQueue = () => {
       }
       setSelected(null);
       await reviews.refetch();
-    } catch (e: any) {
-      setError(e.response?.data?.error || e.message || 'Unable to complete this review action.');
+    } catch (e: unknown) {
+      setError(extractApiErrorMessage(e));
     } finally { setSubmitting(false); }
   };
   return <Card>
@@ -82,7 +82,7 @@ const BridgeReviewQueue = () => {
           {selected?.action === 'reject' ? 'Rejecting marks this deposit canceled on STRATO. It does not refund external funds. Confirm the recovery plan before voting.'
             : selected?.action === 'refund' ? 'Verifiers must confirm external non-payment before your STRATO governance vote is submitted. A refund executes only after the required governance approvals.'
             : selected?.action === 'settle' ? 'Re-verify custody and collect verifier attestations, then settle the deposit. On-chain governance approval is required first. Routing may use the authorized fallback.'
-            : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, use Settle approved deposit.'}
+            : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, the bridge automatically retries settlement. Settle approved deposit is available for a manual retry.'}
         </DialogDescription></DialogHeader>
         {selected && <p className="text-sm break-all">Reference: {selected.item.id}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

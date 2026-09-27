@@ -5,7 +5,8 @@ import { config } from "../config";
 import { normalizeOptionalHash } from "../utils/utils";
 import { getBridgeReviewRecords, getWithdrawalRefundEvidence, getSettlementAttestationCount, getSettlementVerifierConfig } from "./cirrusService";
 import { getStratoNetworkId, confirmReviewedDeposit } from "./bridgeService";
-import { withdrawalRefundDigest } from "../signer/authorizationValidation";
+import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authorizationValidation";
+import { rpc } from "../utils/api";
 import { attestWithdrawalRefund } from "./settlementAttestationService";
 import { sendBridgeReviewEmail } from "./emailService";
 import { logError } from "../utils/logger";
@@ -58,7 +59,7 @@ export const prepareBridgeOperation = async (id: string, action: string): Promis
     recipient: `0x${normalize(w.externalRecipient)}`, amount: String(w.externalTokenAmount),
     notBefore: String(a.notBefore), deadline: String(a.deadline), signerSetVersion: String(a.signerSetVersion),
   };
-  const digest = withdrawalRefundDigest(authorization, w, String(verifierVersion));
+  const digest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(target, "getWithdrawalRefundDigest", [item.reference])));
   const [count, verifierConfig] = await Promise.all([getSettlementAttestationCount(digest), getSettlementVerifierConfig()]);
   if (!Number.isSafeInteger(verifierConfig.threshold) || verifierConfig.threshold < 2) throw new Error("Refund verifier threshold is unavailable");
   if (count < verifierConfig.threshold) {

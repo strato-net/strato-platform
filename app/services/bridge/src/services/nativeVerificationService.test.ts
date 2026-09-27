@@ -59,7 +59,9 @@ test("verification binds every native route intent field and selects the correct
   const { verifyNativeRedemptionsBatch } = await import("./nativeVerificationService");
   process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
   const event = log(true, 2);
-  let receipt: any = { status: "0x1", logs: [log(false), event] };
+  let receipt: any = { status: "0x1", blockNumber: "0x64", logs: [log(false), event] };
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
   const deposit = { ...parseNativeDepositLog(1, event)!, depositId: "native:2", bridgeStatus: "1", stratoToken: address("7"), requestedAt: "1", timestamp: "1" };
   assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), true);
@@ -114,4 +116,85 @@ test("native settlement uses verified intent for fresh steps, retries transport 
   await service.confirmNativeDepositBatch([{ ...deposit, actionToken: address("0"), minFinalOut: "0" }]);
   assert.equal(calls[3].method, "confirmDeposit");
   assert.equal(calls[3].args.steps, undefined);
+});
+
+test("native verification defers disputed, missing and immature receipts without manual review", async t => {
+  const rpc = await import("./rpcService");
+  const { verifyNativeRedemptionsBatch } = await import("./nativeVerificationService");
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  const event = log(true, 2);
+  const deposit = { ...parseNativeDepositLog(1, event)!, depositId: "native:2", bridgeStatus: "1",
+    stratoToken: address("7"), requestedAt: "1", timestamp: "1" };
+  const valid = { status: "0x1", blockNumber: "0x64", logs: [event] };
+  let receipt: any = valid, head = 111;
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => head);
+  assert.equal((await verifyNativeRedemptionsBatch([deposit])).has(deposit.depositId), false);
+  head = 112;
+  assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), true);
+  for (const pending of [undefined, { ...valid, __rpcDisagreement: true },
+    { ...valid, blockNumber: undefined }, { ...valid, blockNumber: "invalid" }, { ...valid, blockNumber: "0xffff" }]) {
+    receipt = pending;
+    assert.equal((await verifyNativeRedemptionsBatch([deposit])).has(deposit.depositId), false);
+  }
+  receipt = { ...valid, status: "0x0" };
+  assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), false);
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "0";
+  await assert.rejects(verifyNativeRedemptionsBatch([deposit]), /Invalid deposit confirmation policy/);
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+});
+
+test("native confirmation head uses the slowest RPC and fails closed on bad heads", async t => {
+  const { getVerificationBlockNumber } = await import("./rpcService");
+  const { fetch } = await import("../utils/api");
+  process.env.CHAIN_1_RPC_URL = "https://first.test";
+  process.env.CHAIN_1_VERIFICATION_RPC_URLS = "https://second.test";
+  let second: any = { result: "0x6e" };
+  t.mock.method(fetch, "post", async (url: string) => url.includes("first") ? { result: "0x70" } : second);
+  assert.equal(await getVerificationBlockNumber(1), 110);
+  for (const bad of [{ error: { message: "unavailable" } }, { result: null }, { result: "invalid" },
+    { result: "0x20000000000000" }]) {
+    second = bad;
+    await assert.rejects(getVerificationBlockNumber(1));
+  }
+});
+
+test("native polling neither settles nor sends immature evidence to review", async t => {
+  const cirrus = await import("./cirrusService");
+  const verification = await import("./nativeVerificationService");
+  const bridge = await import("./bridgeService");
+  const { startNativeDepositInitiatedPolling } = await import("../polling/stratoPolling");
+  const settled: string[] = [], reviewed: string[] = [];
+  const entries = ["pending", "valid", "invalid"].map(depositId => ({ depositId, bridgeStatus: "1" }));
+  t.mock.method(cirrus, "getNativeDepositsByStatus", async (status: string) => status === "1" ? entries as any : []);
+  t.mock.method(verification, "verifyNativeRedemptionsBatch", async () => new Map([["valid", true], ["invalid", false]]));
+  t.mock.method(bridge, "confirmNativeDepositBatch", async rows => { settled.push(...rows.map(row => row.depositId)); });
+  t.mock.method(bridge, "reviewNativeDepositBatch", async rows => { reviewed.push(...rows.map(row => row.depositId)); });
+  t.mock.method(globalThis, "setTimeout", (() => 0) as any);
+  startNativeDepositInitiatedPolling();
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.deepEqual(settled, ["valid"]);
+  assert.deepEqual(reviewed, ["invalid"]);
+});
+
+test("native discovery scans and advances only through the confirmed head", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[1, { externalChainId: 1 } as any]]));
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(cursor, "getLastProcessedBlock", async () => 98);
+  const logs = t.mock.method(rpc, "getChainLogs", async (_chain, from, to) => { assert.equal(from, 99); assert.equal(to, 100); return []; });
+  const updates = t.mock.method(cursor, "updateLastProcessedBlockLocally", async (_chain, block) => { assert.equal(block, 100); });
+  t.mock.method(globalThis, "setTimeout", (() => 0) as any);
+  startNativeRedemptionPolling();
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(logs.mock.callCount(), 1);
+  assert.equal(updates.mock.callCount(), 1);
 });

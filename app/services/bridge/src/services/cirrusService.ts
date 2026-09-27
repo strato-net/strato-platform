@@ -214,7 +214,7 @@ export const getExternalWithdrawalsByStatus = async (
           "value->>status": `eq.${status}`,
           address: `eq.${externalAssetBridgeAddress}`,
           order: "value->>requestedAt.asc,key.asc",
-          "bridge.withdrawalsPaused": "eq.false",
+          ...(status === "3" ? {} : { "bridge.withdrawalsPaused": "eq.false" }),
         },
       },
     ),
@@ -224,7 +224,7 @@ export const getExternalWithdrawalsByStatus = async (
   if (!Array.isArray(data) || data.length === 0) return [];
   const eligible = data.filter((item) => {
     const chainId = Number(item.value.externalChainId);
-    if (enabledChains.get(chainId)?.vault) return true;
+    if (status === "3" || enabledChains.get(chainId)?.vault) return true;
     logInfo("ExternalWithdrawal", `Skipping withdrawal ${item.key}: chain ${chainId} is disabled or has no vault`);
     return false;
   });
@@ -269,12 +269,14 @@ export const getExternalWithdrawalsByStatus = async (
 
   return eligible.map((item) => {
     const externalChainId = Number(item.value.externalChainId);
-    const vault = authorizations.get(String(item.key))?.destinationVault || enabledChains.get(externalChainId)!.vault!;
+    const vault = authorizations.get(String(item.key))?.destinationVault ||
+      (status !== "3" ? enabledChains.get(externalChainId)?.vault : undefined);
     return {
       ...item.value,
       bridgeStatus: item.value.status,
       withdrawalId: item.key,
       vault,
+      recoveryOnly: status === "3" && (item.bridge?.withdrawalsPaused !== false || !enabledChains.has(externalChainId)),
       reservationId: normalizeOptionalHash(item.value.reservationId) ?? undefined,
       reservationTxHash: normalizeOptionalHash(item.value.reservationTxHash) ?? undefined,
       cancellationTxHash: normalizeOptionalHash(item.value.cancellationTxHash) ?? undefined,
@@ -398,6 +400,20 @@ export const getDepositStatusByIdentity = async (
     },
   );
   return data?.[0]?.status == null ? undefined : String(data[0].status);
+};
+
+export const getDepositReviewApproval = async (
+  externalChainId: number | string,
+  depositRouter: string,
+  depositId: string,
+): Promise<string | undefined> => {
+  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositReviewApprovals`, {
+    params: { address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
+      key2: `eq.${toCirrusAddress(depositRouter)}`, key3: `eq.${depositId}`, select: "value", limit: 1 },
+  });
+  const approval = data?.[0]?.value;
+  return typeof approval === "string" && /^(0x)?[0-9a-f]{64}$/i.test(approval)
+    ? `0x${approval.replace(/^0x/i, "").toLowerCase()}` : undefined;
 };
 
 export const getDepositSettlementInfoByIdentity = async (
@@ -707,6 +723,16 @@ export const getRecordedDepositReviews = async (
     }
   }
   return result;
+};
+
+export const getDepositReviewApprovals = async (externalChainId: number): Promise<Set<string>> => {
+  const rows = await getPaginatedRows(`/${EXTERNAL_ASSET_BRIDGE_URL}-depositReviewApprovals`, {
+    params: { address: `eq.${externalAssetBridgeAddress}`, key: `eq.${externalChainId}`,
+      select: "key2,key3,value", order: "key2.asc,key3.asc" },
+  });
+  return new Set(rows.filter(row => typeof row.value === "string" &&
+    /^(0x)?[0-9a-f]{64}$/i.test(row.value) && !/^(0x)?0+$/i.test(row.value))
+    .map(row => `${toCirrusAddress(row.key2)}:${row.key3}`));
 };
 
 export const getIndexedDepositSettlements = async (

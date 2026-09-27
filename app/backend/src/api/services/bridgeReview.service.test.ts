@@ -28,6 +28,14 @@ function setup(t: any) {
     } as Record<string, any[]> };
   t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
     state.reads.push({ table, params });
+    if (table.endsWith("-depositReviewApprovals")) {
+      assert.equal(params.address, `eq.${address}`);
+      assert.equal(params.key, "eq.11155111");
+      assert.equal(params.key2, `eq.${address}`);
+      assert.ok(/^eq.\d+$/.test(params.key3));
+      if (state.approvalReadFails) throw new Error("Cirrus unavailable");
+      return { data: [{ value: state.approval }] };
+    }
     assert.ok(params.address, "all reads must be scoped to the configured contract");
     if (table === "/BlockApps-ExternalAssetBridge") return { data: [{ settlementVerifierThreshold: state.threshold }] };
     if (table.endsWith("-settlementAttestationCounts")) return { data: [{ value: state.count }] };
@@ -46,11 +54,6 @@ function setup(t: any) {
     assert.equal(body.method, "eth_call");
     assert.equal(body.params[0].to, `0x${address}`);
     state.rpcCalls++;
-    if (body.params[0].data.startsWith("0x32ad8ee4")) {
-      assert.equal(body.params[0].data, buildBridgeDigestCall("depositReviewApprovals(uint256,address,uint256)", ["11155111", `0x${address}`, BigInt("0x" + body.params[0].data.slice(-64)).toString()]));
-      if (state.approvalReadFails) throw new Error("RPC unavailable");
-      return { data: { result: state.approval } };
-    }
     return { data: { result: state.digest } };
   });
   const operations = t.mock.method(bridge, "requestBridgeOperation", async () => { throw new Error("bridge offline"); });
@@ -69,7 +72,7 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   assert.equal(review.safeProposalHash, hash);
   assert.deepEqual(review.actions, [], "Safe decisions stay in Safe");
   assert.equal(operations.mock.callCount(), 0);
-  assert.equal(state.rpcCalls, 5, "each pending deposit checks its on-chain approval");
+  assert.equal(state.rpcCalls, 0, "unapproved deposits do not need a digest read");
   assert.ok(items.filter(item => item.kind === "deposit_review").every(item => !item.actions.includes("settle")));
 });
 
@@ -81,7 +84,7 @@ test("deposit governance uses the contract digest and never calls the bridge", a
   assert.deepEqual(await prepareAdminBridgeReview("token", depositKey, "reject"), {
     target: address, func: "abortDeposit", args: ["11155111", `0x${address}`, depositId],
   });
-  assert.equal(state.rpcCalls, 3);
+  assert.equal(state.rpcCalls, 1);
   assert.equal(operations.mock.callCount(), 0);
   state.tables["/BlockApps-ExternalAssetBridge-deposits"] = [];
   await assert.rejects(prepareAdminBridgeReview("token", depositKey, "approve"), /unavailable/);
@@ -118,7 +121,7 @@ test("settlement requires a current digest-matched approval and rechecks after d
     assert.deepEqual(item.actions, ["approve", "reject"]);
     await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /matching governance approval/);
   }
-  state.approval = digest;
+  state.approval = digest.slice(2);
   state.approvalReadFails = true;
   assert.ok(!(await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!.actions.includes("settle"));
   await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /matching governance approval/);
@@ -138,8 +141,7 @@ test("contract digest ABI calls preserve full identifiers and reject malformed r
   assert.equal(buildBridgeDigestCall("getWithdrawalRefundDigest(uint256)", [depositId]), `0x49a7c4f5${word}`);
   assert.equal(buildBridgeDigestCall("getReviewedDepositDigest(uint256,address,uint256)", ["1", `0x${address}`, depositId]),
     `0x636ae02a${"1".padStart(64, "0")}${address.padStart(64, "0")}${word}`);
-  assert.equal(buildBridgeDigestCall("depositReviewApprovals(uint256,address,uint256)", ["1", `0x${address}`, depositId]),
-    `0x32ad8ee4${"1".padStart(64, "0")}${address.padStart(64, "0")}${word}`);
+  assert.throws(() => buildBridgeDigestCall("depositReviewApprovals(uint256,address,uint256)", ["1", `0x${address}`, depositId]), /Invalid/);
   assert.throws(() => buildBridgeDigestCall("refundWithdrawal(uint256)", ["1"]), /Invalid/);
   assert.throws(() => buildBridgeDigestCall("getWithdrawalRefundDigest(uint256)", [(1n << 256n).toString()]), /Invalid/);
   for (const result of [undefined, "0x", "0x1234", "z".repeat(66)]) assert.throws(() => parseBridgeDigest({ result }), /Unable to read/);

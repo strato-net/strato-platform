@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import CopyButton from "@/components/ui/copy";
 import type { RouteConfirmation } from "@/interface/swap";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ export default function RouteConfirmDialog({ confirmation, pending, onClose, onC
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
   if (!confirmation) return null;
   const { quote, inputSymbol, inputDecimals, inputAmount, outputToken, tokens, recipient, networkName } = confirmation;
   const bridge = "bridge" in quote ? quote.bridge : undefined;
@@ -26,9 +28,10 @@ export default function RouteConfirmDialog({ confirmation, pending, onClose, onC
 
   return (
     <Dialog open onOpenChange={open => { if (!open && !pending) onClose(); }}>
-      <DialogContent className="max-w-[95vw] sm:max-w-lg" aria-busy={pending}>
+      <DialogContent className="max-w-[95vw] sm:max-w-lg" aria-busy={pending}
+        onOpenAutoFocus={event => { event.preventDefault(); titleRef.current?.focus(); }}>
         <DialogHeader>
-          <DialogTitle>{confirmLabel}</DialogTitle>
+          <DialogTitle ref={titleRef} tabIndex={-1} className="outline-none">{confirmLabel}</DialogTitle>
           <DialogDescription className="text-xs">
             Review the amounts and receiving account.{quote.steps.length > 0 ? " The execution route may change while preserving the minimum below." : ""}
           </DialogDescription>

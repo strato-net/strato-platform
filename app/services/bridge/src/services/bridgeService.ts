@@ -11,7 +11,8 @@ import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 import { normalizeOptionalHash } from "../utils/utils";
 import { mintVouchersForDeposits } from "./voucherService";
-import { eth } from "../utils/api";
+import { eth, rpc } from "../utils/api";
+import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authorizationValidation";
 import {
   buildNativeMintRequest,
   executeNativeMint,
@@ -36,6 +37,7 @@ import {
 } from "./externalWithdrawalService";
 import {
   getDepositStatusByIdentity,
+  getDepositReviewApproval,
   getDepositSettlementInfoByIdentity,
   getEnabledChains,
 } from "./cirrusService";
@@ -56,6 +58,7 @@ let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
 const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
 const inFlightSafeProposalWithdrawals = new Set<string>();
+const reviewedDepositSettlements = new Map<string, Promise<string>>();
 
 export const getStratoNetworkId = async (): Promise<bigint> => {
   if (cachedStratoNetworkId != null) {
@@ -358,7 +361,28 @@ export const recordDepositForReview = async (
   }
 };
 
-export const confirmReviewedDeposit = async (
+export const confirmReviewedDeposit = (
+  externalChainId: number,
+  depositRouter: string,
+  depositId: string,
+): Promise<string> => {
+  const key = `${externalChainId}:${depositRouter.replace(/^0x/i, "").toLowerCase()}:${depositId}`;
+  const existing = reviewedDepositSettlements.get(key);
+  if (existing) return existing;
+  const pending = settleReviewedDeposit(externalChainId, depositRouter, depositId)
+    .then(async hash => {
+      try {
+        await depositStateService.markSettledByIdentity(externalChainId, depositRouter, depositId);
+      } catch (error) {
+        logError("DepositRecovery", error as Error, { operation: "markReviewedDepositSettled", externalChainId, depositRouter, depositId });
+      }
+      return hash;
+    }).finally(() => reviewedDepositSettlements.delete(key));
+  reviewedDepositSettlements.set(key, pending);
+  return pending;
+};
+
+const settleReviewedDeposit = async (
   externalChainId: number,
   depositRouter: string,
   depositId: string,
@@ -380,6 +404,14 @@ export const confirmReviewedDeposit = async (
     throw new Error(
       `Deposit is not pending review on STRATO (status ${onchainStatus || "unavailable"})`,
     );
+  }
+  const digestArgs = [externalChainId, `0x${depositRouter.replace(/^0x/i, "")}`, depositId];
+  const [approval, digest] = await Promise.all([
+    getDepositReviewApproval(externalChainId, depositRouter, depositId),
+    rpc.post("", buildBridgeDigestRequest(config.externalAssetBridge.address!, "getReviewedDepositDigest", digestArgs)).then(parseBridgeDigest),
+  ]);
+  if (!approval || /^0x0+$/.test(approval) || approval !== digest) {
+    throw new Error("Settlement requires a matching governance approval");
   }
   const chain = (await getEnabledChains()).get(externalChainId);
   const custodyAddress = chain?.vault || chain?.custody;
@@ -702,6 +734,11 @@ export const processExternalWithdrawal = async (
   let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
   const authorizationExpired =
     reservationState.latestTimestamp > BigInt(authorization.deadline);
+
+  if (withdrawal.recoveryOnly && !authorizationExpired &&
+      (reservationState.status === 0 || reservationState.status === 1)) {
+    return;
+  }
 
   if (
     !withdrawal.reservationId &&

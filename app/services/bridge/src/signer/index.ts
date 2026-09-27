@@ -6,14 +6,14 @@ import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
 import { WithdrawalReleasePendingError } from "../types";
 import { ConsensusProvider } from "./consensusProvider";
-import { depositSettlementDigest } from "./authorizationValidation";
+import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
 import { verifierAccessControl } from "./accessControl";
 import {
   Contract,
   TypedDataEncoder,
   getAddress,
 } from "ethers";
-import { withdrawalRefundDigest, matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
+import { matchesSourceWithdrawalAuthorization } from "./authorizationValidation";
 import {
   DepositSettlementAttestation,
   validateDepositSettlement,
@@ -202,6 +202,18 @@ const stratoGet = async (path: string, params: Record<string, string>) => {
     if (error?.response?.status !== 401) throw error;
     stratoToken = undefined;
     return request();
+  }
+};
+
+const readSourceDigest = async (method: string, args: unknown[]): Promise<string> => {
+  const request = async () => axios.post(`${stratoNodeUrl}/rpc`,
+    buildBridgeDigestRequest(sourceBridge, method, args),
+    { headers: authHeaders(await getStratoToken()), timeout: 30_000 });
+  try { return parseBridgeDigest((await request()).data); }
+  catch (error: any) {
+    if (error?.response?.status !== 401) throw error;
+    stratoToken = undefined;
+    return parseBridgeDigest((await request()).data);
   }
 };
 
@@ -420,22 +432,15 @@ const validateSourceDepositRoute = async (
 
 const isDepositReviewApproved = async (
   deposit: DepositSettlementAttestation,
-  generation: string,
 ): Promise<boolean> => {
-  const [approval, bridge] = await Promise.all([
-    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-depositReviewApprovals", {
-      address: `eq.${sourceBridge}`, key: `eq.${deposit.externalChainId}`,
-      key2: `eq.${normalize(deposit.depositRouter)}`, key3: `eq.${deposit.depositId}`, select: "value",
-    }),
-    stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge", {
-      address: `eq.${sourceBridge}`, select: "settlementVerifierSetVersion",
-    }),
-  ]);
-  const version = bridge.data?.[0]?.settlementVerifierSetVersion;
-  if (version == null || !approval.data?.[0]?.value) return false;
-  return normalize(approval.data[0].value) === normalize(depositSettlementDigest(
-    deposit, sourceChainId.toString(), sourceBridge, String(version), generation,
-  ));
+  const response = await stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-depositReviewApprovals", {
+    address: `eq.${sourceBridge}`, key: `eq.${deposit.externalChainId}`,
+    key2: `eq.${normalize(deposit.depositRouter)}`, key3: `eq.${deposit.depositId}`, select: "value",
+  });
+  const approval = response.data?.[0]?.value;
+  if (typeof approval !== "string" || !/^(0x)?[0-9a-f]{64}$/i.test(approval) || /^(0x)?0+$/i.test(approval)) return false;
+  const digest = await readSourceDigest("getDepositSettlementDigest", depositDigestArgs(deposit));
+  return normalize(approval) === normalize(digest);
 };
 
 const validateDestinationIdentity = (
@@ -736,7 +741,7 @@ app.post("/v1/attest-deposit", async (req, res) => {
     const policyDecision = evaluateDepositPolicy(verifierPolicy, deposit);
     const manuallyReviewed =
       policyDecision.decision === "manual_review" &&
-      (await isDepositReviewApproved(deposit, expectedGeneration));
+      (await isDepositReviewApproved(deposit));
     if (policyDecision.decision === "manual_review" && !manuallyReviewed) {
       throw new ManualReviewRequiredError(policyDecision.reason);
     }
@@ -868,15 +873,11 @@ app.post("/v1/attest-refund", async (req, res) => {
   try {
     const authorization = req.body.authorization as WithdrawalAuthorization;
     await validateRpcIdentity();
-    const [withdrawal, bridgeResponse] = await Promise.all([
-      validateSourceWithdrawal(authorization, [3, 5], false),
-      stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge", {
-        address: `eq.${sourceBridge}`, select: "settlementVerifierSetVersion",
-      }),
+    await Promise.all([
+      validateSourceWithdrawal(authorization, [3], false),
       validateRefundDestination(authorization),
     ]);
-    const expectedDigest = withdrawalRefundDigest(authorization, withdrawal,
-      bridgeResponse.data?.[0]?.settlementVerifierSetVersion);
+    const expectedDigest = await readSourceDigest("getWithdrawalRefundDigest", [authorization.sourceWithdrawalId]);
     const transactionHash = await submitStratoAttestation("attestWithdrawalRefund", {
       withdrawalId: authorization.sourceWithdrawalId, expectedDigest,
     });

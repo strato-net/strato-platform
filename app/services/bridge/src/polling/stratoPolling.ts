@@ -169,7 +169,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
 
       const verificationResults = await verifyNativeRedemptionsBatch(deposits);
 
-      const results: ConfirmNativeDepositArgs[] = deposits.map((deposit) => ({
+      const results: ConfirmNativeDepositArgs[] = deposits.filter((deposit) => verificationResults.has(deposit.depositId)).map((deposit) => ({
         externalChainId: deposit.externalChainId,
         externalBridge: deposit.externalBridge,
         externalRedemptionId: deposit.externalRedemptionId,

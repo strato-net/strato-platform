@@ -3,7 +3,7 @@ import test from "node:test";
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { depositSettlementDigest } from "./authorizationValidation";
+import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
@@ -298,7 +298,6 @@ test("AUTO_ROUTE requires a positive minimum even for manually reviewed amounts"
   assert.throws(() => evaluateDepositPolicy(enabled, { ...routed, actionToken: "0".repeat(40) }));
 });
 
-
 test("runtime recomputes the baseline hash and rejects changed limits", () => {
   const directory = mkdtempSync(resolve(tmpdir(), "verifier-policy-"));
   const file = resolve(directory, "policy.json");
@@ -315,25 +314,36 @@ test("runtime recomputes the baseline hash and rejects changed limits", () => {
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test("pending review alone cannot authorize a deposit; approval binds the exact generation and fields", async () => {
-  const statement = signerSource.statements.find((item) => ts.isVariableStatement(item) &&
-    item.declarationList.declarations.some((d) => d.name.getText(signerSource) === "isDepositReviewApproved"));
-  assert.ok(statement);
-  let approvedDigest: string | undefined;
-  const check = runInNewContext(ts.transpileModule(statement.getText(signerSource), {
-    compilerOptions: { target: ts.ScriptTarget.ES2020 },
-  }).outputText + "\nisDepositReviewApproved", {
-    sourceBridge: policy.sourceBridge, sourceChainId: BigInt(policy.sourceChainId), depositSettlementDigest,
-    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
-    stratoGet: async (path: string) => ({ data: path.endsWith("depositReviewApprovals") ?
-      (approvedDigest ? [{ value: approvedDigest }] : []) : [{ settlementVerifierSetVersion: "1" }] }),
+test("deposit review uses the contract digest of the requested intent, fails closed and rejects stale approvals", async () => {
+  const digest = "0x3a9f5e6a40844430f1f61c4b614c965438da99da853e642aba9ca4ad0485800d";
+  let approval = "0x" + "0".repeat(64), currentDigest = digest;
+  const calls: any[] = [];
+  let rpcError = false;
+  const checks = loadSignerChecks(["readSourceDigest", "isDepositReviewApproved"], {
+    sourceBridge: policy.sourceBridge, stratoNodeUrl: "https://strato.test", normalize: (v: string) => v.replace(/^0x/i, "").toLowerCase(),
+    buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest,
+    getStratoToken: async () => "token", authHeaders: (token: string) => ({ Authorization: `Bearer ${token}` }),
+    stratoGet: async (url: string, params: any) => {
+      assert.ok(url.endsWith("-depositReviewApprovals"));
+      assert.equal(params.key3, `eq.${deposit.depositId}`);
+      return { data: [{ value: approval }] };
+    },
+    axios: { post: async (_url: string, body: any) => {
+      calls.push(body);
+      if (rpcError) return { data: { error: { message: "unavailable" } } };
+      return { data: { result: currentDigest } };
+    } },
   });
-  assert.equal(await check(deposit, "0"), false);
-  approvedDigest = depositSettlementDigest(deposit, policy.sourceChainId, policy.sourceBridge, "1", "0");
-  assert.equal(await check(deposit, "0"), true);
-  assert.equal(await check(deposit, "1"), false);
-  assert.equal(await check({ ...deposit, externalTokenAmount: "101" }, "0"), false);
-  assert.equal(await check({ ...deposit, stratoRecipient: policy.sourceBridge }, "0"), false);
+  assert.equal(await checks.isDepositReviewApproved(deposit), false);
+  assert.equal(calls.length, 0);
+  approval = digest.slice(2);
+  assert.equal(await checks.isDepositReviewApproved(deposit), true);
+  assert.deepEqual(calls.at(-1), buildBridgeDigestRequest(policy.sourceBridge, "getDepositSettlementDigest", depositDigestArgs(deposit)));
+  currentDigest = "0x" + "b".repeat(64); // Changed generation, verifier version, or committed intent.
+  assert.equal(await checks.isDepositReviewApproved({ ...deposit, externalTokenAmount: "101" }), false);
+  assert.deepEqual(calls.at(-1), buildBridgeDigestRequest(policy.sourceBridge, "getDepositSettlementDigest", depositDigestArgs({ ...deposit, externalTokenAmount: "101" })));
+  rpcError = true;
+  await assert.rejects(checks.isDepositReviewApproved(deposit), /Unable to read/);
 });
 
 test("enforceWithdrawalPolicy requires an executed Safe approval covering the authorization deadline", async () => {
@@ -551,4 +561,49 @@ test("release handler returns pending confirmations without logging or submittin
   validationError = null;
   assert.equal((await invoke()).status, 200);
   assert.equal(submitted, 1);
+});
+
+test("refund handler attests the contract digest only after source and non-payment checks", async () => {
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-refund"');
+  assert.ok(endpoint);
+  const digest = "0xbe620f2a844e6b18a371d579311e6e4c28075c0b7292146b43954623110fde7f";
+  let handler: any, failure = "";
+  const calls: string[] = [];
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    validateRpcIdentity: async () => {},
+    validateSourceWithdrawal: async (_authorization: any, statuses: number[], requireEnabled: boolean) => {
+      assert.equal(JSON.stringify(statuses), "[3]"); assert.equal(requireEnabled, false);
+      if (failure === "source") throw new Error("source mismatch");
+      calls.push("source");
+    },
+    validateRefundDestination: async () => {
+      if (failure === "payment") throw new Error("payment already occurred");
+      calls.push("nonpayment");
+    },
+    readSourceDigest: async (method: string, args: string[]) => {
+      assert.equal(method, "getWithdrawalRefundDigest"); assert.equal(args[0], "1");
+      assert.ok(calls.includes("source") && calls.includes("nonpayment"));
+      if (failure === "rpc") throw new Error("digest unavailable");
+      return digest;
+    },
+    submitStratoAttestation: async (method: string, args: any) => {
+      assert.equal(method, "attestWithdrawalRefund"); assert.equal(args.withdrawalId, "1");
+      assert.equal(args.expectedDigest, digest); calls.push("attest"); return "tx";
+    },
+    auditDecision: () => {}, settlementAttestorAddress: "attestor",
+  });
+  for (failure of ["", "source", "payment", "rpc"]) {
+    calls.length = 0;
+    let status = 200, result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body: { authorization: { sourceWithdrawalId: "1" } } }, response);
+    assert.equal(status, failure ? 422 : 200);
+    assert.equal(calls.includes("attest"), !failure);
+    if (!failure) assert.equal(result.digest, digest);
+  }
 });

@@ -20,11 +20,13 @@ import {
   getExternalBridgeRebaseFactors,
   getRebaseRequiredRoutes,
   getRouteRebaseKey,
+  getDepositReviewApprovals,
 } from "../services/cirrusService";
 import {
   recordDepositForReview,
   settleDeposit,
   settleRoutedDeposit,
+  confirmReviewedDeposit,
 } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
 import {
@@ -183,6 +185,21 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   for (const reviewed of reviewedDeposits) {
     if (!shouldRecordReview(reviewed, reviewRetryMs)) continue;
     await recordReviewOnce(reviewed.deposit, "retryDepositReviewRecord");
+  }
+  if (reviewedDeposits.length) {
+    try {
+      const approvals = await getDepositReviewApprovals(externalChainId);
+      for (const { deposit } of reviewedDeposits) {
+        if (!approvals.has(`${normalizeAddress(deposit.depositRouter)}:${deposit.depositId}`)) continue;
+        try {
+          await confirmReviewedDeposit(externalChainId, deposit.depositRouter, deposit.depositId);
+        } catch (error) {
+          logError("DepositRecovery", error as Error, { operation: "settleApprovedDeposit", depositIdentity: depositIdentity(deposit) });
+        }
+      }
+    } catch (error) {
+      logError("DepositRecovery", error as Error, { operation: "readDepositApprovals", externalChainId });
+    }
   }
   const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
   // Get the effective last processed block (max of blockchain and local storage)

@@ -40,6 +40,8 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
     // Include the encoded query, not just the raw IDs, when checking URL bounds.
     assert.ok(`${url}?${new URLSearchParams(params)}`.length < 8000);
     let rows = data[path] || [];
+    if (params["value->>enabled"] === "eq.true") rows = rows.filter(row => row.value.enabled === true);
+    if (params["bridge.withdrawalsPaused"] === "eq.false") rows = rows.filter(row => row.bridge?.withdrawalsPaused !== true);
     for (const column of ["key", "key2", "key3", "withdrawalId"]) {
       const filter = params[column];
       if (filter?.startsWith("in.(")) {
@@ -102,6 +104,33 @@ test("malformed indexed attestation counts cannot enable refund preparation", as
   assert.equal(await getSettlementAttestationCount("0x" + "a".repeat(64)), 2);
 });
 
+test("paused and disabled chains retain READY recovery using the committed vault", async t => {
+  const ready = { ...withdrawal(1), bridge: { withdrawalsPaused: true }, value: { ...withdrawal(1).value, status: "3" } };
+  const initiated = { ...withdrawal(2), bridge: { withdrawalsPaused: true } };
+  const calls = await mockCirrus(t, {
+    [`${external}-chains`]: [{ key: "1", value: { enabled: false, vault: target } }],
+    [`${external}-withdrawals`]: [ready, initiated],
+    [`${external}-withdrawalAuthorizations`]: [{ key: ready.key, value: { destinationVault: router, notBefore: "100", signerSetVersion: "1" } }],
+  });
+  const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const [row] = await getExternalWithdrawalsByStatus("3");
+  assert.equal(row.vault, router);
+  assert.equal(row.recoveryOnly, true);
+  assert.equal(calls.find(call => call.path.endsWith("-withdrawals"))!.params["bridge.withdrawalsPaused"], undefined);
+  assert.deepEqual(await getExternalWithdrawalsByStatus("1"), []);
+});
+
+test("review approval scan ignores zero and malformed values and preserves large IDs", async t => {
+  await mockCirrus(t, { [`${external}-depositReviewApprovals`]: [
+    { key: "1", key2: router, key3: id(1), value: "a".repeat(64) },
+    { key: "1", key2: router, key3: id(2), value: "0x" + "b".repeat(64) },
+    { key: "1", key2: router, key3: id(3), value: "0x" + "0".repeat(64) },
+    { key: "1", key2: router, key3: id(4), value: "invalid" },
+  ] });
+  const { getDepositReviewApprovals } = await import("./cirrusService");
+  assert.deepEqual([...await getDepositReviewApprovals(1)], [`${router}:${id(1)}`, `${router}:${id(2)}`]);
+});
+
 for (const [method, table, rows, identity] of [
   ["getWithdrawalsByStatus", `${legacy}-withdrawals`, Array.from({ length: 7 }, (_, i) => withdrawal(i)), "withdrawalId"],
   ["getExternalWithdrawalsByStatus", `${external}-withdrawals`, Array.from({ length: 7 }, (_, i) => withdrawal(i)), "withdrawalId"],
@@ -154,7 +183,7 @@ test("withdrawal reads normalize unset Cirrus hashes and preserve real reservati
 });
 
 test("READY withdrawal with Cirrus zero hashes reserves and releases instead of reporting a mismatch", async (t) => {
-  await mockCirrus(t, { [`${external}-withdrawals`]: [{ ...withdrawal(1), value: {
+  await mockCirrus(t, { [`${external}-withdrawals`]: [{ ...withdrawal(1), bridge: { withdrawalsPaused: false }, value: {
     ...withdrawal(1).value, status: "3", reservationId: "0".repeat(40), cancellationTxHash: "0".repeat(40),
   } }] });
   const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
@@ -251,4 +280,18 @@ test("pagination rejects malformed or failed later pages instead of returning pa
     await assert.rejects(getNativeWithdrawalsByStatus("1"), /Invalid Cirrus response|offline/);
     t.mock.restoreAll();
   }
+});
+
+test("review approval reads use the stored mapping and preserve the composite identity", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getDepositReviewApproval } = await import("./cirrusService");
+  let approval: any = "A".repeat(64);
+  t.mock.method(cirrus, "get", async (url: string, { params }: any) => {
+    assert.ok(url.endsWith("-depositReviewApprovals"));
+    assert.equal(params.key, "eq.1"); assert.equal(params.key2, `eq.${router}`);
+    assert.equal(params.key3, `eq.${id(1)}`); assert.equal(params.select, "value");
+    return [{ value: approval }];
+  });
+  assert.equal(await getDepositReviewApproval(1, "0x" + router.toUpperCase(), id(1)), "0x" + "a".repeat(64));
+  for (approval of [undefined, 1, "invalid"]) assert.equal(await getDepositReviewApproval(1, router, id(1)), undefined);
 });

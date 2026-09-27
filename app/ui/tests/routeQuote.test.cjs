@@ -858,6 +858,7 @@ test('confirmation renders rounded display amounts, fees, route and a distinct f
   const wrapper = ({ children }) => React.createElement('div', null, children);
   runSource(fs.readFileSync(path.join(__dirname, '../src/components/router/RouteConfirmDialog.tsx'), 'utf8'), {
     exports: components, require: id => {
+      if (id === 'react') return React;
       if (id === 'react/jsx-runtime') return require(id);
       if (id === '@/components/ui/button') return { Button: wrapper };
       if (id === '@/components/ui/copy') return { default: () => null };

@@ -635,3 +635,36 @@ test("WebSocket reconnect backs off and periodic polls cannot bypass the delay",
   providers.at(-1).handlers.close();
   assert.equal(timers[0].delay, 1000, "a stable connection resets the backoff");
 });
+
+test("approved reviews settle automatically, isolate failures, and retry on the next poll", async t => {
+  const cirrus = await import("../services/cirrusService");
+  const rpc = await import("../services/rpcService");
+  const bridge = await import("../services/bridgeService");
+  const recovery = await import("../services/depositRecoveryService");
+  const { depositStateService: state } = await import("../services/depositStateService");
+  const { blockTrackingService: blocks } = await import("../services/blockTrackingService");
+  const { reconcileExternalDeposits } = await import("./alchemyPolling");
+  const logger = await import("../utils/logger");
+  const deposits = classifyDepositLogs([1, 2, 3].map(id => makeLog("DepositRouted", `0x${String(id).repeat(64)}`, id)), CHAIN_ID).standardDeposits;
+  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[CHAIN_ID, { externalChainId: CHAIN_ID,
+    depositRouter: deposits[0].depositRouter, lastProcessedBlock: 100, enabled: true, chainName: "test", custody: recipient }]]));
+  t.mock.method(cirrus, "getDepositReviewApprovals", async () => new Set(deposits.slice(0, 2).map(d => `${d.depositRouter.replace(/^0x/, "")}:${d.depositId}`)));
+  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
+  t.mock.method(state, "listReviews", async () => deposits.map(deposit => ({ deposit, status: "review" as const, reviewRecordedOnchain: true })));
+  t.mock.method(state, "list", async () => []);
+  t.mock.method(state, "oldestPendingBlock", async () => undefined);
+  t.mock.method(state, "pruneSettled", async () => undefined);
+  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 100);
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
+  t.mock.method(logger, "logError", () => {});
+  const calls: string[] = [];
+  t.mock.method(bridge, "confirmReviewedDeposit", async (_chain, _router, id) => {
+    calls.push(id);
+    if (calls.length === 1) throw new Error("Verifier unavailable");
+    return "hash";
+  });
+  await reconcileExternalDeposits(CHAIN_ID);
+  await reconcileExternalDeposits(CHAIN_ID);
+  assert.deepEqual(calls, ["1", "2", "1", "2"]);
+});

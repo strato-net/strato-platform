@@ -95,6 +95,19 @@ export const getChainLogs = async (
   return unwrapRpcResult(response, "eth_getLogs", chainId) || [];
 };
 
+export const getVerificationBlockNumber = async (chainId: number): Promise<number> => {
+  const heads = await Promise.all(getChainRpcUrls(chainId).map(async (url) => {
+    const value = unwrapRpcResult(await fetch.post(url, {
+      jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [],
+    }), "eth_blockNumber", chainId);
+    if (typeof value !== "string" || !/^0x[0-9a-f]+$/i.test(value)) throw new Error("Invalid verification head");
+    const head = Number(BigInt(value));
+    if (!Number.isSafeInteger(head)) throw new Error("Invalid verification head");
+    return head;
+  }));
+  return Math.min(...heads);
+};
+
 // Batch get transaction receipts
 export const getTransactionReceiptsBatch = async (
   chainId: number,

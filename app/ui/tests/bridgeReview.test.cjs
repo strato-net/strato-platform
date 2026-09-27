@@ -4,8 +4,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, unavailable = false, approved = true } = {}) {
+const axiosExports = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/axios.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText, {
+  exports: axiosExports,
+  console: { warn() {} },
+  require: id => id === 'axios' ? { default: { create: () => ({ interceptors: { request: { use() {} }, response: { use() {} } } }) } } : {},
+});
+
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
@@ -19,7 +30,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
       if (id === 'react') return { useState: initial => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = value; }]; } };
       if (id === '@tanstack/react-query') return { useQuery: () => ({ data: unavailable ? undefined : [item], isError: unavailable, refetch: async () => {} }) };
       if (id === '@/context/UserContext') return { useUser: () => ({ castVoteOnIssue: async (...args) => votes.push(args) }) };
-      if (id === '@/lib/axios') return { api: { post: async (...args) => { requests.push(args); if (failure) throw { response: { data: { error: failure } } }; return { data: response }; } } };
+      if (id === '@/lib/axios') return { extractApiErrorMessage: axiosExports.extractApiErrorMessage, api: { post: async (...args) => { requests.push(args); if (failure) throw { response: { status, data: { error: failure } } }; return { data: response }; } } };
       if (id === '@/lib/bridge/utils') return { getChainName: () => 'Sepolia' };
       if (id === '@/utils/numberUtils') return { truncateAddress: value => value };
       return new Proxy({}, { get: (_, name) => String(name) });
@@ -47,6 +58,26 @@ test('failed refund evidence stays in the dialog and never casts a vote', async 
   h.select(); await h.confirm();
   assert.equal(h.votes.length, 0);
   assert.match(h.text(h.render()), /External payment already occurred/);
+});
+
+test('settlement API errors render an alert without crashing or closing confirmation', async () => {
+  for (const { status, failure, expected } of [
+    { status: 500, failure: { message: 'Internal service failure', status: 500, type: 'Error' }, expected: 'Something went wrong. Please try again later.' },
+    { status: 409, failure: { message: 'Verifier threshold not reached', status: 409 }, expected: 'Verifier threshold not reached' },
+    { status: 409, failure: 'Matching governance approval required', expected: 'Matching governance approval required' },
+    { status: 400, failure: { message: { unexpected: true } }, expected: 'An unexpected error occurred.' },
+  ]) {
+    const h = harness({ kind: 'deposit_review', action: 'settle', status, failure });
+    h.select(); await h.confirm();
+    const tree = h.render();
+    const alert = h.nodes(tree).find(node => node.props?.role === 'alert');
+    assert.ok(alert);
+    assert.equal(renderToStaticMarkup(React.createElement('p', alert.props)), `<p role="alert" class="text-sm text-destructive">${expected}</p>`);
+    assert.equal(h.nodes(tree).find(node => node.type === 'Dialog').props.open, true);
+    assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node).includes('Confirm settlement')).props.disabled, false);
+    assert.equal(h.votes.length, 0);
+    assert.equal(h.requests.length, 1);
+  }
 });
 
 test('deposit rejection explains the lack of external refund; settlement does not cast a vote', async () => {

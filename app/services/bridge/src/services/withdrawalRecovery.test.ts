@@ -99,7 +99,7 @@ async function worker() {
   (api.cirrus as any).get = async (url: string, { params }: any) => {
     if (params.offset) return [];
     url = url.split("?")[0];
-    if (url.endsWith("-withdrawals")) return state.completed ? [] : [{ key: "7", value: {
+    if (url.endsWith("-withdrawals")) return state.completed ? [] : [{ key: "7", bridge: { withdrawalsPaused: phase !== "release" }, value: {
       status: "3", externalChainId: 1, externalToken: address("3"), externalRecipient: address("4"),
       externalTokenAmount: "100", authorizationDeadline: "1100", reservationId: state.reservationId,
       stratoSender: address("5"), stratoToken: address("6"), stratoTokenAmount: "100", requestedAt: "1",

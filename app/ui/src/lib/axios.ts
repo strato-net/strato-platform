@@ -253,7 +253,7 @@ api.interceptors.request.use(
 );
 
 // Helper: Extract error message from backend response
-function extractApiErrorMessage(error: any): string {
+export function extractApiErrorMessage(error: any): string {
   // For 500+ errors, never show the raw server message
   const status = error?.response?.status;
   if (!status || status >= 500) {
@@ -267,7 +267,7 @@ function extractApiErrorMessage(error: any): string {
   const errorData = error?.response?.data;
 
   // If error is an object with message property
-  if (errorData?.error && typeof errorData.error === 'object' && errorData.error.message) {
+  if (typeof errorData?.error?.message === 'string' && errorData.error.message) {
     return errorData.error.message;
   }
   
@@ -282,7 +282,7 @@ function extractApiErrorMessage(error: any): string {
   }
   
   // Fallback to generic error message
-  return error?.message || "An unexpected error occurred.";
+  return typeof error?.message === 'string' && error.message ? error.message : "An unexpected error occurred.";
 }
 
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs

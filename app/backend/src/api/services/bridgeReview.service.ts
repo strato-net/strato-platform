@@ -46,8 +46,14 @@ export const getAdminBridgeReviews = async (accessToken: string): Promise<Bridge
       const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];
       let approved = false;
       try {
-        const approval = await getReviewDigest(accessToken, "depositReviewApprovals(uint256,address,uint256)", args);
-        approved = BigInt(approval) !== 0n && approval === await getReviewDigest(accessToken, "getReviewedDepositDigest(uint256,address,uint256)", args);
+        const { data } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-depositReviewApprovals`, { params: {
+          address: `eq.${externalAssetBridge}`, key: `eq.${chainId}`, key2: `eq.${router.replace(/^0x/i, "").toLowerCase()}`,
+          key3: `eq.${depositId}`, select: "value", limit: 1,
+        } });
+        const approval = data?.[0]?.value;
+        approved = typeof approval === "string" && /^(0x)?[0-9a-f]{64}$/i.test(approval) &&
+          !/^(0x)?0+$/i.test(approval) && `0x${approval.replace(/^0x/i, "").toLowerCase()}` ===
+          await getReviewDigest(accessToken, "getReviewedDepositDigest(uint256,address,uint256)", args);
       } catch {
         // Keep the review visible, but never offer settlement on an unverified approval.
       }

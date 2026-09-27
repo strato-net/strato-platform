@@ -153,6 +153,9 @@ test("AUTO_ROUTE retries missing Cirrus metadata then submits a named-enum route
   assert.equal(settled.mock.callCount(), 2);
 
   const { confirmReviewedDeposit } = await import("./bridgeService");
+  t.mock.method(api.rpc, "post", async () => ({ result: "0x" + "a".repeat(64) }));
+  t.mock.method(await import("./cirrusService"), "getDepositReviewApproval", async () => "0x" + "a".repeat(64));
+  t.mock.method(state, "markSettledByIdentity", async () => undefined);
   t.mock.method(state, "getByIdentity", async () => ({ deposit, status: "review" as const }));
   quotedOut = "95";
   await confirmReviewedDeposit(11155111, deposit.depositRouter, "4");
@@ -356,13 +359,17 @@ test("treats a duplicate identity as settled only when Cirrus confirms completio
   assert.equal(await settleDeposit(deposit), null);
 });
 
-test("confirms reviewed deposits through the bridge operator", async () => {
+test("confirms reviewed deposits through the bridge operator", async (t) => {
   const stratoHelper = await import("../utils/stratoHelper");
-  const { cirrus } = await import("../utils/api");
+  const { cirrus, rpc } = await import("../utils/api");
+  let approvalMatches = false;
+  t.mock.method(rpc, "post", async () => ({ result: "0x" + "a".repeat(64) }));
+  t.mock.method(await import("./cirrusService"), "getDepositReviewApproval", async () => "0x" + (approvalMatches ? "a" : "b").repeat(64));
   const cirrusService = await import("./cirrusService");
   const rpcService = await import("./rpcService");
   const verificationService = await import("./verificationService");
   const { depositStateService } = await import("./depositStateService");
+  t.mock.method(depositStateService, "markSettledByIdentity", async () => undefined);
   const recovery = await import("./depositRecoveryService");
   const originalRecover = recovery.recoverReviewedDeposit;
   const originalGetEnabledChains = cirrusService.getEnabledChains;
@@ -373,7 +380,7 @@ test("confirms reviewed deposits through the bridge operator", async () => {
   const calls: any[] = [];
   const deposit = {
     externalChainId: 1,
-    depositRouter: "router",
+    depositRouter: "a".repeat(40),
     depositId: "7",
     externalSender: "sender",
     externalToken: "external-token",
@@ -405,15 +412,22 @@ test("confirms reviewed deposits through the bridge operator", async () => {
     new Map([[verificationService.depositIdentity(deposit), { state: "invalid", error: new Error("custody missing") }]]);
 
   const { confirmReviewedDeposit } = await import("./bridgeService");
+  await assert.rejects(confirmReviewedDeposit(1, "a".repeat(40), "7"), /matching governance approval/);
+  assert.equal(calls.length, 0);
+  approvalMatches = true;
   await assert.rejects(
-    () => confirmReviewedDeposit(1, "router", "7"),
+    () => confirmReviewedDeposit(1, "a".repeat(40), "7"),
     /custody missing/,
   );
   assert.equal(calls.length, 0);
 
   (verificationService as any).verifyDetectedDepositsBatch = async () =>
     new Map([[verificationService.depositIdentity(deposit), { state: "verified" }]]);
-  const hash = await confirmReviewedDeposit(1, "router", "7");
+  const first = confirmReviewedDeposit(1, "a".repeat(40), "7");
+  const second = confirmReviewedDeposit(1, "0x" + "A".repeat(40), "7");
+  assert.equal(first, second, "manual and automatic settlement share one in-flight request");
+  const [hash] = await Promise.all([first, second]);
+  assert.equal(calls.length, 1);
 
   assert.equal(hash, "confirm-hash");
   assert.deepEqual(calls[0], {
@@ -422,18 +436,18 @@ test("confirms reviewed deposits through the bridge operator", async () => {
     method: "confirmReviewedDeposit",
     args: {
       externalChainId: 1,
-      depositRouter: "router",
+      depositRouter: "a".repeat(40),
       depositId: "7",
     },
   });
   let recovered = false;
   (depositStateService as any).getByIdentity = async () => undefined;
   (recovery as any).recoverReviewedDeposit = async (chainId: number, router: string, id: string) => {
-    assert.deepEqual([chainId, router, id], [1, "router", "7"]);
+    assert.deepEqual([chainId, router, id], [1, "a".repeat(40), "7"]);
     recovered = true;
     return { deposit, status: "review", reviewRecordedOnchain: true };
   };
-  assert.equal(await confirmReviewedDeposit(1, "router", "7"), "confirm-hash");
+  assert.equal(await confirmReviewedDeposit(1, "a".repeat(40), "7"), "confirm-hash");
   assert.equal(recovered, true);
   (recovery as any).recoverReviewedDeposit = originalRecover;
   (cirrusService as any).getEnabledChains = originalGetEnabledChains;
@@ -1261,7 +1275,6 @@ test("mixed-head reads never refresh over an externally reserved authorization",
   assert.deepEqual(trace, []);
 });
 
-
 test("leaves an expired unreserved withdrawal for governance refund", async () => {
   const stratoHelper = await import("../utils/stratoHelper");
   const vaultService = await import("./externalWithdrawalService");
@@ -1717,52 +1730,41 @@ test("requires HTTPS for every external verifier service", async () => {
   );
 });
 
-test("isolates disabled-chain withdrawals and resumes them when re-enabled", async () => {
+test("isolates disabled-chain new withdrawals but keeps READY recovery pinned to its vault", async (t) => {
   const { cirrus } = await import("../utils/api");
   const { getExternalWithdrawalsByStatus } = await import("./cirrusService");
-  const originalGet = cirrus.get;
   let disabledChainEnabled = false;
   let noEnabledChains = false;
-  let enrichmentCalls = 0;
-  (cirrus as any).get = async (url: string, { params }: any) => {
-    if (url.includes("-withdrawals?")) {
-      if (params.offset) return [];
-      return [1, 2].map((chainId) => ({
-        key: String(chainId),
-        value: { externalChainId: chainId, status: params["value->>status"].slice(3) },
-      }));
-    }
+  t.mock.method(cirrus, "get", async (url: string, { params }: any) => {
+    if (params.offset) return [];
+    if (url.includes("-withdrawals?")) return [1, 2].map((chainId) => ({
+      key: String(chainId), bridge: { withdrawalsPaused: false },
+      value: { externalChainId: chainId, status: params["value->>status"].slice(3) },
+    }));
     if (url.endsWith("-chains")) {
       assert.equal(params["value->>enabled"], "eq.true");
       return noEnabledChains ? [] : [1, ...(disabledChainEnabled ? [2] : [])].map((chainId) => ({
         key: String(chainId), value: { enabled: true, vault: `vault-${chainId}` },
       }));
     }
-    if (url.endsWith("-depositRouters")) return [];
-    assert.ok(url.endsWith("-withdrawalAuthorizations") || url.endsWith("-withdrawalManualReviews"));
-    enrichmentCalls++;
-    assert.equal(params.key, disabledChainEnabled ? "in.(1,2)" : "in.(1)");
-    return [];
-  };
-  try {
-    for (const status of ["1", "2", "3"]) {
-      const withdrawals = await getExternalWithdrawalsByStatus(status);
-      assert.deepEqual(withdrawals.map((row) => [row.withdrawalId, row.vault, row.bridgeStatus]), [
-        ["1", "vault-1", status],
-      ]);
-    }
-    disabledChainEnabled = true;
-    const resumed = await getExternalWithdrawalsByStatus("3");
-    assert.deepEqual(resumed.map((row) => [row.withdrawalId, row.vault]), [
-      ["1", "vault-1"], ["2", "vault-2"],
-    ]);
-    noEnabledChains = true;
-    const before = enrichmentCalls;
-    assert.deepEqual(await getExternalWithdrawalsByStatus("3"), []);
-    assert.equal(enrichmentCalls, before);
-  } finally {
-    cirrus.get = originalGet;
+    if (url.endsWith("-depositRouters") || url.endsWith("-withdrawalManualReviews")) return [];
+    assert.ok(url.endsWith("-withdrawalAuthorizations"));
+    return [1, 2].map((chainId) => ({ key: String(chainId), value: { destinationVault: `original-${chainId}` } }));
+  });
+  for (const status of ["1", "2"]) {
+    const rows = await getExternalWithdrawalsByStatus(status);
+    assert.deepEqual(rows.map((row) => [row.withdrawalId, row.vault]), [["1", "original-1"]]);
   }
+  const ready = await getExternalWithdrawalsByStatus("3");
+  assert.deepEqual(ready.map((row) => [row.withdrawalId, row.vault, row.recoveryOnly]), [
+    ["1", "original-1", false], ["2", "original-2", true],
+  ]);
+  disabledChainEnabled = true;
+  assert.ok((await getExternalWithdrawalsByStatus("3")).every((row) => !row.recoveryOnly));
+  noEnabledChains = true;
+  const recovery = await getExternalWithdrawalsByStatus("3");
+  assert.equal(recovery.length, 2);
+  assert.ok(recovery.every((row) => row.recoveryOnly));
 });
 
 test("recovers withdrawal events in bounded ranges from the authorization time", async () => {
@@ -1827,7 +1829,6 @@ test("waits for capacity before authorizing either withdrawal path and leaves re
   assert.deepEqual(requested, ["1", "2"], "already-authorized recovery must bypass the capacity wait");
 });
 
-
 test("app quote client never forwards operator credentials", async (t) => {
   const axios = (await import("axios")).default;
   const { app } = await import("../utils/api");
@@ -1863,4 +1864,33 @@ test("prefixes bare-hex cirrus addresses so ethers never treats them as ENS name
   } finally {
     (cirrus as any).get = originalGet;
   }
+});
+
+test("paused READY withdrawals defer payment but still cancel expired reservations", async (t) => {
+  const vault = await import("./externalWithdrawalService");
+  const strato = await import("../utils/stratoHelper");
+  const { processExternalWithdrawal } = await import("./bridgeService");
+  const trace: string[] = [];
+  let status = 0, now = 1000n;
+  t.mock.method(vault, "buildWithdrawalAuthorization", async () => ({ deadline: "1100", signerSetVersion: "1" } as any));
+  t.mock.method(vault, "getReservationState", async () => ({ status, latestTimestamp: now,
+    signerSetVersion: 1n, reservationId: "reservation", reservationTxHash: "reserve-hash" }));
+  t.mock.method(vault, "reserveWithdrawal", async () => { throw new Error("must not reserve while paused"); });
+  t.mock.method(vault, "releaseWithdrawal", async () => { throw new Error("must not release while paused"); });
+  t.mock.method(vault, "cancelExpiredWithdrawal", async () => { trace.push("cancel"); return "cancel-hash"; });
+  t.mock.method(strato, "execute", async (input: any) => {
+    trace.push(input.method); return { status: "Success", hash: "hash" } as any;
+  });
+  const withdrawal = { bridgeStatus: "3", recoveryOnly: true, withdrawalId: "7" } as any;
+  await processExternalWithdrawal(withdrawal);
+  status = 1;
+  await processExternalWithdrawal(withdrawal);
+  assert.deepEqual(trace, []);
+  now = 1101n;
+  await processExternalWithdrawal(withdrawal);
+  assert.deepEqual(trace, ["recordWithdrawalReservation", "cancel", "recordWithdrawalCancellation"]);
+  trace.length = 0;
+  status = 0;
+  await processExternalWithdrawal(withdrawal);
+  assert.deepEqual(trace, [], "unreserved expiry needs no external transaction");
 });

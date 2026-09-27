@@ -6,7 +6,7 @@ import type { BridgeHistorySource } from "../../types/types";
 import { keccak256 } from "../../utils/keccak256";
 
 export const buildBridgeDigestCall = (signature: string, args: string[]): string => {
-  const types = ["getReviewedDepositDigest(uint256,address,uint256)", "depositReviewApprovals(uint256,address,uint256)"].includes(signature) ? ["uint", "address", "uint"]
+  const types = signature === "getReviewedDepositDigest(uint256,address,uint256)" ? ["uint", "address", "uint"]
     : signature === "getWithdrawalRefundDigest(uint256)" ? ["uint"] : [];
   if (!types.length || args.length !== types.length) throw new Error("Invalid bridge digest call");
   const words = args.map((arg, index) => {
