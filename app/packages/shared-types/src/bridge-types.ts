@@ -244,3 +244,40 @@ export interface CreditCardTopUpExecuteParams {
   externalRecipient: string;
   externalToken: string;
 }
+
+export interface BridgeReviewItem {
+  id: string;
+  source: "eab" | "native" | "legacy";
+  kind: "deposit_review" | "withdrawal_review" | "withdrawal_refund";
+  chainId: string;
+  reference: string;
+  token: string;
+  amount: string;
+  account: string;
+  reason: string;
+  safeProposalHash?: string;
+  actions: Array<"approve" | "reject" | "refund" | "settle">;
+}
+
+export interface BridgeReviewVote {
+  target: string;
+  func: string;
+  args: string[];
+}
+
+export interface BridgeReviewRow {
+  key: string;
+  key2?: string;
+  key3?: string;
+  value: Record<string, any>;
+}
+
+export interface BridgeReviewRecords {
+  deposits: BridgeReviewRow[];
+  withdrawals: BridgeReviewRow[];
+  reviews: BridgeReviewRow[];
+  nativeDeposits: BridgeReviewRow[];
+  nativeWithdrawals: BridgeReviewRow[];
+  legacyDeposits: BridgeReviewRow[];
+  legacyWithdrawals: BridgeReviewRow[];
+}

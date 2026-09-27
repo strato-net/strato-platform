@@ -1,4 +1,5 @@
 import axios from "axios";
+import { bridgeUrl, bridgeOperationsToken } from "../../config/config";
 import type { BridgeProtocol, BridgeHistorySource } from "../../types/types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -41,6 +42,17 @@ const {
 
 const normalizeAddress = (value?: string): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
+
+export const requestBridgeOperation = async (action: { id: string; action: "refund" | "settle" }): Promise<{ digest?: string; transactionHash?: string }> => {
+  if (!bridgeUrl || !bridgeOperationsToken) throw new Error("Bridge review integration is not configured");
+  const response = await axios.request({
+    method: "POST",
+    url: `${bridgeUrl.replace(/\/$/, "")}/operations/reviews/prepare`,
+    headers: { Authorization: `Bearer ${bridgeOperationsToken}` },
+    data: action, timeout: 180_000,
+  });
+  return response.data;
+};
 
 export const getBridgeTransferContractName = (
   address: string,

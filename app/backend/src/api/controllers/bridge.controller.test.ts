@@ -4,7 +4,30 @@ import BridgeController, { TradeBridgeController } from "./bridge.controller";
 import bridgeRouter from "../routes/bridge.routes";
 import tradeRouter from "../routes/trade.routes";
 import * as service from "../services/bridge.service";
+import * as reviewService from "../services/bridgeReview.service";
 import * as userService from "../services/user.service";
+
+test("bridge review operations reject non-admins and invalid actions before proxying", async t => {
+  let admin = false, calls = 0;
+  t.mock.method(userService, "isUserAdmin", async () => admin);
+  t.mock.method(reviewService, "prepareAdminBridgeReview", async () => { calls++; return { target: "bridge", func: "refundWithdrawal", args: ["2"] }; });
+  let status = 200;
+  const response = { status: (value: number) => { status = value; return response; }, json: () => {} } as any;
+  const request = { method: "POST", accessToken: "test", address: "1".repeat(40), body: { id: "eab:withdrawal:2", action: "refund" } } as any;
+  const next = (error?: any) => { if (error) throw error; };
+  await BridgeController.reviews(request, response, next);
+  assert.equal(status, 403); assert.equal(calls, 0);
+  admin = true; request.body.action = "setOwner";
+  await BridgeController.reviews(request, response, next);
+  assert.equal(status, 400); assert.equal(calls, 0);
+  request.body.action = "refund";
+  await BridgeController.reviews(request, response, next);
+  assert.equal(calls, 1);
+  for (const path of ["/admin/reviews", "/admin/reviews/prepare"]) {
+    const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === path)?.route;
+    assert.ok(route && route.stack.length > 1, "admin review routes require authentication middleware");
+  }
+});
 
 test("bridge endpoints bind their protocol server-side for every operation", async (t) => {
   const calls: Array<{ method: string; args: any[] }> = [];

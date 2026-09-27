@@ -19,6 +19,7 @@ import { depositMetricsService } from "./services/depositMetricsService";
 import { confirmReviewedDeposit } from "./services/bridgeService";
 import { depositStateService } from "./services/depositStateService";
 import { getDepositStatusByIdentity } from "./services/cirrusService";
+import { prepareBridgeOperation } from "./services/bridgeReviewService";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -27,6 +28,7 @@ app.set("env", "production");
 app.use(cors());
 app.use("/webhooks/deposits", verifierAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
 app.use("/operations/deposits", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use("/operations/reviews", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
 app.use(bodyParser.json());
 
 // Global error handler
@@ -46,6 +48,18 @@ app.use(
 );
 
 // Exposed Routes
+app.post("/operations/reviews/prepare", async (req, res) => {
+  if (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["refund", "settle"].includes(req.body?.action)) {
+    res.status(400).json({ error: "Invalid review action" });
+    return;
+  }
+  try { res.json(await prepareBridgeOperation(req.body.id, req.body.action)); }
+  catch (error) {
+    logError("BridgeReviews", error as Error, { operation: req.body.action, reviewId: req.body.id });
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+
 app.get("/health", async (_, res) => {
   const health = healthMonitor.snapshot();
   const errorLogPresent = await healthMonitor.errorFileExists();

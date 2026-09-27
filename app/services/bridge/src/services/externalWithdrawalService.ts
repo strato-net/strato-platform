@@ -96,6 +96,20 @@ const WITHDRAWAL_REVIEW_TYPES = {
 const vaultInterface = new Interface(EXTERNAL_VAULT_ABI);
 const pendingReviewProposals = new Map<string, ReturnType<typeof createWithdrawalReviewProposal>>();
 
+export const getPendingWithdrawalReview = async (review: WithdrawalReview): Promise<string | undefined> => {
+  const digest = getWithdrawalReviewDigest(review);
+  const safeAddress = config.safe.address || "";
+  const journalPath = path.join(process.cwd(), "data", "safe-reviews", `${review.destinationChainId}-${safeAddress.toLowerCase()}-${digest}.json`);
+  let saved: PersistedWithdrawalReview;
+  try { saved = JSON.parse(await fs.readFile(journalPath, "utf8")); }
+  catch (error: any) { if (error.code === "ENOENT") return; throw error; }
+  if (saved.reviewDigest !== digest || saved.proposal?.safeAddress !== safeAddress ||
+      !/^\d+$/.test(saved.approvalDeadline) || !/^0x[0-9a-f]{64}$/i.test(saved.proposal.safeTxHash)) {
+    throw new Error("Invalid persisted Safe review proposal");
+  }
+  if (BigInt(saved.approvalDeadline) > BigInt(Math.floor(Date.now() / 1000))) return saved.proposal.safeTxHash;
+};
+
 const authorizationDomain = (authorization: WithdrawalAuthorization) => ({
   name: "ExternalBridgeVault",
   version: "1",

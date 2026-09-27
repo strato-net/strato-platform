@@ -25,6 +25,7 @@ import { safeToBigInt } from "../utils/utils";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 import { healthMonitor } from "../utils/healthMonitor";
+import { notifyBridgeReviews } from "../services/bridgeReviewService";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -400,6 +401,9 @@ export const initializeStratoPolling = async () => {
   startNativeWithdrawalRequestPolling();
   startWithdrawalTxPolling();
   startNativeWithdrawalTxPolling();
+  if (config.email.approverEmails.length) {
+    startNonOverlappingPolling("notifyBridgeReviews", config.polling.withdrawalInterval || 5 * 60 * 1000, notifyBridgeReviews);
+  }
 
   logInfo("StratoPolling", "STRATO polling initialized");
 };

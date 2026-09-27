@@ -725,3 +725,45 @@ export const getIndexedDepositSettlements = async (
   }
   return result;
 };
+
+export const getBridgeReviewRecords = async () => {
+  const read = (contract: string, address: string | undefined, table: string, filters: Record<string, string>) =>
+    address ? getPaginatedRows(`/${contract}-${table}`, { params: {
+      address: `eq.${address}`, select: "key,value", order: "key.asc", ...filters,
+    } }) : Promise.resolve([]);
+  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals] = await Promise.all([
+    read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": "eq.2" }),
+    read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "withdrawals", { "value->>status": "in.(2,3)" }),
+    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "deposits", { "value->>bridgeStatus": "eq.2" }),
+    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { "value->>bridgeStatus": "eq.2", "value->>useInstantPath": "eq.false" }),
+    read(MERCATA_BRIDGE_URL, config.bridge.withdrawalPollingEnabled ? bridgeAddress : undefined, "deposits", { select: "key,key2,value", order: "key.asc,key2.asc", "value->>bridgeStatus": "eq.2" }),
+    read(MERCATA_BRIDGE_URL, config.bridge.withdrawalPollingEnabled ? bridgeAddress : undefined, "withdrawals", { "value->>bridgeStatus": "eq.2" }),
+  ]);
+  const [reviews, authorizations] = await Promise.all([getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
+    withdrawals.filter(row => String(row.value.status) === "2").map(row => String(row.key)),
+    { params: { address: `eq.${externalAssetBridgeAddress}`, select: "key,value", order: "key.asc" } }),
+    getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`,
+      withdrawals.filter(row => String(row.value.status) === "3").map(row => String(row.key)),
+      { params: { address: `eq.${externalAssetBridgeAddress}`, select: "key,value", order: "key.asc" } }),
+  ]);
+  return { deposits, withdrawals, reviews, authorizations, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals };
+};
+
+export const getWithdrawalRefundEvidence = async (withdrawalId: string) => {
+  const params = { address: `eq.${externalAssetBridgeAddress}`, key: `eq.${withdrawalId}`, select: "value", limit: 1 };
+  const [withdrawals, authorizations, bridges] = await Promise.all([
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawals`, { params }),
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalAuthorizations`, { params }),
+    cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}`, { params: { address: params.address, select: "settlementVerifierSetVersion", limit: 1 } }),
+  ]);
+  return { withdrawal: withdrawals?.[0]?.value, authorization: authorizations?.[0]?.value, verifierVersion: bridges?.[0]?.settlementVerifierSetVersion };
+};
+
+export const getSettlementAttestationCount = async (digest: string): Promise<number> => {
+  const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-settlementAttestationCounts`, { params: {
+    address: `eq.${externalAssetBridgeAddress}`, or: `(key.eq.${digest},key.eq.${digest.replace(/^0x/i, "")})`, select: "value", limit: 1,
+  } });
+  const count = Number(rows?.[0]?.value ?? 0);
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error("Invalid indexed settlement attestation count");
+  return count;
+};

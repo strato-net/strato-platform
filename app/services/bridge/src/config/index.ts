@@ -119,6 +119,9 @@ const config = {
       type: "FUNCTION" as const,
     },
   },
+  email: {
+    approverEmails: process.env.TRANSACTION_APPROVER_EMAILS?.split(",").map(value => value.trim()).filter(Boolean) || [],
+  },
   api: {
     nodeUrl: process.env.NODE_URL,
     appUrl: process.env.STRATO_APP_API_URL,

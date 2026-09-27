@@ -19,9 +19,34 @@ import {
   WithdrawalSummaryResponse
 } from "@strato/shared-types";
 import { isUserAdmin } from "../services/user.service";
+import { getAdminBridgeReviews, prepareAdminBridgeReview } from "../services/bridgeReview.service";
+import { StratoError } from "../../errors";
 import type { BridgeProtocol } from "../../types/types";
 
 const createBridgeController = (protocol: BridgeProtocol) => class BridgeController {
+  static async reviews(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!(await isUserAdmin(req.accessToken, req.address as string))) {
+        res.status(403).json({ error: "Administrator access is required" });
+        return;
+      }
+      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund", "settle"].includes(req.body?.action))) {
+        res.status(400).json({ error: "Invalid review action" });
+        return;
+      }
+      res.json(req.method === "POST"
+        ? await prepareAdminBridgeReview(req.accessToken, req.body.id, req.body.action)
+        : await getAdminBridgeReviews(req.accessToken));
+    } catch (error: any) {
+      if (error instanceof StratoError) { res.status(error.status).json({ error: error.message }); return; }
+      if (error.response?.status === 409 && typeof error.response?.data?.error === "string") {
+        res.status(409).json({ error: error.response.data.error });
+        return;
+      }
+      next(new Error("Bridge review request failed; check STRATO connectivity or the requested operation"));
+    }
+  }
+
   static async requestWithdrawal(
     req: Request,
     res: Response,

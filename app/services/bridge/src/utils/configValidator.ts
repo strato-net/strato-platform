@@ -101,6 +101,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
   let operatorAddress = "";
   let relayerAddress = "";
 
+  if (config.email.approverEmails.length) {
+    if (!process.env.SENDGRID_API_KEY) errors.push("SENDGRID_API_KEY is required for bridge review notifications");
+  } else {
+    warnings.push("TRANSACTION_APPROVER_EMAILS is unset: governance review queue emails are disabled");
+  }
+
   // Validate required environment variables
   const requiredEnvVars = [
     "BA_USERNAME",

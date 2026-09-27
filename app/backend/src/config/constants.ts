@@ -14,6 +14,8 @@ export const ANONYMOUS_QUOTE_CACHE_SIZE = 128;
 export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
 export const ROUTE_CANDIDATES_PER_HOP = 12;
 export const ROUTE_QUOTE_CONCURRENCY = 4;
+export const BRIDGE_REVIEW_PAGE_SIZE = 200;
+export const BRIDGE_REVIEW_ID_BATCH_SIZE = 20;
 // Maximum output sacrificed for fewer route steps; 0 selects strictly by output.
 export const ROUTE_OUTPUT_TOLERANCE_BPS = 5n;
 

@@ -342,3 +342,26 @@ test("release confirmation waits stay pending without hiding real verifier failu
   mode = "accepted";
   await attestWithdrawalRelease(authorization, "reservation", "tx");
 });
+
+test("refund quorum requires matching digests from distinct eligible attestors", async t => {
+  const cirrus = await import("./cirrusService");
+  const logger = await import("../utils/logger");
+  const { attestWithdrawalRefund } = await import("./settlementAttestationService");
+  t.mock.method(logger, "logError", () => undefined);
+  t.mock.method(cirrus, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "one,two,three";
+  const digest = "0x" + "a".repeat(64);
+  let mode = "stale";
+  t.mock.method(axios, "post", async (url: string) => {
+    assert.ok(url.endsWith("/v1/attest-refund"));
+    const identity = url.split("/")[2];
+    return { data: { transactionHash: `tx-${identity}`, settlementAttestor: mode === "duplicate" ? "one" : identity,
+      digest: mode === "stale" && identity !== "one" ? "0x" + "b".repeat(64) : mode === "missing" ? undefined : digest } };
+  });
+  for (mode of ["stale", "missing", "duplicate"]) {
+    await assert.rejects(attestWithdrawalRefund({ destinationChainId: "1" } as any, digest), /threshold not reached/);
+  }
+  mode = "valid";
+  await attestWithdrawalRefund({ destinationChainId: "1" } as any, digest);
+});

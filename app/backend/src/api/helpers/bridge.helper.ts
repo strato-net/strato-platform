@@ -3,6 +3,27 @@ import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
 import { BridgeToken } from "@strato/shared-types";
 import type { BridgeHistorySource } from "../../types/types";
+import { keccak256 } from "../../utils/keccak256";
+
+export const buildBridgeDigestCall = (signature: string, args: string[]): string => {
+  const types = signature === "getReviewedDepositDigest(uint256,address,uint256)" ? ["uint", "address", "uint"]
+    : signature === "getWithdrawalRefundDigest(uint256)" ? ["uint"] : [];
+  if (!types.length || args.length !== types.length) throw new Error("Invalid bridge digest call");
+  const words = args.map((arg, index) => {
+    if (types[index] === "address") {
+      if (!/^0x[0-9a-f]{40}$/i.test(arg)) throw new Error("Invalid deposit router address");
+      return arg.slice(2).toLowerCase().padStart(64, "0");
+    }
+    if (!/^\d+$/.test(arg) || BigInt(arg) >= (1n << 256n)) throw new Error("Invalid bridge identifier");
+    return BigInt(arg).toString(16).padStart(64, "0");
+  });
+  return `0x${keccak256(Buffer.from(signature)).toString("hex").slice(0, 8)}${words.join("")}`;
+};
+
+export const parseBridgeDigest = (response: any): string => {
+  if (response?.error || !/^0x[0-9a-f]{64}$/i.test(response?.result || "")) throw new Error("Unable to read current bridge review digest from STRATO");
+  return response.result.toLowerCase();
+};
 
 // ============================================================================
 // TYPES

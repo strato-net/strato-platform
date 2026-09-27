@@ -6,7 +6,6 @@ import {
 } from "../config";
 import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
-import sendEmail from "./emailService";
 import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData, WithdrawalReleasePendingError } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
@@ -1004,26 +1003,6 @@ const confirmEligibleWithdrawalBatch = async (
       throw executeError;
     }
 
-    const emailPromises = transactionProposals.map(async (proposal) => {
-      try {
-        await sendEmail(proposal.safeTxHash, proposal.externalChainId);
-        return "success";
-      } catch (emailError) {
-        logError("BridgeService", emailError as Error, {
-          operation: "sendEmail",
-          safeTxHash: proposal.safeTxHash,
-        });
-        return "failed";
-      }
-    });
-
-    const emailResults = await Promise.all(emailPromises);
-    const successCount = emailResults.filter((r) => r === "success").length;
-    const failureCount = emailResults.filter((r) => r === "failed").length;
-    logInfo(
-      "BridgeService",
-      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
-    );
   }
 };
 
@@ -1307,16 +1286,6 @@ export const queueManualNativeWithdrawalBatch = async (
         proposalReference,
       );
       await recordNativeWithdrawalProposal(withdrawal.withdrawalId, proposalReference);
-
-      try {
-        await sendEmail(proposalReference, withdrawal.externalChainId);
-      } catch (emailError) {
-        logError("BridgeService", emailError as Error, {
-          operation: "sendEmail",
-          safeTxHash: proposalReference,
-          withdrawalId: withdrawal.withdrawalId,
-        });
-      }
 
       const baseMessage =
         `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;

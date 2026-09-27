@@ -55,8 +55,10 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
       assert.ok(identities.length > 0 && identities.length <= 20);
       rows = rows.filter((row) => identities.some((match) => row.key2 === match[1] && String(row.key3) === match[2]));
     }
-    for (const field of ["status", "bridgeStatus"]) {
-      if (params[`value->>${field}`]) rows = rows.filter((row) => String(row.value[field]) === params[`value->>${field}`].slice(3));
+    for (const field of ["status", "bridgeStatus", "useInstantPath"]) {
+      const filter = params[`value->>${field}`];
+      if (filter?.startsWith("eq.")) rows = rows.filter((row) => String(row.value[field]) === filter.slice(3));
+      if (filter?.startsWith("in.(")) rows = rows.filter((row) => filter.slice(4, -1).split(",").includes(String(row.value[field])));
     }
     if (params.offset != null) {
       assert.ok(params.order, "every page needs deterministic ordering");
@@ -67,6 +69,38 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
   });
   return calls;
 }
+
+test("admin review queries paginate both bridges and exclude automatic native delays", async t => {
+  const withdrawals = Array.from({ length: 45 }, (_, i) => ({ ...withdrawal(i), value: { ...withdrawal(i).value, status: i % 2 ? "3" : "2" } }));
+  const deposits = Array.from({ length: 7 }, (_, i) => ({ ...deposit(i), value: { ...deposit(i).value, status: "2" } }));
+  const calls = await mockCirrus(t, {
+    [`${external}-withdrawals`]: withdrawals,
+    [`${external}-deposits`]: deposits,
+    [`${external}-withdrawalManualReviews`]: withdrawals.map(row => ({ key: row.key, value: {} })),
+    [`${external}-withdrawalAuthorizations`]: withdrawals.map(row => ({ key: row.key, value: {} })),
+    [`${native}-withdrawals`]: [false, true].map((useInstantPath, i) => ({ key: String(i), value: { bridgeStatus: "2", useInstantPath } })),
+  });
+  const { getBridgeReviewRecords } = await import("./cirrusService");
+  const records = await getBridgeReviewRecords();
+  assert.equal(records.deposits.length, 7);
+  assert.equal(records.withdrawals.length, 45);
+  assert.equal(records.reviews.length, 23);
+  assert.equal(records.authorizations.length, 22);
+  assert.deepEqual(records.nativeWithdrawals.map(row => row.key), ["0"]);
+  assert.ok(calls.every(call => call.params.address === `eq.${"1".repeat(40)}`));
+});
+
+test("malformed indexed attestation counts cannot enable refund preparation", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getSettlementAttestationCount } = await import("./cirrusService");
+  let value: any = "NaN";
+  t.mock.method(cirrus, "get", async () => [{ value }]);
+  for (value of ["NaN", "-1", "1.5", "9007199254740993"]) {
+    await assert.rejects(getSettlementAttestationCount("0x" + "a".repeat(64)), /Invalid indexed/);
+  }
+  value = "2";
+  assert.equal(await getSettlementAttestationCount("0x" + "a".repeat(64)), 2);
+});
 
 for (const [method, table, rows, identity] of [
   ["getWithdrawalsByStatus", `${legacy}-withdrawals`, Array.from({ length: 7 }, (_, i) => withdrawal(i)), "withdrawalId"],

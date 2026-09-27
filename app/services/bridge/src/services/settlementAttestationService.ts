@@ -19,6 +19,7 @@ const requestVerifierQuorum = async (
   chainId: string | number,
   path: string,
   payload: unknown,
+  expectedDigest?: string,
 ): Promise<boolean> => {
   const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
   const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
@@ -60,6 +61,9 @@ const requestVerifierQuorum = async (
         const attestor = String(response.data?.settlementAttestor || "").toLowerCase().replace(/^0x/, "");
         if (typeof response.data?.transactionHash !== "string" || !response.data.transactionHash.length || !eligible.has(attestor)) {
           throw new Error(`Verifier ${url} returned no valid settlement attestation`);
+        }
+        if (expectedDigest && (typeof response.data.digest !== "string" || response.data.digest.toLowerCase() !== expectedDigest.toLowerCase())) {
+          throw new Error(`Verifier ${url} returned a stale refund digest`);
         }
         if (response.data.fallbackOnly !== undefined && typeof response.data.fallbackOnly !== "boolean") {
           throw new Error(`Verifier ${url} returned an invalid fallback mode`);
@@ -160,4 +164,8 @@ export const attestWithdrawalRelease = async (
     "/v1/attest-release",
     { authorization, reservationId, externalTxHash },
   );
+};
+
+export const attestWithdrawalRefund = async (authorization: WithdrawalAuthorization, expectedDigest: string): Promise<void> => {
+  await requestVerifierQuorum(authorization.destinationChainId, "/v1/attest-refund", { authorization }, expectedDigest);
 };

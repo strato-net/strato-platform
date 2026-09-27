@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +16,7 @@ import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
 import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
+import BridgeReviewQueue from '@/components/admin/BridgeReviewQueue';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
 import StakingAdminTab from '@/components/admin/StakingAdminTab';
@@ -24,7 +25,8 @@ const Admin = () => {
   usePageTitle("Admin");
 
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('tokens');
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'bridge' ? 'bridge' : 'tokens');
 
   return (
     <div className="min-h-screen bg-background">
@@ -211,6 +213,7 @@ const Admin = () => {
             <VoteTab />
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
+            <BridgeReviewQueue />
             <BridgeTransactionsPage isAdmin={true} />
           </TabsContent>
           <TabsContent value="staking" className="space-y-6">
