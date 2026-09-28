@@ -15,14 +15,36 @@ export const STANDARD_DEPOSIT_EVENT_SIGNATURE = id(
 export const ACTION_DEPOSIT_EVENT_SIGNATURE = id(
   "DepositRoutedWithAction(address,uint256,address,address,address,uint96,uint8,address,uint256)",
 );
+// A deposit that offers a solver fee for immediate delivery on STRATO. A
+// separate event rather than extra fields on DepositRouted, so that a relayer
+// running the old code keeps working through the upgrade.
+export const FEE_DEPOSIT_EVENT_SIGNATURE = id(
+  "DepositRoutedWithFee(address,uint256,address,address,address,uint96,uint256,uint256,uint256)",
+);
 export const DEPOSIT_EVENT_SIGNATURES = [
   STANDARD_DEPOSIT_EVENT_SIGNATURE,
   ACTION_DEPOSIT_EVENT_SIGNATURE,
+  FEE_DEPOSIT_EVENT_SIGNATURE,
 ];
 
 // RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
 export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
   "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
+
+// The fee-bearing redemption, and the solver claim on a STRATO withdrawal.
+export const NATIVE_FEE_REDEMPTION_EVENT_SIGNATURE = id(
+  "RedemptionRequestedWithFee(address,uint256,address,address,uint96,uint256,uint256,uint256)",
+);
+export const NATIVE_REDEMPTION_EVENT_SIGNATURES = [
+  NATIVE_REDEMPTION_EVENT_SIGNATURE,
+  NATIVE_FEE_REDEMPTION_EVENT_SIGNATURE,
+];
+
+// WithdrawalFilled, emitted by both external-chain bridges when a solver takes
+// over a withdrawal's claim. The relayer mirrors these back to STRATO.
+export const WITHDRAWAL_FILLED_EVENT_SIGNATURE = id(
+  "WithdrawalFilled(bytes32,address,address,uint32,address,uint256,uint256,uint256)",
+);
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =

@@ -33,6 +33,9 @@ const deposit = (overrides: Partial<WindowDeposit> = {}): WindowDeposit => {
     action: "0",
     actionToken: ETH,
     minFinalOut: "0",
+    maxFee: "0",
+    requestedAt: "0",
+    feeHalfLife: "0",
     depositId,
     depositKey: externalTxHash,
     sharesTransaction: false,
@@ -94,7 +97,8 @@ const harness = (options: {
         break;
       }
       case "depositBatch":
-      case "depositBatchWithAction": {
+      case "depositBatchWithAction":
+      case "depositBatchWithFee": {
         a.externalTxHashes.forEach((key: string, i: number) =>
           legacyRecord(key, { externalToken: a.externalTokens[i], targetStratoToken: a.targetStratoTokens[i] }),
         );
@@ -103,6 +107,7 @@ const harness = (options: {
       }
       case "deposit":
       case "depositWithAction":
+      case "depositWithFee":
         legacyRecord(a.externalTxHash, a as any);
         records.set(canonicalDepositKey(a.externalTxHash), 1);
         break;
@@ -387,6 +392,39 @@ test("legacy: action deposits go through depositBatchWithAction", async () => {
   assert.deepEqual(h.methods(), ["depositBatch", "depositBatchWithAction", "setLastProcessedBlock"]);
   assert.deepEqual(h.calls[1].args.actions, ["2"]);
   assert.deepEqual(h.calls[1].args.minFinalOuts, ["9"]);
+});
+
+test("legacy: fee-bearing deposits go through depositBatchWithFee with the origin schedule", async () => {
+  const h = harness({ useDepositWindow: false });
+  const fee = deposit({ kind: "fee", maxFee: "30000", requestedAt: "1700000000", feeHalfLife: "21600" });
+  await h.recorder.recordWindow(CHAIN_ID, 500, [deposit(), fee]);
+
+  assert.deepEqual(h.methods(), ["depositBatch", "depositBatchWithFee", "setLastProcessedBlock"]);
+  assert.deepEqual(h.calls[1].args.maxFees, ["30000"]);
+  // The origin chain's timestamp, untouched; the half-life is STRATO's own to commit
+  assert.deepEqual(h.calls[1].args.requestedAts, ["1700000000"]);
+  assert.equal("feeHalfLives" in h.calls[1].args, false);
+});
+
+test("legacy: a fee-bearing duplicate falls back one at a time through depositWithFee", async () => {
+  const h = harness({ useDepositWindow: false });
+  const already = deposit({ kind: "fee", maxFee: "1", requestedAt: "1700000000" });
+  const fresh = deposit({ kind: "fee", maxFee: "2", requestedAt: "1700000001" });
+  h.records.set(canonicalDepositKey(already.depositKey), 1);
+  await h.recorder.recordWindow(CHAIN_ID, 500, [already, fresh]);
+
+  assert.deepEqual(h.methods(), ["depositBatchWithFee", "depositWithFee", "depositWithFee", "setLastProcessedBlock"]);
+  assert.equal(h.records.get(canonicalDepositKey(fresh.depositKey)), 1);
+});
+
+test("window: fee terms ride along in the window call, zero for plain deposits", async () => {
+  const h = harness({ useDepositWindow: true });
+  const fee = deposit({ kind: "fee", maxFee: "30000", requestedAt: "1700000000", feeHalfLife: "21600" });
+  await h.recorder.recordWindow(CHAIN_ID, 500, [deposit(), fee]);
+
+  assert.deepEqual(h.methods(), ["recordDepositWindow"]);
+  assert.deepEqual(h.calls[0].args.maxFees, ["0", "30000"]);
+  assert.deepEqual(h.calls[0].args.requestedAts, ["0", "1700000000"]);
 });
 
 // ---------------- recovery path ----------------

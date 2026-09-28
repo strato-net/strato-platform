@@ -152,14 +152,14 @@ npm start
 
 1. **Deposit Detection**
    - External-chain polling scans block windows up to `head - CHAIN_<id>_CONFIRMATIONS`, never past a block the RPC endpoint cannot serve yet
-   - Reads standard and action deposit events in one ordered block range and ABI-decodes the action intent
+   - Reads standard, action and fee-bearing (`DepositRoutedWithFee`) deposit events in one ordered block range and ABI-decodes the action intent or the solver fee schedule
    - Deduplicates exact RPC log repeats
    - Keys each deposit by its transaction hash, or `<hash>#<depositId>` when one transaction emitted several deposits
    - Polls never overlap: the next run starts after the previous one finishes
 
 2. **Recording** (`depositRecorder.ts`)
-   - With `BRIDGE_RECORD_DEPOSIT_WINDOW=true`, one `recordDepositWindow` call stores a window's deposits and advances the on-chain checkpoint together. The contract skips deposits it already has and records ones it cannot mint (for example a disabled route) as `QUARANTINED` (status 6), so one bad deposit never blocks the window. The relayer never confirms a quarantined deposit
-   - Otherwise it uses `depositBatch` / `depositBatchWithAction`, then `setLastProcessedBlock`
+   - With `BRIDGE_RECORD_DEPOSIT_WINDOW=true`, one `recordDepositWindow` call stores a window's deposits and advances the on-chain checkpoint together. The contract skips deposits it already has and records ones it cannot mint (for example a disabled route) as `QUARANTINED` (status 6), so one bad deposit never blocks the window. The relayer never confirms a quarantined deposit. A fee-bearing deposit's schedule (`maxFee`, origin `requestedAt`) is committed in the same call; a fee the bridge cannot honour quarantines that deposit instead of reverting the window. A deposit a solver had `ANNOUNCED` against a bond (status 7) is adopted by the window exactly as `deposit` adopts it
+   - Otherwise it uses `depositBatch` / `depositBatchWithAction` / `depositBatchWithFee`, then `setLastProcessedBlock`
    - A rejected batch is retried one deposit at a time. A deposit the contract can never accept is written to `data/depositDeadLetters.json` and logged as an error for manual resolution, and the rest of the window proceeds
    - Every checkpoint (on-chain and `data/lastProcessedBlocks.json`) moves only after each deposit in the window is visible in Cirrus or dead-lettered
 
