@@ -147,6 +147,19 @@ slashing waits for provable round changes (Phase 4). Optional knob: after
 removed from the set, stake untouched; `syncValidator` re-adds it after the cooldown). Notable
 downtime is an admin kick (`removeOperator` / governance vote).
 
+**Reaching consensus.** `processBlock` runs inside the fee call, not inside the transaction, and
+the node folds the fee call's results into the transaction's before deriving the header. Before
+the fee-path deltas fork that fold carried only logs and events, not the validator-set and stake
+deltas, so a jail (or any demotion `processBlock` triggers) was applied in governance and staking
+while every block header kept the validator's seat and weight: helium blocks 294831 (`bdd3…`) and
+623065 (`f1e4…`) show `ValidatorRemoved` in Cirrus and `removedValidators: []` in the header. The
+fold is fixed behind `isFeePathDeltasForkActive` (`strato/core/vm-tools/src/Blockchain/Forks.hs`);
+from the fork height the jailing transaction's block removes the validator in consensus too.
+Helium's height is not scheduled yet, upquark shares the staking activation height, fresh networks
+have it from genesis. The fix does not repair a set that already diverged, because governance will
+not emit `ValidatorRemoved` again for a validator it has already dropped; see Activation and
+rollout for the reconciliation.
+
 Eligibility: `selfBond >= minStake` (10k) — a validator must have its own stake at risk; delegated
 stake adds weight but cannot qualify it. `selfBondGraceUntil` phases this in for validators admitted
 on delegated stake: while it is unset (0, as on an upgraded proxy) or in the future,
@@ -230,6 +243,18 @@ before the activation height; (5) deploy `FeeRouter`
 and `DeciderState.updatePayFeeContract` (owner key); (6) migrate V1 stakers (stop schedule,
 `setParams(unbondingSeconds=0)`, users unstake/restake). Fresh networks get `FeeRouter` at
 `0xDEC1DE03` from genesis.
+
+**Fee-path deltas fork and helium reconciliation.** Set `heliumFeePathDeltasForkBlock` above every
+node's head, ship it, restart validators before the height. From then on jails reach the header,
+but the validators governance removed before the fork (`bdd3…` at block 294831, `f1e4…` at 623065)
+stay in every header's `currentValidators` until governance emits an event for them again. Two ways
+to close the gap, to be decided when the fork is scheduled: (a) `tryActivate(validator)` once its
+jail has expired and it is eligible: governance emits `ValidatorAdded` plus a stake update, and both
+the header (`nextValidatorsAndStakes`) and blockstanbul (`applyValidatorChanges`) apply adds by set
+union, so re-adding a seat the header already holds is idempotent and only refreshes the weight; or
+(b) leave the seat until the first post-fork jail or demotion removes it, and meanwhile check
+`unattributedFees` / `creditBlockReward` for a proposer staking no longer lists. An admin vote
+cannot remove a validator that governance no longer lists.
 
 ## Known limitations (accepted for this phase)
 

@@ -104,6 +104,9 @@ putBaggerState = Mod.put (Mod.Proxy @B.BaggerState)
 --
 -- Gated: receipts roots are live in the header, so this moves the root and
 -- proposer and verifier must switch at the same block.
+--
+-- The reward call's validator-set and stake deltas travel the same way, under
+-- their own fork; see 'attachFeePathDeltas'.
 attachBlockRewards :: BlockHeader -> Maybe ExecResults -> [TxRunResult] -> [TxRunResult]
 attachBlockRewards bd mRewards trrs = fst $ attachBlockRewards' bd mRewards trrs
 
@@ -121,9 +124,12 @@ attachBlockRewards' ::
 attachBlockRewards' bd (Just rewardResult) (trr : rest)
   | isBlockRewardReceiptForkActive (number bd),
     Right er <- trrResult trr =
-      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
-                        erLogs = erLogs rewardResult ++ erLogs er
-                      }
+      -- No network schedules the deltas fork before this one (see
+      -- Blockchain.Forks), so gating it inside this branch loses nothing.
+      let merged = attachFeePathDeltas (number bd) rewardResult
+                     er { erEvents = erEvents rewardResult ++ erEvents er,
+                          erLogs = erLogs rewardResult ++ erLogs er
+                        }
        in (trr {trrResult = Right merged} : rest, Nothing)
 -- A run that produced transactions owns the block's first receipt, so nothing is
 -- owed onward: either the merge above happened, or this is a pre-fork block (or

@@ -10,6 +10,7 @@ import Blockchain.Data.TXOrigin
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.Database.MerklePatricia (StateRoot (..))
+import Blockchain.Forks (isFeePathDeltasForkActive)
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import SolidVM.Model.Delta
@@ -191,6 +192,28 @@ getStakeDeltasFromResults = foldl' go M.empty
   where go acc trr = case trrResult trr of
           Left _ -> acc
           Right ExecResults{..} -> M.union erStakeUpdates acc
+
+-- | Fold the consensus-visible deltas of a call the fee path made outside the
+-- transaction (the per-transaction fee call or the once-per-block reward call)
+-- into the transaction's results, so that 'getDeltasFromResults' and
+-- 'getStakeDeltasFromResults' carry them into the header. The auxiliary call
+-- runs before the transaction's own code, so its validator changes come first
+-- and the transaction's stake updates win, as they do across transactions.
+-- Events, logs, traces and the action are left to the callers, which already
+-- merge them at every height.
+--
+-- Gated by 'isFeePathDeltasForkActive': before the fork the deltas are dropped
+-- exactly as they always were, so pre-fork blocks replay unchanged and the
+-- proposer and every verifier flip together.
+attachFeePathDeltas :: Integer -> ExecResults -> ExecResults -> ExecResults
+attachFeePathDeltas blockNum aux er
+  | isFeePathDeltasForkActive blockNum =
+      er
+        { erNewValidators = erNewValidators aux ++ erNewValidators er,
+          erRemovedValidators = erRemovedValidators aux ++ erRemovedValidators er,
+          erStakeUpdates = M.union (erStakeUpdates er) (erStakeUpdates aux)
+        }
+  | otherwise = er
 
 -- | Convert a 'TxRunResult' to its canonical 'Receipt' for inclusion in the
 -- receipts trie (Phase 0 spec §6.2). Mirrors the gas/status accounting in

@@ -454,7 +454,10 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       Left failure -> pure (Left failure)
       Right feeResult -> do
         let combineA f x y = liftA2 f x y <|> x <|> y
-            attachFeeResult er = er
+            -- The fee call's validator-set and stake changes (a processBlock jail or
+            -- demotion, a weight refresh) reach the header from the fee-path deltas
+            -- fork on; see 'attachFeePathDeltas'.
+            attachFeeResult er = attachFeePathDeltas (number b) feeResult $ er
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))

@@ -16,10 +16,19 @@
 -- heliumToBasicForkBlock) predate this module and continue to live alongside
 -- their use sites. New consensus forks should be added here so they're easy to
 -- find and audit.
+--
+-- Forks defined here:
+--
+--   * 'isReceiptsRootForkActive': receipts root in block headers
+--   * 'isBlockRewardReceiptForkActive': block-reward events in the block's first receipt
+--   * 'isOperatorPrecedenceForkActive': Solidity operator precedence in the SolidVM parser
+--   * 'isFeePathDeltasForkActive': validator-set and stake changes made by the fee
+--     path reach the block header
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
     isOperatorPrecedenceForkActive,
+    isFeePathDeltasForkActive,
     forkNotScheduled
   )
 where
@@ -117,3 +126,47 @@ isOperatorPrecedenceForkActive blockNum =
    in not $ (net == upquarkNetworkID  && blockNum < upquarkOperatorPrecedenceForkBlock)
          || (net == heliumNetworkID   && blockNum < heliumOperatorPrecedenceForkBlock)
          || (net == forktestNetworkID && blockNum < forktestOperatorPrecedenceForkBlock)
+
+-- | Block from which validator-set and stake changes made by the fee path
+-- reach the block header.
+--
+-- Two calls run outside the transaction's own SolidVM call: the per-transaction
+-- fee call (Decider.decide -> FeeRouter.payFees -> StratoStaking.processBlock)
+-- and the once-per-block reward call (FeeRouter.payBlockRewards). Their results
+-- are folded into the transaction's ExecResults (attachFeeResult in vm-runner,
+-- attachBlockRewards' in Bagger), but that fold predates the delta fields and
+-- carried only logs and events, never erNewValidators / erRemovedValidators /
+-- erStakeUpdates, which are what getDeltasFromResults and
+-- getStakeDeltasFromResults turn into the header's newValidators /
+-- removedValidators / stakeUpdates. A validator that processBlock jailed was
+-- therefore removed in governance and staking but kept its seat and weight in
+-- consensus.
+--
+-- Proposer and verifier derive the deltas the same way, so those headers
+-- validated; by the same symmetry, fixing the fold changes header contents and
+-- an upgraded proposer would be rejected by an un-upgraded verifier
+-- (ValidatorMismatch / StakeMismatch). Hence a height. Helium is past its
+-- staking fork and has produced jail blocks under the old fold, so it needs a
+-- flag day of its own: replace forkNotScheduled with a height above every
+-- node's head once the upgrade is coordinated. Every other network switches
+-- when staking activates, since the fee path cannot move the validator set
+-- before StratoStaking drives consensus: a no-op on upquark until block
+-- 1,000,000, live from genesis on fresh networks.
+--
+-- No network schedules this before isBlockRewardReceiptForkActive, which
+-- attachBlockRewards' relies on. The fix does not by itself shrink a header set
+-- that already diverged: governance will not emit ValidatorRemoved again for a
+-- validator it has already dropped. See the jail section of
+-- techdocs/design-docs/staking-consensus.md.
+heliumFeePathDeltasForkBlock :: Integer
+heliumFeePathDeltasForkBlock = forkNotScheduled
+
+isFeePathDeltasForkActive :: Integer -> Bool
+isFeePathDeltasForkActive blockNum =
+  let conf = networkConfig ethConf
+      switchAt
+        | Conf.networkID conf == upquarkNetworkID = upquarkStakingForkBlock
+        | Conf.networkID conf == heliumNetworkID = heliumFeePathDeltasForkBlock
+        -- 'Nothing' means staking is live from genesis, so the fork is too.
+        | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
+   in blockNum >= switchAt
