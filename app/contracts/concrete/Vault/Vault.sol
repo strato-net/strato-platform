@@ -581,8 +581,10 @@ contract record Vault is Ownable, Pausable {
      * @param holders Share holders to redeem. Accounts with no shares are skipped,
      *        so a list may safely contain duplicates or already-redeemed accounts.
      * @return redeemed Number of holders whose shares were burned
-     * @dev Owner only. Not gated by whenNotPaused on purpose: pause first to freeze
-     *      user activity, then sweep.
+     * @dev Owner only. Not gated by whenNotPaused, so it works whether or not the
+     *      vault is paused. Pausing beforehand is optional: balances are read when
+     *      the call executes, so a holder who withdraws in the meantime is simply
+     *      redeemed for what is left, or skipped.
      * @dev Never reverts on a per-holder condition. A revert inside an onlyOwner body
      *      is swallowed by Ownable's governance fallback and would fail the whole
      *      vote, so holders that cannot be paid in full right now are left intact.

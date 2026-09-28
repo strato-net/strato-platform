@@ -37,8 +37,10 @@
  * duplicate vote), holders already redeemed are skipped by the contract, and nothing
  * executes until admin 2 approves.
  *
- * Preconditions: the vault proxy must already point at the implementation that has
- * redeemAllFor, and the vault should be paused so user withdrawals cannot race the sweep.
+ * Precondition: the vault proxy must already point at the implementation that has
+ * redeemAllFor. Pausing the vault is not required: redeemAllFor reads each holder's
+ * balance when admin 2's approval executes it, so a holder who withdraws in between is
+ * redeemed for what is left, or skipped.
  */
 require('dotenv').config();
 const config = require('./config');
@@ -230,9 +232,6 @@ async function main() {
   console.log(`vault:        ${vault} (paused: ${vaultRow._paused})`);
   console.log(`share token:  ${vaultRow.shareToken}`);
   console.log(`bot executor: ${vaultRow.botExecutor}`);
-  if (!vaultRow._paused) {
-    console.log('WARNING: vault is not paused; user withdrawals can still race the sweep (harmless, but pause first if you can)');
-  }
   console.log('');
 
   const snapshot = await loadHolders(nodeUrl, tokenObj, vaultRow.shareToken);
