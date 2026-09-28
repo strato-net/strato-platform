@@ -1,0 +1,609 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
+import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
+import { resolve } from "node:path";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
+import { getAddress, TypedDataEncoder } from "ethers";
+import {
+  loadVerifierPolicy,
+  evaluateDepositPolicy,
+  evaluateWithdrawalPolicy,
+  type VerifierPolicy,
+} from "./verifierPolicy";
+import type { DepositSettlementAttestation } from "./settlementValidation";
+
+const externalToken = "0x1111111111111111111111111111111111111111";
+const stratoToken = "2222222222222222222222222222222222222222";
+
+const policy: VerifierPolicy = {
+  version: "test-1",
+  baselinePolicyHash: `sha256:${"a".repeat(64)}`,
+  verifierIndex: 1,
+  settlementAttestor: "8888888888888888888888888888888888888888",
+  sourceChainId: "9001",
+  sourceBridge: "3333333333333333333333333333333333333333",
+  destinationChainId: "11155111",
+  destinationVault: "0x4444444444444444444444444444444444444444",
+  routes: [{
+    externalToken,
+    stratoToken,
+    depositsEnabled: true,
+    autoRouteEnabled: false,
+    maxAutoDepositAmount: "100",
+  }],
+  tokens: [{
+    token: externalToken,
+    withdrawalsEnabled: true,
+    maxAutoWithdrawalAmount: "50",
+  }],
+};
+
+const deposit = {
+  externalChainId: "11155111",
+  depositRouter: "0x5555555555555555555555555555555555555555",
+  depositId: "1",
+  externalSender: "0x6666666666666666666666666666666666666666",
+  externalToken,
+  externalTokenAmount: "100",
+  externalTxHash: `0x${"1".repeat(64)}`,
+  externalBlockHash: `0x${"2".repeat(64)}`,
+  externalLogIndex: 0,
+  stratoRecipient: "7777777777777777777777777777777777777777",
+  stratoToken,
+  action: "0",
+  actionToken: "0000000000000000000000000000000000000000",
+  minFinalOut: "0",
+} satisfies DepositSettlementAttestation;
+
+// Load the actual route check without starting the verifier or initializing KMS.
+const signerSource = ts.createSourceFile(
+  "index.ts",
+  readFileSync(resolve(__dirname, "../../src/signer/index.ts"), "utf8"),
+  ts.ScriptTarget.Latest,
+  true,
+);
+const routeCheck = signerSource.statements.find(
+  (statement) => ts.isVariableStatement(statement) &&
+    statement.declarationList.declarations.some(
+      (declaration) => declaration.name.getText(signerSource) === "validateSourceDepositRoute",
+    ),
+);
+assert.ok(routeCheck);
+const routeCheckCode = ts.transpileModule(routeCheck.getText(signerSource), {
+  compilerOptions: { target: ts.ScriptTarget.ES2020 },
+}).outputText;
+
+test("validates structured Cirrus deposit routes and AUTO_ROUTE permissions", async () => {
+  let route: unknown = { depositsEnabled: true, withdrawalsEnabled: false, externalDecimals: 18 };
+  let autoRoute = false;
+  const validate = runInNewContext(`${routeCheckCode}\nvalidateSourceDepositRoute`, {
+    sourceBridge: policy.sourceBridge,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    stratoGet: async (path: string, params: Record<string, string>) => {
+      assert.equal(params.address, `eq.${policy.sourceBridge}`);
+      assert.equal(params.key, `eq.${externalToken.slice(2)}`);
+      assert.equal(params.key2, `eq.${deposit.externalChainId}`);
+      assert.equal(params.key3, `eq.${stratoToken}`);
+      assert.equal(params.select, "value");
+      if (path.endsWith("-routes")) {
+        assert.equal(params["value->>depositsEnabled"], "eq.true");
+        assert.equal(params.value, undefined);
+        return { data: route === undefined ? [] : [{ value: route }] };
+      }
+      assert.equal(path, "/cirrus/search/BlockApps-ExternalAssetBridge-depositActionConfigs");
+      assert.equal(params["value->>depositsEnabled"], undefined);
+      return { data: [{ value: { autoRoute } }] };
+    },
+  }) as (input: DepositSettlementAttestation, allowFallback?: boolean) => Promise<boolean>;
+
+  await validate(deposit);
+  for (route of [undefined, false, true, {}, { depositsEnabled: false }, { depositsEnabled: "true" }]) {
+    await assert.rejects(validate(deposit), /Deposit route is not enabled/);
+    await assert.rejects(validate({ ...deposit, action: "4" }, true), /Deposit route is not enabled/);
+  }
+  route = { depositsEnabled: true };
+  await assert.rejects(validate({ ...deposit, action: "4" }), /AUTO_ROUTE is not enabled/);
+  assert.equal(await validate({ ...deposit, action: "4" }, true), true);
+  autoRoute = true;
+  assert.equal(await validate({ ...deposit, action: "4" }, true), false);
+});
+
+test("requires local review above the automatic deposit limit", () => {
+  assert.equal(evaluateDepositPolicy(policy, deposit).decision, "approve");
+  assert.equal(
+    evaluateDepositPolicy(policy, {
+      ...deposit,
+      externalTokenAmount: "101",
+    }).decision,
+    "manual_review",
+  );
+});
+
+test("disallowed AUTO_ROUTE permits only fallback while deposit validation and limits still apply", () => {
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  assert.equal(evaluateDepositPolicy(policy, routed).fallbackOnly, true);
+  assert.equal(evaluateDepositPolicy(policy, routed).decision, "approve");
+  const reviewed = evaluateDepositPolicy(policy, { ...routed, externalTokenAmount: "101" });
+  assert.equal(reviewed.decision, "manual_review");
+  assert.equal(reviewed.fallbackOnly, true);
+  assert.equal(evaluateDepositPolicy({ ...policy, routes: [{ ...policy.routes[0], autoRouteEnabled: true }] }, routed).fallbackOnly, false);
+  assert.throws(() => evaluateDepositPolicy({ ...policy, routes: [] }, routed), /rejects the deposit route/);
+  assert.throws(() => evaluateDepositPolicy({ ...policy, routes: [{ ...policy.routes[0], depositsEnabled: false }] }, routed), /rejects the deposit route/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, action: "3" }), /rejects the deposit action/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, minFinalOut: "0" }), /positive minFinalOut/);
+  assert.throws(() => evaluateDepositPolicy(policy, { ...routed, actionToken: "0".repeat(40) }), /positive minFinalOut/);
+});
+
+test("requires local review above the automatic withdrawal limit", () => {
+  assert.equal(
+    evaluateWithdrawalPolicy(policy, { token: externalToken, amount: "50" })
+      .decision,
+    "approve",
+  );
+  assert.equal(
+    evaluateWithdrawalPolicy(policy, { token: externalToken, amount: "51" })
+      .decision,
+    "manual_review",
+  );
+});
+
+test("validates historical releases independently of current authorization eligibility", async () => {
+  const names = ["AUTHORIZATION_TYPES", "domain", "validateDestinationIdentity", "validateDestination", "validateReleasedDestination"];
+  const code = names.map((name) => {
+    const statement = signerSource.statements.find((node) =>
+      ts.isVariableStatement(node) && node.declarationList.declarations.some(
+        (declaration) => declaration.name.getText(signerSource) === name,
+      ),
+    );
+    assert.ok(statement, name);
+    return statement.getText(signerSource);
+  }).join("\n");
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "100",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+  const reservationId = `0x${"a".repeat(64)}`;
+  let timestamp = 1101;
+  let version = 1n;
+  let enabled = true;
+  const reservation = { status: 2n, authorizationDigest: "" };
+  const checks = runInNewContext(ts.transpileModule(code, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + "\n({ validateDestination, validateReleasedDestination, digest: (a) => TypedDataEncoder.hash(domain(a), AUTHORIZATION_TYPES, a) })", {
+    destinationChainId: BigInt(policy.destinationChainId), destinationVault: policy.destinationVault,
+    authorizationSignerAddress: "signer", getAddress, TypedDataEncoder,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    provider: { getBlock: async () => ({ timestamp }) },
+    vault: {
+      getReservationId: async () => reservationId,
+      reservations: async () => reservation,
+      maxAuthorizationValiditySeconds: async () => 1800n,
+      signerSetVersion: async () => version,
+      attestationSigners: async () => enabled,
+    },
+  });
+  reservation.authorizationDigest = checks.digest(authorization);
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /timing or signer set/);
+  timestamp = 1050;
+  version = 2n;
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /timing or signer set/);
+  enabled = false;
+  await checks.validateReleasedDestination(authorization, reservationId);
+  await assert.rejects(checks.validateDestination(authorization), /signer is not enabled/);
+  for (const mismatch of [{ destinationChainId: "1" }, { destinationVault: externalToken }]) {
+    await assert.rejects(checks.validateReleasedDestination(
+      { ...authorization, ...mismatch }, reservationId,
+    ), /Destination mismatch/);
+  }
+  await assert.rejects(checks.validateReleasedDestination(
+    authorization, `0x${"b".repeat(64)}`,
+  ), /does not match authorization/);
+  await assert.rejects(checks.validateReleasedDestination(
+    { ...authorization, amount: "101" }, reservationId,
+  ), /does not match authorization/);
+  for (const status of [0n, 1n, 3n]) {
+    reservation.status = status;
+    await assert.rejects(checks.validateReleasedDestination(authorization, reservationId), /does not match authorization/);
+  }
+});
+
+const loadSignerChecks = (names: string[], context: Record<string, unknown>) => {
+  const code = names.map((name) => {
+    const node = signerSource.statements.find((statement) => ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((declaration) => declaration.name.getText(signerSource) === name));
+    assert.ok(node, name);
+    return node.getText(signerSource);
+  }).join("\n");
+  return runInNewContext(ts.transpileModule(code, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + `\n({${names.join(",")}})`, context);
+};
+
+test("pins actual RPC identities without truncating STRATO network IDs", async () => {
+  let externalId = "0x1";
+  let networkID: string | undefined = "123456789012345678901234";
+  const { validateRpcIdentity } = loadSignerChecks(["validateRpcIdentity"], {
+    destinationChainId: 1n, sourceChainId: BigInt(networkID),
+    provider: { send: async (method: string) => { assert.equal(method, "eth_chainId"); return externalId; } },
+    stratoGet: async (path: string) => {
+      assert.equal(path, "/strato-api/eth/v1.2/metadata");
+      return { data: { networkID } };
+    },
+  });
+  await validateRpcIdentity();
+  externalId = "0x2";
+  await assert.rejects(validateRpcIdentity(), /External RPC chain ID mismatch/);
+  externalId = "0x1";
+  networkID = "123456789012345678901235";
+  await assert.rejects(validateRpcIdentity(), /STRATO RPC network ID mismatch/);
+  networkID = undefined;
+  await assert.rejects(validateRpcIdentity(), /STRATO RPC network ID mismatch/);
+});
+
+test("refund attestations reject paid, reserved, unconfirmed, or mismatched vault state", async () => {
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "100",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+  let confirmedTimestamp = 1101;
+  let status = 0;
+  let digest = "";
+  const checks = loadSignerChecks(["AUTHORIZATION_TYPES", "domain", "validateDestinationIdentity", "validateRefundDestination"], {
+    destinationChainId: BigInt(policy.destinationChainId), destinationVault: policy.destinationVault,
+    verifierConfirmations: 5, getAddress, TypedDataEncoder,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    provider: { getBlock: async (tag: string | number) => tag === "latest"
+      ? { number: 20, timestamp: 1200 } : { number: 15, timestamp: confirmedTimestamp } },
+    vault: {
+      getReservationId: async () => "reservation",
+      reservations: async (_id: string, options: { blockTag: number }) => {
+        assert.equal(options.blockTag, 15);
+        return { status, authorizationDigest: digest };
+      },
+    },
+  });
+  await checks.validateRefundDestination(authorization);
+  confirmedTimestamp = 1100;
+  await assert.rejects(checks.validateRefundDestination(authorization), /has not expired/);
+  confirmedTimestamp = 1101;
+  for (status of [1, 2]) {
+    await assert.rejects(checks.validateRefundDestination(authorization), /not refundable/);
+  }
+  status = 3;
+  digest = `0x${"0".repeat(64)}`;
+  await assert.rejects(checks.validateRefundDestination(authorization), /not refundable/);
+  digest = TypedDataEncoder.hash(checks.domain(authorization), checks.AUTHORIZATION_TYPES, authorization);
+  await checks.validateRefundDestination(authorization);
+  await assert.rejects(checks.validateRefundDestination({ ...authorization, amount: "101" }), /not refundable/);
+});
+
+test("AUTO_ROUTE requires a positive minimum even for manually reviewed amounts", () => {
+  const enabled = structuredClone(policy);
+  enabled.routes[0].autoRouteEnabled = true;
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  assert.equal(evaluateDepositPolicy(enabled, routed).decision, "approve");
+  for (const minFinalOut of ["0", "-1", "invalid"]) {
+    assert.throws(() => evaluateDepositPolicy(enabled, { ...routed, minFinalOut, externalTokenAmount: "101" }));
+  }
+  assert.throws(() => evaluateDepositPolicy(enabled, { ...routed, actionToken: "0".repeat(40) }));
+});
+
+test("runtime recomputes the baseline hash and rejects changed limits", () => {
+  const directory = mkdtempSync(resolve(tmpdir(), "verifier-policy-"));
+  const file = resolve(directory, "policy.json");
+  const baseline = { version: policy.version, sourceChainId: policy.sourceChainId, sourceBridge: policy.sourceBridge,
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    routes: policy.routes, tokens: policy.tokens };
+  const input = { ...baseline, verifierIndex: 1, settlementAttestor: policy.settlementAttestor,
+    baselinePolicyHash: `sha256:${createHash("sha256").update(JSON.stringify(baseline)).digest("hex")}` };
+  try {
+    writeFileSync(file, JSON.stringify(input));
+    assert.equal(loadVerifierPolicy(file).policy.routes[0].maxAutoDepositAmount, "100");
+    writeFileSync(file, JSON.stringify({ ...input, tokens: [{ ...input.tokens[0], maxAutoWithdrawalAmount: "500" }] }));
+    assert.throws(() => loadVerifierPolicy(file), /does not match policy limits/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("deposit review uses the contract digest of the requested intent, fails closed and rejects stale approvals", async () => {
+  const digest = "0x3a9f5e6a40844430f1f61c4b614c965438da99da853e642aba9ca4ad0485800d";
+  let approval = "0x" + "0".repeat(64), currentDigest = digest;
+  const calls: any[] = [];
+  let rpcError = false;
+  const checks = loadSignerChecks(["readSourceDigest", "isDepositReviewApproved"], {
+    sourceBridge: policy.sourceBridge, stratoNodeUrl: "https://strato.test", normalize: (v: string) => v.replace(/^0x/i, "").toLowerCase(),
+    buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest,
+    getStratoToken: async () => "token", authHeaders: (token: string) => ({ Authorization: `Bearer ${token}` }),
+    stratoGet: async (url: string, params: any) => {
+      assert.ok(url.endsWith("-depositReviewApprovals"));
+      assert.equal(params.key3, `eq.${deposit.depositId}`);
+      return { data: [{ value: approval }] };
+    },
+    axios: { post: async (_url: string, body: any) => {
+      calls.push(body);
+      if (rpcError) return { data: { error: { message: "unavailable" } } };
+      return { data: { result: currentDigest } };
+    } },
+  });
+  assert.equal(await checks.isDepositReviewApproved(deposit), false);
+  assert.equal(calls.length, 0);
+  approval = digest.slice(2);
+  assert.equal(await checks.isDepositReviewApproved(deposit), true);
+  assert.deepEqual(calls.at(-1), buildBridgeDigestRequest(policy.sourceBridge, "getDepositSettlementDigest", depositDigestArgs(deposit)));
+  currentDigest = "0x" + "b".repeat(64); // Changed generation, verifier version, or committed intent.
+  assert.equal(await checks.isDepositReviewApproved({ ...deposit, externalTokenAmount: "101" }), false);
+  assert.deepEqual(calls.at(-1), buildBridgeDigestRequest(policy.sourceBridge, "getDepositSettlementDigest", depositDigestArgs({ ...deposit, externalTokenAmount: "101" })));
+  rpcError = true;
+  await assert.rejects(checks.isDepositReviewApproved(deposit), /Unable to read/);
+});
+
+test("enforceWithdrawalPolicy requires an executed Safe approval covering the authorization deadline", async () => {
+  // Local limit 500, contract review threshold 100: amounts of 150 and 501
+  // exercise the contract-threshold and local-policy triggers respectively.
+  const localPolicy = { ...policy, tokens: [{ ...policy.tokens[0], maxAutoWithdrawalAmount: "500" }] };
+  const tokenPolicy = { enabled: true, maxPerWithdrawal: 1000n, manualReviewThreshold: 100n };
+  let approvalDeadline = 0n;
+  let requestedDigest: string | undefined;
+  class ManualReviewRequiredError extends Error {}
+  const checks = loadSignerChecks(
+    ["WITHDRAWAL_REVIEW_TYPES", "domain", "reviewDigest", "enforceWithdrawalPolicy"],
+    {
+      destinationChainId: BigInt(policy.destinationChainId),
+      destinationVault: policy.destinationVault,
+      TypedDataEncoder,
+      evaluateWithdrawalPolicy,
+      verifierPolicy: localPolicy,
+      ManualReviewRequiredError,
+      vault: {
+        tokenPolicies: async () => tokenPolicy,
+        largeWithdrawalApprovalDeadline: async (digest: string) => {
+          requestedDigest = digest;
+          return approvalDeadline;
+        },
+      },
+    },
+  );
+  const authorization = {
+    sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
+    destinationChainId: policy.destinationChainId, destinationVault: policy.destinationVault,
+    token: externalToken, recipient: deposit.externalSender, amount: "50",
+    notBefore: "1000", deadline: "1100", signerSetVersion: "1",
+  };
+
+  // Below both limits: approved without consulting the Safe approval.
+  await checks.enforceWithdrawalPolicy(authorization);
+  assert.equal(requestedDigest, undefined);
+
+  // Above the contract review threshold with no recorded approval.
+  const large = { ...authorization, amount: "150" };
+  await assert.rejects(checks.enforceWithdrawalPolicy(large), ManualReviewRequiredError);
+  assert.equal(requestedDigest, checks.reviewDigest(large));
+
+  // An approval that expires before the authorization deadline is insufficient.
+  approvalDeadline = 1099n;
+  await assert.rejects(checks.enforceWithdrawalPolicy(large), ManualReviewRequiredError);
+
+  // An executed approval covering the deadline permits signing, and binds
+  // the exact review digest of the authorization being signed.
+  approvalDeadline = 1100n;
+  await checks.enforceWithdrawalPolicy(large);
+  assert.equal(requestedDigest, checks.reviewDigest(large));
+
+  // The local verifier policy alone triggers the same requirement (F2's
+  // original mismatch): 501 exceeds the local limit of 500 while staying
+  // below the contract threshold, now raised to 1000.
+  tokenPolicy.manualReviewThreshold = 1000n;
+  approvalDeadline = 0n;
+  await assert.rejects(checks.enforceWithdrawalPolicy({ ...authorization, amount: "501" }), ManualReviewRequiredError);
+  approvalDeadline = 1100n;
+  await checks.enforceWithdrawalPolicy({ ...authorization, amount: "501" });
+
+  // Hard limits reject outright — never downgraded to manual review.
+  await assert.rejects(checks.enforceWithdrawalPolicy({ ...authorization, amount: "1001" }), /exceeds destination vault maximum/);
+  tokenPolicy.enabled = false;
+  await assert.rejects(checks.enforceWithdrawalPolicy(authorization), /token is disabled/);
+});
+
+test("withdrawal review dissent takes precedence over two returned signatures", async () => {
+  const source = ts.createSourceFile("externalWithdrawalService.ts",
+    readFileSync(resolve(__dirname, "../../src/services/externalWithdrawalService.ts"), "utf8"), ts.ScriptTarget.Latest, true);
+  const statement = source.statements.find((item) => ts.isVariableStatement(item) &&
+    item.declarationList.declarations.some((d) => d.name.getText(source) === "signWithdrawalAuthorization"));
+  assert.ok(statement);
+  let reviews = 0;
+  const sign = runInNewContext(ts.transpileModule(statement.getText(source).replace(/^export /, ""), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText + "\nsignWithdrawalAuthorization", {
+    getExternalBridgeVerifierUrls: () => ["one", "two", "three"],
+    getExternalBridgeVerifierApiTokens: () => ["a", "b", "c"],
+    VERIFIER_REQUEST_TIMEOUT_MS: 1000, AbortSignal,
+    Signature: { from: (signature: string) => ({ serialized: signature }) },
+    verifyTypedData: (_domain: unknown, _types: unknown, _auth: unknown, signature: string) => signature,
+    authorizationDomain: () => ({}), WITHDRAWAL_AUTHORIZATION_TYPES: {}, logError: () => {},
+    proposeWithdrawalReview: async () => { reviews++; },
+    axios: {
+      isAxiosError: () => true,
+      post: async (url: string) => {
+        const signer = url.split("/")[0];
+        if (signer === "three") throw { response: { status: 409, data: { decision: "manual_review" } } };
+        return { data: { signature: signer, authorizationSigner: signer } };
+      },
+    },
+  });
+  await assert.rejects(sign({ destinationChainId: "1", sourceWithdrawalId: "7" }), /executed Safe approval/);
+  assert.equal(reviews, 1);
+});
+
+test("deposit handler validates custody and route before submitting fallback-only attestations", async () => {
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-deposit"');
+  assert.ok(endpoint);
+  let handler: any;
+  let localPolicy = structuredClone(policy);
+  let invalidReceipt = false;
+  let disabledRoute = false;
+  let sourceFallbackOnly = false;
+  let reviewApproved = false;
+  const calls: any[] = [];
+  class ManualReviewRequiredError extends Error {}
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    sourceBridge: policy.sourceBridge, destinationChainId: BigInt(policy.destinationChainId),
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    stratoGet: async () => ({ data: [{ value: "2" }] }),
+    getDepositChainConfig: async () => ({ routers: [deposit.depositRouter], vault: policy.destinationVault }),
+    verifierPolicy: localPolicy, evaluateDepositPolicy, ManualReviewRequiredError,
+    isDepositReviewApproved: async () => reviewApproved,
+    provider: {}, verifierConfirmations: 12,
+    validateDepositSettlement: async () => { calls.push("receipt"); if (invalidReceipt) throw new Error("custody mismatch"); },
+    validateSourceDepositRoute: async (_deposit: any, allowFallback: boolean) => {
+      calls.push("route"); assert.equal(allowFallback, true);
+      if (disabledRoute) throw new Error("deposit route disabled");
+      return sourceFallbackOnly;
+    },
+    submitStratoAttestation: async (method: string, args: any) => { calls.push({ method, args }); return "tx"; },
+    auditDecision: () => {}, settlementAttestorAddress: policy.settlementAttestor,
+    console: { error: () => {} },
+  });
+  const routed = { ...deposit, action: "4", actionToken: stratoToken, minFinalOut: "1" };
+  const invoke = async (body = routed) => {
+    calls.length = 0;
+    let status = 200;
+    let result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body }, response);
+    return { status, result };
+  };
+  const fallback = await invoke();
+  assert.equal(fallback.status, 200);
+  assert.equal(fallback.result.fallbackOnly, true);
+  assert.deepEqual(calls.slice(0, 2), ["receipt", "route"]);
+  assert.equal(calls[2].method, "attestDepositFallback");
+  assert.equal(calls[2].args.action, "4");
+  assert.equal(calls[2].args.minFinalOut, "1");
+  assert.equal(calls[2].args.expectedGeneration, "2");
+  localPolicy.routes[0].autoRouteEnabled = true;
+  assert.equal((await invoke()).result.fallbackOnly, false);
+  assert.equal(calls[2].method, "attestDepositSettlement");
+  sourceFallbackOnly = true;
+  assert.equal((await invoke()).result.fallbackOnly, true);
+  assert.equal(calls[2].method, "attestDepositFallback");
+  invalidReceipt = true;
+  assert.equal((await invoke()).status, 422);
+  assert.equal(JSON.stringify(calls), JSON.stringify(["receipt"]));
+  invalidReceipt = false;
+  disabledRoute = true;
+  assert.equal((await invoke()).status, 422);
+  assert.equal(JSON.stringify(calls), JSON.stringify(["receipt", "route"]));
+  disabledRoute = false;
+  localPolicy.routes[0].autoRouteEnabled = false;
+  assert.equal((await invoke({ ...routed, externalTokenAmount: "101" })).status, 409);
+  assert.equal(calls.length, 0);
+  reviewApproved = true;
+  assert.equal((await invoke({ ...routed, externalTokenAmount: "101" })).result.fallbackOnly, true);
+  assert.equal(calls[2].method, "attestDepositFallback");
+});
+
+test("release handler returns pending confirmations without logging or submitting an attestation", async () => {
+  const { WithdrawalReleasePendingError } = await import("../types");
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-release"');
+  assert.ok(endpoint);
+  let handler: any;
+  let validationError: Error | null = new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations");
+  let sourceError: Error | null = null;
+  let submitted = 0;
+  let errors = 0;
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    WithdrawalReleasePendingError, provider: {}, verifierConfirmations: 12,
+    validateSourceWithdrawal: async () => { if (sourceError) throw sourceError; }, validateReleasedDestination: async () => {},
+    validateWithdrawalRelease: async () => { if (validationError) throw validationError; },
+    submitStratoAttestation: async () => { submitted++; return "tx"; },
+    settlementAttestorAddress: "attestor", console: { error: () => { errors++; } },
+  });
+  const invoke = async () => {
+    let status = 200;
+    let result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body: { authorization: { destinationVault: "vault" }, reservationId: "reservation", externalTxHash: "release" } }, response);
+    return { status, result };
+  };
+  const pending = await invoke();
+  assert.equal(pending.status, 409);
+  assert.equal(pending.result.decision, "pending_confirmations");
+  assert.equal(submitted, 0);
+  assert.equal(errors, 0);
+  sourceError = new Error("source mismatch");
+  assert.equal((await invoke()).status, 422);
+  assert.equal(errors, 1);
+  assert.equal(submitted, 0);
+  sourceError = null;
+  validationError = new Error("release proof mismatch");
+  assert.equal((await invoke()).status, 422);
+  assert.equal(errors, 2);
+  assert.equal(submitted, 0);
+  validationError = null;
+  assert.equal((await invoke()).status, 200);
+  assert.equal(submitted, 1);
+});
+
+test("refund handler attests the contract digest only after source and non-payment checks", async () => {
+  const endpoint = signerSource.statements.find(item => ts.isExpressionStatement(item) &&
+    ts.isCallExpression(item.expression) && item.expression.expression.getText(signerSource) === "app.post" &&
+    item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-refund"');
+  assert.ok(endpoint);
+  const digest = "0xbe620f2a844e6b18a371d579311e6e4c28075c0b7292146b43954623110fde7f";
+  let handler: any, failure = "";
+  const calls: string[] = [];
+  runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, {
+    app: { post: (_path: string, fn: any) => { handler = fn; } },
+    validateRpcIdentity: async () => {},
+    validateSourceWithdrawal: async (_authorization: any, statuses: number[], requireEnabled: boolean) => {
+      assert.equal(JSON.stringify(statuses), "[3]"); assert.equal(requireEnabled, false);
+      if (failure === "source") throw new Error("source mismatch");
+      calls.push("source");
+    },
+    validateRefundDestination: async () => {
+      if (failure === "payment") throw new Error("payment already occurred");
+      calls.push("nonpayment");
+    },
+    readSourceDigest: async (method: string, args: string[]) => {
+      assert.equal(method, "getWithdrawalRefundDigest"); assert.equal(args[0], "1");
+      assert.ok(calls.includes("source") && calls.includes("nonpayment"));
+      if (failure === "rpc") throw new Error("digest unavailable");
+      return digest;
+    },
+    submitStratoAttestation: async (method: string, args: any) => {
+      assert.equal(method, "attestWithdrawalRefund"); assert.equal(args.withdrawalId, "1");
+      assert.equal(args.expectedDigest, digest); calls.push("attest"); return "tx";
+    },
+    auditDecision: () => {}, settlementAttestorAddress: "attestor",
+  });
+  for (failure of ["", "source", "payment", "rpc"]) {
+    calls.length = 0;
+    let status = 200, result: any;
+    const response = { status: (code: number) => { status = code; return response; }, json: (data: any) => { result = data; } };
+    await handler({ body: { authorization: { sourceWithdrawalId: "1" } } }, response);
+    assert.equal(status, failure ? 422 : 200);
+    assert.equal(calls.includes("attest"), !failure);
+    if (!failure) assert.equal(result.digest, digest);
+  }
+});

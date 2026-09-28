@@ -1,22 +1,44 @@
 import sgMail from "@sendgrid/mail";
+import { MailDataRequired } from "@sendgrid/mail";
 import { config } from "../config";
 import { retry } from "../utils/api";
-import type { BridgeReviewItem } from "@strato/shared-types";
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || "");
 
-export const sendBridgeReviewEmail = async (item: BridgeReviewItem, resolved = false): Promise<void> => {
-  const recipients = config.email.approverEmails;
-  if (!recipients.length) throw new Error("TRANSACTION_APPROVER_EMAILS is required for bridge review notifications");
-  const event = resolved ? "No longer awaiting review" : "Action required";
-  await retry(() => sgMail.send({
-    to: recipients, from: "info@blockapps.net",
-    subject: `Bridge ${event.toLowerCase()}: ${item.source.toUpperCase()} ${item.kind.replace(/_/g, " ")} ${item.reference}`,
-    text: [event, `Reference: ${item.id}`, `Network: ${item.chainId}`, `Account: ${item.account}`,
-      `Token: ${item.token}`, `Amount (raw units): ${item.amount}`,
-      resolved ? "Check the transaction history for its final outcome." : item.reason,
-      ...(item.safeProposalHash ? [`Safe proposal: ${item.safeProposalHash}`] : []),
-      item.kind === "withdrawal_review" ? "Review in Safe." : "Review in Admin > Bridge.",
-    ].join("\n"),
-  }), { logPrefix: "BridgeReviewEmail" });
+const getSafeChainIdentifier = (chainId: number | string): string => {
+  const chainIdNum = typeof chainId === "string" ? parseInt(chainId, 10) : chainId;
+  const chainMap: Record<number, string> = {
+    1: "eth",
+    8453: "base",
+    11155111: "sep",
+    59144: "linea",
+    84532: "basesep",
+    4663: "robinhood",
+    46630: "robinhood-testnet",
+  };
+  return chainMap[chainIdNum] || `chain-${chainIdNum}`;
 };
+
+const sendEmail = async (safeTxHash: string, chainId: number | string) => {
+  const emailAddresses = process.env.TRANSACTION_APPROVER_EMAILS?.split(
+    ",",
+  ).map((email) => email.trim());
+  const safeAddress = config.safe.address;
+  const chainIdentifier = getSafeChainIdentifier(chainId);
+
+  const safeTxLink = `https://app.safe.global/transactions/tx?safe=${chainIdentifier}:${safeAddress}&id=multisig_${safeAddress}_${safeTxHash}`;
+
+  const msg: MailDataRequired = {
+    to: emailAddresses || [],
+    from: "info@blockapps.net",
+    subject: "New Bridge Transaction Proposed and Pending Approval",
+    text: `Please review and approve the transaction: ${safeTxLink}`,
+  };
+
+  await retry(
+    () => sgMail.send(msg),
+    { logPrefix: "EmailService" }
+  );
+};
+
+export default sendEmail;

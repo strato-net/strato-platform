@@ -22,7 +22,6 @@ export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
     }));
 
     const result = await execute(mintTransactions);
-
     logInfo("VoucherService", `Successfully minted ${voucherCount} vouchers for ${stratoRecipients.length} users, tx: ${result.hash}`);
   } catch (error) {
     logError("VoucherService", error as Error, { 

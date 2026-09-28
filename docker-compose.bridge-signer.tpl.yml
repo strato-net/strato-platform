@@ -21,7 +21,7 @@ services:
     - VERIFIER_POLICY_PATH=/run/secrets/eab-verifier-policy.json
     - EXTERNAL_BRIDGE_VERIFIER_API_TOKEN=${EXTERNAL_BRIDGE_VERIFIER_API_TOKEN}
     - VERIFIER_CONFIRMATIONS=${VERIFIER_CONFIRMATIONS}
-    image: ${BRIDGE_IMAGE:-<REPO_URL>bridge:<VERSION>-<HASH_BRIDGE>}
+    image: ${BRIDGE_IMAGE:-<REPO_URL>bridge-eab:<VERSION>-<HASH_BRIDGE_EAB>}
     command: ["node", "dist/signer/index.js"]
     init: true
     restart: unless-stopped

@@ -19,6 +19,21 @@ for the UI/backend release even when native routing is out of scope.
 Wait for each AdminRegistry issue or Safe transaction to execute. Stop on
 failure. Run the command `status` prints; do not invent flags.
 
+## Service build boundary
+
+EAB runtime and verifiers are built from `app/services/bridge-eab`, using its
+Dockerfile with `app` as the build context. Use `make bridge-eab bridge-eab-nginx`
+and `make docker-compose-bridge-eab` from the repository root. The existing
+`bridge` targets and `app/services/bridge` now build the legacy service from
+`develop`; do not use those artifacts for EAB. See the
+[service migration notes](app/services/bridge-eab/README.md#service-separation-and-deployment).
+
+Keep the deployed EAB data mount, cursors, service names, and immutable-image
+workflow. Update infrastructure build and verifier provenance paths before the
+next release. No contract upgrade or runtime ownership change is part of the
+service package separation; native solver/routing compatibility remains a
+separate release gate.
+
 ## Files
 
 After `bundle`, the only shared file is `deployment-bundle.json` plus its

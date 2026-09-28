@@ -61,8 +61,10 @@ HASH_APP_BACKEND := $(call dir_hash,app/backend)
 HASH_APP_UI := $(call dir_hash,app/ui)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
-HASH_BRIDGE := $(call dir_hash,app/services/bridge app/packages/shared-types)
+HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
+HASH_BRIDGE_EAB := $(call dir_hash,app/services/bridge-eab app/packages/shared-types)
+HASH_BRIDGE_EAB_NGINX := $(call dir_hash,app/services/bridge-eab/nginx)
 HASH_TRACKING := $(call dir_hash,app/services/tracking)
 HASH_TRACKING_NGINX := $(call dir_hash,app/services/tracking/nginx)
 HASH_TRACKING_UI := $(call dir_hash,app/services/tracking/ui)
@@ -100,6 +102,8 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_SMD>|$(HASH_SMD)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g' \
+            -e 's|<HASH_BRIDGE_EAB>|$(HASH_BRIDGE_EAB)|g' \
+            -e 's|<HASH_BRIDGE_EAB_NGINX>|$(HASH_BRIDGE_EAB_NGINX)|g' \
             -e 's|<HASH_TRACKING>|$(HASH_TRACKING)|g' \
             -e 's|<HASH_TRACKING_NGINX>|$(HASH_TRACKING_NGINX)|g' \
             -e 's|<HASH_TRACKING_UI>|$(HASH_TRACKING_UI)|g'
@@ -167,7 +171,7 @@ smd:
 bridge:
 	@if $(call image_missing,$(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE)); then \
 		echo "Building bridge ($(VERSION)-$(HASH_BRIDGE))..."; \
-		docker build -f app/services/bridge/Dockerfile -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app && \
+		docker build -f app/services/bridge/Dockerfile -t $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) ./app/services/bridge && \
 		docker tag $(REPO_URL)bridge:$(VERSION)-$(HASH_BRIDGE) $(REPO_AWS_ECR_URL)bridge:$(VERSION)-$(HASH_BRIDGE); \
 	else \
 		echo "bridge up to date"; \
@@ -180,6 +184,24 @@ bridge-nginx:
 		docker tag $(REPO_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX) $(REPO_AWS_ECR_URL)bridge-nginx:$(VERSION)-$(HASH_BRIDGE_NGINX); \
 	else \
 		echo "bridge-nginx up to date"; \
+	fi
+
+bridge-eab:
+	@if $(call image_missing,$(REPO_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB)); then \
+		echo "Building bridge-eab ($(VERSION)-$(HASH_BRIDGE_EAB))..."; \
+		docker build -f app/services/bridge-eab/Dockerfile -t $(REPO_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) ./app && \
+		docker tag $(REPO_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB) $(REPO_AWS_ECR_URL)bridge-eab:$(VERSION)-$(HASH_BRIDGE_EAB); \
+	else \
+		echo "bridge-eab up to date"; \
+	fi
+
+bridge-eab-nginx:
+	@if $(call image_missing,$(REPO_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX)); then \
+		echo "Building bridge-eab-nginx ($(VERSION)-$(HASH_BRIDGE_EAB_NGINX))..."; \
+		docker build --add-host=openresty.org:3.125.51.27 -t $(REPO_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX) ./app/services/bridge-eab/nginx && \
+		docker tag $(REPO_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX) $(REPO_AWS_ECR_URL)bridge-eab-nginx:$(VERSION)-$(HASH_BRIDGE_EAB_NGINX); \
+	else \
+		echo "bridge-eab-nginx up to date"; \
 	fi
 
 tracking:
@@ -259,13 +281,23 @@ app-ui-force:
 
 bridge-force:
 	@echo Now building bridge...
-	docker build -f app/services/bridge/Dockerfile -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app
+	docker build -f app/services/bridge/Dockerfile -t ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ./app/services/bridge
 	docker tag ${REPO_URL}bridge:${VERSION}-${HASH_BRIDGE} ${REPO_AWS_ECR_URL}bridge:${VERSION}-${HASH_BRIDGE}
 
 bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
+
+bridge-eab-force:
+	@echo Now building bridge-eab...
+	docker build -f app/services/bridge-eab/Dockerfile -t ${REPO_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB} ./app
+	docker tag ${REPO_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB} ${REPO_AWS_ECR_URL}bridge-eab:${VERSION}-${HASH_BRIDGE_EAB}
+
+bridge-eab-nginx-force:
+	@echo Now building bridge-eab-nginx...
+	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX} ./app/services/bridge-eab/nginx
+	docker tag ${REPO_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX} ${REPO_AWS_ECR_URL}bridge-eab-nginx:${VERSION}-${HASH_BRIDGE_EAB_NGINX}
 
 tracking-force:
 	@echo Now building tracking...
@@ -545,3 +577,8 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-setup
 	@rm -f $(HOME)/.local/bin/convoke
 	@echo "Done"
+
+.PHONY: bridge-eab bridge-eab-nginx bridge-eab-force bridge-eab-nginx-force docker-compose-bridge-eab
+docker-compose-bridge-eab:
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml > docker-compose.bridge-eab.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.yml

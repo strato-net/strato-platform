@@ -1,12 +1,5 @@
 import { getAddress } from "ethers";
 
-export const normalizeOptionalHash = (value?: string | null): string | null => {
-  const normalized = value?.trim();
-  if (!normalized) return null;
-  const withoutPrefix = normalized.replace(/^0x/i, "");
-  return /^0+$/.test(withoutPrefix) ? null : normalized;
-};
-
 /**
  * Converts an amount from one decimal place to another
  * @param amount - The amount as BigInt or string (hex/decimal)
@@ -169,6 +162,3 @@ export function isOkStatus(receipt: any): boolean {
   return receipt.status === 1 || receipt.status === true || 
     (typeof receipt.status === "string" && receipt.status.toLowerCase() === "0x1");
 }
-
-export const normalizeHex = (value: string): string =>
-  value.replace(/^0x/i, "").toLowerCase();

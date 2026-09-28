@@ -15,7 +15,7 @@ settlement after activation is not part of this plan. Legacy history remains rea
 | Area | Current implementation | Cutover consequence |
 | --- | --- | --- |
 | New standard withdrawals | Unified Trade's `/trade/bridge/*` path approves EAB; legacy Fund's `/bridge/*` path remains on MercataBridge. | Deploying the new backend does not switch legacy pages. Gate old intake explicitly before draining and retiring it. |
-| Legacy withdrawals | Service queries MercataBridge at `BRIDGE_ADDRESS`, proposes Safe transactions, then finalizes or aborts. | Keep the old contract address, custody, Safe access, and settlement worker available until drained. |
+| Legacy withdrawals | The legacy `app/services/bridge` service queries MercataBridge at `BRIDGE_ADDRESS`, proposes Safe transactions, then finalizes or aborts. | Keep the old contract address, custody, Safe access, and settlement worker available until drained. |
 | Deposits | New service discovers chains/routers from EAB and processes EAB deposits. | It does not replace the old MercataBridge deposit processor. Drain old deposits before retiring that processor. |
 | History | History is scoped by API path; legacy records remain on the legacy path and native records remain supported. | Preserve old contract queries and status links when retiring old entry points; the unified feed is not a replacement for every legacy record. |
 | Backend startup | Requires configured EAB and TokenRouter, matching router linkage, and an initialized router. | Publish verified network defaults before deploying the new image; node `/health` alone is insufficient. |
@@ -66,18 +66,16 @@ After governance, populate `defaultExternalAssetBridgeFor` and
 network using verified addresses. The current empty entries are release blockers.
 Validate initialization and linkage before building the backend image.
 
-Render the bridge/verifier configuration separately. Keep the old service and its
-existing Safe configuration available for draining. Prepare the new service, but
-do not start it alongside the old processor: it also starts legacy withdrawal
-pollers. No worker-role split is needed for this sequential cutover.
+Render the bridge/verifier configuration separately. The EAB runtime and verifiers
+come from `app/services/bridge-eab`; the unchanged legacy service is in
+`app/services/bridge`. Keep the legacy service and Safe configuration available
+until its MercataBridge deposits and withdrawals have drained. The EAB package
+has no MercataBridge pollers and does not require `BRIDGE_ADDRESS`.
 
-The new service currently still requires legacy configuration, including
-`BRIDGE_ADDRESS`. Retain valid configuration for startup. After the old bridge is
-drained and paused, its withdrawal pollers should return no work because they
-filter `withdrawalsPaused=false`. Verify that behavior before activation. Removing
-those pollers and their configuration requirements is a separate code cleanup,
-not a prerequisite for this cutover. Do not point the legacy Safe settings at
-the new vault.
+Native processing still requires one owner per network. Preserve the EAB data
+mount and cursors when changing images; do not start both native processors on
+the same network. Service separation does not change contract implementations or
+enable solver/fast-path compatibility.
 
 ## 3. Stop old intake and drain
 
@@ -246,7 +244,8 @@ transfer to old custody will be handled.
 - `app/backend/src/api/services/bridge.service.ts`: new withdrawal target,
   combined history, and legacy status normalization.
 - `app/backend/src/config/config.ts`: network defaults and startup validation.
-- `app/services/bridge/src/polling/stratoPolling.ts`: legacy and EAB pollers.
+- `app/services/bridge/src/polling/stratoPolling.ts`: legacy pollers.
+- `app/services/bridge-eab/src/polling/stratoPolling.ts`: EAB and native pollers.
 - `app/services/bridge/src/services/cirrusService.ts`: contract/address filters
   and paused-bridge exclusion.
 - `app/services/bridge/src/services/bridgeService.ts`: Safe confirmation and

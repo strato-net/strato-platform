@@ -1,0 +1,279 @@
+import type { ProposeTransactionProps } from "@safe-global/api-kit";
+import type { RouteStep } from "@strato/shared-types";
+
+export type TransactionTraceResult = any[] | Error;
+
+// ---------------- Utility Types ----------------
+export type NonEmptyArray<T> = [T, ...T[]];
+
+// ---------------- Transaction Types ----------------
+export type TxPayloadArgs = Record<string, any>;
+
+export interface FunctionTx {
+  payload: {
+    contractName: string;
+    contractAddress: string;
+    method: string;
+    args: TxPayloadArgs;
+  };
+  type: "FUNCTION";
+}
+
+export interface BuiltTx {
+  txs: FunctionTx[];
+  txParams: {
+    gasLimit: number;
+    gasPrice: number;
+  };
+}
+
+export interface FunctionInput {
+  contractName: string;
+  contractAddress: string;
+  method: string;
+  args: TxPayloadArgs;
+}
+
+// ---------------- Strato Helper Types ----------------
+export interface TxResult {
+  status: string;
+  hash: string;
+  txResult?: { message?: string };
+  error?: string;
+  message?: string;
+}
+
+export interface TxResponse {
+  status: "Success" | "Failure" | "Pending";
+  hash: string;
+}
+
+// ---------------- API Types ----------------
+export interface RetryConfig {
+  maxAttempts?: number;
+  logPrefix?: string;
+}
+
+export interface ClientOptions {
+  authenticated?: boolean;
+  timeout?: number;
+  logPrefix?: string;
+  tokenProvider?: () => Promise<string>;
+}
+
+export interface ApiClient {
+  get<T = any>(url: string, config?: any): Promise<T>;
+  post<T = any>(url: string, data?: any, config?: any): Promise<T>;
+}
+
+export interface DepositArgs {
+  externalChainId: string | number;
+  depositRouter: string;
+  depositId: string;
+  externalSender: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  observedExternalTokenAmount: string;
+  externalTxHash: string;
+  externalBlockHash: string;
+  externalBlockNumber: number;
+  externalBlockTimestamp: number;
+  externalLogIndex: number;
+  detectedAt: number;
+  stratoRecipient: string;
+  targetStratoToken: string;
+}
+
+export interface ActionDepositArgs extends DepositArgs {
+  action: string;
+  actionToken: string;
+  minFinalOut: string;
+}
+
+export interface StratoRouteStep extends Omit<RouteStep, "action"> {
+  action: string;
+}
+
+export interface RouteDepositArgs extends ActionDepositArgs {
+  steps: StratoRouteStep[];
+}
+
+export interface ConfirmDepositArgs {
+  externalChainId: string | number;
+  externalTxHash: string;
+  depositRouter: string;
+  depositId: string;
+  stratoRecipient: string;
+  verified: boolean;
+}
+
+export interface NativeDepositArgs {
+  externalChainId: string | number;
+  externalBridge: string;
+  externalRedemptionId: string | number;
+  externalSender: string;
+  representationToken: string;
+  externalTxHash: string;
+  stratoRecipient: string;
+  stratoTokenAmount: string;
+  actionToken?: string;
+  minFinalOut?: string;
+}
+
+export interface ConfirmNativeDepositArgs {
+  externalChainId: string | number;
+  externalBridge: string;
+  externalRedemptionId: string | number;
+  depositId: string;
+  stratoRecipient: string;
+  verified: boolean;
+  actionToken?: string;
+  minFinalOut?: string;
+  stratoToken?: string;
+  stratoTokenAmount?: string;
+}
+
+export interface DepositInfo {
+  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  externalSender: string;
+  externalToken: string;
+  requestedAt: string;
+  stratoRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+
+  externalChainId: string | number;
+  externalTxHash: string;
+  depositId: string;
+  externalDecimals: number;
+  depositRouter: string;
+  custodyAddress: string;
+}
+
+export interface NativeDepositInfo {
+  bridgeStatus: string;
+  depositId: string;
+  externalBridge: string;
+  externalSender: string;
+  externalTxHash: string;
+  externalChainId: string | number;
+  externalRedemptionId: string | number;
+  representationToken: string;
+  requestedAt: string;
+  stratoRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+  actionToken?: string;
+  minFinalOut?: string;
+}
+
+
+export interface WithdrawalInfo {
+  recoveryOnly?: boolean;
+  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  custodyTxHash?: string;
+  authorizationNotBefore?: string;
+  authorizationDeadline?: string;
+  cancellationTxHash?: string;
+  externalChainId: string | number;
+  externalRecipient: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  requiresManualReview?: boolean;
+  reservationId?: string;
+  reservationTxHash?: string;
+  reviewApprovalDeadline?: string;
+  reviewDigest?: string;
+  reviewProposalHash?: string;
+  signerSetVersion?: string;
+  requestedAt: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+
+  withdrawalId: string;
+  vault?: string;
+}
+
+export interface NativeWithdrawalInfo {
+  bridgeStatus: string;
+  externalTxHash: string;
+  externalChainId: string | number;
+  externalBridge: string;
+  externalRecipient: string;
+  representationToken: string;
+  externalTokenAmount: string;
+  requestedAt: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+  nativeMintProposalHash?: string;
+  nativeMintNotBefore?: string;
+  useInstantPath?: boolean;
+
+  withdrawalId: string;
+}
+
+export interface ChainInfo {
+  externalChainId: number;
+  depositRouter: string;
+  depositRouters?: string[];
+  lastProcessedBlock: number;
+  enabled: boolean;
+  custody?: string;
+  vault?: string;
+  chainName: string;
+}
+
+export interface AssetInfo {
+  enabled: boolean;
+  stratoToken: string;
+  externalName: string;
+  externalToken: string;
+  externalSymbol: string;
+  externalChainId: number;
+  externalDecimals: number;
+  maxPerWithdrawal: number;
+}
+
+export interface BridgeInfo {
+  DECIMAL_PLACES: number;
+  USDST_ADDRESS: string;
+  WITHDRAWAL_ABORT_DELAY: number;
+  _owner: string;
+  depositsPaused: boolean;
+  tokenFactory: string;
+  withdrawalCounter: number;
+  withdrawalsPaused: boolean;
+}
+
+export type EthCustodyDeposit = Pick<DepositArgs,
+  "depositId" | "depositRouter" | "externalSender" | "observedExternalTokenAmount"
+>;
+
+export type RecordedDepositReview = Pick<ActionDepositArgs,
+  "externalChainId" | "depositRouter" | "depositId" | "externalTxHash" |
+  "externalSender" | "externalToken" | "externalTokenAmount" | "stratoRecipient" |
+  "targetStratoToken" | "action" | "actionToken" | "minFinalOut"
+>;
+
+export interface PersistedWithdrawalReview {
+  reviewDigest: string;
+  approvalDeadline: string;
+  proposal: ProposeTransactionProps;
+}
+
+export interface PollHealthState {
+  intervalMs: number;
+  startedAt: number;
+  completedAt?: number;
+  running: boolean;
+  failed: boolean;
+  runFailed: boolean;
+}
+
+export class WithdrawalReleasePendingError extends Error {}

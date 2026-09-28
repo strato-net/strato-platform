@@ -1,0 +1,211 @@
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
+import { verifierAccessControl } from "./signer/accessControl";
+import cors from "cors";
+import bodyParser from "body-parser";
+import { logInfo, logError } from "./utils/logger";
+import { validateBridgeConfig } from "./utils/configValidator";
+import {
+  reconcileExternalDeposits,
+  startMultiChainDepositPolling,
+} from "./polling/alchemyPolling";
+import { startNativeRedemptionPolling } from "./polling/nativeRedemptionPolling";
+import { initializeStratoPolling } from "./polling/stratoPolling";
+import { initOpenIdConfig} from "./auth";
+import { healthMonitor } from "./utils/healthMonitor";
+import { depositMetricsService } from "./services/depositMetricsService";
+import { confirmReviewedDeposit } from "./services/bridgeService";
+import { depositStateService } from "./services/depositStateService";
+import { getDepositStatusByIdentity } from "./services/cirrusService";
+import { prepareBridgeOperation } from "./services/bridgeReviewService";
+
+const app = express();
+const port = process.env.PORT || 3003;
+
+app.set("env", "production");
+app.use(cors());
+app.use("/webhooks/deposits", verifierAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
+app.use("/operations/deposits", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use("/operations/reviews", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use(bodyParser.json());
+
+// Global error handler
+app.use(
+  (
+    error: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    logError("BridgeService", error, { operation: "request" });
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// Exposed Routes
+app.post("/operations/reviews/prepare", async (req, res) => {
+  if (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["refund", "settle"].includes(req.body?.action)) {
+    res.status(400).json({ error: "Invalid review action" });
+    return;
+  }
+  try { res.json(await prepareBridgeOperation(req.body.id, req.body.action)); }
+  catch (error) {
+    logError("BridgeReviews", error as Error, { operation: req.body.action, reviewId: req.body.id });
+    res.status(409).json({ error: (error as Error).message });
+  }
+});
+
+app.get("/health", async (_, res) => {
+  const health = healthMonitor.snapshot();
+  const errorLogPresent = await healthMonitor.errorFileExists();
+  res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
+});
+
+app.get("/metrics/deposits", (_, res) => {
+  res.json(depositMetricsService.snapshot());
+});
+
+app.post("/webhooks/deposits/:chainId", async (req, res) => {
+  const chainId = Number(req.params.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    res.status(400).json({ error: "Invalid chain ID" });
+    return;
+  }
+  try {
+    await reconcileExternalDeposits(chainId);
+    res.status(202).json({ accepted: true });
+  } catch (error) {
+    logError("DepositWebhook", error as Error, { chainId });
+    res.status(503).json({ error: "Reconciliation failed" });
+  }
+});
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/confirm",
+  async (req, res) => {
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const transactionHash = await confirmReviewedDeposit(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      try {
+        await depositStateService.markSettledByIdentity(
+          chainId,
+          depositRouter,
+          depositId,
+        );
+      } catch (error) {
+        logError("DepositOperations", error as Error, {
+          operation: "markReviewedDepositSettled",
+          chainId,
+          depositRouter,
+          depositId,
+        });
+      }
+      res.status(200).json({ transactionHash });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit confirmation failed" });
+    }
+  },
+);
+
+app.post(
+  "/operations/deposits/:chainId/:depositRouter/:depositId/reset",
+  async (req, res) => {
+    const chainId = Number(req.params.chainId);
+    const depositId = req.params.depositId;
+    const depositRouter = req.params.depositRouter.replace(/^0x/i, "");
+    if (
+      !Number.isSafeInteger(chainId) ||
+      chainId <= 0 ||
+      !/^[1-9][0-9]*$/.test(depositId) ||
+      !/^[0-9a-fA-F]{40}$/.test(depositRouter)
+    ) {
+      res.status(400).json({ error: "Invalid deposit identity" });
+      return;
+    }
+    try {
+      const onchainStatus = await getDepositStatusByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      if (onchainStatus !== undefined && onchainStatus !== "0") {
+        res.status(409).json({
+          error: `Deposit reuse must be owner-authorized before reset (status ${onchainStatus})`,
+        });
+        return;
+      }
+      await depositStateService.resetForRetryByIdentity(
+        chainId,
+        depositRouter,
+        depositId,
+      );
+      res.status(202).json({ reset: true });
+    } catch (error) {
+      logError("DepositOperations", error as Error, {
+        operation: "resetDepositForRetry",
+        chainId,
+        depositRouter,
+        depositId,
+      });
+      res.status(503).json({ error: "Deposit reset failed" });
+    }
+  },
+);
+
+app.listen(port, async () => {
+  try {
+    logInfo("BridgeService", "Starting bridge service...");
+
+    // Validate configuration before starting
+    const configValid = await validateBridgeConfig();
+    if (!configValid) {
+      const error = new Error(
+        "Configuration validation failed - service cannot start",
+      );
+      logError("BridgeService", error);
+      process.exit(1);
+    }
+
+    // Initialize OAuth
+    await initOpenIdConfig();
+
+    // Start polling services
+    startMultiChainDepositPolling();
+    startNativeRedemptionPolling();
+    await initializeStratoPolling();
+    healthMonitor.markReady();
+
+    logInfo(
+      "BridgeService",
+      `Bridge service started successfully on port ${port}`,
+    );
+  } catch (error) {
+    logError("BridgeService", error as Error, { operation: "startup" });
+    process.exit(1);
+  }
+});

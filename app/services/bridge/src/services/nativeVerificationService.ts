@@ -1,11 +1,40 @@
-import { getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
-import { getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, ZERO_ADDRESS } from "../config";
+import { Interface } from "ethers";
+import { getTransactionReceiptsBatch } from "./rpcService";
+import {
+  getNativeRepresentationBridgeAddress,
+  NATIVE_REDEMPTION_EVENT_SIGNATURES,
+} from "../config";
+import { NATIVE_REDEMPTION_EVENTS_ABI } from "../polling/nativeRedemptionPolling";
 import { NativeDepositInfo } from "../types";
-import { parseNativeDepositLog } from "../utils/nativeRedemption";
 import { logError } from "../utils/logger";
+
+const redemptionEvents = new Interface(NATIVE_REDEMPTION_EVENTS_ABI);
 
 const normalizeAddress = (value: string) =>
   value.toLowerCase().replace(/^0x/, "");
+
+/// Decoded by ABI, not by slicing: the fee-bearing variant appends three words,
+/// and reading a fixed two out of five would misverify every such redemption.
+const decodeNativeRedemption = (
+  log: { topics: string[]; data: string },
+): { amount: bigint; redemptionId: bigint } => {
+  const parsed = redemptionEvents.parseLog({ topics: log.topics, data: log.data });
+  if (!parsed) {
+    throw new Error("Log does not match a supported redemption event");
+  }
+  return {
+    amount: BigInt(parsed.args.amount.toString()),
+    redemptionId: BigInt(parsed.args.redemptionId.toString()),
+  };
+};
+
+const decodeIndexedAddress = (topic: string): string => {
+  if (!topic.startsWith("0x") || topic.length !== 66) {
+    throw new Error(`Invalid topic: ${topic}`);
+  }
+
+  return `0x${topic.slice(26)}`.toLowerCase();
+};
 
 export const verifyNativeRedemptionsBatch = async (
   deposits: NativeDepositInfo[],
@@ -25,17 +54,10 @@ export const verifyNativeRedemptionsBatch = async (
   }
 
   for (const [externalChainId, chainDeposits] of depositsByChain) {
-    const confirmations = getDepositConfirmationPolicy(externalChainId);
-    let receipts: Map<string, any>, latestBlock: number;
-    try {
-      [receipts, latestBlock] = await Promise.all([
-        getTransactionReceiptsBatch(externalChainId, [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))]),
-        getVerificationBlockNumber(externalChainId),
-      ]);
-    } catch (error) {
-      logError("NativeVerificationService", error as Error, { externalChainId });
-      continue;
-    }
+    const receipts = await getTransactionReceiptsBatch(
+      externalChainId,
+      [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))],
+    );
 
     for (const deposit of chainDeposits) {
       try {
@@ -48,28 +70,41 @@ export const verifyNativeRedemptionsBatch = async (
         }
 
         const receipt = receipts.get(deposit.externalTxHash);
-        // Missing, disputed or immature evidence stays pending; it is not a failed deposit.
-        if (!receipt || receipt.__rpcDisagreement ||
-            typeof receipt.blockNumber !== "string" || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber) ||
-            BigInt(receipt.blockNumber) + BigInt(confirmations) > BigInt(latestBlock)) continue;
-        if (receipt.status !== "0x1") {
+        if (!receipt || receipt.status !== "0x1") {
           results.set(deposit.depositId, false);
           continue;
         }
 
-        const verified = receipt.logs.some((log) => {
-          if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) return false;
-          const event = parseNativeDepositLog(externalChainId, { ...log, transactionHash: deposit.externalTxHash });
-          return event !== null &&
-            normalizeAddress(event.externalBridge) === normalizeAddress(deposit.externalBridge) &&
-            normalizeAddress(event.representationToken) === normalizeAddress(deposit.representationToken) &&
-            normalizeAddress(event.externalSender) === normalizeAddress(deposit.externalSender) &&
-            normalizeAddress(event.stratoRecipient) === normalizeAddress(deposit.stratoRecipient) &&
-            BigInt(event.stratoTokenAmount) === BigInt(deposit.stratoTokenAmount) &&
-            BigInt(event.externalRedemptionId) === BigInt(deposit.externalRedemptionId) &&
-            normalizeAddress(event.actionToken!) === normalizeAddress(deposit.actionToken || ZERO_ADDRESS) &&
-            BigInt(event.minFinalOut!) === BigInt(deposit.minFinalOut || "0");
+        const matchingLog = receipt.logs.find((log) => {
+          if (!log.address || normalizeAddress(log.address) !== normalizeAddress(expectedBridgeAddress)) {
+            return false;
+          }
+
+          return (
+            log.topics.length >= 4 &&
+            NATIVE_REDEMPTION_EVENT_SIGNATURES.some(
+              (signature) => log.topics[0].toLowerCase() === signature.toLowerCase(),
+            )
+          );
         });
+
+        if (!matchingLog) {
+          results.set(deposit.depositId, false);
+          continue;
+        }
+
+        const representationToken = normalizeAddress(decodeIndexedAddress(matchingLog.topics[1]));
+        const externalSender = normalizeAddress(decodeIndexedAddress(matchingLog.topics[2]));
+        const stratoRecipient = normalizeAddress(decodeIndexedAddress(matchingLog.topics[3]));
+        const { amount, redemptionId } = decodeNativeRedemption(matchingLog);
+
+        const verified =
+          normalizeAddress(matchingLog.address) === normalizeAddress(deposit.externalBridge) &&
+          representationToken === normalizeAddress(deposit.representationToken) &&
+          externalSender === normalizeAddress(deposit.externalSender) &&
+          stratoRecipient === normalizeAddress(deposit.stratoRecipient) &&
+          amount === BigInt(deposit.stratoTokenAmount) &&
+          redemptionId === BigInt(deposit.externalRedemptionId);
 
         results.set(deposit.depositId, verified);
       } catch (error) {

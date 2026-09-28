@@ -4,13 +4,6 @@ import { id } from "ethers";
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
 export const WAD = 10n ** 18n;
-export const VERIFIER_REQUEST_TIMEOUT_MS = 60_000;
-export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
-// HyperEVM caps JSON-RPC batches at 20 calls per HTTP request
-export const RPC_BATCH_LIMIT = 20;
-export const TRACE_RPC_PROBE_BLOCKS = 20;
-export const CIRRUS_PAGE_SIZE = 200;
-export const CIRRUS_FILTER_BATCH_SIZE = 20;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
@@ -22,17 +15,35 @@ export const STANDARD_DEPOSIT_EVENT_SIGNATURE = id(
 export const ACTION_DEPOSIT_EVENT_SIGNATURE = id(
   "DepositRoutedWithAction(address,uint256,address,address,address,uint96,uint8,address,uint256)",
 );
+// A deposit that offers a solver fee for immediate delivery on STRATO. A
+// separate event rather than extra fields on DepositRouted, so that a relayer
+// running the old code keeps working through the upgrade.
+export const FEE_DEPOSIT_EVENT_SIGNATURE = id(
+  "DepositRoutedWithFee(address,uint256,address,address,address,uint96,uint256,uint256,uint256)",
+);
 export const DEPOSIT_EVENT_SIGNATURES = [
   STANDARD_DEPOSIT_EVENT_SIGNATURE,
   ACTION_DEPOSIT_EVENT_SIGNATURE,
+  FEE_DEPOSIT_EVENT_SIGNATURE,
 ];
 
 // RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
 export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
   "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
 
-export const NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE = id(
-  "RedemptionRequestedWithRoute(address,uint256,address,address,uint96,address,uint256)",
+// The fee-bearing redemption, and the solver claim on a STRATO withdrawal.
+export const NATIVE_FEE_REDEMPTION_EVENT_SIGNATURE = id(
+  "RedemptionRequestedWithFee(address,uint256,address,address,uint96,uint256,uint256,uint256)",
+);
+export const NATIVE_REDEMPTION_EVENT_SIGNATURES = [
+  NATIVE_REDEMPTION_EVENT_SIGNATURE,
+  NATIVE_FEE_REDEMPTION_EVENT_SIGNATURE,
+];
+
+// WithdrawalFilled, emitted by both external-chain bridges when a solver takes
+// over a withdrawal's claim. The relayer mirrors these back to STRATO.
+export const WITHDRAWAL_FILLED_EVENT_SIGNATURE = id(
+  "WithdrawalFilled(bytes32,address,address,uint32,address,uint256,uint256,uint256)",
 );
 
 // Transfer(address,address,uint256)
@@ -41,7 +52,6 @@ export const TRANSFER_EVENT_SIGNATURE =
 
 // Error file configuration
 export const ERROR_FILE_NAME = "bridge-error.flag";
-export const HEALTH_POLL_TIMEOUT_MS = 15 * 60_000;
 
 const config = {
   auth: {
@@ -51,26 +61,15 @@ const config = {
     clientId: process.env.CLIENT_ID,
     openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
   },
-  relayerAuth: {
-    baUsername: process.env.RELAYER_BA_USERNAME,
-    baPassword: process.env.RELAYER_BA_PASSWORD,
-    clientSecret: process.env.RELAYER_CLIENT_SECRET,
-    clientId: process.env.RELAYER_CLIENT_ID,
-    openIdDiscoveryUrl: process.env.RELAYER_OPENID_DISCOVERY_URL,
-  },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
-    withdrawalPollingEnabled: process.env.LEGACY_WITHDRAWAL_POLLING_ENABLED !== "false",
-  },
-  externalAssetBridge: {
-    address: process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS,
-    manualReviewValiditySeconds: Number(
-      process.env.EXTERNAL_BRIDGE_MANUAL_REVIEW_VALIDITY_SECONDS ||
-        7 * 24 * 60 * 60,
-    ),
-  },
-  tokenRouter: {
-    address: process.env.TOKEN_ROUTER,
+    // Record each scanned block window with MercataBridge.recordDepositWindow, which stores the
+    // deposits and advances the checkpoint in one transaction. Enable only once the bridge logic
+    // with recordDepositWindow is live and the relayer is whitelisted for it.
+    recordDepositWindow: process.env.BRIDGE_RECORD_DEPOSIT_WINDOW === "true",
+    // How long to wait for Cirrus to show just-recorded deposits before leaving the checkpoint alone
+    readBackTimeoutMs: Number(process.env.BRIDGE_READ_BACK_TIMEOUT_MS) || 30_000,
+    readBackIntervalMs: 3_000,
   },
   nativeBridge: {
     address: process.env.STRATO_NATIVE_BRIDGE_ADDRESS,
@@ -85,8 +84,7 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     hotWalletAddress: process.env.SAFE_HOT_WALLET_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
-    safeProposerKmsKeyId: process.env.SAFE_PROPOSER_KMS_KEY_ID,
-    safeProposerKmsRegion: process.env.SAFE_PROPOSER_KMS_REGION,
+    safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
     apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
@@ -96,7 +94,7 @@ const config = {
     mintCount: 25,
   },
   polling: {
-    bridgeInInterval: 1 * 60 * 1000, // 1 minute
+    bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)
     bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
     withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
     ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
@@ -119,12 +117,8 @@ const config = {
       type: "FUNCTION" as const,
     },
   },
-  email: {
-    approverEmails: process.env.TRANSACTION_APPROVER_EMAILS?.split(",").map(value => value.trim()).filter(Boolean) || [],
-  },
   api: {
     nodeUrl: process.env.NODE_URL,
-    appUrl: process.env.STRATO_APP_API_URL,
     errorCodes: {
       ECONNREFUSED: "Connection refused",
       ENOTFOUND: "DNS lookup failed",
@@ -152,46 +146,30 @@ export const getChainRpcUrl = (chainId: number | bigint): string => {
   return rpcUrl;
 };
 
-export const getChainRpcUrls = (chainId: number | bigint): string[] => [
-  getChainRpcUrl(chainId),
-  ...(process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] || "")
-    .split(",")
-    .map((url) => url.trim())
-    .filter(Boolean),
-];
-
-export const getDepositConfirmationPolicy = (
-  chainId: number | bigint,
-): number => {
-  const value =
-    process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`] ||
-    process.env.DEPOSIT_CONFIRMATIONS;
-  const confirmations = Number(value);
-  if (!Number.isSafeInteger(confirmations) || confirmations <= 0) {
-    throw new Error(`Invalid deposit confirmation policy for chain ${chainId}`);
-  }
-  return confirmations;
+// Blocks a deposit must be buried under before it is scanned, so a reorg or an RPC node lagging
+// behind the one that answered eth_blockNumber cannot hide it from an already-scanned range
+const DEFAULT_CHAIN_CONFIRMATIONS: Record<string, number> = {
+  "1": 3,
+  "11155111": 3,
+  "8453": 10,
+  "84532": 10,
 };
+const FALLBACK_CHAIN_CONFIRMATIONS = 5;
 
-export const DEPOSIT_WS_RECONNECT_BASE_MS = 1_000;
-export const DEPOSIT_WS_RECONNECT_MAX_MS = 60_000;
-
-export const getDepositReconciliationDepth = (): number =>
-  Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);
-
-export const getMissingReceiptGraceMs = (): number =>
-  Number(process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000);
-
-export const getSettlementRetryGraceMs = (): number =>
-  Number(process.env.DEPOSIT_SETTLEMENT_RETRY_GRACE_MS || 15 * 60 * 1000);
-
-export const getReviewRecordRetryMs = (): number =>
-  Number(process.env.DEPOSIT_REVIEW_RECORD_RETRY_MS || 60 * 1000);
-
-export const getChainWsRpcUrl = (
-  chainId: number | bigint,
-): string | undefined =>
-  process.env[`CHAIN_${chainId}_WS_RPC_URL`];
+export const getChainConfirmations = (chainId: number | bigint): number => {
+  const chainIdStr = chainId.toString();
+  const configured = process.env[`CHAIN_${chainIdStr}_CONFIRMATIONS`]?.trim();
+  if (configured) {
+    const confirmations = Number(configured);
+    if (!Number.isInteger(confirmations) || confirmations < 0) {
+      throw new Error(
+        `CHAIN_${chainIdStr}_CONFIRMATIONS must be a non-negative integer, got "${configured}"`,
+      );
+    }
+    return confirmations;
+  }
+  return DEFAULT_CHAIN_CONFIRMATIONS[chainIdStr] ?? FALLBACK_CHAIN_CONFIRMATIONS;
+};
 
 export const getNativeRepresentationBridgeAddress = (
   chainId: number | bigint,
@@ -241,45 +219,6 @@ export const getNativeBridgePrivateKeys = (
   return keys;
 };
 
-export const getExternalBridgeVerifierUrls = (
-  chainId: number | bigint,
-): string[] =>
-  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || "")
-    .split(",")
-    .map((url) => url.trim().replace(/\/$/, ""))
-    .filter(Boolean);
-
-export const getExternalBridgeVerifierApiTokens = (
-  chainId: number | bigint,
-): string[] =>
-  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || "")
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-
-export const getExternalBridgeExecutorPrivateKey = (
-  chainId: number | bigint,
-): string | undefined =>
-  process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY`]?.trim();
-
-export interface ExternalBridgeExecutorKmsConfig {
-  address: string;
-  keyId: string;
-  region: string;
-}
-
-export const getExternalBridgeExecutorKmsConfig = (
-  chainId: number | bigint,
-): ExternalBridgeExecutorKmsConfig | undefined => {
-  const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
-  const address = process.env[`${prefix}_ADDRESS`]?.trim();
-  const keyId = process.env[`${prefix}_KMS_KEY_ID`]?.trim();
-  const region = process.env[`${prefix}_KMS_REGION`]?.trim();
-
-  if (!address && !keyId && !region) return undefined;
-  return { address: address || "", keyId: keyId || "", region: region || "" };
-};
-
 // Validate required environment variables
 const requiredEnvVars = [
   "BA_USERNAME",
@@ -287,18 +226,11 @@ const requiredEnvVars = [
   "CLIENT_SECRET",
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
-  "RELAYER_BA_USERNAME",
-  "RELAYER_BA_PASSWORD",
-  "RELAYER_CLIENT_SECRET",
-  "RELAYER_CLIENT_ID",
-  "RELAYER_OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
-  "EXTERNAL_ASSET_BRIDGE_ADDRESS",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_KMS_KEY_ID",
-  "SAFE_PROPOSER_KMS_REGION",
+  "SAFE_PROPOSER_PRIVATE_KEY",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);

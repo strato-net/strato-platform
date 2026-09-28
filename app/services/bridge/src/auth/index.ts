@@ -4,24 +4,25 @@ import { logError } from "../utils/logger";
 import { strato } from "../utils/api";
 
 
-type AuthRole = "operator" | "relayer";
-
-const getIdentityConfig = (role: AuthRole) =>
-  role === "operator" ? config.auth : config.relayerAuth;
-
-const getOAuthConfig = (role: AuthRole) => {
-  const identity = getIdentityConfig(role);
-  if (
-    !identity.clientId ||
-    !identity.clientSecret ||
-    !identity.openIdDiscoveryUrl
-  ) {
-    throw new Error(`${role} OAuth client configuration is incomplete`);
+// Validation function to check config at runtime
+const validateConfig = () => {
+  if (!config.auth?.clientId) {
+    throw new Error("CLIENT_ID is not configured");
   }
+  if (!config.auth?.clientSecret) {
+    throw new Error("CLIENT_SECRET is not configured");
+  }
+  if (!config.auth?.openIdDiscoveryUrl) {
+    throw new Error("OPENID_DISCOVERY_URL is not configured");
+  }
+};
+
+const getOAuthConfig = () => {
+  validateConfig();
   return {
-    clientId: identity.clientId,
-    clientSecret: identity.clientSecret,
-    openIdDiscoveryUrl: identity.openIdDiscoveryUrl,
+    clientId: config.auth.clientId!,
+    clientSecret: config.auth.clientSecret!,
+    openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl!,
     scope: "openid email profile",
     tokenField: "access_token",
   };
@@ -32,19 +33,23 @@ interface TokenData {
   expiresAt: number;
 }
 
-const cachedTokens: Partial<Record<AuthRole, TokenData>> = {};
+const CACHED_DATA: {
+  [key: string]: TokenData | null;
+} = {
+  serviceToken: null,
+};
 
 let cachedUserAddress: string | null = null;
 
 // Promise deduplication: concurrent callers share one in-flight request
-const tokenRefreshPromises: Partial<Record<AuthRole, Promise<string>>> = {};
+let tokenRefreshPromise: Promise<string> | null = null;
 let addressPromise: Promise<string> | null = null;
 
 const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
 
 // Add singleton pattern for OAuth initialization
 let oauthInitialized = false;
-const oauthInstances: Partial<Record<AuthRole, any>> = {};
+let oauthInstance: any = null;
 
 export const initOpenIdConfig = async () => {
   // If already initialized, return immediately
@@ -54,18 +59,16 @@ export const initOpenIdConfig = async () => {
   }
 
   try {
-    await Promise.all(
-      (["operator", "relayer"] as AuthRole[]).map(async (role) => {
-        const identity = getIdentityConfig(role);
-        console.log(`[Auth] Initializing ${role} OAuth`, {
-          clientId: identity.clientId,
-          openIdDiscoveryUrl: identity.openIdDiscoveryUrl,
-          hasUsername: !!identity.baUsername,
-          hasPassword: !!identity.baPassword,
-        });
-        oauthInstances[role] = await OAuthUtil.init(getOAuthConfig(role));
-      }),
-    );
+    console.log(`[Auth] Initializing OAuth with config:`, {
+      clientId: config.auth.clientId,
+      hasClientSecret: !!config.auth.clientSecret,
+      openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl,
+      hasUsername: !!config.auth.baUsername,
+      hasPassword: !!config.auth.baPassword
+    });
+
+    // Initialize OAuth client
+    oauthInstance = await OAuthUtil.init(getOAuthConfig());
 
     oauthInitialized = true;
 
@@ -82,12 +85,13 @@ export const initOpenIdConfig = async () => {
   }
 };
 
-const getToken = async (role: AuthRole): Promise<string> => {
-  const identity = getIdentityConfig(role);
-  if (!identity.baUsername || !identity.baPassword) {
-    throw new Error(`${role} resource-owner credentials are incomplete`);
+export const getBAUserToken = async (): Promise<string> => {
+  if (!config.auth.baUsername) {
+    throw new Error("BA_USERNAME is not configured");
   }
-  const userTokenData = cachedTokens[role];
+
+  const cacheKey = config.auth.baUsername;
+  const userTokenData = CACHED_DATA[cacheKey];
   const currentTime = Math.floor(Date.now() / 1000);
 
   // Check if a valid cached token exists
@@ -100,54 +104,57 @@ const getToken = async (role: AuthRole): Promise<string> => {
   }
 
   // Deduplicate concurrent refresh requests
-  if (tokenRefreshPromises[role]) {
-    return tokenRefreshPromises[role]!;
+  if (tokenRefreshPromise) {
+    return tokenRefreshPromise;
   }
 
-  tokenRefreshPromises[role] = (async () => {
+  tokenRefreshPromise = (async () => {
     try {
-      const oauthInstance = oauthInstances[role];
       if (!oauthInstance) {
         throw new Error(
           "OAuth client not initialized. Call initOpenIdConfig() first",
         );
       }
 
+      if (!config.auth.baPassword) {
+        throw new Error("BA_PASSWORD is not configured");
+      }
+
+      // Fetch a new token using Resource Owner Password Credentials
       const tokenObj =
         await oauthInstance.getAccessTokenByResourceOwnerCredential(
-          identity.baUsername,
-          identity.baPassword,
+          config.auth.baUsername,
+          config.auth.baPassword,
         );
 
-      const token = tokenObj.token[getOAuthConfig(role).tokenField] as string;
+      // Type assertion for token object
+      const token = tokenObj.token[getOAuthConfig().tokenField] as string;
       const expiresAt = tokenObj.token.expires_at as number;
-      cachedTokens[role] = { token, expiresAt };
+
+      // Cache the new token
+      CACHED_DATA[cacheKey] = { token, expiresAt };
 
       return token;
     } catch (error: any) {
-      console.error(`[Auth] ${role} token error:`, {
+      console.error(`[Auth] getBAUserToken error:`, {
         errorMessage: error?.message,
         errorName: error?.name,
         errorStack: error?.stack,
-        hasOAuthInstance: !!oauthInstances[role],
-        hasPassword: !!identity.baPassword,
-        username: identity.baUsername,
+        hasOAuthInstance: !!oauthInstance,
+        hasPassword: !!config.auth.baPassword,
+        username: config.auth.baUsername
       });
 
       throw new Error(
-        `Failed to fetch ${role} OAuth token: ${error?.message || "Unknown error"}`,
+        `Failed to fetch user OAuth token: ${error?.message || "Unknown error"}`,
       );
     } finally {
-      delete tokenRefreshPromises[role];
+      tokenRefreshPromise = null;
     }
   })();
 
-  return tokenRefreshPromises[role]!;
+  return tokenRefreshPromise;
 };
-
-export const getBAUserToken = (): Promise<string> => getToken("operator");
-
-export const getRelayerToken = (): Promise<string> => getToken("relayer");
 
 export const getBAUserAddress = async (): Promise<string> => {
   if (cachedUserAddress) {

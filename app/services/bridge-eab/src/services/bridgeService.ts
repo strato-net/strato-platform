@@ -1,0 +1,1202 @@
+import { recoverReviewedDeposit } from "./depositRecoveryService";
+import {
+  config,
+  getChainRpcUrl,
+  getNativeRepresentationBridgeAddress,
+} from "../config";
+import { JsonRpcProvider, MaxUint256 } from "ethers";
+import { execute, executeAsRelayer } from "../utils/stratoHelper";
+import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, WithdrawalReleasePendingError } from "../types";
+import { logInfo, logError } from "../utils/logger";
+import { normalizeOptionalHash } from "../utils/utils";
+import { mintVouchersForDeposits } from "./voucherService";
+import { eth, rpc } from "../utils/api";
+import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authorizationValidation";
+import {
+  buildNativeMintRequest,
+  executeNativeMint,
+  getExistingNativeMintTxHash,
+  getNativeMintProposalExecution,
+  proposeNativeMint,
+} from "./nativeMintService";
+import {
+  buildWithdrawalReview,
+  buildWithdrawalAuthorization,
+  cancelExpiredWithdrawal,
+  checkWithdrawalPolicy,
+  getConfirmedRotationState,
+  getExternalChainLatestTimestamp,
+  getReservationId,
+  getReservationState,
+  getWithdrawalCapacity,
+  proposeWithdrawalReview,
+  releaseWithdrawal,
+  reserveWithdrawal,
+  WithdrawalManualReviewError,
+} from "./externalWithdrawalService";
+import {
+  getDepositStatusByIdentity,
+  getDepositReviewApproval,
+  getDepositSettlementInfoByIdentity,
+  getEnabledChains,
+} from "./cirrusService";
+import { depositStateService } from "./depositStateService";
+import { getCurrentBlockNumber } from "./rpcService";
+import {
+  depositIdentity,
+  verifyDetectedDepositsBatch,
+} from "./verificationService";
+import { fetchRouteSteps } from "./routeQuoteService";
+import { isTransportRouteError } from "../utils/routeFailure";
+import {
+  attestDepositSettlement,
+  attestWithdrawalRelease,
+} from "./settlementAttestationService";
+
+let cachedStratoNetworkId: bigint | null = null;
+const announcedManualNativeWithdrawals = new Map<string, string | null>();
+const pendingNativeInstantWithdrawalTxHashes = new Map<string, string>();
+const reviewedDepositSettlements = new Map<string, Promise<string>>();
+
+export const getStratoNetworkId = async (): Promise<bigint> => {
+  if (cachedStratoNetworkId != null) {
+    return cachedStratoNetworkId;
+  }
+
+  const metadata: any = await eth.get("/metadata");
+  const networkId = metadata?.networkID;
+  if (networkId == null) {
+    throw new Error("Network ID not found in STRATO metadata");
+  }
+
+  cachedStratoNetworkId = BigInt(networkId.toString());
+  return cachedStratoNetworkId;
+};
+
+const getNativeMintRequest = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+) => {
+  const bridgeAddress = getNativeRepresentationBridgeAddress(
+    Number(withdrawal.externalChainId),
+  );
+  if (!bridgeAddress) {
+    throw new Error(
+      `CHAIN_${Number(withdrawal.externalChainId)}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS is not configured`,
+    );
+  }
+  return buildNativeMintRequest(
+    withdrawal,
+    sourceChainId,
+    config.nativeBridge.address!,
+    bridgeAddress,
+  );
+};
+
+const submitNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string> => {
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
+  return executeNativeMint(payload);
+};
+
+const getDestinationChainLatestTimestamp = async (
+  externalChainId: string | number,
+): Promise<bigint | null> => {
+  const provider = new JsonRpcProvider(getChainRpcUrl(BigInt(externalChainId)));
+  const latestBlock = await provider.getBlock("latest");
+  return latestBlock ? BigInt(latestBlock.timestamp) : null;
+};
+
+const isDestinationMintReady = async (
+  withdrawal: NativeWithdrawalInfo,
+): Promise<boolean> => {
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) {
+    return true;
+  }
+
+  const latestTimestamp = await getDestinationChainLatestTimestamp(
+    withdrawal.externalChainId,
+  );
+  if (latestTimestamp == null || latestTimestamp >= notBefore) {
+    return true;
+  }
+
+  logInfo(
+    "BridgeService",
+    `Native withdrawal ${withdrawal.withdrawalId} destination chain is not ready for mint; latest block timestamp ${latestTimestamp.toString()} is before notBefore ${notBefore.toString()}`,
+  );
+  return false;
+};
+
+const findExistingNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string | null> => {
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
+  return getExistingNativeMintTxHash(payload);
+};
+
+const proposeManualNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+): Promise<string> => {
+  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
+  return proposeNativeMint(payload);
+};
+
+const syncManualNativeMintProposal = async (
+  withdrawal: NativeWithdrawalInfo,
+  proposalReference: string | null,
+): Promise<boolean> => {
+  if (!proposalReference) {
+    return false;
+  }
+
+  const result = await getNativeMintProposalExecution(
+    proposalReference,
+    withdrawal.externalChainId,
+  );
+
+  if (result.status === "pending") {
+    return true;
+  }
+
+  if (result.status === "rejected") {
+    await execute({
+      contractName: "StratoNativeBridge",
+      contractAddress: config.nativeBridge.address!,
+      method: "abortWithdrawal",
+      args: {
+        id: Number(withdrawal.withdrawalId),
+      },
+    });
+    announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+    return true;
+  }
+
+  if (!result.txHash) {
+    return true;
+  }
+
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "finalizeWithdrawal",
+    args: {
+      id: Number(withdrawal.withdrawalId),
+      externalTxHash: result.txHash,
+      nativeMintProposalHash: proposalReference,
+    },
+  });
+  announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+  return true;
+};
+
+const recordNativeWithdrawalProposal = async (
+  withdrawalId: string,
+  proposalReference: string,
+) => {
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "recordWithdrawalProposal",
+    args: {
+      id: Number(withdrawalId),
+      nativeMintProposalHash: proposalReference,
+    },
+  });
+};
+
+const isDuplicateDepositError = (error: unknown): boolean => {
+  const message = (error as Error).message;
+  return (
+    message.includes("EAB: duplicate deposit") ||
+    message.includes("MB: dup key") ||
+    message.includes("MB: duplicate deposit")
+  );
+};
+
+export const settleDeposit = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<string | null> => {
+  await attestDepositSettlement(deposit);
+  return submitDepositSettlement(deposit);
+};
+
+const submitDepositSettlement = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<string | null> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
+  try {
+    const submit = actionDeposit.action && actionDeposit.action !== "0"
+      ? execute
+      : executeAsRelayer;
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "settleDeposit",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
+      },
+    });
+    logInfo(
+      "BridgeService",
+      `Settled deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
+    );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
+  } catch (error) {
+    if (isDuplicateDepositError(error)) {
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
+      );
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
+      logInfo(
+        "BridgeService",
+        `Deposit already settled: ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
+      );
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const settleRoutedDeposit = async (
+  deposit: RouteDepositArgs,
+): Promise<string | null> => {
+  try {
+    const fallbackOnly = await attestDepositSettlement(deposit);
+    if (fallbackOnly) return await submitDepositSettlement(deposit);
+    const result = await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "settleDepositWithRoute",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        expectedTokenOut: deposit.actionToken,
+        minFinalOut: deposit.minFinalOut,
+        steps: deposit.steps,
+      },
+    });
+    logInfo(
+      "BridgeService",
+      `Settled routed deposit ${deposit.externalChainId}:${deposit.depositRouter}:${deposit.depositId}`,
+    );
+    await mintVouchersForDeposits([deposit.stratoRecipient]);
+    return result.hash;
+  } catch (error) {
+    if (isDuplicateDepositError(error)) {
+      const status = await getDepositStatusByIdentity(
+        deposit.externalChainId,
+        deposit.depositRouter,
+        deposit.depositId,
+      );
+      if (status !== "4") {
+        throw new Error(
+          `Duplicate deposit identity is not completed (status ${status || "unavailable"})`,
+        );
+      }
+      return null;
+    }
+    throw error;
+  }
+};
+
+export const recordDepositForReview = async (
+  deposit: DepositArgs | ActionDepositArgs,
+): Promise<void> => {
+  const actionDeposit = deposit as Partial<ActionDepositArgs>;
+  try {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordDepositForReview",
+      args: {
+        externalChainId: deposit.externalChainId,
+        depositRouter: deposit.depositRouter,
+        depositId: deposit.depositId,
+        externalSender: deposit.externalSender,
+        externalToken: deposit.externalToken,
+        externalTokenAmount: deposit.externalTokenAmount,
+        externalTxHash: deposit.externalTxHash,
+        stratoRecipient: deposit.stratoRecipient,
+        stratoToken: deposit.targetStratoToken,
+        action: actionDeposit.action || "0",
+        actionToken: actionDeposit.actionToken || "0000000000000000000000000000000000000000",
+        minFinalOut: actionDeposit.minFinalOut || "0",
+      },
+    });
+  } catch (error) {
+    if (!isDuplicateDepositError(error)) throw error;
+  }
+};
+
+export const confirmReviewedDeposit = (
+  externalChainId: number,
+  depositRouter: string,
+  depositId: string,
+): Promise<string> => {
+  const key = `${externalChainId}:${depositRouter.replace(/^0x/i, "").toLowerCase()}:${depositId}`;
+  const existing = reviewedDepositSettlements.get(key);
+  if (existing) return existing;
+  const pending = settleReviewedDeposit(externalChainId, depositRouter, depositId)
+    .then(async hash => {
+      try {
+        await depositStateService.markSettledByIdentity(externalChainId, depositRouter, depositId);
+      } catch (error) {
+        logError("DepositRecovery", error as Error, { operation: "markReviewedDepositSettled", externalChainId, depositRouter, depositId });
+      }
+      return hash;
+    }).finally(() => reviewedDepositSettlements.delete(key));
+  reviewedDepositSettlements.set(key, pending);
+  return pending;
+};
+
+const settleReviewedDeposit = async (
+  externalChainId: number,
+  depositRouter: string,
+  depositId: string,
+): Promise<string> => {
+  let pending = await depositStateService.getByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (!pending || pending.status !== "review") {
+    pending = await recoverReviewedDeposit(externalChainId, depositRouter, depositId);
+  }
+  const onchainStatus = await getDepositStatusByIdentity(
+    externalChainId,
+    depositRouter,
+    depositId,
+  );
+  if (onchainStatus !== "2") {
+    throw new Error(
+      `Deposit is not pending review on STRATO (status ${onchainStatus || "unavailable"})`,
+    );
+  }
+  const digestArgs = [externalChainId, `0x${depositRouter.replace(/^0x/i, "")}`, depositId];
+  const [approval, digest] = await Promise.all([
+    getDepositReviewApproval(externalChainId, depositRouter, depositId),
+    rpc.post("", buildBridgeDigestRequest(config.externalAssetBridge.address!, "getReviewedDepositDigest", digestArgs)).then(parseBridgeDigest),
+  ]);
+  if (!approval || /^0x0+$/.test(approval) || approval !== digest) {
+    throw new Error("Settlement requires a matching governance approval");
+  }
+  const chain = (await getEnabledChains()).get(externalChainId);
+  const custodyAddress = chain?.vault || chain?.custody;
+  if (!chain || !custodyAddress) {
+    throw new Error("Enabled chain custody configuration is unavailable");
+  }
+  const latestBlock = await getCurrentBlockNumber(externalChainId);
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification entry ${depositIdentity(pending.deposit)}`,
+    { latestBlock, custodyAddress },
+  );
+  const verification = (
+    await verifyDetectedDepositsBatch(
+      [pending.deposit],
+      latestBlock,
+      custodyAddress,
+    )
+  ).get(depositIdentity(pending.deposit));
+  logInfo(
+    "BridgeService",
+    `Reviewed deposit verification exit ${depositIdentity(pending.deposit)} state=${verification?.state || "unknown"}`,
+  );
+  if (verification?.state !== "verified") {
+    const reason =
+      verification?.state === "invalid"
+        ? verification.error.message
+        : verification?.state || "unknown";
+    throw new Error(`Reviewed deposit re-verification failed: ${reason}`);
+  }
+  const fallbackOnly = await attestDepositSettlement(pending.deposit);
+  const actionDeposit = pending.deposit as Partial<ActionDepositArgs>;
+  const submit = actionDeposit.action && actionDeposit.action !== "0"
+    ? execute
+    : executeAsRelayer;
+  let method = "confirmReviewedDeposit";
+  let args: Record<string, unknown> = {
+    externalChainId,
+    depositRouter,
+    depositId,
+  };
+  if (actionDeposit.action === "4" && !fallbackOnly) {
+    const settlementInfo = await getDepositSettlementInfoByIdentity(
+      externalChainId,
+      depositRouter,
+      depositId,
+    );
+    if (!settlementInfo || settlementInfo.status !== "2") {
+      throw new Error("Reviewed deposit settlement data is unavailable");
+    }
+    try {
+      const steps = await fetchRouteSteps({
+        tokenIn: settlementInfo.stratoToken,
+        tokenOut: actionDeposit.actionToken!,
+        amountIn: settlementInfo.stratoTokenAmount,
+        minFinalOut: actionDeposit.minFinalOut!,
+      });
+      method = "confirmReviewedDepositWithRoute";
+      args = { ...args, steps };
+    } catch (error) {
+      if (isTransportRouteError(error)) throw error;
+      logInfo(
+        "BridgeService",
+        `Reviewed routed deposit ${depositIdentity(pending.deposit)} will use source-token fallback: ${(error as Error).message}`,
+      );
+    }
+  }
+  try {
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method,
+      args,
+    });
+    return result.hash;
+  } catch (error) {
+    if (
+      method !== "confirmReviewedDepositWithRoute" ||
+      isTransportRouteError(error)
+    ) {
+      throw error;
+    }
+    logInfo(
+      "BridgeService",
+      `Reviewed routed settlement ${depositIdentity(pending.deposit)} failed deterministically; using source-token fallback: ${(error as Error).message}`,
+    );
+    const result = await submit({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "confirmReviewedDeposit",
+      args: {
+        externalChainId,
+        depositRouter,
+        depositId,
+      },
+    });
+    return result.hash;
+  }
+};
+
+export const recordNativeDepositBatch = async (
+  depositArgs: NonEmptyArray<NativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  try {
+    await execute(
+      depositArgs.map((deposit) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n ? "recordDepositWithRoute" : "recordDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
+          externalSender: deposit.externalSender,
+          externalTxHash: deposit.externalTxHash,
+          representationToken: deposit.representationToken,
+          stratoRecipient: deposit.stratoRecipient,
+          stratoTokenAmount: deposit.stratoTokenAmount,
+          ...(deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n ? { actionToken: deposit.actionToken, minFinalOut: deposit.minFinalOut } : {}),
+        },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully recorded ${depositArgs.length} native deposits`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (
+      errorMessage.includes("SNB: duplicate deposit")
+    ) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already processed by another server: ${depositArgs.length} deposits (${depositArgs.map((d) => `${d.externalBridge}:${d.externalRedemptionId}`).join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const confirmNativeDepositBatch = async (
+  deposits: NonEmptyArray<ConfirmNativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const depositIds = deposits.map((deposit) => deposit.depositId);
+  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
+
+  try {
+    const calls: FunctionInput[] = [];
+    for (const deposit of deposits) {
+      const routed = !!deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n;
+      let steps: Awaited<ReturnType<typeof fetchRouteSteps>> = [];
+      if (routed) {
+        if (!deposit.stratoToken || !deposit.stratoTokenAmount || !deposit.minFinalOut) {
+          throw new Error("Native routed deposit intent is incomplete");
+        }
+        try {
+          steps = await fetchRouteSteps({ tokenIn: deposit.stratoToken, tokenOut: deposit.actionToken!,
+            amountIn: deposit.stratoTokenAmount, minFinalOut: deposit.minFinalOut });
+        } catch (error) {
+          if (isTransportRouteError(error)) throw error;
+          logInfo("BridgeService", `Native deposit ${deposit.depositId} will use source-token fallback: ${(error as Error).message}`);
+        }
+      }
+      calls.push({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: routed ? "confirmDepositWithRoute" : "confirmDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
+          ...(routed ? { steps } : {}),
+        },
+      });
+    }
+    await execute(calls);
+
+    logInfo(
+      "BridgeService",
+      `Successfully confirmed ${deposits.length} native deposits`,
+    );
+
+    await mintVouchersForDeposits(stratoRecipients);
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already confirmed by another server: ${deposits.length} deposits (${depositIds.join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const reviewNativeDepositBatch = async (
+  deposits: NonEmptyArray<ConfirmNativeDepositArgs>
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const depositIds = deposits.map((deposit) => deposit.depositId);
+
+  try {
+    await execute(
+      deposits.map((deposit) => ({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "reviewDeposit",
+        args: {
+          externalChainId: deposit.externalChainId,
+          externalBridge: deposit.externalBridge,
+          externalRedemptionId: deposit.externalRedemptionId,
+        },
+      }))
+    );
+
+    logInfo(
+      "BridgeService",
+      `Successfully set ${deposits.length} native deposits to pending review`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+
+    if (errorMessage.includes("SNB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Native deposits already reviewed by another server: ${deposits.length} deposits (${depositIds.join(", ")})`,
+      );
+      return;
+    }
+
+    throw error;
+  }
+};
+
+export const processExternalWithdrawal = async (
+  withdrawal: WithdrawalInfo,
+  manualReviewApproved = false,
+): Promise<void> => {
+  if (withdrawal.requiresManualReview && !manualReviewApproved) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
+    );
+  }
+
+  if (String(withdrawal.bridgeStatus) === "1" || String(withdrawal.bridgeStatus) === "2") {
+    const capacity = await getWithdrawalCapacity(withdrawal);
+    if (capacity.available < BigInt(withdrawal.externalTokenAmount)) {
+      logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is waiting for vault capacity`, {
+        available: capacity.available.toString(),
+        retryAfterSeconds: capacity.retryAfterSeconds === MaxUint256
+          ? "pending reservations must clear" : capacity.retryAfterSeconds.toString(),
+      });
+      return;
+    }
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+  const authorization = await buildWithdrawalAuthorization(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+
+  if (String(withdrawal.bridgeStatus) === "1") {
+    // Every verifier must clear the withdrawal before markWithdrawalReady
+    // starts the authorization clock: a verifier-demanded manual review is
+    // recorded on STRATO while the withdrawal is still INITIATED, and the
+    // clock only starts after the Safe approval executes (same lifecycle as
+    // route-threshold reviews).
+    try {
+      await checkWithdrawalPolicy(authorization);
+    } catch (error) {
+      if (error instanceof WithdrawalManualReviewError) {
+        await recordExternalWithdrawalReview(withdrawal);
+        logInfo(
+          "BridgeService",
+          `Withdrawal ${withdrawal.withdrawalId} entered verifier-requested manual review before authorization`,
+        );
+        return;
+      }
+      throw error;
+    }
+  }
+
+  if (
+    String(withdrawal.bridgeStatus) === "1" ||
+    (String(withdrawal.bridgeStatus) === "2" && manualReviewApproved)
+  ) {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "markWithdrawalReady",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        authorizationNotBefore: authorization.notBefore,
+        authorizationDeadline: authorization.deadline,
+        signerSetVersion: authorization.signerSetVersion,
+      },
+    });
+  }
+
+  let reservationState = await getReservationState(authorization, !withdrawal.reservationId);
+  const authorizationExpired =
+    reservationState.latestTimestamp > BigInt(authorization.deadline);
+
+  if (withdrawal.recoveryOnly && !authorizationExpired &&
+      (reservationState.status === 0 || reservationState.status === 1)) {
+    return;
+  }
+
+  if (
+    !withdrawal.reservationId &&
+    reservationState.status === 0 &&
+    !authorizationExpired &&
+    reservationState.signerSetVersion > BigInt(authorization.signerSetVersion)
+  ) {
+    // The latest-head reads above are independent and can mix blocks, so
+    // they only nominate a refresh. Rotation AND non-reservation must hold
+    // at one confirmed block before the committed version is overwritten: a
+    // reservation mined just before the rotation still binds the original
+    // authorization digest, and release/refund verifiers hold it to that
+    // digest forever.
+    const confirmed = await getConfirmedRotationState(authorization);
+    if (
+      confirmed.reserved ||
+      confirmed.signerSetVersion <= BigInt(authorization.signerSetVersion)
+    ) {
+      // Either a reservation bound to the original authorization exists, or
+      // the rotation is not yet confirmed. Defer: the next poll's latest
+      // reads will be coherent and recover the reservation normally with
+      // the original authorization.
+      logInfo(
+        "BridgeService",
+        `Deferred signer set refresh for withdrawal ${withdrawal.withdrawalId}: rotation and reservation state not yet coherent at the confirmed block`,
+      );
+      return;
+    }
+    // A vault signer-set rotation after READY strands the committed
+    // authorization: verifiers and the vault only honor the current set.
+    // Move the committed version forward on STRATO (the authorization window
+    // is unchanged) so the withdrawal can still be signed and reserved
+    // before its deadline. Commit the CONFIRMED version, not the latest-head
+    // one: the contract only moves forward, so committing an unconfirmed
+    // rotation that reorganizes away would strand the withdrawal again.
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "refreshWithdrawalSignerSet",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        signerSetVersion: confirmed.signerSetVersion.toString(),
+      },
+    });
+    authorization.signerSetVersion = confirmed.signerSetVersion.toString();
+    logInfo(
+      "BridgeService",
+      `Refreshed signer set version for withdrawal ${withdrawal.withdrawalId} after vault rotation`,
+      { signerSetVersion: confirmed.signerSetVersion.toString() },
+    );
+  }
+
+  let reservationId = withdrawal.reservationId;
+  if (!reservationId) {
+    if (reservationState.status === 0 && authorizationExpired) {
+      logInfo(
+        "BridgeService",
+        `External withdrawal ${withdrawal.withdrawalId} expired without a reservation and is ready for governance refund`,
+      );
+      return;
+    }
+    const reservation =
+      reservationState.status === 0
+        ? await reserveWithdrawal(authorization)
+        : {
+            reservationId: reservationState.reservationId,
+            transactionHash: reservationState.reservationTxHash!,
+          };
+    reservationId = reservation.reservationId;
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalReservation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        reservationTxHash: reservation.transactionHash,
+      },
+    });
+    if (reservationState.status === 0) {
+      reservationState = { ...reservationState, status: 1 };
+    }
+  } else if (
+    reservationId.toLowerCase().replace(/^0x/, "") !==
+    getReservationId(authorization).toLowerCase().replace(/^0x/, "")
+  ) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} has a mismatched reservation`,
+    );
+  }
+
+  if (
+    reservationState.status === 3 ||
+    (reservationState.status === 1 && authorizationExpired)
+  ) {
+    // The vault cancellation always runs: an expired RESERVED reservation
+    // must be cancelled on the vault whatever STRATO metadata says, or
+    // refund verifiers keep rejecting the still-reserved withdrawal. The
+    // call is idempotent — already-cancelled reservations only have their
+    // cancellation hash read back.
+    const cancellationTxHash = await cancelExpiredWithdrawal(
+      authorization,
+      reservationId,
+    );
+    if (withdrawal.cancellationTxHash) {
+      // The STRATO record is one-shot: the refund digest binds the recorded
+      // hash, so re-recording would invalidate in-flight refund
+      // attestations. Only the write is skipped.
+      return;
+    }
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "recordWithdrawalCancellation",
+      args: {
+        withdrawalId: withdrawal.withdrawalId,
+        reservationId,
+        cancellationTxHash,
+      },
+    });
+    logInfo(
+      "BridgeService",
+      `Cancelled expired external withdrawal ${withdrawal.withdrawalId}; governance refund is now available`,
+      { reservationId, cancellationTxHash },
+    );
+    return;
+  }
+
+  const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
+  try {
+    await attestWithdrawalRelease(
+      authorization,
+      reservationId,
+      releaseTxHash,
+    );
+  } catch (error) {
+    if (!(error instanceof WithdrawalReleasePendingError)) throw error;
+    logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is awaiting external release confirmations`, {
+      externalTxHash: releaseTxHash,
+    });
+    return;
+  }
+  await executeAsRelayer({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "finalizeWithdrawal",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reservationId,
+      externalTxHash: releaseTxHash,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Released and finalized external withdrawal ${withdrawal.withdrawalId}`,
+    { reservationId, releaseTxHash },
+  );
+};
+
+const recordExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  const sourceChainId = await getStratoNetworkId();
+  const review = buildWithdrawalReview(
+    withdrawal,
+    sourceChainId,
+    config.externalAssetBridge.address!,
+  );
+  const proposal = await proposeWithdrawalReview(review);
+  await execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: config.externalAssetBridge.address!,
+    method: "recordWithdrawalReview",
+    args: {
+      withdrawalId: withdrawal.withdrawalId,
+      reviewDigest: proposal.reviewDigest,
+      approvalDeadline: proposal.approvalDeadline,
+      proposalHash: proposal.proposalHash,
+    },
+  });
+};
+
+export const queueExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.requiresManualReview) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} does not require manual review`,
+    );
+  }
+  await recordExternalWithdrawalReview(withdrawal);
+};
+
+export const processPendingExternalWithdrawalReview = async (
+  withdrawal: WithdrawalInfo,
+): Promise<void> => {
+  if (!withdrawal.reviewProposalHash || !withdrawal.reviewApprovalDeadline) {
+    throw new Error(
+      `Withdrawal ${withdrawal.withdrawalId} is missing manual review state`,
+    );
+  }
+  const destinationTimestamp = await getExternalChainLatestTimestamp(
+    withdrawal.externalChainId,
+  );
+  if (
+    destinationTimestamp > BigInt(withdrawal.reviewApprovalDeadline)
+  ) {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "expireWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+  const proposal = await getNativeMintProposalExecution(
+    withdrawal.reviewProposalHash,
+    withdrawal.externalChainId,
+  );
+  if (proposal.status === "pending") {
+    return;
+  }
+  if (proposal.status === "rejected") {
+    await execute({
+      contractName: "ExternalAssetBridge",
+      contractAddress: config.externalAssetBridge.address!,
+      method: "rejectWithdrawalReview",
+      args: { withdrawalId: withdrawal.withdrawalId },
+    });
+    return;
+  }
+
+  await processExternalWithdrawal(withdrawal, true);
+};
+
+const ensureNativeWithdrawalPending = async (
+  withdrawal: NativeWithdrawalInfo,
+): Promise<boolean> => {
+  if (String(withdrawal.bridgeStatus) === "2") {
+    return true;
+  }
+
+  await execute({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "markWithdrawalPending",
+    args: {
+      id: Number(withdrawal.withdrawalId),
+    },
+  });
+  return false;
+};
+
+const getNativeInstantWithdrawalDelayRemaining = (
+  withdrawal: NativeWithdrawalInfo,
+): number => {
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) {
+    return 0;
+  }
+
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  return notBefore > now ? Number(notBefore - now) : 0;
+};
+
+export const finalizeNativeWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+  const failures: Array<{ withdrawalId: string; message: string }> = [];
+  let successful = 0;
+
+  for (const withdrawal of withdrawals) {
+    if (!withdrawal.useInstantPath) {
+      failures.push({
+        withdrawalId: withdrawal.withdrawalId,
+        message: "native withdrawal is not instant-eligible",
+      });
+      continue;
+    }
+
+    try {
+      const alreadyPending = await ensureNativeWithdrawalPending(withdrawal);
+      if (!alreadyPending) {
+        logInfo(
+          "BridgeService",
+          `Native instant withdrawal ${withdrawal.withdrawalId} moved to pending review`,
+        );
+        continue;
+      }
+
+      const delayRemaining = getNativeInstantWithdrawalDelayRemaining(withdrawal);
+      if (delayRemaining > 0) {
+        logInfo(
+          "BridgeService",
+          `Native instant withdrawal ${withdrawal.withdrawalId} is pending review for ${delayRemaining}s before destination mint`,
+        );
+        continue;
+      }
+
+      if (!(await isDestinationMintReady(withdrawal))) {
+        continue;
+      }
+
+      let externalTxHash =
+        pendingNativeInstantWithdrawalTxHashes.get(withdrawal.withdrawalId) ||
+        await findExistingNativeMint(withdrawal, sourceChainId);
+      if (!externalTxHash) {
+        externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
+      }
+      pendingNativeInstantWithdrawalTxHashes.set(
+        withdrawal.withdrawalId,
+        externalTxHash,
+      );
+
+      await execute({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "finalizeWithdrawal",
+        args: {
+          id: Number(withdrawal.withdrawalId),
+          externalTxHash,
+          nativeMintProposalHash: "",
+        },
+      });
+
+      pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
+      successful += 1;
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+
+      if (
+        errorMessage.includes("SNB: bad state") ||
+        errorMessage.includes("SNB: tx hash already set")
+      ) {
+        pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
+        logInfo(
+          "BridgeService",
+          `Native withdrawal already finalized by another server: ${withdrawal.withdrawalId}`,
+        );
+        continue;
+      }
+
+      failures.push({
+        withdrawalId: withdrawal.withdrawalId,
+        message: errorMessage,
+      });
+      logError("BridgeService", error as Error, {
+        operation: "finalizeNativeWithdrawalBatch",
+        withdrawalId: withdrawal.withdrawalId,
+        externalChainId: withdrawal.externalChainId,
+      });
+    }
+  }
+
+  if (successful > 0) {
+    logInfo(
+      "BridgeService",
+      `Successfully finalized ${successful} native withdrawals`,
+    );
+  }
+
+  if (failures.length > 0) {
+    throw new Error(
+      `Failed to finalize ${failures.length} native withdrawals: ${failures
+        .map((failure) => `${failure.withdrawalId} (${failure.message})`)
+        .join(", ")}`,
+    );
+  }
+};
+
+export const queueManualNativeWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<NativeWithdrawalInfo>,
+) => {
+  if (!config.nativeBridge.address) {
+    throw new Error("Native bridge address not configured");
+  }
+
+  const sourceChainId = await getStratoNetworkId();
+
+  for (const withdrawal of withdrawals) {
+    if (withdrawal.useInstantPath) {
+      continue;
+    }
+
+    const recordedProposalReference = normalizeOptionalHash(
+      withdrawal.nativeMintProposalHash,
+    );
+    const existingProposalReference =
+      recordedProposalReference ||
+      normalizeOptionalHash(
+        announcedManualNativeWithdrawals.get(withdrawal.withdrawalId),
+      );
+
+    if (existingProposalReference) {
+      try {
+        if (!recordedProposalReference) {
+          await recordNativeWithdrawalProposal(
+            withdrawal.withdrawalId,
+            existingProposalReference,
+          );
+        }
+        await syncManualNativeMintProposal(
+          withdrawal,
+          existingProposalReference,
+        );
+      } catch (error) {
+        const errorMessage = (error as Error).message;
+        if (
+          errorMessage.includes("SNB: bad state") ||
+          errorMessage.includes("SNB: tx hash already set")
+        ) {
+          announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+          continue;
+        }
+        logError("BridgeService", error as Error, {
+          operation: "syncManualNativeMintProposal",
+          withdrawalId: withdrawal.withdrawalId,
+          externalChainId: withdrawal.externalChainId,
+        });
+      }
+      continue;
+    }
+
+    try {
+      const alreadyPending = await ensureNativeWithdrawalPending(withdrawal);
+      if (!alreadyPending) {
+        logInfo(
+          "BridgeService",
+          `Native withdrawal ${withdrawal.withdrawalId} moved to pending review before manual proposal`,
+        );
+        continue;
+      }
+      const proposalReference = await proposeManualNativeMint(
+        withdrawal,
+        sourceChainId,
+      );
+      announcedManualNativeWithdrawals.set(
+        withdrawal.withdrawalId,
+        proposalReference,
+      );
+      await recordNativeWithdrawalProposal(withdrawal.withdrawalId, proposalReference);
+
+      const baseMessage =
+        `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;
+      const suffix = proposalReference
+        ? ` (reference: ${proposalReference})`
+        : "";
+      logInfo("BridgeService", `${baseMessage}${suffix}`);
+    } catch (error) {
+      logError("BridgeService", error as Error, {
+        operation: "queueManualNativeWithdrawalBatch",
+        withdrawalId: withdrawal.withdrawalId,
+        externalChainId: withdrawal.externalChainId,
+      });
+    }
+  }
+};

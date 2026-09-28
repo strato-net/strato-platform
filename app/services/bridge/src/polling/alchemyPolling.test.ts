@@ -1,71 +1,27 @@
+import "../test/setupEnv";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Interface } from "ethers";
 import {
   buildActionDepositBatchArgs,
-  classifyDepositLogs,
+  buildDepositWindowArgs,
+  canonicalDepositKey,
+  depositKeyTxHash,
+  extractWindowDeposits,
   RawDepositLog,
 } from "../services/depositEventService";
-import {
-  clampCursorToPending,
-  hasReceiptGraceExpired,
-  hasSettlementGraceExpired,
-  isPendingReorgReplacement,
-  resetPendingForRetry,
-  shouldRecordReview,
-} from "../services/depositStateService";
-import { getExecutableRouteSteps } from "../utils/routeQuoteUtils";
-import { RouteAction, RouteQuoteResponse } from "@strato/shared-types";
-
-for (const name of [
-  "BA_USERNAME",
-  "BA_PASSWORD",
-  "CLIENT_SECRET",
-  "CLIENT_ID",
-  "OPENID_DISCOVERY_URL",
-  "BRIDGE_ADDRESS",
-  "EXTERNAL_ASSET_BRIDGE_ADDRESS",
-  "PRICE_ORACLE_ADDRESS",
-  "SAFE_ADDRESS",
-  "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_KMS_KEY_ID",
-  "SAFE_PROPOSER_KMS_REGION",
-  "RELAYER_BA_USERNAME",
-  "RELAYER_BA_PASSWORD",
-  "RELAYER_CLIENT_ID",
-  "RELAYER_CLIENT_SECRET",
-  "RELAYER_OPENID_DISCOVERY_URL",
-  "TOKEN_ROUTER",
-]) {
-  process.env[name] ||= "1111111111111111111111111111111111111111";
-}
-process.env.SENDGRID_API_KEY ||= "SG.test.test";
-
-const CHAIN_ID = 999;
-
-// The config module exits the process on missing variables; satisfy it before importing it
-for (const envVar of [
-  "BA_USERNAME",
-  "BA_PASSWORD",
-  "CLIENT_SECRET",
-  "CLIENT_ID",
-  "OPENID_DISCOVERY_URL",
-  "BRIDGE_ADDRESS",
-  "PRICE_ORACLE_ADDRESS",
-  "SAFE_ADDRESS",
-  "SAFE_PROPOSER_ADDRESS",
-  "SAFE_PROPOSER_PRIVATE_KEY",
-]) {
-  process.env[envVar] = process.env[envVar] || "test";
-}
-process.env[`CHAIN_${CHAIN_ID}_RPC_URL`] = "http://localhost:1/unused";
-
-import { fetch as httpClient } from "../utils/api";
+import { cirrus, fetch as httpClient } from "../utils/api";
 import {
   getChainLogs,
   getTransactionReceiptsBatch,
 } from "../services/rpcService";
-import { planLogWindows } from "./alchemyPolling";
+import { blockTrackingService } from "../services/blockTrackingService";
+import { depositRecorder } from "../services/depositRecorder";
+import { planLogWindows, pollChainForDeposits } from "./alchemyPolling";
+import { ChainInfo, WindowDeposit } from "../types";
+
+const CHAIN_ID = 999;
+process.env[`CHAIN_${CHAIN_ID}_RPC_URL`] = "http://localhost:1/unused";
 
 const stubPost = <T>(handler: (body: any) => any, run: () => Promise<T>) => {
   const original = (httpClient as any).post;
@@ -90,376 +46,135 @@ const makeLog = (
   eventName: "DepositRouted" | "DepositRoutedWithAction",
   transactionHash: string,
   depositId = 1,
-  action = 2,
+  blockNumber = 0x10,
+  logIndex = 0,
 ): RawDepositLog => {
   const encoded = events.encodeEventLog(
     events.getEvent(eventName)!,
     eventName === "DepositRouted"
       ? [token, 100n, sender, recipient, target, depositId]
-      : [token, 100n, sender, recipient, target, depositId, action, metal, 90n],
+      : [token, 100n, sender, recipient, target, depositId, 2, metal, 90n],
   );
   return {
     address: "0x6666666666666666666666666666666666666666",
-    blockHash: `0x${"ff".repeat(32)}`,
-    blockNumber: "0x10",
+    blockNumber: `0x${blockNumber.toString(16)}`,
     data: encoded.data,
-    logIndex: "0x0",
+    logIndex: `0x${logIndex.toString(16)}`,
     topics: encoded.topics,
     transactionHash,
   };
 };
 
-test("classifies standard and action deposits from one log range", () => {
+test("extracts standard and action deposits with their router ids", () => {
   const standardHash = `0x${"aa".repeat(32)}`;
   const actionHash = `0x${"bb".repeat(32)}`;
-  const result = classifyDepositLogs(
+  const result = extractWindowDeposits(
     [
-      makeLog("DepositRouted", standardHash),
-      makeLog("DepositRoutedWithAction", actionHash),
+      makeLog("DepositRouted", standardHash, 7),
+      makeLog("DepositRoutedWithAction", actionHash, 8, 0x11),
     ],
     1,
   );
 
-  assert.equal(result.standardDeposits.length, 1);
-  assert.equal(result.standardDeposits[0].externalTxHash, standardHash);
-  assert.equal(result.standardDeposits[0].depositId, "1");
-  assert.equal(
-    result.standardDeposits[0].depositRouter,
-    "0x6666666666666666666666666666666666666666",
-  );
-  assert.equal(result.actionDeposits.length, 1);
-  assert.equal(result.actionDeposits[0].action, "2");
-  assert.equal(result.actionDeposits[0].actionToken, metal);
-  assert.equal(result.actionDeposits[0].minFinalOut, "90");
+  assert.equal(result.length, 2);
+  assert.equal(result[0].kind, "standard");
+  assert.equal(result[0].depositId, "7");
+  assert.equal(result[0].depositKey, standardHash);
+  assert.equal(result[0].action, "0");
+  assert.equal(result[1].kind, "action");
+  assert.equal(result[1].depositId, "8");
+  assert.equal(result[1].action, "2");
+  assert.equal(result[1].actionToken, metal);
+  assert.equal(result[1].minFinalOut, "90");
 });
 
-test("processes multiple deposits from one transaction independently", () => {
-  const transactionHash = `0x${"cc".repeat(32)}`;
-  const actionLog = makeLog("DepositRoutedWithAction", transactionHash, 2);
-  actionLog.logIndex = "0x1";
-  const result = classifyDepositLogs(
-    [makeLog("DepositRouted", transactionHash), actionLog],
+test("keys each deposit of a multi-deposit transaction by its router id", () => {
+  const transactionHash = `0x${"CC".repeat(32)}`;
+  const actionLog = makeLog("DepositRoutedWithAction", transactionHash, 12, 0x10, 1);
+  const otherHash = `0x${"ce".repeat(32)}`;
+  const result = extractWindowDeposits(
+    [actionLog, makeLog("DepositRouted", transactionHash, 11), makeLog("DepositRouted", otherHash, 13, 0x12)],
     1,
   );
-  assert.equal(result.standardDeposits.length, 1);
-  assert.equal(result.actionDeposits.length, 1);
+
+  const lowerHash = transactionHash.toLowerCase();
   assert.deepEqual(
+    result.map((d) => [d.depositKey, d.sharesTransaction]),
     [
-      result.standardDeposits[0].depositId,
-      result.actionDeposits[0].depositId,
+      [`${lowerHash}#11`, true],
+      [`${lowerHash}#12`, true],
+      [otherHash, false],
     ],
-    ["1", "2"],
+  );
+  assert.equal(depositKeyTxHash(result[1].depositKey), lowerHash);
+});
+
+test("orders deposits by block and log index", () => {
+  const result = extractWindowDeposits(
+    [
+      makeLog("DepositRouted", `0x${"01".repeat(32)}`, 3, 0x20, 0),
+      makeLog("DepositRouted", `0x${"02".repeat(32)}`, 2, 0x10, 5),
+      makeLog("DepositRouted", `0x${"03".repeat(32)}`, 1, 0x10, 2),
+    ],
+    1,
+  );
+  assert.deepEqual(result.map((d) => d.depositId), ["1", "2", "3"]);
+});
+
+test("rejects a window that reports one deposit id twice", () => {
+  assert.throws(
+    () =>
+      extractWindowDeposits(
+        [
+          makeLog("DepositRouted", `0x${"04".repeat(32)}`, 5),
+          makeLog("DepositRouted", `0x${"05".repeat(32)}`, 5, 0x11),
+        ],
+        1,
+      ),
+    /Deposit id 5 appears twice/,
   );
 });
 
 test("deduplicates exact RPC log repeats", () => {
   const log = makeLog("DepositRouted", `0x${"cd".repeat(32)}`);
   const repeatedLog = { ...log, topics: [...log.topics] };
-  const result = classifyDepositLogs([log, repeatedLog], 1);
+  const result = extractWindowDeposits([log, repeatedLog], 1);
 
-  assert.equal(result.standardDeposits.length, 1);
-  assert.equal(result.actionDeposits.length, 0);
+  assert.equal(result.length, 1);
+  assert.equal(result[0].sharesTransaction, false);
 });
 
-test("quarantines a deposit log that cannot be ABI decoded", () => {
+test("rejects a deposit log that cannot be ABI decoded", () => {
   const malformed = makeLog("DepositRoutedWithAction", `0x${"dd".repeat(32)}`);
   malformed.data = "0x";
-  const result = classifyDepositLogs([malformed], 1);
-  assert.equal(result.actionDeposits.length, 0);
-  assert.equal(result.quarantinedLogs.length, 1);
-  assert.match(result.quarantinedLogs[0].error, /data|buffer|overflow/i);
+  assert.throws(
+    () => extractWindowDeposits([malformed], 1),
+    /data|buffer|overflow/i,
+  );
 });
 
-test("quarantines every deposit log when one event in the transaction is malformed", () => {
-  const transactionHash = `0x${"de".repeat(32)}`;
-  const valid = makeLog("DepositRouted", transactionHash);
-  const malformed = makeLog("DepositRoutedWithAction", transactionHash, 2);
-  malformed.logIndex = "0x1";
-  malformed.data = "0x";
-  const result = classifyDepositLogs([valid, malformed], 1);
-
-  assert.equal(result.standardDeposits.length, 0);
-  assert.equal(result.actionDeposits.length, 0);
-  assert.equal(result.quarantinedLogs.length, 2);
-});
-
-test("quarantines duplicate deposit identities as one transaction", () => {
-  const transactionHash = `0x${"df".repeat(32)}`;
-  const first = makeLog("DepositRouted", transactionHash, 1);
-  const duplicate = makeLog("DepositRouted", transactionHash, 1);
-  duplicate.logIndex = "0x1";
-  const result = classifyDepositLogs([first, duplicate], 1);
-
-  assert.equal(result.standardDeposits.length, 0);
-  assert.equal(result.quarantinedLogs.length, 2);
-  assert.match(result.quarantinedLogs[0].error, /Duplicate deposit identity/);
-});
-
-test("preserves every action field in batch arguments", () => {
-  const actionDeposit = classifyDepositLogs(
-    [makeLog("DepositRoutedWithAction", `0x${"ee".repeat(32)}`)],
+test("preserves every action field in batch and window arguments", () => {
+  const actionDeposit = extractWindowDeposits(
+    [makeLog("DepositRoutedWithAction", `0x${"ee".repeat(32)}`, 9)],
     1,
-  ).actionDeposits[0];
+  )[0];
   const args = buildActionDepositBatchArgs([actionDeposit]);
 
   assert.deepEqual(args.actions, ["2"]);
-  assert.deepEqual(args.depositIds, ["1"]);
   assert.deepEqual(args.actionTokens, [metal]);
   assert.deepEqual(args.minFinalOuts, ["90"]);
+
+  const windowArgs = buildDepositWindowArgs(1, 500, [actionDeposit]);
+  assert.equal(windowArgs.lastProcessedBlock, 500);
+  assert.deepEqual(windowArgs.depositIds, ["9"]);
+  assert.deepEqual(windowArgs.externalTxHashes, [actionDeposit.depositKey]);
+  assert.deepEqual(windowArgs.actions, ["2"]);
 });
 
-test("carries event intent through quote steps into routed settlement", async () => {
-  const actionDeposit = classifyDepositLogs(
-    [makeLog("DepositRoutedWithAction", `0x${"ef".repeat(32)}`, 1, 4)],
-    1,
-  ).actionDeposits[0];
-  const quote: RouteQuoteResponse = {
-    tokenIn: target,
-    tokenOut: metal,
-    amountIn: "100",
-    amountOut: "95",
-    minFinalOut: "90",
-    slippageBps: 0,
-    deadline: 1,
-    steps: [
-      {
-        action: RouteAction.FORGE,
-        target: "0x7777777777777777777777777777777777777777",
-        tokenIn: target,
-        tokenOut: metal,
-        minAmountOut: "95",
-        parameter1: "0",
-        parameter2: "0",
-        direction: false,
-        factoryPoolIndex: "0",
-        amountIn: "100",
-        amountOut: "95",
-        feeAmount: "5",
-        feeBps: 500,
-        priceImpact: 0,
-        label: "Forge",
-      },
-    ],
-  };
-  const steps = getExecutableRouteSteps(
-    quote,
-    actionDeposit.targetStratoToken,
-    actionDeposit.actionToken,
-    actionDeposit.minFinalOut,
-  );
-  const { attemptDepositSettlement } = await import("./alchemyPolling");
-
-  const error = await attemptDepositSettlement(
-    { ...actionDeposit, steps },
-    async (deposit) => {
-      assert.equal(deposit.action, "4");
-      assert.equal(deposit.minFinalOut, "90");
-      assert.equal(deposit.steps[0].minAmountOut, "90");
-      return "0xsettled";
-    },
-  );
-  assert.equal(error, null);
-});
-
-test("falls back only after a deterministic routed settlement failure", async () => {
-  const { attemptRoutedSettlementWithFallback } = await import(
-    "./alchemyPolling"
-  );
-  const deposit = {} as any;
-  let fallbackCalls = 0;
-  const deterministic = await attemptRoutedSettlementWithFallback(
-    deposit,
-    async () => {
-      throw new Error("TR: step slippage");
-    },
-    async () => {
-      fallbackCalls += 1;
-      return "0xfallback";
-    },
-  );
-  assert.equal(deterministic.error, null);
-  assert.equal(deterministic.usedFallback, true);
-  assert.equal(fallbackCalls, 1);
-
-  const transport = await attemptRoutedSettlementWithFallback(
-    deposit,
-    async () => {
-      throw new Error("Request timeout");
-    },
-    async () => {
-      fallbackCalls += 1;
-      return "0xunsafe";
-    },
-  );
-  assert.match(transport.error?.message || "", /timeout/i);
-  assert.equal(transport.usedFallback, false);
-  assert.equal(fallbackCalls, 1);
-});
-
-test("keeps missing route dependencies and STRATO serialization errors retryable", async () => {
-  const { attemptRoutedSettlementWithFallback } = await import("./alchemyPolling");
-  const { isTransportRouteError } = await import("../utils/routeFailure");
-  for (const message of [
-    "Bridge route metadata is unavailable",
-    "Forge oracle price is unavailable",
-    "STRATO_APP_API_URL is not configured",
-    "argValueToValue: Expected TypeEnum to be a string",
-    "parse error: call arguments: expecting hexadecimal digit",
-  ]) {
-    const error = new Error(message);
-    assert.equal(isTransportRouteError(error), true);
-    const result = await attemptRoutedSettlementWithFallback({} as any,
-      async () => { throw error; },
-      async () => { assert.fail("An unavailable dependency must not trigger fallback"); });
-    assert.equal(result.error, error);
-    assert.equal(result.usedFallback, false);
-  }
-});
-
-test("applies rebase only when the exact route requires it", async () => {
-  const [{ getRoutedDepositAmount }, { getRouteRebaseKey }] = await Promise.all([
-    import("./alchemyPolling"),
-    import("../services/cirrusService"),
-  ]);
-  const deposit = classifyDepositLogs(
-    [makeLog("DepositRouted", `0x${"ab".repeat(32)}`)],
-    1,
-  ).standardDeposits[0];
-  const ordinaryDeposit = {
-    ...deposit,
-    externalToken: "0x7777777777777777777777777777777777777777",
-    externalTokenAmount: "100",
-  };
-  const requiredRoutes = new Set([
-    getRouteRebaseKey(
-      deposit.externalToken,
-      deposit.externalChainId,
-      deposit.targetStratoToken,
-    ),
-  ]);
-
-  const rebasedAmount = await getRoutedDepositAmount(
-    deposit,
-    18,
-    async () => requiredRoutes,
-    async () =>
-      new Map([
-        [
-          deposit.targetStratoToken.replace(/^0x/, "").toLowerCase(),
-          2n * 10n ** 18n,
-        ],
-      ]),
-  );
-  const ordinaryAmount = await getRoutedDepositAmount(
-    ordinaryDeposit,
-    18,
-    async () => requiredRoutes,
-    async () => new Map(),
-  );
-
-  assert.equal(rebasedAmount, 50n);
-  assert.equal(ordinaryAmount, 100n);
-  assert.equal(deposit.externalTokenAmount, "100");
-  assert.equal(ordinaryDeposit.externalTokenAmount, "100");
-  await assert.rejects(
-    () =>
-      getRoutedDepositAmount(
-        { ...deposit, externalTokenAmount: "100" },
-        18,
-        async () => requiredRoutes,
-        async () => new Map(),
-      ),
-    /Rebase factor unavailable/,
-  );
-});
-
-test("uses elapsed time rather than poll count for missing receipt review", () => {
-  assert.equal(hasReceiptGraceExpired(1_000, 300_000, 299_999), false);
-  assert.equal(hasReceiptGraceExpired(1_000, 300_000, 301_000), true);
-});
-
-test("quarantines settlement failures only after elapsed retry grace", () => {
-  assert.equal(hasSettlementGraceExpired(1_000, 900_000, 900_999), false);
-  assert.equal(hasSettlementGraceExpired(1_000, 900_000, 901_000), true);
-});
-
-test("does not resubmit a review already recorded on STRATO", () => {
-  assert.equal(
-    shouldRecordReview({
-      deposit: {} as any,
-      status: "review",
-      reviewReason: "RPC conflict",
-      reviewRecordedOnchain: true,
-    }),
-    false,
-  );
-  assert.equal(
-    shouldRecordReview({
-      deposit: {} as any,
-      status: "review",
-      reviewReason: "RPC conflict",
-      reviewRecordLastAttemptAt: 1_000,
-    }, 60_000, 60_999),
-    false,
-  );
-  assert.equal(
-    shouldRecordReview({
-      deposit: {} as any,
-      status: "review",
-      reviewReason: "RPC conflict",
-      reviewRecordLastAttemptAt: 1_000,
-    }, 60_000, 61_000),
-    true,
-  );
-});
-
-test("clamps the cursor behind the oldest unsettled deposit", () => {
-  assert.equal(clampCursorToPending(200, 150), 149);
-  assert.equal(clampCursorToPending(200), 200);
-});
-
-test("replaces a reverted pending observation when its deposit ID is reused", () => {
-  const oldDeposit = classifyDepositLogs(
-    [makeLog("DepositRouted", `0x${"12".repeat(32)}`)],
-    1,
-  ).standardDeposits[0];
-  const replacement = classifyDepositLogs(
-    [makeLog("DepositRouted", `0x${"34".repeat(32)}`)],
-    1,
-  ).standardDeposits[0];
-  replacement.externalBlockHash = `0x${"ab".repeat(32)}`;
-
-  assert.equal(
-    isPendingReorgReplacement(
-      { deposit: oldDeposit, status: "pending" },
-      replacement,
-    ),
-    true,
-  );
-});
-
-test("resets reviewed local state after owner reuse authorization", () => {
-  const deposit = classifyDepositLogs(
-    [makeLog("DepositRouted", `0x${"56".repeat(32)}`)],
-    1,
-  ).standardDeposits[0];
-  const pending = {
-    deposit,
-    status: "review" as const,
-    reviewReason: "External receipt remained unavailable",
-    reviewRecordedOnchain: true,
-    reviewRecordLastAttemptAt: 1,
-    settlementFirstFailedAt: 1,
-  };
-
-  resetPendingForRetry(pending, 500);
-
-  assert.equal(pending.status, "pending");
-  assert.equal(pending.reviewReason, undefined);
-  assert.equal(pending.reviewRecordedOnchain, undefined);
-  assert.equal(pending.reviewRecordLastAttemptAt, undefined);
-  assert.equal(pending.settlementFirstFailedAt, undefined);
-  assert.equal(pending.deposit.detectedAt, 500);
+test("canonical deposit keys match the contract's normalization", () => {
+  assert.equal(canonicalDepositKey("0xABcd"), "0xabcd");
+  assert.equal(canonicalDepositKey("ABcd"), "0xabcd");
+  assert.equal(canonicalDepositKey("0xABcd#007"), "0xabcd#7");
 });
 
 test("getChainLogs throws on a JSON-RPC error returned with HTTP 200", async () => {
@@ -516,155 +231,131 @@ test("keeps JSON-RPC batches within the 20-call submission limit", async () => {
   );
 });
 
-test("records an expired trace failure for review and settles the next deposit in the same pass", async (t) => {
-  const rpc = await import("../services/rpcService");
-  const cirrus = await import("../services/cirrusService");
-  const recovery = await import("../services/depositRecoveryService");
-  const verification = await import("../services/verificationService");
-  const bridge = await import("../services/bridgeService");
-  const { depositStateService: state } = await import("../services/depositStateService");
-  const { blockTrackingService: blocks } = await import("../services/blockTrackingService");
-  const { getMissingReceiptGraceMs } = await import("../config");
-  const { reconcileExternalDeposits } = await import("./alchemyPolling");
-  const deposits = classifyDepositLogs([
-    makeLog("DepositRouted", `0x${"aa".repeat(32)}`, 1),
-    makeLog("DepositRouted", `0x${"bb".repeat(32)}`, 2),
-  ], CHAIN_ID).standardDeposits;
-  deposits[0].externalToken = "0x0000000000000000000000000000000000000000";
-  const [untraceable, healthy] = deposits;
-  const error = new Error("Trace RPC disagreement");
-  const effects: string[] = [];
-  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[CHAIN_ID, {
-    externalChainId: CHAIN_ID, depositRouter: untraceable.depositRouter,
-    lastProcessedBlock: 15, enabled: true, chainName: "test", custody: recipient,
-  }]]));
-  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
-  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 15);
-  t.mock.method(blocks, "updateLastProcessedBlockEverywhere", async () => undefined);
-  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
-  t.mock.method(rpc, "getChainLogs", async () => []);
-  t.mock.method(state, "listReviews", async () => []);
-  t.mock.method(state, "list", async () => deposits.map((deposit) => ({ deposit, status: "pending" as const })));
-  t.mock.method(state, "oldestPendingBlock", async () => undefined);
-  t.mock.method(state, "pruneSettled", async () => undefined);
-  t.mock.method(verification, "verifyDetectedDepositsBatch", async () => new Map([
-    [verification.depositIdentity(untraceable), { state: "missing" as const, error }],
-    [verification.depositIdentity(healthy), { state: "verified" as const }],
-  ]));
-  t.mock.method(state, "markReceiptMissing", async (deposit, graceMs, reason) => {
-    assert.equal(deposit, untraceable);
-    assert.equal(graceMs, getMissingReceiptGraceMs());
-    assert.equal(reason, `External trace remained unavailable: ${error.message}`);
-    return { deposit, status: "review" as const, reviewReason: reason };
-  });
-  t.mock.method(state, "markReviewAttempted", async () => undefined);
-  t.mock.method(state, "markReviewRecorded", async () => undefined);
-  t.mock.method(state, "markSettled", async (deposit) => { assert.equal(deposit, healthy); });
-  t.mock.method(bridge, "recordDepositForReview", async (deposit) => {
-    assert.equal(deposit, untraceable);
-    effects.push("review");
-    return null;
-  });
-  t.mock.method(bridge, "settleDeposit", async (deposit) => {
-    assert.equal(deposit, healthy);
-    effects.push("settle");
-    return null;
-  });
-  await reconcileExternalDeposits(CHAIN_ID);
-  assert.deepEqual(effects, ["review", "settle"]);
+// ---------------- pollChainForDeposits ----------------
+
+const chainInfo: ChainInfo = {
+  externalChainId: CHAIN_ID,
+  depositRouter: "0x6666666666666666666666666666666666666666",
+  lastProcessedBlock: 0,
+  enabled: true,
+  custody: "0x7777777777777777777777777777777777777777",
+  chainName: "Test",
+};
+
+const withPollStubs = async (
+  {
+    head,
+    lastProcessed,
+    missingBlocks = [],
+    logsFor = () => [],
+  }: {
+    head: number;
+    lastProcessed: number;
+    missingBlocks?: number[];
+    logsFor?: (from: number, to: number) => RawDepositLog[];
+  },
+  run: (seen: { windows: Array<[number, WindowDeposit[]]>; rpc: string[] }) => Promise<void>,
+) => {
+  const seen = { windows: [] as Array<[number, WindowDeposit[]]>, rpc: [] as string[] };
+  const originalEffective = blockTrackingService.getEffectiveLastProcessedBlock;
+  const originalRecord = depositRecorder.recordWindow;
+  const originalCirrusGet = (cirrus as any).get;
+  blockTrackingService.getEffectiveLastProcessedBlock = async () => lastProcessed;
+  depositRecorder.recordWindow = async (_chainId, toBlock, deposits) => {
+    seen.windows.push([toBlock, deposits]);
+  };
+  (cirrus as any).get = async () => [];
+  try {
+    await stubPost(
+      (body: any) => {
+        seen.rpc.push(body.method);
+        switch (body.method) {
+          case "eth_blockNumber":
+            return { jsonrpc: "2.0", id: 1, result: `0x${head.toString(16)}` };
+          case "eth_getBlockByNumber": {
+            const block = parseInt(body.params[0], 16);
+            return { jsonrpc: "2.0", id: 1, result: missingBlocks.includes(block) ? null : { number: body.params[0] } };
+          }
+          case "eth_getLogs":
+            return {
+              jsonrpc: "2.0",
+              id: 1,
+              result: logsFor(parseInt(body.params[0].fromBlock, 16), parseInt(body.params[0].toBlock, 16)),
+            };
+          default:
+            throw new Error(`unexpected RPC ${body.method}`);
+        }
+      },
+      () => run(seen),
+    );
+  } finally {
+    blockTrackingService.getEffectiveLastProcessedBlock = originalEffective;
+    depositRecorder.recordWindow = originalRecord;
+    (cirrus as any).get = originalCirrusGet;
+  }
+};
+
+test("scans only blocks buried under the configured confirmations", async () => {
+  process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`] = "4";
+  process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`] = "10";
+  try {
+    await withPollStubs({ head: 1024, lastProcessed: 1000 }, async (seen) => {
+      await pollChainForDeposits(chainInfo);
+      assert.deepEqual(seen.windows.map(([toBlock]) => toBlock), [1010, 1020]);
+    });
+    await withPollStubs({ head: 1004, lastProcessed: 1000 }, async (seen) => {
+      await pollChainForDeposits(chainInfo);
+      assert.deepEqual(seen.windows, []);
+      assert.deepEqual(seen.rpc, ["eth_blockNumber"]);
+    });
+  } finally {
+    delete process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`];
+    delete process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`];
+  }
 });
 
-test("confirmation policy fails closed after runtime environment changes", async (t) => {
-  const { getDepositConfirmationPolicy } = await import("../config");
-  const keys = ["CHAIN_999999_DEPOSIT_CONFIRMATIONS", "DEPOSIT_CONFIRMATIONS"];
-  const prior = keys.map(key => process.env[key]);
-  t.after(() => keys.forEach((key, i) => { if (prior[i] === undefined) delete process.env[key]; else process.env[key] = prior[i]; }));
-  delete process.env.DEPOSIT_CONFIRMATIONS;
-  for (const value of [undefined, "0", "-1", "1.5", "bad"]) {
-    if (value === undefined) delete process.env[keys[0]]; else process.env[keys[0]] = value;
-    assert.throws(() => getDepositConfirmationPolicy(999999), /Invalid deposit confirmation/);
+test("never passes a block the RPC endpoint cannot serve yet", async () => {
+  process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`] = "0";
+  process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`] = "10";
+  try {
+    await withPollStubs({ head: 1030, lastProcessed: 1000, missingBlocks: [1020] }, async (seen) => {
+      await assert.rejects(() => pollChainForDeposits(chainInfo), /cannot serve block 1020/);
+      assert.deepEqual(seen.windows.map(([toBlock]) => toBlock), [1010]);
+      assert.equal(seen.rpc.filter((m) => m === "eth_getLogs").length, 1);
+    });
+  } finally {
+    delete process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`];
+    delete process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`];
   }
-  process.env[keys[0]] = "12";
-  assert.equal(getDepositConfirmationPolicy(999999), 12);
-  delete process.env[keys[0]];
-  process.env.DEPOSIT_CONFIRMATIONS = "8";
-  assert.equal(getDepositConfirmationPolicy(999999), 8);
 });
 
-test("WebSocket reconnect backs off and periodic polls cannot bypass the delay", async () => {
-  const fs = await import("node:fs");
-  const vm = await import("node:vm");
-  const ts = await import("typescript");
-  const source = fs.readFileSync("src/polling/alchemyPolling.ts", "utf8");
-  const start = source.indexOf("const syncRealtimeSubscription =");
-  const end = source.indexOf("export const reconcileExternalDeposits", start);
-  const code = source.slice(start, end).replace("const syncRealtimeSubscription =", "exports.sync =");
-  let now = 0;
-  const providers: any[] = [], timers: { fn: () => void; delay: number }[] = [];
-  const exports: any = {};
-  class Provider {
-    handlers: Record<string, () => void> = {};
-    websocket = { on: (name: string, fn: () => void) => { this.handlers[name] = fn; } };
-    constructor() { providers.push(this); }
-    async destroy() {}
-    async on() {}
+test("hands every window, empty or not, to the recorder with keyed deposits", async () => {
+  process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`] = "0";
+  process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`] = "10";
+  const sharedHash = `0x${"f1".repeat(32)}`;
+  try {
+    await withPollStubs(
+      {
+        head: 1020,
+        lastProcessed: 1000,
+        logsFor: (from) =>
+          from === 1011
+            ? [
+                makeLog("DepositRouted", sharedHash, 21, 1012, 0),
+                makeLog("DepositRouted", sharedHash, 22, 1012, 1),
+              ]
+            : [],
+      },
+      async (seen) => {
+        await pollChainForDeposits(chainInfo);
+        assert.deepEqual(seen.windows.map(([toBlock, deposits]) => [toBlock, deposits.map((d) => d.depositKey)]), [
+          [1010, []],
+          [1020, [`${sharedHash}#21`, `${sharedHash}#22`]],
+        ]);
+      },
+    );
+  } finally {
+    delete process.env[`CHAIN_${CHAIN_ID}_CONFIRMATIONS`];
+    delete process.env[`CHAIN_${CHAIN_ID}_LOGS_SPAN`];
   }
-  const context: any = { exports, WebSocketProvider: Provider, Date: { now: () => now },
-    getChainWsRpcUrl: () => "wss://test", realtimeProviders: new Map(), realtimeRetries: new Map(),
-    DEPOSIT_WS_RECONNECT_BASE_MS: 1000, DEPOSIT_WS_RECONNECT_MAX_MS: 60000,
-    DEPOSIT_EVENT_SIGNATURES: [], logInfo: () => {}, logError: () => {},
-    setTimeout: (fn: () => void, delay: number) => timers.push({ fn, delay }) };
-  vm.runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
-  context.syncRealtimeSubscription = exports.sync;
-  const chain = { externalChainId: 1, depositRouter: "router" };
-  exports.sync(chain);
-  for (const expected of [1000, 2000, 4000, 8000, 16000, 32000, 60000, 60000]) {
-    providers.at(-1).handlers.close();
-    providers.at(-1).handlers.error();
-    assert.equal(timers.length, 1, "close/error must schedule only one retry");
-    const timer = timers.shift()!;
-    assert.equal(timer.delay, expected);
-    const count = providers.length;
-    exports.sync(chain);
-    assert.equal(providers.length, count);
-    now += expected;
-    timer.fn();
-    assert.equal(providers.length, count + 1);
-  }
-  now += 60000;
-  providers.at(-1).handlers.close();
-  assert.equal(timers[0].delay, 1000, "a stable connection resets the backoff");
-});
-
-test("approved reviews settle automatically, isolate failures, and retry on the next poll", async t => {
-  const cirrus = await import("../services/cirrusService");
-  const rpc = await import("../services/rpcService");
-  const bridge = await import("../services/bridgeService");
-  const recovery = await import("../services/depositRecoveryService");
-  const { depositStateService: state } = await import("../services/depositStateService");
-  const { blockTrackingService: blocks } = await import("../services/blockTrackingService");
-  const { reconcileExternalDeposits } = await import("./alchemyPolling");
-  const logger = await import("../utils/logger");
-  const deposits = classifyDepositLogs([1, 2, 3].map(id => makeLog("DepositRouted", `0x${String(id).repeat(64)}`, id)), CHAIN_ID).standardDeposits;
-  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[CHAIN_ID, { externalChainId: CHAIN_ID,
-    depositRouter: deposits[0].depositRouter, lastProcessedBlock: 100, enabled: true, chainName: "test", custody: recipient }]]));
-  t.mock.method(cirrus, "getDepositReviewApprovals", async () => new Set(deposits.slice(0, 2).map(d => `${d.depositRouter.replace(/^0x/, "")}:${d.depositId}`)));
-  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
-  t.mock.method(state, "listReviews", async () => deposits.map(deposit => ({ deposit, status: "review" as const, reviewRecordedOnchain: true })));
-  t.mock.method(state, "list", async () => []);
-  t.mock.method(state, "oldestPendingBlock", async () => undefined);
-  t.mock.method(state, "pruneSettled", async () => undefined);
-  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 100);
-  t.mock.method(rpc, "isChainConfigured", () => true);
-  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
-  t.mock.method(logger, "logError", () => {});
-  const calls: string[] = [];
-  t.mock.method(bridge, "confirmReviewedDeposit", async (_chain, _router, id) => {
-    calls.push(id);
-    if (calls.length === 1) throw new Error("Verifier unavailable");
-    return "hash";
-  });
-  await reconcileExternalDeposits(CHAIN_ID);
-  await reconcileExternalDeposits(CHAIN_ID);
-  assert.deepEqual(calls, ["1", "2", "1", "2"]);
 });
