@@ -1,4 +1,8 @@
 library BridgeTypes {
+    // BridgeStatus is APPEND ONLY. These values are stored on chain, indexed
+    // in Cirrus, and filtered on by the relayer ("status 1", "status 2"), so
+    // inserting a member renumbers live records. ANNOUNCED sits at the end for
+    // that reason, not because it belongs there.
     enum BridgeStatus {
         NONE,         // default (mapping unset)
         INITIATED,    // deposit  : relayer observed external tx
@@ -8,8 +12,12 @@ library BridgeTypes {
         COMPLETED,    // flow fully executed
         ABORTED,      // user/relayer reclaimed escrow
         SWEPT,        // withdrawal: governance cancelled it and moved the escrow to a triage wallet
-        QUARANTINED   // deposit: received in custody but not mintable as requested; governance
+        QUARANTINED,  // deposit: received in custody but not mintable as requested; governance
                       // resolves it with rerouteDeposit or abortDeposit
+        ANNOUNCED     // deposit: posted permissionlessly against a bond, NOT yet observed
+                      //   by the relayer. Solvers may fill against it; nothing can be
+                      //   minted or unlocked from it until the relayer's own record
+                      //   adopts it and moves it to INITIATED.
     }
 
     struct DepositInfo {
