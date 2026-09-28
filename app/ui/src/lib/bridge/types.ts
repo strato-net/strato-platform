@@ -51,6 +51,7 @@ export type AutoRouteDepositResult = {
 };
 
 export type BridgeContextType = {
+  scope: "fund" | "trade";
   pendingDepositsKey: string;
   loading: boolean;
   error: string | null;

@@ -10,10 +10,10 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   describe "vmRunnerRtsFlags" $ do
-    it "4+ cores, >16GB: full 512MB pool across 4 capabilities, no heap cap" $
-      vmRunnerRtsFlags 4 32768 `shouldBe` words "-T -N4 -A128m -I2"
+    it "4+ cores, >16GB: 256MB pool across 4 capabilities, -F1.2, no heap cap" $
+      vmRunnerRtsFlags 4 32768 `shouldBe` words "-T -N4 -A64m -I2 -F1.2"
     it "caps -N at 4 on many-core machines (serial mutator)" $
-      vmRunnerRtsFlags 16 65536 `shouldBe` words "-T -N4 -A128m -I2"
+      vmRunnerRtsFlags 16 65536 `shouldBe` words "-T -N4 -A64m -I2 -F1.2"
     it "4 cores, 16GB nominal" $
       vmRunnerRtsFlags 4 16384
         `shouldBe` words "-T -N4 -A64m -I2 -F1.5 -M9830m"

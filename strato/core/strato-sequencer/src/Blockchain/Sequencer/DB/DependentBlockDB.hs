@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -30,9 +31,8 @@ import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
+import Control.Monad.Composable.Base (Eff, InternalState, provide, runEff, withResources)
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader (ReaderT, runReaderT)
-import Control.Monad.Trans.Resource (runResourceT)
 import Data.Binary
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text as T
@@ -148,8 +148,8 @@ instance (MonadIO m, Accessible DependentBlockDB m) => (Keccak256 `Alters` Depen
 runWithDependentBlockDB ::
   FilePath ->  -- ^ Path to the LevelDB database
   Int ->       -- ^ Cache size (0 = 8MB default)
-  ReaderT DependentBlockDB IO a ->
+  Eff '[DependentBlockDB, InternalState] a ->
   IO a
-runWithDependentBlockDB dbPath cacheSize action = runResourceT $ do
+runWithDependentBlockDB dbPath cacheSize action = runEff . withResources $ do
   db <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = cacheSize}
-  liftIO $ runReaderT action (DependentBlockDB db)
+  provide (DependentBlockDB db) action

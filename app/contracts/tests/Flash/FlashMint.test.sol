@@ -323,7 +323,7 @@ contract Describe_FlashMint is Authorizable {
         collT = Token(COLL);
         collT.setStatus(2);
         oracle.setAssetPrice(COLL, 100e18);
-        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, WAD, false);
+        cdp.setCollateralAssetParams(COLL, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
 
         // The two mint/burn grants — identical in shape to the ones CDPEngine already holds.
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));

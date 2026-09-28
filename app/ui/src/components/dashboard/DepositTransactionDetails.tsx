@@ -3,7 +3,7 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
+import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, LEGACY_DEPOSIT_STATUS_OPTIONS, getBridgeStatusLabel, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
@@ -22,6 +22,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
 
   const {
+    scope,
     loading: isLoading,
     fetchDepositTransactions,
     availableNetworks,
@@ -180,39 +181,13 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         const statusStr = record?.DepositInfo?.bridgeStatus || "0";
         const statusNum = parseInt(statusStr);
-        if (statusNum === ExternalBridgeStatus.INITIATED) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              <Clock className="h-3 w-3 mr-1" />
-              Initiated
-            </span>
-          );
-        } else if (statusNum === ExternalBridgeStatus.PENDING_REVIEW) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              <Clock className="h-3 w-3 mr-1" />
-              Pending Review
-            </span>
-          );
-        } else if (statusNum === ExternalBridgeStatus.COMPLETED) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Completed
-            </span>
-          );
-        } else if (statusNum === ExternalBridgeStatus.ABORTED) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              Aborted
-            </span>
-          );
-        }
+        const status = getBridgeStatusLabel(statusNum, record.bridgeSource);
+        const StatusIcon = statusNum === ExternalBridgeStatus.COMPLETED ? CheckCircle2
+          : (statusNum === ExternalBridgeStatus.INITIATED || statusNum === ExternalBridgeStatus.PENDING_REVIEW) ? Clock : AlertCircle;
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Unknown
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+            <StatusIcon className="h-3 w-3 mr-1" />
+            {status.text === "Complete" ? "Completed" : status.text}
           </span>
         );
       },
@@ -266,7 +241,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
-              options={DEPOSIT_STATUS_OPTIONS}
+              options={scope === "fund" ? LEGACY_DEPOSIT_STATUS_OPTIONS : DEPOSIT_STATUS_OPTIONS}
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>

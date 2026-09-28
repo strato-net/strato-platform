@@ -44,6 +44,7 @@ import Control.Monad (forever, forM, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
@@ -80,9 +81,6 @@ yieldToVm ts = yield $ SeqOutEvent [] ts
 yieldToBoth :: Monad m => [P2pEvent] -> [VmTask] -> ConduitT i SeqOutEvent m ()
 yieldToBoth es ts = yield $ SeqOutEvent es ts
 
-instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
-  doIO = lift . doIO
-
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
 
@@ -98,7 +96,7 @@ tryResolveSelfAddr = do
     Just addr -> return (Just addr)
     Nothing -> do
       let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runLoggingT $ runVaultM vaultUrl' $ do
+      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runVaultM vaultUrl' $ do
         pubKey <- getPub
         return $ fromPublicKey pubKey
       case result of

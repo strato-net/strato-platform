@@ -10,6 +10,7 @@ default-extensions:
 
 library:
   source-dirs: src/
+  ghc-options: -O2 -fexpose-all-unfoldings -fspecialise-aggressively
   dependencies:
   - aeson >=2.1.1.0 && <2.3
   - aeson-casing
@@ -35,6 +36,7 @@ library:
   - scientific
   - servant-server
   - source-tools
+  - store
   - strato-model
   - openapi3
   - text
@@ -49,14 +51,19 @@ tests:
     other-modules:
       - BasicValueStringTest
       - StorageTest
+      - ValueBinaryTest
     dependencies:
+      - binary
       - bytestring
+      - containers
       - ethereum-rlp
       - format
       - hspec
       - persistent
       - solid-vm-model
+      - strato-model
       - unliftio
+      - vector
 
 benchmarks:
   storage-bench:

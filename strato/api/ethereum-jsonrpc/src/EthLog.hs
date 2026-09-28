@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -56,7 +57,7 @@ instance ToJSON EthLog where
       hexBytes bs = T.pack $ "0x" ++ BC.unpack (B16.encode bs)
       hexInt n = T.pack $ "0x" ++ showHex n ""
 
-eventRowToLog :: EventRow -> CodeDBM IO EthLog
+eventRowToLog :: EventRow -> CodeDBM '[] EthLog
 eventRowToLog row = do
   let addrText = erAddress row
   addr <- case addressFromHex (BC.pack $ T.unpack addrText) of
@@ -100,7 +101,7 @@ eventToLog cc row =
 -- contract code, code collection, or event definition cannot be resolved.
 -- Used where a single unresolvable event must not fail the whole request
 -- (e.g. bloom computation over every event in a transaction or block).
-eventRowToLogMaybe :: EventRow -> CodeDBM IO (Maybe EthLog)
+eventRowToLogMaybe :: EventRow -> CodeDBM '[] (Maybe EthLog)
 eventRowToLogMaybe row =
   case addressFromHex (BC.pack $ T.unpack (erAddress row)) of
     Left _ -> pure Nothing

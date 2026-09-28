@@ -4,6 +4,35 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 
 Oracle config is keyed by network in `assets.json` (`networks[ORACLE_NETWORK_ID]`). Set `ORACLE_NETWORK_ID` to the upquark network ID on production (`33056204878082667`) and to the helium network ID on testnet (`114784819836269`). Each block has complete `assets` and `sources`.
 
+## Price-only feeds (symbol-derived keys)
+
+`PriceOracle` keys prices by address, so an asset with no STRATO token still needs one. For assets that
+are priced but not tokenized — commodities, or L1s with no bridge route — `targetAssetAddress` is **the
+feed symbol as left-aligned ASCII, zero-padded to 20 bytes**, and the feed behaves like any other: median
+of the sources, same batch push, same `prices` row in Cirrus.
+
+| Key | Asset | Quote |
+| --- | --- | --- |
+| `4252454e54000000000000000000000000000000` | `BRENT` | Brent crude, USD/barrel, ICE front-month |
+| `444f474500000000000000000000000000000000` | `DOGE` | Dogecoin, USD |
+
+Derive one, or read one back:
+
+```bash
+python3 -c "print('BRENT'.encode().hex().ljust(40,'0'))"
+python3 -c "print(bytes.fromhex('4252454e54000000000000000000000000000000').rstrip(b'\0').decode())"
+```
+
+Consumers read them exactly like a token price, and the existing contract tests already exercise a bare
+address as a price key. Two things to know:
+
+- **Nothing is deployed at these addresses.** There is no token, no balance and no pool. They will not
+  appear in `/tokens`, the dashboard or price-tracking, all of which build their universe from deployed
+  tokens. `/oracle/price?asset=…` and `/oracle/price-history/:assetAddress` serve them directly.
+- **No registry is needed.** The key is a function of the symbol, so two feeds added in parallel cannot
+  collide, and a `prices` row decodes back to its symbol with no lookup. Symbols are limited to 20
+  characters and uppercase ASCII. `deadbeef` remains used by proxy-only assets that are never submitted.
+
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources

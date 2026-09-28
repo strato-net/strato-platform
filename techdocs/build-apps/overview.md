@@ -41,7 +41,7 @@ References: [Core Platform API](../reference/strato-node-api.md), [Cirrus](../re
 | **B. Bloc** (`/bloc/v2.2`) | Your STRATO account's Vault key, server-side | Calling any contract function by name with JSON arguments |
 | **C. JSON-RPC** (`/rpc`) with viem or ethers | Your own private key | Self-custody bots, scripts and dApps |
 | **D. Cirrus** (`/cirrus/search`) | Nobody (read-only) | Indexed state, mappings and events |
-| **E. External wallets** (strato-wallet, MetaMask) | The user's wallet | Browser dApps |
+| **E. External wallets** (STRATO Wallet, MetaMask) | The user's wallet | Browser dApps |
 
 Options A and B use an OAuth 2.0 / OIDC access token from Keycloak (realm `mercata`). Request client credentials at [support.blockapps.net](https://support.blockapps.net). See the [Integration Guide](integration.md) for each option.
 
@@ -66,7 +66,9 @@ The STRATO web app in this repository uses every integration option:
 - `app/backend/src/api/services/`: per-feature transaction logic (tokens, CDP, lending, swaps, bridge, rewards, staking)
 - `app/ui/src/pages/Transfer.tsx`: an external-wallet token transfer signed as a legacy transaction
 - `app/contracts/concrete/`: the DeFi contracts
-- `strato-wallet/`: the STRATO browser wallet extension
+
+The STRATO Wallet browser extension lives in its own repository,
+[strato-net/strato-wallet](https://github.com/strato-net/strato-wallet).
 
 ## Run your own node
 

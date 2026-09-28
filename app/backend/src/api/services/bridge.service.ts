@@ -387,6 +387,10 @@ export const getBridgeTransactions = async (
   };
   const nativeParams = nativeTransactionParams(rawParams, userAddress, type);
   const legacyParams = legacyTransactionParams(rawParams, userAddress, type);
+  // Status 6 means quarantined only in the legacy deposit history scope.
+  if (isDeposit && source === "legacy" && rawParams["value->>bridgeStatus"] === "eq.6") {
+    legacyParams["value->>bridgeStatus"] = "eq.6";
+  }
   const legacyConfig = LEGACY_QUERY_CONFIGS[type];
 
   const [standardResponse, legacyResponse, nativeResponse, nativeCountResponse] = await Promise.all([

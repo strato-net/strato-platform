@@ -173,6 +173,16 @@ const YIELD_VAULTS = [
     iconColor: "text-indigo-600 dark:text-indigo-400",
   },
   {
+    key: "hype-yield",
+    name: "HYPE Yield Vault",
+    subtitle: "Earn HYPE yield and Reward Points",
+    asset: "WHYPE",
+    badge: "Yield Vault",
+    // icon needs to be updated
+    iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
+    iconColor: "text-indigo-600 dark:text-indigo-400",
+  },
+  {
     key: "wbtc-carry",
     name: "wBTC Carry Vault",
     subtitle: "ERC-4626 carry vault for wBTC deposits",

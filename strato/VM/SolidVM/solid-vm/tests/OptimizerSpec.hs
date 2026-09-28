@@ -13,6 +13,7 @@ module OptimizerSpec where
 --pick, pre,
 
 import BlockApps.Logging
+import Control.Monad.Composable.Base (runEff)
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.SolidStorageDB
@@ -110,7 +111,7 @@ comparteContracts contract1 contract2 = do
 
 getOutContextM :: ContextM Bool -> IO (Bool)
 getOutContextM mB = do
-  (a, _) <- runLoggingT (runTestContextM $ withCurrentBlockHash zeroHash mB)
+  (a, _) <- runEff . runLogging $ runTestContextM (withCurrentBlockHash zeroHash mB)
   return a
 
 ---------------------------------------------

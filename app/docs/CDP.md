@@ -22,7 +22,7 @@ Core flows:
 Accrual and units:
 - Per‑asset index `rateAccumulator` (RAY, 1e27). Debt reads use `scaledDebt * rateAccumulator / RAY`.
 - `_rpow` computes discrete compounding; accumulator never falls below RAY.
-- `unitScale` maps collateral token units to 1e18 when valuing in USD.
+- `unitScale` maps collateral token units to 1e18 when valuing in USD. It is `10**decimals()` of the token, derived by the engine at first listing (the asset must be a `TokenFactory` token) and never accepted from calldata. `setCollateralAssetParams` cannot change it; the only re-derivation path is `resyncUnitScale`, which requires the asset to be paused with zero outstanding debt, because rescaling the divisor on an open book moves every CR for that asset in one block.
 
 Formulas:
 - Debt (USD, 18d): `debtUSD = scaledDebt × rateAccumulator / 1e27`.

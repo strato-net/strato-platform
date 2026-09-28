@@ -75,6 +75,51 @@ All of these use 18 decimals.
 !!! warning "Look up tokens by address, not symbol"
     Symbols are not unique. For example, more than one token uses the symbol `GOLDST`. Bridged tokens such as ETH and WBTC have no "ST" suffix.
 
+## Price feed addresses (both networks)
+
+`PriceOracle` keys prices by address, but a feed does not need a deployed token: `setAssetPrice` only
+requires a non-zero address. Assets that are priced but not tokenized -- commodities, or L1s with no
+bridge route -- are keyed on **the feed symbol as left-aligned ASCII**, zero-padded to 20 bytes.
+
+The address is therefore *derived from the name*, not handed out by a registry. Two people adding feeds
+in parallel cannot collide, because the key is a function of the symbol. And the key is self-describing:
+hex-decode any `prices` row and the symbol falls out, with no lookup table.
+
+| Address | Feed | Notes |
+|---|---|---|
+| `444f474500000000000000000000000000000000` | DOGE | Dogecoin spot in USD. Dogecoin is a native UTXO L1, so it has no ERC-20, no bridge route and no STRATO token. |
+
+Derive one, or read one back:
+
+```bash
+python3 -c "print('DOGE'.encode().hex().ljust(40,'0'))"
+# 444f474500000000000000000000000000000000
+python3 -c "print(bytes.fromhex('444f474500000000000000000000000000000000').rstrip(b'\0').decode())"
+# DOGE
+```
+
+Symbols must be 20 characters or fewer, and uppercase ASCII by convention. These addresses sit far above
+the platform's reserved `…10xx` genesis range and the low-numbered precompiles, so they cannot shadow
+either.
+
+Read a price exactly like any other asset. Prices are 1e18-scaled USD:
+
+```solidity
+uint256 dogeUsd = PriceOracle(0x0000000000000000000000000000000000001002)
+    .getAssetPrice(address(0x444f474500000000000000000000000000000000));
+```
+
+Or off-chain, through Cirrus:
+
+```bash
+curl -s "https://app.strato.nexus/cirrus/search/BlockApps-PriceOracle-prices?address=eq.0000000000000000000000000000000000001002&key=eq.444f474500000000000000000000000000000000&select=key,value::text"
+```
+
+!!! warning "A price key is not a token"
+    These addresses hold no balance, no supply and no `transfer`, and no contract is deployed at them.
+    Use them to read a price only. Never list one as a swap-pool asset or as lending or CDP collateral --
+    there is nothing to custody or liquidate behind it.
+
 ## Per-network contracts
 
 These contracts were deployed after genesis, so each network has its own address.

@@ -162,11 +162,12 @@ vmNurseryPoolMB memMB
 -- converts an OOM-kill into bounded behavior (the RTS auto-enables compacting
 -- GC when live data reaches ~30% of the cap), and @-F1.5@ roughly doubles
 -- major-GC frequency (~2–5% throughput) to keep the peak lower. On >16GB
--- machines these must NOT be applied — the throughput cost buys nothing there.
+-- machines no @-M@ cap; the milder @-F1.2@ measured −10% RSS at −1…−3%
+-- throughput (2026-09-21, one 300s pinned catch-up sync on a 32GB box).
 heapCapFlags :: Integer -> [String]
 heapCapFlags memMB
   | memMB <= 16 * 1024 = ["-F1.5", "-M" ++ show ((memMB * 6) `div` 10) ++ "m"]
-  | otherwise = []
+  | otherwise = ["-F1.2"]
 
 -- | vm-runner: @-N4 -A⟨pool/4⟩@ was the fastest measured config on the
 -- 4-core reference box (2,972s vs 3,114–3,201s for -N2 at the same pool).
@@ -177,7 +178,11 @@ heapCapFlags memMB
 -- at the same pool) — on a 2-core box one capability avoids GC-sync cost and
 -- pool splitting, and leaves the other core to the sequencer/p2p/postgres.
 -- @-I2@ (idle GC) is kept from the previous fixed flags, @-T@ powers the
--- metrics export.
+-- metrics export. The pool is capped at 256MB: on a 32-core/32GB box with
+-- the in-process node cache (2026-09-21, 300s pinned catch-up sync), 256MB
+-- plus @-F1.2@ measured −26% RSS (3.4GB → 2.5GB) at −2…−3% throughput. That
+-- differs from the 2026-08-28 +8%…+35% pool-halving cost (4-core box, no
+-- node cache); re-measure there before relying on either number.
 vmRunnerRtsFlags :: Int -> Integer -> [String]
 vmRunnerRtsFlags cores memMB =
   ["-T", "-N" ++ show n, "-A" ++ show (pool `div` fromIntegral n) ++ "m", "-I2"]
@@ -187,7 +192,7 @@ vmRunnerRtsFlags cores memMB =
     n | cores >= 4 = 4
       | cores == 3 = 2
       | otherwise = 1
-    pool = vmNurseryPoolMB memMB
+    pool = min 256 (vmNurseryPoolMB memMB)
 
 -- | strato-sequencer: serial event loop with a multi-GB catch-up heap, same
 -- shape as the vm-runner but never A/B'd — every rule here is a PREDICTION by

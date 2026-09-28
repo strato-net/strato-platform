@@ -21,6 +21,7 @@ library
     , blockapps-vault-wrapper-api
     , blockapps-vault-wrapper-client
     , bytestring
+    , composable-monads-base
     , mtl
     , strato-auth
   default-language: Haskell2010

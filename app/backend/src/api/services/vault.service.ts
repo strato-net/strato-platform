@@ -1056,6 +1056,36 @@ export const withdraw = async (
   );
 };
 
+/**
+ * Withdraw from the vault by burning an exact number of shares.
+ * Used for "withdraw all": burning the user's full share balance avoids the
+ * rounding/NAV-drift dust that a USD-denominated withdrawal can leave behind.
+ */
+export const withdrawShares = async (
+  accessToken: string,
+  userAddress: string,
+  body: { shares: string }
+): Promise<{ status: string; hash: string }> => {
+  const vaultAddress = getVaultAddress();
+
+  if (!vaultAddress) {
+    throw new Error("Vault not found");
+  }
+
+  const { shares } = body;
+
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(Vault),
+    contractAddress: vaultAddress,
+    method: "withdrawShares",
+    args: { sharesToBurn: shares },
+  }, userAddress, accessToken);
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════

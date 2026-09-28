@@ -26,7 +26,7 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
-import BlockApps.Logging (runNoLoggingT)
+import Control.Monad.Composable.Base (runEff, withNoLogger, withResources)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
@@ -322,12 +322,12 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         content <- liftIO $ BS.readFile "genesis.json"
         case JSON.decode (BL.fromStrict content) of
           Nothing -> error "Failed to parse provided genesis.json"
-          Just genesisInfo -> runNoLoggingT . runResourceT . runSetupDBM $ do
+          Just genesisInfo -> liftIO . runEff . withNoLogger . withResources . runSetupDBM $ do
             void $ addCode mempty
             populateMPTFromGenesis genesisInfo
       else do
         let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
-        runNoLoggingT . runResourceT . runSetupDBM $ do
+        liftIO . runEff . withNoLogger . withResources . runSetupDBM $ do
           void $ addCode mempty
           populateMPTAndWriteGenesis genesisInfo
         liftIO $ putStrLn "  ✓ Created genesis.json"

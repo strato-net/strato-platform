@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -15,7 +16,7 @@ module Strato.Monad where
 import Aws (Credentials(..))
 import Data.ByteString.Lazy as DBL hiding (map)
 import BlockApps.Logging as BL
-import Control.Monad.Reader
+import Control.Monad.Composable.Base
 import Control.Monad.Trans.Except
 import Data.String
 import Data.Text (Text)
@@ -26,7 +27,7 @@ import Network.Wai.Parse
 import Servant
 import UnliftIO hiding (Handler (..))
 
-type HighwayM = ReaderT HighwayWrapperEnv (LoggingT IO)
+type HighwayM = Eff '[ReaderEnv HighwayWrapperEnv, Logger]
 
 toUserError :: (MonadUnliftIO m, MonadLogger m) => Text -> m a -> m a
 toUserError msg = flip catch $ reportAndConvertError msg
@@ -72,8 +73,9 @@ data HighwayWrapperError
 
 runHighwayWithEnv :: HighwayWrapperEnv -> HighwayM a -> IO a
 runHighwayWithEnv env =
-  runLoggingT
-    . flip runReaderT env
+  runEff
+    . runLogging
+    . withReaderEnv env
 
 runHighwayToIO :: HighwayWrapperEnv -> HighwayM a -> IO (Either HighwayWrapperError a)
 runHighwayToIO env = try . runHighwayWithEnv env

@@ -50,6 +50,30 @@ vm.runInNewContext(transpile(fs.readFileSync(path.join(__dirname, '../src/utils/
   exports: numberUtils, require,
 });
 
+const bridgeConstants = {};
+vm.runInNewContext(transpile(fs.readFileSync(path.join(__dirname, '../src/lib/bridge/constants.ts'), 'utf8')), {
+  exports: bridgeConstants, require: () => ({ defineChain: value => value }),
+});
+const bridgeUtils = {};
+vm.runInNewContext(transpile(fs.readFileSync(path.join(__dirname, '../src/lib/bridge/utils.ts'), 'utf8')), {
+  exports: bridgeUtils, require: id => id === './constants' ? bridgeConstants : {},
+});
+
+test('legacy statuses stay separate from EAB and normalized native history', () => {
+  const label = bridgeUtils.getBridgeStatusLabel;
+  assert.equal(label(6, 'legacy').text, 'On Hold');
+  assert.equal(label(6, 'external').text, 'Refunded');
+  assert.equal(label(3, 'external').text, 'Ready');
+  for (const source of ['legacy', 'external', 'native']) {
+    assert.equal(label(4, source).text, 'Complete');
+    assert.equal(label(7, source).text, 'Aborted');
+  }
+  assert.equal(label(5, 'legacy').text, 'Swept');
+  assert.equal(label(3, 'legacy').text, 'Unknown');
+  assert(bridgeUtils.LEGACY_DEPOSIT_STATUS_OPTIONS.some(o => o.value === 6 && o.label === 'On Hold'));
+  assert(!bridgeUtils.DEPOSIT_STATUS_OPTIONS.some(o => o.value === 6));
+});
+
 test('metal activity retains separate payment and output decimals, including zero', async () => {
   const { resolveTokenMetadata, mapEventsToMetalTxs } = load(async () => ({ data: [
     { address: 'pay', _symbol: 'PAY', customDecimals: 6 },
@@ -90,7 +114,7 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
         fetchDepositTransactions: async () => ({ data: deposits }), fetchWithdrawTransactions: async () => ({ data: [] }),
         availableNetworks: [], bridgeableTokens: [],
       }) };
-      if (id === '@/lib/bridge/utils') return { ExternalBridgeStatus: { COMPLETED: 4 }, mergePendingDeposits: () => ({ remaining: pending }) };
+      if (id === '@/lib/bridge/utils') return { ...bridgeUtils, mergePendingDeposits: () => ({ remaining: pending }) };
       if (id === '@/lib/metalActivity') return metadataModule;
       if (id === '@/utils/numberUtils') return numberUtils;
       if (id === '@/hooks/use-mobile') return { useIsMobile: () => false };
@@ -189,4 +213,12 @@ test('trade USD estimates respect token decimals and omit missing prices', () =>
   }
   assert.equal(numberUtils.formatTokenUsd('1', 6, undefined), null);
   assert.equal(numberUtils.formatTokenUsd('1', 6, 'bad price'), null);
+});
+
+test('recent deposits retain their bridge source when rendering colliding statuses', async () => {
+  const rows = await recentRows({ deposits: ['legacy', 'external'].map(bridgeSource => ({
+    bridgeSource, block_timestamp: '2026-09-28T00:00:00Z',
+    DepositInfo: { bridgeStatus: '6', stratoTokenAmount: '1000000000000000000' },
+  })) });
+  assert.deepEqual(rows.map(row => row.status.text), ['On Hold', 'Refunded']);
 });

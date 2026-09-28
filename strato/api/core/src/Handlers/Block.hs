@@ -29,7 +29,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Control.Arrow ((&&&), (***))
 import Control.Monad (unless)
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Data.List
 import qualified Data.Map as Map
 import Data.Maybe
@@ -149,7 +149,7 @@ server = getBlockInfo
 
 ---------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [Block] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable BlocksFilterParams [Block] (Base.Eff es) where
   select _ b@BlocksFilterParams {..}
     | b == blocksFilterParams {qbSortby = qbSortby} =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)

@@ -433,6 +433,7 @@ export const BridgeProvider = ({ children, scope = "fund" }: { children: ReactNo
   return (
     <BridgeContext.Provider
       value={{
+        scope,
         pendingDepositsKey,
         loading,
         error,

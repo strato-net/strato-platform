@@ -5,11 +5,11 @@ import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
-import { ExternalBridgeStatus, WITHDRAWAL_STATUS_LABELS, mergePendingDeposits } from '@/lib/bridge/utils';
+import { ExternalBridgeStatus, WITHDRAWAL_STATUS_LABELS, getBridgeStatusLabel, mergePendingDeposits } from '@/lib/bridge/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
 import { METAL_ACTIVITY_PAIR, resolveTokenMetadata, collectMetalTokenAddrs, mapEventsToMetalTxs } from '@/lib/metalActivity';
-import type { BridgeToken } from '@strato/shared-types';
+import type { BridgeToken, BridgeTransaction } from '@strato/shared-types';
 import type { NetworkSummary } from '@/lib/bridge/types';
 
 type RecentTx = {
@@ -22,6 +22,7 @@ type RecentTx = {
   stratoTokenSymbol?: string;
   amount?: string;
   status?: string;
+  bridgeSource?: BridgeTransaction['bridgeSource'];
   depositOutcome?: 'bridge' | 'save' | 'forge' | 'route' | 'fallback';
   finalTokenSymbol?: string;
   finalAmount?: string;
@@ -35,21 +36,9 @@ type RecentTx = {
   payDecimals?: number;
 };
 
-const STATUS_LABELS: Record<number, { text: string; color: string }> = {
-  [ExternalBridgeStatus.INITIATED]: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
-  [ExternalBridgeStatus.PENDING_REVIEW]: { text: "Pending Review", color: "bg-amber-500/15 text-amber-500" },
-  [ExternalBridgeStatus.READY]: { text: "Ready", color: "bg-blue-500/15 text-blue-500" },
-  [ExternalBridgeStatus.COMPLETED]: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
-  [ExternalBridgeStatus.CANCELLED]: { text: "Canceled", color: "bg-red-500/15 text-red-500" },
-  [ExternalBridgeStatus.REFUNDED]: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
-  [ExternalBridgeStatus.ABORTED]: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
-};
-const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
-const METAL_STATUS = STATUS_LABELS[ExternalBridgeStatus.COMPLETED];
+const METAL_STATUS = getBridgeStatusLabel(ExternalBridgeStatus.COMPLETED);
 const normalizeAddress = (address?: string) =>
   (address || "").toLowerCase().replace(/^0x/, "");
-
-const getStatusLabel = (status?: string | number) => STATUS_LABELS[parseInt(String(status || "0"))] || UNKNOWN_STATUS;
 
 const formatTimeAgo = (time?: string) => {
   if (!time) return "-";
@@ -89,7 +78,7 @@ const TxRow = ({ icon, iconBg, label, status, timeLabel, fromAmount, fromSymbol,
 const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): RecentTx => {
   const info = tx.DepositInfo as Record<string, unknown> | undefined;
   return {
-    _type: 'deposit', block_timestamp: tx.block_timestamp as string,
+    _type: 'deposit', bridgeSource: tx.bridgeSource as RecentTx['bridgeSource'], block_timestamp: tx.block_timestamp as string,
     externalChainId: (tx.externalChainId ?? info?.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
@@ -106,7 +95,7 @@ const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): Recen
 const mapWithdrawal = (tx: Record<string, unknown>): RecentTx => {
   const info = tx.WithdrawalInfo as Record<string, unknown> | undefined;
   return {
-    _type: 'withdrawal', block_timestamp: tx.block_timestamp as string,
+    _type: 'withdrawal', bridgeSource: tx.bridgeSource as RecentTx['bridgeSource'], block_timestamp: tx.block_timestamp as string,
     externalChainId: (info?.externalChainId ?? tx.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
     amount: info?.stratoTokenAmount as string, status: info?.bridgeStatus as string,
@@ -273,8 +262,8 @@ const RecentTransactions = ({
         const isFallback = !isW && tx.depositOutcome === "fallback";
         const isRouted = !isW && tx.depositOutcome === "route";
         const status = {
-          ...getStatusLabel(tx.status),
-          ...(isW && { text: WITHDRAWAL_STATUS_LABELS[Number(tx.status)] || UNKNOWN_STATUS.text }),
+          ...getBridgeStatusLabel(tx.status, tx.bridgeSource),
+          ...(isW && tx.bridgeSource !== "legacy" && { text: WITHDRAWAL_STATUS_LABELS[Number(tx.status)] || "Unknown" }),
         };
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
         const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);

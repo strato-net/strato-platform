@@ -614,3 +614,31 @@ test("native deposit history keeps separate routed outcomes for redemptions shar
   assert.deepEqual(result.map(row => row.depositOutcome), ["route", "fallback", "bridge"]);
   assert.deepEqual(result.slice(0, 2).map(row => row.finalAmount), ["99", "100"]);
 });
+
+test("legacy On Hold filtering does not change EAB or native status semantics", async (t) => {
+  const service = await import("./bridge.service");
+  let source: "legacy" | "external" | "all" = "legacy";
+  t.mock.getter(constants, "stratoNativeBridge", () => "9".repeat(40));
+  const queried = new Set<string>();
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    if (table.endsWith("-deposits")) {
+      queried.add(table);
+      if (table.includes("MercataBridge")) {
+        assert.equal(params["value->>bridgeStatus"], source === "legacy" ? "eq.6" : "eq.-1");
+      } else if (table.includes("StratoNativeBridge")) {
+        assert.equal(params["value->>bridgeStatus"], "eq.-1");
+      } else if (table.includes("ExternalAssetBridge")) {
+        assert.notEqual(source, "legacy");
+        assert.equal(params["value->>status"], "eq.6");
+      }
+      if (params.select === "count()") return { data: [{ count: 0 }] };
+    }
+    return { data: [] };
+  });
+  for (source of ["legacy", "external", "all"] as const) {
+    await service.getBridgeTransactions("token", "deposit", "user", { "value->>bridgeStatus": "eq.6" }, source);
+  }
+  assert(queried.has(`/${constants.MercataBridge}-deposits`));
+  assert(queried.has(`/${constants.ExternalAssetBridge}-deposits`));
+  assert(queried.has(`/${constants.StratoNativeBridge}-deposits`));
+});

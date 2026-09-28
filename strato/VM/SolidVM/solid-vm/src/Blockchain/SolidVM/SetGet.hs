@@ -346,24 +346,24 @@ showSM (SContractFunction address functionName) = do
 showSM (SVariadic xs) = ("variadic(" ++) . (++ ")") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x
 
-jsonSM :: MonadSM m => Value -> m String
+jsonSM :: MonadSM m => Value -> m T.Text
 jsonSM = go False
   where
     go _ SNULL = return "null"
-    go _ (SInteger v) = return $ show v
-    go b (SString v) = return $ bool id show b v
-    go b (SBytes v) = return . bool id show b . BC.unpack $ B16.encode v
+    go _ (SInteger v) = return . T.pack $ show v
+    go b (SString v) = return . T.pack $ bool id show b v
+    go b (SBytes v) = return . T.pack . bool id show b . BC.unpack $ B16.encode v
     go _ (SBool v) = return $ bool "false" "true" v
-    go _ (SEnumVal _ _ num) = return $ show num
-    go b (SAddress a _) = return . bool id show b $ show a
+    go _ (SEnumVal _ _ num) = return . T.pack $ show num
+    go b (SAddress a _) = return . T.pack . bool id show b $ show a
     go _ (STuple v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
-      return $ "[" ++ intercalate ", " strings ++ "]"
+      return $ "[" <> T.intercalate ", " strings <> "]"
     go _ (SArray v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
-      return $ "[" ++ intercalate ", " strings ++ "]"
+      return $ "[" <> T.intercalate ", " strings <> "]"
     go _ (SStruct name m) = do
       valStrings <-
         forM (M.toList m) $ \(n, var) -> do
@@ -371,9 +371,9 @@ jsonSM = go False
           valString <- go True val
           return (n, valString)
       return $
-        labelToString name ++ "{"
-          ++ intercalate ", " (map (\(n, v) -> show (labelToString n) ++ ": " ++ v) valStrings)
-          ++ "}"
+        labelToText name <> "{"
+          <> T.intercalate ", " (map (\(n, v) -> T.pack (show (labelToString n)) <> ": " <> v) valStrings)
+          <> "}"
     go _ (SMap m) = do
       valStrings <-
         forM (M.toList m) $ \(key, var) -> do
@@ -383,9 +383,9 @@ jsonSM = go False
           return (keyString, valString)
       return $
         "{"
-          ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
-          ++ "}"
-    go b (SContract _ address) = return . bool id show b $ show address
-    go _ (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse (go True) xs
-    go _ (SDecimal v) = return $ show v
+          <> T.intercalate ", " (map (\(k, v) -> k <> ": " <> v) valStrings)
+          <> "}"
+    go b (SContract _ address) = return . T.pack . bool id show b $ show address
+    go _ (SVariadic xs) = (\xs' -> "[" <> T.intercalate ", " xs' <> "]") <$> traverse (go True) xs
+    go _ (SDecimal v) = return . T.pack $ show v
     go _ _ = return "0"

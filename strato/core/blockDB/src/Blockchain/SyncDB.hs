@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
@@ -37,6 +38,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
+import           Control.Monad.Composable.Base         (Eff, Logger, runEff)
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
@@ -53,8 +55,8 @@ import           Text.RawString.QQ
 
 newtype SyncStatus = SyncStatus { unSyncStatus :: Bool }
 
-liftLog :: LoggingT m a -> m a
-liftLog = runLoggingT
+liftLog :: MonadIO m => Eff '[Logger] a -> m a
+liftLog = liftIO . runEff . runLogging
 
 inNamespace ::
   RedisDBKeyable k =>

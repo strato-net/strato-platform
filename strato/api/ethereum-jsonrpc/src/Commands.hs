@@ -10,6 +10,7 @@ module Commands
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..), txToEthValue)
@@ -314,7 +315,7 @@ callVM' waitMicros c = do
   -- replies.
   result <- withPendingResponse (jrcId c) $ \slot ->
     timeout waitMicros $ do
-      void $ runStreamMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
+      void . runEff $ runStreamMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
       takeMVar slot
   return $ case result of
     Just val -> Bin.decode (BL.fromStrict val)
