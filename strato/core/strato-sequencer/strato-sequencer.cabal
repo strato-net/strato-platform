@@ -111,6 +111,23 @@ executable strato-sequencer
     , warp
   default-language: Haskell2010
 
+test-suite dependent-block-db-test
+  type: exitcode-stdio-1.0
+  main-is: Main.hs
+  other-modules:
+      Paths_strato_sequencer
+  hs-source-dirs:
+      test-db
+  ghc-options: -Wall -O2 -threaded -rtsopts -fprof-auto -dynamic
+  build-depends:
+      base
+    , composable-monads-base
+    , hspec
+    , strato-model
+    , strato-sequencer
+    , temporary
+  default-language: Haskell2010
+
 benchmark send-to-blockstanbul
   type: exitcode-stdio-1.0
   main-is: BlockstanbulSend.hs

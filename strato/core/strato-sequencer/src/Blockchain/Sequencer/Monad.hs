@@ -25,6 +25,7 @@ module Blockchain.Sequencer.Monad
     BlockPeriod (..),
     RoundPeriod (..),
     runSequencerM,
+    commitSequencerState,
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
@@ -95,7 +96,11 @@ data SequencerContext = SequencerContext
     -- the (view, fire time) it is currently armed for. Keeps 'createNewTimer'
     -- to a single live AlarmClock no matter how many times it is re-armed.
     _roundTimerClock :: IORef (Maybe (AlarmClock UTCTime)),
-    _armedRoundTimer :: IORef (Maybe (View, UTCTime))
+    _armedRoundTimer :: IORef (Maybe (View, UTCTime)),
+    -- | The best sequenced block not yet published to Redis. p2p and a
+    -- restarting sequencer read Redis as "what is durably sequenced", so it
+    -- is only published by 'commitSequencerState', after the block's output.
+    _pendingBestSequencedBlock :: Maybe BestSequencedBlock
   }
 
 makeLenses ''SequencerContext
@@ -194,13 +199,25 @@ instance HasBlockstanbulContext SequencerM where
 
 instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
-    RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
-      Just v -> v
-  put _ bestSequencedBlock =
-    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
-      Right _ -> return ()
+    use pendingBestSequencedBlock >>= \case
+      Just v -> return v
+      Nothing ->
+        RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
+          Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
+          Just v -> v
+  put _ = modify' . (pendingBestSequencedBlock ?~)
+
+-- | Make the sequencer's record of what it has emitted durable: the
+-- dependent-block DB and the best sequenced block in Redis. 'writeToKafka'
+-- runs this right after each write of the output log and never without one,
+-- so that record can never claim a block the log does not have.
+commitSequencerState :: SequencerM ()
+commitSequencerState = do
+  commitDependentBlockDB
+  use pendingBestSequencedBlock >>= mapM_ (\bsb ->
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bsb) >>= \case
+      Left _ -> $logInfoS "commitSequencerState" $ T.pack "Failed to update BestSequencedBlock"
+      Right _ -> pendingBestSequencedBlock .= Nothing)
 
 
 runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> Eff '[Logger] a
@@ -210,7 +227,7 @@ runSequencerM vaultUrl' c bc m = do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
-    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
+    depBlock <- openDependentBlockDB dbPath dbCS
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     armedVT <- liftIO $ newIORef Nothing
     roundClock <- liftIO $ newIORef Nothing
@@ -222,7 +239,8 @@ runSequencerM vaultUrl' c bc m = do
           _latestViewAndProposal = latestVandP,
           _armedViewTimer = armedVT,
           _roundTimerClock = roundClock,
-          _armedRoundTimer = armedRT
+          _armedRoundTimer = armedRT,
+          _pendingBestSequencedBlock = Nothing
         }
       (unSequencerM m)
 
