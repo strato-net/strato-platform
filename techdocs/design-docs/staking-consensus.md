@@ -245,16 +245,19 @@ and `DeciderState.updatePayFeeContract` (owner key); (6) migrate V1 stakers (sto
 `0xDEC1DE03` from genesis.
 
 **Fee-path deltas fork and helium reconciliation.** Set `heliumFeePathDeltasForkBlock` above every
-node's head, ship it, restart validators before the height. From then on jails reach the header,
-but the validators governance removed before the fork (`bdd3…` at block 294831, `f1e4…` at 623065)
-stay in every header's `currentValidators` until governance emits an event for them again. Two ways
-to close the gap, to be decided when the fork is scheduled: (a) `tryActivate(validator)` once its
-jail has expired and it is eligible: governance emits `ValidatorAdded` plus a stake update, and both
-the header (`nextValidatorsAndStakes`) and blockstanbul (`applyValidatorChanges`) apply adds by set
-union, so re-adding a seat the header already holds is idempotent and only refreshes the weight; or
-(b) leave the seat until the first post-fork jail or demotion removes it, and meanwhile check
-`unattributedFees` / `creditBlockReward` for a proposer staking no longer lists. An admin vote
-cannot remove a validator that governance no longer lists.
+node's head and ship it to every node, verifiers included, before the height: a node that runs the
+fork alone rejects the first post-fork block carrying a fee-path delta (`ValidatorMismatch`). From
+then on jails reach the header, but a validator governance dropped before the fork (`f1e4…` at block
+623065; `bdd3…`, dropped at 294831, was re-added since) stays in every header's `currentValidators`,
+and nothing removes it on its own: a repeat jail of a validator staking no longer holds active emits
+`ValidatorJailed` only, because `_syncValidator` returns for `!isValidator` and governance's
+`removeValidatorFromStaking` returns false for an unlisted address. The way back to a consistent
+state is to re-add it: `tryActivate(validator)` once its jail has expired and it is eligible emits
+`ValidatorAdded` plus a stake update, and both the header (`nextValidatorsAndStakes`) and
+blockstanbul (`applyValidatorChanges`) apply adds by set union, so the header set is unchanged and
+governance catches up to it. From there the fixed fold does its job: the next jail, demotion or
+admin vote removes the validator from governance and header together. Until the re-add, check
+`unattributedFees` / `creditBlockReward` for the proposer staking no longer lists.
 
 ## Known limitations (accepted for this phase)
 
