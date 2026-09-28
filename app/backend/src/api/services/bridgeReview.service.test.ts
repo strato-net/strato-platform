@@ -5,8 +5,8 @@ import { cirrus } from "../../utils/appApiHelper";
 import * as config from "../../config/config";
 import { constants } from "../../config/constants";
 import * as bridge from "./bridge.service";
-import { getAdminBridgeReviews, prepareAdminBridgeReview } from "./bridgeReview.service";
-import { buildBridgeDigestCall, parseBridgeDigest } from "../helpers/bridge.helper";
+import { getAdminBridgePolicies, getAdminBridgeReviews, prepareAdminBridgeReview } from "./bridgeReview.service";
+import { parseBridgePolicyJson, buildBridgePolicyRows, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue, isBridgeProcessingIssuesPage } from "../helpers/bridge.helper";
 
 const address = "1".repeat(40), hash = "0x" + "a".repeat(64), digest = "0x" + "b".repeat(64);
 const depositId = "9007199254740993123456789";
@@ -37,7 +37,7 @@ function setup(t: any) {
       return { data: [{ value: state.approval }] };
     }
     assert.ok(params.address, "all reads must be scoped to the configured contract");
-    if (table === "/BlockApps-ExternalAssetBridge") return { data: [{ settlementVerifierThreshold: state.threshold }] };
+    if (table === "/BlockApps-ExternalAssetBridge") return { data: state.tables[table] || [{ settlementVerifierThreshold: state.threshold }] };
     if (table.endsWith("-settlementAttestationCounts")) return { data: [{ value: state.count }] };
     let rows = state.tables[table] || [];
     for (const field of ["status", "bridgeStatus", "useInstantPath"]) {
@@ -46,6 +46,7 @@ function setup(t: any) {
       if (filter?.startsWith("in.(")) rows = rows.filter(row => filter.slice(4, -1).split(",").includes(String(row.value[field])));
     }
     if (params.key?.startsWith("in.(")) rows = rows.filter(row => params.key.slice(4, -1).split(",").includes(row.key));
+    if ([`/${constants.AdminRegistry}`, `/${constants.StratoNativeBridge}`, `/${constants.StratoNativeCustodyVault}`].includes(table)) return { data: rows };
     assert.ok(params.order);
     return { data: rows.slice(params.offset, params.offset + Math.min(2, params.limit)) };
   });
@@ -147,4 +148,140 @@ test("contract digest ABI calls preserve full identifiers and reject malformed r
   for (const result of [undefined, "0x", "0x1234", "z".repeat(66)]) assert.throws(() => parseBridgeDigest({ result }), /Unable to read/);
   assert.throws(() => parseBridgeDigest({ result: digest, error: { message: "reverted" } }), /Unable to read/);
   assert.equal(parseBridgeDigest({ result: digest }), digest);
+});
+
+test("bridge governance parses exact large identifiers and rejects malformed arguments", () => {
+  assert.deepEqual(parseBridgeReviewIssue("approveReviewedDeposit", `[11155111,"0x${address}",${depositId},"${digest}"]`), { id: depositKey, action: "approve", digest });
+  assert.deepEqual(parseBridgeReviewIssue("refundWithdrawal", `[${depositId}]`), { id: `eab:withdrawal:${depositId}`, action: "refund" });
+  assert.throws(() => parseBridgeReviewIssue("refundWithdrawal", [Number(depositId)]), /identifier/);
+  assert.throws(() => parseBridgeReviewIssue("approveReviewedDeposit", ["1", address, "2"]), /arguments/);
+  assert.equal(parseBridgeReviewIssue("setOwner", "[]"), undefined);
+});
+
+test("review progress reads current votes, exact deposit digest, and per-function thresholds", async t => {
+  const { state, operations } = setup(t);
+  const registry = `/${constants.AdminRegistry}`;
+  const issueId = "c".repeat(64), oldId = "d".repeat(64), refundId = "e".repeat(64);
+  state.tables[registry] = [{ defaultVotingThresholdBps: 6000 }];
+  state.tables[`${registry}-admins`] = [address, "2".repeat(40), "3".repeat(40), "0".repeat(40), { length: 3 }].map((value, i) => ({ key: String(i), value }));
+  state.tables[`${registry}-votingThresholds`] = [{ key: address, key2: "approveReviewedDeposit", value: "0" }, { key: address, key2: "refundWithdrawal", value: "10000" }];
+  state.tables[`${registry}-currentIssues`] = [issueId, oldId, refundId].map(key => ({ key, value: true }));
+  state.tables[`${registry}-IssueCreated`] = [
+    { issueId, target: address, func: "approveReviewedDeposit", args: `[11155111,"${address}",${depositId},"${digest}"]` },
+    { issueId: oldId, target: address, func: "approveReviewedDeposit", args: `[11155111,"${address}",${depositId},"${hash}"]` },
+    { issueId: refundId, target: address, func: "refundWithdrawal", args: "[2]" },
+  ];
+  state.tables[`${registry}-votes`] = [
+    { key: issueId, key2: "0", value: address }, { key: issueId, key2: "1", value: "4".repeat(40) },
+    { key: issueId, key2: "length", value: { length: 2 } }, { key: oldId, key2: "0", value: "3".repeat(40) },
+    { key: refundId, key2: "0", value: "2".repeat(40) },
+  ];
+  let items = await getAdminBridgeReviews("token", `0x${address}`);
+  let reviewed = items.find(item => item.id === depositKey)!;
+  assert.equal(reviewed.governanceStatus, "available");
+  assert.deepEqual(reviewed.governance?.approve, { issueId, votesCast: 2, votesRequired: 2, hasVoted: true });
+  assert.equal(reviewed.approvalStatus, "pending", "quorum alone cannot claim execution or approval");
+  assert.equal(items.find(item => item.id === "eab:withdrawal:2")?.governance?.refund?.votesRequired, 3);
+  assert.equal(operations.mock.callCount(), 0);
+  assert.equal(state.rpcCalls, 1, "approval and vote matching share the digest read");
+  state.approval = digest;
+  items = await getAdminBridgeReviews("token", "3".repeat(40));
+  reviewed = items.find(item => item.id === depositKey)!;
+  assert.equal(reviewed.approvalStatus, "approved");
+  assert.equal(reviewed.governance?.approve?.hasVoted, false, "vote state is personalized");
+  state.tables[registry] = [];
+  reviewed = (await getAdminBridgeReviews("token", address)).find(item => item.id === depositKey)!;
+  assert.equal(reviewed.governanceStatus, "unavailable");
+  assert.equal(reviewed.governance, undefined);
+  assert.equal(reviewed.approvalStatus, "approved", "governance metadata failure cannot hide verified approval");
+});
+
+test("processing page validation rejects malformed row details instead of crashing the UI", () => {
+  const row = { id: "one", context: { source: "eab", chainId: "1", bridge: address, reference: "1", stage: "settle" },
+    issues: [{ code: "PAUSED", message: "Paused", retryable: true, details: { limit: depositId } }], firstSeenAt: 1, lastSeenAt: 1, attempts: 1, nextRetryAt: 2 };
+  const page = { items: [row], total: 1, offset: 0, limit: 25, state: "active", fetchedAt: 2 };
+  assert.equal(isBridgeProcessingIssuesPage(page), true);
+  assert.equal(isBridgeProcessingIssuesPage({ ...page, items: [{ ...row, context: null }] }), false);
+  assert.equal(isBridgeProcessingIssuesPage({ ...page, items: [{ ...row, issues: [{ ...row.issues[0], details: { limit: {} } }] }] }), false);
+});
+
+test("processing proxy uses only the configured endpoint and a server-side operations token", async t => {
+  const previousUrl = config.bridgeUrl, previousToken = config.bridgeOperationsToken;
+  (config as any).bridgeUrl = "https://bridge.test/";
+  (config as any).bridgeOperationsToken = "test-operations-token";
+  t.after(() => { (config as any).bridgeUrl = previousUrl; (config as any).bridgeOperationsToken = previousToken; });
+  let invalid = false;
+  const request = t.mock.method(axios, "request", async (options: any) => {
+    assert.equal(options.url, "https://bridge.test/operations/reviews/processing-issues");
+    assert.equal(options.method, "GET");
+    assert.equal(options.headers.Authorization, "Bearer test-operations-token");
+    assert.deepEqual(options.params, { state: "active", offset: 25, limit: 25 });
+    assert.equal(options.timeout, 15_000);
+    return { data: { items: invalid ? [null] : [], total: 25, offset: 25, limit: 25, state: "active", fetchedAt: 1 } };
+  });
+  assert.equal((await bridge.getBridgeProcessingIssues("active", 25, 25)).total, 25);
+  invalid = true;
+  await assert.rejects(bridge.getBridgeProcessingIssues("active", 25, 25), /Invalid bridge processing response/);
+  (config as any).bridgeOperationsToken = "";
+  await assert.rejects(bridge.getBridgeProcessingIssues("active", 25, 25), /not configured/);
+  assert.equal(request.mock.callCount(), 2);
+});
+
+test("policy overview reads only Cirrus, paginates all routes, and uses the custody address in storage", async t => {
+  const { state, operations } = setup(t);
+  const token = "6".repeat(40), custody = "7".repeat(40);
+  state.tables["/BlockApps-ExternalAssetBridge"] = [{ depositsPaused: false, withdrawalsPaused: true }];
+  state.tables["/BlockApps-ExternalAssetBridge-routes"] = Array.from({ length: 3 }, (_, i) => ({ key: String(i).repeat(40), key2: "11155111", key3: token, value: {
+    depositsEnabled: true, withdrawalsEnabled: false, externalSymbol: "USDC", externalDecimals: "6", maxPerWithdrawal: "2000000", manualReviewThreshold: "1000000",
+  } }));
+  state.tables["/BlockApps-ExternalAssetBridge-chains"] = [{ key: "11155111", value: { enabled: true } }];
+  state.tables["/BlockApps-ExternalAssetBridge-mintPolicies"] = [{ key: token, value: { capacity: depositId, consumed: "1", refillRate: "100", lastRefillAt: "1000" } }];
+  state.tables["/BlockApps-ExternalAssetBridge-nativeAutoRouteEnabled"] = [{ key: "11155111", key2: token, value: true }];
+  state.tables["/BlockApps-StratoNativeBridge"] = [{ depositsPaused: false, withdrawalsPaused: false, custodyVault: `0x${custody}`, INSTANT_WITHDRAWAL_DELAY_SECONDS: "900" }];
+  state.tables["/BlockApps-StratoNativeBridge-assets"] = [{ key: token, key2: 11155111, value: { enabled: true, representationToken: address, externalSymbol: "USDST", maxPerWithdrawal: "0", instantWithdrawalThreshold: "50" } }];
+  state.tables["/BlockApps-StratoNativeBridge-tokenBridgeConfigs"] = [{ key: token, value: { depositsDisabled: false, withdrawalsDisabled: true, maxOutstandingWithdrawal: "100" } }];
+  state.tables["/BlockApps-StratoNativeCustodyVault"] = [{ paused: false }];
+  state.tables["/BlockApps-StratoNativeCustodyVault-lockedBalance"] = [{ key: token, value: "80" }];
+  state.tables["/BlockApps-Token"] = [{ address: token, _symbol: "USDST", customDecimals: "18" }];
+  const overview = await getAdminBridgePolicies("token");
+  assert.equal(overview.items.length, 5);
+  assert.equal(overview.items.filter(item => item.source === "eab" && item.kind === "Route").length, 3);
+  const field = (item: any, label: string) => item.fields.find((entry: any) => entry.label === label);
+  const mint = overview.items.find(item => item.kind === "Mint policy")!;
+  assert.equal(field(mint, "Remaining at last refill").value, (BigInt(depositId) - 1n).toString(), "do not extrapolate accrual from local time");
+  const eth = overview.items.find(item => item.externalToken === "0".repeat(40))!;
+  assert.equal(field(eth, "Auto-route configured").value, "Yes", "native ETH uses its distinct EAB routing mapping");
+  assert.equal(field(eth, "Maximum per withdrawal").decimals, 6);
+  assert.equal(field(eth, "Maximum per withdrawal").unit, "USDC");
+  const native = overview.items.find(item => item.source === "native")!;
+  assert.equal(native.chainId, "11155111");
+  assert.equal(field(native, "Remaining aggregate allowance").value, "20");
+  assert.equal(field(native, "Maximum per withdrawal").value, "No route cap");
+  assert.ok(state.reads.filter(read => read.table.includes("CustodyVault")).every(read => read.params.address === `eq.${custody}`));
+  assert.equal(state.rpcCalls, 0);
+  assert.equal(operations.mock.callCount(), 0);
+});
+
+test("policy projection distinguishes unconfigured, zero allowance, unknown units, and missing custody state", () => {
+  const base: any = { eab: {}, native: {}, routes: [], chains: [], mintPolicies: [], actions: [], ethAutoRoute: [], nativeConfigs: [], nativeAutoRoute: [], locked: [], tokens: [],
+    nativeAssets: [{ key: address, key2: "1", value: { enabled: false, representationToken: address, maxPerWithdrawal: "0", instantWithdrawalThreshold: "0" } }] };
+  const fields = (records: any) => new Map(buildBridgePolicyRows(records).find(row => row.source === "native")!.fields.map(field => [field.label, field]));
+  let result = fields(base);
+  assert.equal(result.get("Locked balance (all networks)")!.value, null, "an absent custody vault must not claim zero usage");
+  assert.equal(result.get("Instant withdrawal threshold")!.value, "Instant withdrawals disabled");
+  assert.equal(result.get("Remaining aggregate allowance")!.value, "No aggregate cap");
+  result = fields({ ...base, custody: { paused: false }, nativeConfigs: [{ key: address, value: { maxOutstandingWithdrawal: "100" } }], locked: [{ key: address, value: "101" }] });
+  assert.equal(result.get("Remaining aggregate allowance")!.value, "0", "zero remaining does not mean uncapped");
+  assert.equal(result.get("Outstanding limit (shared across networks)")!.decimals, undefined, "missing metadata must show raw units");
+  result = fields({ ...base, nativeConfigs: [{ key: address, value: { maxOutstandingWithdrawal: Number.MAX_SAFE_INTEGER + 1 } }] });
+  assert.equal(result.get("Outstanding limit (shared across networks)")!.value, null);
+  const unconfiguredMint = buildBridgePolicyRows({ ...base, routes: [{ key: address, key2: "1", key3: address, value: {} }] }).find(row => row.kind === "Mint policy")!;
+  assert.equal(unconfiguredMint.fields[0].value, "Not configured — minting blocked");
+});
+
+
+test("Cirrus policy JSON preserves integer precision before projecting limits", () => {
+  const parsed: any = parseBridgePolicyJson('[{"key":11155111,"value":{"capacity":9007199254740993123456789}}]');
+  assert.equal(parsed[0].key, 11155111);
+  assert.equal(parsed[0].value.capacity, depositId);
 });

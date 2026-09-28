@@ -213,3 +213,30 @@ test("processing emails use existing recipients and distinguish recovery from co
   assert.match(sent[1].text, /Processing may still be in progress/);
   assert.doesNotMatch(sent[0].text + sent[1].text, /https?:\/\//);
 });
+
+test("admin listing paginates active and cleared records without exposing notification state or changing retries", async t => {
+  const f = await fixture(t);
+  await f.service.record(context("1"), issue("FUNDING_REQUIRED"));
+  f.advance(1_000);
+  await f.service.record(context("2"), issue("PAUSED"));
+  f.advance(1_000);
+  await f.service.record(context("3"), issue("DEPENDENCY_UNAVAILABLE"));
+  await f.service.resolve(context("2"));
+  const before = await f.service.snapshot();
+  const first = await f.open().list("active", 0, 1);
+  assert.equal(first.total, 2);
+  assert.equal(first.items[0].context.reference, "3");
+  assert.equal((await f.service.list("active", 1, 1)).items[0].context.reference, "1");
+  assert.equal((await f.service.list("active", 2, 1)).items.length, 0);
+  const cleared = await f.service.list("cleared", 0, 25);
+  assert.equal(cleared.total, 1);
+  assert.equal(cleared.items[0].outcome, "processing_resumed");
+  assert.equal("notifications" in first, false);
+  assert.equal("version" in first, false);
+  assert.deepEqual(await f.service.snapshot(), before, "reading cannot change retry or email state");
+  for (const [offset, limit] of [[-1, 1], [0, 101], [0, 0], [1.5, 10]]) {
+    await assert.rejects(f.service.list("active", offset, limit), /pagination/);
+  }
+  writeFileSync(f.file, "null");
+  await assert.rejects(f.open().list("active", 0, 25), /Invalid processing issue journal/);
+});

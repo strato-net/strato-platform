@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { 
+  getBridgeProcessingIssues,
   requestWithdrawal,
   requestNativeWithdrawal as requestNativeWithdrawalService,
   getDepositActions,
@@ -19,11 +20,35 @@ import {
   WithdrawalSummaryResponse
 } from "@strato/shared-types";
 import { isUserAdmin } from "../services/user.service";
-import { getAdminBridgeReviews, prepareAdminBridgeReview } from "../services/bridgeReview.service";
+import { getAdminBridgePolicies, getAdminBridgeReviews, prepareAdminBridgeReview } from "../services/bridgeReview.service";
 import { StratoError } from "../../errors";
 import type { BridgeProtocol } from "../../types/types";
 
 const createBridgeController = (protocol: BridgeProtocol) => class BridgeController {
+  static async policies(req: Request, res: Response): Promise<void> {
+    if (!(await isUserAdmin(req.accessToken, req.address as string))) {
+      res.status(403).json({ error: "Administrator access is required" }); return;
+    }
+    try { res.json(await getAdminBridgePolicies(req.accessToken)); }
+    catch { res.status(503).json({ error: "Indexed bridge policies are unavailable. Refresh after the STRATO connection recovers." }); }
+  }
+
+  static async processingIssues(req: Request, res: Response): Promise<void> {
+    if (!(await isUserAdmin(req.accessToken, req.address as string))) {
+      res.status(403).json({ error: "Administrator access is required" }); return;
+    }
+    const state = req.query.state ?? "active";
+    const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
+    const limit = req.query.limit === undefined ? 25 : Number(req.query.limit);
+    if ((state !== "active" && state !== "cleared") ||
+      [req.query.offset, req.query.limit].some(value => value !== undefined && (typeof value !== "string" || !/^\d+$/.test(value))) || !Number.isSafeInteger(offset) || offset < 0 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      res.status(400).json({ error: "Invalid processing issue pagination" }); return;
+    }
+    try { res.json(await getBridgeProcessingIssues(state, offset, limit)); }
+    catch { res.status(503).json({ error: "Processing records are unavailable. Governance reviews and transaction history remain available." }); }
+  }
+
   static async reviews(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!(await isUserAdmin(req.accessToken, req.address as string))) {
@@ -36,7 +61,7 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
       }
       res.json(req.method === "POST"
         ? await prepareAdminBridgeReview(req.accessToken, req.body.id, req.body.action)
-        : await getAdminBridgeReviews(req.accessToken));
+        : await getAdminBridgeReviews(req.accessToken, req.address as string));
     } catch (error: any) {
       if (error instanceof StratoError) { res.status(error.status).json({ error: error.message }); return; }
       if (error.response?.status === 409 && typeof error.response?.data?.error === "string") {

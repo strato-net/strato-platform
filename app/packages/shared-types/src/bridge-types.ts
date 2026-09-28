@@ -256,6 +256,9 @@ export interface BridgeReviewItem {
   account: string;
   reason: string;
   safeProposalHash?: string;
+  approvalStatus?: "pending" | "approved" | "unavailable";
+  governanceStatus?: "available" | "unavailable";
+  governance?: Partial<Record<BridgeReviewGovernanceAction, BridgeReviewGovernance>>;
   actions: Array<"approve" | "reject" | "refund" | "settle">;
 }
 
@@ -265,11 +268,11 @@ export interface BridgeReviewVote {
   args: string[];
 }
 
-export interface BridgeReviewRow {
+export interface BridgeReviewRow<T = Record<string, any>> {
   key: string;
   key2?: string;
   key3?: string;
-  value: Record<string, any>;
+  value: T;
 }
 
 export interface BridgeReviewRecords {
@@ -280,4 +283,96 @@ export interface BridgeReviewRecords {
   nativeWithdrawals: BridgeReviewRow[];
   legacyDeposits: BridgeReviewRow[];
   legacyWithdrawals: BridgeReviewRow[];
+}
+
+export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund";
+
+export interface BridgeReviewGovernance {
+  issueId?: string;
+  votesCast: number;
+  votesRequired: number;
+  hasVoted: boolean;
+}
+
+export type ProcessingIssueCode = "MINT_CAPACITY" | "WITHDRAWAL_CAPACITY" | "FUNDING_REQUIRED" |
+  "MANUAL_REVIEW" | "POLICY_RESTRICTED" | "DEPENDENCY_UNAVAILABLE" | "CONFIRMATIONS_PENDING" |
+  "PAUSED" | "CONFIGURATION" | "UNKNOWN";
+
+export interface ProcessingIssue {
+  code: ProcessingIssueCode;
+  retryable: boolean;
+  message: string;
+  details: Record<string, string>;
+}
+
+export interface ProcessingContext {
+  source: "eab" | "native";
+  chainId: string;
+  bridge: string;
+  reference: string;
+  stage: string;
+  token?: string;
+  account?: string;
+}
+
+export interface ProcessingRecord {
+  context: ProcessingContext;
+  issues: ProcessingIssue[];
+  firstSeenAt: number;
+  lastSeenAt: number;
+  attempts: number;
+  nextRetryAt: number;
+  resolvedAt?: number;
+  outcome?: "processing_resumed" | "completed";
+}
+
+export interface BridgeProcessingIssuesPage {
+  items: Array<ProcessingRecord & { id: string }>;
+  total: number;
+  offset: number;
+  limit: number;
+  state: "active" | "cleared";
+  fetchedAt: number;
+}
+
+export interface BridgePolicyField {
+  label: string;
+  value: string | null;
+  kind?: "amount" | "timestamp";
+  decimals?: number;
+  unit?: string;
+}
+
+export interface BridgePolicyRow {
+  id: string;
+  source: "eab" | "native";
+  kind: "Mint policy" | "Route";
+  token: string;
+  symbol?: string;
+  chainId?: string;
+  externalToken?: string;
+  externalSymbol?: string;
+  fields: BridgePolicyField[];
+}
+
+export interface BridgePolicyOverview {
+  items: BridgePolicyRow[];
+  unconfigured: Array<"eab" | "native">;
+  fetchedAt: number;
+}
+
+export interface BridgePolicyRecords {
+  eab?: Record<string, unknown>;
+  native?: Record<string, unknown>;
+  custody?: Record<string, unknown>;
+  routes: BridgeReviewRow[];
+  chains: BridgeReviewRow[];
+  mintPolicies: BridgeReviewRow[];
+  actions: BridgeReviewRow[];
+  ethAutoRoute: BridgeReviewRow<unknown>[];
+  nativeAssets: BridgeReviewRow[];
+  nativeConfigs: BridgeReviewRow[];
+  nativeAutoRoute: BridgeReviewRow<unknown>[];
+  locked: BridgeReviewRow<unknown>[];
+  tokens: Array<{ address: string; _symbol?: string; customDecimals?: unknown }>;
 }

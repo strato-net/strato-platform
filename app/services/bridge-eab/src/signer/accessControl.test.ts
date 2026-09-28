@@ -36,3 +36,15 @@ test("health is public while verifier operations require bearer authentication",
   const signing = source.indexOf('app.post("/v1/sign-withdrawal"');
   assert.ok(health >= 0 && health < accessControl && accessControl < signing);
 });
+
+test("processing records are behind operations authentication and a read-only nginx route", () => {
+  const source = readFileSync(resolve(__dirname, "../../src/index.ts"), "utf8");
+  const access = source.indexOf('app.use("/operations/reviews", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN))');
+  const read = source.indexOf('app.get("/operations/reviews/processing-issues"');
+  assert.ok(access >= 0 && read > access);
+  const nginx = readFileSync(resolve(__dirname, "../../nginx/nginx.tpl.conf"), "utf8");
+  assert.match(nginx, /location = \/operations\/reviews\/processing-issues\s*\{\s*limit_except GET \{ deny all; \}/);
+  let status = 0;
+  verifierAccessControl(undefined)({} as any, { status: (value: number) => { status = value; return { json() {} }; } } as any, () => assert.fail("unconfigured auth cannot allow access"));
+  assert.equal(status, 503);
+});

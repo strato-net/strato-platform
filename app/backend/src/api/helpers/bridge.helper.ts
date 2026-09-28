@@ -1,7 +1,9 @@
 import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
-import { BridgeToken } from "@strato/shared-types";
+import JSONBig from "json-bigint";
+import { normalizeLegacyEscapes } from "./jsonStringParsing.helper";
+import { BridgePolicyField, BridgePolicyRecords, BridgePolicyRow, BridgeProcessingIssuesPage, BridgeReviewGovernanceAction, BridgeToken } from "@strato/shared-types";
 import type { BridgeHistorySource } from "../../types/types";
 import { keccak256 } from "../../utils/keccak256";
 
@@ -23,6 +25,43 @@ export const buildBridgeDigestCall = (signature: string, args: string[]): string
 export const parseBridgeDigest = (response: any): string => {
   if (response?.error || !/^0x[0-9a-f]{64}$/i.test(response?.result || "")) throw new Error("Unable to read current bridge review digest from STRATO");
   return response.result.toLowerCase();
+};
+
+export const isBridgeProcessingIssuesPage = (data: any): data is BridgeProcessingIssuesPage => {
+  const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
+  return !!data && Array.isArray(data.items) && integer(data.total) && integer(data.offset) && integer(data.limit) &&
+    integer(data.fetchedAt) && data.items.every((record: any) => record && typeof record.id === "string" &&
+      record.context && ["eab", "native"].includes(record.context.source) &&
+      ["chainId", "bridge", "reference", "stage"].every(key => typeof record.context[key] === "string") &&
+      ["account", "token"].every(key => record.context[key] === undefined || typeof record.context[key] === "string") &&
+      [record.firstSeenAt, record.lastSeenAt, record.attempts, record.nextRetryAt].every(integer) &&
+      (record.resolvedAt === undefined || integer(record.resolvedAt)) &&
+      (record.outcome === undefined || ["completed", "processing_resumed"].includes(record.outcome)) &&
+      Array.isArray(record.issues) && record.issues.length > 0 && record.issues.every((issue: any) => issue &&
+        typeof issue.code === "string" && typeof issue.message === "string" && typeof issue.retryable === "boolean" &&
+        issue.details && typeof issue.details === "object" && !Array.isArray(issue.details) &&
+        Object.values(issue.details).every(value => typeof value === "string")));
+};
+
+const bridgeIssueJson = JSONBig({ storeAsString: true });
+
+export const parseBridgePolicyJson = (raw: string): unknown => bridgeIssueJson.parse(raw);
+
+export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: string; action: BridgeReviewGovernanceAction; digest?: string } | undefined => {
+  const action: BridgeReviewGovernanceAction | undefined = func === "approveReviewedDeposit" ? "approve"
+    : func === "abortDeposit" ? "reject" : func === "refundWithdrawal" ? "refund" : undefined;
+  if (!action) return undefined;
+  const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
+  if (!Array.isArray(args) || args.length !== (action === "refund" ? 1 : action === "approve" ? 4 : 3)) throw new Error("Invalid bridge governance arguments");
+  const uint = (value: unknown) => {
+    if ((typeof value === "number" && !Number.isSafeInteger(value)) || !/^\d+$/.test(String(value))) throw new Error("Invalid bridge governance identifier");
+    return BigInt(String(value)).toString();
+  };
+  if (action === "refund") return { id: `eab:withdrawal:${uint(args[0])}`, action };
+  if (!/^(0x)?[0-9a-f]{40}$/i.test(String(args[1]))) throw new Error("Invalid bridge governance router");
+  if (action === "approve" && !/^(0x)?[0-9a-f]{64}$/i.test(String(args[3]))) throw new Error("Invalid bridge governance digest");
+  return { id: `eab:deposit:${uint(args[0])}:${String(args[1]).toLowerCase().replace(/^0x/, "")}:${uint(args[2])}`, action,
+    ...(action === "approve" ? { digest: `0x${String(args[3]).toLowerCase().replace(/^0x/, "")}` } : {}) };
 };
 
 // ============================================================================
@@ -740,3 +779,84 @@ export function parseNativeLockedBalances(
 }
 
 export { LEGACY_QUERY_CONFIGS, QUERY_CONFIGS };
+
+// Indexed policy values only; no wall-clock refill or external-vault capacity inference.
+export const buildBridgePolicyRows = (records: BridgePolicyRecords): BridgePolicyRow[] => {
+  const normalize = (value: string | number) => {
+    if (typeof value !== "string" && !(typeof value === "number" && Number.isSafeInteger(value))) throw new Error("Invalid indexed policy key");
+    return String(value).toLowerCase().replace(/^0x/, "");
+  };
+  const key = (...parts: string[]) => parts.map(normalize).join(":");
+  const uint = (value: unknown): string | null =>
+    (typeof value === "string" && /^\d+$/.test(value)) || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) ? BigInt(value).toString() : null;
+  const decimals = (value: unknown): number | undefined => {
+    const parsed = uint(value);
+    return parsed !== null && BigInt(parsed) <= 255n ? Number(parsed) : undefined;
+  };
+  const flag = (label: string, value: unknown): BridgePolicyField => ({ label,
+    value: value === true || value === "true" ? "Yes" : value === false || value === "false" ? "No" : null });
+  const amount = (label: string, value: unknown, precision: number | undefined, unit: string | undefined, zero?: string): BridgePolicyField => {
+    const parsed = uint(value);
+    return parsed !== null && BigInt(parsed) === 0n && zero ? { label, value: zero }
+      : { label, value: parsed, kind: "amount", decimals: precision, unit };
+  };
+  const tokens = new Map(records.tokens.map(token => [normalize(token.address), token]));
+  const mint = new Map(records.mintPolicies.map(row => [normalize(row.key), row.value]));
+  const chains = new Map(records.chains.map(row => [normalize(row.key), row.value]));
+  const actions = new Map(records.actions.map(row => [key(row.key, row.key2!, row.key3!), row.value]));
+  const ethRoutes = new Map(records.ethAutoRoute.map(row => [key(row.key, row.key2!), row.value]));
+  const configs = new Map(records.nativeConfigs.map(row => [normalize(row.key), row.value]));
+  const nativeRoutes = new Map(records.nativeAutoRoute.map(row => [key(row.key, row.key2!), row.value]));
+  const locked = new Map(records.locked.map(row => [normalize(row.key), row.value]));
+  const rows: BridgePolicyRow[] = [];
+  const tokenInfo = (address: string) => {
+    const token = tokens.get(normalize(address));
+    return { symbol: token?._symbol, precision: token ? decimals(token.customDecimals ?? 18) : undefined };
+  };
+  for (const token of new Set([...mint.keys(), ...records.routes.map(row => normalize(row.key3!))])) {
+    const { symbol, precision } = tokenInfo(token);
+    const p = mint.get(token) ?? { capacity: "0", consumed: "0", refillRate: "0", lastRefillAt: "0" };
+    const capacity = uint(p.capacity), consumed = uint(p.consumed);
+    const remaining = capacity !== null && consumed !== null ? String(BigInt(capacity) > BigInt(consumed) ? BigInt(capacity) - BigInt(consumed) : 0n) : null;
+    rows.push({ id: `eab:mint:${token}`, source: "eab", kind: "Mint policy", token, symbol, fields: [
+      amount("Mint capacity (shared across routes)", p.capacity, precision, symbol, "Not configured — minting blocked"),
+      amount("Remaining at last refill", remaining, precision, symbol),
+      amount("Consumed at last refill", p.consumed, precision, symbol),
+      amount("Refill per second", p.refillRate, precision, symbol),
+      { label: "Last refill recorded", value: uint(p.lastRefillAt), kind: "timestamp" },
+    ] });
+  }
+  for (const row of records.routes) {
+    const token = normalize(row.key3!), chainId = normalize(row.key2!), externalToken = normalize(row.key), v = row.value;
+    const { symbol } = tokenInfo(token);
+    const action = actions.get(key(externalToken, chainId, token));
+    const autoRoute = /^0+$/.test(externalToken) ? ethRoutes.get(key(chainId, token)) ?? false : action ? action.autoRoute : false;
+    rows.push({ id: `eab:route:${key(externalToken, chainId, token)}`, source: "eab", kind: "Route", token, symbol, chainId, externalToken, externalSymbol: v.externalSymbol,
+      fields: [flag("Chain enabled", chains.has(chainId) ? chains.get(chainId)!.enabled : false), flag("Route deposits enabled", v.depositsEnabled),
+        flag("Route withdrawals enabled", v.withdrawalsEnabled), flag("Bridge deposits paused", records.eab?.depositsPaused),
+        flag("Bridge withdrawals paused", records.eab?.withdrawalsPaused), flag("Auto-route configured", autoRoute),
+        amount("Maximum per withdrawal", v.maxPerWithdrawal, decimals(v.externalDecimals), v.externalSymbol, "No route cap"),
+        amount("Review required above", v.manualReviewThreshold, decimals(v.externalDecimals), v.externalSymbol, "No amount-based review threshold"),
+      ] });
+  }
+  for (const row of records.nativeAssets) {
+    const token = normalize(row.key), chainId = normalize(row.key2!), v = row.value;
+    const { symbol, precision } = tokenInfo(token);
+    const config = configs.get(token) ?? { depositsDisabled: false, withdrawalsDisabled: false, maxOutstandingWithdrawal: "0" };
+    const cap = uint(config.maxOutstandingWithdrawal), used = uint(records.custody ? locked.get(token) ?? "0" : undefined);
+    const remaining = cap !== null && used !== null ? String(BigInt(cap) > BigInt(used) ? BigInt(cap) - BigInt(used) : 0n) : null;
+    rows.push({ id: `native:route:${key(token, chainId)}`, source: "native", kind: "Route", token, symbol, chainId,
+      externalToken: v.representationToken, externalSymbol: v.externalSymbol,
+      fields: [flag("Asset enabled", v.enabled), flag("Custody vault paused", records.custody?.paused), flag("Bridge deposits paused", records.native?.depositsPaused),
+        flag("Bridge withdrawals paused", records.native?.withdrawalsPaused), flag("Token deposits disabled", config.depositsDisabled),
+        flag("Token withdrawals disabled", config.withdrawalsDisabled), flag("Auto-route configured", nativeRoutes.get(key(token, chainId)) ?? false),
+        amount("Maximum per withdrawal", v.maxPerWithdrawal, precision, symbol, "No route cap"),
+        amount("Instant withdrawal threshold", v.instantWithdrawalThreshold, precision, symbol, "Instant withdrawals disabled"),
+        { label: "Instant withdrawal delay (seconds)", value: uint(records.native?.INSTANT_WITHDRAWAL_DELAY_SECONDS) },
+        amount("Outstanding limit (shared across networks)", cap, precision, symbol, "No aggregate cap"),
+        amount("Locked balance (all networks)", used, precision, symbol),
+        amount("Remaining aggregate allowance", cap === "0" ? "0" : remaining, precision, symbol, cap === "0" ? "No aggregate cap" : undefined),
+      ] });
+  }
+  return rows;
+};

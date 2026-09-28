@@ -1,3 +1,4 @@
+import type { BridgeProcessingIssuesPage } from "@strato/shared-types";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -64,6 +65,16 @@ export class ProcessingIssueService {
   }
 
   async snapshot(): Promise<ProcessingJournal> { await this.queue; return this.load(); }
+
+  async list(state: "active" | "cleared", offset: number, limit: number): Promise<BridgeProcessingIssuesPage> {
+    if (!["active", "cleared"].includes(state) || !Number.isSafeInteger(offset) || offset < 0 ||
+        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new Error("Invalid processing issue pagination");
+    const records = Object.entries((await this.snapshot()).records)
+      .filter(([, record]) => state === "active" ? !record.resolvedAt : !!record.resolvedAt)
+      .sort(([a, x], [b, y]) => (state === "active" ? y.lastSeenAt - x.lastSeenAt : y.resolvedAt! - x.resolvedAt!) || a.localeCompare(b));
+    return { items: records.slice(offset, offset + limit).map(([id, record]) => ({ id, ...record })),
+      total: records.length, offset, limit, state, fetchedAt: this.now() };
+  }
 
   async due(context: ProcessingContext): Promise<boolean> {
     const record = (await this.snapshot()).records[processingKey(context)];

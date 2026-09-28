@@ -20,6 +20,7 @@ import { confirmReviewedDeposit } from "./services/bridgeService";
 import { depositStateService } from "./services/depositStateService";
 import { getDepositStatusByIdentity } from "./services/cirrusService";
 import { prepareBridgeOperation } from "./services/bridgeReviewService";
+import { processingIssueService } from "./services/processingIssueService";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -48,6 +49,19 @@ app.use(
 );
 
 // Exposed Routes
+app.get("/operations/reviews/processing-issues", async (req, res) => {
+  const state = req.query.state ?? "active";
+  const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
+  const limit = req.query.limit === undefined ? 25 : Number(req.query.limit);
+  if ((state !== "active" && state !== "cleared") ||
+      [req.query.offset, req.query.limit].some(value => value !== undefined && (typeof value !== "string" || !/^\d+$/.test(value))) || !Number.isSafeInteger(offset) || offset < 0 ||
+      !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    res.status(400).json({ error: "Invalid processing issue pagination" }); return;
+  }
+  try { res.json(await processingIssueService.list(state, offset, limit)); }
+  catch { res.status(503).json({ error: "Processing records are unavailable" }); }
+});
+
 app.post("/operations/reviews/prepare", async (req, res) => {
   if (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["refund", "settle"].includes(req.body?.action)) {
     res.status(400).json({ error: "Invalid review action" });

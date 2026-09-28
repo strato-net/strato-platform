@@ -9,6 +9,7 @@ import { getRpcUpstream } from "../../config/rpc.config";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
 import { 
+  isBridgeProcessingIssuesPage,
   buildQueryParams, 
   BridgeMappingRow,
   NativeBridgeAssetRow,
@@ -22,7 +23,7 @@ import {
   LEGACY_QUERY_CONFIGS,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
+import { BridgeProcessingIssuesPage, NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
 import { getPsmMintState, PsmMintState } from "./psm.service";
@@ -52,6 +53,18 @@ export const requestBridgeOperation = async (action: { id: string; action: "refu
     data: action, timeout: 180_000,
   });
   return response.data;
+};
+
+export const getBridgeProcessingIssues = async (state: "active" | "cleared", offset: number, limit: number): Promise<BridgeProcessingIssuesPage> => {
+  if (!bridgeUrl || !bridgeOperationsToken) throw new Error("Bridge operations integration is not configured");
+  const { data } = await axios.request<BridgeProcessingIssuesPage>({
+    method: "GET", url: `${bridgeUrl.replace(/\/$/, "")}/operations/reviews/processing-issues`,
+    headers: { Authorization: `Bearer ${bridgeOperationsToken}` }, params: { state, offset, limit },
+    timeout: 15_000, maxContentLength: 2 * 1024 * 1024,
+  });
+  if (!isBridgeProcessingIssuesPage(data) ||
+      data.state !== state || data.offset !== offset || data.limit !== limit || data.items.length > limit) throw new Error("Invalid bridge processing response");
+  return data;
 };
 
 export const getBridgeTransferContractName = (
