@@ -165,7 +165,7 @@ The platform contracts live in `app/contracts/concrete/`. They are written in So
 | Pools | `Pool`, `PoolFactory`, `StablePool`, `PoolV3`, `PoolV3Factory`, `PositionManagerV3`, `DirectMintPSM` | Constant-product AMM pools, stable pools, concentrated-liquidity (V3) pools, direct-mint PSM |
 | Lending | `LendingPool`, `LiquidityPool`, `CollateralVault`, `LendingRegistry`, `PoolConfigurator`, `RateStrategy`, `PriceOracle`, `SafetyModule` | Supply and borrow, collateral, interest rates, prices. The safety module holds USDST and issues sUSDST. |
 | CDP | `CDPEngine`, `CDPVault`, `CDPRegistry`, `CDPReserve` | Collateralized debt positions that mint USDST; the reserve holds USDST fees |
-| Bridge | `MercataBridge`, `StratoNativeBridge`, `StratoNativeCustodyVault`, `CreditCardTopUp` | Deposits and withdrawals between STRATO and external EVM chains; separate lifecycle for STRATO-native assets |
+| Bridge | `MercataBridge`, `StratoNativeBridge`, `StratoNativeCustodyVault` | Deposits and withdrawals between STRATO and external EVM chains; separate lifecycle for STRATO-native assets |
 | Savings and vaults | `SaveUSDSTVault`, `YieldVault`, `Vault`, `VaultFactory` | USDST savings vault; ERC-4626 yield vault; multi-asset vault |
 | Rewards | `Rewards` | Activity-based rewards, fed by the rewards poller |
 | Vouchers | `Voucher`, `PayFeesWithVoucher` | Fee vouchers |

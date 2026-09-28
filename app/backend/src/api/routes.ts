@@ -19,7 +19,6 @@ import tradeRoutes from "./routes/trade.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
-import creditCardRoutes from "./routes/creditCard.routes";
 import cdpRoutes from "./routes/cdp.routes";
 import rewardsRoutes from "./routes/rewards.routes";
 import protocolFeeRoutes from "./routes/protocolFee.routes";
@@ -95,9 +94,6 @@ router.use("/events", eventsRoutes);
 
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);
-
-// ----- Crypto Credit Card Routes -----
-router.use("/credit-card", creditCardRoutes);
 
 // ----- CDP Routes -----
 router.use("/cdp", cdpRoutes);
