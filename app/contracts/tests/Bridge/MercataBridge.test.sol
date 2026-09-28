@@ -502,7 +502,6 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = [uint256(2)];
         address[] memory actionTokens = [address(goldToken)];
         uint256[] memory minFinalOuts = [uint256(123)];
-        uint256[] memory noFees = [uint256(0)];
 
         relayer.do(
             address(bridge),
@@ -2288,12 +2287,10 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = new uint256[](n);
         address[] memory actionTokens = new address[](n);
         uint256[] memory minFinalOuts = new uint256[](n);
-        uint256[] memory maxFees = new uint256[](n);
-        uint256[] memory requestedAts = new uint256[](n);
         for (uint256 i = 0; i < n; i++) {
             senders[i] = externalSender;
         }
-        relayer.do(address(bridge), "recordDepositWindow", externalChainId, lastBlock, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, maxFees, requestedAts);
+        relayer.do(address(bridge), "recordDepositWindow", externalChainId, lastBlock, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
     }
 
     function recordOne(uint256 lastBlock, uint256 id, address token, uint256 amount, string hash, address recipient, address target) internal {
@@ -2724,9 +2721,8 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = [uint256(2)];
         address[] memory actionTokens = [address(goldToken)];
         uint256[] memory minFinalOuts = [uint256(123)];
-        uint256[] memory noFees = [uint256(0)];
 
-        relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+        relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
 
         (uint256 action, address actionToken, uint256 minFinalOut) = bridge.depositActions(externalChainId, "0xb0000050");
         require(action == 2, "action should be recorded");
@@ -2745,11 +2741,10 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = [uint256(0)];
         address[] memory actionTokens = [address(0)];
         uint256[] memory minFinalOuts = [uint256(0)];
-        uint256[] memory noFees = [uint256(0)];
 
         bool reverted = false;
         try {
-            user1.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+            user1.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
         } catch {
             reverted = true;
         }
@@ -2758,7 +2753,7 @@ contract Describe_MercataBridge is Authorizable {
         bridge.setPause(true, false);
         reverted = false;
         try {
-            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
         } catch {
             reverted = true;
         }
@@ -2768,7 +2763,7 @@ contract Describe_MercataBridge is Authorizable {
         bridge.toggleChain(externalChainId, false);
         reverted = false;
         try {
-            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
         } catch {
             reverted = true;
         }
@@ -2788,11 +2783,10 @@ contract Describe_MercataBridge is Authorizable {
         uint256[] memory actions = [uint256(0)];
         address[] memory actionTokens = [address(0)];
         uint256[] memory minFinalOuts = [uint256(0)];
-        uint256[] memory noFees = [uint256(0)];
 
         bool reverted = false;
         try {
-            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts, noFees, noFees);
+            relayer.do(address(bridge), "recordDepositWindow", externalChainId, 1100, ids, senders, tokens, amounts, hashes, recipients, targets, actions, actionTokens, minFinalOuts);
         } catch {
             reverted = true;
         }
