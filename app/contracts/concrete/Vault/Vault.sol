@@ -229,7 +229,7 @@ contract record Vault is Ownable, Pausable {
         Token(shareToken).burn(msg.sender, sharesBurned);
 
         // Calculate and transfer payouts
-        _executeWithdrawalPayouts(amountUSD, withdrawableEquity);
+        _executeWithdrawalPayouts(amountUSD, withdrawableEquity, msg.sender);
 
         emit Withdrawn(msg.sender, sharesBurned, amountUSD);
 
@@ -263,7 +263,7 @@ contract record Vault is Ownable, Pausable {
         Token(shareToken).burn(msg.sender, sharesToBurn);
 
         // Calculate and transfer payouts
-        _executeWithdrawalPayouts(amountUSD, withdrawableEquity);
+        _executeWithdrawalPayouts(amountUSD, withdrawableEquity, msg.sender);
 
         emit Withdrawn(msg.sender, sharesToBurn, amountUSD);
 
@@ -274,8 +274,9 @@ contract record Vault is Ownable, Pausable {
      * @notice Execute withdrawal payouts proportionally across withdrawable assets
      * @param amountUSD Total USD value to pay out
      * @param withdrawableEquity Total withdrawable equity (pre-computed)
+     * @param recipient Account that receives the basket
      */
-    function _executeWithdrawalPayouts(uint amountUSD, uint withdrawableEquity) internal {
+    function _executeWithdrawalPayouts(uint amountUSD, uint withdrawableEquity, address recipient) internal {
         require(withdrawableEquity > 0, "Vault: no withdrawable equity");
 
         for (uint i = 0; i < supportedAssets.length; i++) {
@@ -316,9 +317,9 @@ contract record Vault is Ownable, Pausable {
             }
 
             if (payout > 0) {
-                bool success = IERC20(asset).transferFrom(address(botExecutor), msg.sender, payout);
+                bool success = IERC20(asset).transferFrom(address(botExecutor), recipient, payout);
                 require(success, "Vault: transfer failed");
-                emit WithdrawalPayout(msg.sender, asset, payout);
+                emit WithdrawalPayout(recipient, asset, payout);
             }
         }
     }
@@ -567,6 +568,62 @@ contract record Vault is Ownable, Pausable {
      */
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SUNSET FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Redeem holders' entire share balances on their behalf and pay each
+     *         one the same pro-rata basket withdrawShares would have paid them.
+     *         Used to wind the vault down once the public withdrawal window closes.
+     * @param holders Share holders to redeem. Accounts with no shares are skipped,
+     *        so a list may safely contain duplicates or already-redeemed accounts.
+     * @return redeemed Number of holders whose shares were burned
+     * @dev Owner only. Not gated by whenNotPaused on purpose: pause first to freeze
+     *      user activity, then sweep.
+     * @dev Never reverts on a per-holder condition. A revert inside an onlyOwner body
+     *      is swallowed by Ownable's governance fallback and would fail the whole
+     *      vote, so holders that cannot be paid in full right now are left intact.
+     * @dev onlyOwner must remain the only modifier. When the owner is the
+     *      AdminRegistry the approved vote re-enters this function from the registry,
+     *      and a nonReentrant guard placed before onlyOwner would reject that call.
+     */
+    function redeemAllFor(address[] holders) external onlyOwner returns (uint redeemed) {
+        require(shareToken != address(0), "Vault: not initialized");
+
+        for (uint i = 0; i < holders.length; i++) {
+            address holder = holders[i];
+            uint shares = IERC20(shareToken).balanceOf(holder);
+            if (shares == 0) {
+                continue;
+            }
+
+            // Same valuation as withdrawShares: pro-rata share of current equity.
+            // currentSupply >= shares > 0 here, so the division is safe.
+            uint totalEquityVal = getTotalEquity();
+            uint currentSupply = IERC20(shareToken).totalSupply();
+            uint amountUSD = (shares * totalEquityVal) / currentSupply;
+
+            // If min reserves block a full payout, leave this position untouched
+            uint withdrawableEquity = getWithdrawableEquity();
+            if (amountUSD > withdrawableEquity) {
+                continue;
+            }
+
+            // Burn first, then pay out (mirrors withdrawShares ordering)
+            Token(shareToken).burn(holder, shares);
+
+            if (amountUSD > 0) {
+                _executeWithdrawalPayouts(amountUSD, withdrawableEquity, holder);
+            }
+
+            emit Withdrawn(holder, shares, amountUSD);
+            redeemed++;
+        }
+
+        return redeemed;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
