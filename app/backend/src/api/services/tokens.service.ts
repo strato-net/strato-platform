@@ -28,6 +28,27 @@ const {
 const normalizeAddress = (address?: string | null) =>
   (address || "").toLowerCase().replace(/^0x/, "");
 
+const addressFilterIncludes = (
+  filter: string | undefined,
+  address: string | undefined | null
+) => {
+  const target = normalizeAddress(address);
+  if (!target) return false;
+  if (!filter) return true;
+
+  const raw = filter.toLowerCase();
+  if (raw.startsWith("eq.")) {
+    return normalizeAddress(raw.slice(3)) === target;
+  }
+  if (raw.startsWith("in.(") && raw.endsWith(")")) {
+    return raw
+      .slice(4, -1)
+      .split(",")
+      .some((value) => normalizeAddress(value.trim()) === target);
+  }
+  return normalizeAddress(raw) === target;
+};
+
 /**
  * Market cap in USD = (price_wei * totalSupply_wei) / 10^36.
  * Divided by 10^36 because both values carry 18 decimals.
@@ -130,7 +151,7 @@ const getYieldVaultTransferableTokens = async (accessToken: string, userAddress:
 };
 
 const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddress: string) => {
-  const vaultAddress = config.saveUsdstVault;
+  const vaultAddress = normalizeAddress(config.saveUsdstVault);
   if (!vaultAddress) return [];
 
   try {
@@ -139,11 +160,11 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
         address: `eq.${vaultAddress}`,
         key: `eq.${userAddress}`,
         value: "gt.0",
-        select: "address,user:key,value::text",
+        select: "address,user:key,balance:value::text",
       },
     });
 
-    const balances = (balanceRows || []).filter((row: any) => row.value && row.value !== "0");
+    const balances = (balanceRows || []).filter((row: any) => row.balance && row.balance !== "0");
     if (balances.length === 0) return [];
 
     const { data: vaultRows } = await cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
@@ -159,7 +180,7 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
     return balances.map((row: any) => ({
       address: row.address || vaultAddress,
       user: row.user || userAddress,
-      balance: row.value,
+      balance: row.balance,
       collateralBalance: "0",
       token: {
         address: row.address || vaultAddress,
@@ -169,7 +190,11 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
         _paused: paused,
       },
     }));
-  } catch {
+  } catch (error) {
+    console.warn("Failed to fetch saveUSDST vault balance:", {
+      vaultAddress,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return [];
   }
 };
@@ -273,9 +298,13 @@ export const getBalance = async (
     key: `eq.${address}`,
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
+  const includeSaveUsdstVault = addressFilterIncludes(rawParams.address, config.saveUsdstVault);
 
-  const [balances, collaterals, cdps, rawPrices] = await Promise.all([
+  const [balances, saveUsdstVaultTokens, collaterals, cdps, rawPrices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
+    includeSaveUsdstVault
+      ? getSaveUsdstVaultTransferableTokens(accessToken, address)
+      : Promise.resolve([]),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
         select: "user:key,asset:key2,amount:value::text",
@@ -327,10 +356,19 @@ export const getBalance = async (
       collateralBalance: (collateralMap.get(a) || 0n).toString(),
       token: tokenDetails.get(a),
     })),
+    ...saveUsdstVaultTokens.map((t: any) => ({
+      ...t,
+      price: (rawPrices.get(t.address) || 0n).toString(),
+      marketCap: "0",
+    })),
   ];
 
-  return allTokens.filter(
-    (t) => t.balance !== "0" || t.collateralBalance !== "0"
+  const isExactSaveUsdstFilter = rawParams.address?.toLowerCase().startsWith("eq.")
+    && addressFilterIncludes(rawParams.address, config.saveUsdstVault);
+
+  return allTokens.filter((t) =>
+    (t.balance !== "0" || t.collateralBalance !== "0")
+    && (!isExactSaveUsdstFilter || isConfiguredSaveUsdstVault(t.address))
   );
 };
 
@@ -339,14 +377,13 @@ export const getBalance = async (
  * Returns tokens with positive balance that are not paused
  */
 export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
-  const [tokens, yieldVaultTokens, saveUsdstVaultTokens] = await Promise.all([
+  const [tokens, yieldVaultTokens] = await Promise.all([
     getBalance(accessToken, userAddress),
     getYieldVaultTransferableTokens(accessToken, userAddress),
-    getSaveUsdstVaultTransferableTokens(accessToken, userAddress),
   ]);
 
   // Filter out paused tokens and ensure nonzero balance
-  return [...tokens, ...yieldVaultTokens, ...saveUsdstVaultTokens].filter((tokenData: any) => {
+  return [...tokens, ...yieldVaultTokens].filter((tokenData: any) => {
     const hasBalance = tokenData.balance !== "0";
     const isNotPaused = tokenData.token?._paused !== true;
     return hasBalance && isNotPaused;

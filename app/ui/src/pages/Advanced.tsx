@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSearchParams } from 'react-router-dom';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
@@ -38,10 +39,22 @@ type TopTab = "swap" | "vault" | "psm" | "bad-debt" | "liquidations";
 // Hidden type - temporarily disabled per issue #7228
 // type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
+// Every tab is its own destination (they are linked to by `?tab=`), so the tab
+// names the page, not the generic "Advanced" shell around it.
+const TAB_TITLES: Record<TopTab, string> = {
+  swap: "Swap Pools",
+  vault: "Diversified Vault",
+  psm: "PSM",
+  "bad-debt": "Bad Debt",
+  liquidations: "Liquidations",
+};
+
 const Advanced = () => {
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TopTab>("swap");
   const { isLoggedIn } = useUser();
+
+  usePageTitle(TAB_TITLES[activeTab]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');

@@ -12,7 +12,7 @@ This document defines the interface for snapshot production, artifact format, re
 - Keep full-sync testing in CI, not in the default local loop.
 - Make snapshots reproducible and safe to publish.
 - Avoid shipping user OAuth tokens, SSL private keys, logs, or host-specific node config.
-- Keep the interface scriptable for Jenkins, local shell usage, and future `strato-up` integration.
+- Keep the interface scriptable for Jenkins, local shell usage, and `strato-up --snapshot`.
 
 ## Non-goals
 
@@ -23,7 +23,7 @@ This document defines the interface for snapshot production, artifact format, re
 
 ## CLI
 
-Add a new command:
+The command:
 
 ```bash
 strato-snapshot <command> [options]
@@ -43,7 +43,9 @@ strato-snapshot create <node-dir> \
 
 Required behavior:
 
-- Fail if the node is not currently synced before shutdown.
+- Fail if the node is not currently synced before shutdown. With
+  `--wait-timeout`, poll (every `--wait-interval` seconds) until the node and
+  layer tips converge instead of failing immediately.
 - Stop all STRATO writers.
 - Verify containers and local processes no longer hold state files open.
 - Verify Postgres reports a clean shutdown.
@@ -57,7 +59,7 @@ Restore a snapshot into a local node directory.
 
 ```bash
 strato-snapshot restore <node-dir> \
-  --source s3://strato-snapshots/helium/latest.tar.zst \
+  --source s3://strato-snapshots/helium/v2/latest.tar.zst \
   --network helium \
   [--force]
 ```
@@ -69,9 +71,11 @@ Required behavior:
 - Ensure `<node-dir>` has a generated local config (`strato-setup` or equivalent).
 - Validate the snapshot network against the requested network.
 - Restore state payload.
-- Preserve local host-specific config.
-- Copy the snapshot's local Postgres password and rewrite local config to match it.
-- Remove stale pidfiles and runtime locks.
+- Preserve local host-specific config, including the node's own Postgres
+  password. The `eth` and `cirrus` databases are loaded from the snapshot's
+  dumps into the node's own Postgres cluster; no credentials are imported.
+- Normalize `localhost` SQL/Cirrus hosts in `ethconf.yaml` to `127.0.0.1`.
+- Remove the stale `.strato.pid`.
 - Start the node only when `--start` is passed; default is restore-only.
 
 ### `inspect`
@@ -82,15 +86,14 @@ Print metadata without restoring.
 strato-snapshot inspect ./snapshots/helium-latest.tar.zst
 ```
 
-Output includes:
+Output (one `key: value` per line):
 
-- network
-- STRATO version and image tags
-- captured block height
-- captured sync status
-- created timestamp
-- payload paths
-- compatibility constraints
+- `network`
+- `createdAt`
+- `stratoVersion`
+- `isSynced`, `nodeBestBlock`, `sequencedBestBlock`, `worldBestBlock`,
+  `apiIndexerTip`, `cirrusTip` (from the manifest's `block` object)
+- `payload` (comma-separated)
 
 ### `publish`
 
@@ -98,7 +101,7 @@ Publish an already-created and smoke-tested artifact.
 
 ```bash
 strato-snapshot publish ./snapshots/helium-2026-04-24.tar.zst \
-  --destination s3://strato-snapshots/helium/ \
+  --destination s3://strato-snapshots/helium/v2/ \
   --alias latest
 ```
 
@@ -112,11 +115,11 @@ Snapshot artifacts are `tar.zst` archives with this root layout:
 SNAPSHOT.json
 payload/
   ethereumH/
-  postgres/
+  postgres-dumps/
+    eth.dump               # pg_dump custom format (-Fc)
+    cirrus.dump
   redis/
-  kafka/
-  secrets/
-    postgres_password
+  jlog/
   prometheus/              # optional
 ```
 
@@ -130,9 +133,12 @@ The archive must not include:
 - `secrets/oauth_credentials.yaml`
 - `secrets/ssl/`
 - `.ethereumH/ethconf.yaml`
+- `secrets/postgres_password`
+- the `oauth` database (node key, user keys)
+- the raw `postgres/` data directory
 - macOS AppleDouble metadata files (`._*`)
 
-`ethconf.yaml` is intentionally excluded because it contains host-specific values and embeds the local Postgres password. Restore preserves the target node's generated config, then rewrites the local database password fields and local database hosts to match the restored stores.
+`ethconf.yaml` is intentionally excluded because it contains host-specific values and embeds the local Postgres password. Postgres is captured as logical dumps of the public blockchain databases (`eth`, `cirrus`) rather than the raw data directory, so no node-specific password or local-only `oauth` data ever rides along. Restore preserves the target node's generated config and credentials and only rewrites `localhost` database hosts to `127.0.0.1`.
 
 ## `SNAPSHOT.json`
 
@@ -143,7 +149,7 @@ Example:
   "schemaVersion": 1,
   "network": "helium",
   "createdAt": "2026-04-24T14:30:00Z",
-  "createdBy": "jenkins:testsync1",
+  "createdBy": "ubuntu@testsync1",
   "stratoVersion": "16.15-cda3022",
   "composeProject": "strato",
   "block": {
@@ -164,10 +170,10 @@ Example:
   },
   "payload": [
     "ethereumH",
-    "postgres",
+    "postgres-dumps/eth.dump",
+    "postgres-dumps/cirrus.dump",
     "redis",
-    "kafka",
-    "secrets/postgres_password"
+    "jlog"
   ],
   "checksums": {
     "payloadSha256": "<sha256>"
@@ -180,6 +186,15 @@ Example:
 }
 ```
 
+`createdBy` is `<user>@<hostname>` of the machine that ran `create`.
+`stratoVersion` is the tag of the `strato` service image in the source node's
+`docker-compose.yml` when that file defines one, else `"unknown"` (the
+locally generated compose runs STRATO under `convoke` rather than as a
+service, so snapshots from such nodes record `"unknown"` and restore's
+major-version check is skipped for them). `payload` names the top-level
+entries under `payload/`; `prometheus` is appended when `--include-prometheus`
+was passed.
+
 ## State Model
 
 Snapshot state is valid only when captured from a quiesced node.
@@ -187,9 +202,9 @@ Snapshot state is valid only when captured from a quiesced node.
 The relevant writable stores are:
 
 - `.ethereumH/*`: LevelDB-backed chain/state data, excluding `ethconf.yaml`.
-- `postgres/`: Postgres data directory for `eth` and `cirrus`.
+- `postgres/`: Postgres data directory. Only the `eth` and `cirrus` databases are captured (as dumps); the local-only `oauth` database is not.
 - `redis/`: Redis append-only data for block/sync metadata.
-- `kafka/`: Kafka logs used by local services.
+- `jlog/`: embedded jlog streaming state (topic segments and per-subscriber checkpoints).
 - `prometheus/`: optional metrics state; excluded by default because it is not needed for dev restore.
 
 The snapshot is network-scoped. A `helium` snapshot must never restore into an `upquark` node directory.
@@ -206,7 +221,11 @@ Before shutdown:
 curl -sf http://127.0.0.1:3000/eth/v1.2/metadata | jq -e '.isSynced == true'
 ```
 
-Also capture `nodeBestBlock`, `sequencedBestBlock`, and `worldBestBlock` for `SNAPSHOT.json`.
+Also capture the block heights for `SNAPSHOT.json`. The metadata endpoint
+does not expose them, so `nodeBestBlock` and `sequencedBestBlock` come from
+apex `/status` (`lastBlock.number`, `pbftData.sequence_number`; default
+`http://apex:3009/status`, override with `--status-url`), and `worldBestBlock`
+from metadata when present.
 
 When `--strict-layers` is passed, also require API-indexer and Cirrus to be at
 or ahead of the node tip within the configured lag. The default API-indexer tip
@@ -224,9 +243,10 @@ cd <node-dir>
 docker compose -p strato down --remove-orphans
 ```
 
-If `.strato.pid` is stale, `strato-snapshot create` also checks for local processes
-with open files under `.ethereumH`, `postgres`, `redis`, or `kafka`, sends them
-`TERM`, and refuses to archive if they remain alive.
+After the stop, `strato-snapshot create` waits up to ~10 seconds for any local
+processes that still hold files open under `.ethereumH`, `postgres`, `redis`,
+or `jlog` to exit on their own, and refuses to archive if they remain. It does
+not signal them itself (Docker Desktop's own file-sharing handles are ignored).
 
 ### 3. No running containers
 
@@ -239,7 +259,7 @@ test -z "$(docker compose -p strato ps -q)"
 ```bash
 ! lsof +D "$PWD/postgres" >/dev/null 2>&1
 ! lsof +D "$PWD/redis" >/dev/null 2>&1
-! lsof +D "$PWD/kafka" >/dev/null 2>&1
+! lsof +D "$PWD/jlog" >/dev/null 2>&1
 ! lsof +D "$PWD/.ethereumH" >/dev/null 2>&1
 ```
 
@@ -260,21 +280,22 @@ docker run --rm \
 Archive only the payload contract:
 
 ```bash
-tar --zstd -cpf "$OUTPUT" \
-  SNAPSHOT.json \
-  --transform 's|^\\.ethereumH|payload/ethereumH|' .ethereumH \
-  --transform 's|^postgres|payload/postgres|' postgres \
-  --transform 's|^redis|payload/redis|' redis \
-  --transform 's|^kafka|payload/kafka|' kafka \
-  --transform 's|^secrets/postgres_password|payload/secrets/postgres_password|' secrets/postgres_password \
-  --exclude='.ethereumH/ethconf.yaml' \
-  --exclude='logs' \
-  --exclude='.strato.pid' \
-  --exclude='secrets/oauth_*' \
-  --exclude='secrets/ssl'
+# Stage the payload, then archive the staging dir:
+staging=$(mktemp -d)
+mkdir -p "$staging/payload"/{ethereumH,redis,jlog,postgres-dumps}
+tar -C .ethereumH --exclude=./ethconf.yaml -cf - . | tar -C "$staging/payload/ethereumH" -xpf -
+tar -C redis -cf - . | tar -C "$staging/payload/redis" -xpf -
+tar -C jlog  -cf - . | tar -C "$staging/payload/jlog"  -xpf -
+chmod -R a+rwX "$staging/payload/jlog"      # usable by any uid after restore
+# eth + cirrus as pg_dump custom-format dumps, via a throwaway postgres
+# container on the stopped data dir:
+pg_dump -Fc --no-owner --no-privileges eth    > "$staging/payload/postgres-dumps/eth.dump"
+pg_dump -Fc --no-owner --no-privileges cirrus > "$staging/payload/postgres-dumps/cirrus.dump"
+# SNAPSHOT.json, then:
+tar -C "$staging" -cf - . | zstd -T0 -o "$OUTPUT"
 ```
 
-Implementation can use a staging directory instead of `tar --transform`; the interface requirement is the artifact layout, not this exact command.
+The implementation stages into a working directory exactly like this; the interface requirement is the artifact layout, not these exact commands.
 
 ## Restore Contract
 
@@ -287,8 +308,9 @@ Fail if:
 - The node is running.
 - Docker containers for the `strato` Compose project are running.
 - The snapshot network does not match `--network`.
-- The target directory has existing `postgres`, `redis`, `kafka`, or `.ethereumH` chain data beyond generated config and `--force` was not passed.
-- The snapshot requires a different incompatible STRATO major version.
+- The target directory has existing `postgres`, `redis`, `jlog`, `kafka`, or `.ethereumH` chain data beyond generated config and `--force` was not passed.
+- The snapshot's `stratoVersion` has a different major version than the target's `strato` image tag (skipped when either is unknown; `--allow-version-drift` overrides).
+- The payload has no `jlog/` directory, i.e. it is a pre-v2 (kafka-era) archive this build cannot use. `--snapshot` can never select one, but an explicit `--source` pointed at the frozen v1 line can, and it is refused before any target state is touched.
 
 ### Config handling
 
@@ -303,29 +325,32 @@ Restore must preserve host-specific generated config:
 
 Restore must copy from the snapshot:
 
-- `payload/secrets/postgres_password`
-- persisted state directories
+- persisted state directories (`.ethereumH` contents, `redis/`, `jlog/`)
+- the `eth` and `cirrus` databases, loaded from the dumps
 
-Restore must update the target `.ethereumH/ethconf.yaml`:
+Restore must not import credentials. The target keeps its own
+`secrets/postgres_password` and the matching password fields in
+`ethconf.yaml`; the dumps are loaded into the target's own Postgres cluster
+(initialized with that password first if the data dir is still empty), so the
+restored databases are reachable with the credentials the node already has.
 
-- `sqlConfig.password`
-- `cirrusConfig.password`
-- `sqlConfig.host` and `cirrusConfig.host` when they point at local Docker
-  database bindings
+Restore must update the target `.ethereumH/ethconf.yaml` in exactly one way:
 
-The password fields must match `secrets/postgres_password`, because the restored Postgres data directory was initialized with that password. Localhost database hosts should resolve to the same address family as the generated Docker port bindings.
+- `sqlConfig.host` and `cirrusConfig.host` when set to `localhost` are
+  rewritten to `127.0.0.1`, so host processes connect over the same address
+  family as the IPv4-only Docker port bindings.
 
 ### Payload replacement
 
-The restore process should remove and replace only state directories:
+The restore process removes and replaces only state:
 
 ```text
 .ethereumH/* except ethconf.yaml
-postgres/
 redis/
-kafka/
+jlog/
+kafka/                       # removed if present (leftover from a pre-jlog build); never written
 prometheus/ if present and requested
-secrets/postgres_password
+eth and cirrus databases     # dropped and reloaded from the dumps
 ```
 
 It must not overwrite:
@@ -333,6 +358,9 @@ It must not overwrite:
 ```text
 docker-compose.yml
 .env
+.ethereumH/ethconf.yaml      # except the localhost host rewrite above
+postgres/                    # the cluster itself, incl. its oauth database
+secrets/postgres_password
 secrets/oauth_credentials.yaml
 secrets/oauth_token
 secrets/ssl/
@@ -341,16 +369,22 @@ logs/
 
 ## Smoke Test
 
-Every published snapshot must pass a restore smoke test:
+`strato-snapshot smoke-test` (also run by `create` unless `--skip-smoke-test`):
 
-1. Restore into an empty temporary node directory.
-2. Start the node.
-3. Wait for the local STRATO API metadata endpoint to return valid JSON.
-4. Require the metadata response to include sync fields.
-5. Require either `isSynced=true` or a nonzero `nodeBestBlock` at least equal to the snapshot's captured `nodeBestBlock`.
-6. Stop the temporary node.
+1. Restore into an empty temporary node directory (`--node-dir` to choose one).
+2. Start the node with `strato-up`.
+3. Wait (up to `--timeout`, default 600s) for the local STRATO API metadata
+   endpoint to return JSON containing the `isSynced` field.
+4. Stop the temporary node.
 
-The smoke test should not publish if Postgres enters crash recovery failures, Redis cannot load append-only data, or LevelDB lock/corruption errors appear in logs.
+This proves the restored state starts and serves the API; it does not compare
+block heights. The synctest pipeline therefore skips the built-in smoke test
+and runs its own restore check before publishing: it restores the created
+archive with `strato-up --snapshot-source=<file>`, waits for the node to come
+up, and requires apex `/status` `lastBlock.number` to be within 100 blocks of
+the height the snapshot was taken at -- proving it resumed from the snapshot
+rather than from genesis. Only then is the archive published and `latest`
+moved.
 
 ## Storage Layout
 
@@ -361,16 +395,32 @@ Recommended remote layout. Each artifact has a sidecar checksum named
 ```text
 s3://strato-snapshots/
   helium/
-    latest.tar.zst
-    latest.tar.zst.sha256
+    latest.tar.zst                          # v1 (kafka-era): frozen, no longer
+    latest.tar.zst.sha256                   # published to
     helium-20260424-143000Z.tar.zst
     helium-20260424-143000Z.tar.zst.sha256
+    v2/                                     # jlog streaming
+      latest.tar.zst
+      latest.tar.zst.sha256
+      helium-20260828-143000Z.tar.zst
+      helium-20260828-143000Z.tar.zst.sha256
   upquark/
     latest.tar.zst
     latest.tar.zst.sha256
+    v2/
+      ...
 ```
 
-Versioned artifacts are immutable. `latest` is a movable alias updated only after smoke test success.
+Timestamped artifacts are immutable. `latest` is a movable alias updated only after smoke test success.
+
+Snapshots are scoped by **snapshot version** (`SNAPSHOT_VERSION` in
+`bin/strato-snapshot`): a build publishes to, and resolves `--snapshot` from,
+only `<network>/<version>/`. The version is bumped whenever the captured state
+stops being readable by the previous version's nodes, so those nodes keep their
+own `latest` instead of having it overwritten with state they cannot read. v1
+is the bare `<network>/` root because tool versions predating the constant have
+that location hardcoded; v2 is the first versioned line and carries jlog
+streaming state in place of kafka.
 
 ## CI Integration
 
@@ -398,7 +448,7 @@ Or restore explicitly, then start:
 
 ```bash
 strato-snapshot restore mynode \
-  --source s3://strato-snapshots/helium/latest.tar.zst \
+  --source s3://strato-snapshots/helium/v2/latest.tar.zst \
   --network helium
 
 strato-up mynode
@@ -417,7 +467,7 @@ For pure App UI/backend work, the preferred loop remains dev mode against a shar
 ## Failure Modes
 
 - **Snapshot was taken while writers were active:** smoke test fails or restored services enter crash recovery. Fix by requiring the cold shutdown gates.
-- **Postgres password mismatch:** backend, apex, or postgrest cannot connect. Fix by copying `secrets/postgres_password` from the snapshot and rewriting `ethconf.yaml` password fields.
+- **Postgres password mismatch:** backend, apex, or postgrest cannot connect. Avoided by design: restore never imports the source node's password; the dumps are loaded into the target's own cluster, so the target's existing `secrets/postgres_password` and `ethconf.yaml` fields stay correct.
 - **Localhost database host mismatch:** host processes try `::1` while Docker
   exposes Postgres only on `127.0.0.1`. Fix by normalizing local SQL and Cirrus
   hosts during restore.
@@ -427,8 +477,12 @@ For pure App UI/backend work, the preferred loop remains dev mode against a shar
 - **Partial sync / sequencer lag:** downloaded/world height can be ahead while local sequencer, VM, API-indexer, or Cirrus remain behind. Fix by refusing `create` until `isSynced=true` and all required layer tips converge.
 - **False-positive startup:** `strato-up` can otherwise return before `convoke` proves it is alive. Fix by checking the `convoke` PID for an immediate startup exit and making snapshot smoke tests stop partially started nodes on failure.
 
-## Open Decisions
+## Decisions
 
-- Whether `prometheus/` is ever useful enough to include by default.
-- Whether restore should start the node by default or remain restore-only.
-- Whether `strato-up` should call `strato-snapshot restore` automatically when a node directory is empty and `--from-snapshot latest` is provided.
+- `prometheus/` is excluded by default; `--include-prometheus` opts in on both
+  `create` and `restore`.
+- `restore` is restore-only by default; `--start` starts the node afterwards.
+- `strato-up --snapshot[=<timestamp>]` (and `--snapshot-source=<file-or-s3-uri>`)
+  runs `strato-setup` and then `strato-snapshot restore` for a node directory
+  that does not exist yet. For an existing directory the flag is ignored with a
+  note, since that is a restart of an existing node, not a fresh one.

@@ -158,20 +158,22 @@ contract StableProbe {
     function go(uint amount) public { lender.flashLoan(address(this), amount, ""); }
 
     function onFlashMint(address _token, uint amount, uint fee, variadic data) external returns (string) {
-        lastPriceBefore = pool.lastPrice(1);
-        getPBefore      = pool.getP(1);
-        emaBefore       = pool.emaPrice(1);
-        oracleBefore    = pool.priceOracle(1);
+        // index 0 is the price of coin 1 quoted in coin 0. It used to be index 1,
+        // back when _getP also emitted the trivial coin0/coin0 price at slot 0.
+        lastPriceBefore = pool.lastPrice(0);
+        getPBefore      = pool.getP(0);
+        emaBefore       = pool.emaPrice(0);
+        oracleBefore    = pool.priceOracle(0);
         dOracleBefore   = pool.dOracle();
         invBefore       = pool.computeInvariant();
 
         IERC20(usdst).approve(address(pool), amount);
         dyOut = pool.exchange(0, 1, amount, 1, address(this));
 
-        lastPriceMid = pool.lastPrice(1);
-        getPMid      = pool.getP(1);
-        emaMid       = pool.emaPrice(1);
-        oracleMid    = pool.priceOracle(1);
+        lastPriceMid = pool.lastPrice(0);
+        getPMid      = pool.getP(0);
+        emaMid       = pool.emaPrice(0);
+        oracleMid    = pool.priceOracle(0);
         dOracleMid   = pool.dOracle();
         invMid       = pool.computeInvariant();
 

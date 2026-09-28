@@ -26,6 +26,30 @@ import {
   RawDepositLog,
 } from "../services/depositEventService";
 
+// Public RPCs (HyperEVM included) cap eth_getLogs ranges — scan in windows below that cap
+const DEFAULT_LOGS_SPAN = 800;
+const MAX_WINDOWS_PER_TICK = 30;
+
+const getLogsSpan = (chainId: number): number =>
+  Number(process.env[`CHAIN_${chainId}_LOGS_SPAN`]) || DEFAULT_LOGS_SPAN;
+
+// Split [fromBlock, toBlock] into at most `cap` windows of `span` blocks
+export const planLogWindows = (
+  fromBlock: number,
+  toBlock: number,
+  span: number,
+  cap: number,
+): Array<[number, number]> => {
+  const windows: Array<[number, number]> = [];
+  let from = fromBlock;
+  for (let i = 0; i < cap && from <= toBlock; i++) {
+    const to = Math.min(from + span - 1, toBlock);
+    windows.push([from, to]);
+    from = to + 1;
+  }
+  return windows;
+};
+
 const applyRebaseFactors = async (
   deposits: Array<DepositArgs | ActionDepositArgs>,
 ) => {
@@ -46,37 +70,10 @@ const applyRebaseFactors = async (
   }
 };
 
-const pollChainForDeposits = async (chainInfo: ChainInfo) => {
-  const externalChainId = chainInfo.externalChainId;
-  const depositRouter = chainInfo.depositRouter;
-  const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
-  // Get the effective last processed block (max of blockchain and local storage)
-  const lastProcessedBlock = await blockTrackingService.getEffectiveLastProcessedBlock(
-    externalChainId, 
-    blockchainLastProcessedBlock
-  );
-  
-  if (!isChainConfigured(externalChainId)) return;
-
-  const currentBlock = await getCurrentBlockNumber(externalChainId);
-  if (currentBlock <= lastProcessedBlock) return;
-
-  const logs = (await getChainLogs(
-    externalChainId,
-    lastProcessedBlock + 1,
-    currentBlock,
-    depositRouter,
-    DEPOSIT_EVENT_SIGNATURES,
-  )) as RawDepositLog[];
-
-  if (logs.length === 0) {
-    await blockTrackingService.updateLastProcessedBlockLocally(
-      externalChainId,
-      currentBlock,
-    );
-    return;
-  }
-
+const recordDeposits = async (
+  logs: RawDepositLog[],
+  externalChainId: number,
+) => {
   const classified = classifyDepositLogs(logs, externalChainId);
   await applyRebaseFactors([
     ...classified.standardDeposits,
@@ -92,10 +89,54 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
       classified.actionDeposits as NonEmptyArray<ActionDepositArgs>,
     );
   }
-  await blockTrackingService.updateLastProcessedBlockEverywhere(
-    externalChainId,
-    currentBlock,
+};
+
+const pollChainForDeposits = async (chainInfo: ChainInfo) => {
+  const externalChainId = chainInfo.externalChainId;
+  const depositRouter = chainInfo.depositRouter;
+  const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
+  // Get the effective last processed block (max of blockchain and local storage)
+  const lastProcessedBlock = await blockTrackingService.getEffectiveLastProcessedBlock(
+    externalChainId, 
+    blockchainLastProcessedBlock
   );
+  
+  if (!isChainConfigured(externalChainId)) return;
+
+  const currentBlock = await getCurrentBlockNumber(externalChainId);
+  if (currentBlock <= lastProcessedBlock) return;
+
+  // Advance the watermark per drained window: a throw mid catch-up never re-widens the range
+  const windows = planLogWindows(
+    lastProcessedBlock + 1,
+    currentBlock,
+    getLogsSpan(externalChainId),
+    MAX_WINDOWS_PER_TICK,
+  );
+
+  for (const [fromBlock, toBlock] of windows) {
+    const logs = (await getChainLogs(
+      externalChainId,
+      fromBlock,
+      toBlock,
+      depositRouter,
+      DEPOSIT_EVENT_SIGNATURES,
+    )) as RawDepositLog[];
+
+    if (logs.length === 0) {
+      await blockTrackingService.updateLastProcessedBlockLocally(
+        externalChainId,
+        toBlock,
+      );
+      continue;
+    }
+
+    await recordDeposits(logs, externalChainId);
+    await blockTrackingService.updateLastProcessedBlockEverywhere(
+      externalChainId,
+      toBlock,
+    );
+  }
 };
 
 export const startMultiChainDepositPolling = () => {

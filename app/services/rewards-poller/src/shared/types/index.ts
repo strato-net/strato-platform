@@ -66,6 +66,24 @@ export interface ProtocolEvent {
   amount: string;
 }
 
+export interface PositionEventRule {
+  action: "Deposit" | "Withdraw";
+  userAttribute: string;
+  amountAttribute: string;
+}
+
+export interface PositionEventSource {
+  networkId: string;
+  sourceContract: string;
+  targetActivitySourceAttribute: string;
+  events: Record<string, PositionEventRule>;
+}
+
+export type PositionActivityRoutes = Map<
+  string,
+  Partial<Record<PositionEventRule["action"], string>>
+>;
+
 export interface RewardsAction {
   sourceContract: string;
   eventName: string;

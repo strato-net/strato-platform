@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -38,8 +39,9 @@ const Rewards = () => {
   const leaderboardOffset = (leaderboardPage - 1) * leaderboardLimit;
   const { entries: leaderboardEntries, total: leaderboardTotal, loading: leaderboardLoading, refetch: refetchLeaderboard } = useRewardsLeaderboard(leaderboardLimit, leaderboardOffset);
 
+  usePageTitle("Rewards");
+
   useEffect(() => {
-    document.title = "Rewards | STRATO";
     // Only fetch inactive tokens if logged in
     if (isLoggedIn && inactiveTokens.length === 0) {
       getInactiveTokens(true);
@@ -97,7 +99,7 @@ const Rewards = () => {
         </div>
         <CardTitle className="text-xl">Start Earning Rewards</CardTitle>
         <CardDescription className="text-base">
-          Connect a wallet to start earning CATA tokens and track your rewards.
+          Connect a wallet to start earning reward points and track your rewards.
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">
@@ -122,7 +124,7 @@ const Rewards = () => {
 
         <main className="p-4 md:p-6">
           {!isLoggedIn && (
-            <GuestSignInBanner message="Sign in to start earning CATA tokens and track your rewards" />
+            <GuestSignInBanner message="Sign in to start earning reward points and track your rewards" />
           )}
           {/* Personal summary cards at top for logged-in users; guests see the global overview here */}
           {isLoggedIn ? (

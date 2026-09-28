@@ -1,4 +1,5 @@
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import SwapWidget from "@/components/swap/SwapWidget";
@@ -9,6 +10,8 @@ import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 
 const SwapAsset = () => {
+  usePageTitle("Trade");
+
   const { isLoggedIn } = useUser();
   const { userRewards, loading: rewardsLoading } = useRewardsUserInfo();
 

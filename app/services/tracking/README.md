@@ -19,6 +19,7 @@ source of truth.
 | `GET /tracking-api/me` | JWT | `{authorized}` — whether the user may use the dashboard |
 | `GET /tracking-api/links` | JWT + allowlist | Link summaries with attribution rollups |
 | `GET /tracking-api/metrics/daily` | JWT + allowlist | Daily snapshot: today's (UTC) opens/engaged, wallets/bridged, bridged-in USD + transfers, on-chain actions — each against the same elapsed window yesterday — plus a 24-bucket opens-by-hour histogram and the busiest links |
+| `GET /tracking-api/metrics/daily/breakdown` | JWT + allowlist | The rows behind the four snapshot tiles over the same UTC-today window: opens (link, geo, referrer, engagement, wallet), wallets (first open, link used, bridged amount, actions taken), bridge-ins (per-wallet amount, asset, source chain) and on-chain actions (grouped by type, then per wallet/link) |
 | `POST /tracking-api/links` | JWT + allowlist | Create a link (random slug; label/source never appear in the URL) |
 | `GET /tracking-api/links/:id` | JWT + allowlist | Bridge-ins, per-category activity summary, per-wallet summaries, visitor geo points with per-visit timestamps and wallet identity, attributed activity feed, per-day history (opens, wallets, bridge/trade value, …) |
 | `GET /tracking-api/links/:id/wallets/:address` | JWT + allowlist | Per-user drill-down: the wallet's full on-chain history (deliberately not attribution-filtered) |
@@ -108,6 +109,17 @@ window runs to the end of the UTC day because block timestamps can sit
 slightly ahead of the service's clock. Bridged-in USD counts priced tokens
 only and sets `bridgeValuePartial` when some token had no oracle price (the
 dashboard renders "$128.4K+").
+
+Each of the four tiles is a disclosure button: opening one fetches
+`/tracking-api/metrics/daily/breakdown` (once, for all four) and shows the rows
+that number is made of — per-visit opens, per-wallet behaviour (first open,
+link used, amount bridged, actions taken by category), per-transfer bridge-ins
+with their source chain, and on-chain actions grouped by action type before the
+event list. The breakdown reuses the same UTC-today window and the same
+attribution snapshot as the tiles, so a table can never disagree with the
+number above it; each section reports `total` (the tile), the newest `shown`
+rows and `truncated` when the list was capped — it is a drill-down, not an
+export.
 
 ## Links table
 

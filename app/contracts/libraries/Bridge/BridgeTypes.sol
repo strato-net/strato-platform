@@ -6,7 +6,8 @@ library BridgeTypes {
         PENDING_REVIEW, // deposit: verification failed, needs review
                       // withdrawal: custody tx proposed, waiting for review
         COMPLETED,    // flow fully executed
-        ABORTED       // user/relayer reclaimed escrow
+        ABORTED,      // user/relayer reclaimed escrow
+        SWEPT         // withdrawal: governance cancelled it and moved the escrow to a triage wallet
     }
 
     struct DepositInfo {

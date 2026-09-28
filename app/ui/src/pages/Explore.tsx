@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate } from 'react-router-dom';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
@@ -146,6 +147,8 @@ const SortIcon = ({ active, dir }: { active: boolean; dir: SortDir }) => {
 };
 
 const Explore = () => {
+  usePageTitle("Explore");
+
   const navigate = useNavigate();
   const { isLoggedIn } = useUser();
   const { earningAssets } = useTokenContext();

@@ -425,6 +425,12 @@ contract record StratoNativeBridge is Ownable {
         );
     }
 
+    function _requireActiveFactoryToken(address stratoToken) internal view {
+        if (TokenFactory(tokenFactory).isFactoryToken(stratoToken)) {
+            require(Token(stratoToken).status() == TokenStatus.ACTIVE, "SNB: inactive token");
+        }
+    }
+
     function requestWithdrawal(
         uint256 externalChainId,
         address externalRecipient,
@@ -446,7 +452,7 @@ contract record StratoNativeBridge is Ownable {
             asset.maxPerWithdrawal == 0 || stratoTokenAmount <= asset.maxPerWithdrawal,
             "SNB: per-withdrawal cap"
         );
-        require(Token(stratoToken).status() == TokenStatus.ACTIVE, "SNB: inactive token");
+        _requireActiveFactoryToken(stratoToken);
         require(
             tokenConfig.maxOutstandingWithdrawal == 0
                 || StratoNativeCustodyVault(custodyVault).lockedBalance(stratoToken) + stratoTokenAmount

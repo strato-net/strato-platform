@@ -48,7 +48,7 @@ You can restore directly from an explicit S3 URI when your AWS profile has acces
 
 ```bash
 bin/strato-snapshot restore "$NODE_DIR" \
-  --source s3://strato-snapshots/helium/helium-20260601-130500Z.tar.zst \
+  --source s3://strato-snapshots/helium/v2/helium-20260601-130500Z.tar.zst \
   --network helium
 ```
 
@@ -68,6 +68,14 @@ bin/strato-snapshot restore "$NODE_DIR" \
   --snapshot=20260601-13:05:00Z \
   --network helium
 ```
+
+Resolved keys are scoped by **snapshot version** (`SNAPSHOT_VERSION` in
+`bin/strato-snapshot`, currently `v2`):
+`s3://<bucket>/<network>/<version>/<key>`. The version is bumped whenever the
+captured state stops being readable by the previous version's nodes, so an
+older build keeps resolving its own `latest`. v1 (kafka streaming) is the bare
+`s3://<bucket>/<network>/` root — the original unversioned layout, frozen and
+no longer published to; v2 carries jlog streaming state.
 
 The bucket defaults to `strato-snapshots` and can be overridden with the
 `STRATO_SNAPSHOT_BUCKET` environment variable or `--bucket <name>`. The same
@@ -189,7 +197,7 @@ Publish an already-created artifact to a local directory or S3 destination:
 
 ```bash
 bin/strato-snapshot publish /tmp/helium-20260601-130500Z.tar.zst \
-  --destination s3://strato-snapshots/helium/ \
+  --destination s3://strato-snapshots/helium/v2/ \
   --alias latest
 ```
 
@@ -228,7 +236,7 @@ Included payload:
   format (`-Fc`) of the public blockchain databases only; restored in parallel
   with `pg_restore -j`
 - `redis/`
-- `kafka/`
+- `jlog/` (segments and per-subscriber `cp.*` checkpoints; jlog is embedded, so this one dir is the whole streaming state)
 - `prometheus/` only when requested
 
 Excluded payload:

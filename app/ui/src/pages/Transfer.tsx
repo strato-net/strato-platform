@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { Link } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -55,9 +56,7 @@ const Transfer = () => {
   const { toast } = useToast();
   const isVaultUser = !!userName;
   const guestMode = !isLoggedIn;
-  useEffect(() => {
-    document.title = "Send Assets | STRATO";
-  }, []);
+  usePageTitle("Send Assets");
   const [tokens, setTokens] = useState<Token[]>([]);
   const [recipient, setRecipient] = useState<string>("");
 

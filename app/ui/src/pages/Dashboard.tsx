@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -120,9 +121,9 @@ const Dashboard = () => {
     },
   }), [netBalanceHistoryCache, rewardsHistoryCache, borrowedHistoryCache, selectedTimeRange, totalBalance, cataBalance, totalBorrowed]);
 
-  useEffect(() => {
-    document.title = "Dashboard | STRATO";
+  usePageTitle("Dashboard");
 
+  useEffect(() => {
     // Check if user just logged in and needs to be redirected back to claim page
     const claimReturnUrl = localStorage.getItem("claimReturnUrl");
     if (claimReturnUrl && isLoggedIn) {

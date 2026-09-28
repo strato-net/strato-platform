@@ -71,7 +71,7 @@ contract Describe_StablePool is Authorizable {
         uint256 liquidity = pool.addLiquidityGeneral([amountA, amountB], amountB, address(0));
 
         require(liquidity > 0, "Liquidity should be greater than zero");
-        require(ERC20(pool.lpToken()).totalSupply() == liquidity, "Total supply should equal liquidity");
+        require(ERC20(pool.lpToken()).totalSupply() == liquidity + 1000, "Total supply should equal liquidity plus the locked MINIMUM_LIQUIDITY");
         require(ERC20(pool.lpToken()).balanceOf(address(this)) == liquidity, "Owner should have LP tokens");
     }
 
@@ -124,7 +124,7 @@ contract Describe_StablePool is Authorizable {
 
         require(tokenAReceived > 0, "Should receive token A");
         require(tokenBReceived > 0, "Should receive token B");
-        require(ERC20(pool.lpToken()).totalSupply() == 0, "Total supply should be zero after removal");
+        require(ERC20(pool.lpToken()).totalSupply() == 1000, "Only MINIMUM_LIQUIDITY (locked at 0xdead) remains after removal");
     }
 
     function it_pool_can_swap_a_to_b() {

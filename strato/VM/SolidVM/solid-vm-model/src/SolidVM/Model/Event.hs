@@ -20,6 +20,10 @@ import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Data.Aeson hiding (Value)
 import Data.Binary
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import GHC.Generics
 import SolidVM.Model.SolidString (stringToLabel)
 import qualified SolidVM.Model.Type as SVMType
@@ -38,6 +42,11 @@ import Text.Format
 --     MonadSM at emit time. Preserved for legacy display paths (EventDB SQL
 --     persistence, RPC responses) that show event args as strings.
 --   * argType: SolidVM type from the event declaration
+--
+-- 'evTopics' holds the Ethereum log topics (topic0 = event signature hash,
+-- followed by each indexed argument, each 32 bytes) computed at emit time from
+-- the contract ABI. Carried here so the block producer can build a real
+-- logsBloom without re-deriving topics from the CodeCollection.
 data Event = Event
   { evBlockHash :: Keccak256,
     evTxHash :: Keccak256,
@@ -45,7 +54,8 @@ data Event = Event
     evContractName :: String,
     evContractAddress :: Address,
     evName :: String,
-    evArgs :: [(String, Value, String, SVMType.Type)]
+    evArgs :: [(String, Value, String, SVMType.Type)],
+    evTopics :: [B.ByteString]
   }
   deriving (Eq, Show, Generic)
 
@@ -93,7 +103,8 @@ instance ToJSON Event where
         "eventContractName" .= evContractName,
         "eventContractAddress" .= evContractAddress,
         "eventName" .= evName,
-        "eventArgs" .= evArgs
+        "eventArgs" .= evArgs,
+        "eventTopics" .= map (TE.decodeUtf8 . B16.encode) evTopics
       ]
 
 instance FromJSON Event where
@@ -106,7 +117,12 @@ instance FromJSON Event where
       <*> o .: "eventContractAddress"
       <*> o .: "eventName"
       <*> (o .: "eventArgs" >>= mapM parseEventArg)
+      -- Default to no topics for events written by older nodes (e.g. an
+      -- existing genesis.json), keeping deserialization backward compatible.
+      <*> (map decodeHexTopic <$> (o .:? "eventTopics" .!= []))
     where
+      decodeHexTopic :: T.Text -> B.ByteString
+      decodeHexTopic = either (const B.empty) id . B16.decode . TE.encodeUtf8
       -- Accept both the current 4-element arg form [name, value, rendered, type]
       -- and the legacy 3-element form [name, rendered, typeString] written by
       -- older nodes (e.g. events in an existing genesis.json). The legacy form
@@ -134,4 +150,4 @@ instance Arbitrary Event where
       s <- arbitrary
       t <- arbitrary
       pure (n, SInteger 0, s, t)
-    pure $ Event bh th sender cn ca nm args
+    pure $ Event bh th sender cn ca nm args []

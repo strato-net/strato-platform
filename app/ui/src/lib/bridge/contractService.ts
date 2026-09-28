@@ -27,6 +27,7 @@ const PROXIED_CHAIN_IDS = new Set([
   "59141",
   "4663",
   "46630",
+  "999",
 ]);
 
 async function getClient(chainId: string) {

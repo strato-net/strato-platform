@@ -27,6 +27,7 @@ library
       Blockchain.Data.Extra
       Blockchain.Data.Log
       Blockchain.Data.LogDB
+      Blockchain.Data.LogsBloom
       Blockchain.Data.ProposalFacts
       Blockchain.Data.RawTransaction
       Blockchain.Data.Receipt
@@ -88,4 +89,19 @@ library
     , transformers
     , unliftio
     , unliftio-core
+  default-language: Haskell2010
+
+test-suite blockapps-data-tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_blockapps_data
+  hs-source-dirs:
+      test/
+  ghc-options: -Wall -O2
+  build-depends:
+      base
+    , blockapps-data
+    , bytestring
+    , hspec
   default-language: Haskell2010

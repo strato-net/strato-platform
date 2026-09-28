@@ -208,9 +208,7 @@ pipeline {
               # docker compose -f docker-compose.highway.push.yml push 2>&1
               #
               # AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
-              # docker compose -f docker-compose.push.ecr.yml push 2>&1
-              # docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
-              # docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
+              # ./scripts/docker-push-ecr.sh -f docker-compose.push.ecr.yml -f docker-compose.vault.push.ecr.yml -f docker-compose.highway.push.ecr.yml 2>&1
             '''
 
             // Merge release code to master

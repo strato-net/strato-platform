@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -14,6 +15,8 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { requestWalletConnection } from "@/lib/auth";
 
 const WithdrawalsPage = () => {
+  usePageTitle("Bridge Out");
+
   const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { loadNetworksAndTokens, withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary, setTargetTransactionTab } =
     useBridgeContext();

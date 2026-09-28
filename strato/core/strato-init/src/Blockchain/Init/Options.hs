@@ -91,10 +91,12 @@ defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB 
 defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
 
 -- Kafka log retention flags (defaults match Kafka's own defaults / the current
--- generated config, so behavior is unchanged unless overridden). Nodes whose
--- state gets snapshotted (e.g. the synctest pipeline) lower these so the raw
--- kafka log dir shipped in the snapshot payload stays small.
-defineFlag "kafkaLogRetentionHours" (168 :: Int) "Kafka log.retention.hours: delete log segments older than this"
-defineFlag "kafkaLogRetentionBytes" (-1 :: Integer) "Kafka log.retention.bytes: max bytes retained per partition (-1 = unlimited)"
-defineFlag "kafkaLogSegmentBytes" (1073741824 :: Int) "Kafka log.segment.bytes: segment file size; retention only deletes closed segments, so lower this together with the retention flags"
+-- generated config, so behavior is unchanged unless overridden). Only consumed
+-- by the Kafka-family streaming backends (see applyKafkaRetention in
+-- DockerCompose.hs); the default embedded JLog backend has no broker to
+-- configure and ignores them. Kept so those backends stay configurable when
+-- selected at build time.
+defineFlag "kafkaLogRetentionHours" (168 :: Int) "Kafka log.retention.hours: delete log segments older than this. Ignored unless a Kafka-family streaming backend is built in (no-op on the default embedded JLog backend)"
+defineFlag "kafkaLogRetentionBytes" (-1 :: Integer) "Kafka log.retention.bytes: max bytes retained per partition (-1 = unlimited). Ignored unless a Kafka-family streaming backend is built in (no-op on the default embedded JLog backend)"
+defineFlag "kafkaLogSegmentBytes" (1073741824 :: Int) "Kafka log.segment.bytes: segment file size; retention only deletes closed segments, so lower this together with the retention flags. Ignored unless a Kafka-family streaming backend is built in (no-op on the default embedded JLog backend)"
 $(return [])

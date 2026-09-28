@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { RecipientClaim } from "@/components/refer/RecipientClaim";
 import { useUser } from "@/context/UserContext";
@@ -13,9 +14,7 @@ const Claim = () => {
   const { resolvedTheme } = useTheme();
   const logo = resolvedTheme === 'dark' ? STRATOLOGODARK : STRATOLOGO;
 
-  useEffect(() => {
-    document.title = "Claim Tokens | STRATO";
-  }, []);
+  usePageTitle("Claim Tokens");
 
   // Store return URL in localStorage when user needs to sign up
   // This will be used after login to redirect back to this page with all query params

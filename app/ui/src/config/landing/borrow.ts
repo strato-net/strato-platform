@@ -5,7 +5,7 @@ import type { ProductLandingConfig } from "./types";
 
 export const borrow: ProductLandingConfig = {
   slug: "borrow",
-  documentTitle: "STRATO Borrow | Access USDST Without Selling Your Assets | STRATO",
+  documentTitle: "STRATO | Borrow | Access USDST Without Selling Your Assets",
   accent: "blue",
   appPath: "/dashboard/borrow",
 

@@ -14,10 +14,16 @@ module Blockchain.SolidVM.CodeCollectionDB
   ( CompilationError (..),
     MemCompilerT (..),
     runMemCompilerT,
+    ParseOptions (..),
+    defaultParseOptions,
     parseSource,
+    parseSourceWith,
     parseSourceWithAnnotations,
     compileSourceNoInheritance,
     compileSource,
+    compileSourceWith,
+    codeCollectionFromSourceWith,
+    codeCollectionFromHashWith,
     compileSourceWithAnnotations,
     compileSourceWithAnnotationsWithoutImports,
     codeCollectionFromSource,
@@ -104,8 +110,10 @@ runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . un
 -- eviction here costs a full re-parse and re-typecheck. It still needs a
 -- bound: entries are whole compiled CodeCollections (megabytes each), and an
 -- unbounded map grows for every code hash ever uploaded.
+-- Keyed by (code hash, legacy operator precedence): the same source parses to
+-- a different AST on either side of the operator-precedence fork.
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (GenCache Keccak256 CodeCollection)
+unsafeCodeCacheIORef :: IORef (GenCache (Keccak256, Bool) CodeCollection)
 unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ gcEmpty 128
 
 -- | Resize the code-collection cache (entry count). vm-runner sets this from
@@ -113,13 +121,28 @@ unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ gcEmpty 128
 setCodeCacheLimit :: Int -> IO ()
 setCodeCacheLimit n = atomicModifyIORef' unsafeCodeCacheIORef $ \c -> (gcSetLimit n c, ())
 
-cacheCodeCollection :: Keccak256 -> CodeCollection -> IO ()
-cacheCodeCollection hsh cc =
+cacheCodeCollection :: (Keccak256, Bool) -> CodeCollection -> IO ()
+cacheCodeCollection (hsh, legacy) cc =
   -- Copy the hash's bytes (a tx-decode slice must not be pinned by the
   -- cache) and force the collection so the entry doesn't retain parser
   -- thunks over the source text.
-  let key = unsafeCreateKeccak256FromByteString . B.copy $ keccak256ToByteString hsh
+  let key = (unsafeCreateKeccak256FromByteString . B.copy $ keccak256ToByteString hsh, legacy)
    in modifyIORef' unsafeCodeCacheIORef (gcInsert key $! force cc)
+
+-- | Parse-time switches. The VM derives them from the block being executed;
+-- everything else (APIs, tooling, tests) uses 'defaultParseOptions'.
+newtype ParseOptions = ParseOptions
+  { -- | Parse with the pre-fork operator table. See
+    -- 'SolidVM.Solidity.Parse.Statement.legacyExpression'.
+    parseLegacyOperatorPrecedence :: Bool
+  }
+  deriving (Eq, Show)
+
+defaultParseOptions :: ParseOptions
+defaultParseOptions = ParseOptions {parseLegacyOperatorPrecedence = False}
+
+parserStateFor :: ParseOptions -> ParserState
+parserStateFor opts = withLegacyOperatorPrecedence (parseLegacyOperatorPrecedence opts) initialParserState
 
 withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Either [SourceAnnotation T.Text] b)
 withAnnotations f = fmap (first unwind) . f
@@ -130,7 +153,10 @@ withAnnotations f = fmap (first unwind) . f
     unwind (TCEx errs) = errs
 
 parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
-parseSource fileName src = bimap PEx unsourceUnits $ runParser solidityFile initialParserState (T.unpack fileName) (T.unpack src)
+parseSource = parseSourceWith defaultParseOptions
+
+parseSourceWith :: ParseOptions -> T.Text -> T.Text -> Either CompilationError [SourceUnit]
+parseSourceWith opts fileName src = bimap PEx unsourceUnits $ runParser solidityFile (parserStateFor opts) (T.unpack fileName) (T.unpack src)
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)
@@ -143,10 +169,21 @@ compileSourceNoInheritance ::
   Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSourceNoInheritance isRunningTests typeCheck initCodeMap = runExceptT $ do
+compileSourceNoInheritance = compileSourceNoInheritanceWith defaultParseOptions
+
+compileSourceNoInheritanceWith ::
+  ( HasCodeDB m,
+    A.Selectable Address AddressState m
+  ) =>
+  ParseOptions ->
+  Bool ->
+  Bool ->
+  Map T.Text T.Text ->
+  m (Either CompilationError CodeCollection)
+compileSourceNoInheritanceWith opts isRunningTests typeCheck initCodeMap = runExceptT $ do
   let getNamedSUnits :: T.Text -> T.Text -> Either CompilationError (Positioned UnresolvedFileUnitsF)
       getNamedSUnits fileName src = do
-        sourceUnits <- parseSource fileName src
+        sourceUnits <- parseSourceWith opts fileName src
         foldrM (\u ufu -> maybe (pure ufu) (first (IEx . (<$ (def :: SourceAnnotation ()))) . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
       userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
@@ -173,7 +210,7 @@ compileSourceNoInheritance isRunningTests typeCheck initCodeMap = runExceptT $ d
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
-  theCC <- withExceptT (\(x,t) -> IEx $ t <$ x) $ resolveImports (codeCollectionFromHashNoCache isRunningTests False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
+  theCC <- withExceptT (\(x,t) -> IEx $ t <$ x) $ resolveImports (codeCollectionFromHashNoCacheWith opts isRunningTests False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
   pure $ force theCC
 
 --- Don't typecheck in Slipstream!!!
@@ -185,21 +222,33 @@ compileSource ::
   Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSource isRunningTests typeCheck mTT = do
-  eCC <- compileSource' isRunningTests typeCheck mTT
-  pure $ first SVMEx . applyInheritanceFunctions =<< eCC
+compileSource = compileSourceWith defaultParseOptions
 
-compileSource' ::
+compileSourceWith ::
   ( HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  ParseOptions ->
   Bool ->
   Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSource' isRunningTests typeCheck mTT = do
+compileSourceWith opts isRunningTests typeCheck mTT = do
+  eCC <- compileSource'With opts isRunningTests typeCheck mTT
+  pure $ first SVMEx . applyInheritanceFunctions =<< eCC
+
+compileSource'With ::
+  ( HasCodeDB m,
+    A.Selectable Address AddressState m
+  ) =>
+  ParseOptions ->
+  Bool ->
+  Bool ->
+  Map T.Text T.Text ->
+  m (Either CompilationError CodeCollection)
+compileSource'With opts isRunningTests typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritanceNoFunctions
-  eCC <- compileSourceNoInheritance isRunningTests typeCheck mTT
+  eCC <- compileSourceNoInheritanceWith opts isRunningTests typeCheck mTT
   pure $ case applyInheritanceE =<< eCC of
     Right cc -> O.detector <$> if typeCheck
           then typeCheckDetector cc
@@ -236,7 +285,20 @@ codeCollectionFromSource ::
   Bool ->
   B.ByteString ->
   m (Keccak256, CodeCollection)
-codeCollectionFromSource isRunningTests typeCheck initCode = do
+codeCollectionFromSource = codeCollectionFromSourceWith defaultParseOptions
+
+codeCollectionFromSourceWith ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m
+    -- , HasCodeCollectionDB m
+  ) =>
+  ParseOptions ->
+  Bool ->
+  Bool ->
+  B.ByteString ->
+  m (Keccak256, CodeCollection)
+codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
@@ -247,22 +309,23 @@ codeCollectionFromSource isRunningTests typeCheck initCode = do
         [(t, src)] | T.null t -> encodeUtf8 src -- for backwards compatibility
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
+      cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
   codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case gcLookup hsh codeCache of
+  case gcLookup cacheKey codeCache of
     Just cc -> do
       recordCacheEvent CacheHit
       return (hsh, cc)
     Nothing -> do
       recordCacheEvent StorageWrite
       hsh' <- addCode canonicalInitCode
-      ecc <- compileSource isRunningTests typeCheck initMap
+      ecc <- compileSourceWith opts isRunningTests typeCheck initMap
       let cc = case ecc of
             Right a -> a
             Left (PEx p) -> parseError "codeCollectionFromSource" p
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ cacheCodeCollection hsh cc
+      liftIO $ cacheCodeCollection cacheKey cc
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -275,35 +338,50 @@ codeCollectionFromHash ::
   Bool ->
   Keccak256 ->
   m CodeCollection
-codeCollectionFromHash isRunningTests typeCheck hsh = do
+codeCollectionFromHash = codeCollectionFromHashWith defaultParseOptions
+
+codeCollectionFromHashWith ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m
+    -- , HasCodeCollectionDB m
+  ) =>
+  ParseOptions ->
+  Bool ->
+  Bool ->
+  Keccak256 ->
+  m CodeCollection
+codeCollectionFromHashWith opts isRunningTests typeCheck hsh = do
+  let cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
   codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case gcLookup hsh codeCache of
+  case gcLookup cacheKey codeCache of
     Just cc -> do
       recordCacheEvent CacheHit
       return cc
     Nothing -> do
       recordCacheEvent CacheMiss
-      cc <- codeCollectionFromHashNoCache isRunningTests True typeCheck hsh
-      liftIO $ cacheCodeCollection hsh cc
+      cc <- codeCollectionFromHashNoCacheWith opts isRunningTests True typeCheck hsh
+      liftIO $ cacheCodeCollection cacheKey cc
       return cc
 
-codeCollectionFromHashNoCache ::
+codeCollectionFromHashNoCacheWith ::
   ( HasCodeDB m,
     A.Selectable Address AddressState m
   ) =>
+  ParseOptions ->
   Bool ->
   Bool ->
   Bool ->
   Keccak256 ->
   m CodeCollection
-codeCollectionFromHashNoCache isRunningTests mergeFuncs typeCheck hsh =
+codeCollectionFromHashNoCacheWith opts isRunningTests mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
     Just initCode -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
             Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-      ecc <- (if mergeFuncs then compileSource else compileSource') isRunningTests typeCheck initMap
+      ecc <- (if mergeFuncs then compileSourceWith else compileSource'With) opts isRunningTests typeCheck initMap
       case ecc of
         Right a -> pure a
         Left (PEx p) -> parseError "codeCollectionFromHash" p

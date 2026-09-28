@@ -269,6 +269,81 @@ export interface DailySnapshot {
   topLinks: DailySnapshotLink[];
 }
 
+// Rows behind the four Daily Snapshot tiles (GET /metrics/daily/breakdown),
+// over the same UTC-today window as the tiles themselves. Lists are
+// newest-first and capped server-side (`truncated`).
+export interface BreakdownLink {
+  id: string;
+  slug: string;
+  label: string;
+  source: string;
+}
+
+export interface OpenRow {
+  at: string;
+  engaged: boolean;
+  link: BreakdownLink | null;
+  city: string | null;
+  country: string | null;
+  referrer: string | null;
+  address: string | null; // wallet connected during that visit, if any
+}
+
+export interface WalletRow {
+  address: string;
+  externalWalletAddress: string | null;
+  stratoAddress: string | null;
+  connector: string | null;
+  connectedAt: string;
+  firstOpenAt: string | null;
+  link: BreakdownLink | null;
+  city: string | null;
+  country: string | null;
+  bridgeIns: number;
+  bridgeValueUsd: number;
+  bridgeValuePartial: boolean; // an unpriced token makes the USD a floor
+  assets: string[];
+  actions: number;
+  actionSummary: ActivitySummary;
+  lastActivityAt: string | null;
+}
+
+export interface BridgeRow extends BridgeInItem {
+  link: BreakdownLink | null;
+  chainName: string | null;
+}
+
+export interface ActionCategoryRow {
+  category: ActivityCategory;
+  count: number;
+  wallets: number;
+  links: number;
+}
+
+export interface ActionRow {
+  at: string;
+  category: ActivityCategory;
+  description: string;
+  address: string;
+  link: BreakdownLink | null;
+}
+
+export interface BreakdownSection<Row> {
+  total: number; // matches the tile
+  shown: number;
+  truncated: boolean;
+  rows: Row[];
+}
+
+export interface DailyBreakdown {
+  date: string;
+  generatedAt: string;
+  opens: BreakdownSection<OpenRow>;
+  wallets: BreakdownSection<WalletRow>;
+  bridgeIns: BreakdownSection<BridgeRow> & { valueUsd: number; valuePartial: boolean };
+  actions: BreakdownSection<ActionRow> & { byCategory: ActionCategoryRow[] };
+}
+
 export interface CreateLinkInput {
   label: string;
   source: string;
@@ -334,6 +409,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const getMe = () => apiFetch<{ authorized: boolean }>('/me');
 export const getDailySnapshot = () => apiFetch<DailySnapshot>('/metrics/daily');
+export const getDailyBreakdown = () => apiFetch<DailyBreakdown>('/metrics/daily/breakdown');
 export const listLinks = () => apiFetch<LinkSummary[]>('/links');
 export const getLink = (id: string) => apiFetch<LinkDetail>(`/links/${id}`);
 export const getWallet = (linkId: string, address: string) =>

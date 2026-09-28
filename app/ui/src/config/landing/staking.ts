@@ -5,7 +5,7 @@ import type { ProductLandingConfig } from "./types";
 
 export const staking: ProductLandingConfig = {
   slug: "staking",
-  documentTitle: "STRATO Staking | Put Your STRATO To Work | STRATO",
+  documentTitle: "STRATO | Staking | Put Your STRATO To Work",
   accent: "blue",
   appPath: "/dashboard/earn-staking",
 

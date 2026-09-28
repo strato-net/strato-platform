@@ -1,10 +1,13 @@
 import React from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import BridgeTransactionsComponent from '../components/dashboard/BridgeTransactionsPage';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav';
 
 const BridgeTransactionsPage = () => {
+  usePageTitle("Bridge Transactions");
+
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />

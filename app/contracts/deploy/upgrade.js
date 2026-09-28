@@ -13,7 +13,18 @@ const path = require('path');
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
 
 const BATCH_TARGETS = [
-    "----proxy-address----",
+    "2869b1391b1bc0aa908b1a2e4a157cd289c18584", // ETH / USDST 0.30%
+    "910357ffc86715153b16af9aa9152eb54814cb9c", // USDC / USDST 0.05%
+    "c35b5af3590abc71c099b6b2ae355a9648a7ca43", // USDT / USDST 0.05%
+    "961d5c8a8c999b3b888c330e6cf78f5d3e7fa027", // GOLDST / USDST 0.30%
+    "d2976426e738b7d852091b150d531a8a6efc7c9e", // BOOE / USDST 1.00%
+    "6ad6b5690a8c78e96db1fe9eb79d4d20935dd6f9", // SILVST-USDST-LP / USDST 0.05%
+    "5b8f21b53d3a5ea7dd66710ff18d161bb62e9a71", // WBTC / USDST 0.01%
+    "530dc7ccdd1e586badbecd7dc1e04216b7ec0ea5", // GOLDST / USDST 0.01%
+    "7667a34dd6724a04735cfd4771cabda1d61dd04c", // ETH / USDST 0.01%
+    "277c30d97574f52fdab3ab4f0e30f27aea05aecf", // SILVST / USDST 0.05%
+    "bce2f1542b3bffb416d70f8bd36f03af8ab7563c", // NVDA / USDST 0.01%
+    "ac86e7ca88fb19cf9e4f30c6370e043d5f165d79", // SPY / USDST 0.01%
 ];
 
 /**

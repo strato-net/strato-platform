@@ -348,6 +348,31 @@ Disable:
 node configure-bridge-deposit-actions.js --env testnet --operation disable --execute
 ```
 
+#### `upgrade-stablepools.js`
+Points every deployed StablePool proxy at a fresh implementation built from the current `concrete/Pools/StablePool.sol`. Dry run by default; idempotent; governance-aware (exit code 2 while votes are pending, re-run after voting).
+
+Dry run (no credentials needed; discovery uses the public Cirrus endpoint `.../cirrus/search/BlockApps-StablePool?DMaTime=gt.0`):
+```bash
+node deploy/upgrade-stablepools.js --env testnet
+node deploy/upgrade-stablepools.js --env prod
+```
+
+Apply:
+```bash
+node deploy/upgrade-stablepools.js --env testnet --execute
+node deploy/upgrade-stablepools.js --env prod --execute --with-factory
+```
+
+Options: `--with-factory` also upgrades the PoolFactory proxy so pools created afterwards use the patched source (without it, `createStablePool` keeps using the factory's embedded, old StablePool); `--pools a,b,c` restricts the run; `--pool-impl` / `--factory-impl` reuse implementations you already deployed; `--skip-disabled` leaves migrated pools alone; `--env-file` selects the credentials file (default `app/contracts/.env`). Every address is verified to be a Proxy whose current logic is a StablePool before it is touched. Implementation addresses and in-flight vote issues are recorded in `deploy/upgrade-stablepools.state.<env>.json`.
+
+#### `sweep-withdrawal.js`
+One-command incident response for the MercataBridge (0x1008): cancels in-flight withdrawals (`INITIATED` or `PENDING_REVIEW`) and moves their escrow to a triage wallet, so stolen funds cannot bridge out and can be returned to victims. With `--execute` it also upgrades the bridge logic to the sweep-capable implementation if needed (deploying it, or reusing one another admin already deployed), then prints the custody Safe proposals to reject. Dry run by default; safe to re-run; on multi-admin networks every admin runs the same command until it reports done. `--force-upgrade` redeploys the logic whenever the proxy's on-chain code hash differs from the hash of the local `BaseCodeCollection.sol` build. Full steps: `deploy/RUNBOOK-sweep-withdrawal.md`.
+
+```bash
+node deploy/sweep-withdrawal.js --env prod --ids 274 --triage <addr>            # dry run
+node deploy/sweep-withdrawal.js --env prod --ids 274 --triage <addr> --execute  # sweep, then reject in the Safe app
+```
+
 ## Directory Structure
 
 ```
@@ -358,6 +383,8 @@ deploy/
 ├── contract.js     # Contract compilation and deployment
 ├── deploy.js       # Main code collection deployment script
 ├── README.md       # This file
+├── sweep-withdrawal.js # Incident response: cancel bridge withdrawals and move escrow to a triage wallet
 ├── upgrade.js      # Proxy upgrade script
+├── upgrade-stablepools.js # Repoint every StablePool proxy (and optionally the factory) at a fresh implementation
 └── util.js         # General utility functions
 ```

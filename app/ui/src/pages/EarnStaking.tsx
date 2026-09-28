@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
@@ -288,8 +289,9 @@ const EarnStaking = () => {
     }
   }, [isLoggedIn]);
 
+  usePageTitle("Stake");
+
   useEffect(() => {
-    document.title = "Stake STRATO | STRATO";
     window.scrollTo(0, 0);
     refreshInfo();
   }, [refreshInfo]);

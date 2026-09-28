@@ -479,7 +479,7 @@ bPrimeToB (Block' x) = x
 newtype BlockHeader' = BlockHeader' BlockHeader deriving (Eq, Show)
 
 instance ToJSON BlockHeader' where
-  toJSON (BlockHeader' (BlockHeader ph uh a sr tr rr _ d num gl gu ts ed mh non)) =
+  toJSON (BlockHeader' (BlockHeader ph uh a sr tr rr lb d num gl gu ts ed mh non)) =
     object
       [ "kind" .= ("BlockData" :: String),
         "parentHash" .= ph,
@@ -488,6 +488,7 @@ instance ToJSON BlockHeader' where
         "stateRoot" .= sr,
         "transactionsRoot" .= tr,
         "receiptsRoot" .= rr,
+        "logsBloom" .= lb,
         "difficulty" .= d,
         "number" .= num,
         "gasLimit" .= gl,
@@ -505,6 +506,7 @@ instance ToJSON BlockHeader' where
         "stateRoot" .= stateRoot,
         "transactionsRoot" .= transactionsRoot,
         "receiptsRoot" .= receiptsRoot,
+        "logsBloom" .= logsBloom,
         "number" .= number,
         "timestamp" .= timestamp,
         "extraData" .= extraData,
@@ -522,6 +524,7 @@ instance ToJSON BlockHeader' where
         "stateRoot" .= stateRoot,
         "transactionsRoot" .= transactionsRoot,
         "receiptsRoot" .= receiptsRoot,
+        "logsBloom" .= logsBloom,
         "number" .= number,
         "timestamp" .= timestamp,
         "extraData" .= extraData,
@@ -545,7 +548,7 @@ instance FromJSON BlockHeader' where
           <*> v .: "stateRoot"
           <*> v .: "transactionsRoot"
           <*> v .: "receiptsRoot"
-          <*> v .:? "logBloom" .!= B.replicate 64 0x30
+          <*> v .:? "logsBloom" .!= B.replicate 64 0x30
           <*> v .: "number"
           <*> v .: "timestamp"
           <*> v .: "extraData"
@@ -581,7 +584,7 @@ instance FromJSON BlockHeader' where
           <*> v .: "stateRoot"
           <*> v .: "transactionsRoot"
           <*> v .: "receiptsRoot"
-          <*> v .:? "logBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
+          <*> v .:? "logsBloom" .!= B.replicate 64 0x30 -- this is what log blooms currently get set to
           <*> v .: "number"
           <*> v .: "timestamp"
           <*> v .: "extraData"

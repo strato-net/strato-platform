@@ -41,7 +41,13 @@ data ParserState = ParserState
     pragmaVersion :: PragmaVersion,
     pragmas :: [(String, String)],
     userDefinedTypes :: (M.Map String String),
-    contractSrcLength :: Int
+    contractSrcLength :: Int,
+    -- | Parse expressions with the pre-fork operator table, in which assignment
+    -- bound tighter than @&&@ / @||@ (so @a = b || c@ meant @(a = b) || c@) and
+    -- the ternary bound tighter than both. Only the VM sets this, for blocks
+    -- before the operator-precedence fork; everything else parses Solidity's
+    -- real precedence.
+    legacyOperatorPrecedence :: Bool
   }
 
 -- TODO: add lenses to make the referencing and changing of the parser state faster
@@ -49,10 +55,17 @@ data ParserState = ParserState
 type SolidityParser = Parsec SourceCode ParserState
 
 initialParserState :: ParserState
-initialParserState = ParserState "" "" [] M.empty 0
+initialParserState = ParserState "" "" [] M.empty 0 False
 
 initialParserStateWithLength :: Int -> ParserState
-initialParserStateWithLength srcLength = ParserState "" "" [] M.empty srcLength
+initialParserStateWithLength srcLength = ParserState "" "" [] M.empty srcLength False
+
+-- | The parser state the VM uses for code that must keep its pre-fork meaning.
+withLegacyOperatorPrecedence :: Bool -> ParserState -> ParserState
+withLegacyOperatorPrecedence legacy st = st {legacyOperatorPrecedence = legacy}
+
+getLegacyOperatorPrecedence :: SolidityParser Bool
+getLegacyOperatorPrecedence = legacyOperatorPrecedence <$> getState
 
 --given inputs set the parser state
 setParserState :: ParserState -> SolidityParser ()
@@ -64,7 +77,7 @@ setPragmaVersion :: PragmaVersion -> SolidityParser ()
 setPragmaVersion p =
   do
     ParserState {..} <- getState
-    putState (ParserState contractName p pragmas userDefinedTypes contractSrcLength)
+    putState (ParserState contractName p pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence)
 
 --Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
@@ -72,7 +85,7 @@ setContractName :: ContractName -> SolidityParser ()
 setContractName cn =
   do
     ParserState {..} <- getState
-    putState (ParserState cn pragmaVersion pragmas userDefinedTypes contractSrcLength)
+    putState (ParserState cn pragmaVersion pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence)
 
 addPragma :: String -> String -> SolidityParser ()
 addPragma k v = do
@@ -81,15 +94,15 @@ addPragma k v = do
     "solidvm" ->
       let pragmaList = resolveSolidVMVersion v
           newPragmas = pragmaList ++ pragmas
-      in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength
-    _ -> putState $ ParserState contractName pragmaVersion ((k,v):pragmas) userDefinedTypes contractSrcLength
+      in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence
+    _ -> putState $ ParserState contractName pragmaVersion ((k,v):pragmas) userDefinedTypes contractSrcLength legacyOperatorPrecedence
 
 addUserDefinedType :: String -> String -> SolidityParser ()
 addUserDefinedType k v =
   --putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) =<< ParserState{..} =<< getState
   do
     ParserState {..} <- getState
-    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes) contractSrcLength)
+    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes) contractSrcLength legacyOperatorPrecedence)
 
 -- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName

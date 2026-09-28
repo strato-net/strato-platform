@@ -6,11 +6,14 @@
 module EthLog
   ( EthLog(..)
   , eventRowToLog
+  , eventRowToLogMaybe
   , eventToLog
+  , ethLogsBloom
   , matchesTopics
   ) where
 
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLog, findEventDef)
+import Blockchain.Data.LogsBloom (bloomFromItems)
 import Blockchain.Strato.Model.Address (addressFromHex)
 import Control.Monad.Composable.CodeDB (CodeDBM, EventRow(..), lookupCodeCollection, lookupCodeHash)
 import Data.Aeson (ToJSON(..), Value(..), object, (.=))
@@ -92,6 +95,32 @@ eventToLog cc row =
   where
     extractText (String s) = Just s
     extractText _          = Nothing
+
+-- | Like 'eventRowToLog', but yields 'Nothing' instead of throwing when the
+-- contract code, code collection, or event definition cannot be resolved.
+-- Used where a single unresolvable event must not fail the whole request
+-- (e.g. bloom computation over every event in a transaction or block).
+eventRowToLogMaybe :: EventRow -> CodeDBM IO (Maybe EthLog)
+eventRowToLogMaybe row =
+  case addressFromHex (BC.pack $ T.unpack (erAddress row)) of
+    Left _ -> pure Nothing
+    Right addr ->
+      lookupCodeHash addr >>= \case
+        Nothing -> pure Nothing
+        Just cHash ->
+          lookupCodeCollection cHash >>= \case
+            Nothing -> pure Nothing
+            Just cc -> pure $
+              case findEventDef cc (stringToLabel $ T.unpack (erEventName row)) of
+                Nothing -> Nothing
+                Just _  -> Just (eventToLog cc row)
+
+-- | Ethereum logs bloom over a set of reconstructed logs (address + topics).
+ethLogsBloom :: [EthLog] -> B.ByteString
+ethLogsBloom = bloomFromItems . concatMap logItems
+  where
+    logItems l = addrBytes (address l) : topics l
+    addrBytes t = either (const B.empty) id (B16.decode (BC.pack (T.unpack t)))
 
 matchesTopics :: [String] -> EthLog -> Bool
 matchesTopics [] _ = True

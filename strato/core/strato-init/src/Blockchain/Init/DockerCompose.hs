@@ -278,10 +278,13 @@ generateDockerCompose = do
         }
 
   -- Message broker service (configured via streaming package). The retention
-  -- flags are only meaningful for the Kafka backend, so they are merged in
-  -- (left-biased union) only when the broker environment is Kafka's.
-  -- The flags are used during the network snapshot creation to avoid including the old consumed logs and
-  -- keep the snapshot size smaller.
+  -- flags are only meaningful for the Kafka-family backends, so they are merged
+  -- in (left-biased union) only when the broker environment is Kafka's -- i.e.
+  -- never on the default JLog backend, which is embedded and declares no
+  -- broker environment at all. (They used to also bound the size of a node
+  -- snapshot, which no longer applies: JLog unlinks a topic's segments once
+  -- every subscriber has checkpointed past them, so strato-snapshot captures
+  -- the jlog/ dir as-is with no retention tuning or pre-archive pruning.)
   let bc = brokerConfig
       kafkaRetentionEnv = Map.fromList
         [ ("KAFKA_LOG_RETENTION_HOURS", show flags_kafkaLogRetentionHours)

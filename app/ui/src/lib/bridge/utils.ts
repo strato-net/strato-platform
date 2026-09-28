@@ -169,6 +169,8 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://robinhoodchain.blockscout.com/tx/${txHash}`;
     case 46630: // Robinhood Chain Testnet
       return `https://explorer.testnet.chain.robinhood.com/tx/${txHash}`;
+    case 999: // HyperEVM
+      return `https://hyperevmscan.io/tx/${txHash}`;
     default:
       return `https://etherscan.io/tx/${txHash}`;
   }

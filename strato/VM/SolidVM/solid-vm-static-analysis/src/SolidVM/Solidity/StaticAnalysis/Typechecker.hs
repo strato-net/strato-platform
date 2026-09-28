@@ -1052,7 +1052,19 @@ contractHelper test cc c =
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_flConstants cc)
       funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper test cc c) <$> M.toList funcsAndConstr
-      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper test cc c <$> M.elems (_modifiers c)
+      -- Inherited modifiers are typechecked once, in the contract that declares
+      -- them, where any private state they touch is in scope. The merged copy a
+      -- child carries would be checked against the child's storage, which has
+      -- had the parent's private variables filtered out, and every such
+      -- modifier came back as "Unknown variable".
+      spanOf a = (_sourceAnnotationStart a, _sourceAnnotationEnd a)
+      inheritedModifierSpans = S.fromList
+        [ spanOf (_modifierContext m)
+        | p <- fromMaybe [] (getParentsAnnotated cc c),
+          m <- M.elems (_modifiers p)
+        ]
+      ownModifiers = filter ((`S.notMember` inheritedModifierSpans) . spanOf . _modifierContext) $ M.elems (_modifiers c)
+      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper test cc c <$> ownModifiers
   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::

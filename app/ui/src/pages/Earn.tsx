@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileSidebar from "@/components/dashboard/MobileSidebar";
@@ -18,6 +19,8 @@ import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { api } from "@/lib/axios";
 import { formatUnits } from "ethers";
 import { CircleArrowDown, PiggyBank, ShieldCheck, TrendingUp } from "lucide-react";
+import AssetIcon from "@/components/ui/AssetIcon";
+import { SAVE_USDST_VAULT_KEY } from "@/config/vaultIcons";
 import { useNavigate } from "react-router-dom";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
 import { BestApyInfoTooltip } from "@/components/earn/BestApyInfoTooltip";
@@ -226,8 +229,9 @@ const Earn = () => {
   const guestMode = !isLoggedIn;
   const navigate = useNavigate();
 
+  usePageTitle("Earn");
+
   useEffect(() => {
-    document.title = "Earn | STRATO";
     window.scrollTo(0, 0);
   }, []);
 
@@ -716,13 +720,27 @@ const Earn = () => {
                       </p>
                       <div className="flex items-start gap-3.5">
                         {configuredFeaturedOpportunity.kind === "saveUsdst" ? (
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
-                            <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                          </div>
+                          <AssetIcon
+                            vaultKey={SAVE_USDST_VAULT_KEY}
+                            alt="USDST Savings Vault"
+                            className="h-12 w-12 shrink-0 rounded-full object-cover"
+                            fallback={
+                              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                                <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                              </div>
+                            }
+                          />
                         ) : configuredFeaturedOpportunity.kind === "yieldVault" ? (
-                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg}`}>
-                            <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
-                          </div>
+                          <AssetIcon
+                            vaultKey={YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].key}
+                            alt={YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].name}
+                            className="h-12 w-12 shrink-0 rounded-full object-cover"
+                            fallback={
+                              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconBg}`}>
+                                <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[configuredFeaturedOpportunity.vaultIndex].iconColor}`} />
+                              </div>
+                            }
+                          />
                         ) : (
                           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
                             <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
@@ -808,13 +826,27 @@ const Earn = () => {
                     </p>
                     <div className="flex items-start gap-3.5">
                       {topOpportunity.kind === "saveUsdst" ? (
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
-                          <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                        </div>
+                        <AssetIcon
+                          vaultKey={SAVE_USDST_VAULT_KEY}
+                          alt="USDST Savings Vault"
+                          className="h-12 w-12 shrink-0 rounded-full object-cover"
+                          fallback={
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 dark:bg-emerald-400/15">
+                              <PiggyBank className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                          }
+                        />
                       ) : topOpportunity.kind === "yieldVault" ? (
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg}`}>
-                          <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
-                        </div>
+                        <AssetIcon
+                          vaultKey={YIELD_VAULTS[topOpportunity.vaultIndex].key}
+                          alt={YIELD_VAULTS[topOpportunity.vaultIndex].name}
+                          className="h-12 w-12 shrink-0 rounded-full object-cover"
+                          fallback={
+                            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${YIELD_VAULTS[topOpportunity.vaultIndex].iconBg}`}>
+                              <TrendingUp className={`h-5 w-5 ${YIELD_VAULTS[topOpportunity.vaultIndex].iconColor}`} />
+                            </div>
+                          }
+                        />
                       ) : (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-500/15 dark:bg-cyan-400/15">
                           <ShieldCheck className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
@@ -921,9 +953,16 @@ const Earn = () => {
                             >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
-                                    <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                                  </div>
+                                  <AssetIcon
+                                    vaultKey={SAVE_USDST_VAULT_KEY}
+                                    alt="USDST Savings Vault"
+                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                    fallback={
+                                      <div className="w-8 h-8 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 flex items-center justify-center shrink-0">
+                                        <PiggyBank className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                      </div>
+                                    }
+                                  />
                                   <p className="font-medium truncate">USDST Savings Vault</p>
                                   <Badge variant="secondary" className="text-[10px]">Savings Vault</Badge>
                                   {saveUsdstRewardMeta.earnsRewards && (
@@ -991,9 +1030,16 @@ const Earn = () => {
                             >
                               <td className="px-4 py-3">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <div className={`w-8 h-8 rounded-full ${cfg.iconBg} flex items-center justify-center shrink-0`}>
-                                    <TrendingUp className={`h-4 w-4 ${cfg.iconColor}`} />
-                                  </div>
+                                  <AssetIcon
+                                    vaultKey={cfg.key}
+                                    alt={cfg.name}
+                                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                                    fallback={
+                                      <div className={`w-8 h-8 rounded-full ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+                                        <TrendingUp className={`h-4 w-4 ${cfg.iconColor}`} />
+                                      </div>
+                                    }
+                                  />
                                   <p className="font-medium truncate">{cfg.name}</p>
                                   <Badge variant="secondary" className="text-[10px]">{cfg.badge}</Badge>
                                   {!yvLive && (

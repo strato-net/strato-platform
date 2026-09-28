@@ -2,6 +2,8 @@
 
 Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
 
+Oracle config is keyed by network in `assets.json` (`networks[ORACLE_NETWORK_ID]`). Set `ORACLE_NETWORK_ID` to the upquark network ID on production (`33056204878082667`) and to the helium network ID on testnet (`114784819836269`). Each block has complete `assets` and `sources`.
+
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources
@@ -21,6 +23,7 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 # STRATO Configuration
 STRATO_NODE_URL=https://node1.testnet.strato.nexus/
 PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
+ORACLE_NETWORK_ID=114784819836269  # helium testnet; production: 33056204878082667 (upquark)
 
 # OAuth Configuration
 OAUTH_CLIENT_ID=your-client-id

@@ -33,7 +33,7 @@ pipeline {
         sh "unlink strato-platform-origin || true"
         sh "ln -s /home/ubuntu/strato-platform strato-platform-origin"
         dir ("strato-platform-origin") {
-          sh "strato-down || (cd mynode docker compose -p strato down -vt0 && cd ..) && sleep 7"
+          sh "if [ -d mynode ]; then strato-down || (cd mynode && docker compose -p strato down -vt0); sleep 7; fi"
           sh "rm -rf mynode"
           withEnv(['JENKINS_NODE_COOKIE=dontKillMe']) {
             sh "./run.sh"

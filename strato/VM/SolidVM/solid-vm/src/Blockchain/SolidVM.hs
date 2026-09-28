@@ -40,6 +40,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
+import BlockApps.Solidity.ABI.Bridge (encodeEventToLog)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -256,7 +257,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
+    opts <- parseOptionsForCurrentBlock
+    (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 initCode
     addNewCodeCollection hsh cc
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
@@ -1009,7 +1011,17 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
           let contractName' = labelToString $ CC._contractName curCnct
-          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs
+          -- Derive the Ethereum log topics (topic0 + indexed args) from the event
+          -- ABI now, while the CodeCollection is in hand, so the block producer can
+          -- build a real logsBloom without re-deriving them. Uses the same encoder
+          -- and the same (name -> rendered value) attributes the JSON-RPC layer
+          -- reconstructs from Cirrus, so producer and RPC blooms agree.
+          let (evTopicBytes, _) =
+                encodeEventToLog
+                  (stringToLabel eventName)
+                  ev
+                  (M.fromList [(T.pack n, T.pack v) | (n, _, v, _) <- evArgs])
+          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
@@ -2764,7 +2776,8 @@ callBuiltin "create" args@(cName : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+  opts <- parseOptionsForCurrentBlock
+  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddress creator
   execResults <- create' creator newAddress hsh cc contractName' argVals
@@ -2788,7 +2801,8 @@ callBuiltin "create2" args@(salt : n : src : argVals) = do
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
+  opts <- parseOptionsForCurrentBlock
+  (hsh, cc) <- codeCollectionFromSourceWith opts isRunningTests True $ DT.encodeUtf8 $ T.pack contractSrc
   addNewCodeCollection hsh cc
   newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals

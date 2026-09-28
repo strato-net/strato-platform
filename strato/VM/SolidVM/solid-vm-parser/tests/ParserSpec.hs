@@ -107,6 +107,49 @@ spec = do
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
 
+  describe "Operator precedence" $ do
+    let parseExpr = fmap (fmap (const ())) . runParser expression initialParserState ""
+        legacyState = initialParserState {legacyOperatorPrecedence = True}
+        parseLegacy = fmap (fmap (const ())) . runParser expression legacyState ""
+        v = Variable ()
+        bin = Binary ()
+        cases =
+          [ -- assignment is the loosest operator: the whole `b || c` is assigned
+            ("a = b || c", bin "=" (v "a") (bin "||" (v "b") (v "c"))),
+            ("a = b && c", bin "=" (v "a") (bin "&&" (v "b") (v "c"))),
+            ("a |= b || c", bin "|=" (v "a") (bin "||" (v "b") (v "c"))),
+            ("a = c ? x : y", bin "=" (v "a") (Ternary () (v "c") (v "x") (v "y"))),
+            -- ternary is looser than || and &&
+            ("a || b ? x : y", Ternary () (bin "||" (v "a") (v "b")) (v "x") (v "y")),
+            ("a && b ? x : y", Ternary () (bin "&&" (v "a") (v "b")) (v "x") (v "y")),
+            -- && binds tighter than ||
+            ("a && b || c", bin "||" (bin "&&" (v "a") (v "b")) (v "c")),
+            ("a || b && c", bin "||" (v "a") (bin "&&" (v "b") (v "c"))),
+            -- relational binds tighter than equality
+            ("a < b == c", bin "==" (bin "<" (v "a") (v "b")) (v "c")),
+            ("a == b < c", bin "==" (v "a") (bin "<" (v "b") (v "c"))),
+            -- ** and assignment associate to the right
+            ("a ** b ** c", bin "**" (v "a") (bin "**" (v "b") (v "c"))),
+            ("a = b = c", bin "=" (v "a") (bin "=" (v "b") (v "c"))),
+            -- unchanged neighbours
+            ("!a || b", bin "||" (Unitary () "!" (v "a")) (v "b")),
+            ("a + b * c", bin "+" (v "a") (bin "*" (v "b") (v "c")))
+          ]
+    forM_ cases $ \(input, want) -> do
+      it ("parses " ++ input ++ " with Solidity precedence") $ parseExpr input `shouldBe` Right want
+
+    -- The pre-fork table, kept for replaying old blocks: assignment bound
+    -- tighter than && / ||, and the ternary tighter than both.
+    let legacyCases =
+          [ ("a = b || c", bin "||" (bin "=" (v "a") (v "b")) (v "c")),
+            ("a = b && c", bin "&&" (bin "=" (v "a") (v "b")) (v "c")),
+            ("a || b ? x : y", bin "||" (v "a") (Ternary () (v "b") (v "x") (v "y"))),
+            ("a < b == c", bin "<" (v "a") (bin "==" (v "b") (v "c"))),
+            ("a ** b ** c", bin "**" (bin "**" (v "a") (v "b")) (v "c"))
+          ]
+    forM_ legacyCases $ \(input, want) -> do
+      it ("parses " ++ input ++ " with the legacy table") $ parseLegacy input `shouldBe` Right want
+
   describe "Arg literal parsing (parseArg)" $ do
     let parseA = fmap (fmap (const ())) . runParser parseArg initialParserState ""
         cases =

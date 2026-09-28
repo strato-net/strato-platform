@@ -20,7 +20,7 @@ module.exports = {
       gasPrice: "auto",
     },
     mainnet: {
-      url: process.env.MAINNET_RPC_URL,
+      url: process.env.MAINNET_RPC_URL || "https://eth.merkle.io",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },
@@ -57,6 +57,12 @@ module.exports = {
         process.env.ROBINHOOD_RPC_URL ||
         "https://rpc.mainnet.chain.robinhood.com",
       chainId: 4663,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: "auto",
+    },
+    hyperEvm: {
+      url: process.env.HYPEREVM_RPC_URL || "https://rpc.hyperliquid.xyz/evm",
+      chainId: 999,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
     },

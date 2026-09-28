@@ -23,6 +23,13 @@ import "../Tokens/Token.sol";
 /// @notice Pool factory contract
 contract record PoolFactory is Ownable {
 
+    /// @notice EMA half-life window handed to every new StablePool, in seconds.
+    /// @dev This is a *duration*, not a timestamp. Passing block.timestamp here
+    ///      gave every pool a ~55 year averaging window, which pinned the moving
+    ///      average to its seed value forever.
+    uint constant MA_EXP_TIME = 866;
+
+
     // ============ EVENTS ============
 
     /// @notice Event emitted when a new pool is created
@@ -285,9 +292,9 @@ contract record PoolFactory is Ownable {
             100,
             swapFeeRate * 1e6, // 0.3% * FEE_DENOMINATOR
             1e10,
-            block.timestamp,
+            MA_EXP_TIME,
             [address(tokenA), address(tokenB)],
-            [1e18, 1e18],
+            [_rateMultiplierFor(tokenA), _rateMultiplierFor(tokenB)],
             [1, 1],
             [address(0), address(0)],
             lpTokenAddress
@@ -353,7 +360,7 @@ contract record PoolFactory is Ownable {
             100,
             swapFeeRate * 1e6, // 0.3% * FEE_DENOMINATOR
             1e10,
-            block.timestamp,
+            MA_EXP_TIME,
             tokens,
             rateMultipliers,
             assetTypes,
@@ -524,7 +531,7 @@ contract record PoolFactory is Ownable {
             100,
             swapFeeRate * 1e6,
             1e10,
-            block.timestamp,
+            MA_EXP_TIME,
             uniqueTokens,
             uniqueRateMultipliers,
             uniqueAssetTypes,
@@ -670,6 +677,18 @@ contract record PoolFactory is Ownable {
         emit NewPool(_coin, address(pool.coins(0)), poolAddress);
 
         return mintAmount;
+    }
+
+    /// @dev G6: the Curve convention, 10**(36 - decimals), so every coin's
+    ///      balance scales to 1e18 units inside the pool. A flat 1e18 priced a
+    ///      6-decimal coin 1e12 times too low.
+    ///      NB: called through the IERC20Metadata interface on purpose. From an
+    ///      internal function SolidVM binds `ERC20(t).decimals()` to ERC20's own
+    ///      body (18) instead of dispatching to Token's external override.
+    function _rateMultiplierFor(address token) internal view returns (uint) {
+        uint dec = uint(IERC20Metadata(token).decimals());
+        require(dec <= 36, "Unsupported token decimals");
+        return 10 ** (36 - dec);
     }
 
     function updatePoolImplementation() external onlyOwner {

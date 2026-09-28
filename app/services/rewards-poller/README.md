@@ -118,7 +118,7 @@ RETRY_MAX_DELAY=10000
 
 ## Event Mappings
 
-The service uses hardcoded event mappings to convert protocol events to Rewards contract calls:
+The service uses configured event mappings to convert protocol events to Rewards contract calls:
 
 - `Pool.Deposited` → `rewards.deposit(activityId: 1, user, amount)`
 - `Pool.Withdrawn` → `rewards.withdraw(activityId: 1, user, amount)`
@@ -126,6 +126,20 @@ The service uses hardcoded event mappings to convert protocol events to Rewards 
 - `LiquidityPool.Withdrawn` → `rewards.withdraw(activityId: 2, user, amount)`
 - `LendingPool.Borrowed` → `rewards.occurred(activityId: 3, user, amount)`
 - `LendingPool.Repaid` → `rewards.occurred(activityId: 4, user, amount)`
+
+Position event source addresses and mappings are configured in
+`src/infra/config/positionEventSourceConfig.json`.
+At startup, the poller reads the node metadata and selects only entries matching
+the node's `networkID`.
+The native custody configuration maps `Locked` and `Unlocked` events to the token's
+existing Position activity:
+
+- `Locked` → the activity's existing `Withdraw` action event
+- `Unlocked` → the activity's existing `Deposit` action event
+
+The poller resolves the target activity and its configured event names from the
+event's `token` attribute. No token address, Rewards activity ID, or Rewards contract
+configuration change is required.
 
 ## Usage
 

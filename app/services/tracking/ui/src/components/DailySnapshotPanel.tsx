@@ -1,15 +1,21 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ChevronDown } from 'lucide-react';
 import {
   DailySnapshot,
   formatCount,
   formatUsdCompact,
+  getDailyBreakdown,
   getDailySnapshot,
   MetricDelta,
 } from '../api';
+import SnapshotBreakdown, {
+  BREAKDOWN_LABELS,
+  BreakdownKey,
+  breakdownCaption,
+} from './SnapshotBreakdown';
 import { Skeleton } from './primitives';
 
 // "Daily Snapshot": today's (UTC) cross-link numbers with a delta against the
@@ -53,29 +59,51 @@ const Delta = ({ delta }: { delta: MetricDelta }) => {
   );
 };
 
+// Each tile is a disclosure button: clicking it opens the table of rows the
+// number is made of, below the grid.
 const Tile = ({
   label,
   value,
   sub,
   delta,
   highlight,
+  expanded,
+  onToggle,
 }: {
   label: string;
   value: string;
   sub: string;
   delta: MetricDelta;
   highlight?: boolean;
+  expanded: boolean;
+  onToggle: () => void;
 }) => (
-  <div
-    className={`rounded-lg border p-4 ${highlight ? 'border-primary bg-primary/5' : 'border-border'}`}
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-expanded={expanded}
+    title={`${expanded ? 'Hide' : 'Show'} the ${label.toLowerCase()} breakdown`}
+    className={`rounded-lg border p-4 text-left transition-colors hover:bg-muted/50 ${
+      expanded
+        ? 'border-primary ring-1 ring-primary/40'
+        : highlight
+          ? 'border-primary bg-primary/5'
+          : 'border-border'
+    }`}
   >
-    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
+      <ChevronDown
+        size={14}
+        className={`shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`}
+      />
+    </div>
     <div className="mt-1 text-2xl font-semibold">{value}</div>
     <div className="mt-2 flex items-center justify-between gap-2">
       <span className="truncate text-xs text-muted-foreground">{sub}</span>
       <Delta delta={delta} />
     </div>
-  </div>
+  </button>
 );
 
 const SectionLabel = ({ children }: { children: ReactNode }) => (
@@ -158,11 +186,20 @@ const TopLinks = ({ snapshot }: { snapshot: DailySnapshot }) => {
 };
 
 const DailySnapshotPanel = () => {
+  const [expanded, setExpanded] = useState<BreakdownKey | null>(null);
   const snapshot = useQuery({
     queryKey: ['metrics', 'daily'],
     queryFn: getDailySnapshot,
     staleTime: 15_000,
     refetchInterval: 30_000,
+  });
+  // One request covers all four tables, and only once a tile is opened
+  const breakdown = useQuery({
+    queryKey: ['metrics', 'daily', 'breakdown'],
+    queryFn: getDailyBreakdown,
+    enabled: expanded !== null,
+    staleTime: 15_000,
+    refetchInterval: expanded === null ? false : 30_000,
   });
 
   if (snapshot.isPending) {
@@ -178,6 +215,9 @@ const DailySnapshotPanel = () => {
       </section>
     );
   }
+
+  const toggle = (metric: BreakdownKey) =>
+    setExpanded((current) => (current === metric ? null : metric));
 
   const data = snapshot.data;
   // date is a UTC day string: parse as local midnight so it doesn't shift back
@@ -201,26 +241,61 @@ const DailySnapshotPanel = () => {
             sub={`${formatCount(data.engagedOpens)} engaged`}
             delta={data.opens}
             highlight
+            expanded={expanded === 'opens'}
+            onToggle={() => toggle('opens')}
           />
           <Tile
             label="Wallets"
             value={formatCount(data.wallets.value)}
             sub={`${formatCount(data.bridgedWallets)} bridged`}
             delta={data.wallets}
+            expanded={expanded === 'wallets'}
+            onToggle={() => toggle('wallets')}
           />
           <Tile
             label="Bridged in"
             value={`${formatUsdCompact(data.bridgeValueUsd.value)}${data.bridgeValuePartial ? '+' : ''}`}
             sub={`${formatCount(data.bridgeIns)} transfer${data.bridgeIns === 1 ? '' : 's'}`}
             delta={data.bridgeValueUsd}
+            expanded={expanded === 'bridgeIns'}
+            onToggle={() => toggle('bridgeIns')}
           />
           <Tile
             label="On-chain actions"
             value={formatCount(data.actions.value)}
             sub={`across ${data.actionLinks} link${data.actionLinks === 1 ? '' : 's'}`}
             delta={data.actions}
+            expanded={expanded === 'actions'}
+            onToggle={() => toggle('actions')}
           />
         </div>
+
+        {expanded && (
+          <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <SectionLabel>{BREAKDOWN_LABELS[expanded]} breakdown</SectionLabel>
+              {breakdown.data && (
+                <span className="text-xs text-muted-foreground">
+                  {breakdownCaption(expanded, breakdown.data)}
+                </span>
+              )}
+            </div>
+            <div className="mt-3">
+              {breakdown.isPending ? (
+                <Skeleton className="h-48 w-full" />
+              ) : breakdown.isError ? (
+                <p className="rounded-lg border border-border p-6 text-center text-sm text-muted-foreground">
+                  The breakdown is unavailable.{' '}
+                  <button className="underline" onClick={() => breakdown.refetch()}>
+                    Retry
+                  </button>
+                </p>
+              ) : (
+                <SnapshotBreakdown metric={expanded} breakdown={breakdown.data} />
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>

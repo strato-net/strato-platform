@@ -167,7 +167,15 @@ async function fetchTokenSymbols(accessToken: string, addresses: Set<string>): P
   const { data } = await cirrus.get(accessToken, `/${constants.Token}`, {
     params: { select: "address,_symbol,_name", address: `in.(${[...addresses].join(",")})` }
   });
-  return new Map((data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }]));
+  const symbols = new Map<string, { name: string; symbol: string }>(
+    (data || []).map((t: any) => [stripHex(t.address), { name: t._name || "-", symbol: t._symbol || "-" }])
+  );
+  const missingAddresses = new Set([...addresses].filter((address) => !symbols.has(stripHex(address))));
+  if (missingAddresses.size) {
+    const storageSymbols = await fetchStorageTokenSymbols(accessToken, missingAddresses);
+    for (const [address, metadata] of storageSymbols) symbols.set(address, metadata);
+  }
+  return symbols;
 }
 
 async function fetchStorageTokenSymbols(accessToken: string, addresses: Set<string>): Promise<Map<string, { name: string; symbol: string }>> {
