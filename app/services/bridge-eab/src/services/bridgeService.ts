@@ -1,3 +1,5 @@
+import { processingIssueService, withdrawalProcessingContext } from "./processingIssueService";
+import { processingIssue, classifyProcessingError } from "../utils/processingIssues";
 import { recoverReviewedDeposit } from "./depositRecoveryService";
 import {
   config,
@@ -665,7 +667,7 @@ export const reviewNativeDepositBatch = async (
 export const processExternalWithdrawal = async (
   withdrawal: WithdrawalInfo,
   manualReviewApproved = false,
-): Promise<void> => {
+): Promise<boolean> => {
   if (withdrawal.requiresManualReview && !manualReviewApproved) {
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} requires manual review`,
@@ -673,17 +675,21 @@ export const processExternalWithdrawal = async (
   }
 
   if (String(withdrawal.bridgeStatus) === "1" || String(withdrawal.bridgeStatus) === "2") {
+    const capacityContext = withdrawalProcessingContext("eab", withdrawal, "withdrawal-capacity");
+    if (!await processingIssueService.due(capacityContext)) return false;
     const capacity = await getWithdrawalCapacity(withdrawal);
     if (capacity.available < BigInt(withdrawal.externalTokenAmount)) {
-      logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is waiting for vault capacity`, {
-        available: capacity.available.toString(),
-        retryAfterSeconds: capacity.retryAfterSeconds === MaxUint256
-          ? "pending reservations must clear" : capacity.retryAfterSeconds.toString(),
+      await processingIssueService.record(withdrawalProcessingContext("eab", withdrawal, "withdrawal-capacity"), {
+        issues: [processingIssue("WITHDRAWAL_CAPACITY", { token: withdrawal.externalToken,
+          required: withdrawal.externalTokenAmount, available: capacity.available.toString(), units: "external-token-base-units",
+          ...(capacity.retryAfterSeconds === MaxUint256 ? {} : { retryAfterSeconds: capacity.retryAfterSeconds.toString() }),
+        })],
       });
-      return;
+      return false;
     }
   }
 
+  await processingIssueService.resolve(withdrawalProcessingContext("eab", withdrawal, "withdrawal-capacity"));
   const sourceChainId = await getStratoNetworkId();
   const authorization = await buildWithdrawalAuthorization(
     withdrawal,
@@ -706,7 +712,7 @@ export const processExternalWithdrawal = async (
           "BridgeService",
           `Withdrawal ${withdrawal.withdrawalId} entered verifier-requested manual review before authorization`,
         );
-        return;
+        return true;
       }
       throw error;
     }
@@ -735,7 +741,7 @@ export const processExternalWithdrawal = async (
 
   if (withdrawal.recoveryOnly && !authorizationExpired &&
       (reservationState.status === 0 || reservationState.status === 1)) {
-    return;
+    return false;
   }
 
   if (
@@ -763,7 +769,7 @@ export const processExternalWithdrawal = async (
         "BridgeService",
         `Deferred signer set refresh for withdrawal ${withdrawal.withdrawalId}: rotation and reservation state not yet coherent at the confirmed block`,
       );
-      return;
+      return false;
     }
     // A vault signer-set rotation after READY strands the committed
     // authorization: verifiers and the vault only honor the current set.
@@ -796,7 +802,7 @@ export const processExternalWithdrawal = async (
         "BridgeService",
         `External withdrawal ${withdrawal.withdrawalId} expired without a reservation and is ready for governance refund`,
       );
-      return;
+      return false;
     }
     const reservation =
       reservationState.status === 0
@@ -845,7 +851,7 @@ export const processExternalWithdrawal = async (
       // The STRATO record is one-shot: the refund digest binds the recorded
       // hash, so re-recording would invalidate in-flight refund
       // attestations. Only the write is skipped.
-      return;
+      return false;
     }
     await execute({
       contractName: "ExternalAssetBridge",
@@ -862,7 +868,7 @@ export const processExternalWithdrawal = async (
       `Cancelled expired external withdrawal ${withdrawal.withdrawalId}; governance refund is now available`,
       { reservationId, cancellationTxHash },
     );
-    return;
+    return true;
   }
 
   const releaseTxHash = await releaseWithdrawal(authorization, reservationId);
@@ -874,11 +880,10 @@ export const processExternalWithdrawal = async (
     );
   } catch (error) {
     if (!(error instanceof WithdrawalReleasePendingError)) throw error;
-    logInfo("BridgeService", `Withdrawal ${withdrawal.withdrawalId} is awaiting external release confirmations`, {
-      externalTxHash: releaseTxHash,
-    });
-    return;
+    await processingIssueService.record(withdrawalProcessingContext("eab", withdrawal, "release-confirmations"), error);
+    return false;
   }
+  await processingIssueService.resolve(withdrawalProcessingContext("eab", withdrawal, "release-confirmations"));
   await executeAsRelayer({
     contractName: "ExternalAssetBridge",
     contractAddress: config.externalAssetBridge.address!,
@@ -895,6 +900,7 @@ export const processExternalWithdrawal = async (
     `Released and finalized external withdrawal ${withdrawal.withdrawalId}`,
     { reservationId, releaseTxHash },
   );
+  return true;
 };
 
 const recordExternalWithdrawalReview = async (
@@ -933,7 +939,7 @@ export const queueExternalWithdrawalReview = async (
 
 export const processPendingExternalWithdrawalReview = async (
   withdrawal: WithdrawalInfo,
-): Promise<void> => {
+): Promise<boolean> => {
   if (!withdrawal.reviewProposalHash || !withdrawal.reviewApprovalDeadline) {
     throw new Error(
       `Withdrawal ${withdrawal.withdrawalId} is missing manual review state`,
@@ -951,14 +957,14 @@ export const processPendingExternalWithdrawalReview = async (
       method: "expireWithdrawalReview",
       args: { withdrawalId: withdrawal.withdrawalId },
     });
-    return;
+    return true;
   }
   const proposal = await getNativeMintProposalExecution(
     withdrawal.reviewProposalHash,
     withdrawal.externalChainId,
   );
   if (proposal.status === "pending") {
-    return;
+    return false;
   }
   if (proposal.status === "rejected") {
     await execute({
@@ -967,10 +973,10 @@ export const processPendingExternalWithdrawalReview = async (
       method: "rejectWithdrawalReview",
       args: { withdrawalId: withdrawal.withdrawalId },
     });
-    return;
+    return true;
   }
 
-  await processExternalWithdrawal(withdrawal, true);
+  return processExternalWithdrawal(withdrawal, true);
 };
 
 const ensureNativeWithdrawalPending = async (
@@ -1011,7 +1017,7 @@ export const finalizeNativeWithdrawalBatch = async (
   }
 
   const sourceChainId = await getStratoNetworkId();
-  const failures: Array<{ withdrawalId: string; message: string }> = [];
+  const failures: Array<{ withdrawalId: string; message: string; error?: unknown }> = [];
   let successful = 0;
 
   for (const withdrawal of withdrawals) {
@@ -1088,11 +1094,7 @@ export const finalizeNativeWithdrawalBatch = async (
       failures.push({
         withdrawalId: withdrawal.withdrawalId,
         message: errorMessage,
-      });
-      logError("BridgeService", error as Error, {
-        operation: "finalizeNativeWithdrawalBatch",
-        withdrawalId: withdrawal.withdrawalId,
-        externalChainId: withdrawal.externalChainId,
+        error,
       });
     }
   }
@@ -1105,12 +1107,13 @@ export const finalizeNativeWithdrawalBatch = async (
   }
 
   if (failures.length > 0) {
-    throw new Error(
+    throw Object.assign(new Error(
       `Failed to finalize ${failures.length} native withdrawals: ${failures
         .map((failure) => `${failure.withdrawalId} (${failure.message})`)
         .join(", ")}`,
-    );
+    ), { issues: failures.flatMap(failure => classifyProcessingError(failure.error || new Error(failure.message))) });
   }
+  return successful > 0;
 };
 
 export const queueManualNativeWithdrawalBatch = async (
@@ -1148,6 +1151,7 @@ export const queueManualNativeWithdrawalBatch = async (
           withdrawal,
           existingProposalReference,
         );
+        await processingIssueService.resolve(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"));
       } catch (error) {
         const errorMessage = (error as Error).message;
         if (
@@ -1157,11 +1161,7 @@ export const queueManualNativeWithdrawalBatch = async (
           announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
           continue;
         }
-        logError("BridgeService", error as Error, {
-          operation: "syncManualNativeMintProposal",
-          withdrawalId: withdrawal.withdrawalId,
-          externalChainId: withdrawal.externalChainId,
-        });
+        await processingIssueService.record(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"), error);
       }
       continue;
     }
@@ -1184,6 +1184,7 @@ export const queueManualNativeWithdrawalBatch = async (
         proposalReference,
       );
       await recordNativeWithdrawalProposal(withdrawal.withdrawalId, proposalReference);
+      await processingIssueService.resolve(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"));
 
       const baseMessage =
         `Native withdrawal ${withdrawal.withdrawalId} exceeds the instant threshold and remains pending manual approval/execution`;
@@ -1192,11 +1193,7 @@ export const queueManualNativeWithdrawalBatch = async (
         : "";
       logInfo("BridgeService", `${baseMessage}${suffix}`);
     } catch (error) {
-      logError("BridgeService", error as Error, {
-        operation: "queueManualNativeWithdrawalBatch",
-        withdrawalId: withdrawal.withdrawalId,
-        externalChainId: withdrawal.externalChainId,
-      });
+      await processingIssueService.record(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"), error);
     }
   }
 };

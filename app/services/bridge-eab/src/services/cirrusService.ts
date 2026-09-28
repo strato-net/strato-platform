@@ -4,6 +4,7 @@ import { config, CIRRUS_PAGE_SIZE, CIRRUS_FILTER_BATCH_SIZE } from "../config";
 import { logInfo } from "../utils/logger";
 import {
   ChainInfo,
+  ProcessingContext,
   DepositArgs,
   RecordedDepositReview,
   WithdrawalInfo,
@@ -735,4 +736,53 @@ export const getSettlementAttestationCount = async (digest: string): Promise<num
   const count = Number(rows?.[0]?.value ?? 0);
   if (!Number.isSafeInteger(count) || count < 0) throw new Error("Invalid indexed settlement attestation count");
   return count;
+};
+
+// Diagnostics only: indexed values are not an authorization or a promise of capacity.
+export const getMintPolicyDiagnostics = async (token: string): Promise<Record<string, string>> => {
+  const rows = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-mintPolicies`, { params: {
+    address: `eq.${externalAssetBridgeAddress}`, key: `eq.${toCirrusAddress(token)}`, select: "value", limit: 1,
+  } });
+  const p = rows?.[0]?.value;
+  if (!p || ![p.capacity, p.consumed, p.refillRate, p.lastRefillAt].every(v => /^\d+$/.test(String(v)))) return {};
+  const capacity = BigInt(p.capacity), consumed = BigInt(p.consumed);
+  return { token, capacity: capacity.toString(), available: (capacity > consumed ? capacity - consumed : 0n).toString(),
+    refillRate: String(p.refillRate), observedAt: String(p.lastRefillAt), units: "indexed-strato-token-base-units" };
+};
+
+export const getCompletedProcessingContexts = async (contexts: ProcessingContext[]) => {
+  const completed: ProcessingContext[] = [];
+  const groups = new Map<string, ProcessingContext[]>();
+  for (const context of contexts) {
+    if (!/^(0x)?[a-f0-9]{40}$/i.test(context.bridge) || !/^\d+$/.test(context.chainId)) continue;
+    const key = `${context.source}:${context.bridge}:${context.chainId}:${context.stage.startsWith("deposit") ? "deposits" : "withdrawals"}`;
+    groups.set(key, [...(groups.get(key) || []), context]);
+  }
+  for (const group of groups.values()) {
+    const first = group[0], isDeposit = first.stage.startsWith("deposit");
+    const contract = first.source === "eab" ? EXTERNAL_ASSET_BRIDGE_URL : NATIVE_BRIDGE_URL;
+    const statusField = first.source === "eab" ? "status" : "bridgeStatus";
+    const terminal = first.source === "eab" ? ["4", "6", "7"] : ["3", "4", "5"];
+    for (let offset = 0; offset < group.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
+      const batch = group.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
+      const filters = batch.flatMap(c => {
+        if (isDeposit && c.source === "eab") {
+          const [router, id] = c.reference.split(":");
+          return /^[a-f0-9]{40}$/i.test(router) && /^\d+$/.test(id) ? [`and(key.eq.${c.chainId},key2.eq.${router},key3.eq.${id})`] : [];
+        }
+        return /^(0x)?[a-f0-9]+$/i.test(c.reference) ? [`key.eq.${c.reference}`] : [];
+      });
+      if (!filters.length) continue;
+      const rows = await getPaginatedRows(`/${contract}-${isDeposit ? "deposits" : "withdrawals"}`, { params: {
+        address: `eq.${toCirrusAddress(first.bridge)}`, select: isDeposit && first.source === "eab" ? "key,key2,key3,value" : "key,value",
+        order: isDeposit && first.source === "eab" ? "key.asc,key2.asc,key3.asc" : "key.asc",
+        [`value->>${statusField}`]: `in.(${terminal.join(",")})`, or: `(${filters.join(",")})`,
+      } });
+      for (const c of batch) {
+        if (rows.some(row => terminal.includes(String(row.value?.[statusField])) &&
+          (isDeposit && c.source === "eab" ? `${toCirrusAddress(row.key2)}:${row.key3}` === c.reference && String(row.key) === c.chainId : String(row.key) === c.reference))) completed.push(c);
+      }
+    }
+  }
+  return completed;
 };

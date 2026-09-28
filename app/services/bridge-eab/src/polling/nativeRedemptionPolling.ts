@@ -1,3 +1,4 @@
+import { processingIssueService } from "../services/processingIssueService";
 import { config, getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "../config";
 import { getVerificationBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
 import { getEnabledChains } from "../services/cirrusService";
@@ -38,9 +39,16 @@ const pollChainNativeRedemptions = async (chainId: number) => {
     .filter((deposit): deposit is NativeDepositArgs => deposit !== null);
 
   if (deposits.length > 0) {
+    if (!config.nativeBridge.address) throw new Error("Native bridge address not configured");
+    let recordedAll = true;
     for (const deposit of deposits) {
-      await recordNativeDepositBatch([deposit]);
+      const recorded = await processingIssueService.run({ source: "native", chainId: String(chainId),
+        bridge: config.nativeBridge.address!, reference: `${deposit.externalBridge}:${deposit.externalRedemptionId}`,
+        stage: "deposit-recording", token: deposit.representationToken }, () => recordNativeDepositBatch([deposit]));
+      if (!recorded) recordedAll = false;
     }
+    // Continue other deposits, but never advance the cursor past unrecorded evidence.
+    if (!recordedAll) return;
     logInfo(
       "NativeRedemptionPolling",
       `Recorded ${deposits.length} native redemption deposits for chain ${chainId}`,

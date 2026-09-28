@@ -43,6 +43,12 @@ export const TRANSFER_EVENT_SIGNATURE =
 export const ERROR_FILE_NAME = "bridge-error.flag";
 export const HEALTH_POLL_TIMEOUT_MS = 15 * 60_000;
 
+export const PROCESSING_RETRY_BASE_MS = 30_000;
+export const PROCESSING_RETRY_MAX_MS = 5 * 60_000;
+export const PROCESSING_ALERT_GRACE_MS = 5 * 60_000;
+export const PROCESSING_REMINDER_MS = 60 * 60_000;
+export const PROCESSING_HISTORY_MS = 7 * 24 * 60 * 60_000;
+
 const config = {
   auth: {
     baUsername: process.env.BA_USERNAME,

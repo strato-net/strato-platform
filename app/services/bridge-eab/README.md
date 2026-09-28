@@ -149,6 +149,41 @@ Each chain poll reconciles STRATO pending reviews through Cirrus. Missing observ
 
 This does not recover old unrecorded reviews if an earlier service version already advanced the cursor beyond them. Preserve existing cache files during rollout; those cases need an explicit historical replay. A corrupt committed JSON file still fails closed and must be preserved for investigation before recovery. No additional database is required.
 
+### Processing blockers, retries, and operational emails
+
+The EAB runtime records per-transfer failures in `data/processingIssues.json`. This covers EAB settlement (including approved reviews), review recording, and withdrawal processing, plus native deposit recording/confirmation and withdrawal execution/proposals. Each record identifies the bridge, chain, transfer, and operation, with reason codes, first/last occurrence, attempt count, next retry time, and resolution. This is operational state, not approval or settlement evidence.
+
+| Reason | Operator action |
+| --- | --- |
+| `MINT_CAPACITY` | Check the token's mint bucket and refill rate; wait for refill or have governance change the policy. |
+| `WITHDRAWAL_CAPACITY` | Check available vault capacity, refill, and outstanding reservations. |
+| `FUNDING_REQUIRED` | Fund the named submitting account with external gas or STRATO USDST/vouchers, as indicated. |
+| `DEPENDENCY_UNAVAILABLE` | Check RPC/verifier availability and authentication. |
+| `CONFIRMATIONS_PENDING` | Wait for the required external confirmations. |
+| `POLICY_RESTRICTED`, `PAUSED` | Check token/route permissions, pause state, and the reported verifier policy version/digest. |
+| `CONFIGURATION`, `UNKNOWN` | Investigate the referenced operation and verifier logs; these failures retain the existing review safeguards. |
+| `MANUAL_REVIEW` | Use the existing governance review queue and its emails. |
+
+Amounts remain integer strings in the stated token's base units. Mint diagnostics are explicitly **indexed snapshots** at `observedAt`, not current spendable capacity or a new authorization. Missing diagnostics are omitted. Verifier failures retain the verifier index (one-based order in the configured URL list), policy version/digest, and available limit/confirmation details. Unknown verifier responses remain failures. No signatures, credentials, RPC URLs, or raw HTTP response bodies are stored in this journal.
+
+- Eligible failed submissions retry with a 30-second exponential delay, capped at five minutes with jitter. Capacity/funding/pause waits use up to five minutes; a reported refill wait can shorten that interval. Actual retries occur on the next regular poll after the scheduled time. Retry state survives restarts; unrelated transfers continue.
+- READY EAB withdrawals and pending-review recovery continue on the normal polling schedule. Backoff never skips their expiry/cancellation, reservation recovery, or release reconciliation. Native pending withdrawals also continue reconciliation. No authorization deadline is extended.
+- Known operational settlement waits do not send otherwise valid deposits to governance merely because the settlement retry grace elapsed. Custody/evidence validation, missing-receipt/trace review deadlines, explicit verifier review, and unknown-failure review behavior remain in place. Existing reviews are never cleared by this tracking.
+- Native discovery does not advance its cursor past a recording failure. Other deposits in the scanned range can still be recorded; replay remains idempotent.
+- A successful operation clears its blocker. A terminal on-chain record can also clear it. Disappearance from a status query or a failed Cirrus read cannot produce a recovery notice. **Blocker cleared does not mean transfer completed**, and the email says so. Routing, fallback authorization, quorum and dissent rules are unchanged.
+
+The existing `TRANSACTION_APPROVER_EMAILS` and `SENDGRID_API_KEY` enable operational emails. Matching blockers are grouped, unchanged incidents get at most one reminder per hour, and transient dependency/confirmation waits have a five-minute email grace period. Changes to the reason or reported policy/limit can notify immediately. Governance-only reviews use their existing notification channel. Delivery failures retry; a crash after mail acceptance but before journal acknowledgement can produce a duplicate (at-least-once delivery).
+
+Keep this journal on the existing durable `/app/data` mount, writable by UID 1000, with **one runtime writer**. Writes use atomic replacement and fsync. Resolved history is pruned on subsequent writes after seven days; active blockers are retained. Preserve and restore a corrupt journal from backup; do not delete it as a health-reset action. Journal or notification failures appear in the `processingIssues` health check. Transfer blockers themselves do not mark a working polling loop unhealthy.
+
+To inspect active records inside the runtime container:
+
+```sh
+node -e 'const s=require("/app/data/processingIssues.json"); console.log(JSON.stringify(Object.values(s.records).filter(r=>!r.resolvedAt),null,2))'
+```
+
+Rollout: build the `bridge-eab` image, update the bridge runtime and all verifier tasks, and retain the existing data volume and email settings. The service accepts both old and structured verifier errors, and verifier HTTP statuses/decision fields remain compatible, so either update order is supported. No contract, legacy bridge, backend, UI, nginx, or new environment configuration is required for this phase. Verify a blocked transfer, successful retry, restart deduplication, and email delivery on testnet before relying on alerts. Read-only policy inventory and an Admin processing-issues screen are outside this phase; policies that have not blocked an attempted operation are not proactively scanned.
+
 ### Admin transaction reviews and refund notifications
 
 Admin → Bridge includes an **Action Required** queue. This first phase covers transaction reviews and refunds, not configuration, pause, or verifier-change proposals.
@@ -402,8 +437,9 @@ stalled; a missing scheduled poll is stale after its interval plus 15 minutes
 (`HEALTH_POLL_TIMEOUT_MS`). Empty queues and intentionally paused deposits do
 not fail health when their polling checks succeed.
 
-Individual deposit/withdrawal failures caught for retry or review remain in
-logs and `data/bridge-error.flag`. The file is historical evidence, not a health
+Tracked deposit/withdrawal failures are recorded in `data/processingIssues.json`
+with transition logs and deduplicated emails. Other diagnostic errors may remain
+in logs and `data/bridge-error.flag`. The file is historical evidence, not a health
 gate; `errorLogPresent: true` does not change the HTTP status. A healthy response
 confirms polling readiness, not that every transfer has settled. Monitor review
 queues and item failures separately. No error-file deletion is needed to recover

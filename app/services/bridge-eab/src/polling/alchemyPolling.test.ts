@@ -1,3 +1,6 @@
+import { mkdtempSync as issueTempDir, rmSync as removeIssueDir } from "node:fs";
+import { tmpdir as issueTmpdir } from "node:os";
+import { join as issuePath } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Interface } from "ethers";
@@ -634,7 +637,7 @@ test("WebSocket reconnect backs off and periodic polls cannot bypass the delay",
   assert.equal(timers[0].delay, 1000, "a stable connection resets the backoff");
 });
 
-test("approved reviews settle automatically, isolate failures, and retry on the next poll", async t => {
+test("approved reviews settle automatically, isolate failures, and respect retry backoff", async t => {
   const cirrus = await import("../services/cirrusService");
   const rpc = await import("../services/rpcService");
   const bridge = await import("../services/bridgeService");
@@ -664,5 +667,59 @@ test("approved reviews settle automatically, isolate failures, and retry on the 
   });
   await reconcileExternalDeposits(CHAIN_ID);
   await reconcileExternalDeposits(CHAIN_ID);
-  assert.deepEqual(calls, ["1", "2", "1", "2"]);
+  assert.deepEqual(calls, ["1", "2", "2"]);
+  const now = Date.now();
+  t.mock.method(Date, "now", () => now + 5 * 60_000);
+  await reconcileExternalDeposits(CHAIN_ID);
+  assert.deepEqual(calls, ["1", "2", "2", "1", "2"]);
+});
+
+test("operational settlement failures do not promote deposits to review; evidence failures still do", async t => {
+  const cirrus = await import("../services/cirrusService");
+  const rpc = await import("../services/rpcService");
+  const bridge = await import("../services/bridgeService");
+  const recovery = await import("../services/depositRecoveryService");
+  const verification = await import("../services/verificationService");
+  const { processingIssue } = await import("../utils/processingIssues");
+  const { depositStateService: state } = await import("../services/depositStateService");
+  const { blockTrackingService: blocks } = await import("../services/blockTrackingService");
+  const { reconcileExternalDeposits } = await import("./alchemyPolling");
+  const deposits = classifyDepositLogs([1, 2, 3, 4].map(id => makeLog("DepositRouted", `0x${String(id).repeat(64)}`, id)), CHAIN_ID).standardDeposits;
+  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[CHAIN_ID, { externalChainId: CHAIN_ID,
+    depositRouter: deposits[0].depositRouter, lastProcessedBlock: 100, enabled: true, chainName: "test", custody: recipient }]]));
+  t.mock.method(cirrus, "getAssetInfo", async () => []);
+  t.mock.method(cirrus, "getMintPolicyDiagnostics", async () => ({}));
+  t.mock.method(cirrus, "getDepositSettlementInfoByIdentity", async () => undefined);
+  t.mock.method(recovery, "reconcileRecordedDepositReviews", async () => undefined);
+  t.mock.method(state, "listReviews", async () => []);
+  t.mock.method(state, "list", async () => deposits.map(deposit => ({ deposit, status: "pending" as const })));
+  t.mock.method(state, "oldestPendingBlock", async () => undefined);
+  t.mock.method(state, "pruneSettled", async () => undefined);
+  t.mock.method(blocks, "getEffectiveLastProcessedBlock", async () => 100);
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getCurrentBlockNumber", async () => 100);
+  t.mock.method(verification, "verifyDetectedDepositsBatch", async () => new Map(deposits.map(d => [verification.depositIdentity(d), { state: "verified" as const }])));
+  const failed = t.mock.method(state, "markSettlementFailed", async () => undefined);
+  const cleared = t.mock.method(state, "clearSettlementFailure", async () => undefined);
+  const attempts: string[] = [];
+  t.mock.method(bridge, "settleDeposit", async d => {
+    attempts.push(d.depositId);
+    const codes = ["MINT_CAPACITY", "FUNDING_REQUIRED", "DEPENDENCY_UNAVAILABLE", "UNKNOWN"] as const;
+    throw Object.assign(new Error("settlement failed"), { issues: [processingIssue(codes[Number(d.depositId) - 1])] });
+  });
+  await reconcileExternalDeposits(CHAIN_ID);
+  assert.deepEqual(attempts, ["1", "2", "3", "4"], "a blocked deposit must not starve the next one");
+  assert.deepEqual(cleared.mock.calls.map(call => (call.arguments[0] as unknown as { depositId: string }).depositId), ["1", "2", "3"]);
+  assert.deepEqual(failed.mock.calls.map(call => (call.arguments[0] as unknown as { depositId: string }).depositId), ["4"], "unknown failures retain the existing review grace");
+});
+
+// Exercise real persistence with a fresh journal for each test.
+test.beforeEach(async (t: any) => {
+  const { ProcessingIssueService, processingIssueService } = await import("../services/processingIssueService");
+  const directory = issueTempDir(issuePath(issueTmpdir(), "processing-test-"));
+  const isolated = new ProcessingIssueService(issuePath(directory, "issues.json"));
+  for (const method of ["snapshot", "due", "record", "resolve"] as const) {
+    t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
+  }
+  t.after(() => removeIssueDir(directory, { recursive: true, force: true }));
 });

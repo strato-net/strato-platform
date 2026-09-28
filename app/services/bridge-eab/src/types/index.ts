@@ -277,3 +277,41 @@ export interface PollHealthState {
 }
 
 export class WithdrawalReleasePendingError extends Error {}
+
+export type ProcessingIssueCode = "MINT_CAPACITY" | "WITHDRAWAL_CAPACITY" | "FUNDING_REQUIRED" |
+  "MANUAL_REVIEW" | "POLICY_RESTRICTED" | "DEPENDENCY_UNAVAILABLE" | "CONFIRMATIONS_PENDING" |
+  "PAUSED" | "CONFIGURATION" | "UNKNOWN";
+
+export interface ProcessingIssue {
+  code: ProcessingIssueCode;
+  retryable: boolean;
+  message: string;
+  details: Record<string, string>;
+}
+
+export interface ProcessingContext {
+  source: "eab" | "native";
+  chainId: string;
+  bridge: string;
+  reference: string;
+  stage: string;
+  token?: string;
+  account?: string;
+}
+
+export interface ProcessingRecord {
+  context: ProcessingContext;
+  issues: ProcessingIssue[];
+  firstSeenAt: number;
+  lastSeenAt: number;
+  attempts: number;
+  nextRetryAt: number;
+  resolvedAt?: number;
+  outcome?: "processing_resumed" | "completed";
+}
+
+export interface ProcessingJournal {
+  version: 1;
+  records: Record<string, ProcessingRecord>;
+  notifications: Record<string, { fingerprint: string; sentAt: number; record: ProcessingRecord }>;
+}

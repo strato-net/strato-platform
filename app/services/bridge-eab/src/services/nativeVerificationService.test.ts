@@ -1,3 +1,6 @@
+import { mkdtempSync as issueTempDir, rmSync as removeIssueDir } from "node:fs";
+import { tmpdir as issueTmpdir } from "node:os";
+import { join as issuePath } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Interface } from "ethers";
@@ -9,6 +12,7 @@ for (const name of [
   "CLIENT_ID",
   "OPENID_DISCOVERY_URL",
   "EXTERNAL_ASSET_BRIDGE_ADDRESS",
+  "STRATO_NATIVE_BRIDGE_ADDRESS",
   "PRICE_ORACLE_ADDRESS",
   "SAFE_ADDRESS",
   "SAFE_PROPOSER_ADDRESS",
@@ -166,14 +170,14 @@ test("native polling neither settles nor sends immature evidence to review", asy
   const bridge = await import("./bridgeService");
   const { startNativeDepositInitiatedPolling } = await import("../polling/stratoPolling");
   const settled: string[] = [], reviewed: string[] = [];
-  const entries = ["pending", "valid", "invalid"].map(depositId => ({ depositId, bridgeStatus: "1" }));
+  const entries = ["pending", "valid", "invalid"].map(depositId => ({ depositId, bridgeStatus: "1", externalChainId: "1" }));
   t.mock.method(cirrus, "getNativeDepositsByStatus", async (status: string) => status === "1" ? entries as any : []);
   t.mock.method(verification, "verifyNativeRedemptionsBatch", async () => new Map([["valid", true], ["invalid", false]]));
   t.mock.method(bridge, "confirmNativeDepositBatch", async rows => { settled.push(...rows.map(row => row.depositId)); });
   t.mock.method(bridge, "reviewNativeDepositBatch", async rows => { reviewed.push(...rows.map(row => row.depositId)); });
-  t.mock.method(globalThis, "setTimeout", (() => 0) as any);
+  const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", (() => { resolve(); return 0; }) as any));
   startNativeDepositInitiatedPolling();
-  await new Promise<void>(resolve => setImmediate(resolve));
+  await finished;
   assert.deepEqual(settled, ["valid"]);
   assert.deepEqual(reviewed, ["invalid"]);
 });
@@ -196,4 +200,55 @@ test("native discovery scans and advances only through the confirmed head", asyn
   await new Promise<void>(resolve => setImmediate(resolve));
   assert.equal(logs.mock.callCount(), 1);
   assert.equal(updates.mock.callCount(), 1);
+});
+
+test("native recording isolates blocked deposits without advancing the cursor past them", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const bridge = await import("./bridgeService");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[1, { externalChainId: 1 } as any]]));
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(cursor, "getLastProcessedBlock", async () => 98);
+  t.mock.method(rpc, "getChainLogs", async () => [log(false, 1), log(true, 2)]);
+  const updates = t.mock.method(cursor, "updateLastProcessedBlockLocally", async () => undefined);
+  const recorded: string[] = [];
+  let blocked = true;
+  t.mock.method(bridge, "recordNativeDepositBatch", async rows => {
+    const id = rows[0].externalRedemptionId;
+    recorded.push(id);
+    if (blocked && id === "1") throw new Error("low account balance");
+  });
+  let rerun!: () => Promise<void>;
+  const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", ((run: any) => {
+    rerun = run; resolve(); return 0;
+  }) as any));
+  startNativeRedemptionPolling();
+  await finished;
+  assert.deepEqual(recorded, ["1", "2"]);
+  assert.equal(updates.mock.callCount(), 0);
+  blocked = false;
+  await rerun();
+  assert.deepEqual(recorded, ["1", "2", "2"]);
+  assert.equal(updates.mock.callCount(), 0, "skipping a blocked deposit must hold the cursor");
+  const retryTime = Date.now() + 5 * 60_000;
+  t.mock.method(Date, "now", () => retryTime);
+  await rerun();
+  assert.deepEqual(recorded, ["1", "2", "2", "1", "2"]);
+  assert.equal(updates.mock.callCount(), 1);
+});
+
+// Exercise real persistence with a fresh journal for each test.
+test.beforeEach(async (t: any) => {
+  const { ProcessingIssueService, processingIssueService } = await import("../services/processingIssueService");
+  const directory = issueTempDir(issuePath(issueTmpdir(), "processing-test-"));
+  const isolated = new ProcessingIssueService(issuePath(directory, "issues.json"));
+  for (const method of ["snapshot", "due", "record", "resolve"] as const) {
+    t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
+  }
+  t.after(() => removeIssueDir(directory, { recursive: true, force: true }));
 });

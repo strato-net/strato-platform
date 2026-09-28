@@ -1,3 +1,4 @@
+import { processingIssueService, withdrawalProcessingContext, notifyProcessingIssues } from "../services/processingIssueService";
 import { config } from "../config";
 import {
   confirmNativeDepositBatch,
@@ -65,44 +66,20 @@ export const startExternalWithdrawalPolling = (): void => {
     );
 
     for (const withdrawal of routineWithdrawals) {
-      try {
-        await processExternalWithdrawal(withdrawal);
-      } catch (error) {
-        logError("StratoPolling", error as Error, {
-          operation: "processExternalWithdrawal",
-          withdrawalId: withdrawal.withdrawalId,
-        });
-      }
+      await processingIssueService.run(withdrawalProcessingContext("eab", withdrawal, "withdrawal-processing"),
+        () => processExternalWithdrawal(withdrawal), String(withdrawal.bridgeStatus) !== "1");
     }
     for (const withdrawal of initiated.filter((item) => item.requiresManualReview)) {
-      try {
-        await queueExternalWithdrawalReview(withdrawal);
-      } catch (error) {
-        logError("StratoPolling", error as Error, {
-          operation: "queueExternalWithdrawalReview",
-          withdrawalId: withdrawal.withdrawalId,
-        });
-      }
+      await processingIssueService.run(withdrawalProcessingContext("eab", withdrawal, "withdrawal-review"),
+        () => queueExternalWithdrawalReview(withdrawal), String(withdrawal.bridgeStatus) !== "1");
     }
     for (const withdrawal of pendingReview) {
-      try {
-        await processPendingExternalWithdrawalReview(withdrawal);
-      } catch (error) {
-        logError("StratoPolling", error as Error, {
-          operation: "processPendingExternalWithdrawalReview",
-          withdrawalId: withdrawal.withdrawalId,
-        });
-      }
+      await processingIssueService.run(withdrawalProcessingContext("eab", withdrawal, "withdrawal-review"),
+        () => processPendingExternalWithdrawalReview(withdrawal), String(withdrawal.bridgeStatus) !== "1");
     }
     for (const withdrawal of ready.filter((item) => item.requiresManualReview)) {
-      try {
-        await processExternalWithdrawal(withdrawal, true);
-      } catch (error) {
-        logError("StratoPolling", error as Error, {
-          operation: "resumeApprovedExternalWithdrawal",
-          withdrawalId: withdrawal.withdrawalId,
-        });
-      }
+      await processingIssueService.run(withdrawalProcessingContext("eab", withdrawal, "withdrawal-processing"),
+        () => processExternalWithdrawal(withdrawal, true), String(withdrawal.bridgeStatus) !== "1");
     }
   };
 
@@ -163,7 +140,9 @@ export const startNativeDepositInitiatedPolling = (): void => {
       if (verifiedDeposits.length > 0) {
         for (const deposit of verifiedDeposits) {
           try {
-            await confirmNativeDepositBatch([deposit]);
+            const context = { source: "native" as const, chainId: String(deposit.externalChainId),
+              bridge: config.nativeBridge.address!, reference: deposit.depositId, stage: "deposit-confirmation", token: deposit.stratoToken };
+            await processingIssueService.run(context, () => confirmNativeDepositBatch([deposit]));
           } catch (error) {
             logError("StratoPolling", error as Error, { operation: "confirmNativeDeposit", depositId: deposit.depositId });
           }
@@ -212,20 +191,14 @@ export const startNativeWithdrawalRequestPolling = (): void => {
         (withdrawal) => !withdrawal.useInstantPath,
       );
 
-      if (instantWithdrawals.length > 0) {
-        for (const batch of chunk(instantWithdrawals, POLLING_BATCH_SIZE)) {
-          await finalizeNativeWithdrawalBatch(
-            batch as NonEmptyArray<NativeWithdrawalInfo>,
-          );
-        }
+      for (const withdrawal of instantWithdrawals) {
+        await processingIssueService.run(withdrawalProcessingContext("native", withdrawal),
+          () => finalizeNativeWithdrawalBatch([withdrawal]), String(withdrawal.bridgeStatus) !== "1");
       }
 
-      if (approvalWithdrawals.length > 0) {
-        for (const batch of chunk(approvalWithdrawals, POLLING_BATCH_SIZE)) {
-          await queueManualNativeWithdrawalBatch(
-            batch as NonEmptyArray<NativeWithdrawalInfo>,
-          );
-        }
+      for (const withdrawal of approvalWithdrawals) {
+        await processingIssueService.run(withdrawalProcessingContext("native", withdrawal),
+          () => queueManualNativeWithdrawalBatch([withdrawal]), String(withdrawal.bridgeStatus) !== "1");
       }
     } catch (e: any) {
       healthMonitor.failPoll("startNativeWithdrawalRequestPolling");
@@ -261,19 +234,13 @@ export const startNativeWithdrawalTxPolling = (): void => {
         }
       }
 
-      if (pendingInstantExecution.length > 0) {
-        for (const batch of chunk(pendingInstantExecution, POLLING_BATCH_SIZE)) {
-          await finalizeNativeWithdrawalBatch(
-            batch as NonEmptyArray<NativeWithdrawalInfo>,
-          );
-        }
+      for (const withdrawal of pendingInstantExecution) {
+        await processingIssueService.run(withdrawalProcessingContext("native", withdrawal),
+          () => finalizeNativeWithdrawalBatch([withdrawal]), String(withdrawal.bridgeStatus) !== "1");
       }
-      if (pendingManualExecution.length > 0) {
-        for (const batch of chunk(pendingManualExecution, POLLING_BATCH_SIZE)) {
-          await queueManualNativeWithdrawalBatch(
-            batch as NonEmptyArray<NativeWithdrawalInfo>,
-          );
-        }
+      for (const withdrawal of pendingManualExecution) {
+        await processingIssueService.run(withdrawalProcessingContext("native", withdrawal),
+          () => queueManualNativeWithdrawalBatch([withdrawal]), String(withdrawal.bridgeStatus) !== "1");
       }
     } catch (e: any) {
       healthMonitor.failPoll("startNativeWithdrawalTxPolling");
@@ -300,6 +267,7 @@ export const initializeStratoPolling = async () => {
   startExternalWithdrawalPolling();
   startNativeWithdrawalRequestPolling();
   startNativeWithdrawalTxPolling();
+  startNonOverlappingPolling("processingIssues", config.polling.withdrawalInterval || 5 * 60 * 1000, notifyProcessingIssues);
   if (config.email.approverEmails.length) {
     startNonOverlappingPolling("notifyBridgeReviews", config.polling.withdrawalInterval || 5 * 60 * 1000, notifyBridgeReviews);
   }

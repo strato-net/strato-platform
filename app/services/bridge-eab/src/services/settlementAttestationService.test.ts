@@ -333,11 +333,12 @@ test("release confirmation waits stay pending without hiding real verifier failu
   assert.equal(errors.mock.callCount(), 0);
   mode = "failure";
   await assert.rejects(attestWithdrawalRelease(authorization, "reservation", "tx"), (error) =>
-    error instanceof Error && !(error instanceof WithdrawalReleasePendingError) && /threshold not reached/.test(error.message));
-  assert.equal(errors.mock.callCount(), 1);
+    error instanceof Error && !(error instanceof WithdrawalReleasePendingError) && /threshold not reached/.test(error.message) &&
+      (error as any).issues.some((issue: any) => issue.code === "UNKNOWN" && issue.details.verifier === "3"));
+  assert.equal(errors.mock.callCount(), 0, "per-verifier failures are carried by the aggregate error");
   mode = "pending";
   await assert.rejects(attestDepositSettlement(deposit), /threshold not reached/);
-  assert.equal(errors.mock.callCount(), 4);
+  assert.equal(errors.mock.callCount(), 0);
   mode = "accepted";
   await attestWithdrawalRelease(authorization, "reservation", "tx");
 });

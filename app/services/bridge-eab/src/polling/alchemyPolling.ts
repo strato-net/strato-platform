@@ -1,3 +1,4 @@
+import { processingIssueService, depositProcessingContext } from "../services/processingIssueService";
 import { healthMonitor } from "../utils/healthMonitor";
 import { reconcileRecordedDepositReviews } from "../services/depositRecoveryService";
 import {
@@ -155,17 +156,16 @@ export const attemptRoutedSettlementWithFallback = async (
 
 const recordReviewOnce = async (
   deposit: DepositArgs | ActionDepositArgs,
-  operation: string,
 ): Promise<void> => {
+  const context = depositProcessingContext(deposit, "deposit-review-record");
+  if (!await processingIssueService.due(context)) return;
   await depositStateService.markReviewAttempted(deposit);
   try {
     await recordDepositForReview(deposit);
     await depositStateService.markReviewRecorded(deposit);
+    await processingIssueService.resolve(context);
   } catch (error) {
-    logError("AlchemyPolling", error as Error, {
-      operation,
-      depositIdentity: depositIdentity(deposit),
-    });
+    await processingIssueService.record(context, error);
   }
 };
 
@@ -184,18 +184,15 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
     await depositStateService.listReviews(externalChainId);
   for (const reviewed of reviewedDeposits) {
     if (!shouldRecordReview(reviewed, reviewRetryMs)) continue;
-    await recordReviewOnce(reviewed.deposit, "retryDepositReviewRecord");
+    await recordReviewOnce(reviewed.deposit);
   }
   if (reviewedDeposits.length) {
     try {
       const approvals = await getDepositReviewApprovals(externalChainId);
       for (const { deposit } of reviewedDeposits) {
         if (!approvals.has(`${normalizeAddress(deposit.depositRouter)}:${deposit.depositId}`)) continue;
-        try {
-          await confirmReviewedDeposit(externalChainId, deposit.depositRouter, deposit.depositId);
-        } catch (error) {
-          logError("DepositRecovery", error as Error, { operation: "settleApprovedDeposit", depositIdentity: depositIdentity(deposit) });
-        }
+        await processingIssueService.run(depositProcessingContext(deposit),
+          () => confirmReviewedDeposit(externalChainId, deposit.depositRouter, deposit.depositId));
       }
     } catch (error) {
       logError("DepositRecovery", error as Error, { operation: "readDepositApprovals", externalChainId });
@@ -285,7 +282,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       );
     }
     if (shouldRecordReview(pending, reviewRetryMs)) {
-      await recordReviewOnce(pending.deposit, "recordDetectedDepositForReview");
+      await recordReviewOnce(pending.deposit);
       logError("AlchemyPolling", new Error(pending.reviewReason), {
         depositIdentity: depositIdentity(deposit),
       });
@@ -344,7 +341,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
           : undefined,
       );
       if (updated && shouldRecordReview(updated, reviewRetryMs)) {
-        await recordReviewOnce(deposit, "recordMissingDepositForReview");
+        await recordReviewOnce(deposit);
         logError("AlchemyPolling", new Error(updated.reviewReason), {
           depositIdentity: depositIdentity(deposit),
         });
@@ -357,12 +354,14 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
         deposit,
         verification.error.message,
       );
-      await recordReviewOnce(deposit, "recordInvalidDepositForReview");
+      await recordReviewOnce(deposit);
       logError("AlchemyPolling", verification.error, {
         depositIdentity: depositIdentity(deposit),
       });
       continue;
     }
+    const processingContext = depositProcessingContext(deposit);
+    if (!await processingIssueService.due(processingContext)) continue;
     const submissionStartedAt = Date.now();
     let settlementError: Error | null;
     const actionDeposit = deposit as Partial<ActionDepositArgs>;
@@ -429,10 +428,13 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       settlementError = await attemptDepositSettlement(deposit);
     }
     if (settlementError) {
-      logError("AlchemyPolling", settlementError, {
-        operation: "settleDeposit",
-        depositIdentity: depositIdentity(deposit),
-      });
+      const issues = await processingIssueService.record(processingContext, settlementError);
+      // Operational waits must not turn a valid deposit into a governance review.
+      // Custody failures, explicit manual review and unknown failures retain the existing grace path.
+      if (issues.every(issue => issue.retryable)) {
+        await depositStateService.clearSettlementFailure(deposit);
+        continue;
+      }
       const failed = await depositStateService.markSettlementFailed(
         deposit,
         settlementError,
@@ -442,7 +444,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       );
       if (failed?.transitioned) {
         await quarantineDeposit(deposit, failed.pending.reviewReason!);
-        await recordReviewOnce(deposit, "recordFailedSettlementForReview");
+        await recordReviewOnce(deposit);
       }
       continue;
     }
@@ -455,6 +457,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
       Date.now() - deposit.externalBlockTimestamp,
     );
     await depositStateService.markSettled(deposit);
+    await processingIssueService.resolve(processingContext, "completed");
     logInfo(
       "AlchemyPolling",
       `Deposit settlement exit ${depositIdentity(deposit)} state=settled`,

@@ -1,3 +1,4 @@
+import { ProcessingRecord } from "../types";
 import sgMail from "@sendgrid/mail";
 import { config } from "../config";
 import { retry } from "../utils/api";
@@ -19,4 +20,22 @@ export const sendBridgeReviewEmail = async (item: BridgeReviewItem, resolved = f
       item.kind === "withdrawal_review" ? "Review in Safe." : "Review in Admin > Bridge.",
     ].join("\n"),
   }), { logPrefix: "BridgeReviewEmail" });
+};
+
+export const sendProcessingIssueEmail = async (
+  records: ProcessingRecord[], resolved: boolean,
+): Promise<void> => {
+  if (!config.email.approverEmails.length) throw new Error("TRANSACTION_APPROVER_EMAILS is required");
+  const record = records[0];
+  const event = resolved ? "Processing issue cleared" : "Processing issue requires attention";
+  await sgMail.send({
+    to: config.email.approverEmails, from: "info@blockapps.net",
+    subject: `Bridge: ${event} (${record.context.source}, chain ${record.context.chainId})`,
+    text: [event, `Affected operations: ${records.length}`, `First observed: ${new Date(record.firstSeenAt).toISOString()}`,
+      ...records.slice(0, 20).flatMap(r => [`Reference: ${r.context.reference}; stage: ${r.context.stage}; token: ${r.context.token || "unknown"}`,
+        ...r.issues.map(i => `${i.code}: ${i.message}\n${JSON.stringify(i.details)}`)]),
+      resolved ? "The reported blocker is no longer active. Processing may still be in progress; check transaction history for the final outcome."
+        : `Next retry: ${new Date(record.nextRetryAt).toISOString()}. Amounts are raw integer units unless stated otherwise.`,
+    ].join("\n"),
+  });
 };

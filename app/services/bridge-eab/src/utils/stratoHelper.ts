@@ -1,3 +1,4 @@
+import { classifyProcessingError } from "./processingIssues";
 import {
   bloc,
   strato,
@@ -104,7 +105,7 @@ const getImmediateResult = (
   );
   if (failed) {
     const msg = getTxFailureMessage(failed);
-    logError("StratoHelper", new Error(msg), {
+    if (classifyProcessingError(new Error(msg))[0].code === "UNKNOWN") logError("StratoHelper", new Error(msg), {
       operation: "immediateTransactionFailure",
       result: getTxFailureDetails(failed),
     });
@@ -148,7 +149,7 @@ export const postAndWaitForTx = async (
       const failed = res.find((r) => r?.status === "Failure");
       if (failed) {
         const msg = getTxFailureMessage(failed);
-        logError("StratoHelper", new Error(msg), {
+        if (classifyProcessingError(new Error(msg))[0].code === "UNKNOWN") logError("StratoHelper", new Error(msg), {
           operation: "polledTransactionFailure",
           result: getTxFailureDetails(failed),
           txHashes,
@@ -196,15 +197,18 @@ const executeWithClients = async (
       `Executing ${context} as ${authority} (${inputArray.length} tx)`,
     );
 
-    const result = await postAndWaitForTx(
-      () =>
-        transactionClient.post(
-          "/transaction/parallel?resolve=true",
-          buildFunctionTx(inputs),
-        ),
-      timeout,
-      resultsClient,
-    );
+    let result: Awaited<ReturnType<typeof postAndWaitForTx>>;
+    try {
+      result = await postAndWaitForTx(
+        () => transactionClient.post("/transaction/parallel?resolve=true", buildFunctionTx(inputs)),
+        timeout,
+        resultsClient,
+      );
+    } catch (error) {
+      const issues = classifyProcessingError(error).map(issue => issue.code === "FUNDING_REQUIRED"
+        ? { ...issue, details: { ...issue.details, account: authority, feeAsset: "USDST-or-vouchers" } } : issue);
+      throw Object.assign(error instanceof Error ? error : new Error(String(error)), { issues });
+    }
 
     logInfo(
       "StratoHelper",

@@ -1,3 +1,4 @@
+import { processingIssue } from "../utils/processingIssues";
 import { verifyEthTransactionCustody } from "../utils/custodyValidation";
 import { normalizeAddress, normalizeHex as normalize } from "../utils/utils";
 import { Interface, JsonRpcProvider, ZeroAddress, getAddress } from "ethers";
@@ -59,7 +60,9 @@ export const validateDepositSettlement = async (
   }
   const latestBlock = await provider.getBlockNumber();
   if (latestBlock - receipt.blockNumber < confirmations) {
-    throw new Error("Deposit has insufficient confirmations");
+    throw Object.assign(new Error("Deposit has insufficient confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
+      observedConfirmations: String(latestBlock - receipt.blockNumber), requiredConfirmations: String(confirmations),
+    })] });
   }
 
   const routers = new Set(enabledRouters.map(normalize));
@@ -194,6 +197,8 @@ export const validateWithdrawalRelease = async (
   }
   const latestBlock = await provider.getBlockNumber();
   if (latestBlock - receipt.blockNumber < confirmations) {
-    throw new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations");
+    throw Object.assign(new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
+      observedConfirmations: String(latestBlock - receipt.blockNumber), requiredConfirmations: String(confirmations),
+    })] });
   }
 };

@@ -14,6 +14,7 @@ import {
 } from "ethers";
 import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
+import { verifierIssues } from "../utils/processingIssues";
 import {
   config,
   VERIFIER_REQUEST_TIMEOUT_MS,
@@ -23,7 +24,7 @@ import {
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
-import { PersistedWithdrawalReview, WithdrawalInfo } from "../types";
+import { PersistedWithdrawalReview, WithdrawalInfo, ProcessingIssue } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
 import { fetch as http, retry } from "../utils/api";
 import { initializeSafeForChain } from "../utils/safeHelper";
@@ -326,15 +327,7 @@ export const checkWithdrawalPolicy = async (
       }),
     ),
   );
-  results.forEach((result, index) => {
-    if (result.status === "rejected") {
-      logError("ExternalWithdrawal", result.reason as Error, {
-        operation: "checkWithdrawalPolicy",
-        verifierUrl: signerUrls[index],
-        withdrawalId: authorization.sourceWithdrawalId,
-      });
-    }
-  });
+  const issues = results.flatMap((result, index) => result.status === "rejected" ? verifierIssues(result.reason, index) : []);
   if (
     results.some(
       (result) =>
@@ -344,16 +337,17 @@ export const checkWithdrawalPolicy = async (
         result.reason.response?.data?.decision === "manual_review",
     )
   ) {
-    throw new WithdrawalManualReviewError(
+    throw Object.assign(new WithdrawalManualReviewError(
       `Local verifier manual review required for withdrawal ${authorization.sourceWithdrawalId}`,
-    );
+    ), { issues });
   }
   const failure = results.find((result) => result.status === "rejected");
-  if (failure && failure.status === "rejected") throw failure.reason;
+  if (failure && failure.status === "rejected") throw Object.assign(failure.reason, { issues });
 };
 
 export const signWithdrawalAuthorization = async (
   authorization: WithdrawalAuthorization,
+  onFailures?: (issues: ProcessingIssue[]) => void,
 ): Promise<string[]> => {
   const signerUrls = getExternalBridgeVerifierUrls(
     BigInt(authorization.destinationChainId),
@@ -413,15 +407,8 @@ export const signWithdrawalAuthorization = async (
       result.reason.response?.status === 409 &&
       result.reason.response?.data?.decision === "manual_review",
   ).length;
-  results.forEach((result, index) => {
-    if (result.status === "rejected") {
-      logError("ExternalWithdrawal", result.reason as Error, {
-        operation: "signWithdrawalAuthorization",
-        verifierUrl: signerUrls[index],
-        withdrawalId: authorization.sourceWithdrawalId,
-      });
-    }
-  });
+  const issues = results.flatMap((result, index) => result.status === "rejected" ? verifierIssues(result.reason, index) : []);
+  onFailures?.(issues);
   for (const result of results) {
     if (result.status !== "fulfilled") continue;
     const response = result.value;
@@ -443,9 +430,9 @@ export const signWithdrawalAuthorization = async (
     .map(([, signature]) => signature);
   if (manualReviewRequired > 0) {
     await proposeWithdrawalReview(authorization);
-    throw new Error(
+    throw Object.assign(new Error(
       `Local verifier manual review requires executed Safe approval for withdrawal ${authorization.sourceWithdrawalId}`,
-    );
+    ), { issues });
   }
   return sorted;
 };
@@ -694,12 +681,13 @@ export const reserveWithdrawal = async (
   const status = Number(reservation.status ?? reservation[0]);
 
   if (status === 0) {
-    const signatures = await signWithdrawalAuthorization(authorization);
+    let signingIssues: ProcessingIssue[] = [];
+    const signatures = await signWithdrawalAuthorization(authorization, issues => { signingIssues = issues; });
     const threshold = Number(await vault.attestationThreshold());
     if (signatures.length < threshold) {
-      throw new Error(
+      throw Object.assign(new Error(
         `External bridge attestation threshold requires ${threshold} signatures; configured ${signatures.length}`,
-      );
+      ), { issues: signingIssues });
     }
     const transaction = await vault.reserve(authorization, signatures);
     const receipt = await transaction.wait();

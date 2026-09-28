@@ -1,3 +1,4 @@
+import { verifierIssues, verifierFailureDetails } from "../utils/processingIssues";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
@@ -423,6 +424,7 @@ test("withdrawal review dissent takes precedence over two returned signatures", 
   const sign = runInNewContext(ts.transpileModule(statement.getText(source).replace(/^export /, ""), {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText + "\nsignWithdrawalAuthorization", {
+    verifierIssues,
     getExternalBridgeVerifierUrls: () => ["one", "two", "three"],
     getExternalBridgeVerifierApiTokens: () => ["a", "b", "c"],
     VERIFIER_REQUEST_TIMEOUT_MS: 1000, AbortSignal,
@@ -459,12 +461,13 @@ test("deposit handler validates custody and route before submitting fallback-onl
   runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, {
+    verifierFailureDetails, verifierPolicyDigest: "test-digest", verifierPolicy: localPolicy,
     app: { post: (_path: string, fn: any) => { handler = fn; } },
     sourceBridge: policy.sourceBridge, destinationChainId: BigInt(policy.destinationChainId),
     normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
     stratoGet: async () => ({ data: [{ value: "2" }] }),
     getDepositChainConfig: async () => ({ routers: [deposit.depositRouter], vault: policy.destinationVault }),
-    verifierPolicy: localPolicy, evaluateDepositPolicy, ManualReviewRequiredError,
+    evaluateDepositPolicy, ManualReviewRequiredError,
     isDepositReviewApproved: async () => reviewApproved,
     provider: {}, verifierConfirmations: 12,
     validateDepositSettlement: async () => { calls.push("receipt"); if (invalidReceipt) throw new Error("custody mismatch"); },
@@ -530,6 +533,7 @@ test("release handler returns pending confirmations without logging or submittin
   runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, {
+    verifierFailureDetails, verifierPolicyDigest: "test-digest", verifierPolicy: policy,
     app: { post: (_path: string, fn: any) => { handler = fn; } },
     WithdrawalReleasePendingError, provider: {}, verifierConfirmations: 12,
     validateSourceWithdrawal: async () => { if (sourceError) throw sourceError; }, validateReleasedDestination: async () => {},
@@ -574,6 +578,7 @@ test("refund handler attests the contract digest only after source and non-payme
   runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, {
+    verifierFailureDetails, verifierPolicyDigest: "test-digest", verifierPolicy: policy,
     app: { post: (_path: string, fn: any) => { handler = fn; } },
     validateRpcIdentity: async () => {},
     validateSourceWithdrawal: async (_authorization: any, statuses: number[], requireEnabled: boolean) => {

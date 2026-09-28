@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import axios from "axios";
+import { verifierFailureDetails } from "../utils/processingIssues";
 import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
 import { WithdrawalReleasePendingError } from "../types";
@@ -550,7 +551,11 @@ const enforceWithdrawalPolicy = async (
     )).toString(),
   );
   if (approvalDeadline < BigInt(authorization.deadline)) {
-    throw new ManualReviewRequiredError(local.reason);
+    throw Object.assign(new ManualReviewRequiredError(local.reason), { issues: [{ code: "MANUAL_REVIEW", details: {
+      token: authorization.token, required: authorization.amount, limit: local.decision === "manual_review"
+        ? verifierPolicy.tokens.find(token => token.token.toLowerCase() === authorization.token.toLowerCase())?.maxAutoWithdrawalAmount
+        : manualReviewThreshold.toString(), units: "external-token-base-units",
+    } }] });
   }
   return "executed Safe approval satisfies manual review";
 };
@@ -683,6 +688,7 @@ app.post("/v1/sign-withdrawal", async (req, res) => {
     res.status(manualReview ? 409 : 422).json({
       decision: manualReview ? "manual_review" : "reject",
       error: (error as Error).message,
+      ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress),
     });
   }
 });
@@ -719,6 +725,7 @@ app.post("/v1/check-withdrawal", async (req, res) => {
     res.status(manualReview ? 409 : 422).json({
       decision: manualReview ? "manual_review" : "reject",
       error: (error as Error).message,
+      ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress),
     });
   }
 });
@@ -743,7 +750,11 @@ app.post("/v1/attest-deposit", async (req, res) => {
       policyDecision.decision === "manual_review" &&
       (await isDepositReviewApproved(deposit));
     if (policyDecision.decision === "manual_review" && !manuallyReviewed) {
-      throw new ManualReviewRequiredError(policyDecision.reason);
+      throw Object.assign(new ManualReviewRequiredError(policyDecision.reason), { issues: [{ code: "MANUAL_REVIEW", details: {
+        token: deposit.externalToken, required: deposit.externalTokenAmount, units: "external-token-base-units",
+        limit: verifierPolicy.routes.find(route => normalize(route.externalToken) === normalize(deposit.externalToken) &&
+          normalize(route.stratoToken) === normalize(deposit.stratoToken))?.maxAutoDepositAmount,
+      } }] });
     }
     await validateDepositSettlement(
       provider,
@@ -793,6 +804,7 @@ app.post("/v1/attest-deposit", async (req, res) => {
     res.status(manualReview ? 409 : 422).json({
       decision: manualReview ? "manual_review" : "reject",
       error: (error as Error).message,
+      ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress),
     });
   }
 });
@@ -831,11 +843,11 @@ app.post("/v1/attest-release", async (req, res) => {
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash });
   } catch (error) {
     if (error instanceof WithdrawalReleasePendingError) {
-      res.status(409).json({ decision: "pending_confirmations", error: error.message });
+      res.status(409).json({ decision: "pending_confirmations", error: error.message, ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress) });
       return;
     }
     console.error("Withdrawal release attestation rejected", (error as Error).message);
-    res.status(422).json({ error: (error as Error).message });
+    res.status(422).json({ error: (error as Error).message, ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress) });
   }
 });
 
@@ -885,7 +897,7 @@ app.post("/v1/attest-refund", async (req, res) => {
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest: expectedDigest });
   } catch (error) {
     auditDecision("attest_refund", String(req.body?.authorization?.sourceWithdrawalId || ""), "reject", (error as Error).message);
-    res.status(422).json({ error: (error as Error).message });
+    res.status(422).json({ error: (error as Error).message, ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress) });
   }
 });
 

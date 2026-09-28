@@ -111,6 +111,18 @@ test("persists deposit state atomically and orders reads after pending writes", 
     assert.equal(persisted.reviewReason, reason);
     await restarted.markReviewRecorded(traceDeposit);
     assert.equal((await restarted.getByIdentity(1, "router", "4")).reviewRecordedOnchain, true);
+    await t.test("clearing an operational wait never clears evidence or an existing review", async () => {
+      const before = await restarted.getByIdentity(1, "router", "4");
+      await restarted.clearSettlementFailure(traceDeposit);
+      assert.deepEqual(await restarted.getByIdentity(1, "router", "4"), before);
+      const fundingDeposit = { ...deposit, depositId: "6", detectedAt: now };
+      await restarted.upsert(fundingDeposit);
+      await restarted.markSettlementFailed(fundingDeposit, new Error("mint limit exceeded"), 1000);
+      await restarted.clearSettlementFailure(fundingDeposit);
+      now += 2000;
+      const failure = await restarted.markSettlementFailed(fundingDeposit, new Error("unexpected failure"), 1000);
+      assert.equal(failure.transitioned, false, "an unrelated failure gets its own grace period");
+    });
   } finally {
     fs.rename = originalRename;
     process.chdir(previousDirectory);

@@ -1,3 +1,6 @@
+import { mkdtempSync as issueTempDir, rmSync as removeIssueDir } from "node:fs";
+import { tmpdir as issueTmpdir } from "node:os";
+import { join as issuePath } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { RouteAction } from "@strato/shared-types";
@@ -137,6 +140,8 @@ test("AUTO_ROUTE retries missing Cirrus metadata then submits a named-enum route
   assert.equal(failed.mock.callCount(), 1);
 
   metadataAvailable = true;
+  const retryTime = Date.now() + 5 * 60_000;
+  t.mock.method(Date, "now", () => retryTime);
   await reconcileExternalDeposits(11155111);
   assert.equal(calls[0].method, "settleDepositWithRoute");
   assert.equal(calls[0].args.steps[0].action, "FORGE");
@@ -740,15 +745,15 @@ test("reserves and releases before finalizing a routine withdrawal", async (t) =
   const ready = { ...withdrawal, bridgeStatus: "3", reservationId: "reservation" };
   for (let attempt = 0; attempt < 2; attempt++) {
     trace.length = 0;
-    await processExternalWithdrawal(ready);
+    assert.equal(await processExternalWithdrawal(ready), false, "confirmation waits are not completed operations");
     assert.deepEqual(trace, ["vault:release"]);
   }
-  assert.equal(info.mock.callCount(), 2);
+  assert.equal(info.mock.callCount(), 1, "log a confirmation wait only once");
   attestationError = new Error("invalid release proof");
   await assert.rejects(processExternalWithdrawal(ready), /invalid release proof/);
   attestationError = null;
   trace.length = 0;
-  await processExternalWithdrawal(ready);
+  assert.equal(await processExternalWithdrawal(ready), true);
   assert.deepEqual(trace, ["vault:release", "relayer:finalizeWithdrawal"]);
 });
 
@@ -1812,10 +1817,10 @@ test("waits for capacity before authorizing either withdrawal path and leaves re
     throw new Error("authorization reached");
   });
   for (const bridgeStatus of ["1", "2"]) {
-    await processExternalWithdrawal({ bridgeStatus, withdrawalId: "7", externalTokenAmount: "100" } as any, true);
+    await processExternalWithdrawal({ bridgeStatus, withdrawalId: bridgeStatus, externalTokenAmount: "100" } as any, true);
   }
   assert.deepEqual(requested, ["1", "2"]);
-  await assert.rejects(processExternalWithdrawal({ bridgeStatus: "3" } as any), /authorization reached/);
+  await assert.rejects(processExternalWithdrawal({ bridgeStatus: "3", withdrawalId: "1" } as any), /authorization reached/);
   assert.deepEqual(requested, ["1", "2"], "already-authorized recovery must bypass the capacity wait");
 });
 
@@ -1883,4 +1888,15 @@ test("paused READY withdrawals defer payment but still cancel expired reservatio
   status = 0;
   await processExternalWithdrawal(withdrawal);
   assert.deepEqual(trace, [], "unreserved expiry needs no external transaction");
+});
+
+// Exercise real persistence with a fresh journal for each test.
+test.beforeEach(async (t: any) => {
+  const { ProcessingIssueService, processingIssueService } = await import("../services/processingIssueService");
+  const directory = issueTempDir(issuePath(issueTmpdir(), "processing-test-"));
+  const isolated = new ProcessingIssueService(issuePath(directory, "issues.json"));
+  for (const method of ["snapshot", "due", "record", "resolve"] as const) {
+    t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
+  }
+  t.after(() => removeIssueDir(directory, { recursive: true, force: true }));
 });

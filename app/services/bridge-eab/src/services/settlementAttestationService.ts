@@ -1,11 +1,12 @@
 import axios from "axios";
+import { verifierIssues } from "../utils/processingIssues";
 import {
   VERIFIER_REQUEST_TIMEOUT_MS,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
-import { ActionDepositArgs, DepositArgs, WithdrawalReleasePendingError } from "../types";
-import { logError, logInfo } from "../utils/logger";
+import { ProcessingIssue, ActionDepositArgs, DepositArgs, WithdrawalReleasePendingError } from "../types";
+import { logInfo } from "../utils/logger";
 import { WithdrawalAuthorization } from "./externalWithdrawalService";
 import { getSettlementVerifierConfig } from "./cirrusService";
 
@@ -49,6 +50,7 @@ const requestVerifierQuorum = async (
   let manualReviewRequired = 0;
   let pendingConfirmations = 0;
   let failures = 0;
+  const issues: ProcessingIssue[] = [];
   return new Promise<boolean>((resolve, reject) => {
     void Promise.allSettled(urls.map(async (url, index) => {
       try {
@@ -80,22 +82,15 @@ const requestVerifierQuorum = async (
           // Older verifiers return this exact confirmation-wait message as 422.
           (error.response?.status === 422 && error.response?.data?.error === "Withdrawal release has insufficient confirmations")
         )) {
+          issues.push(...verifierIssues(error, index));
           pendingConfirmations++;
           return;
         }
         failures++;
+        issues.push(...verifierIssues(error, index));
         if (axios.isAxiosError(error) && error.response?.status === 409 && error.response?.data?.decision === "manual_review") {
           manualReviewRequired++;
         }
-        logError("SettlementAttestation", error as Error, {
-          chainId,
-          verifierUrl: url,
-          path,
-          ...(axios.isAxiosError(error) && {
-            status: error.response?.status,
-            verifierError: error.response?.data?.error,
-          }),
-        });
       } finally {
         remaining--;
         // Prefer routing while outstanding responses can still complete a full quorum.
@@ -111,16 +106,16 @@ const requestVerifierQuorum = async (
       if (completed) return;
       completed = true;
       if (pendingConfirmations > 0 && failures === 0) {
-        reject(new WithdrawalReleasePendingError(
+        reject(Object.assign(new WithdrawalReleasePendingError(
           `Withdrawal release is awaiting verifier confirmations: ${accepted.size}/${threshold} attestations`,
-        ));
+        ), { issues }));
         return;
       }
-      reject(manualReviewRequired > 0
+      reject(Object.assign(manualReviewRequired > 0
         ? new SettlementVerifierManualReviewRequired(
           `Settlement verifier manual review required for ${path}: ${manualReviewRequired}/${urls.length}`,
         )
-        : new Error(`Settlement verifier threshold not reached for ${path}: ${accepted.size}/${threshold}`));
+        : new Error(`Settlement verifier threshold not reached for ${path}: ${accepted.size}/${threshold}`), { issues }));
     });
   });
 };

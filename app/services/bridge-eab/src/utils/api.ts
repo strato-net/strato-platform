@@ -1,3 +1,4 @@
+import { classifyProcessingError } from "./processingIssues";
 import axios, { AxiosRequestConfig } from "axios";
 import { getBAUserToken, getRelayerToken } from "../auth";
 import { config } from "../config";
@@ -46,7 +47,9 @@ export const retry = async <T>(
     try {
       return await fn();
     } catch (error: any) {
-      lastError = new Error(extractErrorMessage(error));
+      lastError = Object.assign(new Error(extractErrorMessage(error)), { cause: error });
+
+      if (classifyProcessingError(error).some(issue => ["MINT_CAPACITY", "FUNDING_REQUIRED", "PAUSED", "POLICY_RESTRICTED"].includes(issue.code))) break;
 
       if (i < maxAttempts) {
         // Add exponential backoff for Cloudflare challenges

@@ -150,6 +150,14 @@ const updateState = async <T>(
 };
 
 export const depositStateService = {
+  clearSettlementFailure: (deposit: DepositArgs) => updateState(state => {
+    const pending = state[identity(deposit)];
+    if (pending?.status === "pending") {
+      pending.settlementFirstFailedAt = undefined;
+      pending.settlementLastFailedAt = undefined;
+      pending.settlementError = undefined;
+    }
+  }),
   upsert: (deposit: DetectedDeposit) =>
     updateState((state) => {
       const key = identity(deposit);

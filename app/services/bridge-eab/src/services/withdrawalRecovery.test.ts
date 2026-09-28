@@ -169,9 +169,9 @@ if (process.argv[2] === "--recovery-worker") {
       assert.equal(read().payments, 1);
       assert.equal(read().settlements, 0);
       for (const [phase, reason] of [
-        ["unconfirmed", "insufficient confirmations"],
-        ["failed-receipt", "receipt is missing or failed"],
-        ["duplicate-event", "event does not match settlement"],
+        ["unconfirmed", "CONFIRMATIONS_PENDING"],
+        ["failed-receipt", "UNKNOWN"],
+        ["duplicate-event", "UNKNOWN"],
       ]) {
         run(phase, 1, reason);
         assert.equal(read().settlements, 0);
