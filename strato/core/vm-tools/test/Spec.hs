@@ -24,17 +24,18 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
-import Blockchain.Bagger.Transactions (TxRunResult (..), getStakeDeltasFromResults)
+import Blockchain.Bagger (attachBlockRewards')
+import Blockchain.Bagger.Transactions (TxRunResult (..), attachFeePathDeltas, getDeltasFromResults, getStakeDeltasFromResults)
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ExecResults
 import Blockchain.Data.ProposalFacts
 import Blockchain.Data.RLP
 import Blockchain.Data.VmTrace
-import Blockchain.Forks (isBlockRewardReceiptForkActive)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isFeePathDeltasForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
-import SolidVM.Model.Delta (getStakeDeltasFromEvents)
+import SolidVM.Model.Delta (fromDelta, getStakeDeltasFromEvents)
 import SolidVM.Model.Event
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
@@ -93,6 +94,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       rlpRT = rlpDecode . rlpDeserialize . rlpSerialize . rlpEncode
       v1 = Validator 0x1
       v2 = Validator 0x2
+      v3 = Validator 0x3
       stakingAddr = Address 0xd6726e06
       stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "StratoStaking" addr name args []
       addrArg v = ("validator", SNULL, fromString (show v), SVMType.Address False)
@@ -129,15 +131,15 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
     getStakeDeltasFromEvents Nothing evs `shouldBe` M.empty
 
-  -- The test config is the default (upquark-shaped, staking not scheduled), so
+  -- The test config is the default: upquark-shaped but with no networkID, so
   -- the block-reward receipt fork must track the staking activation height
-  -- rather than switching on its own. Only helium carries a bespoke height.
+  -- (upquark's default, block 1,000,000) rather than switching on its own. Only
+  -- helium carries a bespoke height.
   it "ties the block-reward receipt fork to staking activation off helium" $ do
-    let stakingNotScheduled = 2 ^ (62 :: Int) :: Integer
     isBlockRewardReceiptForkActive 0 `shouldBe` False
     isBlockRewardReceiptForkActive 320000 `shouldBe` False
-    isBlockRewardReceiptForkActive (stakingNotScheduled - 1) `shouldBe` False
-    isBlockRewardReceiptForkActive stakingNotScheduled `shouldBe` True
+    isBlockRewardReceiptForkActive 999999 `shouldBe` False
+    isBlockRewardReceiptForkActive 1000000 `shouldBe` True
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100
@@ -157,6 +159,51 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
         trr st = TxRunResult undefined (Right $ er st) 0 M.empty M.empty []
         results = [trr (M.fromList [(v1, 1), (v2, 2)]), trr (M.fromList [(v1, 3)])]
     getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 3), (v2, 2)]
+
+  -- The fee call and the block-reward call run outside the transaction's own
+  -- SolidVM call, so their validator-set and stake changes reach the header
+  -- only through attachFeePathDeltas, and only from the fork. Off helium and
+  -- upquark the fork tracks staking activation, exactly like the block-reward
+  -- receipt fork above, which attachBlockRewards' relies on.
+  it "ties the fee-path deltas fork to staking activation off helium" $ do
+    let stakingNotScheduled = 2 ^ (62 :: Int) :: Integer
+    isFeePathDeltasForkActive 999999 `shouldBe` False
+    isFeePathDeltasForkActive 1000000 `shouldBe` True
+    forM_ [0, 999999, 1000000, stakingNotScheduled - 1, stakingNotScheduled] $ \h ->
+      isFeePathDeltasForkActive h `shouldBe` isBlockRewardReceiptForkActive h
+
+  it "folds fee-path validator and stake deltas into the transaction from the fork on" $ do
+    let preFork = 999999 :: Integer
+        postFork = 1000000 :: Integer
+        er = (solidvmErrorResults undefined) { erException = Nothing }
+        feeEr = er { erNewValidators = [v3], erRemovedValidators = [v1]
+                   , erStakeUpdates = M.fromList [(v1, 0), (v2, 5)]
+                   , erEvents = [synced (Address 0x1) (0 :: Integer)] }
+        txEr = er { erNewValidators = [v2], erStakeUpdates = M.fromList [(v2, 9)] }
+        trr r = TxRunResult undefined (Right r) 0 M.empty M.empty []
+        headerDeltas r = (fromDelta (getDeltasFromResults [trr r]), getStakeDeltasFromResults [trr r])
+    -- before the fork the fee call's deltas are dropped, as they always were
+    headerDeltas (attachFeePathDeltas preFork feeEr txEr) `shouldBe` (([v2], []), M.fromList [(v2, 9)])
+    -- from the fork on: fee call first, then the transaction, whose stake update wins
+    headerDeltas (attachFeePathDeltas postFork feeEr txEr) `shouldBe` (([v3, v2], [v1]), M.fromList [(v1, 0), (v2, 9)])
+    -- events are the callers' business and are left alone
+    erEvents (attachFeePathDeltas postFork feeEr txEr) `shouldBe` erEvents txEr
+
+  it "attachBlockRewards' carries the reward call's deltas along with its events from the fork on" $
+    forAll genBlockHeaderV3 $ \h -> do
+      let preFork = 999999 :: Integer
+          postFork = 1000000 :: Integer
+          er = (solidvmErrorResults undefined) { erException = Nothing }
+          rewardEr = er { erRemovedValidators = [v1], erStakeUpdates = M.fromList [(v1, 0)]
+                        , erEvents = [synced (Address 0x1) (0 :: Integer)] }
+          txEr = er { erStakeUpdates = M.fromList [(v2, 9)] }
+          trr r = TxRunResult undefined (Right r) 0 M.empty M.empty []
+          attached n = fst $ attachBlockRewards' (h { number = n }) (Just rewardEr) [trr txEr]
+      -- before the fork nothing is attached, deltas included
+      map trrResult (attached preFork) `shouldBe` [Right txEr]
+      -- from the fork on the first transaction carries the reward call's events and deltas
+      map trrResult (attached postFork) `shouldBe`
+        [Right txEr { erEvents = erEvents rewardEr, erRemovedValidators = [v1], erStakeUpdates = M.fromList [(v1, 0), (v2, 9)] }]
 
   it "derives no proposal facts from pre-v3 headers" $
     forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts

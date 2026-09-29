@@ -107,6 +107,7 @@ Most fork heights are defined in `strato/core/vm-tools/src/Blockchain/Forks.hs`.
 | Receipts root in block headers | 250,000 | 1,000,000 | Genesis |
 | Block-reward event included in the block's first receipt | 300,000 | 1,000,000 | Staking activation height |
 | SolidVM Solidity operator precedence | Not scheduled | Not scheduled | Genesis |
+| Validator-set and stake changes made by the fee path (a `processBlock` jail, the block-reward call) reach the block header | Not scheduled | 1,000,000 | Staking activation height |
 
 Staking activation is set per network in `ethconf.yaml` (`networkConfig`), with these defaults:
 

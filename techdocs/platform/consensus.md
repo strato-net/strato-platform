@@ -97,7 +97,7 @@ From the staking activation height, V2 changes consensus in four ways:
 - **Block header.** `BlockHeaderV3` adds the proposal round, the current stake weights and stake updates to the header.
 - **Proposer selection.** The proposer is chosen deterministically, weighted by stake (see below).
 - **Votes.** Prepare, commit and round-change votes are weighted by stake.
-- **Liveness accounting.** The staking contract counts blocks proposed and missed proposals per validator, and emits `ProposalMissed`. After too many consecutive misses, it can jail a validator temporarily: the validator is removed from the set with its stake untouched. There is no slashing.
+- **Liveness accounting.** The staking contract counts blocks proposed and missed proposals per validator, and emits `ProposalMissed`. After too many consecutive misses, it can jail a validator temporarily: the validator is removed from the set with its stake untouched. There is no slashing. The removal reaches the consensus validator set from the fee-path fork height listed on [Networks](networks.md#fork-heights); before it, only the staking and governance contracts record the jail.
 
 The activation height is a per-network setting, and every node must agree on it (see [Networks](networks.md#fork-heights)).
 
