@@ -521,7 +521,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               (fromIntegral availableGas)
               tAddr
-              (txHash ut)
+              (otHash t)
               "transfer"
               [recipientArg, amountArg]
               Nothing
@@ -545,7 +545,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                   proposer
                   (fromIntegral availableGas)
                   tAddr
-                  (txHash ut)
+                  (otHash t)
                   (labelToText fName)
                   argTexts
                   Nothing
@@ -568,7 +568,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
             availableGas
             newAddress
             (TD.code ut)
-            (txHash ut)
+            (otHash t)
             (fromJust $ txContractName ut)
             (txArgs ut)
 
@@ -582,7 +582,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                 proposer -- proposer
                 (fromIntegral availableGas) -- availableGas
                 tAddr -- origin
-                (txHash ut) -- txHash
+                (otHash t) -- txHash
                 (TD.funcName ut)
                 (TD.args ut)
                 Nothing
