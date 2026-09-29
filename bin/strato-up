@@ -54,6 +54,18 @@ if [[ "$FROM_SNAPSHOT" == "true" && -n "$NODE_DIR" && -d "$NODE_DIR" ]]; then
     FROM_SNAPSHOT="false"
 fi
 
+# Refuse to start on top of containers of the strato compose project. They are a
+# running node, or leftovers of one that was not stopped with strato-down: convoke
+# never reaches its own "docker compose down" when it is killed, and Docker
+# restarts the unless-stopped containers after a host reboot. The new node's
+# docker compose up would adopt them. Checked before setup, so nothing is created
+# or downloaded first.
+if [[ -n "$(docker compose -p strato ps -q 2>/dev/null)" ]]; then
+    echo "Error: strato compose containers are running (the node is up, or a previous one was not stopped with strato-down)."
+    echo "Run 'strato-down' first."
+    exit 1
+fi
+
 strato-setup "${SETUP_ARGS[@]}"
 
 if [[ "$FROM_SNAPSHOT" == "true" ]]; then

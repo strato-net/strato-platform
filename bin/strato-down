@@ -8,19 +8,33 @@ if [[ -z "$NODE_DIR" ]]; then
     exit 1
 fi
 
-cd "$NODE_DIR"
-
 echo "Stopping STRATO..."
 
-if [[ -f .strato.pid ]]; then
-    source .strato.pid
-    if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
-        kill "$CONVOKE_PID" 2>/dev/null || true
-        tail --pid="$CONVOKE_PID" -f logs/convoke.log 2>/dev/null || true
+if [[ -d "$NODE_DIR" ]]; then
+    cd "$NODE_DIR"
+    if [[ -f .strato.pid ]]; then
+        source .strato.pid
+        if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
+            kill "$CONVOKE_PID" 2>/dev/null || true
+            tail --pid="$CONVOKE_PID" -f logs/convoke.log 2>/dev/null || true
+            # macOS tail has no --pid: keep waiting so convoke has finished its own shutdown
+            while kill -0 "$CONVOKE_PID" 2>/dev/null; do sleep 1; done
+        fi
+        rm -f .strato.pid
+    else
+        echo "No pidfile found"
     fi
-    rm -f .strato.pid
 else
-    echo "No pidfile found"
+    echo "Node directory not found: $NODE_DIR"
+fi
+
+# convoke removes the containers on a clean shutdown, but not when it was killed
+# or the host rebooted: Docker restarts the unless-stopped containers at boot and
+# the next strato-up would adopt them. Tear the compose project down by name so
+# nothing is left behind; a no-op after a clean shutdown.
+if [[ -n "$(docker compose -p strato ps -aq 2>/dev/null)" ]]; then
+    echo "Removing leftover strato containers..."
+    docker compose -p strato down --remove-orphans
 fi
 
 echo "STRATO stopped"
