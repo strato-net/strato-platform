@@ -19,6 +19,8 @@
 module Blockchain.VMContext
   ( CurrentBlockHash (..),
     withCurrentBlockHash,
+    flushMemDBs,
+    startFromStateRoot,
     withCurrentBlockHashNoCommit,
     VMBase,
     ContextDBs (..),
@@ -333,13 +335,52 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
+  flushMemDBs
+  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots .~ M.empty)
+  Mod.put (Mod.Proxy @CurrentBlockHash) cbh
+  pure a
+
+-- | Write the block maps to the trie and record the root it produced: the
+-- root the entries retained in the maps now describe. Every flush must go
+-- through here, or 'startFromStateRoot' cannot tell a stale map from a fresh one.
+flushMemDBs ::
+  ( MonadLogger m,
+    Mod.Modifiable MemDBs m,
+    HasMemAddressStateDB m,
+    (Maybe Word256 `A.Alters` MP.StateRoot) m,
+    (MP.StateRoot `A.Alters` MP.NodeData) m,
+    (Address `A.Alters` AddressState) m,
+    (N.NibbleString `A.Alters` N.NibbleString) m,
+    HasMemRawStorageDB m,
+    (RawStorageKey `A.Alters` RawStorageValue) m
+  ) =>
+  m ()
+flushMemDBs = do
   flushMemStorageDB
   resetAddressStateTxDBMap
   flushMemAddressStateDB
   sr <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots .~ M.empty) . (flushedRoot .~ sr)
-  Mod.put (Mod.Proxy @CurrentBlockHash) cbh
-  pure a
+  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (flushedRoot .~ sr)
+
+-- | Begin running transactions from @sr@. The block maps may keep what the last
+-- flush left in them only if this run continues from the root that flush
+-- produced; a run starting anywhere else (an ancestor, a sibling branch) must
+-- not see them. Every run must start through here.
+startFromStateRoot ::
+  ( Mod.Modifiable MemDBs m,
+    HasMemAddressStateDB m,
+    HasMemRawStorageDB m,
+    (Maybe Word256 `A.Alters` MP.StateRoot) m
+  ) =>
+  MP.StateRoot ->
+  m ()
+startFromStateRoot sr = do
+  A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
+  startSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+  fr <- _flushedRoot <$> Mod.get (Mod.Proxy @MemDBs)
+  when (startSR /= fr) $ do
+    putAddressStateBlockDBMap emptyBlockMap
+    putMemRawStorageBlockMap emptyBlockMap
 
 withCurrentBlockHashNoCommit ::
   ( MonadUnliftIO m,

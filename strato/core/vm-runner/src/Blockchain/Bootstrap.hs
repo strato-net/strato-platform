@@ -26,7 +26,7 @@ import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
-import Blockchain.VMContext (ContextM)
+import Blockchain.VMContext (ContextM, startFromStateRoot)
 import Blockchain.Wiring ()
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Blockchain.SolidVM.CodeCollectionDB
@@ -74,7 +74,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
   let sr = GI.stateRoot genesisInfo
 
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
+  startFromStateRoot sr
 
   let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
       events' = GI.events genesisInfo
@@ -110,7 +110,7 @@ populateStorageDBs genesisInfo genesisBlock genesisChainId = do
     vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
     pub (Just $ mkStateDiff accountDiffs) vmEvents
 
-  for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
+  for_ mSR startFromStateRoot
 
   bootstrapIndexer OutputBlock
     { obOrigin = Origin.Direct,
