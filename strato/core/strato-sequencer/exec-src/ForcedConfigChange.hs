@@ -6,6 +6,7 @@ import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Control.Monad
+import Control.Monad.Composable.Base (runEff)
 import HFlags
 import System.Exit
 
@@ -37,7 +38,7 @@ main = do
             . ForcedRound
             $ fromIntegral flags_round_number
     print msg
-    resp <- runStreamMConfigured "forced-config-change" $ writeUnseqEvents [msg]
+    resp <- runEff . runStreamMConfigured "forced-config-change" $ writeUnseqEvents [msg]
     print resp
   when (flags_sequence_number >= 0) $ do
     let msg =
@@ -45,7 +46,7 @@ main = do
             . ForcedSequence
             $ fromIntegral flags_sequence_number
     print msg
-    resp <- runStreamMConfigured "forced-config-change" $ writeUnseqEvents [msg]
+    resp <- runEff . runStreamMConfigured "forced-config-change" $ writeUnseqEvents [msg]
     print resp
   if (flags_round_number >= 0 || flags_sequence_number >= 0)
     then exitSuccess

@@ -1,4 +1,6 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -12,6 +14,10 @@ module BlockApps.Logging
     runLoggingTWithHandle,
     runLoggingTWithHandleWithLevel,
     runNoLoggingT,
+    runLogging,
+    runLoggingWithLevel,
+    runLoggingWithHandle,
+    runNoLogging,
     module Control.Monad.Logger,
     logDebugLS,
     logInfoLS,
@@ -23,6 +29,7 @@ where
 
 import Control.Concurrent (ThreadId, myThreadId)
 import Control.Monad
+import Control.Monad.Composable.Base (Eff, Logger, withLogger)
 import Control.Monad.Logger hiding (LoggingT, runLoggingT, runNoLoggingT)
 import qualified Control.Monad.Logger as ML
 import qualified Data.ByteString.Char8 as BC
@@ -54,6 +61,20 @@ runLoggingTWithHandleWithLevel h level = flip ML.runLoggingT (commonLog h level)
 
 runNoLoggingT :: LoggingT m a -> m a
 runNoLoggingT = flip ML.runLoggingT devNull
+
+-- | The flat counterparts of the runners above: provide the common logger to
+-- an 'Eff' row instead of wrapping a 'LoggingT'.
+runLogging :: Eff (Logger ': es) a -> Eff es a
+runLogging = runLoggingWithLevel flags_minLogLevel
+
+runLoggingWithLevel :: LogLevel -> Eff (Logger ': es) a -> Eff es a
+runLoggingWithLevel = runLoggingWithHandle stdout
+
+runLoggingWithHandle :: Handle -> LogLevel -> Eff (Logger ': es) a -> Eff es a
+runLoggingWithHandle h level = withLogger (commonLog h level)
+
+runNoLogging :: Eff (Logger ': es) a -> Eff es a
+runNoLogging = withLogger devNull
 
 -------------------------------------------------
 

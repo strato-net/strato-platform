@@ -20,10 +20,11 @@ import Blockchain.Slipstream.PostgresqlTypedShim
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Streaming (createTopicAndWait)
+import Control.Monad.Composable.Base (runEff, withResources)
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (runReaderT)
-import Control.Monad.Trans.Resource
+import Data.String (fromString)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as T
 import Database.Persist.Postgresql
@@ -39,12 +40,14 @@ main = do
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
 
-  runLoggingT
-    . runResourceT
+  runEff
+    . runLogging
+    . withResources
     . runStreamMConfigured "slipstream"
     $ do
       $logInfoS "main" "Welcome to Slipstream!!!!"
-      void . liftIO . forkIO . run 10777 $ metricsApp
+      let metricsHost = EC.apiListenAddress $ EC.apiConfig ethConf
+      void . liftIO . forkIO . runSettings (setHost (fromString metricsHost) $ setPort 10777 defaultSettings) $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
       createTopicAndWait "vmevents"

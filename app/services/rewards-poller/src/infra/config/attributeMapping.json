@@ -205,7 +205,20 @@
   },
 
   "52042da4c65e8226472b4869019a0aee6d920e21": {
-    "_upquarkComment": "After Upquark HYPE Yield Vault deploy, add that proxy as a sibling key with the same Deposit/Withdraw/QueueProcessed mapping.",
+    "Deposit": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "Withdraw": {
+      "amount": "shares",
+      "user": "owner"
+    },
+    "QueueProcessed": {
+      "amount": "sharesBurned",
+      "user": "owner"
+    }
+  },
+  "fc6b457bf1629c74acd4b33ba49ddc2365d9855b": {
     "Deposit": {
       "amount": "shares",
       "user": "owner"

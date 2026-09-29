@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -31,7 +34,6 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
 import Control.Monad.IO.Unlift
-import Control.Monad.Reader
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Control.Exception (try, SomeException)
 import Data.Aeson (Value, decode)
@@ -54,25 +56,19 @@ data CodeDBEnv = CodeDBEnv
   , cirrusPool  :: CirrusDB
   }
 
-type CodeDBM = ReaderT CodeDBEnv
+type CodeDBM es = Eff (CodeDBEnv ': CirrusDB ': SQLDB ': es)
 
 type HasCodeDBAccess m = (MonadIO m, MonadUnliftIO m, AccessibleEnv CodeDBEnv m)
 
-instance {-# OVERLAPPING #-} Monad m => AccessibleEnv SQLDB (ReaderT CodeDBEnv m) where
-  accessEnv = asks codeDBPool
-
-instance {-# OVERLAPPING #-} Monad m => AccessibleEnv CirrusDB (ReaderT CodeDBEnv m) where
-  accessEnv = asks cirrusPool
-
-instance {-# OVERLAPPING #-} (Keccak256 `A.Alters` DBCode) (ReaderT CodeDBEnv IO) where
+instance (CodeDBEnv :> es) => (Keccak256 `A.Alters` DBCode) (Eff es) where
   lookup _ k = fmap (fmap Text.encodeUtf8) $ lookupCode k
   insert _ _ _ = error "CodeDB monad: insert not supported"
   delete _ _ = error "CodeDB monad: delete not supported"
 
-instance {-# OVERLAPPING #-} A.Selectable FilePath (Either String String) (ReaderT CodeDBEnv IO) where
+instance (CodeDBEnv :> es) => A.Selectable FilePath (Either String String) (Eff es) where
   select _ _ = pure Nothing
 
-instance {-# OVERLAPPING #-} A.Selectable Address AddressState (ReaderT CodeDBEnv IO) where
+instance (CodeDBEnv :> es) => A.Selectable Address AddressState (Eff es) where
   select _ _ = pure Nothing
 
 globalCodeDBEnv :: IORef CodeDBEnv
@@ -82,10 +78,10 @@ globalCodeDBEnv = unsafePerformIO $ do
   newIORef $ CodeDBEnv (SQLDB sPool) (CirrusDB cPool)
 {-# NOINLINE globalCodeDBEnv #-}
 
-runCodeDBM :: MonadIO m => CodeDBM IO a -> m a
+runCodeDBM :: MonadIO m => CodeDBM '[] a -> m a
 runCodeDBM f = liftIO $ do
   env <- readIORef globalCodeDBEnv
-  runReaderT f env
+  runEff $ provide (codeDBPool env) $ provide (cirrusPool env) $ provide env f
 
 stratoQuery :: HasCodeDBAccess m => SQL.SqlPersistT (ResourceT m) a -> m a
 stratoQuery q = do
@@ -104,14 +100,14 @@ lookupCode cHash =
       E.where_ (codeRef E.^. CodeRefCodeHash E.==. E.val cHash)
       return codeRef
 
-lookupCodeCollection :: Keccak256 -> CodeDBM IO (Maybe CodeCollection)
+lookupCodeCollection :: Keccak256 -> CodeDBM '[] (Maybe CodeCollection)
 lookupCodeCollection cHash = do
-  result <- liftIO . try $ runReaderT (codeCollectionFromHash False False cHash) =<< readIORef globalCodeDBEnv
+  result <- liftIO . try $ runCodeDBM (codeCollectionFromHash False False cHash)
   case result of
     Right cc -> return (Just cc)
     Left (_ :: SomeException) -> return Nothing
 
-lookupCodeHash :: Address -> CodeDBM IO (Maybe Keccak256)
+lookupCodeHash :: Address -> CodeDBM '[] (Maybe Keccak256)
 lookupCodeHash addr = do
   rows <- stratoQuery . E.select $
     E.from $ \asr -> do
@@ -133,7 +129,7 @@ data EventRow = EventRow
 -- | The Cirrus @event@ table stores @address@ without a @0x@ prefix, so any
 -- prefix on the address filter is stripped before comparison (mirroring
 -- 'queryEventsByTxHash').
-queryEvents :: Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM IO [EventRow]
+queryEvents :: Maybe Text -> Integer -> Integer -> Maybe Text -> Int -> CodeDBM '[] [EventRow]
 queryEvents mAddr0 fromBlock toBlock mEventName limit = do
   let mAddr = fmap (\a -> if T.isPrefixOf "0x" a then T.drop 2 a else a) mAddr0
       addressFilter = case mAddr of
@@ -164,7 +160,7 @@ queryEvents mAddr0 fromBlock toBlock mEventName limit = do
 -- | All events emitted by a single transaction, ordered by event index. The
 -- Cirrus @event@ table stores @transaction_hash@ without a @0x@ prefix, so any
 -- prefix on the argument is stripped before comparison.
-queryEventsByTxHash :: Text -> Int -> CodeDBM IO [EventRow]
+queryEventsByTxHash :: Text -> Int -> CodeDBM '[] [EventRow]
 queryEventsByTxHash txHash limit = do
   let norm = if T.isPrefixOf "0x" txHash then T.drop 2 txHash else txHash
       q =
