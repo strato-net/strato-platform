@@ -92,7 +92,11 @@ contract ValidatorRegistry is Ownable {
     }
 
     function operatorAuthorizationDigest(address validator, address operator) public view returns (bytes32) {
-        return authorizationDigest(address(this), validator, operator, authorizationNonce[validator]);
+        // `+ 0` materialises a never-written nonce. SolidVM feeds an unwritten storage slot to
+        // abi.encodePacked as zero bytes, not as uint256(0), which dropped the nonce from the
+        // digest of every validator that had not yet consented, so no first signature could
+        // verify. Not redundant.
+        return authorizationDigest(address(this), validator, operator, authorizationNonce[validator] + 0);
     }
 
     // Accepts v as a recovery id (0/1) or in the 27/28 form.
