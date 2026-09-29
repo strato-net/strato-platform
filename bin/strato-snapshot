@@ -2096,7 +2096,7 @@ cmd_restore() {
   if [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" != "1" ]] && command -v docker >/dev/null 2>&1; then
     local containers
     containers="$(cd "$node_dir" && docker compose -p strato ps -q 2>/dev/null || true)"
-    [[ -z "$containers" ]] || die "strato compose containers are running; stop them before restore"
+    [[ -z "$containers" ]] || die "strato compose containers are running; run strato-down first"
   fi
   info "      Node is not running and no strato compose containers are up"
 

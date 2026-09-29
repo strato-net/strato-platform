@@ -74,10 +74,12 @@ strato-down mynode
 1. It sends SIGTERM to each node process group, then SIGKILL to any process still running after 5 seconds.
 2. It runs `docker compose down`.
 
+`convoke` doesn't get to step 2 when it is killed or the host reboots, and Docker restarts the `unless-stopped` containers at boot. `strato-down` therefore also removes any containers of the `strato` Compose project that are still there, so the node is fully stopped either way. `strato-up` refuses to start while such containers exist.
+
 Data in the node directory is kept.
 
 !!! note "macOS"
-    `strato-down` waits for `convoke` to exit using GNU `tail --pid`, which macOS doesn't have. On macOS, run `strato-ps` to confirm nothing is still running before you touch the node directory.
+    `strato-down` streams `convoke.log` while it waits using GNU `tail --pid`, which macOS doesn't have. On macOS it still waits for `convoke` to exit, just without the log output.
 
 To start the same node again with the same build:
 

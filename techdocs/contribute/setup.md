@@ -347,6 +347,10 @@ Run `strato-login`, or start the node with `--localAuth`.
 
 A convoke process from this node directory is still alive. Run `strato-down`, then do a [clean restart](#clean-restart).
 
+**`Error: strato compose containers are running ... Run 'strato-down' first`**
+
+Containers of the `strato` Compose project are up: the node is running, or a previous node was not stopped with `strato-down` (after a host reboot, Docker restarts its containers). Run `strato-down`, then do a [clean restart](#clean-restart).
+
 **Node behaves oddly after a restart**
 
 Don't reuse the node directory. Follow the [clean restart](#clean-restart) sequence.
