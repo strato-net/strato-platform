@@ -572,8 +572,7 @@
             "SPYX",
             "NVDA",
             "TSLAX",
-            "DOGE",
-            "BRENT"
+            "DOGE"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -582,8 +581,7 @@
             "SPYX": "SPY",
             "NVDA": "NVDA",
             "TSLAX": "TSLA",
-            "DOGE": "DOGE/USD",
-            "BRENT": "XBR/USD"
+            "DOGE": "DOGE/USD"
           }
         },
         "OANDA": {
@@ -621,7 +619,7 @@
             "BRENT"
           ],
           "symbolMapping": {
-            "BRENT": "BRENTOIL"
+            "BRENT": "BRN_FRONT_MONTH"
           }
         }
       }
@@ -1198,8 +1196,7 @@
             "SPYX",
             "NVDA",
             "TSLAX",
-            "DOGE",
-            "BRENT"
+            "DOGE"
           ],
           "symbolMapping": {
             "XAU": "XAU/USD",
@@ -1208,8 +1205,7 @@
             "SPYX": "SPY",
             "NVDA": "NVDA",
             "TSLAX": "TSLA",
-            "DOGE": "DOGE/USD",
-            "BRENT": "XBR/USD"
+            "DOGE": "DOGE/USD"
           }
         },
         "OANDA": {
@@ -1247,7 +1243,7 @@
             "BRENT"
           ],
           "symbolMapping": {
-            "BRENT": "BRENTOIL"
+            "BRENT": "BRN_FRONT_MONTH"
           }
         }
       }

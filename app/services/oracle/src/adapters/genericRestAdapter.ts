@@ -1,6 +1,8 @@
 import { apiRequest } from '../utils/apiClient';
-import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig } from '../types';
-import { logError, logInfo } from '../utils/logger';
+import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig, BrentContract } from '../types';
+import { logError, logInfo, logWarning } from '../utils/logger';
+import { ICE_BRENT } from '../utils/constants';
+import { getBrentFrontMonth } from './brentFutures';
 
 function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
@@ -31,7 +33,22 @@ export function generateConstantPrices(assetKeys: string[], assets: Record<strin
 }
 
 // Main fetch function - uses sourceConfig directly
-export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPriceResult> {
+export async function fetchPrices(sourceConfig: SourceConfig, asOf = Date.now()): Promise<BatchPriceResult> {
+    let brentContract: BrentContract | undefined;
+    if (sourceConfig.assets.includes('BRENT') && sourceConfig.symbolMapping?.BRENT === ICE_BRENT.AUTO_SYMBOL) {
+        try {
+            brentContract = await getBrentFrontMonth(asOf);
+            sourceConfig = {
+                ...sourceConfig,
+                symbolMapping: { ...sourceConfig.symbolMapping, BRENT: brentContract.symbol }
+            };
+        } catch (err) {
+            logWarning('GenericRestAdapter', `Skipping BRENT: ${(err as Error).message}`);
+            sourceConfig = { ...sourceConfig, assets: sourceConfig.assets.filter(symbol => symbol !== 'BRENT') };
+        }
+    }
+    if (sourceConfig.assets.length === 0) return {};
+
     const url = buildUrl(sourceConfig);
     const requestOptions = buildRequestOptions(sourceConfig, url);
 
@@ -46,7 +63,15 @@ export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPric
         throw new Error(`${sourceConfig.url}: ${errorMessage}`);
     }
 
-    return parseResponse(response.data, sourceConfig);
+    const prices = parseResponse(response.data, sourceConfig);
+    if (brentContract && prices.BRENT) {
+        prices.BRENT.contractExpiresAt = brentContract.expiresAt;
+        if (Date.now() >= brentContract.expiresAt) {
+            delete prices.BRENT;
+            logWarning('GenericRestAdapter', `Skipping BRENT: ${brentContract.symbol} expired during the request`);
+        }
+    }
+    return prices;
 }
 
 function buildUrl(sourceConfig: SourceConfig): string {

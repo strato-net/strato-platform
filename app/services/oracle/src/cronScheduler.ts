@@ -85,12 +85,12 @@ export function getCronSchedule(): string {
 // Step 1: Fetch from All Sources
 // ============================================================================
 
-async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader): Promise<SourceResult> {
+async function fetchSource(sourceName: string, sourceConfig: SourceConfig, configLoader: ConfigLoader, asOf: number): Promise<SourceResult> {
     const startTime = Date.now();
     try {
         const fetchPromise = sourceName === 'constant'
             ? Promise.resolve(generateConstantPrices(sourceConfig.assets, configLoader.getAllAssets()))
-            : fetchPrices(sourceConfig);
+            : fetchPrices(sourceConfig, asOf);
         const prices = await withTimeout(fetchPromise, TIMEOUTS.FETCH);
         return { sourceName, prices, success: true, duration: Date.now() - startTime };
     } catch (err) {
@@ -102,8 +102,9 @@ async function fetchSource(sourceName: string, sourceConfig: SourceConfig, confi
 
 async function fetchFromAllSources(configLoader: ConfigLoader): Promise<Map<string, SourceResult>> {
     const allSources = Object.entries(configLoader.getAllSourceConfigs());
+    const asOf = Date.now();
     const fetchResults = await Promise.all(
-        allSources.map(([name, config]) => fetchSource(name, config, configLoader))
+        allSources.map(([name, config]) => fetchSource(name, config, configLoader, asOf))
     );
     
     const results = new Map<string, SourceResult>();
@@ -121,12 +122,13 @@ async function fetchFromAllSources(configLoader: ConfigLoader): Promise<Map<stri
 // Step 2: Aggregate Prices
 // ============================================================================
 
-function aggregatePrices(
+export function aggregatePrices(
     configLoader: ConfigLoader,
     sourceResults: Map<string, SourceResult>,
     marketClosed: boolean,
     previousPrices: Map<string, number>
 ): AggregatedPrice[] {
+    const asOf = Date.now();
     return Object.entries(configLoader.getAllAssets())
     .filter(([_, asset]) => !asset.rebase)
     .map(([assetKey, asset]) => {
@@ -145,8 +147,10 @@ function aggregatePrices(
             names.forEach(name => {
                 const result = sourceResults.get(name);
                 const data = result?.success && result?.prices[symbol];
-                if (data) {
+                if (data && (data.contractExpiresAt === undefined || data.contractExpiresAt > asOf)) {
                     sources.push({ name, price: data.price });
+                } else if (data) {
+                    failedSources.push(`${name}(expired ${symbol} contract)`);
                 } else if (result?.success) {
                     failedSources.push(`${name}(no ${symbol})`);
                 } else {

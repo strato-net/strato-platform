@@ -33,6 +33,34 @@ address as a price key. Two things to know:
   collide, and a `prices` row decodes back to its symbol with no lookup. Symbols are limited to 20
   characters and uppercase ASCII. `deadbeef` remains used by proxy-only assets that are never submitted.
 
+## Brent contract alignment
+
+CommodityPriceAPI continues to request `BRENTOIL-FUT`. Its documented benchmark is the nearest
+unexpired ICE Brent contract, without blending or back-adjustment.
+
+Commodities-API uses the local mapping `BRN_FRONT_MONTH`. Before requesting a price, the adapter
+resolves this to a dated symbol such as `BRNX26` or `BRNZ26` using
+[ICE's expiry calendar](https://www.ice.com/products/219/Brent-Crude-Futures/expiry). The symbol sent
+to the API and the symbol used to parse its response are resolved together. No monthly configuration
+edit is needed, and the generic `BRENTOIL` series is never used as a fallback.
+
+Selection switches at 19:30 Europe/London on the listed last trading day. The calendar supplies
+holiday-adjusted dates, and the timezone handles daylight saving. All source requests in a batch use
+the same selection time; a dated Brent response that expires before aggregation is discarded.
+The actual CommodityPriceAPI switch at this boundary still needs to be checked: support describes
+both rolling at expiry and opening the next session on the new contract.
+
+The calendar is refreshed daily and cached in memory. If refresh fails, retries are spaced five minutes
+apart and cached dates can be used for up to seven days, provided they contain an unexpired contract.
+Without a usable calendar, Commodities-API's Brent quote is omitted; other configured symbols can
+still be fetched.
+
+TwelveData's Brent spot quote is excluded. The existing three-source quorum and OANDA configuration
+are unchanged. OANDA remains a CFD, so this correction aligns CommodityPriceAPI with Commodities-API;
+it does not establish three equivalent futures sources or guarantee the absence of divergence.
+
+Run `npm test` to check contract selection, expiry boundaries, calendar failures and adapter mapping.
+
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources

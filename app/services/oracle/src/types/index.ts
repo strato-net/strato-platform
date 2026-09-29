@@ -33,7 +33,13 @@ export interface BatchPriceResult {
     [assetName: string]: {
         price: number;
         feedTimestamp: string;
+        contractExpiresAt?: number; // UTC milliseconds
     };
+}
+
+export interface BrentContract {
+    symbol: string;
+    expiresAt: number;
 }
 
 export interface SourceConfig {
@@ -78,7 +84,7 @@ export interface TxMetric {
 
 export interface SourceResult {
     sourceName: string;
-    prices: Record<string, { price: number; feedTimestamp: string }>;
+    prices: BatchPriceResult;
     success: boolean;
     duration: number;
 }

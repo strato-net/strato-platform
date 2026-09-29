@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc && cp -r src/config dist/",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "test": "npm run build && node --test test/*.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"

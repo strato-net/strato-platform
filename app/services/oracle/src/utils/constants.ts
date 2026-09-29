@@ -32,6 +32,22 @@ export const ORACLE_CONFIG = {
     MAX_PRICE_CHANGE_PERCENT: 20,        // Alert if price changed >20% from last
 };
 
+export const ICE_BRENT = {
+    AUTO_SYMBOL: 'BRN_FRONT_MONTH',
+    CALENDAR_URL: 'https://www.ice.com/api/productguide/spec/219/expiry/csv',
+    CALENDAR_REFRESH_MS: 24 * 60 * 60 * 1000,
+    CALENDAR_MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000,
+    CALENDAR_RETRY_MS: 5 * 60 * 1000,
+    CALENDAR_TIMEOUT_MS: 5000,
+    TIME_ZONE: 'Europe/London',
+    EXPIRY_HOUR: 19,
+    EXPIRY_MINUTE: 30,
+    MONTH_CODES: {
+        Jan: 'F', Feb: 'G', Mar: 'H', Apr: 'J', May: 'K', Jun: 'M',
+        Jul: 'N', Aug: 'Q', Sep: 'U', Oct: 'V', Nov: 'X', Dec: 'Z'
+    } as Record<string, string>
+};
+
 // Retry delay configurations
 export const RETRY_DELAYS = { 
     STATUS: 2000 
