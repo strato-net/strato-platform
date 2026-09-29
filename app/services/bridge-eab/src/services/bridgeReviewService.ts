@@ -11,6 +11,7 @@ import { attestWithdrawalRefund } from "./settlementAttestationService";
 import { sendBridgeReviewEmail } from "./emailService";
 import { logError } from "../utils/logger";
 import { getPendingWithdrawalReview } from "./externalWithdrawalService";
+import { processingIssueService } from "./processingIssueService";
 
 const normalize = (value: string) => value.replace(/^0x/i, "").toLowerCase();
 const notificationPath = path.join(process.cwd(), "data", "bridgeReviewNotifications.json");
@@ -40,7 +41,6 @@ export const prepareBridgeOperation = async (id: string, action: string): Promis
   if (action !== "refund" && action !== "settle") throw new Error("Unsupported bridge operation");
   const item = buildBridgeReviewQueue(await getBridgeReviewRecords()).find(entry => entry.id === id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new Error("Review action is unavailable; refresh the queue");
-  const target = config.externalAssetBridge.address!;
   if (item.kind === "deposit_review") {
     const [, , chainId, router, depositId] = id.split(":");
     if (action === "settle") {
@@ -49,17 +49,22 @@ export const prepareBridgeOperation = async (id: string, action: string): Promis
     }
     throw new Error("Unsupported deposit operation");
   }
-  const evidence = await getWithdrawalRefundEvidence(item.reference);
+  return prepareWithdrawalRefund(item.reference);
+};
+
+const prepareWithdrawalRefund = async (reference: string): Promise<{ digest: string }> => {
+  const target = config.externalAssetBridge.address!;
+  const evidence = await getWithdrawalRefundEvidence(reference);
   const { withdrawal: w, authorization: a, verifierVersion } = evidence;
   if (!w || String(w.status) !== "3" || !a?.destinationVault || verifierVersion == null) throw new Error("Withdrawal refund evidence is unavailable");
   const authorization = {
     sourceChainId: (await getStratoNetworkId()).toString(), sourceBridge: `0x${normalize(target)}`,
-    sourceWithdrawalId: item.reference, destinationChainId: String(w.externalChainId),
+    sourceWithdrawalId: reference, destinationChainId: String(w.externalChainId),
     destinationVault: `0x${normalize(a.destinationVault)}`, token: `0x${normalize(w.externalToken)}`,
     recipient: `0x${normalize(w.externalRecipient)}`, amount: String(w.externalTokenAmount),
     notBefore: String(a.notBefore), deadline: String(a.deadline), signerSetVersion: String(a.signerSetVersion),
   };
-  const digest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(target, "getWithdrawalRefundDigest", [item.reference])));
+  const digest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(target, "getWithdrawalRefundDigest", [reference])));
   const [count, verifierConfig] = await Promise.all([getSettlementAttestationCount(digest), getSettlementVerifierConfig()]);
   if (!Number.isSafeInteger(verifierConfig.threshold) || verifierConfig.threshold < 2) throw new Error("Refund verifier threshold is unavailable");
   if (count < verifierConfig.threshold) {
@@ -67,6 +72,14 @@ export const prepareBridgeOperation = async (id: string, action: string): Promis
     if (await getSettlementAttestationCount(digest) < verifierConfig.threshold) throw new Error("Refund attestations are not indexed yet; retry before voting");
   }
   return { digest };
+};
+
+export const preparePendingWithdrawalRefunds = async (): Promise<void> => {
+  const items = buildBridgeReviewQueue(await getBridgeReviewRecords());
+  for (const item of items.filter(item => item.source === "eab" && item.kind === "withdrawal_refund")) {
+    await processingIssueService.run({ source: "eab", chainId: item.chainId, bridge: config.externalAssetBridge.address!,
+      reference: item.reference, stage: "withdrawal-refund", token: item.token }, () => prepareWithdrawalRefund(item.reference));
+  }
 };
 
 export const notifyBridgeReviews = async (): Promise<void> => {

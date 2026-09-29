@@ -257,6 +257,7 @@ export interface BridgeReviewItem {
   reason: string;
   safeProposalHash?: string;
   approvalStatus?: "pending" | "approved" | "unavailable";
+  refundStatus?: "pending" | "ready" | "unavailable";
   governanceStatus?: "available" | "unavailable";
   governance?: Partial<Record<BridgeReviewGovernanceAction, BridgeReviewGovernance>>;
   actions: Array<"approve" | "reject" | "refund" | "settle">;

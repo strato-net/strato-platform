@@ -4,9 +4,8 @@ import axios from "axios";
 import { cirrus } from "../../utils/appApiHelper";
 import * as config from "../../config/config";
 import { constants } from "../../config/constants";
-import * as bridge from "./bridge.service";
 import { getAdminBridgePolicies, getAdminBridgeReviews, prepareAdminBridgeReview } from "./bridgeReview.service";
-import { parseBridgePolicyJson, buildBridgePolicyRows, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue, isBridgeProcessingIssuesPage } from "../helpers/bridge.helper";
+import { parseBridgePolicyJson, buildBridgePolicyRows, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue } from "../helpers/bridge.helper";
 
 const address = "1".repeat(40), hash = "0x" + "a".repeat(64), digest = "0x" + "b".repeat(64);
 const depositId = "9007199254740993123456789";
@@ -57,7 +56,7 @@ function setup(t: any) {
     state.rpcCalls++;
     return { data: { result: state.digest } };
   });
-  const operations = t.mock.method(bridge, "requestBridgeOperation", async () => { throw new Error("bridge offline"); });
+  const operations = t.mock.method(axios, "request", async () => { throw new Error("bridge offline"); });
   return { state, operations };
 }
 
@@ -73,7 +72,7 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   assert.equal(review.safeProposalHash, hash);
   assert.deepEqual(review.actions, [], "Safe decisions stay in Safe");
   assert.equal(operations.mock.callCount(), 0);
-  assert.equal(state.rpcCalls, 0, "unapproved deposits do not need a digest read");
+  assert.equal(state.rpcCalls, 1, "only the refund needs a digest read");
   assert.ok(items.filter(item => item.kind === "deposit_review").every(item => !item.actions.includes("settle")));
 });
 
@@ -85,7 +84,7 @@ test("deposit governance uses the contract digest and never calls the bridge", a
   assert.deepEqual(await prepareAdminBridgeReview("token", depositKey, "reject"), {
     target: address, func: "abortDeposit", args: ["11155111", `0x${address}`, depositId],
   });
-  assert.equal(state.rpcCalls, 1);
+  assert.equal(state.rpcCalls, 3);
   assert.equal(operations.mock.callCount(), 0);
   state.tables["/BlockApps-ExternalAssetBridge-deposits"] = [];
   await assert.rejects(prepareAdminBridgeReview("token", depositKey, "approve"), /unavailable/);
@@ -100,41 +99,42 @@ test("refund votes reuse indexed quorum while the bridge service is offline", as
   await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:1", "reject"), /unavailable/);
 });
 
-test("only missing attestations and operator settlement contact the bridge; changed evidence blocks voting", async t => {
+test("refunds wait for indexed attestations without calling the bridge", async t => {
   const { state, operations } = setup(t);
-  state.approval = digest;
   state.count = 0;
-  await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund"), /bridge offline/);
-  await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /bridge offline/);
-  assert.equal(operations.mock.callCount(), 2);
-  operations.mock.mockImplementation(async () => { state.count = 2; return { digest }; });
-  assert.equal((await prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund") as any).func, "refundWithdrawal");
-  state.count = 0;
-  operations.mock.mockImplementation(async () => { state.count = 2; state.digest = hash; return { digest }; });
-  await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund"), /evidence changed/);
+  let item = (await getAdminBridgeReviews("token")).find(item => item.id === "eab:withdrawal:2")!;
+  assert.equal(item.refundStatus, "pending");
+  await assert.rejects(prepareAdminBridgeReview("token", item.id, "refund"), /Awaiting verifier attestations/);
+  assert.equal(operations.mock.callCount(), 0);
+  state.count = 2;
+  item = (await getAdminBridgeReviews("token")).find(item => item.id === "eab:withdrawal:2")!;
+  assert.equal(item.refundStatus, "ready");
+  assert.equal((await prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund")).func, "refundWithdrawal");
+  state.threshold = 0;
+  assert.equal((await getAdminBridgeReviews("token")).find(item => item.id === "eab:withdrawal:2")!.refundStatus, "unavailable");
+  await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund"), /unavailable/);
 });
 
-test("settlement requires a current digest-matched approval and rechecks after displaying the queue", async t => {
+test("approved deposits retain their approval status but never expose manual settlement", async t => {
   const { state, operations } = setup(t);
-  for (const approval of ["0x" + "0".repeat(64), hash, "invalid"]) {
+  for (const approval of ["0x" + "0".repeat(64), hash, "invalid", digest]) {
     state.approval = approval;
     const item = (await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!;
     assert.deepEqual(item.actions, ["approve", "reject"]);
-    await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /matching governance approval/);
+    assert.equal(item.approvalStatus, approval === digest ? "approved" : "pending");
+    await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /automatically/);
   }
-  state.approval = digest.slice(2);
   state.approvalReadFails = true;
-  assert.ok(!(await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!.actions.includes("settle"));
-  await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /matching governance approval/);
-  state.approvalReadFails = false;
-  assert.ok((await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!.actions.includes("settle"));
-  state.digest = hash;
-  await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /matching governance approval/);
-  assert.equal(operations.mock.callCount(), 0, "unapproved or changed deposits must not invoke the bridge");
-  state.approval = hash;
-  operations.mock.mockImplementation(async () => ({ transactionHash: "settled-tx" }));
-  assert.deepEqual(await prepareAdminBridgeReview("token", depositKey, "settle"), { transactionHash: "settled-tx" });
-  assert.equal(operations.mock.callCount(), 1);
+  assert.equal((await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!.approvalStatus, "unavailable");
+  assert.equal(operations.mock.callCount(), 0);
+});
+
+test("refund preparation rejects evidence that changes before returning governance arguments", async t => {
+  const { state, operations } = setup(t);
+  let calls = 0;
+  t.mock.method(axios, "post", async () => ({ data: { result: ++calls < 3 ? state.digest : hash } }));
+  await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund"), /evidence changed/);
+  assert.equal(operations.mock.callCount(), 0);
 });
 
 test("contract digest ABI calls preserve full identifiers and reject malformed results", () => {
@@ -183,7 +183,7 @@ test("review progress reads current votes, exact deposit digest, and per-functio
   assert.equal(reviewed.approvalStatus, "pending", "quorum alone cannot claim execution or approval");
   assert.equal(items.find(item => item.id === "eab:withdrawal:2")?.governance?.refund?.votesRequired, 3);
   assert.equal(operations.mock.callCount(), 0);
-  assert.equal(state.rpcCalls, 1, "approval and vote matching share the digest read");
+  assert.equal(state.rpcCalls, 2, "approval and vote matching share one digest read, plus the refund digest");
   state.approval = digest;
   items = await getAdminBridgeReviews("token", "3".repeat(40));
   reviewed = items.find(item => item.id === depositKey)!;
@@ -194,37 +194,6 @@ test("review progress reads current votes, exact deposit digest, and per-functio
   assert.equal(reviewed.governanceStatus, "unavailable");
   assert.equal(reviewed.governance, undefined);
   assert.equal(reviewed.approvalStatus, "approved", "governance metadata failure cannot hide verified approval");
-});
-
-test("processing page validation rejects malformed row details instead of crashing the UI", () => {
-  const row = { id: "one", context: { source: "eab", chainId: "1", bridge: address, reference: "1", stage: "settle" },
-    issues: [{ code: "PAUSED", message: "Paused", retryable: true, details: { limit: depositId } }], firstSeenAt: 1, lastSeenAt: 1, attempts: 1, nextRetryAt: 2 };
-  const page = { items: [row], total: 1, offset: 0, limit: 25, state: "active", fetchedAt: 2 };
-  assert.equal(isBridgeProcessingIssuesPage(page), true);
-  assert.equal(isBridgeProcessingIssuesPage({ ...page, items: [{ ...row, context: null }] }), false);
-  assert.equal(isBridgeProcessingIssuesPage({ ...page, items: [{ ...row, issues: [{ ...row.issues[0], details: { limit: {} } }] }] }), false);
-});
-
-test("processing proxy uses only the configured endpoint and a server-side operations token", async t => {
-  const previousUrl = config.bridgeUrl, previousToken = config.bridgeOperationsToken;
-  (config as any).bridgeUrl = "https://bridge.test/";
-  (config as any).bridgeOperationsToken = "test-operations-token";
-  t.after(() => { (config as any).bridgeUrl = previousUrl; (config as any).bridgeOperationsToken = previousToken; });
-  let invalid = false;
-  const request = t.mock.method(axios, "request", async (options: any) => {
-    assert.equal(options.url, "https://bridge.test/operations/reviews/processing-issues");
-    assert.equal(options.method, "GET");
-    assert.equal(options.headers.Authorization, "Bearer test-operations-token");
-    assert.deepEqual(options.params, { state: "active", offset: 25, limit: 25 });
-    assert.equal(options.timeout, 15_000);
-    return { data: { items: invalid ? [null] : [], total: 25, offset: 25, limit: 25, state: "active", fetchedAt: 1 } };
-  });
-  assert.equal((await bridge.getBridgeProcessingIssues("active", 25, 25)).total, 25);
-  invalid = true;
-  await assert.rejects(bridge.getBridgeProcessingIssues("active", 25, 25), /Invalid bridge processing response/);
-  (config as any).bridgeOperationsToken = "";
-  await assert.rejects(bridge.getBridgeProcessingIssues("active", 25, 25), /not configured/);
-  assert.equal(request.mock.callCount(), 2);
 });
 
 test("policy overview reads only Cirrus, paginates all routes, and uses the custody address in storage", async t => {

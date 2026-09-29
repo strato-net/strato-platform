@@ -6,20 +6,18 @@ import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import WithdrawalWidget from "@/components/router/WithdrawalWidget";
 import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
-import { Link } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
 import { useUser } from "@/context/UserContext";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
-import { requestWalletConnection } from "@/lib/auth";
 import { useFeeBalancesReady, useTradeBridgeCatalog } from "@/hooks/trade/useTradeTokens";
 
 const WithdrawalsPage = () => {
   usePageTitle("Bridge Out");
 
   const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
-  const { withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary, setTargetTransactionTab } =
+  const { withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary } =
     useBridgeContext();
   const bridgeCatalog = useTradeBridgeCatalog();
   const feeBalancesReady = useFeeBalancesReady();
@@ -68,27 +66,7 @@ const WithdrawalsPage = () => {
             <div className="w-full lg:w-[50%] flex">
               <Card className="shadow-sm flex-1 flex flex-col">
                 <CardHeader className="pb-2 md:pb-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="text-base md:text-xl">Bridge Out</CardTitle>
-                    <Link
-                      to="/bridge-transactions?from=withdrawals"
-                      onClick={(e) => {
-                        if (!isLoggedIn) {
-                          e.preventDefault();
-                          requestWalletConnection();
-                          return;
-                        }
-                        setTargetTransactionTab('WithdrawalInitiated');
-                      }}
-                      className={`flex items-center gap-1 text-xs md:text-sm font-semibold transition-colors whitespace-nowrap ${isLoggedIn
-                          ? "text-blue-600 hover:text-blue-800 cursor-pointer"
-                          : "text-muted-foreground hover:text-foreground cursor-pointer"
-                        }`}
-                    >
-                      <ArrowRight size={14} className="md:w-4 md:h-4" />
-                      View Transactions
-                    </Link>
-                  </div>
+                  <CardTitle className="text-base md:text-xl">Bridge Out</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col min-h-0">
                   <div className="w-full flex-1 min-h-0 overflow-auto p-1 -m-1">

@@ -138,6 +138,44 @@ test("refund votes require indexed attestations; subsequent voters reuse the sam
   assert.equal(requests, 2, "existing quorum must not spend more attestor fees");
 });
 
+test("refund preparation runs independently, isolates failures, and skips paid or unexpired withdrawals", async t => {
+  const records = empty();
+  records.withdrawals = [withdrawal("20"), withdrawal("21"),
+    { ...withdrawal("22"), value: { ...withdrawal("22").value, authorizationDeadline: "99999999999" } },
+    { ...withdrawal("23"), value: { ...withdrawal("23").value, externalTxHash: hash } }, withdrawal("24", "2")];
+  const { service, cirrus, bridge } = await setup(t, records);
+  const { ProcessingIssueService, processingIssueService } = await import("./processingIssueService");
+  const isolated = new ProcessingIssueService(path.join(directory, "refund-issues.json"));
+  for (const method of ["due", "record", "resolve"] as const) {
+    t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
+  }
+  const settlements = t.mock.method(bridge, "confirmReviewedDeposit", async () => { throw new Error("No settlement or governance action expected"); });
+  t.mock.method(cirrus, "getWithdrawalRefundEvidence", async (id: string) => ({ withdrawal: withdrawal(id).value, authorization, verifierVersion: "3" }));
+  t.mock.method(cirrus, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: [address] }));
+  const { rpc } = await import("../utils/api");
+  t.mock.method(rpc, "post", async (_path: string, request: any) => {
+    assert.equal(request.method, "eth_call");
+    return { result: "0x" + request.params[0].data.slice(-64) };
+  });
+  const accepted = new Set<string>(), attempts: string[] = [];
+  t.mock.method(cirrus, "getSettlementAttestationCount", async (digest: string) => accepted.has(digest) ? 2 : 0);
+  const attestation = await import("./settlementAttestationService");
+  t.mock.method(attestation, "attestWithdrawalRefund", async (auth: any, digest: string) => {
+    attempts.push(auth.sourceWithdrawalId);
+    if (auth.sourceWithdrawalId === "20") throw new Error("external payment already occurred");
+    accepted.add(digest);
+  });
+  await service.preparePendingWithdrawalRefunds();
+  assert.deepEqual(attempts, ["20", "21"], "one failed refund must not prevent the next from gathering attestations");
+  await service.preparePendingWithdrawalRefunds();
+  assert.deepEqual(attempts, ["20", "21"], "failures back off and existing quorums do not submit duplicate attestations");
+  const issues = Object.values((await isolated.snapshot()).records);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].context.reference, "20");
+  assert.equal(issues[0].context.stage, "withdrawal-refund");
+  assert.equal(settlements.mock.callCount(), 0);
+});
+
 test("email journal deduplicates, retries failed delivery, and never resolves items on a failed scan", async t => {
   const records = empty(); records.deposits = [deposit];
   const { service, cirrus } = await setup(t, records);

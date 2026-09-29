@@ -82,7 +82,9 @@ export class ProcessingIssueService {
   }
 
   async record(context: ProcessingContext, error: unknown): Promise<ProcessingIssue[]> {
-    let issues = classifyProcessingError(error);
+    // Withdrawal workers retry unknown failures; deposits retain their review decision.
+    const withdrawal = context.stage.startsWith("withdrawal-") || context.stage === "release-confirmations";
+    let issues = classifyProcessingError(error).map(issue => withdrawal && issue.code === "UNKNOWN" ? { ...issue, retryable: true } : issue);
     if (context.source === "eab" && context.stage.startsWith("withdrawal") && /^\d+$/.test(context.chainId)) {
       issues = issues.map(issue => issue.code === "FUNDING_REQUIRED" && !issue.details.account
         ? { ...issue, details: { ...issue.details,

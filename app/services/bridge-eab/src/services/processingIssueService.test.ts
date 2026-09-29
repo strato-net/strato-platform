@@ -104,6 +104,29 @@ test("transient grace, failed delivery, and recovery delivery retain durable pen
   assert.deepEqual(f.sent.map(s => s.resolved), [false, true]);
 });
 
+test("progress clears the old alert while normal confirmation waits stay quiet across restart", async t => {
+  const f = await fixture(t);
+  const processing = context("6");
+  const confirmations = { ...processing, stage: "release-confirmations" };
+  await f.service.run(processing, async () => { throw new Error("release receipt unavailable"); });
+  await f.service.notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false]);
+  f.advance(60_000);
+  await f.service.record(confirmations, issue("CONFIRMATIONS_PENDING", { observedConfirmations: "2", requiredConfirmations: "12" }));
+  await f.service.resolve(processing);
+  await f.open().notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false, true]);
+  assert.equal(f.sent[1].records[0].outcome, "processing_resumed");
+  assert.equal((await f.open().snapshot()).records[processingKey(confirmations)].resolvedAt, undefined);
+  f.advance(120_000);
+  await f.open().record(confirmations, issue("CONFIRMATIONS_PENDING", { observedConfirmations: "10", requiredConfirmations: "12" }));
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 2, "expected confirmations do not trigger an attention email");
+  await f.service.resolve(confirmations);
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 2, "an unalerted confirmation wait needs no recovery email");
+});
+
 test("policy changes alert immediately and governance review uses its existing notification channel", async t => {
   const f = await fixture(t);
   await f.service.record(context(), issue("POLICY_RESTRICTED", { policyVersion: "1", limit: "10" }));
@@ -142,12 +165,50 @@ test("verifier diagnostics are sanitized, backward compatible, and do not trust 
   })]);
   assert.equal(classifyProcessingError({ response: { status: 409, data: { decision: "manual_review" } } })[0].code, "MANUAL_REVIEW");
   assert.equal(classifyProcessingError(new Error("EAB: mint limit exceeded"))[0].code, "MINT_CAPACITY");
+  assert.equal(classifyProcessingError(Object.assign(new Error("EAB: mint limit exceeded"), {
+    shortMessage: "execution reverted",
+  }))[0].code, "MINT_CAPACITY");
   assert.equal(classifyProcessingError(new Error("Deposit block hash changed"))[0].retryable, false);
   assert.equal(classifyProcessingError({ response: { status: 503 } })[0].code, "DEPENDENCY_UNAVAILABLE");
   assert.equal(classifyProcessingError({ response: { data: { code: "future-code", retryable: true } } })[0].retryable, false);
   const a: any = {}, b = { cause: a }; a.cause = b;
   assert.equal(classifyProcessingError(a)[0].code, "UNKNOWN");
   assert.equal(verifierFailureDetails(new Error("low account balance"), "v1", "digest").policyVersion, "v1");
+});
+
+test("unknown diagnostics retain the cause without credentials, URLs, or serialized payloads", async t => {
+  const f = await fixture(t);
+  const previousSecret = process.env.CLIENT_SECRET;
+  process.env.CLIENT_SECRET = "unlabelled-secret-value";
+  t.after(() => { process.env.CLIENT_SECRET = previousSecret; });
+  const hash = "0x" + "a".repeat(64);
+  const error = Object.assign(new Error('Vault release reverted at https://rpc.example/private-api-key?key=hidden Bearer bearer-secret password="password-secret" unlabelled-secret-value (request={"privateKey":"payload-secret"})'), {
+    code: "CALL_EXCEPTION", action: "sendTransaction", transactionHash: hash,
+    response: { status: 422 },
+  });
+  await f.service.run(context(), async () => { throw Object.assign(new Error("wrapped"), { cause: error }); });
+  const record = (await f.open().snapshot()).records[processingKey(context())];
+  assert.equal(record.issues[0].retryable, true);
+  assert.equal(record.nextRetryAt - record.lastSeenAt, 30_000);
+  assert.match(record.issues[0].details.reason, /^Vault release reverted/);
+  assert.equal(record.issues[0].details.errorCode, "CALL_EXCEPTION");
+  assert.equal(record.issues[0].details.httpStatus, "422");
+  assert.equal(record.issues[0].details.operation, "sendTransaction");
+  assert.equal(record.issues[0].details.transactionHash, hash);
+  assert.doesNotMatch(JSON.stringify(record), /rpc\.example|private-api-key|bearer-secret|password-secret|unlabelled-secret-value|payload-secret|request=/);
+  const oldVerifier = classifyProcessingError({ response: { status: 422, data: {
+    code: "UNKNOWN", details: {}, error: "Release event not found", retryable: false,
+  } } })[0];
+  assert.equal(oldVerifier.details.reason, "Release event not found");
+  assert.equal(oldVerifier.retryable, false, "unclassified evidence must still take the deposit review path");
+  const nested = classifyProcessingError({ response: { status: 422, data: {
+    error: { message: 'Execution reverted {"headers":{"Authorization":"secret"}}' },
+  } } })[0];
+  assert.equal(nested.details.reason, "Execution reverted");
+  const credentials = classifyProcessingError(new Error('Release failed access_token=remote-secret apiKey=remote-key response=raw-response-secret'))[0];
+  assert.doesNotMatch(JSON.stringify(credentials), /remote-secret|remote-key|raw-response-secret/);
+  assert.ok(classifyProcessingError(new Error("x".repeat(500)))[0].details.reason.length <= 240);
+  assert.equal(classifyProcessingError({ response: { data: { payload: "do-not-serialize" } } })[0].details.reason, undefined);
 });
 
 test("terminal reconciliation requires matching on-chain identities and paginates through row caps", async t => {
@@ -211,6 +272,13 @@ test("processing emails use existing recipients and distinguish recovery from co
   assert.deepEqual(sent[0].to, ["reviewer@example.com"]);
   assert.match(sent[0].text, /FUNDING_REQUIRED/);
   assert.match(sent[1].text, /Processing may still be in progress/);
+  assert.match(sent[1].text, /Cleared issue: FUNDING_REQUIRED/);
+  assert.match(sent[1].text, /Previous diagnostics:/);
+  assert.doesNotMatch(sent[1].text, /needs funding/);
+  await f.service.record(context("2"), issue("UNKNOWN"));
+  await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("2"))]], true);
+  assert.match(sent[2].text, /Cleared issue: UNKNOWN/);
+  assert.doesNotMatch(sent[2].text, /needs operator investigation|\{\}/);
   assert.doesNotMatch(sent[0].text + sent[1].text, /https?:\/\//);
 });
 

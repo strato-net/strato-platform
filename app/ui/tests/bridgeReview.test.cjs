@@ -17,12 +17,13 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../s
   require: id => id === 'axios' ? { default: { create: () => ({ interceptors: { request: { use() {} }, response: { use: (...args) => responseInterceptors.push(args) } } }) } } : id === '@/hooks/use-toast' ? { toast: value => globalToasts.push(value) } : {},
 });
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true, governanceStatus = "available", progress, approvalStatus } = {}) {
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready' } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
   item.governanceStatus = governanceStatus;
   item.approvalStatus = approvalStatus;
+  item.refundStatus = refundStatus;
   item.governance = { [action]: progress ?? { votesCast: 0, votesRequired: 2, hasVoted: false } };
   if (!approved) item.actions = item.actions.filter(action => action !== 'settle');
   const exports = {};
@@ -43,7 +44,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
   const render = () => { cursor = 0; return exports.default(); };
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => !tree || typeof tree !== 'object' ? String(tree ?? '') : Array.isArray(tree) ? tree.map(text).join(' ') : text(tree.props?.children);
-  const select = () => nodes(render()).find(node => node.props?.children === (action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : action === 'approve' ? 'Approve deposit / vote' : 'Prepare refund / vote')).props.onClick();
+  const select = () => nodes(render()).find(node => node.props?.children === (action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : action === 'approve' ? 'Approve deposit / vote' : 'Refund / vote')).props.onClick();
   const confirm = () => nodes(render()).find(node => node.type === 'Button' && text(node).includes(action === 'settle' ? 'Confirm settlement' : 'Confirm vote')).props.onClick();
   return { select, confirm, render, text, nodes, votes, requests };
 }
@@ -64,34 +65,30 @@ test('failed refund evidence stays in the dialog and never casts a vote', async 
   assert.match(h.text(h.render()), /External payment already occurred/);
 });
 
-test('settlement API errors render an alert without crashing or closing confirmation', async () => {
+test('governance API errors render an alert without crashing or closing confirmation', async () => {
   for (const { status, failure, expected } of [
     { status: 500, failure: { message: 'Internal service failure', status: 500, type: 'Error' }, expected: 'Something went wrong. Please try again later.' },
     { status: 409, failure: { message: 'Verifier threshold not reached', status: 409 }, expected: 'Verifier threshold not reached' },
     { status: 409, failure: 'Matching governance approval required', expected: 'Matching governance approval required' },
     { status: 400, failure: { message: { unexpected: true } }, expected: 'An unexpected error occurred.' },
   ]) {
-    const h = harness({ kind: 'deposit_review', action: 'settle', status, failure });
+    const h = harness({ kind: 'deposit_review', action: 'approve', status, failure });
     h.select(); await h.confirm();
     const tree = h.render();
     const alert = h.nodes(tree).find(node => node.props?.role === 'alert');
     assert.ok(alert);
     assert.equal(renderToStaticMarkup(React.createElement('p', alert.props)), `<p role="alert" class="text-sm text-destructive">${expected}</p>`);
     assert.equal(h.nodes(tree).find(node => node.type === 'Dialog').props.open, true);
-    assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node).includes('Confirm settlement')).props.disabled, false);
+    assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node).includes('Confirm vote')).props.disabled, false);
     assert.equal(h.votes.length, 0);
     assert.equal(h.requests.length, 1);
   }
 });
 
-test('deposit rejection explains the lack of external refund; settlement does not cast a vote', async () => {
+test('deposit rejection explains the lack of external refund', async () => {
   const rejection = harness({ kind: 'deposit_review', action: 'reject' });
   rejection.select();
   assert.match(rejection.text(rejection.render()), /does not refund external funds/);
-  const settlement = harness({ kind: 'deposit_review', action: 'settle', response: { transactionHash: 'tx' } });
-  settlement.select(); await settlement.confirm();
-  assert.equal(settlement.votes.length, 0);
-  assert.match(settlement.text(settlement.render()), /Deposit settlement submitted/);
 });
 
 test('unavailable queue is never presented as an empty healthy queue', () => {
@@ -105,19 +102,27 @@ test('STRATO shows withdrawals pending review with approval handled in Safe', ()
   const text = h.text(h.render());
   assert.match(text, /Withdrawal pending review/);
   assert.match(text, /Approval handled in Safe/);
-  assert.doesNotMatch(text, /Reject \/ vote|Prepare refund \/ vote/);
+  assert.doesNotMatch(text, /Reject \/ vote|Refund \/ vote/);
   assert.equal(h.requests.length, 0);
   assert.equal(h.votes.length, 0);
 });
 
-test('deposit settlement stays disabled until matching governance approval exists', () => {
-  const h = harness({ kind: 'deposit_review', action: 'settle', approved: false });
-  const tree = h.render();
-  const button = h.nodes(tree).find(node => node.type === 'Button' && node.props.children === 'Settle approved deposit');
-  assert.equal(button.props.disabled, true);
-  assert.equal(button.props.onClick, undefined);
-  assert.match(h.text(tree), /Matching governance approval required/);
-  assert.equal(h.requests.length, 0);
+test('deposit review never offers manual settlement, including stale API actions', () => {
+  for (const approved of [false, true]) {
+    const h = harness({ kind: 'deposit_review', action: 'settle', approved });
+    assert.doesNotMatch(h.text(h.render()), /Settle approved deposit|Confirm settlement/);
+    assert.equal(h.requests.length, 0);
+  }
+});
+
+test('refund votes stay disabled until indexed attestations are ready', () => {
+  for (const refundStatus of ['pending', 'unavailable']) {
+    const h = harness({ refundStatus });
+    const tree = h.render();
+    assert.equal(h.nodes(tree).find(node => node.type === 'Button' && node.props.children === 'Refund / vote').props.disabled, true);
+    assert.match(h.text(tree), refundStatus === 'pending' ? /Awaiting verifier attestations/ : /attestation status is unavailable/);
+    assert.equal(h.requests.length, 0);
+  }
 });
 
 test('review actions reflect your vote and quorum without claiming approval', () => {
@@ -138,7 +143,7 @@ test('verified approval suppresses another approval vote; unavailable status blo
   assert.equal(h.nodes(h.render()).some(node => node.type === 'Button' && h.text(node) === 'Approve deposit / vote'), false);
   const unavailable = harness({ governanceStatus: 'unavailable' });
   assert.match(unavailable.text(unavailable.render()), /Voting status is unavailable/);
-  assert.equal(unavailable.nodes(unavailable.render()).find(node => node.type === 'Button' && h.text(node) === 'Prepare refund / vote').props.disabled, true);
+  assert.equal(unavailable.nodes(unavailable.render()).find(node => node.type === 'Button' && h.text(node) === 'Refund / vote').props.disabled, true);
 });
 
 test('submitted vote stays distinct while Cirrus still returns the old vote count', async () => {
@@ -154,7 +159,7 @@ test('submitted vote stays distinct while Cirrus still returns the old vote coun
   assert.doesNotMatch(h.text(h.render()), /Waiting for indexed status/);
 });
 
-function processingHarness(result, component = 'BridgeProcessingIssues') {
+function processingHarness(result, component = 'BridgePolicies') {
   const state = []; let cursor = 0; let query;
   const exports = {}, requests = [];
   const jsx = (type, props) => ({ type, props });
@@ -175,37 +180,8 @@ function processingHarness(result, component = 'BridgeProcessingIssues') {
   return { render, nodes, text, requests, query: () => query };
 }
 
-test('processing queue preserves error and first-load states, including stale data', () => {
-  const unavailable = processingHarness({ isError: true });
-  assert.match(unavailable.text(unavailable.render()), /Governance reviews and transaction history remain available/);
-  assert.doesNotMatch(unavailable.text(unavailable.render()), /No active processing issues/);
-  const loading = processingHarness({ isLoading: true });
-  assert.match(loading.text(loading.render()), /Loading processing issues/);
-  const stale = processingHarness({ isError: true, data: { items: [], total: 0, fetchedAt: 1 } });
-  assert.match(stale.text(stale.render()), /displayed records may be stale/);
-  assert.doesNotMatch(stale.text(stale.render()), /No active processing issues/);
-});
-
-test('processing queue pages independently, resets paging for cleared records, and never offers mutation controls', async () => {
-  const h = processingHarness({ data: { items: [{ id: 'one', context: { source: 'native', stage: 'withdrawal-processing', chainId: '11155111', reference: '2' },
-    issues: [{ code: 'PAUSED', message: 'Paused', details: { capacity: '100' } }], firstSeenAt: 1, lastSeenAt: 2, attempts: 1, nextRetryAt: 3,
-    resolvedAt: 4, outcome: 'processing_resumed' }], total: 30, fetchedAt: 5 } });
-  let tree = h.render();
-  assert.equal(h.nodes(tree).find(node => node.type === 'Collapsible').props.defaultOpen, undefined);
-  assert.match(h.text(tree), /Blocker cleared · processing resumed/);
-  assert.doesNotMatch(h.text(tree), /Transfer completed|Confirm vote|Retry now/);
-  h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Next').props.onClick();
-  h.render(); await h.query().queryFn();
-  assert.equal(h.requests[0][1].params.offset, 25);
-  tree = h.render();
-  h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Cleared').props.onClick();
-  h.render(); await h.query().queryFn();
-  assert.equal(h.requests[1][1].params.offset, 0);
-  assert.equal(h.requests[1][1].params.state, 'cleared');
-});
-
 test('admin polling errors stay inline instead of producing repeated global toasts', async () => {
-  for (const url of ['/bridge/admin/reviews', '/bridge/admin/processing-issues?state=active', '/bridge/admin/policies']) {
+  for (const url of ['/bridge/admin/reviews', '/bridge/admin/policies']) {
     const error = { config: { url }, response: { status: 503, data: { error: 'unavailable' } } };
     await assert.rejects(responseInterceptors[0][1](error), value => value === error);
   }

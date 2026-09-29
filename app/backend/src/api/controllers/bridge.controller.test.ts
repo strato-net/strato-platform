@@ -20,6 +20,9 @@ test("bridge review operations reject non-admins and invalid actions before prox
   admin = true; request.body.action = "setOwner";
   await BridgeController.reviews(request, response, next);
   assert.equal(status, 400); assert.equal(calls, 0);
+  request.body.action = "settle";
+  await BridgeController.reviews(request, response, next);
+  assert.equal(status, 400); assert.equal(calls, 0);
   request.body.action = "refund";
   await BridgeController.reviews(request, response, next);
   assert.equal(calls, 1);
@@ -58,37 +61,6 @@ test("bridge endpoints bind their protocol server-side for every operation", asy
       assert.ok(registered.stack.length > 1, "authentication middleware remains attached");
     }
   }
-});
-
-test("processing issues require admin access, bounded paging, and isolate upstream failures", async t => {
-  let admin = false, calls = 0, fail = false, status = 200, body: any;
-  t.mock.method(userService, "isUserAdmin", async () => admin);
-  t.mock.method(service, "getBridgeProcessingIssues", async (state: "active" | "cleared", offset: number, limit: number) => {
-    calls++;
-    if (fail) throw new Error("secret upstream token and URL");
-    return { items: [], total: 0, state, offset, limit, fetchedAt: 1 };
-  });
-  const req: any = { accessToken: "user-token", address: "1".repeat(40), query: {} };
-  const res: any = { status: (value: number) => { status = value; return res; }, json: (value: any) => { body = value; } };
-  await BridgeController.processingIssues(req, res);
-  assert.equal(status, 403); assert.equal(calls, 0);
-  admin = true;
-  for (const query of [{ limit: "101" }, { offset: "-1" }, { offset: ["0"] }, { state: "everything" }, { limit: "" }]) {
-    req.query = query;
-    await BridgeController.processingIssues(req, res);
-    assert.equal(status, 400); assert.equal(calls, 0);
-  }
-  req.query = { state: "cleared", offset: "25", limit: "25" };
-  status = 200;
-  await BridgeController.processingIssues(req, res);
-  assert.equal(body.state, "cleared"); assert.equal(body.offset, 25);
-  fail = true;
-  await BridgeController.processingIssues(req, res);
-  assert.equal(status, 503);
-  assert.match(body.error, /Governance reviews and transaction history remain available/);
-  assert.doesNotMatch(body.error, /secret|upstream/);
-  const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === "/admin/processing-issues")?.route;
-  assert.ok(route && route.stack.length > 1);
 });
 
 test("Cirrus policy overview is admin-only and never reports failed reads as an empty overview", async t => {

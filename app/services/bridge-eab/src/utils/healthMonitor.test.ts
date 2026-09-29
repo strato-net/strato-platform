@@ -100,12 +100,15 @@ test("external withdrawal polling reports query failures and isolates item rejec
     return status === "1" ? [{ withdrawalId: "14", requiresManualReview: false }] as any : [];
   });
   t.mock.method(bridge, "processExternalWithdrawal", async () => { throw new Error("policy rejection"); });
+  const reviews = await import("../services/bridgeReviewService");
+  const refunds = t.mock.method(reviews, "preparePendingWithdrawalRefunds", async () => {});
   startExternalWithdrawalPolling();
   await flush();
   assert.equal(healthMonitor.snapshot().checks.startExternalWithdrawalPolling, "failed");
   available = true;
   await retries.shift()!();
   assert.equal(healthMonitor.snapshot().checks.startExternalWithdrawalPolling, "ok");
+  assert.equal(refunds.mock.callCount(), 1, "refund preparation runs after withdrawal processing, without an Admin request");
 });
 
 test("external deposit polling exposes query failure and recovers with no enabled chains", async (t) => {

@@ -5,7 +5,6 @@ import { constants, BRIDGE_REVIEW_PAGE_SIZE, BRIDGE_REVIEW_ID_BATCH_SIZE } from 
 import { cirrus } from "../../utils/appApiHelper";
 import { StratoError } from "../../errors";
 import { buildBridgePolicyRows, parseBridgePolicyJson, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue } from "../helpers/bridge.helper";
-import { requestBridgeOperation } from "./bridge.service";
 
 const readReviewRows = async <T = BridgeReviewRow>(accessToken: string, contract: string, address: string, table: string, filters: Record<string, string>, lossless = false): Promise<T[]> => {
   if (!address) return [];
@@ -39,6 +38,7 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
     }));
   }
   const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals });
+  for (const item of items) item.actions = item.actions.filter(action => action !== "settle");
   const digests = new Map<string, Promise<string>>();
   const depositDigest = (item: BridgeReviewItem) => {
     if (!digests.has(item.id)) {
@@ -67,7 +67,15 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
         // Keep the review visible, but never offer settlement on an unverified approval.
       }
       if (approved) { item.approvalStatus = "approved"; item.reason = "Approved. The bridge automatically retries settlement; the transfer is not completed until settlement succeeds."; }
-      if (!approved) item.actions = item.actions.filter(action => action !== "settle");
+    }));
+  }
+  const refunds = items.filter(item => item.kind === "withdrawal_refund");
+  for (let offset = 0; offset < refunds.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+    await Promise.all(refunds.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).map(async item => {
+      try {
+        const digest = await getReviewDigest(accessToken, "getWithdrawalRefundDigest(uint256)", [item.reference]);
+        item.refundStatus = await hasRefundQuorum(accessToken, digest) ? "ready" : "pending";
+      } catch { item.refundStatus = "unavailable"; }
     }));
   }
   if (userAddress) await enrichReviewGovernance(accessToken, items, userAddress, depositDigest);
@@ -162,19 +170,12 @@ const hasRefundQuorum = async (accessToken: string, digest: string): Promise<boo
   return count >= threshold;
 };
 
-export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote | { transactionHash: string }> => {
+export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote> => {
+  if (!["approve", "reject", "refund"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
   const item = (await getAdminBridgeReviews(accessToken)).find(entry => entry.id === id);
-  if (item?.kind === "deposit_review" && action === "settle" && !item.actions.includes("settle")) {
-    throw new StratoError("Settlement requires a matching governance approval; refresh the queue after approval completes", 409);
-  }
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
   const target = constants.externalAssetBridge;
   if (item.kind === "deposit_review") {
-    if (action === "settle") {
-      const result = await requestBridgeOperation({ id, action });
-      if (!result.transactionHash) throw new StratoError("Bridge did not return a settlement transaction", 409);
-      return { transactionHash: result.transactionHash };
-    }
     const [, , chainId, router, depositId] = id.split(":");
     const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];
     if (action === "reject") return { target, func: "abortDeposit", args };
@@ -185,11 +186,10 @@ export const prepareAdminBridgeReview = async (accessToken: string, id: string, 
   const args = [item.reference];
   const digest = await getReviewDigest(accessToken, signature, args);
   if (!await hasRefundQuorum(accessToken, digest)) {
-    const result = await requestBridgeOperation({ id, action: "refund" });
-    if (result.digest?.toLowerCase() !== digest || await getReviewDigest(accessToken, signature, args) !== digest ||
-        !await hasRefundQuorum(accessToken, digest)) {
-      throw new StratoError("Refund evidence changed or is not indexed yet; refresh before voting", 409);
-    }
+    throw new StratoError("Awaiting verifier attestations. The bridge prepares refund evidence automatically; refresh before voting", 409);
+  }
+  if (await getReviewDigest(accessToken, signature, args) !== digest) {
+    throw new StratoError("Refund evidence changed; refresh before voting", 409);
   }
   return { target, func: "refundWithdrawal", args };
 };

@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes } from "./jsonStringParsing.helper";
-import { BridgePolicyField, BridgePolicyRecords, BridgePolicyRow, BridgeProcessingIssuesPage, BridgeReviewGovernanceAction, BridgeToken } from "@strato/shared-types";
+import { BridgePolicyField, BridgePolicyRecords, BridgePolicyRow, BridgeReviewGovernanceAction, BridgeToken } from "@strato/shared-types";
 import type { BridgeHistorySource } from "../../types/types";
 import { keccak256 } from "../../utils/keccak256";
 
@@ -25,22 +25,6 @@ export const buildBridgeDigestCall = (signature: string, args: string[]): string
 export const parseBridgeDigest = (response: any): string => {
   if (response?.error || !/^0x[0-9a-f]{64}$/i.test(response?.result || "")) throw new Error("Unable to read current bridge review digest from STRATO");
   return response.result.toLowerCase();
-};
-
-export const isBridgeProcessingIssuesPage = (data: any): data is BridgeProcessingIssuesPage => {
-  const integer = (value: unknown) => Number.isSafeInteger(value) && Number(value) >= 0;
-  return !!data && Array.isArray(data.items) && integer(data.total) && integer(data.offset) && integer(data.limit) &&
-    integer(data.fetchedAt) && data.items.every((record: any) => record && typeof record.id === "string" &&
-      record.context && ["eab", "native"].includes(record.context.source) &&
-      ["chainId", "bridge", "reference", "stage"].every(key => typeof record.context[key] === "string") &&
-      ["account", "token"].every(key => record.context[key] === undefined || typeof record.context[key] === "string") &&
-      [record.firstSeenAt, record.lastSeenAt, record.attempts, record.nextRetryAt].every(integer) &&
-      (record.resolvedAt === undefined || integer(record.resolvedAt)) &&
-      (record.outcome === undefined || ["completed", "processing_resumed"].includes(record.outcome)) &&
-      Array.isArray(record.issues) && record.issues.length > 0 && record.issues.every((issue: any) => issue &&
-        typeof issue.code === "string" && typeof issue.message === "string" && typeof issue.retryable === "boolean" &&
-        issue.details && typeof issue.details === "object" && !Array.isArray(issue.details) &&
-        Object.values(issue.details).every(value => typeof value === "string")));
 };
 
 const bridgeIssueJson = JSONBig({ storeAsString: true });

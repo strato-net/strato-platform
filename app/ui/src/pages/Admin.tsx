@@ -17,7 +17,6 @@ import CollateralConfigManager from '@/components/admin/CollateralConfigManager'
 import VoteTab from '@/components/admin/VoteTab';
 import BridgeTransactionsPage from '@/components/dashboard/BridgeTransactionsPage';
 import BridgeReviewQueue from '@/components/admin/BridgeReviewQueue';
-import BridgeProcessingIssues from '@/components/admin/BridgeProcessingIssues';
 import BridgePolicies from '@/components/admin/BridgePolicies';
 import VaultAdminTab from '@/components/admin/VaultAdminTab';
 import YieldVaultAdminTab from '@/components/admin/YieldVaultAdminTab';
@@ -216,7 +215,6 @@ const Admin = () => {
           </TabsContent>
           <TabsContent value="bridge" className="space-y-6">
             <BridgeReviewQueue />
-            <BridgeProcessingIssues />
             <BridgePolicies />
             <BridgeTransactionsPage isAdmin={true} />
           </TabsContent>

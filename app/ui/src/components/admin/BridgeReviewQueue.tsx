@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { BridgeReviewItem, BridgeReviewVote } from '@strato/shared-types';
+import type { BridgeReviewGovernanceAction, BridgeReviewItem, BridgeReviewVote } from '@strato/shared-types';
 import { api, extractApiErrorMessage } from '@/lib/axios';
 import { useUser } from '@/context/UserContext';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,13 @@ import { getChainName } from '@/lib/bridge/utils';
 import { truncateAddress } from '@/utils/numberUtils';
 import { AlertCircle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 
-const actionLabels = { approve: 'Approve deposit / vote', reject: 'Reject / vote', refund: 'Prepare refund / vote', settle: 'Settle approved deposit' };
+const actionLabels = { approve: 'Approve deposit / vote', reject: 'Reject / vote', refund: 'Refund / vote' };
 
 const BridgeReviewQueue = () => {
   const { castVoteOnIssue, userAddress } = useUser();
   const [submittedVotes, setSubmittedVotes] = useState<Record<string, number>>({});
   const voteKey = (item: BridgeReviewItem, action: string) => `${userAddress}:${item.id}:${action}`;
-  const [selected, setSelected] = useState<{ item: BridgeReviewItem; action: BridgeReviewItem['actions'][number] } | null>(null);
+  const [selected, setSelected] = useState<{ item: BridgeReviewItem; action: BridgeReviewGovernanceAction } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -31,16 +31,12 @@ const BridgeReviewQueue = () => {
     if (!selected) return;
     setSubmitting(true); setError(''); setMessage('');
     try {
-      const { data } = await api.post<BridgeReviewVote | { transactionHash: string }>('/bridge/admin/reviews/prepare', {
+      const { data } = await api.post<BridgeReviewVote>('/bridge/admin/reviews/prepare', {
         id: selected.item.id, action: selected.action,
       });
-      if ('transactionHash' in data) {
-        setMessage('Deposit settlement submitted. Refresh the transaction history for its outcome.');
-      } else {
-        await castVoteOnIssue(data.target, data.func, data.args);
-        setSubmittedVotes(previous => ({ ...previous, [voteKey(selected.item, selected.action)]: Date.now() }));
-        setMessage('Vote submitted. Waiting for indexed governance status; settlement is a separate stage.');
-      }
+      await castVoteOnIssue(data.target, data.func, data.args);
+      setSubmittedVotes(previous => ({ ...previous, [voteKey(selected.item, selected.action)]: Date.now() }));
+      setMessage('Vote submitted. Waiting for indexed governance status; settlement is a separate stage.');
       setSelected(null);
       await reviews.refetch();
     } catch (e: unknown) {
@@ -90,12 +86,12 @@ const BridgeReviewQueue = () => {
         <div className="flex flex-wrap gap-2">
           {item.kind === 'withdrawal_review' && <span className="text-sm text-muted-foreground">Approval handled in Safe</span>}
           {item.safeProposalHash && <span className="inline-flex items-center gap-2 text-sm">Proposal: {truncateAddress(item.safeProposalHash)}<CopyButton address={item.safeProposalHash} /></span>}
-          {item.actions.filter(action => action !== 'approve' || item.approvalStatus !== 'approved').map(action => {
-            const voting = action !== 'settle';
-            const progress = voting ? item.governance?.[action] : undefined;
+          {item.actions.filter((action): action is BridgeReviewGovernanceAction => action !== 'settle' && (action !== 'approve' || item.approvalStatus !== 'approved')).map(action => {
+            const progress = item.governance?.[action];
             const quorum = progress && progress.votesCast >= progress.votesRequired;
-            const pending = voting && !progress?.hasVoted && Date.now() - (submittedVotes[voteKey(item, action)] ?? 0) < 60_000;
-            const disabled = submitting || reviews.isError || (voting && (!progress || item.governanceStatus !== 'available' || pending || (progress?.hasVoted && !quorum)));
+            const pending = !progress?.hasVoted && Date.now() - (submittedVotes[voteKey(item, action)] ?? 0) < 60_000;
+            const disabled = submitting || reviews.isError || !progress || item.governanceStatus !== 'available' || pending ||
+              (progress?.hasVoted && !quorum) || (action === 'refund' && item.refundStatus !== 'ready');
             return <div key={action} className="space-y-1">
               <Button variant={action === 'reject' ? 'destructive' : 'outline'} size="sm" disabled={!!disabled} onClick={() => { setError(''); setSelected({ item, action }); }}>
                 {pending ? 'Vote submitted' : quorum ? `Execute ${action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : 'refund'}` : progress?.hasVoted ? 'You voted' : actionLabels[action]}
@@ -104,10 +100,8 @@ const BridgeReviewQueue = () => {
               {pending && <p role="status" className="text-xs text-muted-foreground">Waiting for indexed status…</p>}
             </div>;
           })}
-          {item.source === 'eab' && item.kind === 'deposit_review' && !item.actions.includes('settle') && <>
-            <Button variant="outline" size="sm" disabled>Settle approved deposit</Button>
-            <span className="text-sm text-muted-foreground self-center">Matching governance approval required</span>
-          </>}
+          {item.kind === 'withdrawal_refund' && item.refundStatus === 'pending' && <p role="status" className="text-sm text-muted-foreground">Awaiting verifier attestations. The bridge prepares refund evidence automatically.</p>}
+          {item.kind === 'withdrawal_refund' && (!item.refundStatus || item.refundStatus === 'unavailable') && <p role="alert" className="text-sm text-destructive">Refund attestation status is unavailable. Refresh before voting.</p>}
         </div>
       </div>)}
     </CardContent>
@@ -117,13 +111,12 @@ const BridgeReviewQueue = () => {
       <DialogContent>
         <DialogHeader><DialogTitle>{selected && actionLabels[selected.action]}</DialogTitle><DialogDescription>
           {selected?.action === 'reject' ? 'Rejecting marks this deposit canceled on STRATO. It does not refund external funds. Confirm the recovery plan before voting.'
-            : selected?.action === 'refund' ? 'Verifiers must confirm external non-payment before your STRATO governance vote is submitted. A refund executes only after the required governance approvals.'
-            : selected?.action === 'settle' ? 'Re-verify custody and collect verifier attestations, then settle the deposit. On-chain governance approval is required first. Routing may use the authorized fallback.'
-            : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, the bridge automatically retries settlement. Settle approved deposit is available for a manual retry.'}
+            : selected?.action === 'refund' ? 'On-chain verifier attestations must confirm external non-payment. A refund executes only after the required governance approvals.'
+            : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, the bridge automatically retries settlement.'}
         </DialogDescription></DialogHeader>
         {selected && <p className="text-sm break-all">Reference: {selected.item.id}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <div className="flex justify-end gap-2"><Button variant="outline" disabled={submitting} onClick={() => setSelected(null)}>Cancel</Button><Button disabled={submitting} onClick={submit}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}{selected?.action === 'settle' ? 'Confirm settlement' : 'Confirm vote'}</Button></div>
+        <div className="flex justify-end gap-2"><Button variant="outline" disabled={submitting} onClick={() => setSelected(null)}>Cancel</Button><Button disabled={submitting} onClick={submit}>{submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Confirm vote</Button></div>
       </DialogContent>
     </Dialog>
   </Card>;

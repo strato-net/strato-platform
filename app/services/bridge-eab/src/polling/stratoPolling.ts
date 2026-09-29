@@ -19,7 +19,7 @@ import { logInfo, logError } from "../utils/logger";
 import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationService";
 import { checkBalances } from "../utils/balanceCheck";
 import { healthMonitor } from "../utils/healthMonitor";
-import { notifyBridgeReviews } from "../services/bridgeReviewService";
+import { notifyBridgeReviews, preparePendingWithdrawalRefunds } from "../services/bridgeReviewService";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -81,6 +81,7 @@ export const startExternalWithdrawalPolling = (): void => {
       await processingIssueService.run(withdrawalProcessingContext("eab", withdrawal, "withdrawal-processing"),
         () => processExternalWithdrawal(withdrawal, true), String(withdrawal.bridgeStatus) !== "1");
     }
+    await preparePendingWithdrawalRefunds();
   };
 
   startNonOverlappingPolling(

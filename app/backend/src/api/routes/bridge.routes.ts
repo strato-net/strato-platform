@@ -6,7 +6,6 @@ const router = Router();
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 router.get("/admin/policies", authHandler.authorizeRequest(), BridgeController.policies);
-router.get("/admin/processing-issues", authHandler.authorizeRequest(), BridgeController.processingIssues);
 router.get("/admin/reviews", authHandler.authorizeRequest(), BridgeController.reviews);
 router.post("/admin/reviews/prepare", authHandler.authorizeRequest(), BridgeController.reviews);
 

@@ -16,11 +16,30 @@ const messages: Record<ProcessingIssueCode, string> = {
 // Only these diagnostic fields may cross the verifier boundary or enter the journal.
 const detailKeys = new Set(["token", "account", "required", "available", "limit", "capacity", "refillRate",
   "retryAfterSeconds", "observedConfirmations", "requiredConfirmations", "policyVersion", "policyDigest",
-  "verifier", "stage", "feeAsset", "units", "observedAt", "transactionHash"]);
+  "verifier", "stage", "feeAsset", "units", "observedAt", "transactionHash", "errorCode", "httpStatus", "operation"]);
+const safeErrorReason = (value: string): string => {
+  let reason = value;
+  for (const [name, secret] of Object.entries(process.env)) {
+    if (/password|secret|token|private.?key|api.?key|credential/i.test(name) && secret && secret.length >= 8) {
+      reason = reason.split(secret).join("REDACTED");
+    }
+  }
+  return reason.replace(/https?:\/\/[^\s"'<>]+/gi, "REDACTED_URL")
+    .replace(/\b(?:Bearer|Basic)\s+[^\s"',;]+/gi, "REDACTED_AUTH")
+    .replace(/\b(?:authorization|password|secret|(?:access[_-]?|refresh[_-]?)?token|api[_-]?key|private[_-]?key|client[_-]?secret|cookie)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, "REDACTED_CREDENTIAL")
+    .replace(/\b(?:0x)?[a-fA-F0-9]{64,}\b/g, "REDACTED_HEX")
+    // Ethers and HTTP errors can append serialized requests or response bodies.
+    .split(/[\r\n({\[]|\b(?:request|response|payload|headers|config)\s*[:=]/i, 1)[0]
+    .replace(/[^\x20-\x7E]/g, " ").trim().slice(0, 240);
+};
 export const safeIssueDetails = (value: unknown): Record<string, string> => {
   const result: Record<string, string> = {};
   if (!value || typeof value !== "object") return result;
   for (const [key, v] of Object.entries(value)) {
+    if (key === "reason" && typeof v === "string") {
+      const reason = safeErrorReason(v);
+      if (reason) result.reason = reason;
+    }
     if (detailKeys.has(key) && typeof v === "string" && /^[a-zA-Z0-9_.: -]{1,160}$/.test(v)) result[key] = v;
   }
   return result;
@@ -38,14 +57,16 @@ export const classifyProcessingError = (error: any, depth = 0): ProcessingIssue[
       Object.prototype.hasOwnProperty.call(messages, issue?.code) ? issue.code : "UNKNOWN", issue?.details));
   }
   const body = error?.response?.data;
-  if (body && Object.prototype.hasOwnProperty.call(messages, body.code)) {
+  if (body && body.code !== "UNKNOWN" && Object.prototype.hasOwnProperty.call(messages, body.code)) {
     return [processingIssue(body.code, { ...safeIssueDetails(body.details),
       ...safeIssueDetails({ policyVersion: body.policyVersion, policyDigest: body.policyDigest }) })];
   }
   if (error?.cause && error.cause !== error) return classifyProcessingError(error.cause, depth + 1);
-  const message = String(body?.error || error?.message || "");
+  const message = [body?.error?.message, body?.error, body?.message, error?.message, error?.shortMessage, error]
+    .find(value => typeof value === "string" && value.length) || "";
   let code: ProcessingIssueCode = "UNKNOWN";
-  if (body?.decision === "pending_confirmations" || error instanceof WithdrawalReleasePendingError || /insufficient confirmations|awaiting.*confirmations/i.test(message)) code = "CONFIRMATIONS_PENDING";
+  if (body?.code === "UNKNOWN") code = "UNKNOWN";
+  else if (body?.decision === "pending_confirmations" || error instanceof WithdrawalReleasePendingError || /insufficient confirmations|awaiting.*confirmations/i.test(message)) code = "CONFIRMATIONS_PENDING";
   else if (/mint limit exceeded/i.test(message)) code = "MINT_CAPACITY";
   else if (/withdrawal capacity|bucket.*(?:exhaust|capacity)|insufficient.*liquidity/i.test(message)) code = "WITHDRAWAL_CAPACITY";
   else if (/low account balance|insufficient funds.*(?:gas|transaction)|insufficient.*(?:voucher|fee balance)/i.test(message)) code = "FUNDING_REQUIRED";
@@ -55,7 +76,17 @@ export const classifyProcessingError = (error: any, depth = 0): ProcessingIssue[
   else if (/mismatched reservation|not configured|signer.*(?:mismatch|version)|configuration/i.test(message)) code = "CONFIGURATION";
   else if (/ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timeout|network|socket|Cloudflare|rate limit|verifier unavailable|RPC unavailable/i.test(`${error?.code} ${message}`) ||
       [401, 403, 429].includes(error?.response?.status) || error?.response?.status >= 500) code = "DEPENDENCY_UNAVAILABLE";
-  return [processingIssue(code)];
+  const details: Record<string, string> = {};
+  if (code === "UNKNOWN") {
+    Object.assign(details, safeIssueDetails(body?.details), safeIssueDetails({ policyVersion: body?.policyVersion, policyDigest: body?.policyDigest }));
+    if (message) details.reason = message;
+    if (typeof error?.code === "string" && /^[A-Z0-9_-]{1,64}$/.test(error.code)) details.errorCode = error.code;
+    if (Number.isInteger(error?.response?.status)) details.httpStatus = String(error.response.status);
+    if (typeof error?.action === "string" && /^[a-zA-Z0-9_]{1,64}$/.test(error.action)) details.operation = error.action;
+    const hash = error?.transactionHash || error?.receipt?.hash || error?.transaction?.hash;
+    if (typeof hash === "string" && /^(0x)?[a-fA-F0-9]{64}$/.test(hash)) details.transactionHash = hash;
+  }
+  return [processingIssue(code, details)];
 };
 
 export const verifierIssues = (error: unknown, index: number): ProcessingIssue[] =>

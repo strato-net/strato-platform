@@ -241,7 +241,6 @@ export const defaultExecutedIssuesLookbackDaysFor: Record<string, number> = {
 };
 
 export let bridgeUrl: string | undefined;
-export const bridgeOperationsToken = process.env.BRIDGE_OPERATIONS_TOKEN;
 export let rewards: string | undefined;
 export let networkId: string | undefined;
 export let networkName: string | undefined;

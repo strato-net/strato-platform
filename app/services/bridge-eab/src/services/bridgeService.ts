@@ -881,6 +881,7 @@ export const processExternalWithdrawal = async (
   } catch (error) {
     if (!(error instanceof WithdrawalReleasePendingError)) throw error;
     await processingIssueService.record(withdrawalProcessingContext("eab", withdrawal, "release-confirmations"), error);
+    await processingIssueService.resolve(withdrawalProcessingContext("eab", withdrawal, "withdrawal-processing"));
     return false;
   }
   await processingIssueService.resolve(withdrawalProcessingContext("eab", withdrawal, "release-confirmations"));

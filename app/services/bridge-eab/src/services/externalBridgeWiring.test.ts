@@ -732,6 +732,14 @@ test("reserves and releases before finalizing a routine withdrawal", async (t) =
 
   const attestation = await import("./settlementAttestationService");
   const { WithdrawalReleasePendingError } = await import("../types");
+  const { processingIssueService, withdrawalProcessingContext } = await import("./processingIssueService");
+  const { processingKey } = await import("../utils/processingIssues");
+  const processing = withdrawalProcessingContext("eab", withdrawal);
+  const review = withdrawalProcessingContext("eab", withdrawal, "withdrawal-review");
+  const otherWithdrawal = { ...processing, reference: "8" };
+  await processingIssueService.record(processing, new Error("release request failed"));
+  await processingIssueService.record(review, new Error("independent review failure"));
+  await processingIssueService.record(otherWithdrawal, new Error("other withdrawal failure"));
   const logger = await import("../utils/logger");
   const info = t.mock.method(logger, "logInfo", () => undefined);
   let attestationError: Error | null = new WithdrawalReleasePendingError("pending confirmations");
@@ -748,13 +756,25 @@ test("reserves and releases before finalizing a routine withdrawal", async (t) =
     assert.equal(await processExternalWithdrawal(ready), false, "confirmation waits are not completed operations");
     assert.deepEqual(trace, ["vault:release"]);
   }
-  assert.equal(info.mock.callCount(), 1, "log a confirmation wait only once");
+  assert.equal(info.mock.callCount(), 2, "log the confirmation wait and previous blocker recovery only once");
+  let records = (await processingIssueService.snapshot()).records;
+  assert.ok(records[processingKey(processing)].resolvedAt, "progress clears the superseded processing error before completion");
+  assert.equal(records[processingKey(processing)].outcome, "processing_resumed");
+  assert.equal(records[processingKey(review)].resolvedAt, undefined, "unrelated stages remain active");
+  assert.equal(records[processingKey(otherWithdrawal)].resolvedAt, undefined, "other withdrawals remain active");
+  const confirmations = withdrawalProcessingContext("eab", withdrawal, "release-confirmations");
+  assert.equal(records[processingKey(confirmations)].resolvedAt, undefined);
   attestationError = new Error("invalid release proof");
-  await assert.rejects(processExternalWithdrawal(ready), /invalid release proof/);
+  assert.equal(await processingIssueService.run(processing, () => processExternalWithdrawal(ready), true), false);
+  assert.equal((await processingIssueService.snapshot()).records[processingKey(processing)].resolvedAt, undefined,
+    "a new failure after progress reopens the processing blocker");
   attestationError = null;
   trace.length = 0;
-  assert.equal(await processExternalWithdrawal(ready), true);
+  assert.equal(await processingIssueService.run(processing, () => processExternalWithdrawal(ready), true), true);
   assert.deepEqual(trace, ["vault:release", "relayer:finalizeWithdrawal"]);
+  records = (await processingIssueService.snapshot()).records;
+  assert.ok(records[processingKey(processing)].resolvedAt);
+  assert.ok(records[processingKey(confirmations)].resolvedAt);
 });
 
 test("records a verifier-demanded review instead of starting the authorization clock", async () => {

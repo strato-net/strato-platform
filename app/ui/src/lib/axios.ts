@@ -385,7 +385,7 @@ api.interceptors.response.use(
     }
     
     // Show toast for all other API errors
-    if (["/bridge/admin/policies", "/bridge/admin/reviews", "/bridge/admin/processing-issues", "/trade/route", "/trade/route/quote", "/trade/bridge-route/quote", "/trade/bridge/requestWithdrawal", "/trade/bridge/requestNativeWithdrawal"].some(path => url.split("?")[0].endsWith(path)) || (!_appAuthenticated && url.split("?")[0].endsWith("/oracle/price"))) {
+    if (["/bridge/admin/policies", "/bridge/admin/reviews", "/trade/route", "/trade/route/quote", "/trade/bridge-route/quote", "/trade/bridge/requestWithdrawal", "/trade/bridge/requestNativeWithdrawal"].some(path => url.split("?")[0].endsWith(path)) || (!_appAuthenticated && url.split("?")[0].endsWith("/oracle/price"))) {
       return Promise.reject(error);
     }
     const errorMessage = extractApiErrorMessage(error);

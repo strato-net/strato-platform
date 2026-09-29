@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  getBridgeProcessingIssues,
   requestWithdrawal,
   requestNativeWithdrawal as requestNativeWithdrawalService,
   getDepositActions,
@@ -33,29 +32,13 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
     catch { res.status(503).json({ error: "Indexed bridge policies are unavailable. Refresh after the STRATO connection recovers." }); }
   }
 
-  static async processingIssues(req: Request, res: Response): Promise<void> {
-    if (!(await isUserAdmin(req.accessToken, req.address as string))) {
-      res.status(403).json({ error: "Administrator access is required" }); return;
-    }
-    const state = req.query.state ?? "active";
-    const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
-    const limit = req.query.limit === undefined ? 25 : Number(req.query.limit);
-    if ((state !== "active" && state !== "cleared") ||
-      [req.query.offset, req.query.limit].some(value => value !== undefined && (typeof value !== "string" || !/^\d+$/.test(value))) || !Number.isSafeInteger(offset) || offset < 0 ||
-        !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
-      res.status(400).json({ error: "Invalid processing issue pagination" }); return;
-    }
-    try { res.json(await getBridgeProcessingIssues(state, offset, limit)); }
-    catch { res.status(503).json({ error: "Processing records are unavailable. Governance reviews and transaction history remain available." }); }
-  }
-
   static async reviews(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (!(await isUserAdmin(req.accessToken, req.address as string))) {
         res.status(403).json({ error: "Administrator access is required" });
         return;
       }
-      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund", "settle"].includes(req.body?.action))) {
+      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund"].includes(req.body?.action))) {
         res.status(400).json({ error: "Invalid review action" });
         return;
       }

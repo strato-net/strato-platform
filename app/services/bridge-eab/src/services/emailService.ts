@@ -33,7 +33,8 @@ export const sendProcessingIssueEmail = async (
     subject: `Bridge: ${event} (${record.context.source}, chain ${record.context.chainId})`,
     text: [event, `Affected operations: ${records.length}`, `First observed: ${new Date(record.firstSeenAt).toISOString()}`,
       ...records.slice(0, 20).flatMap(r => [`Reference: ${r.context.reference}; stage: ${r.context.stage}; token: ${r.context.token || "unknown"}`,
-        ...r.issues.map(i => `${i.code}: ${i.message}\n${JSON.stringify(i.details)}`)]),
+        ...r.issues.map(i => [resolved ? `Cleared issue: ${i.code}` : `${i.code}: ${i.message}`,
+          ...(Object.keys(i.details).length ? [`${resolved ? "Previous diagnostics: " : ""}${JSON.stringify(i.details)}`] : [])].join("\n"))]),
       resolved ? "The reported blocker is no longer active. Processing may still be in progress; check transaction history for the final outcome."
         : `Next retry: ${new Date(record.nextRetryAt).toISOString()}. Amounts are raw integer units unless stated otherwise.`,
     ].join("\n"),
