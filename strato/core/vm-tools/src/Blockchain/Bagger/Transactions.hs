@@ -224,7 +224,7 @@ txRunResultToReceipt trr = do
 
 eventToReceiptLog :: MonadIO m => Event -> m ReceiptLog
 eventToReceiptLog ev = do
-  args <- traverse (\(_, val, _) -> valueToTypedArg val) (evArgs ev)
+  args <- traverse (valueToTypedArg . snd) (evArgs ev)
   pure ReceiptLog
     { rlogContractAddress = evContractAddress ev,
       rlogEventName = evName ev,

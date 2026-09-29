@@ -17,7 +17,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import SolidVM.Model.Event (Event (..))
-import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.TypedArg
 import SolidVM.Model.Value (Value (..), Variable (..))
 import Test.Hspec
@@ -147,8 +146,8 @@ spec = do
                 evContractAddress = testAddr,
                 evName = "Withdrawal",
                 evArgs =
-                  [ ("nonce", SInteger 1, SVMType.Int (Just False) Nothing),
-                    ("recipient", SAddress 0xdead False, SVMType.Address False)
+                  [ ("nonce", SInteger 1),
+                    ("recipient", SAddress 0xdead False)
                   ],
                 evTopics = []
               }
@@ -174,7 +173,7 @@ spec = do
                 evContractName = "C",
                 evContractAddress = testAddr,
                 evName = "BatchSent",
-                evArgs = [("ids", arrVal, SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)],
+                evArgs = [("ids", arrVal)],
                 evTopics = []
               }
           trr = successTrr {trrResult = Right (successResults {erEvents = [ev]})}

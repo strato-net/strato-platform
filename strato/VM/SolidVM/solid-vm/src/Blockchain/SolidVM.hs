@@ -1027,10 +1027,16 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith
-                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value ->
-                          (name, value, idxType))
-                        (CC._eventLogs ev) expVals
+          -- An arg that was never written (unset storage slot, or SNULL) has no
+          -- shape of its own; give it the declared type's default so it leaves
+          -- the VM as a real value ([] / "" / 0 ...) like every other arg.
+          cc <- snd <$> getCurrentCodeCollection
+          evArgs <- forM (zip (CC._eventLogs ev) expVals) $
+            \(CC.EventLog name _ (CC.IndexedType _ idxType _), value) ->
+              (name,) <$> case value of
+                SReference _ -> forceValue =<< createDefaultValue cc curCnct idxType
+                SNULL -> forceValue =<< createDefaultValue cc curCnct idxType
+                _ -> pure value
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
@@ -1045,7 +1051,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 encodeEventToLog
                   eventName
                   ev
-                  (M.fromList [(n, renderValue v) | (n, v, _) <- evArgs])
+                  (M.fromList [(n, renderValue v) | (n, v) <- evArgs])
           addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do

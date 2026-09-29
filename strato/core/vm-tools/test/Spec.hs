@@ -36,7 +36,6 @@ import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Delta (getStakeDeltasFromEvents)
 import SolidVM.Model.Event
-import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
 import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import Blockchain.Strato.Model.Validator
@@ -94,9 +93,9 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       v2 = Validator 0x2
       stakingAddr = Address 0xd6726e06
       stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "StratoStaking" addr name args []
-      addrArg v = ("validator", SAddress v False, SVMType.Address False)
-      weightArg st = ("weight", SInteger st, SVMType.Int (Just False) Nothing)
-      regArg b = ("registered", SBool b, SVMType.Bool)
+      addrArg v = ("validator", SAddress v False)
+      weightArg st = ("weight", SInteger st)
+      regArg b = ("registered", SBool b)
       synced v st = stakeEvent stakingAddr "ValidatorSynced" [addrArg v, regArg True, weightArg st]
 
   it "round trips version-3 headers through RLP" $
@@ -122,7 +121,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
     let evs = [ synced (Address 0x1) (5 :: Integer)
               , stakeEvent 0x101 "ValidatorSynced" [addrArg (Address 0x2), regArg True, weightArg (9 :: Integer)]
               , synced (Address 0x1) (7 :: Integer)
-              , stakeEvent stakingAddr "ValidatorSynced" [("validator", SNULL, SVMType.Address False), regArg True, weightArg (9 :: Integer)]
+              , stakeEvent stakingAddr "ValidatorSynced" [("validator", SNULL), regArg True, weightArg (9 :: Integer)]
               , stakeEvent stakingAddr "ValidatorSynced" [addrArg (Address 0x2), regArg False, weightArg (3 :: Integer)]
               ]
     getStakeDeltasFromEvents (Just stakingAddr) evs `shouldBe` M.fromList [(v1, 7), (v2, 0)]
@@ -140,7 +139,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100
-        stakeArg st = ("stake", SInteger st, SVMType.Int (Just False) Nothing)
+        stakeArg st = ("stake", SInteger st)
         published v st = stakeEvent govAddr "ValidatorStakeUpdated" [addrArg v, stakeArg st]
         evs = [ published (Address 0x1) (11 :: Integer)
               , synced (Address 0x2) (4 :: Integer)          -- staking is no longer watched
