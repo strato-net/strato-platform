@@ -557,8 +557,7 @@ call' from to' fnCalltype functionName valList = do
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} | not (isExternal && _varVisibility /= Just CC.Public) -> do
-          getterArgs <- coerceGetterArgs _varType valList
-          let args' = fromMaybe [] $ case (_varType, getterArgs) of
+          let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
                   SInteger n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
@@ -614,21 +613,11 @@ call' from to' fnCalltype functionName valList = do
     addDelegatecall storageAddress hsh (labelToText $ contract ^. CC.contractName)
   logFunctionCall valList storageAddress contract functionName f
   where
-    -- RPC hex arguments parse as integers; byte keys need their declared width.
-    coerceGetterArgs :: MonadSM m => SVMType.Type -> ValList -> m ValList
-    coerceGetterArgs (SVMType.Mapping _ (SVMType.Bytes _ size) valueType _ _) (SInteger i : args) = do
-      key <- callBuiltin (stringToLabel $ "bytes" ++ maybe "" show size) [SInteger i]
-      (key :) <$> coerceGetterArgs valueType args
-    coerceGetterArgs (SVMType.Mapping _ _ valueType _ _) (arg : args) =
-      (arg :) <$> coerceGetterArgs valueType args
-    coerceGetterArgs _ args = pure args
-
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v =
       case v of
         SInteger i -> Just $ MS.Index $ BC.pack $ show i
         SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
-        SBytes bs -> Just $ MS.Index bs
         SAddress a _ -> Just $ MS.Index $ BC.pack $ show a
         SBool b -> Just $ MS.Index $ bool "false" "true" b
         _ -> Nothing
