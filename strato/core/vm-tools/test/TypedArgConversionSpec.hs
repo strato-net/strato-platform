@@ -139,8 +139,7 @@ spec = do
     it "emitted event becomes a ReceiptLog" $ do
       let ev =
             Event
-              { evBlockHash = zeroHash,
-                evTxHash = zeroHash,
+              { evTxHash = zeroHash,
                 evTxSender = testAddr,
                 evContractName = "MercataBridge",
                 evContractAddress = testAddr,
@@ -167,8 +166,7 @@ spec = do
       let arrVal = SArray (V.fromList [Variable ref1, Variable ref2])
           ev =
             Event
-              { evBlockHash = zeroHash,
-                evTxHash = zeroHash,
+              { evTxHash = zeroHash,
                 evTxSender = testAddr,
                 evContractName = "C",
                 evContractAddress = testAddr,

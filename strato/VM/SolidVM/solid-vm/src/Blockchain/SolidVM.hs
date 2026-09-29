@@ -53,7 +53,6 @@ import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
 import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
@@ -1038,7 +1037,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 SNULL -> forceValue =<< createDefaultValue cc curCnct idxType
                 _ -> pure value
 
-          bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
           let contractName' = labelToText $ CC._contractName curCnct
@@ -1052,7 +1050,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                   eventName
                   ev
                   (M.fromList [(n, renderValue v) | (n, v) <- evArgs])
-          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
+          addEvent $ Event tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos

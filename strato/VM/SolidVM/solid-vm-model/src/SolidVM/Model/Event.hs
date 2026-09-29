@@ -45,8 +45,7 @@ import Text.Format
 -- the contract ABI. Carried here so the block producer can build a real
 -- logsBloom without re-deriving topics from the CodeCollection.
 data Event = Event
-  { evBlockHash :: Keccak256,
-    evTxHash :: Keccak256,
+  { evTxHash :: Keccak256,
     evTxSender :: Address,
     evContractName :: T.Text,
     evContractAddress :: Address,
@@ -67,8 +66,7 @@ eventArgValueString = renderValue . eventArgValue
 
 instance Format Event where
   format Event {..} =
-    "evBlockHash: " ++ format evBlockHash ++ "\n"
-      ++ "evTxHash: "
+    "evTxHash: "
       ++ format evTxHash
       ++ "\n"
       ++ "evTxSender: "
@@ -91,8 +89,7 @@ instance Binary Event
 instance ToJSON Event where
   toJSON Event {..} =
     object
-      [ "eventBlockHash" .= evBlockHash,
-        "eventTxHash" .= evTxHash,
+      [ "eventTxHash" .= evTxHash,
         "eventTxSender" .= evTxSender,
         "eventContractName" .= evContractName,
         "eventContractAddress" .= evContractAddress,
@@ -105,8 +102,7 @@ instance ToJSON Event where
 instance FromJSON Event where
   parseJSON (Object o) =
     Event
-      <$> o .: "eventBlockHash"
-      <*> o .: "eventTxHash"
+      <$> o .: "eventTxHash"
       <*> o .: "eventTxSender"
       <*> o .: "eventContractName"
       <*> o .: "eventContractAddress"
@@ -140,7 +136,6 @@ instance NFData Event
 
 instance Arbitrary Event where
   arbitrary = do
-    bh <- arbitrary
     th <- arbitrary
     sender <- arbitrary
     cn <- arbitrary
@@ -149,4 +144,4 @@ instance Arbitrary Event where
     args <- listOf $ do
       n <- arbitrary
       pure (n, SInteger 0)
-    pure $ Event bh th sender cn ca nm args []
+    pure $ Event th sender cn ca nm args []
