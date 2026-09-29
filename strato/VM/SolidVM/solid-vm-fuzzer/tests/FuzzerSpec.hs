@@ -54,6 +54,57 @@ contract Describe_A {
 |]
     length results `shouldBe` 1
     results `shouldSatisfy` all isSuccess
+  it "reads public byte-key mappings through the same keys as internal access" $ do
+    results <- runTheFuzzer [r|
+contract GetterKeys {
+  mapping(bytes32 => uint) public counts;
+  mapping(bytes32 => mapping(address => mapping(bytes32 => bool))) public votes;
+  mapping(bytes => uint) public dynamicKeys;
+  mapping(uint => mapping(address => mapping(bool => mapping(string => uint)))) public otherKeys;
+
+  constructor() {
+    counts[bytes32(0xc009e7c12890c67a2e36deb34ca9540060e3e542f456c818a91761be623b7fce)] = 3;
+    counts[bytes32(1)] = 7;
+    counts[bytes32(0)] = 9;
+    votes[bytes32(1)][address(0x1234)][bytes32(2)] = true;
+    dynamicKeys[bytes(hex"005d5cff00")] = 11;
+    otherKeys[42][address(0x1234)][true]["key"] = 13;
+  }
+}
+
+contract Describe_GetterKeys {
+  GetterKeys keys;
+  function beforeAll() { keys = new GetterKeys(); }
+
+  function it_reads_binary_digest() returns (bool) {
+    return keys.counts(bytes32(0xc009e7c12890c67a2e36deb34ca9540060e3e542f456c818a91761be623b7fce)) == 3;
+  }
+  function it_reads_rpc_style_hex_argument() returns (bool) {
+    uint count = address(keys).call("counts", 0xc009e7c12890c67a2e36deb34ca9540060e3e542f456c818a91761be623b7fce);
+    return count == 3;
+  }
+  function it_preserves_leading_and_all_zero_bytes() returns (bool) {
+    uint one = address(keys).call("counts", 0x0000000000000000000000000000000000000000000000000000000000000001);
+    uint zero = address(keys).call("counts", 0);
+    return one == 7 && keys.counts(bytes32(1)) == 7 && zero == 9;
+  }
+  function it_reads_nested_byte_keys() returns (bool) {
+    bool voted = address(keys).call("votes", 1, address(0x1234), 2);
+    return voted && keys.votes(bytes32(1), address(0x1234), bytes32(2));
+  }
+  function it_reads_dynamic_byte_keys() returns (bool) {
+    return keys.dynamicKeys(bytes(hex"005d5cff00")) == 11;
+  }
+  function it_preserves_other_key_types() returns (bool) {
+    return keys.otherKeys(42, address(0x1234), true, "key") == 13;
+  }
+  function it_returns_zero_for_an_unset_digest() returns (bool) {
+    return keys.counts(bytes32(2)) == 0;
+  }
+}
+|]
+    length results `shouldBe` 7
+    results `shouldSatisfy` all isSuccess
   it "can run a faulty unit test" $ do
     results <-
       runTheFuzzer
