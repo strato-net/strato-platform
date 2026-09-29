@@ -28,6 +28,7 @@ router.post("/operator/claim-fees", walletAuth, StakingController.claimOperatorF
 
 // validator lifecycle
 router.post("/register", walletAuth, StakingController.register);
+router.post("/operator", walletAuth, StakingController.setOperator);
 router.post("/profile", walletAuth, StakingController.updateProfile);
 router.post("/activate", walletAuth, StakingController.activate);
 router.post("/reconcile", walletAuth, StakingController.reconcile);

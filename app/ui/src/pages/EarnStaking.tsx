@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
@@ -9,6 +9,7 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,6 +37,8 @@ import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
 import BecomeValidatorCard, { type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
+import ChangeOperatorCard, { type ChangeOperatorInput } from "@/components/staking/ChangeOperatorCard";
+import { withHexPrefix } from "@/components/staking/authorization";
 
 type StakingValidator = ValidatorLifecycle & {
   address: string;
@@ -82,7 +85,7 @@ const SHOW_MOVE_BUTTON = false;
 const VALIDATOR_DISPLAY_LIMIT = 10;
 type ProcessingAction =
   | "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond"
-  | "claim-fees" | "operator-claim-fees" | "register" | "activate" | "exit" | "cancel-exit" | "profile";
+  | "claim-fees" | "operator-claim-fees" | "register" | "operator" | "activate" | "exit" | "cancel-exit" | "profile";
 
 type StakingInfo = {
   configured: boolean;
@@ -619,7 +622,11 @@ const EarnStaking = () => {
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { tokenApys } = useEarnContext();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [info, setInfo] = useState<StakingInfo | null>(null);
+  // Inline errors for the two consent cards (the toast shows them too).
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [operatorChangeError, setOperatorChangeError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [processingAction, setProcessingAction] = useState<ProcessingAction | null>(null);
@@ -748,6 +755,27 @@ const EarnStaking = () => {
   // A backend that predates the flag still reports the full validator set, so only an
   // explicit false hides these controls.
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
+
+  // Deep link printed by strato-authorize-operator: ?validator=&operator=&signature=&nonce=.
+  // The signature only works from the operator account named in it, so a different login gets a
+  // notice instead of a prefilled form. A listed validator goes to "Change operator", a new one to
+  // "Become a validator". Login preserves the query string via redirectToLogin's returnTo.
+  const deepLink = useMemo(() => ({
+    validator: searchParams.get("validator") || "",
+    operator: searchParams.get("operator") || "",
+    signature: searchParams.get("signature") || "",
+    nonce: searchParams.get("nonce") || "",
+  }), [searchParams]);
+  const deepLinkOperatorMismatch = isLoggedIn && !!deepLink.operator && !sameAddress(deepLink.operator, userAddress || undefined);
+  const deepLinkListed = !!deepLink.validator && validators.some((validator) => sameAddress(validator.address, deepLink.validator));
+  const deepLinkFor = (card: "register" | "operator") =>
+    isV2 && !deepLinkOperatorMismatch && deepLink.validator && (card === "operator") === deepLinkListed
+      ? {
+        initialValidator: deepLink.validator,
+        initialSignature: deepLink.signature || undefined,
+        expectedNonce: deepLink.nonce || undefined,
+      }
+      : {};
   const claimableFees = useMemo(() => BigInt(info?.claimableFees || "0"), [info?.claimableFees]);
   const totalStakeAmount = useMemo(() => safeParseUnits(stakeAmount, decimals), [decimals, stakeAmount]);
   const apyLabel = isV2 ? "APY (7d)" : "Est. APY";
@@ -853,7 +881,8 @@ const EarnStaking = () => {
     action: () => Promise<void>,
     successTitle: string,
     processing: ProcessingAction,
-    target?: string
+    target?: string,
+    onError?: (message: string) => void
   ): Promise<boolean> => {
     try {
       setSubmitting(true);
@@ -864,9 +893,11 @@ const EarnStaking = () => {
       await refreshInfo();
       return true;
     } catch (error: unknown) {
+      const message = stakingActionErrorMessage(error);
+      onError?.(message);
       toast({
         title: "Transaction failed",
-        description: stakingActionErrorMessage(error),
+        description: message,
         variant: "destructive",
       });
       return false;
@@ -1046,8 +1077,9 @@ const EarnStaking = () => {
       validator
     );
 
-  const handleRegister = (input: RegisterValidatorInput) =>
-    runAction(
+  const handleRegister = (input: RegisterValidatorInput) => {
+    setRegisterError(null);
+    return runAction(
       async () => {
         const body = isV2
           ? {
@@ -1066,8 +1098,29 @@ const EarnStaking = () => {
         await api.post("/staking/register", body, stakingTxConfig);
       },
       "Registration submitted",
-      "register"
+      "register",
+      undefined,
+      setRegisterError
     );
+  };
+
+  // ValidatorRegistry.setOperator(validator, caller, v, r, s): the caller takes over a listed validator.
+  const handleChangeOperator = (input: ChangeOperatorInput) => {
+    setOperatorChangeError(null);
+    return runAction(
+      async () => {
+        await api.post(
+          "/staking/operator",
+          { validator: input.validator, ...(input.signature ? { signature: input.signature } : {}) },
+          stakingTxConfig
+        );
+      },
+      "Operator change submitted",
+      "operator",
+      input.validator,
+      setOperatorChangeError
+    );
+  };
 
   const handleUpdateProfile = (validator: string, profile: OperatorProfileInput) =>
     runAction(
@@ -1300,6 +1353,15 @@ const EarnStaking = () => {
           currentCommissionBps: validator.commissionBps,
         }))}
 
+        {deepLinkOperatorMismatch && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This authorization is for {truncateAddress(withHexPrefix(deepLink.operator), 8, 6)}; log in as that account.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {isLoggedIn && (isV2 || !info.isOperator) && validatorSetDeployed && (
           <BecomeValidatorCard
             isV2={isV2}
@@ -1312,6 +1374,27 @@ const EarnStaking = () => {
             disabled={!canCoverActionFee}
             submitting={submitting && processingAction === "register"}
             onRegister={handleRegister}
+            validators={validators}
+            minStakeRaw={info.minStake}
+            joinsPaused={Boolean(info.joinsPaused)}
+            errorMessage={registerError}
+            {...deepLinkFor("register")}
+          />
+        )}
+
+        {isLoggedIn && isV2 && validatorSetDeployed && (
+          <ChangeOperatorCard
+            connectedAddress={userAddress}
+            validators={validators}
+            minStake={info.minStake}
+            minStakeLabel={formatToken(info.minStake, decimals, 0)}
+            symbol={symbol}
+            joinsPaused={Boolean(info.joinsPaused)}
+            disabled={!canCoverActionFee}
+            submitting={submitting && processingAction === "operator"}
+            errorMessage={operatorChangeError}
+            onChangeOperator={handleChangeOperator}
+            {...deepLinkFor("operator")}
           />
         )}
 
