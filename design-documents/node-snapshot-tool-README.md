@@ -22,10 +22,27 @@ with `STRATO_SNAPSHOT_WORKDIR`; falls back to `$TMPDIR/strato-snapshot`). It is
 purged at the start of every run and removed on exit, so repeated restores do
 not accumulate temp files.
 
-Downloaded archives are kept in a persistent directory, `<repo>/.snapshot-downloads`
-(override with `STRATO_SNAPSHOT_DOWNLOAD_DIR`). Before downloading, the tool
-compares the local copy's SHA-256 against the snapshot's published `.sha256` on
-S3; if they match, the existing file is reused instead of re-downloaded.
+Downloaded archives are kept in a persistent directory, `./.snapshot-downloads`
+under the current directory (override with `STRATO_SNAPSHOT_DOWNLOAD_DIR`).
+Before downloading, the tool compares the local copy's SHA-256 against the
+snapshot's published `.sha256` on S3; if they match, the existing file is reused
+instead of re-downloaded. To keep that comparison cheap, the digest of a
+downloaded archive is computed from the stream while it downloads (no second
+read of the file to verify it) and recorded beside it in `<archive>.verified`
+together with the file's size and mtime. Later runs trust the record while the
+file is unchanged; a changed size or mtime forces a re-hash. Downloads land in
+`<archive>.part` and are renamed into place only after the checksum matched,
+so a crashed or corrupt download never looks like a good cached archive.
+
+The cache holds one archive per network: after a successful download, other
+archives of the same network in the directory (a previous `latest`, another
+timestamp, an earlier snapshot version, or the old unversioned
+`<network>-latest.tar.zst` naming) are deleted, along with their `.verified`
+records and any leftover `.part` files. When the object being fetched has a
+published `.sha256`, this pruning happens before the download so the space is
+free for it. Archives of other networks are never touched. Caches from
+`strato-snapshot` builds older than the move to the current directory may still
+sit in `~/.local/.snapshot-downloads` and can simply be deleted.
 
 ## Restore a Snapshot
 
@@ -97,6 +114,45 @@ bin/strato-up mynode --network=upquark --snapshot
 bin/strato-up mynode --network=helium --snapshot=20260601-13:05:00Z
 ```
 
+### Pre-download a snapshot before a restart (`pull`)
+
+`strato-snapshot pull` downloads a published snapshot into the download cache
+(`.snapshot-downloads/`, see above) without touching any node. A later restore
+of the same snapshot finds the archive there with a matching SHA-256 and skips
+the download, so the slow part of a from-snapshot restart happens while the old
+node is still serving:
+
+```bash
+# While the node is still running: fetch the latest published snapshot for the
+# network mynode is configured for.
+bin/strato-snapshot pull mynode
+
+# Then restart from it. The restore reuses the archive pulled above.
+bin/strato-down mynode && rm -rf mynode && bin/strato-up mynode --network=helium --snapshot
+```
+
+Without `--snapshot=<timestamp>` or `--source <s3-uri>`, `pull` fetches the
+`latest` alias. Without `--network`, it uses the network of the given
+`<node-dir>`, or of the default node recorded by `strato-setup`
+(`~/.strato/default-node`) when no node directory is given, so a bare
+`bin/strato-snapshot pull` works for the last node you set up. It refuses a
+`--network` that contradicts the node's own configuration.
+
+```bash
+bin/strato-snapshot pull --network helium                          # latest helium
+bin/strato-snapshot pull --network helium --snapshot=20260601-13:05:00Z
+bin/strato-snapshot pull --source s3://strato-snapshots/helium/v2/helium-20260601-130500Z.tar.zst
+```
+
+The cache is keyed on the working directory (`./.snapshot-downloads`, or
+`STRATO_SNAPSHOT_DOWNLOAD_DIR` when set), so run `pull` from the directory you
+will run `strato-up`/`restore` from. `pull` prints the cached archive path on
+stdout. A local `--source` is rejected, since there is nothing to download.
+Restore always installs the snapshot it resolves at restore time: if `latest`
+was re-published between the pull and the restore, the checksum no longer
+matches and the newer archive is downloaded, so a stale pull only costs the
+download it was meant to save.
+
 Use `--force` only when replacing existing node state:
 
 ```bash
@@ -150,6 +206,16 @@ bin/strato-snapshot create "$NODE_DIR" \
   --network helium \
   --output /tmp/helium-$(date -u +%Y%m%dT%H%M%SZ).tar
 ```
+
+Before the cold shutdown, `create` asks the node's Redis for a `BGREWRITEAOF`
+and waits for it (bounded at ten minutes, best effort). The append-only file is
+Redis's write history since its last rewrite; Redis rewrites it on its own only
+once it has doubled, so at any moment it is between one and two times the size
+of the dataset it encodes. Compacting it right before the snapshot means the
+archive carries the dataset once, saving up to half of the Redis payload
+depending on when Redis last rewrote it. The staged `.ethereumH` payload also
+leaves out LevelDB's `LOG` and `LOG.old` activity logs in each database
+directory, which carry no state and are recreated on open.
 
 Useful create options:
 
@@ -254,7 +320,17 @@ The `eth`/`cirrus` databases are dumped with a throwaway `postgres:14.18`
 container against the cleanly-stopped data directory. On restore, the load-time
 container runs with relaxed durability (`fsync=off`, `synchronous_commit=off`)
 and `pg_restore -j` for a fast parallel restore; this is safe because the data
-is disposable until the restore completes.
+is disposable until the restore completes. The extracted dumps are bind-mounted
+read-only into that container at `/dumps` rather than copied into it. The dumps
+hold table data only, so most of the load time is Postgres rebuilding indexes;
+on a synced node the Cirrus indexes alone are several times the size of the
+dump.
+
+`restore` narrates what it does in seven numbered steps on stderr: the plan,
+fetching the archive (cache hit or download), extraction with size and file
+count, the compatibility checks, replacing the chain state, loading the two
+databases (with per-database timing), and finalizing. Each line says what the
+step does and why it takes the time it does.
 
 Restore preserves the target node's generated host config and its own
 credentials: it loads the `eth`/`cirrus` dumps into the node's postgres cluster

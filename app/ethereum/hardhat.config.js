@@ -14,6 +14,9 @@ module.exports = {
     },
   },
   networks: {
+    hardhat: process.env.FORK_RPC_URL
+      ? { forking: { url: process.env.FORK_RPC_URL, blockNumber: process.env.FORK_BLOCK ? Number(process.env.FORK_BLOCK) : undefined } }
+      : {},
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],

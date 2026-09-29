@@ -27,6 +27,7 @@ module Control.Monad.Composable.Kafka (
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBestEffort,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -202,6 +203,28 @@ produceItems topicName events = do
       (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
   liftIO $ mapM_ parseKafkaResponse results
   return results
+
+-- | Produce, returning a description of every record the broker rejected
+-- instead of throwing on the first one. An empty list means everything landed.
+--
+-- 'produceItems' reports a rejection by throwing the 'KafkaError' from inside
+-- 'liftIO', and nothing along the vm-runner path catches it. At helium block
+-- 595971 that turned one oversized record into a network-wide outage: vm-runner
+-- exited on an uncaught @MessageSizeTooLarge@ and convoke then tore down every
+-- container on all four validators. (The record that fired there was a
+-- @CodeCollectionAdded@ on @vmevents@, which is consensus-relevant and so still
+-- uses 'produceItems' -- this entry point would not have saved it. It exists so
+-- that the indexer-bound topics cannot cause the same outage.)
+--
+-- Use this only for topics nothing in consensus reads back, where dropping a
+-- record costs a downstream resync rather than correctness. Anything the chain
+-- itself depends on must keep using 'produceItems' and fail loudly.
+produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
+produceItemsBestEffort topicName events = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
+  pure [show e | r <- results, e <- produceResponseErrors r]
 
 -- | Produce to several topics in a SINGLE Kafka request.
 --

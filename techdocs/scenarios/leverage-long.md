@@ -1,555 +1,136 @@
 # Leverage Long Position
 
-Amplify your exposure to an asset through recursive borrowing.
+Increase your exposure to an asset by minting USDST against it and buying more of the same asset.
 
 ---
 
-## ⚠️ High Risk Strategy
+!!! danger "High-risk strategy"
+    Leverage amplifies gains **and** losses and moves your liquidation price closer. A liquidated vault loses collateral worth the repaid debt plus a liquidation penalty. Only use funds you can afford to lose, start small, and read [Risk Management](risk-hedging.md) first.
 
-**WARNING:** This is an advanced, high-risk strategy.
-
-- Can amplify gains AND losses
-- Liquidation risk is significantly higher
-- Only for experienced users
-- Start small and understand the mechanics
+!!! info "What leverage means on STRATO"
+    STRATO has no margin trading, perpetual futures or one-click leverage. "Leverage" here means looping by hand: mint USDST from a vault on the **Borrow** page (CDP), swap it for more of the collateral asset, and deposit that too. Every step is a separate transaction you submit and pay for.
 
 ---
 
-## The Strategy
+## How the Loop Works
 
-Use borrowed USDST to buy more of your collateral asset, creating leveraged exposure.
+1. **Borrow**: deposit the asset into its vault and mint USDST.
+2. **Trade**: swap the USDST for more of the same asset.
+3. **Borrow**: deposit the purchased asset into the same vault.
+4. Optionally mint again and repeat. Each round adds less than the one before.
 
-**How it works:**
+### The Math
 
-1. Supply ETHST as collateral
-2. Borrow USDST against it
-3. Swap USDST → more ETHST
-4. Supply new ETHST as additional collateral
-5. Repeat 2-3 times
+These formulas follow from `CDPEngine`. They ignore swap fees, price impact, transaction fees and stability fees, all of which reduce your real result.
 
-**Result:** 2-3x exposure to ETHST price movements (up AND down)
-
----
-
-## Complete Example: 2x Leverage on 5 ETHST
-
-**Your starting position:**
-
-- You have: 5 ETHST ($15,000)
-- ETHST price: $3,000
-- You believe: ETHST will go up
-- You want: 2x exposure (10 ETHST equivalent)
-
-**The play:**
-
-- Round 1: Supply 5 ETHST, borrow $7,500, buy 2.5 ETHST
-- Round 2: Supply 2.5 ETHST, borrow $3,750, buy 1.25 ETHST
-- Total: 8.75 ETHST position
-- Debt: $11,250 USDST
-- Leverage: ~1.75x
-
-**Time needed:** 20 minutes  
-**Risk level:** ⚠️ HIGH
-
----
-
-## Step-by-Step Implementation
-
-### Step 0: Understand the Risks (READ THIS!)
-
-**What can go wrong:**
-
-**If ETHST drops 20%:**
-
-- Without leverage: Lose $3,000 (20%)
-- With 2x leverage: Lose $6,000 (40% of initial capital)
-- Health factor drops significantly
-- May face liquidation
-
-**If ETHST drops 30%:**
-
-- Without leverage: Lose $4,500 (30%)
-- With 2x leverage: Position likely LIQUIDATED
-- Lose most/all of your collateral
-
-**Only proceed if:**
-
-- [ ] You understand liquidation mechanics
-- [ ] You can monitor position daily
-- [ ] You have funds to add collateral if needed
-- [ ] You accept risk of total loss
-
----
-
-### Step 1: Supply Initial Collateral (2 min)
-
-1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETHST** → Click **"Supply"**
-3. Enter amount: **5.0**
-4. Click **"Supply"** (~$0.10 gas, approval automatic)
-
-**Result:**
-```
-✅ Collateral: 5 ETHST ($15,000)
-✅ Can borrow: Up to $11,250 (75% LTV)
-```
-
----
-
-### Step 2: First Borrow (2 min)
-
-**Borrow conservatively to start:**
-
-1. Go to **Borrow** (in sidebar) → **Borrow** section
-2. Amount: **7,500** USDST (50% of collateral value)
-3. Review:
-
-   - Health Factor: 1.6
-   - Conservative start
-4. Click **"Borrow"** (~$0.10 gas)
-
-**Result:**
-```
-✅ Borrowed: 7,500 USDST
-✅ Health Factor: 1.6
-✅ Debt: 7,500 USDST
-```
-
----
-
-### Step 3: Swap USDST → ETHST (2 min)
-
-1. Go to **Swap Assets**
-2. From: **USDST** → Amount: **7,500**
-3. To: **ETHST**
-4. Review:
-
-   - Receive: ~2.49 ETHST (after 0.3% fee)
-   - Rate: ~$3,009/ETHST (including fee)
-5. Click **"Swap"** (~$0.10 gas)
-
-**Result:**
-```
-✅ Wallet: +2.49 ETHST
-✅ Total ETHST owned: 7.49 (5 in collateral + 2.49 in wallet)
-```
-
----
-
-### Step 4: Supply New ETHST (2 min)
-
-**Add the new ETHST to collateral:**
-
-1. Go to **Borrow** (in sidebar)
-2. In Collateral Management table, find **ETHST** → Click **"Supply"**
-3. Enter amount: **2.49**
-4. Click **"Supply"** (approval automatic)
-
-**Result:**
-```
-✅ Total collateral: 7.49 ETHST ($22,470)
-✅ Debt: 7,500 USDST
-✅ Health Factor: 2.4 (improved!)
-✅ Can borrow more: Up to $16,852
-```
-
----
-
-### Step 5: Second Borrow Round (2 min)
-
-**Now borrow again:**
-
-1. Go to **Borrow** (in sidebar) → **Borrow** section
-2. Amount: **3,750** USDST (additional borrowing)
-3. Check Health Factor: Will be ~1.6
-4. Click **"Borrow"**
-
-**Result:**
-```
-✅ Total debt: 11,250 USDST
-✅ Health Factor: 1.6
-✅ Can borrow: ~$5k more
-```
-
----
-
-### Step 6: Second Swap & Supply (4 min)
-
-**Repeat the process:**
-
-1. **Swap:** 3,750 USDST → ~1.24 ETHST
-2. **Supply:** 1.24 ETHST to collateral
-
-**Final Result:**
-```
-✅ Total collateral: 8.73 ETHST ($26,190)
-✅ Total debt: 11,250 USDST
-✅ Health Factor: 1.86
-✅ Leverage: 1.75x
-```
-
----
-
-## Your Leveraged Position
-
-### Position Summary
-
-**Starting capital:** 5 ETHST ($15,000)
-
-**Final position:**
-
-- Collateral: 8.73 ETHST ($26,190)
-- Debt: 11,250 USDST
-- Net value: $14,940 (slight loss from fees)
-- ETHST exposure: 8.73 ETHST (vs 5 originally)
-- **Leverage: 1.75x**
-
-### Effective Exposure
-
-**Price movement impact:**
-
-| ETHST Price Change | Your Gain/Loss | vs No Leverage |
-|------------------|----------------|----------------|
-| +10% | +$2,619 (17.5%) | +$1,500 (10%) |
-| +20% | +$5,238 (35%) | +$3,000 (20%) |
-| +50% | +$13,095 (87%) | +$7,500 (50%) |
-| -10% | -$2,619 (17.5%) | -$1,500 (10%) |
-| -20% | -$5,238 (35%) | -$3,000 (20%) |
-| -30% | -$7,857 (52%) | -$4,500 (30%) |
-
-**Amplification:** ~1.75x in both directions ⚠️
-
----
-
-## Risk Management
-
-### Critical Health Factor Levels
-
-**Your HF: 1.86**
-
-**Safe zones:**
-
-- HF > 1.5: ✅ Safe, relax
-- HF 1.3-1.5: ⚠️ Monitor daily
-- HF 1.1-1.3: 🔴 Dangerous, add collateral soon
-- HF < 1.1: 🚨 URGENT - liquidation imminent
-
-### Price Drop Tolerance
-
-**When liquidation hits:**
+If every round mints down to the same collateralization ratio `c` (as a ratio, e.g. 2.0 for 200%):
 
 ```
-Health Factor = 1.0 at liquidation
-Current HF = 1.86
-
-Safe price drop = 46.2%
-ETH can drop from $3,000 to ~$1,614
+Exposure after many rounds  → c / (c − 1)  × your starting collateral
+Debt after many rounds      → 1 / (c − 1)  × your starting collateral value
+Each round adds             1 / c of the previous round
 ```
 
-**Set price alerts:**
+`c` can't go below the asset's **minimum CR**, because minting must keep `debt < collateral value ÷ minimum CR`.
 
-- Warning: $2,000 (-33%)
-- Urgent: $1,800 (-40%)
-- Critical: $1,700 (-43%)
+Liquidation depends on the vault's Health Factor (**HF = CR ÷ liquidation ratio**), not on how many rounds you did:
 
-### How to Respond to Drops
+```
+Price drop to liquidation = 1 − 1 / HF
+Liquidation price         = entry oracle price / HF
+```
 
-**If ETHST drops 10% ($3,000 → $2,700):**
-
-**Option 1: Add collateral**
-- Supply more ETHST or other assets
-- Improves HF immediately
-- Keep leverage
-
-**Option 2: Repay debt**
-- Repay 2,000-3,000 USDST
-- Reduces risk
-- Lower leverage
-
-**Option 3: Partial exit**
-- Sell 1 ETHST for USDST
-- Repay debt
-- De-leverage partially
+!!! example "Hypothetical illustration (not current parameters)"
+    If an asset's liquidation ratio were 150% and you looped at a 200% CR, your HF would be about 1.33. Exposure would approach 2× your starting collateral, and a price drop of about 25% would make the vault liquidatable. Check the real parameters for your asset in the app.
 
 ---
 
-## Advanced: 3x Leverage (Extremely High Risk)
+## Step-by-Step
 
-**⚠️⚠️⚠️ NOT RECOMMENDED FOR MOST USERS**
+### Step 0: Check the Parameters
 
-**To achieve ~3x leverage:**
+On **Borrow**, look at the vault for your asset: stability fee, current Health Factor, and how much you can mint. The asset's minimum CR, liquidation ratio, liquidation penalty, close factor and debt floor bound what's possible. (Developers can read them with `CDPEngine.collateralParams(asset)`.)
 
-1. Perform 4-5 rounds of borrow→swap→supply
-2. Final position:
+Before you start, make sure that:
 
-   - Collateral: ~15 ETHST from 5 ETHST start
-   - Debt: ~$30,000 USDST
-   - HF: ~1.1-1.2 (very risky)
-3. Liquidation at 15-20% ETHST drop
+- [ ] You understand per-vault liquidation ([Mint USDST via CDP](../guides/mint-cdp.md))
+- [ ] You can check the position regularly (the app has no alerts)
+- [ ] You have spare funds to add collateral or repay
+- [ ] The pool for USDST → asset on **Trade** has enough liquidity for your size
 
-**Why this is dangerous:**
+### Step 1: Deposit and Mint
 
-- Tiny drops = liquidation
-- High interest costs
-- Difficult to exit
-- Slippage on large swaps
+1. Go to **Borrow**.
+2. In the **Mint** form, enter the USDST amount and set the target Health Factor with the slider. The form shows how it will allocate the deposit and mint across vaults. For a single-asset loop, make sure the allocation uses only your chosen asset's vault; switch off auto-allocation if needed.
+3. Review and confirm. You can also use the vault's own **Deposit** and **Mint USDST** actions.
 
-**If you must:**
+### Step 2: Swap USDST for the Asset
 
-- Use CDP instead (lower fees)
-- Monitor every few hours
-- Have exit plan ready
-- Accept high probability of liquidation
+1. Go to **Trade**, choose USDST → your asset.
+2. Check price impact and slippage. The app routes to the best-rate pool by default.
+3. Confirm. Keep some USDST for transaction fees (0.01 USDST or one voucher per transaction).
 
----
+### Step 3: Deposit the Purchased Asset
 
-## Cost Analysis
+1. **Borrow** → your vault → **Deposit**.
+2. Your vault's Health Factor rises because collateral increased and debt didn't.
 
-### Costs of Leverage
+### Step 4: Repeat (Optional)
 
-**One-time costs:**
-| Item | Cost |
-|------|------|
-| Swaps (2 rounds × 0.3%) | ~$33 |
-| Gas fees (6 transactions) | ~$0.60 |
-| **Total initial** | **~$33.60** |
-
-**Ongoing costs:**
-| Item | Annual Cost |
-|------|-------------|
-| Interest (5% on $11.25k) | $562.50/year |
-| **Monthly** | **~$47/month** |
-
-### Break-even Analysis
-
-**To profit after 1 year:**
-
-ETH must rise > 3.75% to cover interest costs
-
-**Example scenarios:**
-
-- ETHST +5%: Net gain ~$219 (1.5%)
-- ETHST +10%: Net gain ~$2,056 (14%)
-- ETHST +20%: Net gain ~$4,675 (31%)
-
-**Without leverage (5 ETHST):**
-
-- ETHST +5%: $750 gain (5%)
-- ETHST +10%: $1,500 gain (10%)
-- ETHST +20%: $3,000 gain (20%)
+**Mint USDST** from the vault again while keeping Health Factor at or above your target, then repeat Steps 2–3. Stop when the extra exposure isn't worth the added costs and risk.
 
 ---
 
-## Exit Strategy
+## Costs
 
-### Taking Profits
+| Cost | Where it comes from |
+|------|---------------------|
+| Stability fee | Per-asset rate, compounds per second into vault debt (shown on the vault) |
+| Swap fee | Charged by the pool on every swap; varies by pool |
+| Price impact | Larger swaps in thinner pools get worse prices |
+| Transaction fee | 0.01 USDST or one voucher per transaction, even if it reverts; approval plus action costs 0.02 USDST |
 
-**If ETHST rises 50% ($3,000 → $4,500):**
-
-**Your position:**
-
-- Collateral: 8.73 ETHST ($39,285)
-- Debt: 11,250 USDST (unchanged)
-- Net value: $28,035
-- Profit: $13,035 (87% gain!)
-
-**How to exit:**
-
-1. **Sell some ETHST:**
-
-   - Withdraw 2.5 ETHST from collateral
-   - Swap → USDST
-   - Receive ~$11,220
-
-2. **Repay all debt:**
-
-   - Repay 11,250 USDST
-   - Zero debt
-
-3. **Withdraw remaining collateral:**
-
-   - Withdraw 6.23 ETHST
-   - Total ETHST in wallet: 6.23
-   - Plus any leftover USDST
-
-**Final result:**
-
-- Started: 5 ETHST at $3,000 = $15,000
-- Ended: 6.23 ETHST at $4,500 = $28,035
-- **Profit: $13,035 (87%)**
-- vs no leverage: $7,500 (50%)
+A leveraged position loses money in a flat market because the stability fee keeps accruing.
 
 ---
 
-## Real Example: 90-Day Scenarios
+## Managing the Position
 
-### Scenario A: Bull Market 🚀
+**If the price falls:**
 
-**ETH: $3,000 → $3,900 (+30%)**
+- **Deposit** more collateral into the vault, or
+- **Repay** USDST (partial repays can't leave debt below the debt floor), or
+- **De-lever:** withdraw some collateral (only while CR stays at or above the minimum CR), swap it to USDST, and repay. Repeat in rounds.
 
-| Metric | No Leverage | With Leverage |
-|--------|-------------|---------------|
-| Starting value | $15,000 | $15,000 |
-| Ending value | $19,500 | $23,097 |
-| Interest paid | $0 | $141 |
-| Net profit | $4,500 (30%) | $7,956 (53%) |
+**To close completely:**
 
-**Leverage wins:** Extra $3,456 profit ✅
+1. Swap enough of the asset (from your wallet, or withdrawn within the minimum-CR limit) to USDST.
+2. **Repay All USDST** on the vault. Repay All burns the full debt including accrued stability fee.
+3. **Withdraw** the remaining collateral. With zero debt there's no CR check.
 
----
-
-### Scenario B: Sideways Market ➡️
-
-**ETH: $3,000 → $3,000 (0%)**
-
-| Metric | No Leverage | With Leverage |
-|--------|-------------|---------------|
-| Starting value | $15,000 | $15,000 |
-| Ending value | $15,000 | $14,859 |
-| Interest paid | $0 | $141 |
-| Net profit | $0 | -$141 |
-
-**Leverage loses:** Bleed from interest ❌
-
----
-
-### Scenario C: Bear Market 📉
-
-**ETH: $3,000 → $2,400 (-20%)**
-
-| Metric | No Leverage | With Leverage |
-|--------|-------------|---------------|
-| Starting value | $15,000 | $15,000 |
-| Ending value | $12,000 | $9,702 |
-| Interest paid | $0 | $141 |
-| Net loss | -$3,000 (20%) | -$5,439 (36%) |
-
-**Leverage amplifies loss:** Extra -$2,439 loss 🔴
-
----
-
-## Tips for Success
-
-### DO ✅
-
-- Start with low leverage (1.5-2x max)
-- Set strict price alerts
-- Check position daily (multiple times if volatile)
-- Have plan to add collateral or exit
-- Take profits incrementally
-- Use CDP for long-term (lower fees)
-
-### DON'T ❌
-
-- Go above 3x leverage (extremely risky)
-- Leverage with money you can't lose
-- Ignore health factor warnings
-- Leverage in bear markets
-- Add leverage when already down
-- Forget about interest costs
-
----
-
-## When to Use Leverage
-
-### GOOD Times ✅
-
-- Strong bull market momentum
-- High conviction on price direction
-- Low volatility environment
-- You can monitor frequently
-- Have capital to add if needed
-
-### BAD Times ❌
-
-- High market volatility
-- Uncertain market direction
-- Can't monitor regularly
-- Already maxed out capital
-- Bear market or downtrend
-
----
-
-## Alternative: Leverage via CDP
-
-**Better for long-term leverage:**
-
-**Advantages:**
-
-- Lower fees (2.5% vs 5%)
-- Track CR instead of HF
-- Better for multi-month positions
-
-**Same risks:**
-
-- Liquidation danger
-- Amplified losses
-- Interest costs
-
-**Note:** Lending and CDP use separate collateral vaults - you cannot share the same collateral between both systems
+If you can't withdraw enough to repay at once, alternate **Withdraw Max** → swap → **Repay** until the debt is gone.
 
 ---
 
 ## Troubleshooting
 
-### "Can't borrow more - insufficient collateral"
-
-**Problem:** Hit borrowing limit
-
-**Fix:**
-
-- Stop adding leverage
-- Current position is max safe level
-- Don't force it
-
-### Health factor dropping fast
-
-**Problem:** ETHST price falling
-
-**Urgent actions:**
-
-1. Add collateral immediately
-2. Or repay debt
-3. Don't wait for liquidation
-
-### High slippage on swaps
-
-**Problem:** Large trade size
-
-**Fix:**
-
-- Split swaps into smaller sizes
-- Wait between rounds
-- Accept that max leverage is limited
-
----
-
-## Summary
-
-**Leverage amplifies everything:**
-
-- ✅ Gains in bull markets
-- ❌ Losses in bear markets
-- 💰 Interest costs always apply
-- ⚠️ Liquidation risk is real
-
-**Use responsibly:**
-
-- Low leverage (1.5-2x)
-- High conviction only
-- Strict risk management
-- Have exit plan
+| Contract error | Meaning |
+|----------------|---------|
+| `CDPEngine: insufficient collateral` | Mint would exceed the minimum-CR limit; mint less |
+| `CDPEngine: below min CR` | Withdrawal would push CR under the minimum; repay first |
+| `CDPEngine: debt ceiling exceeded` | The asset's system-wide debt cap is reached |
+| `CDPEngine: below debt floor` | Vault debt would be under the per-asset minimum |
 
 ---
 
 ## Next Steps
 
-- **[Risk Management](risk-hedging.md)** - Hedge leveraged positions
-- **[Exit Strategy](withdrawals.md)** - Close quickly if needed
+- **[Risk Management](risk-hedging.md)** - Buffers, repay/deposit formulas, monitoring
+- **[Swap Guide](../guides/swap.md)** - Pool types, price impact and slippage
+- **[Exit Strategy](withdrawals.md)** - Close positions and withdraw
+- **[Safety Guide](../safety.md)**
 
 ### Need Help?
 
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-

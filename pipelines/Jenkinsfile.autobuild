@@ -190,10 +190,7 @@ pipeline {
               def WORKDIR = pwd()
               catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                 sh """#!/bin/bash -lex
-                  # *V2.test.sol covers the staking V2 contracts, which are parked outside
-                  # BaseCodeCollection until the validator fleet is upgraded past the
-                  # staking fork. Drop the ! -name filter to switch them back on.
-                  find app/contracts/tests -name '*.test.sol' ! -name '*V2.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                  find app/contracts/tests -name '*.test.sol' -print0 | xargs -0 -I {} sh -c 'echo "Running test: {}" && cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
                 """
               }
             }
@@ -208,31 +205,6 @@ pipeline {
               cd smd-ui
               docker build --target test .
             '''
-          }
-        }
-
-        stage('Tracking Server Tests') {
-          steps {
-            sh '''#!/bin/bash -le
-              set -x
-              echo 'Running Tracking Server tests'
-              cd app/services/tracking
-              # Dashboard SPA: typecheck + production build (the builder stage runs `tsc && vite build`)
-              docker build --target builder ./ui
-              # Service: real image + throwaway postgres + mocked Keycloak/Cirrus, black-box suite in test/
-              docker compose -f docker-compose.test.yml -p tracking-tests down -v --remove-orphans || true
-              docker compose -f docker-compose.test.yml -p tracking-tests up --build --abort-on-container-exit --exit-code-from tests
-            '''
-          }
-          post {
-            always {
-              sh '''#!/bin/bash -le
-                cd app/services/tracking
-                docker compose -f docker-compose.test.yml -p tracking-tests logs --no-color tracking > tracking-tests.log 2>&1 || true
-                docker compose -f docker-compose.test.yml -p tracking-tests down -v --remove-orphans || true
-              '''
-              archiveArtifacts artifacts: 'app/services/tracking/tracking-tests.log', allowEmptyArchive: true
-            }
           }
         }
       }

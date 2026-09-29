@@ -122,6 +122,7 @@ executable vm-runner
     , common-log
     , hflags
     , process-monitor
+    , strato-conf
     , strato-model
     , vm-runner
     , vm-tools

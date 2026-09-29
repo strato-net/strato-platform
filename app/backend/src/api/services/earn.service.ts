@@ -19,6 +19,7 @@ import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } fro
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getStratoStakingNetworkApy } from "./staking.service";
 import { getPools as getV3Pools } from "./poolV3.service";
+import { V3_POOL_APY_MIN_TVL_USD } from "../../config/poolV3Constants";
 import { getCarryVaultUsdPriceMap } from "../helpers/oracle.helper";
 import { ApySource, TokenApyEntry, PoolV3 } from "@strato/shared-types";
 
@@ -27,11 +28,11 @@ import { ApySource, TokenApyEntry, PoolV3 } from "@strato/shared-types";
 const { Pool, DECIMALS, Token, ZERO_ADDRESS, DAY_MS, BPS_DIVISOR } = constants;
 
 /**
- * V3 pools below this TVL are left out of the token APY feed. A pool's `apy` annualizes
- * a single day of fees, so a near-empty pool with one swap posts a headline number that
- * would win the Native max for both of its tokens.
+ * The Diversified Vault is being sunset (deposits closed, holders withdrawing).
+ * While true, its share token publishes no APY at all so nothing in the app
+ * advertises yield on a product that no longer accepts deposits.
  */
-const V3_POOL_APY_MIN_TVL_USD = 1_000;
+const DIVERSIFIED_VAULT_SUNSET = true;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,9 +74,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     },
   );
 
-  const { vaultAPY, vaultRewardApy, currentVaultBalances } = await computeVaultApys(
-    accessToken, vaultAddr, ctx, phase1b, rewardActivities,
-  );
+  const { vaultAPY, vaultRewardApy, currentVaultBalances } = DIVERSIFIED_VAULT_SUNSET
+    ? { vaultAPY: null, vaultRewardApy: null, currentVaultBalances: new Map<string, string>() }
+    : await computeVaultApys(accessToken, vaultAddr, ctx, phase1b, rewardActivities);
 
   const map = new Map<string, ApySource[]>();
   const add: AddFn = (t, e) => { const arr = map.get(t); if (arr) arr.push(e); else map.set(t, [e]); };
@@ -99,7 +100,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   await addPoolApys(accessToken, add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
   addV3PoolApys(add, await v3PoolsPromise, ctx.prices, baseYieldByAddr);
 
-  if (ctx.shareTokenAddress) {
+  if (ctx.shareTokenAddress && !DIVERSIFIED_VAULT_SUNSET) {
     if (isPositiveApy(vaultAPY)) add(ctx.shareTokenAddress, { source: "vault", apy: vaultAPY });
     if (isPositiveApy(vaultWeightedApy)) add(ctx.shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
     if (isPositiveApy(vaultRewardApy)) add(ctx.shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
@@ -339,7 +340,8 @@ function addDirectMintRewards(add: AddFn, rewardActivities: any[]) {
   if (apy) add(constants.USDST, { source: "rewards", apy, meta: "direct_mint" });
 }
 
-// STRATO staking: native schedule APY plus the CATA rewards activity (if one is
+// STRATO staking: native staking APY (v1 reward schedule, or v2 realized block
+// rewards) plus the CATA rewards activity (if one is
 // registered against the staking contract), both keyed to the STRATO token so
 // the portfolio row shows the combined figure.
 async function addStakingApys(accessToken: string, add: AddFn, rewardActivities: any[]) {

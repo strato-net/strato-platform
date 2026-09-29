@@ -1,334 +1,111 @@
 # First-Time User Journey
 
-Complete walkthrough from getting assets onto STRATO to your first DeFi transaction.
+Get assets onto STRATO, cover your transaction fees, and mint your first USDST.
 
 ---
 
-## Your Goal
+## What You Need
 
-Get your crypto onto STRATO and borrow USDST to start using DeFi.
+- An EVM wallet (for example MetaMask) holding assets on a supported network
+- A browser at [app.strato.nexus](https://app.strato.nexus)
 
-**What you have:**
+## How Fees Work on STRATO
 
-- 1 ETH on Ethereum mainnet
-- MetaMask wallet
+Every STRATO transaction pays a flat fee: **one voucher** if you hold one, otherwise **0.01 USDST**. Many app actions send two calls (approve + action), so a confirmation can show 0.02 USDST. Your USDST and voucher balances are shown in the **USDST Balance** box in the corner of the app. See [Transactions and Fees](../platform/transactions-and-fees.md).
 
-**What you'll achieve:**
-
-- Bridge ETH to STRATO
-- Use it as collateral
-- Borrow 500 USDST
-- Start using STRATO DeFi
-
-**Time needed:** 30 minutes (mostly waiting for bridge)  
-**Total cost:** ~$21 (Ethereum gas + STRATO fees)
+!!! tip "You don't need USDST before your first deposit"
+    The bridge relayer submits the STRATO side of a bridge-in deposit for you. When your deposit is confirmed, it also mints vouchers to your STRATO account (25 per deposit in the current relayer), which is enough to pay for your first transactions.
 
 ---
 
-## Complete Walkthrough
+## Step 1: Sign In
 
-### Part 1: Bridge Your Assets (15-20 minutes)
+1. Open [app.strato.nexus](https://app.strato.nexus) and click **Connect Wallet**.
+2. Sign in with a STRATO account or connect an EVM wallet.
 
-**Step 1: Go to Deposits Page**
-
-1. Visit [https://app.strato.nexus/bridge](https://app.strato.nexus/bridge)
-2. Connect your MetaMask wallet
-3. Ensure you're on **Ethereum Mainnet** network
-
-**Step 2: Initiate Bridge**
-
-1. From: **Ethereum** → To: **STRATO**
-2. Asset: **ETH**
-3. Amount: **1.0**
-4. Review costs:
-
-   - Ethereum gas: ~$20 (varies with congestion)
-   - Total: ~$20
-
-**Step 3: Confirm & Wait**
-
-1. Click **"Bridge"**
-2. Confirm transaction in MetaMask
-3. Wait for:
-
-   - Ethereum confirmation: 1-2 minutes
-   - Bridge processing: 10-15 minutes
-4. Track status in Bridge page
-
-**Result:**
-```
-✅ Bridged: 1 ETH from Ethereum to STRATO
-✅ Time: ~15 minutes
-✅ Cost: ~$21
-✅ Now have: 1 ETHST on STRATO
-```
-
-**While waiting:**
-
-- Read [Core Concepts](../concepts.md) to understand health factor
+Bridging in also needs your **external wallet** (the one holding funds on the source network) connected. The Fund page prompts you for it.
 
 ---
 
-### Part 2: Get USDST for Fees (5 minutes)
+## Step 2: Bridge Assets In
 
-**Problem:** You need USDST to pay gas fees on STRATO
+1. In the sidebar, open **Fund** and select **Bridge In**.
+2. Under **Choose Network**, pick the network your funds are on. On mainnet the bridge is enabled for Ethereum, Base, Linea, HyperEVM and Robinhood Chain; the selector always shows the current list.
+3. Under **You Send**, pick the asset and amount. The app asks your wallet to switch networks if needed.
+4. Under **You Receive On STRATO**, pick what arrives. Depending on the asset and network, the options can include:
+    - The bridged token itself (for example ETH or WBTC)
+    - **USDST**, for supported stablecoins
+    - **saveUSDST**, which deposits straight into the USDST Savings Vault
+    - **GOLDST** or **SILVST**, bought on arrival (the fee is shown on the card)
+5. Click **Deposit** and confirm in your wallet. You pay the source network's gas.
+6. Track progress in the **Recent Transactions** panel. Tokens (and vouchers) arrive after the relayer confirms the deposit.
 
-**Solution:** Quick borrow to get gas fees
+For supported assets and mechanics, see the [Bridge Guide](../guides/bridge.md).
 
-1. **Go to Borrow page** (in sidebar)
-2. **Try to supply ETHST as collateral:**
+**Other ways to get funds:**
 
-   - In the Collateral Management table, find **ETHST**
-   - Click the **"Supply"** button
-   - Enter **0.1** (keep 0.9 for now)
-   - Click **"Supply"** → Confirm
-   - Wait... **ERROR: Need USDST for gas!**
-
-**Catch-22 Solution:**
-
-- Get from a friend
-- OR use the app's "Get Gas" feature if available
-- OR bridge in USDC first, swap USDST for USDST
-
-**For this guide, assume you got 10 USDST for fees.**
+- **Buy Crypto** (`/dashboard/onramp` on app.strato.nexus): pay by card, bank transfer or Apple Pay through Stripe; the purchased crypto is credited to your STRATO account.
+- **Send**: another STRATO user can send tokens to your STRATO address.
 
 ---
 
-### Part 3: Supply Collateral (2 minutes)
+## Step 3: Mint USDST Against Collateral (Optional)
 
-**Now you have gas, let's continue:**
+The **Borrow** page mints USDST from collateralized debt positions (CDP vaults).
 
-**Step 1: Supply ETHST**
+1. Open **Borrow**. The **Mint against collateral (CDP)** panel appears.
+2. Enter a **Mint Amount**. By default the app allocates the required collateral from your eligible wallet balances; you can switch this off and set deposit and mint amounts per vault.
+3. Use the risk slider (**Riskier** / **Safer**) to set your safety buffer. Check **Projected Vault Health** and the **Stability Fee**.
+4. Click **Mint**. The app sends the collateral deposit transaction(s) first, then the mint transaction(s).
 
-1. Go to **Borrow** (sidebar)
-2. **In the Collateral Management table**, find **ETHST**
-3. Click the **"Supply"** button
-4. **In the modal:**
-   - Enter **1.0** (use all of it)
-   - Review the preview
-5. Click **"Supply"**
-   - Confirm (~$0.10 gas in USDST)
-   - Approval + supply happen automatically in one transaction
-   - Wait 1-2 seconds
+Your position appears under **Your Vaults** with its collateral, debt and **Health Factor**.
 
-**Result:**
-```
-✅ Supplied: 1 ETHST ($3,000)
-✅ Can borrow: Up to $2,250 USDST
-✅ Health Factor: N/A (no debt yet)
-```
+!!! example "Illustrative example (hypothetical prices and parameters)"
+    You deposit 1 ETH worth $3,000 into a vault with a 150% liquidation ratio and mint 1,000 USDST.
 
-**Your balances:**
+    - Collateralization ratio (CR) = $3,000 / $1,000 = 300%
+    - Health factor = CR / liquidation ratio = 300% / 150% = **2.0**
+    - The vault becomes liquidatable if ETH falls below $1,500 (health factor 1.0)
 
-- ETHST: 0 (moved to collateral)
-- USDST: 9.90 (spent $0.10 on gas for one transaction)
-- Collateral: 1 ETHST
+**Keep in mind:**
+
+- Health factor below 1.0 means the vault can be liquidated, and a liquidation penalty is taken from your collateral.
+- The stability fee accrues continuously, so your debt grows over time.
+- Each collateral asset has its own vault and its own parameters, shown in the app.
+
+See the [Mint USDST (CDP) Guide](../guides/mint-cdp.md).
 
 ---
 
-### Part 4: Borrow USDST (2 minutes)
+## What Next
 
-**Step 1: Borrow**
-
-1. Go to **Borrow** (sidebar) → **Borrow** section
-2. Enter **500** USDST
-3. Review:
-
-   - Borrowing: 500 USDST
-   - New Health Factor: **3.6** (very safe)
-   - Interest: ~5% annually
-4. Click **"Borrow"**
-   - Confirm (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result:**
-```
-✅ Borrowed: 500 USDST
-✅ Health Factor: 3.6 (Very safe)
-✅ Your wallet: +500 USDST
-```
-
-**Your balances:**
-
-- ETHST: 0
-- USDST: 509.70 (9.70 remaining + 500 borrowed)
-- Collateral: 1 ETHST ($3,000)
-- Debt: 500 USDST
-
----
-
-## Summary: What You Achieved
-
-**Starting point:**
-
-- 1 ETH on Ethereum
-
-**Ending point:**
-
-- 1 ETHST as collateral on STRATO
-- 509.70 USDST in wallet
-- Health Factor: 3.6 (very safe)
-- Ready to use STRATO DeFi
-
-**Total costs:**
-
-- Ethereum gas: ~$20
-- STRATO gas: ~$0.30
-- **Total: ~$20.30**
-
-**What you can do now:**
-
-- ✅ Use USDST for transaction fees
-- ✅ Swap USDST for other tokens
-- ✅ Provide liquidity and earn fees
-- ✅ Keep borrowing against collateral
-- ✅ Earn Reward Points
-
----
-
-## Next Steps
-
-### Option A: Start Trading
-
-**[Swap USDST for other tokens →](../guides/swap.md)**
-- Trade for any token on STRATO
-- Build your portfolio
-- Take advantage of opportunities
-
-### Option B: Earn Passive Income
-
-**[Provide Liquidity →](../guides/liquidity.md)**
-- Use your USDST to provide liquidity
-- Earn 8-15% APR in trading fees
-- Plus Reward Points
-
-### Option C: Expand Your Position
-
-**[Borrow More →](../guides/borrow.md)**
-- You can borrow up to $2,250 total
-- Currently using only $500
-- Health factor is very safe at 3.6
-
-### Option D: Try CDP for Lower Fees
-
-**[Mint via CDP →](../guides/mint-cdp.md)**
-- Lower fees than borrowing
-- Better for long-term positions
-- More capital efficient
-
----
-
-## Important Reminders
-
-### Monitor Your Health Factor
-
-**Check daily:**
-
-1. Go to **Borrow** (sidebar)
-2. See your health factor
-3. Keep it above 2.0
-
-**If ETHST price drops:**
-
-- Health factor decreases
-- Add more collateral or repay debt
-- Don't let it drop below 1.0!
-
-### Keep USDST for Gas
-
-**Always maintain:**
-
-- At least 10-20 USDST in wallet
-- For transaction fees
-- Gas is cheap (~$0.10) but you need it
-
-### Accrue Interest
-
-**Remember:**
-
-- Your 500 USDST debt grows daily
-- ~5% annually = $0.07/day
-- After 30 days: Owe ~$502
-- Track and repay when ready
-
----
-
-## Common Questions
-
-### "How do I get more ETHST on STRATO?"
-
-Bridge more from Ethereum:
-
-1. Follow Part 1 again
-2. Bridge additional ETH
-3. Supply as collateral
-
-### "Can I withdraw my ETHST?"
-
-Only if you maintain health factor above 1.0:
-
-1. Repay your debt first (or partially)
-2. Then withdraw collateral
-3. Health factor must stay safe
-
-### "What if I need to exit completely?"
-
-See **[Withdrawals Guide →](withdrawals.md)**
+- **Trade**: swap USDST for other tokens on the **Trade** page. See the [Swap Guide](../guides/swap.md).
+- **Earn**: deposit USDST in the **USDST Savings Vault** (Earn page) or add liquidity under **Advanced → Swap Pools**. See [Maximize Yield](maximize-yield.md) and the [Liquidity Guide](../guides/liquidity.md).
+- **Rewards**: eligible positions accrue Reward Points. See the [Rewards Guide](../guides/rewards.md).
+- **Exit**: see [Withdrawals](withdrawals.md).
 
 ---
 
 ## Troubleshooting
 
-### Bridge taking too long
+**Deposit hasn't arrived**
 
-**Normal:** 15-20 minutes total
+- Confirm the source-network transaction succeeded in that network's block explorer.
+- Check **Recent Transactions** on the Fund page.
+- If it's still missing, contact support with the transaction hash.
 
-**If > 30 minutes:**
+**Not enough balance for the transaction fee**
 
-- Check Ethereum transaction confirmed on Etherscan
-- Contact support with transaction hash
-- Monitor bridge status page
+- You need one voucher or 0.01 USDST per call. Bridge in a supported stablecoin and receive USDST, swap for USDST, or mint USDST on the Borrow page.
 
-### "Insufficient USDST for transaction fee"
+**Health factor is dropping**
 
-**Problem:** Ran out of gas USDST
-
-**Solution:**
-
-- Get more USDST (borrow small amount, or swap)
-- Ask in community for small amount
-
-### Health factor warnings
-
-**If health factor drops below 2.0:**
-
-1. Check ETHST price movement
-2. Add more collateral or repay debt
-3. Don't ignore yellow/red warnings
+- In **Borrow → Your Vaults**, deposit more collateral or repay USDST.
 
 ---
 
-## Congratulations! 🎉
-
-You've successfully:
-
-- ✅ Bridged assets to STRATO
-- ✅ Supplied collateral
-- ✅ Borrowed USDST
-- ✅ Ready for DeFi
-
-**You're now a STRATO user!**
-
-### Continue Your Journey
-
-- **[Core Concepts](../concepts.md)** - Deepen your understanding
-- **[Safety Guide](../safety.md)** - Protect your assets
-- **[All Guides](../guides/borrow.md)** - Explore more features
-- **[FAQ](../faq.md)** - Common questions
-
-### Get Help
+## Get Help
 
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-
+- [Core Concepts](../concepts.md) · [Safety Guide](../safety.md) · [FAQ](../faq.md)

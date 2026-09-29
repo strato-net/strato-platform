@@ -20,6 +20,7 @@ import { roundByMagnitude, formatRoundedWithCommas } from "@/services/rewardsSer
 import { formatBalance, safeBigInt } from "@/utils/numberUtils";
 import { Button } from "@/components/ui/button";
 import LiquidationAlertBanner, { CDPLiquidationAlertBanner } from "@/components/ui/LiquidationAlertBanner";
+import VaultSunsetBanner from "@/components/vault/VaultSunsetBanner";
 import GuestPromoSection from "@/components/dashboard/GuestPromoSection";
 import ContactInquiryModal from "@/components/contact/ContactInquiryModal";
 import MemberBenefitDialog from "@/components/dashboard/MemberBenefitDialog";
@@ -238,6 +239,7 @@ const Dashboard = () => {
 
         <main className="p-4 md:p-6 pb-24 md:pb-6">
           <GuestPromoSection variant={!isLoggedIn ? 1 : (!isLoadingNetBalance && totalBalance === 0) ? 2 : 3} userRewards={rewardsUserInfo} />
+          {isLoggedIn && <VaultSunsetBanner />}
           {showFullDashboard && <LiquidationAlertBanner />}
           {showFullDashboard && <CDPLiquidationAlertBanner />}
           {showFullDashboard && (

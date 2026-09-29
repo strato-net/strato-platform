@@ -109,5 +109,5 @@ main = do
             redisConn = RBDB.RedisConnection conn
           }
   race_ (runLoggingT (runSequencerM vaultUrl' seqCfg ctx sequencer))
-    . run 8050
+    . runSettings (setHost (fromString $ Conf.apiListenAddress $ Conf.apiConfig ethConf) $ setPort 8050 defaultSettings)
     $ metricsApp

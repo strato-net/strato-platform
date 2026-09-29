@@ -1,423 +1,135 @@
 # Borrow USDST
 
-Access USD liquidity without selling your crypto assets.
+Get USDST against your crypto or metal tokens without selling them.
 
-!!! info "Alternative: Mint via CDP"
-    You can also **[mint USDST via CDP](mint-cdp.md)** which typically has lower fees but requires more active management.
+In the STRATO app, **Borrow** (sidebar, under **TRADE**) mints USDST from CDP vaults: you lock collateral and new USDST is created against it. This guide walks through that page. For how vaults, stability fees and liquidation work under the hood, see **[Mint USDST via CDP](mint-cdp.md)**.
 
-!!! note "Variable Parameters"
-    Interest rates, gas costs, and asset parameters shown are typical examples. Actual values may vary based on network conditions, asset type, and governance settings. Always check current rates in the app before transacting.
+!!! note "Lending pool borrowing"
+    STRATO also has a lending pool (`LendingPool`) where USDST suppliers lend to borrowers. The app does not currently show a lending-pool borrow form. The Borrow page uses CDP vaults only.
 
----
-
-## Complete Example: Borrow $1,000 USDST
-
-**Your situation:**
-
-- You have: 1 ETHST in your wallet
-- ETHST price: $3,000
-- You need: $1,000 USDST for expenses
-
-**What you'll do:**
-
-1. Supply 1 ETHST as collateral
-2. Borrow 1,000 USDST
-3. Use your USDST
-4. Repay the loan (anytime)
-5. Withdraw your collateral
-
-**Time needed:** 5 minutes  
-**Total gas cost:** ~$0.30 (3 transactions)  
-**Interest cost:** ~$4 per month (5% annual rate)
+!!! info "Live values"
+    Collateral assets, stability fees, liquidation ratios, debt floors and ceilings are set per asset by governance and can change. The app always shows the current values. Any numbers below are illustrations only.
 
 ---
 
-## Step 1: Supply Collateral
+## Before You Start
 
-**What you have:**
-
-- 1 ETHST worth $3,000
-
-**In the app:**
-
-1. **Go to Borrow page** (in sidebar)
-2. **In the Collateral Management table**, find **ETHST**
-3. Click the **"Supply"** button for ETHST 4. **In the modal:**
-   - Enter amount: **1.0** (or click "Max")
-   - Review the health impact preview
-5. **Click "Supply"**
-   - Confirm in wallet (~$0.10 gas)
-   - Approval + supply happen automatically in one transaction
-   - Wait 1-2 seconds
-
-**Result:**
-```
-✅ Collateral supplied: 1 ETHST ($3,000)
-✅ Can borrow up to: $2,250 USDST (75% of collateral)
-✅ Health Factor: N/A (no debt yet)
-```
-
-**Your wallet:**
-
-- Before: 1 ETHST
-- After: 0 ETHST (moved to collateral vault)
+- Sign in to [app.strato.nexus](https://app.strato.nexus) (the Borrow page is read-only for guests).
+- Hold a supported collateral token on STRATO. If your assets are on another chain, bridge them first ([Bridge Assets](bridge.md)).
+- Keep a little USDST or some vouchers for transaction fees. Every STRATO transaction costs **0.01 USDST, or one voucher if you hold one**. Some actions take more than one transaction (for example, a deposit followed by a mint), and the app shows the total before you confirm. The fee is charged even if a transaction reverts.
 
 ---
 
-## Step 2: Borrow USDST
+## Step 1: Choose How Much to Mint
 
-**What you want:** $1,000 USDST
+1. Open **Borrow** from the sidebar.
+2. In the **Mint against collateral (CDP)** card, enter a **Mint Amount**. **Available to Mint** shows the most you can mint with your current wallet balances and vaults.
+3. Set the **Health Factor** slider between **Safer** and **Riskier**. The label under the slider shows the risk level:
 
-**In the app:**
+    | Target health factor | Label |
+    |---|---|
+    | 2.5 or higher | Low Risk |
+    | 2.0 to 2.5 | Medium Risk |
+    | 1.5 to 2.0 | Higher Risk |
+    | Below 1.5 | High Risk |
 
-1. **Go to Borrow section** → Click **"Borrow"**
-2. **Enter amount:** Type **1000** USDST
-3. **Review the preview:**
+    The slider cannot go below the minimum your vaults allow.
 
-   - Borrowing: 1,000 USDST
-   - New Health Factor: **1.8** (Safe ✓)
-   - Interest Rate: ~5% annually
-   - Max you could borrow: $2,250
-4. **Click "Borrow"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
+4. Leave **Automatically allocate across vaults** checked to let the app decide how much collateral to deposit, and how much to mint, in each vault. Uncheck it to enter your own numbers in the **Vault Breakdown** table (Asset, Stability Fee, Deposit, Mint, HF).
 
-**Result:**
+The card also shows **Average Stability Fee**, the **Transaction Fee** (in USDST and vouchers) and, when rewards are active, **Mint Rewards APY**.
+
+## Step 2: Confirm
+
+1. Click **Confirm Mint**.
+2. A progress window lists each transaction. Collateral deposits run first, then the mints. If one step fails, the remaining steps are skipped.
+3. When it finishes, the USDST is in your wallet.
+
+---
+
+## What Health Factor Means Here
+
+Each vault holds one collateral asset. For a vault:
+
 ```
-✅ Borrowed: 1,000 USDST
-✅ Health Factor: 1.8 (Safe)
-✅ Your wallet: +1,000 USDST
+Collateralization ratio (CR) = collateral value (USD) / debt (USD)
+Health factor (HF)           = CR / liquidation ratio of that asset
 ```
 
-**Your position now:**
+- **HF at or above 1:** the vault cannot be liquidated.
+- **HF below 1** (CR below the liquidation ratio): anyone can liquidate part of the vault.
+- Minting and withdrawing collateral must also keep CR at or above the asset's **minimum CR**. That minimum is at least the liquidation ratio, so you can never mint straight into a liquidatable position. Price moves afterwards can still get you there.
 
-- Collateral: 1 ETHST ($3,000)
-- Debt: 1,000 USDST
-- Health Factor: 1.8 (very safe)
-- Still available to borrow: $1,250 more (but don't!)
+**Illustration only:** if an asset's liquidation ratio were 150% and your vault held $3,000 of it against 1,000 USDST of debt, CR would be 300% and HF would be 2.0. A 50% fall in that asset's price would bring HF to 1.0.
 
-**What is Health Factor?**
-- **Above 2.0:** Very safe ✅
-- **1.5 - 2.0:** Safe with buffer
-- **1.0 - 1.5:** Moderate risk ⚠️
-- **Below 1.0:** Liquidation danger ❌
-
-Your 1.8 health factor means you have a good safety buffer.
+Debt grows over time through the asset's stability fee, so HF drifts down slowly even when prices don't move.
 
 ---
 
-## Step 3: Use Your USDST
+## Step 3: Manage Your Position
 
-You now have 1,000 USDST to use for:
+Once you have a position, two cards appear beside the mint card:
 
-- ✅ Transaction fees on STRATO
-- ✅ Swap for other tokens
-- ✅ Provide liquidity
-- ✅ Bridge to other chains
-- ✅ Any other purpose
+- **Your Position:** Total Debt, Average Stability Fee, Average Health Factor, Vault Collateral Supplied.
+- **Your Vaults:** one row per collateral asset, with its health factor and four actions:
 
-**Your debt grows slowly:**
+| Action | What it does | Max option |
+|---|---|---|
+| **Deposit** | Add collateral to the vault (raises HF) | - |
+| **Withdraw** | Take collateral back (lowers HF) | **Withdraw Max** withdraws the most you can while keeping CR at or above the minimum |
+| **Mint** | Mint more USDST from this vault (lowers HF) | **Mint Max USDST** |
+| **Repay** | Burn USDST to reduce this vault's debt (raises HF) | **Repay All USDST** |
 
-- Interest: ~5% per year = 0.014% per day
-- After 1 day: Owe $1,000.14
-- After 30 days: Owe ~$1,004
-- After 1 year: Owe ~$1,050
+Each action previews the vault's new health factor before you confirm.
 
----
-
-## Step 4: Repay (Anytime)
-
-**When you're ready** (no rush, but interest accumulates):
-
-1. **Get USDST to repay**
-   - You might have it from what you borrowed
-   - Or swap other tokens for USDST
-   - Or mint more via CDP
-
-2. **Go to Borrow page** (in sidebar) → **"Repay"**
-3. **Enter amount:**
-
-   - Type specific amount (e.g., 1004 to repay all)
-   - Or click **"Repay Max"** to close loan completely
-4. **Click "Repay"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result after full repayment:**
-```
-✅ Debt repaid: 1,004 USDST (1,000 principal + 4 interest)
-✅ Health Factor: N/A (no debt)
-✅ Gas cost: ~$0.10
-```
-
-**Your position:**
-
-- Collateral: 1 ETHST (still in vault)
-- Debt: 0 USDST
-- Health Factor: No debt
-- You can now withdraw collateral
+!!! warning "Watch your health factor"
+    If a vault's health factor falls, add collateral or repay debt before it reaches 1. The Portfolio page shows a warning when a vault is close to liquidation.
 
 ---
 
-## Step 5: Withdraw Collateral
+## Step 4: Repay and Close
 
-**After repaying fully:**
+1. Get enough USDST to cover the debt plus accrued stability fees. You can [swap](swap.md) for it or use USDST you already hold.
+2. In **Your Vaults**, choose **Repay** on the vault. Enter an amount, or use the max option (**Repay All USDST**) to clear the vault's debt.
+3. Choose **Withdraw** (or **Withdraw Max**) to take your collateral back.
 
-1. **Go to Borrow page** (in sidebar)
-2. **In the Collateral Management table**, find your asset
-3. Click the **"Withdraw"** button for that asset
-2. **Select asset:** Choose **ETH**
-3. **Enter amount:** Type **1.0** (or click "Max")
-4. **Click "Withdraw Collateral"**
-   - Confirm in wallet (~$0.10 gas)
-   - Wait 1-2 seconds
-
-**Result:**
-```
-✅ Withdrawn: 1 ETHST to your wallet
-✅ Total position closed
-```
-
-**Final accounting:**
-
-- You borrowed: 1,000 USDST
-- You repaid: 1,004 USDST
-- Total cost: $4 interest + $0.30 gas = **$4.30 total**
-- You still have: 1 ETHST (same as you started)
+!!! note "Debt floor"
+    Each asset can have a minimum debt per vault. A mint that would leave the vault below that floor is rejected. So is a partial repay: in that case, repay in full with **Repay All USDST**.
 
 ---
 
-## What If Prices Change?
+## If You Get Liquidated
 
-### Scenario: ETHST Drops to $2,500
-
-**What happens:**
-
-- Your collateral value: Now $2,500 (was $3,000)
-- Your debt: Still 1,000 USDST (unchanged)
-- Your health factor: Drops to **1.5** (caution ⚠️)
-
-**What to do:**
-
-- **Option 1: Add more collateral** - Supply 0.2 more ETHST - **Option 2: Repay some debt** - Repay 400 USDST
-- **Option 3: Monitor closely** - Still safe, but watch the price
-
-### Scenario: ETHST Drops to $2,000 (Danger!)
-
-**What happens:**
-
-- Your collateral value: Now $2,000
-- Your debt: Still 1,000 USDST
-- Your health factor: **1.0** (liquidation risk ❌)
-
-**Danger zone:**
-
-- Health factor below 1.0 = **you can be liquidated**
-- Liquidators can repay your debt and take your collateral
-- You lose 5-10% of collateral value as liquidation bonus
-
-**What to do immediately:**
-
-1. Add more collateral, OR
-2. Repay some/all debt
-3. Don't let health factor drop below 1.0!
-
-**Best practice:** Keep health factor **above 2.0** for safety buffer.
+When a vault's health factor drops below 1, any user can repay part of its debt and take collateral worth that amount plus a per-asset liquidation penalty. **Advanced > Liquidations** lists positions that can be liquidated. You keep the USDST you minted but lose the seized collateral. For how much can be taken and how it's priced, see [Mint USDST via CDP](mint-cdp.md#liquidation).
 
 ---
 
-## Managing Your Position
+## Costs
 
-### Check Your Position
-
-**In the app:**
-
-- Go to **Borrow** page (in sidebar)
-- You'll see:
-
-  - Collateral amount and value
-  - Debt amount (with accrued interest)
-  - Health Factor with color indicator
-  - Available to borrow or withdraw
-
-**Health Factor colors:**
-
-- 🟢 **Green (> 2.0):** Safe
-- 🟡 **Yellow (1.5-2.0):** Caution
-- 🟠 **Orange (1.0-1.5):** Warning
-- 🔴 **Red (< 1.0):** Danger - liquidation imminent
-
-### Adding More Collateral
-
-If health factor drops:
-
-1. Go to **Supply**
-2. Add more collateral
-3. Health factor improves immediately
-
-### Partial Repayment
-
-Don't need to repay all at once:
-
-1. Go to **Repay**
-2. Enter any amount to repay
-3. Reduces debt and improves health factor
+| Cost | How it works |
+|---|---|
+| **Stability fee** | Annual rate set per collateral asset. It compounds every second and is added to your debt. The app shows it for each vault. |
+| **Transaction fee** | 0.01 USDST or one voucher for each STRATO transaction |
+| **Liquidation penalty** | Only charged if your vault is liquidated |
 
 ---
 
-## Tips & Best Practices
+## Common Errors
 
-### DO ✅
-
-- **Over-collateralize:** Supply 2-3x what you plan to borrow
-- **Monitor daily:** Check health factor when prices move
-- **Set alerts:** Use price alerts for your collateral assets
-- **Keep buffer:** Maintain health factor above 2.0
-- **Start small:** Test with small amounts first
-- **Save USDST:** Keep some USDST for gas fees
-
-### DON'T ❌
-
-- **Max out:** Don't borrow your maximum capacity
-- **Ignore warnings:** Yellow/orange health factor = take action
-- **Forget interest:** Debt grows daily (track it)
-- **Use all crypto:** Keep some assets liquid
-- **Panic sell:** Add collateral instead during dips
-- **Forget gas:** Always have USDST for fees
-
----
-
-## Common Issues
-
-### "Insufficient collateral"
-
-**Problem:** Trying to borrow more than your collateral allows
-
-**Solution:**
-
-1. Supply more collateral first, OR
-2. Reduce the borrow amount
-
----
-
-### "Would exceed health factor limit"
-
-**Problem:** This borrow would make your health factor too low
-
-**Solution:**
-
-- Reduce borrow amount
-- Supply more collateral
-- Check your calculation: Can borrow up to 75% of collateral value
-
----
-
-### "Insufficient USDST balance"
-
-**Problem:** Don't have enough USDST to repay
-
-**Solution:**
-
-1. Swap other tokens for USDST, OR
-2. Mint USDST via CDP, OR
-3. Repay a smaller amount now, rest later
-
----
-
-### "Approval needed" or "Insufficient allowance"
-
-**Problem:** Token approval failed in the bundled transaction
-
-**Solution:**
-
-1. Try the supply operation again
-2. Ensure you have enough gas for the transaction
-3. Wait for confirmation
-4. Then retry your action
-
----
-
-### Health factor dropping
-
-**Problem:** Your collateral value is decreasing
-
-**Solution (act quickly):**
-
-1. **Add collateral:** Supply more assets
-2. **Repay debt:** Even partial repayment helps
-3. **Monitor closely:** Set price alerts
-4. **Don't wait:** Act before it reaches 1.0
-
----
-
-## Understanding Costs
-
-### Interest Rates
-
-**How interest works:**
-
-- Interest accrues every second
-- Typical rate: ~5% annually
-- Compounds continuously
-
-**Example costs:**
-| Borrowed | Time | Interest Owed |
-|----------|------|---------------|
-| $1,000 | 1 day | $0.14 |
-| $1,000 | 1 week | $1 |
-| $1,000 | 30 days | $4 |
-| $1,000 | 1 year | $50 |
-| $10,000 | 30 days | $40 |
-
-### Gas Fees
-
-| Action | Gas Cost |
-|--------|----------|
-| Supply collateral | ~$0.10 |
-| Borrow | ~$0.10 |
-| Repay | ~$0.10 |
-| Withdraw | ~$0.10 |
-
-**Total for complete cycle:** ~$0.30-$0.40
-
----
-
-## When to Borrow vs Mint (CDP)
-
-### Choose Borrowing (Lending Pool) If:
-
-- ✅ Short-term liquidity need (days/weeks)
-- ✅ Want flexibility to add/remove collateral easily
-- ✅ Comfortable with variable rates
-- ✅ Need quick access
-
-### Choose Minting (CDP) If:
-
-- ✅ Long-term position (months)
-- ✅ Want lower, more stable fees
-- ✅ Maximizing capital efficiency
-- ✅ Willing to manage vaults
-
-**See:** **[Mint USDST via CDP Guide](mint-cdp.md)**
+| Message | Meaning | What to do |
+|---|---|---|
+| Insufficient Collateral | Your balances can't support the mint amount at the chosen health factor | Lower the amount, move the slider toward Riskier, or add collateral |
+| Debt floor prevents allocation / below debt floor | The mint would leave a vault under its minimum debt | Mint more, or pick a different vault |
+| repay leaves debt below floor | A partial repay would leave debt under the floor | Use **Repay All USDST** |
+| below min CR | The withdrawal or mint would push CR under the minimum | Withdraw or mint less, or repay first |
+| debt ceiling exceeded | Total USDST minted against this asset is at its limit | Use another collateral asset |
+| Mint/Withdraw paused by admin | The asset or the engine is paused | Wait, or use another asset |
 
 ---
 
 ## Next Steps
 
-### Earn While You Have USDST
-
-- **[Provide Liquidity](liquidity.md)** - Earn fees on your USDST
-- **[Swap Tokens](swap.md)** - Trade for other assets
-- **[Earn Rewards](rewards.md)** - Claim Reward Points
-
-### Learn More
-
-- **[Core Concepts](../concepts.md)** - Health Factor, liquidation, etc.
-- **[Safety Guide](../safety.md)** - Risk management
-- **[FAQ](../faq.md)** - Common questions
-
-### Need Help?
-
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
+- **[Mint USDST via CDP](mint-cdp.md):** vault mechanics in detail
+- **[Swap Tokens](swap.md):** trade your USDST
+- **[Earn Rewards](rewards.md):** CDP minting can be a reward activity
+- **[Safety Guide](../safety.md):** oracle and liquidation risk

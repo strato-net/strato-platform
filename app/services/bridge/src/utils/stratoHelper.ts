@@ -7,6 +7,18 @@ import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
 // Core Transaction Functions
 // ============================================================================
 
+/**
+ * A posted transaction had no result when the wait ran out. Its outcome is unknown: it may still
+ * be mined, or a later transaction may take its nonce and evict it, so nothing that depends on it
+ * may proceed as if it succeeded.
+ */
+export class TxPendingError extends Error {
+  constructor(readonly hashes: string[]) {
+    super(`Transaction outcome unknown, still pending after the wait: ${hashes.join(", ")}`);
+    this.name = "TxPendingError";
+  }
+}
+
 let stratoWriteQueue: Promise<void> = Promise.resolve();
 
 const enqueueStratoWrite = async <T>(task: () => Promise<T>): Promise<T> => {
@@ -36,16 +48,18 @@ export const buildFunctionTx = (
   },
 });
 
+// The node reports failure reasons as plain strings, e.g. "solidity require failed: MB: bad state";
+// callers match on them, so they must reach the thrown Error unchanged
 const getTxFailureMessage = (result: any): string => {
-  return (
+  const reason =
     result?.txResult?.status?.details ||
     result?.txResult?.status?.type?.contents ||
     result?.txResult?.message ||
     result?.txResult?.response ||
     result?.error ||
     result?.message ||
-    "Transaction failed"
-  );
+    "Transaction failed";
+  return typeof reason === "string" ? reason : extractErrorMessage(reason);
 };
 
 const getTxFailureDetails = (result: any) => ({
@@ -80,38 +94,22 @@ export const until = async <T>(
   }
 };
 
-/**
- * Evaluate immediate status from resolve=true response
- * Returns TxResponse if definitive result, undefined if polling needed
- */
-const getImmediateResult = (
-  response: any[],
-): TxResponse | undefined => {
-  const first = response[0];
-  const status = first?.status;
+const isFailure = (result: any) =>
+  result?.status === "Failure" || result?.status === "Failed";
 
-  switch (status) {
-    case "Success":
-      return { status: "Success", hash: first.hash };
-    case "Failed":
-    case "Failure": {
-      const msg = getTxFailureMessage(first);
-      logError("StratoHelper", new Error(extractErrorMessage(msg)), {
-        operation: "immediateTransactionFailure",
-        result: getTxFailureDetails(first),
-      });
-      throw new Error(extractErrorMessage(msg));
-    }
-    case "Pending":
-    case undefined:
-    default:
-      // Pending, undefined, or unknown status: fall back to polling
-      return undefined;
-  }
+const throwTxFailure = (failed: any, operation: string, txHashes: string[]): never => {
+  const error = new Error(getTxFailureMessage(failed));
+  logError("StratoHelper", error, {
+    operation,
+    result: getTxFailureDetails(failed),
+    txHashes,
+  });
+  throw error;
 };
 
 /**
- * Post transaction and wait for completion
+ * Post transaction(s) and wait until every one of them has succeeded.
+ * Throws on any failure, and throws TxPendingError when the wait runs out first.
  */
 export const postAndWaitForTx = async (
   postFn: () => Promise<any>,
@@ -128,39 +126,41 @@ export const postAndWaitForTx = async (
     return r.hash;
   });
 
-  // Check for immediate result from resolve=true
-  const immediate = getImmediateResult(response);
-  if (immediate) {
-    return immediate;
+  // resolve=true may already carry the outcome of every transaction
+  const immediateFailure = response.find(isFailure);
+  if (immediateFailure) {
+    throwTxFailure(immediateFailure, "immediateTransactionFailure", txHashes);
+  }
+  if (response.every((r) => r?.status === "Success")) {
+    return { status: "Success", hash: txHashes[0] };
   }
 
-  // Fallback to polling for results
   const results = await until(
     (res: TxResult[]) => {
-      const failed = res.find((r) => r?.status === "Failure");
+      const failed = res.find(isFailure);
       if (failed) {
-        const msg = getTxFailureMessage(failed);
-        logError("StratoHelper", new Error(extractErrorMessage(msg)), {
-          operation: "polledTransactionFailure",
-          result: getTxFailureDetails(failed),
-          txHashes,
-        });
-        throw new Error(extractErrorMessage(msg));
+        throwTxFailure(failed, "polledTransactionFailure", txHashes);
       }
-      return res.every((r) => r?.status !== "Pending");
+      return res.length === txHashes.length && res.every((r) => r?.status !== "Pending");
     },
     () => bloc.post("/transactions/results", txHashes),
     { timeout },
   );
 
-  return {
-    status: results[0].status as TxResponse["status"],
-    hash: results[0].hash,
-  };
+  if (results.length === txHashes.length && results.every((r) => r?.status === "Success")) {
+    return { status: "Success", hash: txHashes[0] };
+  }
+
+  const unresolved = txHashes.filter((_, i) => results[i]?.status !== "Success");
+  const unexpected = results.find((r) => r && r.status !== "Pending" && r.status !== "Success");
+  if (unexpected) {
+    throw new Error(`Unexpected transaction status ${unexpected.status} for ${unexpected.hash}`);
+  }
+  throw new TxPendingError(unresolved);
 };
 
 /**
- * Execute transaction(s) with logging
+ * Execute transaction(s) with logging. Resolves only when every transaction succeeded.
  */
 export const execute = async (
   inputs: FunctionInput | FunctionInput[],
@@ -173,17 +173,24 @@ export const execute = async (
   return enqueueStratoWrite(async () => {
     logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
 
-    const result = await postAndWaitForTx(
-      () =>
-        strato.post(
-          "/transaction/parallel?resolve=true",
-          buildFunctionTx(inputs),
-        ),
-      timeout,
-    );
+    try {
+      const result = await postAndWaitForTx(
+        () =>
+          strato.post(
+            "/transaction/parallel?resolve=true",
+            buildFunctionTx(inputs),
+          ),
+        timeout,
+      );
 
-    logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
-    return result;
+      logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
+      return result;
+    } catch (error) {
+      if (error instanceof TxPendingError) {
+        logError("StratoHelper", error, { operation: context });
+      }
+      throw error;
+    }
   });
 };
 

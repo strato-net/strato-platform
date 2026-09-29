@@ -189,18 +189,18 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   simCounter <- newTVarIO 0
 
+  let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
+      bindPort = Conf.apiPort (Conf.apiConfig ethConf)
   let env =
         BlocEnv
           { Bloc.Monad.txSizeLimit = Conf.txSizeLimit (networkConfig ethConf),
             Bloc.Monad.gasLimit = Conf.gasLimit (networkConfig ethConf),
             Bloc.Monad.stateFetchLimit = stateFetchLimit',
             Bloc.Monad.globalNonceCounter = nonceCache,
-            Bloc.Monad.vmJsonRpcUrl = Conf.vmJsonRpcUrl (Conf.vmConfig ethConf),
+            Bloc.Monad.vmJsonRpcUrl = "http://" ++ bindHost' ++ ":" ++ show Conf.jsonRpcPort,
             Bloc.Monad.simInFlight = simCounter,
             Bloc.Monad.simMaxConcurrent = Conf.simMaxConcurrent (Conf.vmConfig ethConf)
           }
-  let bindHost' = Conf.apiListenAddress (Conf.apiConfig ethConf)
-      bindPort = Conf.apiPort (Conf.apiConfig ethConf)
   putStrLn $ "Starting strato-api on " ++ bindHost' ++ ":" ++ show bindPort
   let settings = setPort bindPort $ setHost (fromString bindHost') defaultSettings
   runSettings settings $ app env theDoc urlMap

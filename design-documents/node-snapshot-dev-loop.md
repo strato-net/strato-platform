@@ -78,6 +78,33 @@ Required behavior:
 - Remove the stale `.strato.pid`.
 - Start the node only when `--start` is passed; default is restore-only.
 
+### `pull`
+
+Download a published snapshot into the local download cache without restoring
+it, so that a later `restore` (or `strato-up --snapshot`) of the same snapshot
+skips the download.
+
+```bash
+strato-snapshot pull [<node-dir>] \
+  [--network helium] \
+  [--snapshot[=<timestamp>] | --source <s3-uri>]
+```
+
+Required behavior:
+
+- Never touch a node directory; `pull` is safe to run while the node is serving.
+- Default to the `latest` alias for the network when no selection is given.
+- When `--network` is not passed, take it from `<node-dir>`'s `ethconf.yaml`,
+  else from the default node recorded by `strato-setup`
+  (`~/.strato/default-node`). Refuse a `--network` that contradicts
+  `<node-dir>`'s configured network.
+- Download into the same persistent cache `restore` reads
+  (`./.snapshot-downloads`, or `STRATO_SNAPSHOT_DOWNLOAD_DIR`), verify against
+  the published `.sha256`, and reuse an already cached copy whose checksum
+  still matches.
+- Refuse a local `--source`: there is nothing to pull.
+- Print the cached archive path on stdout.
+
 ### `inspect`
 
 Print metadata without restoring.
@@ -233,9 +260,18 @@ probe is `/eth/v1.2/block/last/1`; Cirrus should use an explicit
 `--cirrus-tip-url` when CI has one, otherwise the CLI falls back to a conservative
 Postgres probe against the `cirrus` database's `storage` table.
 
-### 2. Cold shutdown
+### 2. Redis AOF compaction, then cold shutdown
 
-Stop the node and Compose stack:
+Before stopping anything, ask Redis to compact its append-only file so the
+snapshot carries the dataset rather than its write history (best effort,
+bounded wait):
+
+```bash
+docker exec <redis-container> redis-cli BGREWRITEAOF
+# poll INFO persistence until aof_rewrite_in_progress:0 and aof_rewrite_scheduled:0
+```
+
+Then stop the node and Compose stack:
 
 ```bash
 strato-down <node-dir> || true
@@ -283,7 +319,8 @@ Archive only the payload contract:
 # Stage the payload, then archive the staging dir:
 staging=$(mktemp -d)
 mkdir -p "$staging/payload"/{ethereumH,redis,jlog,postgres-dumps}
-tar -C .ethereumH --exclude=./ethconf.yaml -cf - . | tar -C "$staging/payload/ethereumH" -xpf -
+tar -C .ethereumH --exclude=./ethconf.yaml --exclude='./*/LOG' --exclude='./*/LOG.old' -cf - . \
+  | tar -C "$staging/payload/ethereumH" -xpf -    # LevelDB activity logs carry no state
 tar -C redis -cf - . | tar -C "$staging/payload/redis" -xpf -
 tar -C jlog  -cf - . | tar -C "$staging/payload/jlog"  -xpf -
 chmod -R a+rwX "$staging/payload/jlog"      # usable by any uid after restore
@@ -300,6 +337,18 @@ The implementation stages into a working directory exactly like this; the interf
 ## Restore Contract
 
 Restore should be deterministic and conservative.
+
+### Fetching the archive
+
+For an `s3://` source the tool keeps a per-directory download cache
+(`./.snapshot-downloads`). The archive's SHA-256 is computed from the download
+stream and checked against the published `.sha256` before the file is renamed
+from `<archive>.part` into place; the verified digest is recorded in
+`<archive>.verified` with the file's size and mtime, so a later run reuses an
+unchanged cached archive without re-reading it. Other archives of the same
+network in the cache are pruned around a successful download (before it when
+the object has a published sidecar, so the space is available). Archives of
+other networks are kept.
 
 ### Preflight
 
@@ -339,6 +388,22 @@ Restore must update the target `.ethereumH/ethconf.yaml` in exactly one way:
 - `sqlConfig.host` and `cirrusConfig.host` when set to `localhost` are
   rewritten to `127.0.0.1`, so host processes connect over the same address
   family as the IPv4-only Docker port bindings.
+
+### Database load
+
+The `eth` and `cirrus` dumps are loaded by a throwaway `postgres:14.18`
+container started on the node's own data directory with the extracted dumps
+bind-mounted read-only at `/dumps` (no copy into the container), running as the
+node's postgres uid with durability relaxed for the bulk load. Each database is
+dropped, recreated empty and restored with `pg_restore -j <cpus>`; index
+rebuilding dominates the time.
+
+### Restore log
+
+`restore` reports seven numbered steps on stderr (plan, fetch, extract, checks,
+replace state, load databases, finalize) with sizes, file counts and per-step
+timings, so an operator can see what the tool is doing at any moment and where
+the time goes.
 
 ### Payload replacement
 
@@ -452,6 +517,16 @@ strato-snapshot restore mynode \
   --network helium
 
 strato-up mynode
+```
+
+To restart an existing node from the latest snapshot with as little downtime
+as possible, pull the snapshot while the node is still serving, then replace
+the node directory. The restore reuses the pulled archive instead of
+downloading it while the node is down:
+
+```bash
+strato-snapshot pull mynode
+strato-down mynode && rm -rf mynode && strato-up mynode --network=helium --snapshot
 ```
 
 After that, app iteration should use the existing patch flow:

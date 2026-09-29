@@ -48,11 +48,12 @@ usage() {
 Usage:
   strato-snapshot create <node-dir> --network <network> --output <file> [options]
   strato-snapshot restore <node-dir> (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
+  strato-snapshot pull [<node-dir>] [--network <network>] [--snapshot[=<ts>] | --source <s3-uri>] [--bucket <name>]
   strato-snapshot inspect (<file-or-s3-uri> | --snapshot[=<ts>] --network <network>)
   strato-snapshot smoke-test (--source <file-or-s3-uri> | --snapshot[=<ts>]) --network <network> [options]
   strato-snapshot publish <file> --destination <dir-or-s3-uri> [--alias latest]
 
-Snapshot selection (restore/inspect/smoke-test):
+Snapshot selection (restore/inspect/smoke-test/pull):
   --source <file-or-s3-uri>  Explicit snapshot location (local path or s3:// URI).
   --snapshot[=<timestamp>]   Resolve from the published S3 bucket for --network,
                              under this build's snapshot version:
@@ -76,6 +77,19 @@ Create options:
   --skip-smoke-test          Do not restore/start-test the created artifact.
   --smoke-node-dir <dir>     Directory to use for create smoke test.
   --smoke-timeout <seconds>  Smoke-test metadata timeout. Default: 600.
+
+Pull:
+  Downloads a published snapshot into the local download cache without touching
+  any node, so that a later restore of the same snapshot skips the download.
+  Run it while the old node is still serving to keep a restart short:
+    strato-snapshot pull mynode
+    strato-down mynode && rm -rf mynode && strato-up mynode --network=<network> --snapshot
+  Without --snapshot=<ts> or --source it pulls the latest published snapshot.
+  Without --network it uses the network of <node-dir>, or of the default node
+  recorded by strato-setup (~/.strato/default-node) when no <node-dir> is given.
+  The cache is ./.snapshot-downloads (override: STRATO_SNAPSHOT_DOWNLOAD_DIR),
+  keyed on the current directory: run pull from the directory the later
+  restore / strato-up will run from. Prints the cached archive path on stdout.
 
 Restore options:
   --force                    Replace existing state.
@@ -260,6 +274,40 @@ file_size_bytes() {
   stat -c %s "$f" 2>/dev/null || stat -f %z "$f" 2>/dev/null || wc -c < "$f" 2>/dev/null || printf '0\n'
 }
 
+# Cross-platform file mtime as epoch seconds (0 if missing).
+file_mtime_epoch() {
+  local f="$1"
+  [[ -e "$f" ]] || { printf '0\n'; return; }
+  stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null || printf '0\n'
+}
+
+# Size of a directory tree in bytes (0 if missing).
+dir_size_bytes() {
+  local d="$1"
+  [[ -d "$d" ]] || { printf '0\n'; return; }
+  local kb
+  kb="$(du -sk "$d" 2>/dev/null | awk '{print $1}')"
+  printf '%s\n' "$(( ${kb:-0} * 1024 ))"
+}
+
+# Human-readable byte count for log lines (1024-based, like ls -lh / du -h).
+human_bytes() {
+  awk -v b="${1:-0}" 'BEGIN {
+    split("B KB MB GB TB", u, " "); i = 1
+    while (b >= 1024 && i < 5) { b /= 1024; i++ }
+    if (i == 1) printf "%d %s\n", b, u[i]; else printf "%.1f %s\n", b, u[i]
+  }'
+}
+
+# Human-readable time since a start epoch, e.g. "42s", "3m07s", "1h02m09s".
+elapsed_since() {
+  local s
+  s=$(( $(date +%s) - $1 ))
+  if (( s >= 3600 )); then printf '%dh%02dm%02ds\n' $(( s / 3600 )) $(( s % 3600 / 60 )) $(( s % 60 ))
+  elif (( s >= 60 )); then printf '%dm%02ds\n' $(( s / 60 )) $(( s % 60 ))
+  else printf '%ds\n' "$s"; fi
+}
+
 # Content-Length of an HTTP(S) URL (empty if unknown). Uses a HEAD request.
 http_content_length() {
   local url="$1"
@@ -312,31 +360,46 @@ download_with_bar() {
   return $rc
 }
 
-# Download an s3:// object to a local path. The snapshot bucket is public-read,
-# so we fetch it over plain HTTPS with curl or wget -- no aws CLI or credentials
-# required. Falls back to the aws CLI only if neither curl nor wget is present.
-# Returns non-zero if the download fails.
+# Run a downloader that writes the object to stdout, teeing the bytes into
+# <dest> while hashing them. The SHA-256 used to verify the download therefore
+# comes from the same pass as the download itself: no second read of a multi-GB
+# file. The hex digest is written to <digest_out>. A downloader failure fails
+# the pipeline (pipefail is on); <dest> is then partial and the caller discards it.
+stream_download() {
+  local dest="$1"
+  local digest_out="$2"
+  shift 2
+  "$@" | tee "$dest" | sha256_stream > "$digest_out"
+}
+
+# Download an s3:// object to a local path, hashing it on the way. The snapshot
+# bucket is public-read, so we fetch it over plain HTTPS with curl or wget -- no
+# aws CLI or credentials required. Falls back to the aws CLI only if neither
+# curl nor wget is present. Returns non-zero if the download fails.
 #
 # Pass show_progress=true (3rd arg) to display a fixed-width bracketed progress
-# bar (used for the large archive; left off for tiny sidecar files).
+# bar (used for the large archive; left off for tiny sidecar files), and a path
+# as 4th arg to receive the SHA-256 hex digest of the downloaded bytes.
 s3_download() {
   local s3_uri="$1"
   local dest="$2"
   local show_progress="${3:-false}"
+  local digest_out="${4:-}"
   local url total
   url="$(s3_to_https_url "$s3_uri")"
+  [[ -n "$digest_out" ]] || digest_out="$(mktemp_dir)/digest"
 
   if command -v curl >/dev/null 2>&1; then
     if [[ "$show_progress" == "true" ]]; then
       total="$(http_content_length "$url")"
       if [[ -n "$total" ]]; then
-        download_with_bar "$dest" "$total" curl -fsSL -o "$dest" "$url" && return 0
+        download_with_bar "$dest" "$total" stream_download "$dest" "$digest_out" curl -fsSL "$url" && return 0
       else
-        # Unknown size: fall back to curl's own bar.
-        curl -fSL --progress-bar -o "$dest" "$url" && return 0
+        # Unknown size: curl's own bar goes to stderr while the body streams on stdout.
+        stream_download "$dest" "$digest_out" curl -fSL --progress-bar "$url" && return 0
       fi
     else
-      curl -fsSL -o "$dest" "$url" && return 0
+      stream_download "$dest" "$digest_out" curl -fsSL "$url" && return 0
     fi
     return 1
   fi
@@ -344,20 +407,19 @@ s3_download() {
     if [[ "$show_progress" == "true" ]]; then
       total="$(http_content_length "$url")"
       if [[ -n "$total" ]]; then
-        download_with_bar "$dest" "$total" wget -q -O "$dest" "$url" && return 0
+        download_with_bar "$dest" "$total" stream_download "$dest" "$digest_out" wget -q -O - "$url" && return 0
       else
-        wget -q --show-progress -O "$dest" "$url" && return 0
+        stream_download "$dest" "$digest_out" wget -q --show-progress -O - "$url" && return 0
       fi
     else
-      wget -q -O "$dest" "$url" && return 0
+      stream_download "$dest" "$digest_out" wget -q -O - "$url" && return 0
     fi
     return 1
   fi
-  # Last resort: aws CLI (anonymous, then signed). aws shows its own progress
-  # unless quieted; keep it quiet to avoid the verbose per-chunk output.
+  # Last resort: aws CLI (anonymous, then signed), streaming the object to stdout.
   if command -v aws >/dev/null 2>&1; then
-    aws s3 cp --only-show-errors --no-sign-request "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
-    aws s3 cp --only-show-errors "$s3_uri" "$dest" >/dev/null 2>&1 && return 0
+    stream_download "$dest" "$digest_out" aws s3 cp --only-show-errors --no-sign-request "$s3_uri" - 2>/dev/null && return 0
+    stream_download "$dest" "$digest_out" aws s3 cp --only-show-errors "$s3_uri" - 2>/dev/null && return 0
   fi
   return 1
 }
@@ -372,22 +434,54 @@ fetch_expected_checksum() {
   awk '{print $1}' "$checksum_file"
 }
 
-# Verify a downloaded archive against an expected sha256 (from the published
-# sidecar). A missing/empty expected checksum is a soft skip; a mismatch is fatal.
-verify_checksum() {
-  local s3_uri="$1"
-  local local_file="$2"
-  local expected="$3"
-  if [[ -z "$expected" ]]; then
-    warn "no checksum sidecar at ${s3_uri}.sha256; skipping integrity check"
-    return 0
-  fi
-  local actual
-  info "Verifying downloaded snapshot checksum (reads the full archive; can take a few minutes on slow disks)..."
-  actual="$(sha256_file "$local_file")"
-  [[ "$expected" == "$actual" ]] \
-    || die "checksum mismatch for $s3_uri (expected $expected, got $actual)"
-  info "Verified snapshot checksum: $actual"
+# Record of a cached archive's verified SHA-256, kept beside it as
+# <archive>.verified together with the file's size and mtime. A later run trusts
+# the recorded digest while the file is unchanged, instead of re-reading the
+# whole multi-GB archive just to compare it with S3.
+record_verified_digest() {
+  local file="$1"
+  local digest="$2"
+  printf 'sha256 %s\nsize %s\nmtime %s\n' "$digest" "$(file_size_bytes "$file")" "$(file_mtime_epoch "$file")" > "$file.verified"
+}
+
+# Print the recorded SHA-256 of a cached archive if a record exists and the
+# file's size and mtime still match it; print nothing otherwise.
+cached_archive_digest() {
+  local file="$1"
+  local rec="$1.verified"
+  [[ -f "$rec" && -f "$file" ]] || return 0
+  local digest size mtime
+  digest="$(awk '$1 == "sha256" {print $2}' "$rec")"
+  size="$(awk '$1 == "size" {print $2}' "$rec")"
+  mtime="$(awk '$1 == "mtime" {print $2}' "$rec")"
+  [[ -n "$digest" && "$size" == "$(file_size_bytes "$file")" && "$mtime" == "$(file_mtime_epoch "$file")" ]] || return 0
+  printf '%s\n' "$digest"
+}
+
+# Remove the other cached archives of a network from the download cache. A node
+# only ever needs one snapshot per network: a previous 'latest' can never be
+# reused once S3 has moved on, and archives of an earlier snapshot version (or
+# under the old unversioned "<network>-latest" naming) are unreadable by this
+# build anyway. Leftover partial downloads and orphaned .verified records of the
+# same network go too. Archives of other networks are left alone. <keep> is the
+# archive being fetched (and its record), which is never removed here.
+prune_download_cache() {
+  local dl_dir="$1"
+  local network="$2"
+  local keep="$3"
+  local f base keep_base
+  keep_base="$(basename "$keep")"
+  for f in "$dl_dir/$network"-*; do
+    [[ -f "$f" ]] || continue
+    base="$(basename "$f")"
+    [[ "$base" != "$keep_base" && "$base" != "$keep_base.verified" ]] || continue
+    case "$base" in
+      *.tar.zst|*.tzst|*.tar.gz|*.tgz|*.tar|*.part|*.verified) ;;
+      *) continue ;;
+    esac
+    info "Removing a stale cached archive of $network ($(human_bytes "$(file_size_bytes "$f")")): $f"
+    rm -f "$f"
+  done
 }
 
 # Persistent directory for downloaded snapshot archives, so an already-downloaded
@@ -407,50 +501,86 @@ fetch_source() {
     command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1 || command -v aws >/dev/null 2>&1 \
       || die "need one of curl, wget, or aws to download $source"
 
-    local dl_dir local_file expected
-    # Stable local path keyed by the S3 object key (e.g. helium-latest.tar.zst),
+    local dl_dir local_file expected key network
+    # Stable local path keyed by the S3 object key (e.g. helium-v2-latest.tar.zst),
     # so repeated restores of the same key reuse one file.
+    key="${source#s3://}"; key="${key#*/}"        # strip s3://bucket/
+    network="${key%%/*}"                          # first key component, e.g. helium
     dl_dir="$(snapshot_download_dir || true)"
     if [[ -n "$dl_dir" ]]; then
-      local key
-      key="${source#s3://}"; key="${key#*/}"        # strip s3://bucket/
-      local_file="$dl_dir/${key//\//-}"             # flatten network/ prefix
+      local_file="$dl_dir/${key//\//-}"           # flatten network/version/ prefix
     else
       # No writable persistent dir: fall back to the per-run work area.
       local suffix; suffix="$(archive_suffix "$source")"
       local_file="$(mktemp_dir)/snapshot${suffix}"
     fi
 
-    # Learn the expected checksum once; used both for reuse and verification.
+    # The published .sha256 sidecar is the reference both for reusing a cached
+    # copy and for verifying a fresh download.
     expected="$(fetch_expected_checksum "$source" || true)"
 
-    # Decide whether the existing local copy can be reused, comparing its SHA-256
-    # against the published .sha256 on S3.
     if [[ -f "$local_file" ]]; then
       if [[ -z "$expected" ]]; then
-        info "Local snapshot found but S3 has no .sha256 to compare; re-downloading: $local_file"
+        info "Cached archive found, but S3 publishes no .sha256 to compare it with; downloading again: $local_file"
       else
-        info "Found local snapshot; comparing its SHA-256 against S3 (${expected})"
-        info "(reads the full archive; can take a few minutes on slow disks)..."
-        local local_sum
-        local_sum="$(sha256_file "$local_file")"
-        if [[ "$local_sum" == "$expected" ]]; then
-          info "SHA-256 matches; reusing already-downloaded snapshot (no download needed): $local_file"
+        local cached_sum
+        cached_sum="$(cached_archive_digest "$local_file")"
+        if [[ -n "$cached_sum" ]]; then
+          info "Cached archive found: $local_file ($(human_bytes "$(file_size_bytes "$local_file")"))"
+          info "Using the SHA-256 recorded when it was last verified (file unchanged since); no re-read needed."
+        else
+          info "Cached archive found without a verification record: $local_file"
+          info "Hashing it to compare with S3 (reads the full archive once; can take a few minutes on slow disks)..."
+          cached_sum="$(sha256_file "$local_file")"
+          record_verified_digest "$local_file" "$cached_sum"
+        fi
+        if [[ "$cached_sum" == "$expected" ]]; then
+          info "SHA-256 matches S3 ($expected); reusing the cached archive, no download needed."
           printf '%s\n' "$local_file"
           return 0
         fi
-        info "SHA-256 differs (local ${local_sum} != S3 ${expected}); downloading a fresh snapshot"
+        info "SHA-256 differs from S3 (cached $cached_sum, S3 $expected): the published snapshot changed since this copy was downloaded."
+        info "Removing the stale copy to make room for the new one."
+        rm -f "$local_file" "$local_file.verified"
       fi
     else
-      info "No local snapshot cached yet; downloading"
+      info "No cached copy of this snapshot yet; downloading it."
     fi
 
-    info "Downloading snapshot: $(s3_to_https_url "$source")"
-    # Show a progress bar for the (large) archive download. The bar goes to
-    # stderr so it does not pollute the path printed on stdout.
-    s3_download "$source" "$local_file" true \
-      || die "failed to download snapshot from $(s3_to_https_url "$source")"
-    verify_checksum "$source" "$local_file" "$expected"
+    # Make room before the download when the object is known to exist (it has a
+    # published sidecar): other archives of this network can never be reused.
+    # Without a sidecar the key may be a typo, so the cache is only pruned once
+    # the download has actually succeeded.
+    if [[ -n "$dl_dir" && -n "$expected" && "$key" == */* ]]; then
+      prune_download_cache "$dl_dir" "$network" "$local_file"
+    fi
+
+    local url part digest_file actual
+    url="$(s3_to_https_url "$source")"
+    part="$local_file.part"
+    digest_file="$(mktemp_dir)/download.sha256"
+    info "Downloading $url"
+    info "-> $part (the SHA-256 is computed from the stream while downloading, so no separate verification read follows)"
+    rm -f "$part"
+    if ! s3_download "$source" "$part" true "$digest_file"; then
+      rm -f "$part"
+      die "failed to download snapshot from $url"
+    fi
+    actual="$(<"$digest_file")"
+    if [[ -z "$expected" ]]; then
+      warn "no checksum sidecar at ${source}.sha256; the download cannot be verified (SHA-256 of what was received: $actual)"
+    elif [[ "$actual" != "$expected" ]]; then
+      rm -f "$part"
+      die "checksum mismatch for $source (expected $expected, got $actual); the download was discarded"
+    else
+      info "Verified snapshot checksum: $actual"
+    fi
+    mv -f "$part" "$local_file"
+    record_verified_digest "$local_file" "$actual"
+    info "Downloaded $(human_bytes "$(file_size_bytes "$local_file")") into the cache: $local_file"
+    if [[ -n "$dl_dir" && "$key" == */* ]]; then
+      prune_download_cache "$dl_dir" "$network" "$local_file"
+    fi
     printf '%s\n' "$local_file"
   else
     [[ -f "$source" ]] || die "snapshot source not found: $source"
@@ -551,12 +681,17 @@ copy_dir_contents_without_appledouble() {
   (cd "$src" && tar_without_appledouble -cf - .) | (cd "$dest" && tar -xpf -)
 }
 
+# Stage .ethereumH without the host-specific ethconf.yaml and without LevelDB's
+# LOG / LOG.old: every LevelDB directory under .ethereumH (state, hash, code,
+# ...) keeps a plain-text activity log there that LevelDB recreates on open. It
+# carries no state and grows to tens of MB on a long-running node.
 copy_ethereum_payload() {
   local src="$1"
   local dest="$2"
   [[ -d "$src" ]] || die "missing .ethereumH state directory"
   mkdir -p "$dest"
-  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' -cf - .) | (cd "$dest" && tar_without_appledouble -xpf -)
+  (cd "$src" && tar_without_appledouble --exclude='./ethconf.yaml' --exclude='./*/LOG' --exclude='./*/LOG.old' -cf - .) \
+    | (cd "$dest" && tar_without_appledouble -xpf -)
 }
 
 read_ethconf_value() {
@@ -1090,6 +1225,74 @@ wait_for_local_state_users() {
   die "local state writer processes are still running after stop: $(state_pid_descriptions "$pids")"
 }
 
+redis_container() {
+  local node_dir="$1"
+  if [[ -f "$node_dir/docker-compose.yml" ]]; then
+    docker compose -p strato -f "$node_dir/docker-compose.yml" ps -q redis 2>/dev/null | head -1
+  else
+    (cd "$node_dir" && docker compose -p strato ps -q redis 2>/dev/null | head -1)
+  fi
+}
+
+# One field of `redis-cli INFO <section>` from a redis container; empty if the
+# container or redis is unreachable.
+redis_info_field() {
+  local cid="$1"
+  local section="$2"
+  local field="$3"
+  docker exec "$cid" redis-cli info "$section" 2>/dev/null \
+    | awk -F: -v f="$field" '$1 == f { gsub(/\r/, "", $2); print $2 }'
+}
+
+# Compact redis's append-only file before the cold shutdown. The AOF is the
+# write history since its last rewrite; redis only rewrites it on its own once
+# it has doubled, so it is anywhere between one and two times the dataset it
+# encodes. BGREWRITEAOF replaces it with the dataset itself, so the snapshot
+# carries redis once rather than its recent history (a saving of up to half the
+# redis payload, depending on when redis last rewrote it). Best effort: any
+# failure only leaves a larger redis payload. The background rewrite is waited
+# for with a bound.
+compact_redis_aof() {
+  local node_dir="$1"
+  [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
+  command -v docker >/dev/null 2>&1 || return 0
+  local cid before after enabled
+  cid="$(redis_container "$node_dir" || true)"
+  if [[ -z "$cid" ]]; then
+    warn "redis container not found; skipping AOF compaction"
+    return 0
+  fi
+  enabled="$(redis_info_field "$cid" persistence aof_enabled)"
+  if [[ -z "$enabled" ]]; then
+    warn "cannot query redis; skipping AOF compaction"
+    return 0
+  fi
+  if [[ "$enabled" != "1" ]]; then
+    info "redis AOF persistence is off; nothing to compact"
+    return 0
+  fi
+  before="$(redis_info_field "$cid" persistence aof_current_size)"
+  info "Compacting the redis append-only file before shutdown (BGREWRITEAOF; currently $(human_bytes "${before:-0}"))..."
+  # An "already in progress" error here is fine: the wait below covers it.
+  docker exec "$cid" redis-cli bgrewriteaof >/dev/null 2>&1 || true
+  local i in_progress scheduled
+  for i in $(seq 1 600); do
+    in_progress="$(redis_info_field "$cid" persistence aof_rewrite_in_progress)"
+    scheduled="$(redis_info_field "$cid" persistence aof_rewrite_scheduled)"
+    if [[ -z "$in_progress" ]]; then
+      warn "lost contact with redis while waiting for the AOF rewrite; continuing"
+      return 0
+    fi
+    if [[ "$in_progress" == "0" && "$scheduled" == "0" ]]; then
+      after="$(redis_info_field "$cid" persistence aof_current_size)"
+      info "redis AOF compacted: $(human_bytes "${before:-0}") -> $(human_bytes "${after:-0}")"
+      return 0
+    fi
+    sleep 1
+  done
+  warn "redis AOF rewrite did not finish within 10 minutes; continuing with the uncompacted file"
+}
+
 stop_writers() {
   local node_dir="$1"
   if [[ -x "$SCRIPT_DIR/strato-down" ]]; then
@@ -1397,9 +1600,13 @@ pg_temp_start() {
   local init_password="${2:-}"
   local run_user="${3:-}"
   local mode="${4:-}"
+  local dumps_dir="${5:-}"
   need_cmd docker
   local args=(-d --rm -v "$data_dir:/var/lib/postgresql/data")
   [[ -n "$run_user" ]] && args+=(--user "$run_user")
+  # Optional read-only mount of the extracted dumps at /dumps, so pg_restore
+  # reads them in place instead of a docker cp writing them a second time.
+  [[ -n "$dumps_dir" ]] && args+=(-v "$dumps_dir:/dumps:ro")
   if postgres_data_dir_initialized "$data_dir"; then
     args+=(-e POSTGRES_HOST_AUTH_METHOD=trust)
   else
@@ -1481,31 +1688,42 @@ load_databases() {
   local dumps_dir="$2"
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
-  local cid db run_user jobs
+  local cid db run_user jobs t0 t1
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
   jobs="$(snapshot_pg_jobs)"
+  # The dumps are bind-mounted read-only into the throwaway container: pg_restore
+  # -j needs a seekable file, not a copy, so this saves writing them a second
+  # time. Make sure the container's uid can read them whatever the archive modes.
+  chmod a+r "$dumps_dir"/*.dump 2>/dev/null || true
+  t0="$(date +%s)"
+  if postgres_data_dir_initialized "$data_dir"; then
+    info "      Starting a temporary $SNAPSHOT_POSTGRES_IMAGE container on the node's existing postgres cluster ($data_dir)"
+  else
+    info "      Starting a temporary $SNAPSHOT_POSTGRES_IMAGE container that initializes the node's postgres cluster in $data_dir with the node's own password"
+  fi
+  info "      (runs as uid:gid $run_user like the node's postgres; durability relaxed for the bulk load: fsync=off, synchronous_commit=off, maintenance_work_mem=1GB)"
   # "fast" mode relaxes durability on the throwaway load container for a much
   # faster bulk restore; safe because the data is disposable until restore
   # completes (on failure we just retry the whole restore).
-  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast)"
+  cid="$(pg_temp_start "$data_dir" "$node_password" "$run_user" fast "$dumps_dir")"
+  info "      Temporary postgres ready after $(elapsed_since "$t0") (container ${cid:0:12}); dumps mounted read-only at /dumps"
   for db in "${SNAPSHOT_PG_DATABASES[@]}"; do
     [[ -f "$dumps_dir/$db.dump" ]] || { pg_temp_stop "$cid"; die "snapshot missing database dump: $db.dump"; }
-    info "Loading database '$db'..."
-    # Recreate the database empty, then restore in parallel (data + indexes).
+    t1="$(date +%s)"
+    info "      Database '$db': drop and recreate it empty, then pg_restore -j $jobs from $db.dump ($(human_bytes "$(file_size_bytes "$dumps_dir/$db.dump")"))"
+    info "      (the dump holds table data only; every index is rebuilt here, which is what takes the time)"
     docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
     docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
-    # pg_restore -j needs a seekable file, so copy the dump into the container.
-    docker cp "$dumps_dir/$db.dump" "$cid:/tmp/$db.dump" \
-      || { pg_temp_stop "$cid"; die "failed to copy dump into container for '$db'"; }
-    info "Rebuilding database '$db' from dump (data load + index rebuild; can take a few minutes on slow machines)..."
     docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
-      -j "$jobs" -d "$db" "/tmp/$db.dump" >/dev/null 2>&1 \
+      -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>&1 \
       || { pg_temp_stop "$cid"; die "failed to restore dump for database '$db'"; }
-    docker exec "$cid" rm -f "/tmp/$db.dump" >/dev/null 2>&1 || true
+    info "      Database '$db' loaded in $(elapsed_since "$t1")"
   done
+  info "      Stopping the temporary postgres (clean shutdown, so the node's own postgres can open the cluster)"
   pg_temp_stop "$cid"
+  info "      Databases loaded in $(elapsed_since "$t0") in total"
 }
 
 stage_payload() {
@@ -1578,9 +1796,12 @@ restore_payload() {
   [[ -f "$node_dir/secrets/postgres_password" ]] \
     || die "target node has no secrets/postgres_password; run strato-setup first"
 
-  info "Moving restored state (.ethereumH, redis, jlog) into node..."
+  info "[5/7] Replacing the node's chain state with the snapshot's"
+  info "      Removing the old .ethereumH state (ethconf.yaml is kept), redis/, jlog/ and any pre-jlog kafka/"
   remove_restored_state "$node_dir"
   mkdir -p "$node_dir/.ethereumH" "$node_dir/postgres"
+  info "      Moving the extracted state into place: .ethereumH $(human_bytes "$(dir_size_bytes "$extracted/payload/ethereumH")"), redis $(human_bytes "$(dir_size_bytes "$extracted/payload/redis")"), jlog $(human_bytes "$(dir_size_bytes "$extracted/payload/jlog")")"
+  info "      (a rename within one filesystem: instant, no bytes are copied)"
   # Move (not copy) from the throwaway extraction dir: an instant rename on the
   # same filesystem, and never slower than a copy across filesystems.
   move_dir_contents "$extracted/payload/ethereumH" "$node_dir/.ethereumH"
@@ -1594,6 +1815,7 @@ restore_payload() {
   # processes that will run the node can read and write the state regardless of
   # which uid that is.
   if [[ -d "$node_dir/jlog" ]]; then
+    info "      Relaxing jlog/ permissions so the node's processes can read and write it under any uid"
     chmod -R a+rwX "$node_dir/jlog"
   fi
 
@@ -1602,20 +1824,25 @@ restore_payload() {
   # keeps its own postgres password and local-only `oauth` DB; no foreign
   # credentials are imported (A2), and no node/user-specific data from the
   # source rides along (B3).
+  info "[6/7] Loading the public databases (eth, cirrus) into the node's own postgres cluster"
+  info "      The node keeps its own postgres password and its local-only oauth database; only eth and cirrus are replaced"
   local node_password
   node_password="$(<"$node_dir/secrets/postgres_password")"
   load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
+    info "      Replacing prometheus/ with the snapshot's ($(human_bytes "$(dir_size_bytes "$extracted/payload/prometheus")")) (--include-prometheus)"
     rm -rf "$node_dir/prometheus"
     move_dir_contents "$extracted/payload/prometheus" "$node_dir/prometheus"
   fi
 
+  info "[7/7] Finalizing the node directory"
   # Normalize localhost SQL/Cirrus hosts to 127.0.0.1 so host processes connect
   # to the IPv4-only Docker port bindings. The node's own postgres password in
   # ethconf is left untouched (A2: the node keeps its own credentials).
+  info "      Rewriting localhost SQL/Cirrus hosts to 127.0.0.1 in ethconf.yaml (host processes must use the IPv4-only Docker port bindings)"
   rewrite_ethconf_localhost_db_hosts "$node_dir/.ethereumH/ethconf.yaml"
-
+  info "      Removing the stale .strato.pid; the work area $WORKDIR is deleted on exit"
   rm -f "$node_dir/.strato.pid"
 }
 
@@ -1665,6 +1892,117 @@ print("payload: " + ", ".join(data.get("payload", [])))
 PY
 }
 
+# Network to resolve a published snapshot for when pulling: --network if given,
+# else the network the node in <node-dir> is configured for, else that of the
+# default node recorded by strato-setup (~/.strato/default-node, the same
+# fallback strato-down and strato-ps use). Prints the network; dies if none can
+# be determined or if --network contradicts the node's own config.
+resolve_pull_network() {
+  local node_dir="$1"
+  local network="$2"
+
+  if [[ -z "$node_dir" && -z "$network" ]]; then
+    node_dir="$(cat "$HOME/.strato/default-node" 2>/dev/null || true)"
+    [[ -n "$node_dir" ]] \
+      || die "--network is required (or pass <node-dir>; no default node is recorded in ~/.strato/default-node)"
+    [[ -d "$node_dir" ]] \
+      || die "default node directory not found: $node_dir (pass --network or <node-dir>)"
+    info "Using the network of the default node: $node_dir"
+  fi
+
+  if [[ -n "$node_dir" ]]; then
+    [[ -d "$node_dir" ]] || die "node directory not found: $node_dir"
+    local configured
+    configured="$(node_network "$node_dir")"
+    if [[ -n "$network" ]]; then
+      [[ -z "$configured" || "$configured" == "$network" ]] \
+        || die "node '$node_dir' is configured for network '$configured', not '$network'"
+    else
+      network="$configured"
+      [[ -n "$network" ]] \
+        || die "could not read the network from $node_dir/.ethereumH/ethconf.yaml; pass --network"
+    fi
+  fi
+
+  printf '%s\n' "$network"
+}
+
+# Pre-download a published snapshot into the persistent download cache without
+# touching any node, so a later restore of the same snapshot finds the archive
+# already there (SHA-256 matching the published sidecar) and skips the download.
+# This takes the slow part of a from-snapshot restart off the critical path:
+# pull while the old node is still serving, then strato-down, remove the node
+# dir and strato-up --snapshot.
+#
+# The cache is keyed on the working directory ($PWD/.snapshot-downloads unless
+# STRATO_SNAPSHOT_DOWNLOAD_DIR is set), exactly as fetch_source resolves it for
+# restore, so pull must run from the directory the later restore / strato-up
+# runs from (strato-up invokes restore before it cd's into the node dir).
+cmd_pull() {
+  need_cmd python3
+  local node_dir source use_snapshot timestamp network bucket
+  node_dir=""
+  source=""
+  use_snapshot="false"
+  timestamp=""
+  network=""
+  bucket=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --source) source="$2"; shift 2 ;;
+      --snapshot) use_snapshot="true"; shift ;;
+      --snapshot=*) use_snapshot="true"; timestamp="${1#*=}"; shift ;;
+      --network) network="$2"; shift 2 ;;
+      --bucket) bucket="$2"; shift 2 ;;
+      -*) die "unknown pull option: $1" ;;
+      *)
+        [[ -z "$node_dir" ]] || die "pull accepts a single positional <node-dir>"
+        node_dir="$1"; shift ;;
+    esac
+  done
+
+  if [[ -z "$source" ]]; then
+    # Nothing selected means the latest published snapshot. --network is only
+    # needed on this path: an explicit --source already names the object.
+    use_snapshot="true"
+    network="$(resolve_pull_network "$node_dir" "$network")"
+  elif [[ -n "$node_dir" ]]; then
+    [[ -d "$node_dir" ]] || die "node directory not found: $node_dir"
+  fi
+  source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
+  [[ "$source" == s3://* ]] \
+    || die "pull downloads s3:// sources only; $source is a local path and needs no pull"
+
+  # fetch_source falls back to the per-run work area (removed on exit) when the
+  # persistent cache is unusable; a pull into that would be wasted, so refuse.
+  local dl_dir
+  dl_dir="$(snapshot_download_dir || true)"
+  [[ -n "$dl_dir" ]] \
+    || die "cannot create the download cache directory ${STRATO_SNAPSHOT_DOWNLOAD_DIR:-$PWD/.snapshot-downloads}"
+
+  local archive
+  archive="$(fetch_source "$source")"
+  info "Snapshot cached: $archive"
+  local where
+  if [[ -n "${STRATO_SNAPSHOT_DOWNLOAD_DIR:-}" ]]; then
+    where="with the same STRATO_SNAPSHOT_DOWNLOAD_DIR"
+  else
+    where="from this directory ($PWD)"
+  fi
+  if [[ "$use_snapshot" == "true" ]]; then
+    local selector="--snapshot"
+    if [[ -n "$timestamp" ]]; then
+      selector="--snapshot=$timestamp"
+    fi
+    info "A restore run $where reuses it instead of downloading, e.g.:"
+    info "  strato-up <node-dir> --network=$network $selector"
+  else
+    info "A restore of --source $source run $where reuses it instead of downloading."
+  fi
+  printf '%s\n' "$archive"
+}
+
 cmd_restore() {
   need_cmd python3
 
@@ -1698,22 +2036,39 @@ cmd_restore() {
   done
 
   [[ -n "$network" ]] || die "--network is required"
+  local t_start t_step
+  t_start="$(date +%s)"
   source="$(resolve_selection_source "$source" "$use_snapshot" "$timestamp" "$network" "$bucket")"
 
   node_dir="$(absolute_path "$node_dir")"
   local archive extracted manifest generated_flag
+  info "[1/7] Restore plan: snapshot $source"
+  info "      into node $node_dir (network $network); work area $WORKDIR"
+
+  info "[2/7] Fetching the archive (a cached copy is reused when its SHA-256 still matches S3)"
   archive="$(fetch_source "$source")"
+
   extracted="$(mktemp_dir)"
   manifest="$extracted/SNAPSHOT.json"
-  info "Extracting snapshot archive (this can take a while for large snapshots)..."
+  t_step="$(date +%s)"
+  info "[3/7] Extracting the $(human_bytes "$(file_size_bytes "$archive")") archive into $extracted"
+  info "      (decompression is fast; this step is bound by writing the uncompressed state to disk, mostly the LevelDB state trie)"
   extract_archive "$archive" "$extracted"
   [[ -f "$manifest" ]] || die "SNAPSHOT.json missing from archive"
+  info "      Extracted $(human_bytes "$(dir_size_bytes "$extracted")") in $(find "$extracted" -type f | wc -l | tr -d ' ') files ($(elapsed_since "$t_step"))"
 
+  info "[4/7] Checking that the snapshot fits the target node"
   local snapshot_network
   snapshot_network="$(manifest_field "$manifest" network)"
   [[ "$snapshot_network" == "$network" ]] || die "snapshot network '$snapshot_network' does not match requested network '$network'"
+  info "      Snapshot: network $snapshot_network, created $(manifest_field "$manifest" createdAt 2>/dev/null || echo unknown), STRATO $(manifest_field "$manifest" stratoVersion 2>/dev/null || echo unknown), node best block $(manifest_field "$manifest" block.nodeBestBlock 2>/dev/null || echo unknown)"
 
   generated_flag="$(mktemp_dir)/generated"
+  if [[ -f "$node_dir/.ethereumH/ethconf.yaml" && -f "$node_dir/docker-compose.yml" ]]; then
+    info "      Target already has generated config (ethconf.yaml, docker-compose.yml); it is kept as is"
+  else
+    info "      Target has no generated config yet; running strato-setup for network $network"
+  fi
   ensure_node_config "$node_dir" "$network" "$generated_flag"
 
   local target_network
@@ -1729,9 +2084,13 @@ cmd_restore() {
     containers="$(cd "$node_dir" && docker compose -p strato ps -q 2>/dev/null || true)"
     [[ -z "$containers" ]] || die "strato compose containers are running; stop them before restore"
   fi
+  info "      Node is not running and no strato compose containers are up"
 
-  if [[ "$(cat "$generated_flag")" != "true" && "$force" != "true" ]] && state_exists "$node_dir"; then
-    die "target contains existing state; pass --force to replace it"
+  if [[ "$(cat "$generated_flag")" != "true" ]] && state_exists "$node_dir"; then
+    [[ "$force" == "true" ]] || die "target contains existing state; pass --force to replace it"
+    info "      Target has existing chain state; it will be replaced (--force)"
+  else
+    info "      Target has no prior chain state"
   fi
 
   if [[ "$allow_version_drift" != "true" && -f "$node_dir/docker-compose.yml" ]]; then
@@ -1746,11 +2105,14 @@ print(images.get("strato", ""))
     target_version="${target_strato##*:}"
     if [[ -n "$snapshot_version" && "$snapshot_version" != "unknown" && -n "$target_version" && "$target_version" != "$target_strato" ]]; then
       [[ "$(major_version "$snapshot_version")" == "$(major_version "$target_version")" ]] || die "snapshot version '$snapshot_version' is incompatible with target '$target_version'"
+      info "      STRATO major version matches: snapshot $snapshot_version, target $target_version"
+    else
+      info "      STRATO version check skipped (snapshot '${snapshot_version:-unknown}', target image '${target_strato:-none}')"
     fi
   fi
 
   restore_payload "$extracted" "$node_dir" "$include_prometheus"
-  info "Snapshot restored into: $node_dir"
+  info "Snapshot restored into: $node_dir ($(elapsed_since "$t_start") in total)"
 
   if [[ "$start" == "true" ]]; then
     "$SCRIPT_DIR/strato-up" "$node_dir"
@@ -1825,6 +2187,8 @@ cmd_create() {
     [[ -n "$summary" ]] && warn "Last live check: $summary"
     die "node/layers are not synced enough to snapshot"
   fi
+
+  compact_redis_aof "$node_dir"
 
   info "Stopping writers before snapshot..."
   stop_writers "$node_dir"
@@ -1986,6 +2350,7 @@ main() {
   case "$cmd" in
     create) cmd_create "$@" ;;
     restore) cmd_restore "$@" ;;
+    pull) cmd_pull "$@" ;;
     inspect) cmd_inspect "$@" ;;
     smoke-test) cmd_smoke_test "$@" ;;
     publish) cmd_publish "$@" ;;

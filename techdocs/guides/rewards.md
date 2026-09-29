@@ -1,513 +1,103 @@
 # Manage Rewards
 
-Earn and claim Reward Points for participating in STRATO DeFi.
+Earn Reward Points for using STRATO DeFi, and claim them.
 
-!!! note "Variable Rewards"
-    APR estimates and reward rates shown are based on current emission rates and typical conditions. Actual rewards may vary based on total participation, emission schedule changes, and your activity level. Always check current reward rates in the app.
-
----
-
-## Complete Example: Earn & Claim Reward Points Rewards
-
-**Your situation:**
-
-- You've been: Using STRATO DeFi for 30 days
-- Activities: Provided liquidity, borrowed USDST
-- You've earned: 150 Reward Points
-
-**What you'll do:**
-
-1. Check your pending rewards
-2. Claim your Reward Points
-3. Decide what to do with it
-
-**Time needed:** 2 minutes  
-**Gas cost:** ~$0.10 to claim
+!!! info "Live rates"
+    Activities, emission rates and seasons are configured on-chain by governance and change over time. The Rewards page shows current values. Any APY in the app is an estimate from current rates and prices.
 
 ---
 
-### Quick Walkthrough
+## How Rewards Work
 
-**Step 1: Check Rewards**
-- Go to **Rewards** page
-- See breakdown:
+Rewards are handled by the `Rewards` contract and organized into **activities**. Each activity tracks one kind of participation, such as holding liquidity in a given pool, minting against a CDP asset, or depositing in a vault.
 
-  - Liquidity providing: 100 Points
-  - Borrowing: 30 Points
-  - Swaps: 20 Points
-  - **Total pending: 150 Reward Points**
-- Current value: 150 Reward Points × $2 = **$300**
+- **Position activities** follow a balance that can go up or down, such as an LP position or CDP debt. Your stake rises when you add to the position and falls when you reduce it.
+- **One-time activities** count discrete actions. Your stake only increases.
 
-**Step 2: Claim Rewards**
-- Click **"Claim All"**
-- Confirm in wallet (~$0.10 gas)
-- Wait 1-2 seconds
+Each activity has an **emission rate** (points per second). Emissions are shared among participants in proportion to their stake:
 
-**Result:**
 ```
-✅ Claimed: 150 Reward Points
-✅ Value: $300
-✅ Cost: $0.10 gas
-✅ Tokens in your wallet
+Your rewards over a period ≈ emission rate × time × (your stake / total stake)
 ```
 
-**Step 3: Use Your Reward Points**
-- **Option A:** Hold for potential appreciation
-- **Option B:** Swap for USDST (instant $300)
-- **Option C:** Provide Reward Point liquidity (earn more fees)
+The contract calculates this with a cumulative reward-per-stake index, so your share is exact for whatever stake you held over each interval. Different activities measure stake in different units (token amounts, USD value or shares), so stakes aren't comparable across activities. An activity can also set a minimum amount.
 
-**Your earnings:**
+An off-chain rewards service reads protocol events and records them in the `Rewards` contract. New activity can take a short while to show up.
 
-- 30 days of DeFi activity
-- Earned: 150 Reward Points ($300)
-- Average: $10/day in Reward Points
-- Plus: Trading fees from liquidity
+### Seasons
+
+Governance can start a new **season**. The Activities tab label shows the current one (for example "Activities (Season 3)"). Emission rates and the activity list can change between seasons. Rewards you've already accrued are kept.
 
 ---
 
-## Overview
+## Rewards Page
 
-**What are Reward Points?**
-- **Reward Points**: STRATO's governance and rewards token
-- Earned by using STRATO DeFi (borrowing, liquidity, swaps, etc.)
-- Distributed continuously based on activity
-- Can be claimed anytime and traded or held
+Open **Rewards** from the sidebar (under **EARN**).
 
-**Why earn Reward Points?**
-- **Governance**: Vote on protocol changes (coming soon)
-- **Additional yield**: Bonus returns on top of DeFi activities
-- **Ecosystem participation**: Support and benefit from STRATO growth
+**Summary cards** (when signed in):
 
----
+- **Total Claimable Rewards**: what you'd receive by clicking **Claim All**. Marked "(incl. Bonus)" when a community bonus is included.
+- **My Claimed Rewards**: **Reward Points** claimed so far, plus any **Community Bonus**
+- **Global Rewards Overview**: **Total Earned**, number of **Activities**, and the **Reward Token** the contract pays out (CATA)
 
-## How to Earn Reward Points
+**Tabs:**
 
-### Earning Activities
+| Tab | Shows |
+|---|---|
+| **Activities** | Every activity: type, emission rate, total stake, and an **Earn Now** button that opens the page where you can participate |
+| **My Active Positions** | Your stake in each activity, **Estimated Rewards/Day** and last update |
+| **Leaderboard** | Top earners |
 
-**Lending Pool**:
-
-- ✅ Supply collateral to lending pool
-- ✅ Borrow USDST from lending pool
-- Rewards proportional to supply/borrow amounts and duration
-
-**CDP (Collateralized Debt Positions)**:
-
-- ✅ Mint USDST via CDP vaults
-- ✅ Maintain CDP positions
-- Rewards based on minted amount and duration
-
-**Liquidity Provision**:
-
-- ✅ Provide liquidity to swap pools
-- ✅ Earn from high-volume pools
-- Bonus rewards for priority pools (check app for current incentives)
-
-**Swapping**:
-
-- ✅ Execute swaps on STRATO
-- Smaller rewards per swap, but adds up
-
-**Referrals** (if available):
-
-- ✅ Refer friends to STRATO
-- Earn % of their rewards
-
-### Reward Rates
-
-Rates vary by:
-
-- **Activity type**: Liquidity provision often earns more
-- **Pool/market**: Some pools have boosted rewards
-- **Season**: Rates adjust periodically (check current rates in app)
-- **Total participation**: Your share of total pool activity
-
-**Check current rates**:
-
-- App → **Rewards** section
-- View APR for each activity
-- Compare to optimize earnings
+Guests see the global overview and the Activities and Leaderboard tabs.
 
 ---
 
-## Prerequisites
+## Claim Rewards
 
-- [ ] STRATO account with connected wallet
-- [ ] Active DeFi positions (lending, CDP, liquidity, or swaps)
-- [ ] Small USDST for gas to claim rewards (< $0.10)
+1. On **Rewards**, check **Total Claimable Rewards**.
+2. Click **Claim All**. You can also claim individual activities from **My Active Positions**.
+3. Confirm the transaction. It costs **0.01 USDST, or one voucher**.
 
----
+Claiming settles your pending rewards and transfers the reward token (CATA) to your wallet. Unclaimed rewards don't expire. They keep accumulating until you claim.
 
-## Step-by-Step: Check Your Rewards
-
-### Step 1: Go to Rewards Page
-
-1. Navigate to **Rewards** section in STRATO app
-2. Connect wallet if not already connected
-
-### Step 2: View Pending Rewards
-
-See your unclaimed Reward Points:
-
-- **Total pending**: All unclaimed Reward Points across activities
-- **By activity**: Breakdown per source
-  - Lending rewards
-  - CDP rewards
-  - Liquidity rewards
-  - Swap rewards
-- **USD value**: Current value in dollars
-
-### Step 3: Review Earning History
-
-Check:
-
-- **Daily earnings**: Reward Points earned per day recently
-- **Historical rewards**: Past claims and amounts
-- **Earning rate**: Projected annual earnings at current rate
+!!! note "Pre-funded contract"
+    Rewards are paid from tokens held by the `Rewards` contract. If it hasn't been topped up enough, a claim fails with "Insufficient reward tokens" until it is refunded.
 
 ---
 
-## Step-by-Step: Claim Rewards
+## Ways to Earn
 
-### Step 1: Go to Rewards Page
+The **Activities** tab is the authoritative list. Typical sources in the app:
 
-Ensure you have:
+- **Liquidity:** positions in reward-eligible pools ([Provide Liquidity](liquidity.md))
+- **CDP minting:** the Borrow page shows **Mint Rewards APY** when minting is an activity ([Borrow USDST](borrow.md))
+- **Vaults:** vault deposits on the **Earn** page, when listed as activities
+- **Staking:** STRATO staking can carry a rewards APY on top of its native yield ([Consensus and staking](../platform/consensus.md))
 
-- Pending Reward Points to claim
-- Small USDST for gas (< $0.10)
+### USDST Savings Vault
 
-### Step 2: Click Claim
+**Earn > USDST Savings Vault** is the simplest way to earn on idle USDST:
 
-1. Click **Claim All** (or select specific rewards)
-2. Review amount to claim
-3. Check gas fee estimate
+1. Click **Deposit USDST** and enter an amount. You receive **saveUSDST**, the vault's share token.
+2. saveUSDST doesn't rebase. The USDST each share redeems for rises as the vault accrues its savings rate and receives reward distributions. The page shows **Current Price**, **TVL** and **Your Position**.
+3. To exit, choose **Redeem saveUSDST**.
 
-### Step 3: Confirm Transaction
-
-1. Confirm transaction in wallet
-2. Pay gas fee (< $0.10 in USDST)
-3. Wait for confirmation (1-2 seconds)
-
-✅ **Done!** Reward Points added to your wallet.
-
-### When to Claim
-
-**Optimal claiming**:
-
-- Claim weekly or monthly to save gas
-- Wait until minimum claim amount (e.g., > 10 Reward Points)
-- Batch claim with other transactions
-
-**Immediate claiming**:
-
-- When Reward Point price is high (sell opportunity)
-- Before major protocol changes
-- If you need liquidity
-
----
-
-## What to Do with Reward Points
-
-### Option 1: Hold
-
-- Keep Reward Points in wallet
-- Benefit from potential price appreciation
-- Use for future governance voting
-
-### Option 2: Swap for Other Tokens
-
-1. Go to **Swap** section
-2. Select Reward Points → USDST (or other token)
-3. Execute swap
-4. Take profits or reinvest
-
-See **[Swap Guide](swap.md)** for instructions.
-
-### Option 3: Provide Reward Point Liquidity
-
-Earn additional yields:
-
-1. Go to **Pools** section
-2. Find Reward Point liquidity pools (e.g., RewardPoints-USDC)
-3. Provide liquidity
-4. Earn trading fees + more Reward Points
-
-See **[Liquidity Guide](liquidity.md)** for details.
-
-### Option 4: Use for Governance (Coming Soon)
-
-Future utility:
-
-- Vote on protocol proposals
-- Influence reward distributions
-- Shape STRATO development
-
----
-
-## Maximizing Rewards
-
-### Highest-Earning Activities
-
-**Typically highest APR**:
-
-1. **Liquidity provision** in priority pools
-2. **CDP minting** (especially during bonus periods)
-3. **Lending supply** (large amounts, long duration)
-4. **Borrowing** (pays interest but earns Reward Points)
-
-**Check current boosts** in app's Rewards section.
-
-### Optimal Strategies
-
-#### Strategy 1: Liquidity Focus
-
-1. Provide liquidity to high-reward pools
-2. Keep positions for extended periods
-3. Claim and reinvest rewards weekly
-4. Compound for maximum growth
-
-#### Strategy 2: CDP Efficiency
-
-1. Mint USDST via CDP (lower fees than borrowing)
-2. Use minted USDST for other activities
-3. Earn Reward Points from both CDP and other activities
-4. Maintain healthy collateralization ratio
-
-#### Strategy 3: Diversified Approach
-
-1. Split capital across activities
-2. Borrow, provide liquidity, and mint via CDP
-3. Earn from multiple sources
-4. Reduces risk concentration
-
-### Timing Considerations
-
-**Boost periods**:
-
-- Watch for special boost events
-- Increase participation during high-reward periods
-- Check announcements for bonuses
-
-**Gas optimization**:
-
-- Batch claim rewards with other transactions
-- Claim during low activity periods (if variable gas)
-
----
-
-## Reward Seasons
-
-### What Are Seasons?
-
-Reward Points distributed in seasons:
-
-- **Fixed duration**: E.g., 3-6 months per season
-- **Total Reward Points pool**: Fixed amount allocated per season
-- **Rate adjustments**: Rates set at season start
-- **Fresh start**: New season = new reward structure
-
-### Season Changes
-
-**What changes between seasons**:
-
-- Total Reward Points allocated
-- Reward rates per activity
-- Boosted pools/activities
-- Earning multipliers
-
-**What stays same**:
-
-- Earning mechanisms
-- Claim process
-- Reward Points utility
-
-**Check current season**:
-
-- App → Rewards → Season info
-- See end date and total remaining
-
----
-
-## Tracking & Analytics
-
-### Personal Dashboard
-
-Monitor your rewards:
-
-- **Pending rewards**: Unclaimed Reward Points
-- **Claimed history**: Past claims
-- **Earning rate**: Daily/weekly Reward Points earned
-- **USD value**: Current and historical values
-
-### Activity Breakdown
-
-See earnings by source:
-
-- **Lending**: Supply + borrow rewards
-- **CDP**: Minting rewards
-- **Liquidity**: Pool-specific rewards
-- **Swaps**: Trading rewards
-
-### Projections
-
-Estimate future earnings:
-
-- Based on current positions
-- Assumes constant rates (rates may change)
-- Helps plan strategies
+When you bridge in, you can also deposit straight into the vault with the **auto-save** option on the Fund page ([Bridge Assets](bridge.md)).
 
 ---
 
 ## Common Issues
 
-### "No rewards to claim"
-
-**Cause**: Haven't accrued rewards yet
-
-**Fix**:
-
-- Start participating (borrow, provide liquidity, etc.)
-- Wait for rewards to accumulate (check after 24 hours)
-- Verify you have active positions
-
-### "Claim transaction failed"
-
-**Causes**:
-
-- Insufficient USDST for gas
-- Rewards already claimed
-- Network congestion
-
-**Fix**:
-
-- Get USDST for gas fees
-- Refresh page to see updated balance
-- Try again after a few seconds
-
-### "Rewards lower than expected"
-
-**Reasons**:
-
-- Rates changed during season
-- More participants (dilutes pool)
-- Position size decreased
-- Rates apply to partial period
-
-**Check**:
-
-- Current rates in app
-- Your position history
-- Season changes
+| Problem | Cause | What to do |
+|---|---|---|
+| Nothing to claim | No stake in an active activity yet, or recent events not processed yet | Check **My Active Positions**; allow time for processing |
+| Claim failed | Out of USDST or vouchers for the fee, or the contract is underfunded | Top up USDST or vouchers; try again later |
+| Rewards lower than expected | Total stake grew, emission rate changed, or your position shrank | Compare current rates on the **Activities** tab |
 
 ---
 
-## Best Practices
+## Next Steps
 
-### Claiming
-
-- [ ] Claim at least once per season
-- [ ] Wait for minimum amount to save gas
-- [ ] Batch with other transactions
-- [ ] Record claim amounts for tax purposes
-
-### Maximizing
-
-- [ ] Focus on highest-reward activities
-- [ ] Maintain positions long-term
-- [ ] Reinvest rewards (compound)
-- [ ] Monitor boost periods
-
-### Security
-
-- [ ] Verify Reward Points token address before swapping
-- [ ] Use official STRATO app for claims
-- [ ] Don't share wallet private keys
-- [ ] Track claimed amounts
-
----
-
-## Understanding Reward Math
-
-### How Rewards Are Calculated
-
-**General formula**:
-```
-Your rewards = (Your share of activity) × (Total pool rewards) × (Time period)
-```
-
-**Example - Liquidity rewards**:
-
-- Total pool: 10,000 Reward Points per month
-- Your liquidity: $10,000
-- Total pool liquidity: $1,000,000
-- Your share: 1%
-- Your rewards: 10,000 × 1% = 100 Points per month
-
-### APR Calculation
-
-**Annual Percentage Rate (APR)**:
-```
-APR = (Annual rewards in $) / (Your position value in $) × 100%
-```
-
-**Example**:
-
-- Your position: $10,000
-- Monthly rewards: 100 Points
-- Reward Point price: $2
-- Monthly $ rewards: 100 × $2 = $200
-- Annual $ rewards: $200 × 12 = $2,400
-- **APR: $2,400 / $10,000 = 24%**
-
-!!! note
-    APR is estimated and changes with Reward Point price, reward rates, and participation levels.
-
----
-
-## Reward Points Details
-
-### Token Info
-
-- **Symbol**: STRP (Reward Points)
-- **Type**: ERC20 on STRATO
-- **Use cases**: Governance, rewards, trading
-- **Supply**: Check tokenomics documentation
-
-### Where to Trade
-
-- **STRATO Swap**: Primary trading venue
-- **Liquidity pools**: RewardPoints-USDC, RewardPoints-ETH
-- **External exchanges**: (if listed)
-
-### Trading Desk
-
-Monitor Reward Point value:
-
-- App → Swap → Reward Point price
-- Liquidity pool stats
-- External price trackers (if available)
-
----
-
-## What's Next?
-
-### Optimize Your Earnings
-
-- **[Provide Liquidity](liquidity.md)** - High-reward activity
-- **[Mint via CDP](mint-cdp.md)** - Efficient Reward Points earning
-- **[Borrow USDST](borrow.md)** - Earn while borrowing
-
-### Learn More
-
-- **[Core Concepts](../concepts.md)** - Understand Reward Points role
-- **[Safety Guide](../safety.md)** - Protect your rewards
-- **[FAQ](../faq.md)** - Common reward questions
-
----
-
-## Need Help?
-
-- **FAQ**: [Rewards Questions](../faq.md#rewards)
-- **Support**: [support.blockapps.net](https://support.blockapps.net)
-- **API Reference**: [Interactive API (Swagger)](../reference/interactive-api.md)
-- **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-
+- **[Provide Liquidity](liquidity.md)**
+- **[Borrow USDST](borrow.md)**
+- **[Safety Guide](../safety.md)**

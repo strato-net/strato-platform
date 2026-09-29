@@ -235,7 +235,8 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     // CommodityPriceAPI: rates.{symbol} object with close price
     } else if (parsePattern === 'rates.{symbol}' && data.rates) {
         symbols.forEach(symbol => {
-            const rate = data.rates[symbol];
+            const mapped = sourceConfig.symbolMapping?.[symbol] || symbol;
+            const rate = data.rates[mapped];
             if (rate) {
                 // Handle both direct number and object with close price
                 const priceUSD = typeof rate === 'number' ? rate : (rate.close || rate.price || rate.value);
@@ -280,12 +281,12 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum pair where baseToken matches the mapped contract address
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base pair where baseToken matches the mapped contract address
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
             const candidates = data.pairs.filter((p: any) =>
-                p.chainId === 'ethereum' &&
+                (p.chainId === 'ethereum' || p.chainId === 'base') &&
                 p.baseToken?.address?.toLowerCase() === mappedAddress &&
                 p.priceUsd
             );

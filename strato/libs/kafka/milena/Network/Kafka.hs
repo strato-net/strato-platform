@@ -167,9 +167,21 @@ defaultRequestTimeout = 10000
 defaultMinBytes :: MinBytes
 defaultMinBytes = MinBytes 0
 
--- | Default: @4 * 1024 * 1024@
+-- | Per-partition fetch ceiling, and with it the largest record this client can
+-- ever read back.
+--
+-- This is not just a buffer size: 'apiVersion' pins Fetch to v0, and before
+-- KIP-74 (Fetch v3) a broker returns nothing at all for a partition whose next
+-- record exceeds the request's maxBytes. It does not error -- the consumer just
+-- receives an empty message set, forever, on every retry. So a record larger
+-- than this is not slow to read, it is unreadable, and the consumer wedges
+-- silently at that offset.
+--
+-- The broker must therefore never be allowed to accept a record bigger than
+-- this: keep @message.max.bytes@ (see the broker config in
+-- Control.Monad.Composable.Kafka.DockerConfig) below it.
 defaultMaxBytes :: MaxBytes
-defaultMaxBytes = 4 * 1024 * 1024
+defaultMaxBytes = 16 * 1024 * 1024
 
 -- | Default: @0@
 defaultMaxWaitTime :: MaxWaitTime
