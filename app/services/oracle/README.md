@@ -13,7 +13,7 @@ of the sources, same batch push, same `prices` row in Cirrus.
 
 | Key | Asset | Quote |
 | --- | --- | --- |
-| `4252454e54000000000000000000000000000000` | `BRENT` | Brent crude, USD/barrel, ICE front-month |
+| `4252454e54000000000000000000000000000000` | `BRENT` | Brent crude spot, USD/barrel (TwelveData only, `minSources: 1`) |
 | `444f474500000000000000000000000000000000` | `DOGE` | Dogecoin, USD |
 
 Derive one, or read one back:
