@@ -1008,8 +1008,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM getVar exps
-  expStrs <- mapM jsonSM expVals
+  expVals <- mapM (forceValue <=< getVar) exps
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
@@ -1028,10 +1027,10 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith3
-                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
-                          (name, value, valStr, idxType))
-                        (CC._eventLogs ev) expVals expStrs
+          let evArgs = zipWith
+                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value ->
+                          (name, value, idxType))
+                        (CC._eventLogs ev) expVals
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
@@ -1046,7 +1045,7 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 encodeEventToLog
                   eventName
                   ev
-                  (M.fromList [(n, v) | (n, _, v, _) <- evArgs])
+                  (M.fromList [(n, renderValue v) | (n, v, _) <- evArgs])
           addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do

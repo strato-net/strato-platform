@@ -18,14 +18,14 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import Data.List (intercalate, partition)
+import Data.List (elemIndex, intercalate, partition)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.CodeCollection.Event (EventF (..), EventLog (..))
 import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
-import SolidVM.Model.SolidString (SolidString, labelToText)
+import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..), getConst)
 
@@ -81,7 +81,15 @@ encodeSingleReturn (SVMType.Bytes _ Nothing) s =
 encodeSingleReturn (SVMType.Bytes _ (Just n)) s =
   let bs = either (const B.empty) (\x -> x) $ B16.decode $ BC.pack $ stripQuotes s
    in padLeft32 $ B.take (fromIntegral n) bs
-encodeSingleReturn (SVMType.Enum _ _ _) s = encodeUint256 (read s)
+-- Enums render as "Type.Member"; the ABI wants the member's position in the
+-- declaration. Bare numbers (older rendered text) are still accepted.
+encodeSingleReturn (SVMType.Enum _ _ names) s =
+  encodeUint256 $ case elemIndex (stringToLabel member) =<< names of
+    Just i -> fromIntegral i
+    Nothing -> case reads s of
+      [(n, "")] -> n
+      _ -> 0
+  where member = reverse . takeWhile (/= '.') $ reverse s
 encodeSingleReturn _ s = case reads s :: [(Integer, String)] of
   [(n, _)] -> encodeUint256 n
   _ -> encodeUint256 0

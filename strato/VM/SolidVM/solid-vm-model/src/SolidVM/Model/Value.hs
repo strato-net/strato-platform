@@ -18,6 +18,7 @@ module SolidVM.Model.Value
     getConst,
     weakGetVar,
     forceLoadVar,
+    renderValue,
   )
 where
 
@@ -37,6 +38,7 @@ import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
+import Data.Bool (bool)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Decimal
@@ -397,6 +399,33 @@ forceLoadVar = forceLoadVal <=< weakGetVar
           SArray vs -> SArray . fmap Constant <$> traverse forceLoadVar vs
           SMap m -> SMap . fmap Constant <$> traverse forceLoadVar m
           _ -> pure v
+
+-- | JSON-ish text form of a fully evaluated value (only 'Constant' cells;
+-- see 'forceLoadVar'). Used for event args wherever they are shown as text.
+renderValue :: Value -> T.Text
+renderValue = go False
+  where
+    go _ SNULL = "null"
+    go _ (SInteger v) = T.pack $ show v
+    go b (SString v) = T.pack $ bool id show b v
+    go b (SBytes v) = T.pack . bool id show b . BC.unpack $ B16.encode v
+    go _ (SBool v) = bool "false" "true" v
+    go _ (SEnumVal tn vn _) = labelToText tn <> "." <> labelToText vn
+    go b (SAddress a _) = T.pack . bool id show b $ show a
+    go _ (STuple v) = "[" <> T.intercalate ", " (map (go True . getConst) (V.toList v)) <> "]"
+    go _ (SArray v) = "[" <> T.intercalate ", " (map (go True . getConst) (V.toList v)) <> "]"
+    go _ (SStruct name m) =
+      labelToText name <> "{"
+        <> T.intercalate ", " [T.pack (show (labelToString n)) <> ": " <> go True (getConst var) | (n, var) <- M.toList m]
+        <> "}"
+    go _ (SMap m) =
+      "{"
+        <> T.intercalate ", " [go True key <> ": " <> go True (getConst var) | (key, var) <- M.toList m]
+        <> "}"
+    go b (SContract _ address) = T.pack . bool id show b $ show address
+    go _ (SVariadic xs) = "[" <> T.intercalate ", " (map (go True) xs) <> "]"
+    go _ (SDecimal v) = T.pack $ show v
+    go _ _ = "0"
 
 instance ToJSON Variable where
   toJSON (Constant v) = toJSON v

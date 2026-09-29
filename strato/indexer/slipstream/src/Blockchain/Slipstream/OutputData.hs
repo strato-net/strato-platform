@@ -1047,9 +1047,9 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataValue = value
     }
 
-getArraysFromEvents :: [(Text, SVMValue.Value, Text, SVMType.Type)] -> (Text, [(Value, Value)])
+getArraysFromEvents :: [(Text, SVMValue.Value, SVMType.Type)] -> (Text, [(Value, Value)])
 getArraysFromEvents evArgs = do
-  let li = [(name, valStr) | (name, _, valStr, t) <- evArgs, isArrayType t]
+  let li = [(name, SVMValue.renderValue v) | (name, v, t) <- evArgs, isArrayType t]
       isArrayType (SVMType.Array _ _) = True
       isArrayType _ = False
   case li of
@@ -1088,7 +1088,7 @@ insertGlobalEventTableQuery aggregatedEvents =
 
     eventValues agEv@AggregateEvent {eventEvent = ev} =
       let attributesMap = ValueMapping $
-            Map.fromList [(ValueString name, SimpleValue . ValueString $ valStr) | (name, _, valStr, _) <- Action.evArgs ev]
+            Map.fromList [(ValueString name, SimpleValue . ValueString $ SVMValue.renderValue v) | (name, v, _) <- Action.evArgs ev]
        in Just <$>
             [ SimpleValue . ValueAddress $ Action.evContractAddress ev
             , SimpleValue . ValueString . T.pack . keccak256ToHex $ eventBlockHash agEv

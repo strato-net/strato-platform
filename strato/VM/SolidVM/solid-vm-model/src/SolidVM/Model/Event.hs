@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module SolidVM.Model.Event
@@ -27,20 +28,18 @@ import qualified Data.Text.Encoding as TE
 import GHC.Generics
 import SolidVM.Model.SolidString (stringToLabel)
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Value (..))
+import SolidVM.Model.Value (Value (..), renderValue)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
 import Text.Format
 
 -- A SolidVM event emitted from a contract.
 --
--- Each entry in 'evArgs' is @(argName, argValue, argValueRendered, argType)@:
+-- Each entry in 'evArgs' is @(argName, argValue, argType)@:
 --   * argName: parameter name from the event declaration
---   * argValue: typed Value captured at emit time, used by consumers that need
---     type fidelity (e.g. canonical RLP encoding for the receipts trie)
---   * argValueRendered: pre-rendered string form of argValue, computed inside
---     MonadSM at emit time. Preserved for legacy display paths (EventDB SQL
---     persistence, RPC responses) that show event args as strings.
+--   * argValue: fully evaluated Value captured at emit time (only 'Constant'
+--     cells, no storage references); render with 'renderValue' where text is
+--     needed
 --   * argType: SolidVM type from the event declaration
 --
 -- 'evTopics' holds the Ethereum log topics (topic0 = event signature hash,
@@ -54,22 +53,22 @@ data Event = Event
     evContractName :: T.Text,
     evContractAddress :: Address,
     evName :: T.Text,
-    evArgs :: [(T.Text, Value, T.Text, SVMType.Type)],
+    evArgs :: [(T.Text, Value, SVMType.Type)],
     evTopics :: [B.ByteString]
   }
   deriving (Eq, Show, Generic)
 
-eventArgName :: (T.Text, Value, T.Text, SVMType.Type) -> T.Text
-eventArgName (n, _, _, _) = n
+eventArgName :: (T.Text, Value, SVMType.Type) -> T.Text
+eventArgName (n, _, _) = n
 
-eventArgValue :: (T.Text, Value, T.Text, SVMType.Type) -> Value
-eventArgValue (_, v, _, _) = v
+eventArgValue :: (T.Text, Value, SVMType.Type) -> Value
+eventArgValue (_, v, _) = v
 
-eventArgValueString :: (T.Text, Value, T.Text, SVMType.Type) -> T.Text
-eventArgValueString (_, _, s, _) = s
+eventArgValueString :: (T.Text, Value, SVMType.Type) -> T.Text
+eventArgValueString = renderValue . eventArgValue
 
-eventArgType :: (T.Text, Value, T.Text, SVMType.Type) -> SVMType.Type
-eventArgType (_, _, _, t) = t
+eventArgType :: (T.Text, Value, SVMType.Type) -> SVMType.Type
+eventArgType (_, _, t) = t
 
 instance Format Event where
   format Event {..} =
@@ -89,7 +88,7 @@ instance Format Event where
       ++ T.unpack evName
       ++ "\n"
       ++ "evArgs: "
-      ++ show [(n, s) | (n, _, s, _) <- evArgs]
+      ++ show [(n, renderValue v) | (n, v, _) <- evArgs]
       ++ "\n"
 
 instance Binary Event
@@ -103,7 +102,8 @@ instance ToJSON Event where
         "eventContractName" .= evContractName,
         "eventContractAddress" .= evContractAddress,
         "eventName" .= evName,
-        "eventArgs" .= evArgs,
+        -- JSON keeps the 4-element form [name, value, rendered, type]
+        "eventArgs" .= [(n, v, renderValue v, t) | (n, v, t) <- evArgs],
         "eventTopics" .= map (TE.decodeUtf8 . B16.encode) evTopics
       ]
 
@@ -124,15 +124,18 @@ instance FromJSON Event where
       decodeHexTopic :: T.Text -> B.ByteString
       decodeHexTopic = either (const B.empty) id . B16.decode . TE.encodeUtf8
       -- Accept both the current 4-element arg form [name, value, rendered, type]
-      -- and the legacy 3-element form [name, rendered, typeString] written by
-      -- older nodes (e.g. events in an existing genesis.json). The legacy form
-      -- carries no typed Value, so it degrades to SNULL + UnknownLabel; string
-      -- consumers keep working and typed consumers fall back on the rendered
-      -- form, mirroring the SNULL fallback in SolidVM.Model.Delta.
-      parseEventArg v = parseJSON v <|> parseLegacyArg v
+      -- (rendered is derived from value and ignored) and the legacy 3-element
+      -- form [name, rendered, typeString] written by older nodes (e.g. events in
+      -- an existing genesis.json). The legacy form carries no typed Value, so
+      -- the rendered text is kept as an SString + UnknownLabel; string consumers
+      -- keep working and typed consumers fall back on it (see SolidVM.Model.Delta).
+      parseEventArg v = parseCurrentArg v <|> parseLegacyArg v
+      parseCurrentArg v = do
+        (n, val, _ :: T.Text, t) <- parseJSON v
+        pure (n, val, t)
       parseLegacyArg v = do
         (n, s, t) <- parseJSON v
-        pure (n, SNULL, s, SVMType.UnknownLabel (stringToLabel t))
+        pure (n, SString (T.unpack s), SVMType.UnknownLabel (stringToLabel t))
   parseJSON o = error $ "parseJSON Event: Expected object, got:" ++ show o
 
 instance NFData Event
@@ -147,7 +150,6 @@ instance Arbitrary Event where
     nm <- arbitrary
     args <- listOf $ do
       n <- arbitrary
-      s <- arbitrary
       t <- arbitrary
-      pure (n, SInteger 0, s, t)
+      pure (n, SInteger 0, t)
     pure $ Event bh th sender cn ca nm args []

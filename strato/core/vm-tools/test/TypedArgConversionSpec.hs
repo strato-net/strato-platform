@@ -147,8 +147,8 @@ spec = do
                 evContractAddress = testAddr,
                 evName = "Withdrawal",
                 evArgs =
-                  [ ("nonce", SInteger 1, "1", SVMType.Int (Just False) Nothing),
-                    ("recipient", SAddress 0xdead False, "0xdead", SVMType.Address False)
+                  [ ("nonce", SInteger 1, SVMType.Int (Just False) Nothing),
+                    ("recipient", SAddress 0xdead False, SVMType.Address False)
                   ],
                 evTopics = []
               }
@@ -174,7 +174,7 @@ spec = do
                 evContractName = "C",
                 evContractAddress = testAddr,
                 evName = "BatchSent",
-                evArgs = [("ids", arrVal, "[11,22]", SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)],
+                evArgs = [("ids", arrVal, SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)],
                 evTopics = []
               }
           trr = successTrr {trrResult = Right (successResults {erEvents = [ev]})}
