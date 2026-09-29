@@ -49,6 +49,7 @@ import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import           Data.Bool                       (bool)
 import qualified Data.Set as Set
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Map                        (Map)
@@ -291,7 +292,7 @@ slipstreamQueryText _ CreateView{..} =
               , tableNameToDoubleQuoteText sourceTableName
               , " e WHERE e.address = s.address AND e.collection_name = s.collection_name"
               ]
-           ++ [ T.concat [" AND e.\"key\"->>'", k, "' = s.\"key\"->>'", k, "'"]
+           ++ [ T.concat [" AND e.\"key\"->>'", k, "_hex' = s.\"key\"->>'", k, "_hex'"]
               | k <- mappingKeyName <$> [1 .. mappingKeyCount]
               ]
            ++ [ " AND e.\"key\"->>'"
@@ -337,6 +338,8 @@ slipstreamQueryText _ CreateView{..} =
                   ]
                 _ -> ""
             , case t of
+                SqlBytesKey -> T.concat
+                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
                 SqlJsonbArray -> T.concat
                   [ "THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
@@ -410,6 +413,7 @@ slipstreamQueryText _ CreateView{..} =
                       SqlBool      -> "false::boolean"
                       SqlDecimal   -> "'0'::text"
                       SqlText      -> "''::text"
+                      SqlBytesKey  -> "NULL::text"
                       SqlJsonb     -> "to_jsonb(''::text)"
                       SqlTimestamp -> "'infinity'::timestamp)"
                       SqlSerial    -> "0::numeric"
@@ -673,7 +677,9 @@ createCollectionTable ::
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
 createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
-      keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
+      keySqlTypes = (\case
+        SVMType.Bytes{} -> SqlBytesKey
+        keyType -> fromMaybe SqlText $ solidityTypeToSQLType False (Just c) cc keyType) <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       keyCount = length keyNames
       lastKeyName = if keyCount <= 1 then "key" else "key" <> tshow keyCount
@@ -886,12 +892,24 @@ insertCollectionTableQuery rows =
           keyValuePairs =
             [ ValueMapping
               . Map.fromList
-              $ (\(t,k) -> (ValueString t, k))
-              <$> keyColumnNames (collectionDataKeys m)
+              $ concatMap keyValues $ keyColumnNames (collectionDataKeys m)
             , SimpleValue . ValueString $ collectionDataPath m
             , val
             ]
        in (m, isObject,) $ Just <$> keyValuePairs
+
+    -- Store readable keys plus their lossless bytes. Collection views use the
+    -- bytes for Solidity bytes/bytesN keys, even when those bytes are valid UTF-8.
+    -- Existing rows/views require a clean reindex to populate/use the hex keys.
+    keyValues (name, SimpleValue (ValueBytes _ raw)) =
+      let hex = decodeUtf8 $ Base16.encode raw
+          readable = case decodeUtf8' raw of
+            Right text | not (BS.elem 0 raw) -> text
+            _ -> "~hex:" <> hex
+       in [ (ValueString name, SimpleValue $ ValueString readable)
+          , (ValueString $ name <> "_hex", SimpleValue $ ValueString hex)
+          ]
+    keyValues (name, value) = [(ValueString name, value)]
 
     preparedRows = map prepareRow rows
 

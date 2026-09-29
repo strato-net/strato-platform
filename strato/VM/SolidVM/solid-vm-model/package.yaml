@@ -53,6 +53,8 @@ tests:
       - StorageTest
       - ValueBinaryTest
     dependencies:
+      - aeson
+      - base16-bytestring
       - binary
       - bytestring
       - containers
@@ -60,8 +62,10 @@ tests:
       - format
       - hspec
       - persistent
+      - servant-server
       - solid-vm-model
       - strato-model
+      - text
       - unliftio
       - vector
 
