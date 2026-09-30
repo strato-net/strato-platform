@@ -40,7 +40,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
-import BlockApps.Solidity.ABI.Bridge (encodeEventToLog)
+import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -1042,14 +1042,10 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           let contractName' = labelToText $ CC._contractName curCnct
           -- Derive the Ethereum log topics (topic0 + indexed args) from the event
           -- ABI now, while the CodeCollection is in hand, so the block producer can
-          -- build a real logsBloom without re-deriving them. Uses the same encoder
-          -- and the same (name -> rendered value) attributes the JSON-RPC layer
-          -- reconstructs from Cirrus, so producer and RPC blooms agree.
-          let (evTopicBytes, _) =
-                encodeEventToLog
-                  eventName
-                  ev
-                  (M.fromList [(n, renderValue v) | (n, v) <- evArgs])
+          -- build a real logsBloom without re-deriving them. Encodes straight from
+          -- the Values; gives the same bytes as the text-based encodeEventToLog the
+          -- JSON-RPC layer applies to Cirrus rows, so producer and RPC blooms agree.
+          let (evTopicBytes, _) = encodeEventToLogValues eventName ev evArgs
           addEvent $ Event tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do

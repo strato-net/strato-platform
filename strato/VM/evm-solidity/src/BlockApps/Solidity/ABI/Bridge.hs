@@ -7,6 +7,7 @@ module BlockApps.Solidity.ABI.Bridge
     encodeReturnABI,
     encodeValueABI,
     encodeEventToLog,
+    encodeEventToLogValues,
     findEventDef,
   )
 where
@@ -27,7 +28,7 @@ import SolidVM.Model.CodeCollection.Event (EventF (..), EventLog (..))
 import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Value (..), getConst)
+import SolidVM.Model.Value (Value (..), getConst, renderValue)
 
 --------------------------------------------------------------------------------
 -- ABI bytes -> SolidVM text arguments
@@ -211,30 +212,75 @@ encodeSingleValue _ SNULL = encodeUint256 0
 encodeSingleValue _ _ = B.empty
 
 --------------------------------------------------------------------------------
--- Event log encoding: rendered event args (name -> value) -> EVM topics + data
+-- Event log encoding: event args -> EVM topics + data
 --------------------------------------------------------------------------------
 
-encodeEventToLog :: SolidString -> EventF a -> M.Map T.Text T.Text -> ([B.ByteString], B.ByteString)
-encodeEventToLog evName eventDef attrs =
+-- | Topics (topic0 + one per indexed arg) and ABI data (the non-indexed args) of an
+-- emitted event, from the emitter's (name, value) pairs.
+encodeEventToLogValues :: SolidString -> EventF a -> [(T.Text, Value)] -> ([B.ByteString], B.ByteString)
+encodeEventToLogValues evName eventDef args =
   let logs = _eventLogs eventDef
       allTypes = map (indexedTypeType . _eventLogType) logs
       topic0 = if _eventAnonymous eventDef then []
                else let sig = T.unpack (labelToText evName)
                             ++ "(" ++ intercalate "," (map svmTypeToCanonical allTypes) ++ ")"
                     in [keccak256ToByteString $ hash $ BC.pack sig]
-      params = [ (indexedTypeType (_eventLogType l), _eventLogIndexed l, maybe "0" T.unpack (M.lookup (_eventLogName l) attrs))
-               | l <- logs ]
-      indexedTopics = [encodeTopic t s | (t, True, s) <- params]
-      nonIndexedData = encodeReturnTuple [(t, s) | (t, False, s) <- params]
+      params = [ (indexedTypeType (_eventLogType l), _eventLogIndexed l, lookup (_eventLogName l) args) | l <- logs ]
+      indexedTopics = [encodeTopic t v | (t, True, v) <- params]
+      nonIndexedData = encodeReturnTuple [(t, maybe "0" (T.unpack . renderValue) v) | (t, False, v) <- params]
   in (topic0 ++ indexedTopics, nonIndexedData)
 
+-- | The same from rendered text (name -> rendered value), which is what the JSON-RPC
+-- layer has from Cirrus: each arg is parsed back into a 'Value' by its declared type.
+encodeEventToLog :: SolidString -> EventF a -> M.Map T.Text T.Text -> ([B.ByteString], B.ByteString)
+encodeEventToLog evName eventDef attrs =
+  encodeEventToLogValues evName eventDef
+    [ (name, v)
+    | l <- _eventLogs eventDef
+    , let name = _eventLogName l
+    , Just s <- [M.lookup name attrs]
+    , Just v <- [textToValue (indexedTypeType (_eventLogType l)) (T.unpack s)]
+    ]
+
 -- | An indexed parameter is one 32-byte topic; dynamic types are stored as the
--- keccak256 of their contents rather than inline.
-encodeTopic :: SVMType.Type -> String -> B.ByteString
-encodeTopic (SVMType.String _) s = keccak256ToByteString . hash . BC.pack $ readStringLiteral s
-encodeTopic (SVMType.Bytes _ Nothing) s =
-  keccak256ToByteString . hash . either (const B.empty) id . B16.decode . BC.pack $ stripQuotes s
-encodeTopic t s = encodeSingleReturn t s
+-- keccak256 of their contents rather than inline. A missing or unusable arg is 0.
+encodeTopic :: SVMType.Type -> Maybe Value -> B.ByteString
+encodeTopic _ Nothing = encodeUint256 0
+encodeTopic t (Just v) = case (t, v) of
+  (SVMType.Int (Just True) _, SInteger n) -> encodeInt256 n
+  (SVMType.Int _ _, SInteger n) -> encodeUint256 n
+  (SVMType.Bool, SBool b) -> encodeUint256 (if b then 1 else 0)
+  (SVMType.Address _, SAddress a _) -> padLeft32 $ addressToByteString a
+  (SVMType.Address _, SContract _ a) -> padLeft32 $ addressToByteString a
+  (SVMType.Enum _ _ names, SEnumVal _ member _) -> encodeUint256 $ maybe 0 fromIntegral (elemIndex member =<< names)
+  (SVMType.Enum _ _ _, SInteger n) -> encodeUint256 n
+  (SVMType.String _, SString s) -> keccak256ToByteString . hash $ BC.pack s
+  (SVMType.Bytes _ Nothing, SBytes bs) -> keccak256ToByteString $ hash bs
+  (SVMType.Bytes _ (Just n), SBytes bs) -> padLeft32 $ B.take (fromIntegral n) bs
+  -- any other shape: go through its rendered text, which yields one of the shapes above or nothing
+  _ -> encodeTopic t (textToValue t (T.unpack (renderValue v)))
+
+-- | Rendered text of an event arg back to a 'Value' of the declared type; only
+-- produces the shapes 'encodeTopic' handles directly.
+textToValue :: SVMType.Type -> String -> Maybe Value
+textToValue t s = case t of
+  SVMType.Int _ _ -> SInteger <$> readInteger s
+  SVMType.Bool -> Just $ SBool (s == "true")
+  SVMType.Address _ -> case reads (stripQuotes s) of
+    [(a, _)] -> Just $ SAddress a False
+    _ -> Nothing
+  SVMType.Enum _ typedef names
+    -- rendered as "Type.Member"; a bare number (older rendered text) is the position itself
+    | Just ns <- names, member `elem` ns -> Just $ SEnumVal typedef member 0
+    | otherwise -> SInteger <$> readInteger s
+    where member = stringToLabel . reverse . takeWhile (/= '.') $ reverse s
+  SVMType.String _ -> Just $ SString s
+  SVMType.Bytes _ _ -> Just . SBytes . either (const B.empty) id . B16.decode . BC.pack $ stripQuotes s
+  _ -> Nothing
+  where
+    readInteger str = case reads str :: [(Integer, String)] of
+      [(n, _)] -> Just n
+      _ -> Nothing
 
 -- | The event declared by a specific contract in the collection. Events are
 -- resolved by (contract, event) rather than event name alone: several contracts
