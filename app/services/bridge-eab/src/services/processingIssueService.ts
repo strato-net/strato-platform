@@ -106,7 +106,7 @@ export class ProcessingIssueService {
       const key = processingKey(context), old = state.records[key], now = this.now();
       const changed = !old || !!old.resolvedAt || fingerprint(old.issues) !== fingerprint(issues);
       const attempts = changed ? 1 : old.attempts + 1;
-      const transient = issues.every(i => ["DEPENDENCY_UNAVAILABLE", "UNKNOWN", "CONFIRMATIONS_PENDING"].includes(i.code));
+      const transient = issues.every(i => ["DEPENDENCY_UNAVAILABLE", "UNKNOWN", "CONFIRMATIONS_PENDING", "INDEXING_PENDING"].includes(i.code));
       let delay = transient ? Math.min(PROCESSING_RETRY_MAX_MS, PROCESSING_RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 10)) : PROCESSING_RETRY_MAX_MS;
       const refill = issues.map(i => Number(i.details.retryAfterSeconds)).filter(n => Number.isFinite(n) && n > 0);
       if (refill.length) delay = Math.min(PROCESSING_RETRY_MAX_MS, Math.max(PROCESSING_RETRY_BASE_MS, Math.min(...refill) * 1000));
@@ -155,7 +155,7 @@ export class ProcessingIssueService {
         const record = records[0], saved = state.notifications[key];
         const signature = fingerprint(records.flatMap(r => r.issues).filter((issue, i, all) =>
           all.findIndex(other => fingerprint([other]) === fingerprint([issue])) === i));
-        const immediate = records.some(r => r.issues.some(i => !["DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING"].includes(i.code)));
+        const immediate = records.some(r => r.issues.some(i => !["DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING", "INDEXING_PENDING"].includes(i.code)));
         if (!immediate && records.every(r => this.now() - r.firstSeenAt < PROCESSING_ALERT_GRACE_MS)) continue;
         if (saved?.fingerprint === signature && this.now() - saved.sentAt < PROCESSING_REMINDER_MS) continue;
         try {

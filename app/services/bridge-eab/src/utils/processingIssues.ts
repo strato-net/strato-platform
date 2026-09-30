@@ -8,6 +8,7 @@ const messages: Record<ProcessingIssueCode, string> = {
   POLICY_RESTRICTED: "The transfer is blocked by a route or token policy.",
   DEPENDENCY_UNAVAILABLE: "An RPC, verifier, or authentication dependency is unavailable.",
   CONFIRMATIONS_PENDING: "Waiting for external transaction confirmations.",
+  INDEXING_PENDING: "Waiting for settlement attestations to be indexed.",
   PAUSED: "Bridge or route processing is paused.",
   CONFIGURATION: "Bridge configuration or authorization evidence needs operator investigation.",
   UNKNOWN: "An unexpected processing failure needs operator investigation.",
@@ -47,7 +48,7 @@ export const safeIssueDetails = (value: unknown): Record<string, string> => {
 
 export const processingIssue = (code: ProcessingIssueCode, details: Record<string, string> = {}): ProcessingIssue => ({
   code, message: messages[code], retryable: ["MINT_CAPACITY", "WITHDRAWAL_CAPACITY", "FUNDING_REQUIRED",
-    "DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING", "PAUSED"].includes(code), details: safeIssueDetails(details),
+    "DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING", "INDEXING_PENDING", "PAUSED"].includes(code), details: safeIssueDetails(details),
 });
 
 export const classifyProcessingError = (error: any, depth = 0): ProcessingIssue[] => {

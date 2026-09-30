@@ -177,9 +177,10 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
       
       const isAdmin = await isUserAdmin(accessToken, userAddress);
       
-      const addressToUse = (context === 'admin' && isAdmin) ? undefined : userAddress;
+      const adminHistory = context === 'admin' && isAdmin;
+      const addressToUse = adminHistory ? undefined : userAddress;
       
-      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams, protocol);
+      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams, adminHistory ? "all" : protocol);
       res.json(result);
     } catch (error: any) {
       next(error);

@@ -573,8 +573,26 @@ test("refund handler attests the contract digest only after source and non-payme
     item.expression.arguments[0]?.getText(signerSource) === '"/v1/attest-refund"');
   assert.ok(endpoint);
   const digest = "0xbe620f2a844e6b18a371d579311e6e4c28075c0b7292146b43954623110fde7f";
+  const submit = signerSource.statements.find(item => ts.isVariableStatement(item) &&
+    item.declarationList.declarations.some(declaration => declaration.name.getText(signerSource) === "submitStratoAttestation"));
+  assert.ok(submit);
   let handler: any, failure = "";
   const calls: string[] = [];
+  const submitStratoAttestation = runInNewContext(`${ts.transpileModule(submit.getText(signerSource), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText}\nsubmitStratoAttestation`, {
+    stratoNodeUrl: "https://strato.test", sourceBridge: policy.sourceBridge,
+    getStratoToken: async () => "token", authHeaders: () => ({}),
+    axios: { post: async (url: string, body: any) => {
+      assert.equal(url, "https://strato.test/strato/v2.3/transaction/parallel?resolve=true");
+      const { method, args } = body.txs[0].payload;
+      assert.equal(method, "attestWithdrawalRefund"); assert.equal(args.withdrawalId, "1");
+      // STRATO's JSON transaction API decodes bytes32 as exactly 64 unprefixed hex characters.
+      assert.match(args.expectedDigest, /^[0-9a-f]{64}$/);
+      assert.equal(`0x${Buffer.from(args.expectedDigest, "hex").toString("hex")}`, digest);
+      calls.push("attest"); return { data: [{ hash: "tx", status: "Success" }] };
+    } },
+  });
   runInNewContext(ts.transpileModule(endpoint.getText(signerSource), {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, {
@@ -596,10 +614,7 @@ test("refund handler attests the contract digest only after source and non-payme
       if (failure === "rpc") throw new Error("digest unavailable");
       return digest;
     },
-    submitStratoAttestation: async (method: string, args: any) => {
-      assert.equal(method, "attestWithdrawalRefund"); assert.equal(args.withdrawalId, "1");
-      assert.equal(args.expectedDigest, digest); calls.push("attest"); return "tx";
-    },
+    submitStratoAttestation,
     auditDecision: () => {}, settlementAttestorAddress: "attestor",
   });
   for (failure of ["", "source", "payment", "rpc"]) {

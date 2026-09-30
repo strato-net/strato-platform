@@ -12,6 +12,7 @@ import { sendBridgeReviewEmail } from "./emailService";
 import { logError } from "../utils/logger";
 import { getPendingWithdrawalReview } from "./externalWithdrawalService";
 import { processingIssueService } from "./processingIssueService";
+import { processingIssue } from "../utils/processingIssues";
 
 const normalize = (value: string) => value.replace(/^0x/i, "").toLowerCase();
 const notificationPath = path.join(process.cwd(), "data", "bridgeReviewNotifications.json");
@@ -69,7 +70,10 @@ const prepareWithdrawalRefund = async (reference: string): Promise<{ digest: str
   if (!Number.isSafeInteger(verifierConfig.threshold) || verifierConfig.threshold < 2) throw new Error("Refund verifier threshold is unavailable");
   if (count < verifierConfig.threshold) {
     await attestWithdrawalRefund(authorization, digest);
-    if (await getSettlementAttestationCount(digest) < verifierConfig.threshold) throw new Error("Refund attestations are not indexed yet; retry before voting");
+    const indexedCount = await getSettlementAttestationCount(digest);
+    if (indexedCount < verifierConfig.threshold) throw Object.assign(new Error("Refund attestations are not indexed yet; retry before voting"), {
+      issues: [processingIssue("INDEXING_PENDING", { available: String(indexedCount), required: String(verifierConfig.threshold) })],
+    });
   }
   return { digest };
 };

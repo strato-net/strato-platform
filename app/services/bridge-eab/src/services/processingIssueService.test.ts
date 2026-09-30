@@ -127,6 +127,50 @@ test("progress clears the old alert while normal confirmation waits stay quiet a
   assert.equal(f.sent.length, 2, "an unalerted confirmation wait needs no recovery email");
 });
 
+test("normal indexing and confirmation waits send neither attention nor recovery emails across restarts", async t => {
+  const f = await fixture(t);
+  for (const code of ["INDEXING_PENDING", "CONFIRMATIONS_PENDING"] as const) {
+    const waiting = { ...context(code), stage: code === "INDEXING_PENDING" ? "withdrawal-refund" : "release-confirmations" };
+    await f.service.run(waiting, async () => { throw issue(code, { available: "0", required: "2" }); });
+    await f.open().notify(f.send);
+    assert.equal(await f.open().due(waiting), false);
+    f.advance(60_000);
+    assert.equal(await f.open().due(waiting), true);
+    await f.open().record(waiting, issue(code, { available: "1", required: "2" }));
+    await f.open().notify(f.send);
+    f.advance(60_000);
+    await f.open().run(waiting, async () => {});
+    await f.open().notify(f.send);
+    assert.ok((await f.open().snapshot()).records[processingKey(waiting)].resolvedAt);
+  }
+  assert.equal(f.sent.length, 0);
+});
+
+test("stalled indexing alerts after grace and sends recovery only for an alerted wait", async t => {
+  const f = await fixture(t);
+  const waiting = { ...context(), stage: "withdrawal-refund" };
+  await f.service.record(waiting, issue("INDEXING_PENDING", { available: "0", required: "2" }));
+  f.advance(5 * 60_000 - 1);
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 0);
+  f.advance(1);
+  await f.open().record(waiting, issue("INDEXING_PENDING", { available: "1", required: "2" }));
+  await f.open().notify(f.send);
+  await f.open().notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false]);
+  await f.open().resolve(waiting);
+  await f.open().notify(f.send);
+  await f.open().notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false, true]);
+});
+
+test("an expected wait does not suppress an accompanying actionable failure", async t => {
+  const f = await fixture(t);
+  await f.service.record(context(), { issues: [processingIssue("INDEXING_PENDING"), processingIssue("FUNDING_REQUIRED")] });
+  await f.service.notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false]);
+});
+
 test("policy changes alert immediately and governance review uses its existing notification channel", async t => {
   const f = await fixture(t);
   await f.service.record(context(), issue("POLICY_RESTRICTED", { policyVersion: "1", limit: "10" }));

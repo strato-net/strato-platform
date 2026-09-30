@@ -891,7 +891,7 @@ app.post("/v1/attest-refund", async (req, res) => {
     ]);
     const expectedDigest = await readSourceDigest("getWithdrawalRefundDigest", [authorization.sourceWithdrawalId]);
     const transactionHash = await submitStratoAttestation("attestWithdrawalRefund", {
-      withdrawalId: authorization.sourceWithdrawalId, expectedDigest,
+      withdrawalId: authorization.sourceWithdrawalId, expectedDigest: expectedDigest.slice(2),
     });
     auditDecision("attest_refund", authorization.sourceWithdrawalId, "approve", "Confirmed non-payment and bound source state");
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest: expectedDigest });

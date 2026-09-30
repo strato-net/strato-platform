@@ -63,6 +63,30 @@ test("bridge endpoints bind their protocol server-side for every operation", asy
   }
 });
 
+test("admin history includes every bridge while personal history retains its protocol and address", async t => {
+  let admin = false;
+  const calls: any[][] = [];
+  t.mock.method(userService, "isUserAdmin", async () => admin);
+  t.mock.method(service, "getBridgeTransactions", async (...args: any[]) => {
+    calls.push(args); return { data: [], totalCount: 0 };
+  });
+  const address = "1".repeat(40);
+  const response = { json: () => {} } as any;
+  const next = (error?: any) => { if (error) throw error; };
+  for (const [controller, protocol] of [[BridgeController, "legacy"], [TradeBridgeController, "external"]] as const) {
+    for (const type of ["deposit", "withdrawal"]) {
+      for (admin of [false, true]) {
+        for (const context of [undefined, "admin"]) {
+          const request = { accessToken: "token", address, params: { type }, query: { context, limit: "10" } } as any;
+          await controller.getTransactions(request, response, next);
+          const adminHistory = admin && context === "admin";
+          assert.deepEqual(calls.at(-1), ["token", type, adminHistory ? undefined : address, { limit: "10" }, adminHistory ? "all" : protocol]);
+        }
+      }
+    }
+  }
+});
+
 test("Cirrus policy overview is admin-only and never reports failed reads as an empty overview", async t => {
   let admin = false, calls = 0, fail = false, status = 200, body: any;
   t.mock.method(userService, "isUserAdmin", async () => admin);

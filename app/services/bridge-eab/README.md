@@ -160,6 +160,7 @@ The EAB runtime records per-transfer failures in `data/processingIssues.json`. T
 | `FUNDING_REQUIRED` | Fund the named submitting account with external gas or STRATO USDST/vouchers, as indicated. |
 | `DEPENDENCY_UNAVAILABLE` | Check RPC/verifier availability and authentication. |
 | `CONFIRMATIONS_PENDING` | Wait for the required external confirmations. |
+| `INDEXING_PENDING` | Wait for refund attestations to appear in Cirrus; quorum checks remain enforced. |
 | `POLICY_RESTRICTED`, `PAUSED` | Check token/route permissions, pause state, and the reported verifier policy version/digest. |
 | `CONFIGURATION`, `UNKNOWN` | Investigate the referenced operation and verifier logs; these failures retain the existing review safeguards. |
 | `MANUAL_REVIEW` | Use the existing governance review queue and its emails. |
@@ -172,7 +173,7 @@ Amounts remain integer strings in the stated token's base units. Mint diagnostic
 - Native discovery does not advance its cursor past a recording failure. Other deposits in the scanned range can still be recorded; replay remains idempotent.
 - A successful operation clears its blocker. A terminal on-chain record can also clear it. Disappearance from a status query or a failed Cirrus read cannot produce a recovery notice. **Blocker cleared does not mean transfer completed**, and the email says so. Routing, fallback authorization, quorum and dissent rules are unchanged.
 
-The existing `TRANSACTION_APPROVER_EMAILS` and `SENDGRID_API_KEY` enable operational emails. Matching blockers are grouped, unchanged incidents get at most one reminder per hour, and transient dependency/confirmation waits have a five-minute email grace period. Changes to the reason or reported policy/limit can notify immediately. Governance-only reviews use their existing notification channel. Delivery failures retry; a crash after mail acceptance but before journal acknowledgement can produce a duplicate (at-least-once delivery).
+The existing `TRANSACTION_APPROVER_EMAILS` and `SENDGRID_API_KEY` enable operational emails. Matching blockers are grouped, unchanged incidents get at most one reminder per hour, and transient dependency/confirmation/indexing waits have a five-minute email grace period. Waits that clear within that period send neither attention nor recovery emails; recovery emails are sent only for previously alerted incidents. Changes to the reason or reported policy/limit can notify immediately. Governance-only reviews use their existing notification channel. Delivery failures retry; a crash after mail acceptance but before journal acknowledgement can produce a duplicate (at-least-once delivery).
 
 Keep this journal on the existing durable `/app/data` mount, writable by UID 1000, with **one runtime writer**. Writes use atomic replacement and fsync. Resolved history is pruned on subsequent writes after seven days; active blockers are retained. Preserve and restore a corrupt journal from backup; do not delete it as a health-reset action. Journal or notification failures appear in the `processingIssues` health check. Transfer blockers themselves do not mark a working polling loop unhealthy.
 

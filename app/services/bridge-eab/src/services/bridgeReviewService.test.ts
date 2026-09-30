@@ -129,7 +129,13 @@ test("refund votes require indexed attestations; subsequent voters reuse the sam
   });
   await assert.rejects(service.prepareBridgeOperation("eab:withdrawal:2", "refund"), /payment already occurred/);
   rejected = false;
-  await assert.rejects(service.prepareBridgeOperation("eab:withdrawal:2", "refund"), /not indexed/);
+  await assert.rejects(service.prepareBridgeOperation("eab:withdrawal:2", "refund"), (error: any) => {
+    assert.match(error.message, /not indexed/);
+    assert.equal(error.issues[0].code, "INDEXING_PENDING");
+    assert.equal(error.issues[0].retryable, true);
+    assert.deepEqual(error.issues[0].details, { available: "0", required: "2" });
+    return true;
+  });
   count = 2;
   const vote = await service.prepareBridgeOperation("eab:withdrawal:2", "refund");
   assert.ok("digest" in vote);
