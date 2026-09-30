@@ -45,6 +45,10 @@ function validateNetwork(
             errors.push(`${assetPrefix} constantPrice must be a number`);
         }
 
+        if (asset.minSources !== undefined && (!Number.isInteger(asset.minSources) || asset.minSources < 1)) {
+            errors.push(`${assetPrefix} minSources must be a positive integer`);
+        }
+
         if (asset.weekendProxy !== undefined && typeof asset.weekendProxy !== 'string') {
             errors.push(`${assetPrefix} weekendProxy must be a string (proxy symbol)`);
         }
@@ -142,7 +146,7 @@ function validateNetwork(
             return;
         }
 
-        const requiredSources = ORACLE_CONFIG.MIN_VALID_SOURCES;
+        const requiredSources = asset.minSources ?? ORACLE_CONFIG.MIN_VALID_SOURCES;
         if (sources.length < requiredSources) {
             errors.push(
                 `Network ${networkLabel} asset ${assetKey} has only ${sources.length} source(s), needs at least ${requiredSources}. ` +

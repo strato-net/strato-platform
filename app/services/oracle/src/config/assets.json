@@ -305,7 +305,8 @@
         },
         "BRENT": {
           "targetAssetAddress": "4252454e54000000000000000000000000000000",
-          "comment": "Brent crude, USD per barrel, ICE front-month. Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. CommodityPriceAPI/Commodities-API/OANDA quote front-month futures and agree within ~1%; TwelveData XBR/USD is spot and runs ~3-4% below in contango. It is kept as a fourth source so any single provider can fail without stalling the feed - three futures sources keep the median futures-anchored - but it can push the source-divergence warning over 5% when the curve steepens."
+          "minSources": 1,
+          "comment": "Brent crude spot, USD per barrel (TwelveData XBR/USD). Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. Single-source by design (minSources: 1): the futures providers diverge from spot by the contango, so they are not mixed in; a TwelveData failure still fails the asset."
         }
       },
       "sources": {
@@ -550,13 +551,11 @@
           "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
           "assets": [
             "XAU",
-            "XAG",
-            "BRENT"
+            "XAG"
           ],
           "symbolMapping": {
             "XAU": "XAU",
-            "XAG": "XAG",
-            "BRENT": "BRENTOIL-FUT"
+            "XAG": "XAG"
           }
         },
         "TwelveData": {
@@ -596,13 +595,11 @@
           "comment": "Practice API. Use api-fxtrade.oanda.com for live",
           "assets": [
             "XAU",
-            "XAG",
-            "BRENT"
+            "XAG"
           ],
           "symbolMapping": {
             "XAU": "XAU_USD",
-            "XAG": "XAG_USD",
-            "BRENT": "BCO_USD"
+            "XAG": "XAG_USD"
           }
         },
         "constant": {
@@ -610,19 +607,6 @@
           "assets": [
             "USDST"
           ]
-        },
-        "Commodities-API": {
-          "url": "https://commodities-api.com/api/latest",
-          "params": "access_key,base=USD,symbols",
-          "parse": "data.rates.{symbol}",
-          "apiKeyEnvVar": "COMMODITIES_API_KEY",
-          "comment": "Returns rates relative to base USD; the parser inverts (1/rate) to get USD per barrel.",
-          "assets": [
-            "BRENT"
-          ],
-          "symbolMapping": {
-            "BRENT": "BRENTOIL"
-          }
         }
       }
     },
@@ -931,7 +915,8 @@
         },
         "BRENT": {
           "targetAssetAddress": "4252454e54000000000000000000000000000000",
-          "comment": "Brent crude, USD per barrel, ICE front-month. Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. CommodityPriceAPI/Commodities-API/OANDA quote front-month futures and agree within ~1%; TwelveData XBR/USD is spot and runs ~3-4% below in contango. It is kept as a fourth source so any single provider can fail without stalling the feed - three futures sources keep the median futures-anchored - but it can push the source-divergence warning over 5% when the curve steepens."
+          "minSources": 1,
+          "comment": "Brent crude spot, USD per barrel (TwelveData XBR/USD). Price-feed only: no token is deployed at this address. The key is the symbol as left-aligned ASCII, zero-padded to 20 bytes. Single-source by design (minSources: 1): the futures providers diverge from spot by the contango, so they are not mixed in; a TwelveData failure still fails the asset."
         }
       },
       "sources": {
@@ -1176,13 +1161,11 @@
           "apiKeyEnvVar": "COMMODITY_PRICE_API_KEY",
           "assets": [
             "XAU",
-            "XAG",
-            "BRENT"
+            "XAG"
           ],
           "symbolMapping": {
             "XAU": "XAU",
-            "XAG": "XAG",
-            "BRENT": "BRENTOIL-FUT"
+            "XAG": "XAG"
           }
         },
         "TwelveData": {
@@ -1222,13 +1205,11 @@
           "comment": "Practice API. Use api-fxtrade.oanda.com for live",
           "assets": [
             "XAU",
-            "XAG",
-            "BRENT"
+            "XAG"
           ],
           "symbolMapping": {
             "XAU": "XAU_USD",
-            "XAG": "XAG_USD",
-            "BRENT": "BCO_USD"
+            "XAG": "XAG_USD"
           }
         },
         "constant": {
@@ -1236,19 +1217,6 @@
           "assets": [
             "USDST"
           ]
-        },
-        "Commodities-API": {
-          "url": "https://commodities-api.com/api/latest",
-          "params": "access_key,base=USD,symbols",
-          "parse": "data.rates.{symbol}",
-          "apiKeyEnvVar": "COMMODITIES_API_KEY",
-          "comment": "Returns rates relative to base USD; the parser inverts (1/rate) to get USD per barrel.",
-          "assets": [
-            "BRENT"
-          ],
-          "symbolMapping": {
-            "BRENT": "BRENTOIL"
-          }
         }
       }
     }
