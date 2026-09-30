@@ -1084,6 +1084,7 @@ insertGlobalEventTableQuery aggregatedEvents =
       baseEventColumns ++
       [ ("event_name", SqlText)
       , ("attributes", SqlJsonb)
+      , ("contract_name", SqlText)
       ]
 
     eventValues agEv@AggregateEvent {eventEvent = ev} =
@@ -1099,6 +1100,7 @@ insertGlobalEventTableQuery aggregatedEvents =
             , SimpleValue . ValueInt False Nothing . fromIntegral $ eventIndex agEv
             , SimpleValue . ValueString $ Action.evName ev
             , attributesMap
+            , SimpleValue . ValueString $ Action.evContractName ev
             ]
 
 ------------------
@@ -1287,10 +1289,12 @@ initialSlipstreamQueries =
       , ("event_index", SqlDecimal)
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
+      , ("contract_name", SqlText)
       ]
       ["address", "block_hash", "event_index"]
       Nothing -- (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
       []
+  , RawSQL "ALTER TABLE event ADD COLUMN IF NOT EXISTS contract_name text;"
   , CreateTable
       eventArrayTableName
       [ ("address", SqlText)
