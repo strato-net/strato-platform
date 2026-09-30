@@ -23,7 +23,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
@@ -48,7 +48,7 @@ server = getTransactionResult :<|> postBatchTransactionResult
 
 ---------------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Keccak256 [TransactionResult] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable Keccak256 [TransactionResult] (Base.Eff es) where
   select _ txHash = fmap (Just . map E.entityVal) . sqlQuery $
     E.select $
       E.from $ \(txr) -> do

@@ -58,6 +58,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Data.Word
 import qualified Data.Vector as V
+import SolidVM.Model.SolidString (labelToText)
 import qualified SolidVM.Model.Value as SVM
 import qualified SolidVM.Model.Type as SVMType
 import Text.Printf
@@ -126,7 +127,7 @@ svmToSol (SVM.SContract _ a) = SolidityValueAsString $ Text.pack $ show a
 svmToSol (SVM.SBytes bs) = SolidityValueAsString $ Text.pack $ BC.unpack $ B16.encode bs
 svmToSol (SVM.SArray items) = SolidityArray $ map (svmToSol . SVM.getConst) (V.toList items)
 svmToSol (SVM.STuple items) = SolidityArray $ map (svmToSol . SVM.getConst) (V.toList items)
-svmToSol (SVM.SStruct _ vs) = SolidityObject $ map (\(k,v) -> (Text.pack k, svmToSol (SVM.getConst v))) (Map.toList vs)
+svmToSol (SVM.SStruct _ vs) = SolidityObject $ map (\(k,v) -> (labelToText k, svmToSol (SVM.getConst v))) (Map.toList vs)
 svmToSol SVM.SNULL = SolidityValueAsString "0"
 svmToSol _ = SolidityValueAsString "0"
 

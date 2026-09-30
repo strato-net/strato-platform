@@ -18,6 +18,14 @@ library
       SolidVM.Solidity.Parse.ParserTypes
       SolidVM.Solidity.Parse.UnParser
       SolidVM.Solidity.Parse.Declarations
+      SolidVM.Solidity.Parse.Fast.Lexer
+      SolidVM.Solidity.Parse.Fast.Monad
+      SolidVM.Solidity.Parse.Fast.Types
+      SolidVM.Solidity.Parse.Fast.Expression
+      SolidVM.Solidity.Parse.Fast.Statement
+      SolidVM.Solidity.Parse.Fast.Declarations
+      SolidVM.Solidity.Parse.Fast.File
+      SolidVM.Solidity.Parse.Fast.Parser
       SolidVM.Solidity.Xabi
   other-modules:
       SolidVM.Solidity.Parse.Alias
@@ -48,6 +56,7 @@ library
     , source-tools
     , strato-model
     , text
+    , vector
   default-language: Haskell2010
 
 executable parse-solidvm
@@ -66,6 +75,7 @@ test-suite solid-vm-spec
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
+      FastParserSpec
       ParserSpec
       PragmaSpec
       Spec
@@ -84,5 +94,6 @@ test-suite solid-vm-spec
     , solid-vm-parser
     , source-tools
     , strato-model
+    , text
     , vm-tools
   default-language: Haskell2010

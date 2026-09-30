@@ -84,6 +84,7 @@ executable slipstream
       base
     , blockapps-init
     , common-log
+    , composable-monads-base
     , hflags
     , persistent-postgresql
     , process-monitor

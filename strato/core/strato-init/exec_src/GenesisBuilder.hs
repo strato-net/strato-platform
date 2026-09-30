@@ -6,7 +6,6 @@
 
 {-# OPTIONS -fno-warn-orphans      #-}
 
-import BlockApps.Logging (runStdoutLoggingT)
 import Blockchain.DB.CodeDB (addCode)
 import Blockchain.Data.Block (blockBlockData)
 import qualified Blockchain.Data.BlockHeader as BH
@@ -16,7 +15,7 @@ import Blockchain.GenesisBlocks.Builder
 import Blockchain.Init.Monad (runSetupDBMInDir)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator
-import Conduit (runResourceT)
+import Control.Monad.Composable.Base (runEff, withResources, withStdoutLogger)
 import Control.Monad (void)
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
@@ -124,7 +123,7 @@ main = do
 
   -- Compute the correct stateRoot by populating the MPT in a temp directory
   -- (avoids locking conflicts with running strato processes)
-  computedStateRoot <- runStdoutLoggingT $ runResourceT $ runSetupDBMInDir "/tmp/genesis-builder-db" $ do
+  computedStateRoot <- runEff . withStdoutLogger . withResources . runSetupDBMInDir "/tmp/genesis-builder-db" $ do
     void $ addCode mempty
     genesisBlock <- genesisInfoToGenesisBlock gi'
     return $ BH.stateRoot $ blockBlockData genesisBlock

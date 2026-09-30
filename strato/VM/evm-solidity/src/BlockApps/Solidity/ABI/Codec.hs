@@ -30,6 +30,7 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Char (isDigit)
 import Data.List (isPrefixOf)
 import qualified Data.Vector as V
+import SolidVM.Model.SolidString (labelToString)
 import SolidVM.Model.Value
 
 --------------------------------------------------------------------------------
@@ -131,7 +132,7 @@ parseTypeDescriptor s
 
 typeArgToString :: Value -> Maybe String
 typeArgToString (SString s) = Just s
-typeArgToString (SEnum s) = Just s
+typeArgToString (SEnum s) = Just (labelToString s)
 typeArgToString _ = Nothing
 
 --------------------------------------------------------------------------------

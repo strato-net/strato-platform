@@ -4,10 +4,12 @@
 module BlockApps.Init (blockappsInit) where
 
 import BlockApps.Crossmon
-import BlockApps.Logging (LoggingT)
 import Control.Concurrent
 import Control.Monad
-import Control.Monad.Trans.Resource (ResourceT)
+import Control.Monad.Composable.Base (Eff)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
+import Data.Conduit (ConduitT)
 import Data.List (intercalate)
 import Data.Text hiding (intercalate)
 import Foreign hiding (void)
@@ -17,8 +19,13 @@ import Prometheus
 import System.IO
 import System.Posix.Signals
 
-instance (MonadMonitor m) => MonadMonitor (ResourceT m)
-instance (MonadMonitor m) => MonadMonitor (LoggingT m)
+-- Blanket rules so any @Eff@ row (or newtype over one) and any conduit on top
+-- of it can record metrics, the way the transformer instances used to allow.
+instance MonadMonitor (Eff es) where
+  doIO = liftIO
+
+instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
+  doIO = lift . doIO
 
 foreign import ccall unsafe "execvp"
   c_execvp :: CString -> Ptr CString -> IO CInt

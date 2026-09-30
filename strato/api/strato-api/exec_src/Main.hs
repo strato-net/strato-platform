@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,13 +23,16 @@ import Bloc.Server
 import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.CodeDB
+import Blockchain.DB.SQLDB (CirrusDB, SQLDB)
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
+import Blockchain.Data.Block (Block)
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Sequencer.Event (IngestEvent)
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
@@ -36,11 +41,10 @@ import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
 import Control.Monad.Change.Modify
+import Control.Monad.Composable.Base (AccessibleEnv, Eff, Logger, provide, runEff)
 import Control.Monad.Composable.SQL
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Control.Monad.Trans.Reader
 import Core.API
 import Data.Aeson ()
 import qualified Data.ByteString.Char8 as BC
@@ -57,6 +61,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
+import Handlers.QueuedTransactions ()
 import Strato.Auth.ClientCredentials (clientCredentialsConfig, discoveryUrl)
 import Instrumentation
 import Network.HTTP.Types.Status
@@ -76,23 +81,61 @@ import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
+-- | The API server monad: one field per former transformer layer.
+type ApiRow = '[UrlMap, BlocEnv, CirrusDB, SQLDB, Logger]
+
+newtype ApiM a = ApiM {unApiM :: Eff ApiRow a}
+  deriving newtype
+    ( Functor,
+      Applicative,
+      Monad,
+      MonadIO,
+      MonadUnliftIO,
+      MonadLogger,
+      Accessible UrlMap,
+      Accessible BlocEnv,
+      AccessibleEnv SQLDB,
+      AccessibleEnv CirrusDB,
+      GetLastBlocks,
+      GetReceipts,
+      GetLastTransactions
+    )
+
+instance ApiM `Outputs` [IngestEvent] where
+  output = ApiM . output
+
+-- Hand-written rather than derived: 'Selectable' has a constrained default
+-- method ('selectWithDefault'), which GeneralizedNewtypeDeriving cannot coerce.
+instance Selectable AccountsFilterParams [AddressStateRef] ApiM where
+  select p = ApiM . select p
+
+instance Selectable ProxyFilterParams [(AddressStateRef, String)] ApiM where
+  select p = ApiM . select p
+
+instance Selectable BlocksFilterParams [Block] ApiM where
+  select p = ApiM . select p
+
+instance Selectable Keccak256 [TransactionResult] ApiM where
+  select p = ApiM . select p
+
+instance Selectable StorageFilterParams [StorageAddress] ApiM where
+  select p = ApiM . select p
+
+instance Selectable TxsFilterParams [RawTransaction] ApiM where
+  select p = ApiM . select p
+
+instance (Keccak256 `Selectable` SourceMap) ApiM where
   select _ = getCodeFromPostgres
 
-instance {-# OVERLAPPING #-} (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
-  select p = lift . select p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
+instance (Keccak256 `Alters` DBCode) ApiM where
   lookup _ k = fmap (fmap Text.encodeUtf8) $ Account.getCodeFromPostgres' k
   insert _ _ _ = error "API: Keccak256 `Alters` DBCode insert"
   delete _ _ = error "API: Keccak256 `Alters` DBCode delete"
 
-instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a m) where
-  lookup p = lift . lookup p
-  insert p k = lift . insert p k
-  delete p = lift . delete p
+instance Selectable FilePath (Either String String) ApiM where
+  select p = liftIO . select p
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
+instance Selectable Address AddressState ApiM where
   select _ a = runMaybeT $ do
     (AddressStateRef' r) <-
       MaybeT
@@ -109,17 +152,14 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         codePtr
         (Just 0)
 
-instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
-  select p = lift . select p
+instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe SyncStatus) m where
+  access _ = liftIO $ fmap SyncStatus <$> runStratoRedisIO getSyncStatus
 
-instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
-  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
+instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe BestBlock) m where
+  access _ = liftIO $ runStratoRedisIO getBestBlockInfo
 
-instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
-  access _ = runStratoRedisIO getBestBlockInfo
-
-instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
-  access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
+instance {-# OVERLAPPABLE #-} MonadIO m => Accessible (Maybe WorldBestBlock) m where
+  access _ = liftIO $ fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
 
 type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
@@ -131,15 +171,17 @@ fullServer = coreApiServer :<|> bloc
 hoistCoreServer :: BlocEnv -> UrlMap -> Servant.Server FullAPI
 hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))) a -> Handler a
+    convertErrors :: ApiM a -> Handler a
     convertErrors x = Handler $ do
       y <- liftIO
         . try
-        . runLoggingT
+        . runEff
+        . runLogging
         . runSQLM
         . runCirrusM
-        . flip runReaderT blocEnv
-        . flip runReaderT urlMap
+        . provide blocEnv
+        . provide urlMap
+        . unApiM
         $ x `catch` handleRuntimeError `catch` handleApiError
       case y of
         Right a -> pure a

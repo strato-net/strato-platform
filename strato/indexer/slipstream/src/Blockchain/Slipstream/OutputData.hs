@@ -569,7 +569,7 @@ getTableColumnAndType isEvent cc@(CodeCollection ccs _ _ _ _ _ _ _ _) = mapMaybe
     go :: (Text, SVMType.Type) -> Maybe (T.Text, SqlType, Maybe T.Text)
     go (x, y) =
       (\v -> case y of
-        SVMType.UnknownLabel s -> (x, v, bool Nothing (Just $ T.pack s) $ Map.member s ccs)
+        SVMType.UnknownLabel s -> (x, v, bool Nothing (Just $ labelToText s) $ Map.member s ccs)
         _ -> (x, v, Nothing)
       ) <$> solidityTypeToSQLType isEvent Nothing cc y
 
@@ -1027,7 +1027,7 @@ aggEventToCollectionRows ae =
     [] -> []
     args ->
       let (arrayName, arrayElements) = getArraysFromEvents args
-      in map (aggEventToCollectionRow ae ev (T.pack arrayName)) arrayElements
+      in map (aggEventToCollectionRow ae ev arrayName) arrayElements
   where
     ev = eventEvent ae
 
@@ -1035,7 +1035,7 @@ aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Val
 aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
     { address = Action.evContractAddress ev,
-      eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
+      eventInfo = Just (Action.evName ev, eventIndex ae),
       collection_name = arrayName,
       collection_type = "Event Array",
       blockHash = eventBlockHash ae,
@@ -1047,7 +1047,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataValue = value
     }
 
-getArraysFromEvents :: [(String, SVMValue.Value, String, SVMType.Type)] -> (String, [(Value, Value)])
+getArraysFromEvents :: [(Text, SVMValue.Value, Text, SVMType.Type)] -> (Text, [(Value, Value)])
 getArraysFromEvents evArgs = do
   let li = [(name, valStr) | (name, _, valStr, t) <- evArgs, isArrayType t]
       isArrayType (SVMType.Array _ _) = True
@@ -1055,7 +1055,7 @@ getArraysFromEvents evArgs = do
   case li of
     [] -> ("", [])
     (arrayName, arrayStr):_ ->
-         let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 $ T.pack arrayStr) :: Maybe [String])
+         let elements = fromMaybe [] (Aeson.decode (BL.fromStrict $ TE.encodeUtf8 arrayStr) :: Maybe [String])
          in (arrayName, zip (map (SimpleValue . ValueString . T.pack . show) [0 :: Int ..])
                             (map (SimpleValue . ValueString . T.pack) elements))
 
@@ -1084,11 +1084,12 @@ insertGlobalEventTableQuery aggregatedEvents =
       baseEventColumns ++
       [ ("event_name", SqlText)
       , ("attributes", SqlJsonb)
+      , ("contract_name", SqlText)
       ]
 
     eventValues agEv@AggregateEvent {eventEvent = ev} =
       let attributesMap = ValueMapping $
-            Map.fromList [(ValueString $ T.pack name, SimpleValue . ValueString $ T.pack valStr) | (name, _, valStr, _) <- Action.evArgs ev]
+            Map.fromList [(ValueString name, SimpleValue . ValueString $ valStr) | (name, _, valStr, _) <- Action.evArgs ev]
        in Just <$>
             [ SimpleValue . ValueAddress $ Action.evContractAddress ev
             , SimpleValue . ValueString . T.pack . keccak256ToHex $ eventBlockHash agEv
@@ -1097,8 +1098,9 @@ insertGlobalEventTableQuery aggregatedEvents =
             , SimpleValue . ValueInt False Nothing $ eventBlockNumber agEv
             , SimpleValue . ValueAddress $ Action.evTxSender ev
             , SimpleValue . ValueInt False Nothing . fromIntegral $ eventIndex agEv
-            , SimpleValue . ValueString . T.pack $ Action.evName ev
+            , SimpleValue . ValueString $ Action.evName ev
             , attributesMap
+            , SimpleValue . ValueString $ Action.evContractName ev
             ]
 
 ------------------
@@ -1287,10 +1289,12 @@ initialSlipstreamQueries =
       , ("event_index", SqlDecimal)
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
+      , ("contract_name", SqlText)
       ]
       ["address", "block_hash", "event_index"]
       Nothing -- (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
       []
+  , RawSQL "ALTER TABLE event ADD COLUMN IF NOT EXISTS contract_name text;"
   , CreateTable
       eventArrayTableName
       [ ("address", SqlText)

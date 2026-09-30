@@ -30,6 +30,7 @@ library:
     - Blockchain.Init.RtsFlags
   dependencies:
   - aeson
+  - composable-monads-base
   - blockapps-data
   - data-default
   - blockapps-mpdbs
@@ -98,6 +99,7 @@ executables:
       - blockapps-mpdbs
       - bytestring
       - common-log
+      - composable-monads-base
       - conduit
       - data-default
       - strato-genesis

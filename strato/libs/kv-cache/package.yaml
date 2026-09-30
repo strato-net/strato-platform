@@ -1,0 +1,32 @@
+name: kv-cache
+version: 0.1.0.0
+synopsis: In-process caching layers for a key-value store
+description: |
+  A write-behind cache of parsed values in front of a byte-keyed store, for
+  a hot read/write path where an ordered LRU's per-hit bookkeeping is too
+  expensive. One 'Cache v' holds parsed values in a map that empties itself at
+  capacity, copies key and value bytes into slabs on the C heap so a cached
+  entry never pins the store's read buffer, and holds writes back to hand
+  over in one batch every N units of work while reads can still see them.
+license: MIT
+author: BlockApps
+maintainer: info@blockapps.net
+category: Data
+
+ghc-options:
+  - -Wall
+  - -O2
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - KV.Cache
+  other-modules:
+    - KV.Cache.Arena
+    - KV.Cache.BoundedMap
+    - KV.Cache.WriteBatch
+  dependencies:
+    - base >= 4.14 && < 5
+    - bytestring
+    - hashable
+    - unordered-containers

@@ -1631,9 +1631,14 @@ pg_temp_start() {
   # right after the multi-GB snapshot extraction, and on slower filesystems
   # (e.g. macOS bind mounts, with the page cache still flushing the extracted
   # state) it can take several minutes to become ready.
+  # Probe over TCP, not the unix socket: on an empty data dir the image's
+  # entrypoint first runs a socket-only init server (initdb, CREATE DATABASE
+  # eth), stops it, then starts the real one. A socket probe reports ready
+  # during that init phase, and the psql/pg_restore that follows lands in the
+  # gap between the two servers ("connection to server on socket ... failed").
   local i
   for i in $(seq 1 300); do
-    if docker exec "$cid" pg_isready -U postgres >/dev/null 2>&1; then
+    if docker exec "$cid" pg_isready -h 127.0.0.1 -U postgres >/dev/null 2>&1; then
       printf '%s\n' "$cid"
       return 0
     fi
@@ -1688,7 +1693,7 @@ load_databases() {
   local dumps_dir="$2"
   local node_password="$3"
   [[ "${STRATO_SNAPSHOT_OFFLINE_TEST:-}" == "1" ]] && return 0
-  local cid db run_user jobs t0 t1
+  local cid db run_user jobs t0 t1 restore_log
   run_user="$(postgres_run_user "$(dirname "$data_dir")")"
   jobs="$(snapshot_pg_jobs)"
   # The dumps are bind-mounted read-only into the throwaway container: pg_restore
@@ -1712,13 +1717,22 @@ load_databases() {
     t1="$(date +%s)"
     info "      Database '$db': drop and recreate it empty, then pg_restore -j $jobs from $db.dump ($(human_bytes "$(file_size_bytes "$dumps_dir/$db.dump")"))"
     info "      (the dump holds table data only; every index is rebuilt here, which is what takes the time)"
-    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null 2>&1 \
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
-    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null 2>&1 \
+    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
+    restore_log="$(mktemp_dir)/pg_restore-$db.log"
     docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
-      -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>&1 \
-      || { pg_temp_stop "$cid"; die "failed to restore dump for database '$db'"; }
+      -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>"$restore_log" \
+      || {
+        # pg_restore's own errors say why (e.g. "No space left on device": the
+        # rebuilt cluster is ~15x the dumps, most of it Cirrus indexes).
+        warn "pg_restore for database '$db' failed; last lines of its output:"
+        tail -n 20 "$restore_log" >&2
+        df -h "$data_dir" >&2
+        pg_temp_stop "$cid"
+        die "failed to restore dump for database '$db'"
+      }
     info "      Database '$db' loaded in $(elapsed_since "$t1")"
   done
   info "      Stopping the temporary postgres (clean shutdown, so the node's own postgres can open the cluster)"

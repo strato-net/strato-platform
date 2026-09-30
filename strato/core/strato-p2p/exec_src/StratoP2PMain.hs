@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -22,6 +23,7 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Threads
+import           Control.Monad.Composable.Base (Eff, Logger, runEff)
 import           Control.Monad.Composable.Vault (runVaultM)
 import           Executable.StratoP2P
 import           BlockApps.Init
@@ -35,9 +37,9 @@ import           Control.Monad.Composable.Streaming (createStreamEnv, createTopi
 import           Control.Concurrent.MVar (newMVar)
 
 main :: IO ()
-main = runLoggingT initP2P
+main = runEff $ runLogging initP2P
 
-initP2P :: LoggingT IO ()
+initP2P :: Eff '[Logger] ()
 initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
   liftIO $ runInstrumentation "strato-p2p"
@@ -47,7 +49,7 @@ initP2P = labelTheThread "initP2P" $ do
   -- a freshly created table will already have all peers in the inactive state.
   _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
-  liftIO $ runStreamMConfigured "strato-p2p" $ do
+  runStreamMConfigured "strato-p2p" $ do
     createTopicAndWait seqP2pEventsTopicName
     createTopicAndWait unseqEventsTopicName
   setParticipationMode flags_participationMode
@@ -56,7 +58,7 @@ initP2P = labelTheThread "initP2P" $ do
   bcast <- newSeqEventBroadcast
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
       streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
-      runner f = runLoggingT $ runVaultM vaultUrl' $ do
+      runner f = runEff . runLogging $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         -- Every peer connection gets its own producer. A single process-wide

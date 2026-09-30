@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
@@ -33,7 +34,6 @@ import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Conduit
 import Control.Monad (when)
 import Control.Monad.Change (Alters)
 import qualified Control.Monad.Change as A
@@ -212,13 +212,17 @@ stateDiff ::
   Keccak256 ->
   StateRoot ->
   StateRoot ->
-  ConduitT i StateDiff m ()
+  m [StateDiff]
 stateDiff chainId blockNumber blockHash oldRoot newRoot = do
-  mOldSR <- lift $ A.lookup (A.Proxy @MP.StateRoot) chainId
-  lift $ A.insert (A.Proxy @MP.StateRoot) chainId newRoot
-  stateDiff' chainId blockNumber blockHash oldRoot newRoot
-  lift $ A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
+  mOldSR <- A.lookup (A.Proxy @MP.StateRoot) chainId
+  A.insert (A.Proxy @MP.StateRoot) chainId newRoot
+  sds <- stateDiff' chainId blockNumber blockHash oldRoot newRoot
+  A.alter_ (A.Proxy @MP.StateRoot) chainId $ pure . const mOldSR
+  pure sds
 
+-- | One 'StateDiff' per changed account. (StateDiffs go through Kafka, whose
+-- ~1MB message limit a single large contract can exceed, so they are not
+-- batched here.)
 stateDiff' ::
   ( MonadLogger m,
     HasCodeDB m,
@@ -230,50 +234,21 @@ stateDiff' ::
   Keccak256 ->
   StateRoot ->
   StateRoot ->
-  ConduitT i StateDiff m ()
-stateDiff' chainId blockNumber blockHash oldRoot newRoot = do
-  Diff.dbDiff oldRoot newRoot
-    .| (await >>= go (0 :: Integer) [])
-    .| awaitForever (\i -> collectModes i emitDiff)
+  m [StateDiff]
+stateDiff' chainId blockNumber blockHash oldRoot newRoot =
+  Diff.dbDiff oldRoot newRoot >>= mapM accountStateDiff
   where
-    -- NOTE: The `go` function batches individual account diffs into one StateDiff message.
-    -- This was originally set to 100 when StateDiffs went directly to SQL (no message size limits).
-    -- Now that StateDiffs flow through Kafka, the batch size is set to 1 to avoid exceeding
-    -- Kafka's message size limit (~1MB) - contracts with large storage can exceed this easily.
-    --
-    -- With batch size 1, `go` is effectively a pass-through and this batching logic is unnecessary.
-    -- A cleaner solution would be:
-    --   1. Remove `go` entirely from the producer - send individual account diffs as separate messages
-    --   2. Move batching to the consumer (strato-index) - Kafka's consume already batches reads,
-    --      so the indexer could merge multiple messages into one SQL transaction
-    -- This would be more "Kafka-native" (many small messages) and let the consumer optimize SQL
-    -- batching based on what it receives, rather than having the producer guess at batch sizes.
-    go _ diffs Nothing = yield $ reverse diffs
-    go 1 diffs d = yield (reverse diffs) >> go 0 [] d
-    go n diffs (Just d) = await >>= go (n + 1) (d : diffs)
-    collectModes diffs f = do
-      (c, d, u) <- coll [] [] [] diffs
-      f c d u
-    coll c d u [] = return (Map.fromList c, Map.fromList d, Map.fromList u)
-    coll c d u (Diff.Create k v : rest) = do
-      createDiff <- lift $ accountEnd k v
-      coll (createDiff : c) d u rest
-    coll c d u (Diff.Delete k v : rest) = do
-      deleteDiff <- lift $ accountEnd k v
-      coll c (deleteDiff : d) u rest
-    coll c d u (Diff.Update k v1 v2 : rest) = do
-      updateDiff <- lift $ accountUpdate k v1 v2
-      coll c d (updateDiff : u) rest
-    emitDiff createdAccounts deletedAccounts updatedAccounts =
-      yield $
-        StateDiff
-          chainId
-          blockNumber
-          blockHash
-          newRoot
-          createdAccounts
-          deletedAccounts
-          updatedAccounts
+    accountStateDiff = \case
+      Diff.Create k v -> do
+        (a, d) <- accountEnd k v
+        pure $ mk (Map.singleton a d) Map.empty Map.empty
+      Diff.Delete k v -> do
+        (a, d) <- accountEnd k v
+        pure $ mk Map.empty (Map.singleton a d) Map.empty
+      Diff.Update k v1 v2 -> do
+        (a, d) <- accountUpdate k v1 v2
+        pure $ mk Map.empty Map.empty (Map.singleton a d)
+    mk = StateDiff chainId blockNumber blockHash newRoot
 
 accountEnd ::
   ( MonadLogger m,
@@ -387,7 +362,7 @@ incrementalStorage ::
   StateRoot ->
   m (StorageDiff 'Incremental)
 incrementalStorage oldRoot newRoot = do
-  storageDiffs <- runConduit $ Diff.dbDiff oldRoot newRoot .| sinkList
+  storageDiffs <- Diff.dbDiff oldRoot newRoot
   let decodeAll = fmap Map.fromList . mapM decodeDiffKV
   SolidVMDiff <$> decodeAll storageDiffs
   where

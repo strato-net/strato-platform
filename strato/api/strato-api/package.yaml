@@ -23,6 +23,7 @@ executables:
     - cache
     - clock
     - common-log
+    - composable-monads-base
     - containers
     - core-api2
     - ethereum-discovery
@@ -32,6 +33,7 @@ executables:
     - lens
     - monad-alter
     - process-monitor
+    - seqevents
     - servant-multipart
     - servant-server
     - servant-openapi3

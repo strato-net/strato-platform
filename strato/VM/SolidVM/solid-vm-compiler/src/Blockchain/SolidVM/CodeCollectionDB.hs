@@ -52,6 +52,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Default
 import Data.Foldable (foldrM)
+import GHC.Compact (Compact, compact, getCompact)
+import qualified Data.Cache.LRU as LRU
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -64,14 +66,14 @@ import SolidVM.Model.CodeCollection
 import qualified SolidVM.Model.CodeCollection.Def as Def
 import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
-import SolidVM.Solidity.Parse.File
+import qualified SolidVM.Solidity.Parse.Fast.Parser as Fast
+import SolidVM.Solidity.Parse.File (File (..))
 import SolidVM.Solidity.Parse.ParserTypes
 import qualified SolidVM.Solidity.StaticAnalysis.Functions.ConstantFunctions as ConstantFunctions
 import SolidVM.Solidity.StaticAnalysis.Optimizer as O
 import qualified SolidVM.Solidity.StaticAnalysis.Statements.MultipleDeclarations as MultipleDeclarations
 import qualified SolidVM.Solidity.StaticAnalysis.Typechecker as TypeChecker
 import System.IO.Unsafe
-import Text.Parsec (runParser)
 import Text.Parsec.Error
 
 data CompilationError
@@ -104,12 +106,28 @@ runMemCompilerT :: Monad m => MemCompilerT m a -> m a
 runMemCompilerT = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT . unMemCompilerT
 
 -- Apply/catchup touches far more than 10 contracts (DEC1DE, USDST, voucher,
--- oracles, user code). A 10-entry LRU evicts and re-typechecks on the hot path.
+-- oracles, user code), so the LRU holds well over 10 entries.
 -- Keyed by (code hash, legacy operator precedence): the same source parses to
 -- a different AST on either side of the operator-precedence fork.
+-- Each entry lives in its own compact region: the GC neither traces nor copies it.
+maxCacheSize :: Integer
+maxCacheSize = 128
+
 {-# NOINLINE unsafeCodeCacheIORef #-}
-unsafeCodeCacheIORef :: IORef (M.Map (Keccak256, Bool) CodeCollection)
-unsafeCodeCacheIORef = unsafePerformIO $ newIORef M.empty
+unsafeCodeCacheIORef :: IORef (LRU.LRU (Keccak256, Bool) (Compact CodeCollection))
+unsafeCodeCacheIORef = unsafePerformIO $ newIORef $ LRU.newLRU (Just maxCacheSize)
+
+codeCacheLookup :: MonadIO m => (Keccak256, Bool) -> m (Maybe CodeCollection)
+codeCacheLookup k = liftIO $ do
+  cache <- readIORef unsafeCodeCacheIORef
+  case LRU.lookup k cache of
+    (cache', Just c) -> writeIORef unsafeCodeCacheIORef cache' >> pure (Just (getCompact c))
+    (_, Nothing) -> pure Nothing
+
+codeCacheInsert :: MonadIO m => (Keccak256, Bool) -> CodeCollection -> m ()
+codeCacheInsert k cc = liftIO $ do
+  c <- compact cc
+  modifyIORef' unsafeCodeCacheIORef (LRU.insert k c)
 
 -- | Parse-time switches. The VM derives them from the block being executed;
 -- everything else (APIs, tooling, tests) uses 'defaultParseOptions'.
@@ -138,7 +156,7 @@ parseSource :: T.Text -> T.Text -> Either CompilationError [SourceUnit]
 parseSource = parseSourceWith defaultParseOptions
 
 parseSourceWith :: ParseOptions -> T.Text -> T.Text -> Either CompilationError [SourceUnit]
-parseSourceWith opts fileName src = bimap PEx unsourceUnits $ runParser solidityFile (parserStateFor opts) (T.unpack fileName) (T.unpack src)
+parseSourceWith opts fileName src = bimap PEx unsourceUnits $ Fast.parseSolidity (parserStateFor opts) (T.unpack fileName) src
 
 parseSourceWithAnnotations :: T.Text -> T.Text -> Either [SourceAnnotation T.Text] [SourceUnit]
 parseSourceWithAnnotations fileName = runIdentity . withAnnotations (Identity . parseSource fileName)
@@ -168,7 +186,7 @@ compileSourceNoInheritanceWith opts isRunningTests typeCheck initCodeMap = runEx
         sourceUnits <- parseSourceWith opts fileName src
         foldrM (\u ufu -> maybe (pure ufu) (first (IEx . (<$ (def :: SourceAnnotation ()))) . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
-      userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
+      userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, stringToLabel typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
         FLContract c -> do
           let ctrct = c & userDefined .~ userDefinedFromFile ss
@@ -176,19 +194,19 @@ compileSourceNoInheritanceWith opts isRunningTests typeCheck initCodeMap = runEx
         FLFunc name fdec ->
           pure . Just $ def & ufuUnits . at name ?~ FUFunction fdec
         FLConstant name cnst ->
-          pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUConstant cnst
+          pure . Just $ def & ufuUnits . at name ?~ FUConstant cnst
         FLStruct name (Def.Struct fs _ a) ->
           let fls = (\(n, t) -> (n, t, a)) <$> fs
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUStruct fls
+           in pure . Just $ def & ufuUnits . at name ?~ FUStruct fls
         FLEnum name (Def.Enum ns _ a) ->
           let fle = (ns, a)
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUEnum fle
+           in pure . Just $ def & ufuUnits . at name ?~ FUEnum fle
         FLError name (Def.Error ps _ a) ->
           let fler = (\(n, t) -> (n, t, a)) <$> ps
-           in pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUError fler
-        FLUsing u -> pure . Just $ def & ufuUnits . at (show u) ?~ FUUsing u
+           in pure . Just $ def & ufuUnits . at name ?~ FUError fler
+        FLUsing u -> pure . Just $ def & ufuUnits . at (stringToLabel (show u)) ?~ FUUsing u
         Pragma _ n v ->
-          pure . Just $ def & ufuPragmas . at n ?~ v
+          pure . Just $ def & ufuPragmas . at (labelToString n) ?~ v
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
@@ -292,8 +310,8 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
         _ -> BL.toStrict $ Aeson.encode initList
       hsh = hash canonicalInitCode
       cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup cacheKey codeCache of
+  mcc <- codeCacheLookup cacheKey
+  case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
       return (hsh, cc)
@@ -307,7 +325,7 @@ codeCollectionFromSourceWith opts isRunningTests typeCheck initCode = do
             Left (IEx p) -> typeError "codeCollectionFromSource" $ show p
             Left (SVMEx (s, _)) -> throw s
             Left (TCEx xs) -> typeError "Typechecker" $ T.unpack (typeErrorToAnnotation xs)
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert cacheKey cc)
+      codeCacheInsert cacheKey cc
       return $ assert (hsh == hsh') (hsh, cc)
 
 codeCollectionFromHash ::
@@ -335,15 +353,15 @@ codeCollectionFromHashWith ::
   m CodeCollection
 codeCollectionFromHashWith opts isRunningTests typeCheck hsh = do
   let cacheKey = (hsh, parseLegacyOperatorPrecedence opts)
-  codeCache <- liftIO $ readIORef unsafeCodeCacheIORef
-  case M.lookup cacheKey codeCache of
+  mcc <- codeCacheLookup cacheKey
+  case mcc of
     Just cc -> do
       recordCacheEvent CacheHit
       return cc
     Nothing -> do
       recordCacheEvent CacheMiss
       cc <- codeCollectionFromHashNoCacheWith opts isRunningTests True typeCheck hsh
-      liftIO $ modifyIORef' unsafeCodeCacheIORef (M.insert cacheKey cc)
+      codeCacheInsert cacheKey cc
       return cc
 
 codeCollectionFromHashNoCacheWith ::

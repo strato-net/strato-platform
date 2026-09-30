@@ -5,6 +5,7 @@ module Server
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
 import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, jsonRpcPort, runStreamMConfigured)
@@ -25,7 +26,7 @@ startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
   let host = apiListenAddress $ apiConfig ethConf
-  runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+  runEff $ runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
   -- One consumer of the response topic for the whole process; request
   -- handlers register for their reply by id (see ResponseDispatcher).
   startResponseDispatcher
