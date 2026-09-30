@@ -8,8 +8,10 @@ library BridgeTypes {
         COMPLETED,    // flow fully executed
         ABORTED,      // user/relayer reclaimed escrow
         SWEPT,        // withdrawal: governance cancelled it and moved the escrow to a triage wallet
-        QUARANTINED   // deposit: received in custody but not mintable as requested; governance
+        QUARANTINED,  // deposit: received in custody but not mintable as requested; governance
                       // resolves it with rerouteDeposit or abortDeposit
+        REFUND_PENDING,
+        REFUNDED
     }
 
     struct DepositInfo {

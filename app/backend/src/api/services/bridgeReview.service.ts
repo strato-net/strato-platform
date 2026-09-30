@@ -4,7 +4,7 @@ import { nodeUrl, adminRegistry } from "../../config/config";
 import { constants, BRIDGE_REVIEW_PAGE_SIZE, BRIDGE_REVIEW_ID_BATCH_SIZE } from "../../config/constants";
 import { cirrus } from "../../utils/appApiHelper";
 import { StratoError } from "../../errors";
-import { buildBridgePolicyRows, parseBridgePolicyJson, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue } from "../helpers/bridge.helper";
+import { buildBridgePolicyRows, parseBridgePolicyJson, buildBridgeDigestCall, parseBridgeDigest, parseBridgeReviewIssue, bridgeReviewFunction } from "../helpers/bridge.helper";
 
 const readReviewRows = async <T = BridgeReviewRow>(accessToken: string, contract: string, address: string, table: string, filters: Record<string, string>, lossless = false): Promise<T[]> => {
   if (!address) return [];
@@ -23,9 +23,9 @@ const readReviewRows = async <T = BridgeReviewRow>(accessToken: string, contract
 export const getAdminBridgeReviews = async (accessToken: string, userAddress?: string): Promise<BridgeReviewItem[]> => {
   const { ExternalAssetBridge, externalAssetBridge, StratoNativeBridge, stratoNativeBridge, MercataBridge, mercataBridge } = constants;
   const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals] = await Promise.all([
-    readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": "eq.2" }),
+    readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawals", { "value->>status": "in.(2,3)" }),
-    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "eq.2" }),
+    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { "value->>bridgeStatus": "eq.2", "value->>useInstantPath": "eq.false" }),
     readReviewRows(accessToken, MercataBridge, mercataBridge, "deposits", { select: "key,key2,value", order: "key.asc,key2.asc", "value->>bridgeStatus": "eq.2" }),
     readReviewRows(accessToken, MercataBridge, mercataBridge, "withdrawals", { "value->>bridgeStatus": "eq.2" }),
@@ -37,8 +37,24 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
       key: `in.(${ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).join(",")})`,
     }));
   }
+  const nativeRefundIds = nativeDeposits.filter(row => Number(row.value.bridgeStatus) === 7).map(row => row.key);
+  for (let offset = 0; offset < nativeRefundIds.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+    const [proposals, evidence] = await Promise.all(["depositRefundProposals", "depositRefundEvidence"].map(table =>
+      readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, table, {
+        key: `in.(${nativeRefundIds.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).join(",")})`,
+      })));
+    const evidenceHashes = new Map(evidence.map(row => [String(row.key), row.value]));
+    for (const row of nativeDeposits) if (evidenceHashes.has(String(row.key))) row.value.refundEvidenceHash = evidenceHashes.get(String(row.key));
+    const hashes = new Map(proposals.map(row => [String(row.key), row.value]));
+    for (const row of nativeDeposits) if (hashes.has(String(row.key))) row.value.refundProposalHash = hashes.get(String(row.key));
+  }
   const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals });
-  for (const item of items) item.actions = item.actions.filter(action => action !== "settle");
+  const chains = new Map((await readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "chains", {})).map(row => [String(row.key), row.value]));
+  for (const item of items.filter(item => item.source === "eab" && item.actions.includes("refund") && item.kind !== "withdrawal_refund")) {
+    const vault = chains.get(item.chainId)?.vault;
+    if (typeof vault === "string" && /^(0x)?[a-f0-9]{40}$/i.test(vault) && !/^(0x)?0+$/.test(vault)) item.refundVault = vault.replace(/^0x/i, "").toLowerCase();
+    else item.actions = item.actions.filter(action => action !== "refund");
+  }
   const digests = new Map<string, Promise<string>>();
   const depositDigest = (item: BridgeReviewItem) => {
     if (!digests.has(item.id)) {
@@ -86,26 +102,24 @@ const enrichReviewGovernance = async (
   accessToken: string, items: BridgeReviewItem[], userAddress: string,
   depositDigest: (item: BridgeReviewItem) => Promise<string>,
 ): Promise<void> => {
-  const reviews = items.filter(item => item.source === "eab" && item.actions.some(action => action !== "settle"));
+  const reviews = items.filter(item => item.source !== "legacy" && item.actions.length > 0);
   if (!reviews.length) return;
-  const { AdminRegistry, externalAssetBridge } = constants;
+  const { AdminRegistry, externalAssetBridge, stratoNativeBridge } = constants;
   const normalize = (address: string) => address.toLowerCase().replace(/^0x/, "");
   try {
     const [registry, admins, thresholds, active] = await Promise.all([
       cirrus.get(accessToken, `/${AdminRegistry}`, { params: { address: `eq.${adminRegistry}`, select: "defaultVotingThresholdBps", limit: 1 } }),
       readReviewRows<BridgeReviewRow<unknown>>(accessToken, AdminRegistry, adminRegistry, "admins", {}),
-      readReviewRows<BridgeReviewRow<unknown>>(accessToken, AdminRegistry, adminRegistry, "votingThresholds", { key: `eq.${externalAssetBridge}`, select: "key,key2,value", order: "key.asc,key2.asc" }),
+      readReviewRows<BridgeReviewRow<unknown>>(accessToken, AdminRegistry, adminRegistry, "votingThresholds", { key: `in.(${[externalAssetBridge, stratoNativeBridge].filter(Boolean).join(",")})`, select: "key,key2,value", order: "key.asc,key2.asc" }),
       readReviewRows<BridgeReviewRow<unknown>>(accessToken, AdminRegistry, adminRegistry, "currentIssues", { value: "eq.true" }),
     ]);
     const adminCount = new Set(admins.map(row => String(row.value)).filter(value => /^(0x)?[0-9a-f]{40}$/i.test(value) && !/^(0x)?0+$/i.test(value)).map(normalize)).size;
     const defaultBps = Number(registry.data?.[0]?.defaultVotingThresholdBps);
     if (!adminCount || !Number.isSafeInteger(defaultBps) || defaultBps < 1 || defaultBps > 10000) throw new Error("Voting configuration unavailable");
-    const functions = { approve: "approveReviewedDeposit", reject: "abortDeposit", refund: "refundWithdrawal" };
     for (const item of reviews) {
       item.governance = {};
       for (const action of item.actions) {
-        if (action === "settle") continue;
-        const override = Number(thresholds.find(row => normalize(row.key) === normalize(externalAssetBridge) && row.key2 === functions[action])?.value ?? 0);
+        const override = Number(thresholds.find(row => normalize(row.key) === normalize(item.source === "native" ? stratoNativeBridge : externalAssetBridge) && row.key2 === bridgeReviewFunction(item, action))?.value ?? 0);
         const bps = override === 0 ? defaultBps : override;
         if (!Number.isSafeInteger(bps) || bps < 1 || bps > 10000) throw new Error("Voting threshold unavailable");
         item.governance[action] = { votesCast: 0, votesRequired: Math.ceil(adminCount * bps / 10000), hasVoted: false };
@@ -117,15 +131,17 @@ const enrichReviewGovernance = async (
     for (let offset = 0; offset < ids.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
       const batch = ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
       const events = await readReviewRows(accessToken, AdminRegistry, adminRegistry, "IssueCreated", {
-        issueId: `in.(${batch.join(",")})`, target: `eq.${externalAssetBridge}`,
-        func: "in.(approveReviewedDeposit,abortDeposit,refundWithdrawal)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
+        issueId: `in.(${batch.join(",")})`, target: `in.(${[externalAssetBridge, stratoNativeBridge].filter(Boolean).join(",")})`,
+        func: "in.(approveReviewedDeposit,abortDeposit,refundWithdrawal,authorizeDepositDelivery,reopenDeposit,requestDepositRefund,finalizeDepositRefund)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
       }) as unknown as Array<{ issueId: string; target: string; func: string; args: unknown }>;
       const matched = await Promise.all(events.map(async event => {
-        if (!batch.includes(event.issueId) || normalize(event.target) !== normalize(externalAssetBridge)) return undefined;
+        if (!batch.includes(event.issueId)) return undefined;
         const match = parseBridgeReviewIssue(event.func, event.args);
         const item = match && byId.get(match.id);
-        if (!match || !item || !item.governance?.[match.action]) return undefined;
-        if (match.action === "approve" && match.digest !== await depositDigest(item)) return undefined;
+        if (!match || !item || !item.governance?.[match.action] || normalize(event.target) !== normalize(item.source === "native" ? stratoNativeBridge : externalAssetBridge) || event.func !== bridgeReviewFunction(item, match.action)) return undefined;
+        if (event.func === "approveReviewedDeposit" && match.digest !== await depositDigest(item)) return undefined;
+        if (match.vault && match.vault !== item.refundVault) return undefined;
+        if (match.refundEvidenceHash && match.refundEvidenceHash !== normalize(item.refundEvidenceHash || "")) return undefined;
         return { event, item, action: match.action };
       }));
       const matchedIds = [...new Set(matched.flatMap(match => match ? [match.event.issueId] : []))];
@@ -171,10 +187,24 @@ const hasRefundQuorum = async (accessToken: string, digest: string): Promise<boo
 };
 
 export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote> => {
-  if (!["approve", "reject", "refund"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
+  if (!["approve", "reject", "refund", "confirm_refund"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
   const item = (await getAdminBridgeReviews(accessToken)).find(entry => entry.id === id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
-  const target = constants.externalAssetBridge;
+  const target = item.source === "native" ? constants.stratoNativeBridge : constants.externalAssetBridge;
+  if (action === "confirm_refund") {
+    if (item.source !== "native" || !item.refundEvidenceHash) throw new StratoError("Native refund evidence is unavailable", 409);
+    return { target, func: "finalizeDepositRefund", args: [item.reference, item.refundEvidenceHash] };
+  }
+  if (item.source === "native") return { target, func: bridgeReviewFunction(item, action as "approve" | "refund"), args: [item.reference] };
+  if (item.kind === "deposit_recovery" || (item.kind === "deposit_review" && action === "refund")) {
+    const [, , chainId, router, depositId] = id.split(":");
+    const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];
+    if (action === "refund") {
+      if (!item.refundVault) throw new StratoError("Refund vault is unavailable", 409);
+      args.push(`0x${item.refundVault}`);
+    }
+    return { target, func: bridgeReviewFunction(item, action as "approve" | "refund"), args };
+  }
   if (item.kind === "deposit_review") {
     const [, , chainId, router, depositId] = id.split(":");
     const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];

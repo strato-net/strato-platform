@@ -3,8 +3,8 @@ import path from "node:path";
 import { buildBridgeReviewQueue, type BridgeReviewItem } from "@strato/shared-types";
 import { config } from "../config";
 import { normalizeOptionalHash } from "../utils/utils";
-import { getBridgeReviewRecords, getWithdrawalRefundEvidence, getSettlementAttestationCount, getSettlementVerifierConfig } from "./cirrusService";
-import { getStratoNetworkId, confirmReviewedDeposit } from "./bridgeService";
+import { getBridgeReviewRecords, getBridgeReviewOutcome, getWithdrawalRefundEvidence, getSettlementAttestationCount, getSettlementVerifierConfig, getDepositReviewApproval } from "./cirrusService";
+import { getStratoNetworkId } from "./bridgeService";
 import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authorizationValidation";
 import { rpc } from "../utils/api";
 import { attestWithdrawalRefund } from "./settlementAttestationService";
@@ -38,18 +38,11 @@ export const getBridgeReviewQueue = async (): Promise<BridgeReviewItem[]> => {
   return buildBridgeReviewQueue(records, pendingProposals);
 };
 
-export const prepareBridgeOperation = async (id: string, action: string): Promise<{ digest: string } | { transactionHash: string }> => {
-  if (action !== "refund" && action !== "settle") throw new Error("Unsupported bridge operation");
+export const prepareBridgeOperation = async (id: string, action: string): Promise<{ digest: string }> => {
+  if (action !== "refund") throw new Error("Unsupported bridge operation");
   const item = buildBridgeReviewQueue(await getBridgeReviewRecords()).find(entry => entry.id === id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new Error("Review action is unavailable; refresh the queue");
-  if (item.kind === "deposit_review") {
-    const [, , chainId, router, depositId] = id.split(":");
-    if (action === "settle") {
-      if (!Number.isSafeInteger(Number(chainId)) || Number(chainId) <= 0) throw new Error("Unsupported external chain ID");
-      return { transactionHash: await confirmReviewedDeposit(Number(chainId), router, depositId) };
-    }
-    throw new Error("Unsupported deposit operation");
-  }
+  if (item.kind !== "withdrawal_refund") throw new Error("Deposit refunds require a governance decision on STRATO");
   return prepareWithdrawalRefund(item.reference);
 };
 
@@ -103,13 +96,46 @@ export const notifyBridgeReviews = async (): Promise<void> => {
   };
   const present = new Set(current.map(item => item.id));
   for (const item of current) {
-    if (JSON.stringify(saved[item.id]) === JSON.stringify(item)) continue;
-    try { await sendBridgeReviewEmail(item); saved[item.id] = item; await persist(); }
+    try {
+      if (item.recoveryStatus === "reopened" || (item.recoveryStatus === "refund_pending" && !normalizeOptionalHash(item.safeProposalHash) && !item.refundEvidenceHash)) {
+        if (saved[item.id] && JSON.stringify(saved[item.id]) !== JSON.stringify(item)) {
+          saved[item.id] = item; await persist();
+        }
+        continue;
+      }
+      if (item.kind === "withdrawal_review" && !normalizeOptionalHash(item.safeProposalHash)) continue;
+      if (item.kind === "withdrawal_refund") {
+        item.reviewDigest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(config.externalAssetBridge.address!, "getWithdrawalRefundDigest", [item.reference])));
+        const [count, verifierConfig] = await Promise.all([getSettlementAttestationCount(item.reviewDigest), getSettlementVerifierConfig()]);
+        if (!Number.isSafeInteger(verifierConfig.threshold) || verifierConfig.threshold < 2) throw new Error("Refund verifier threshold is unavailable");
+        if (count < verifierConfig.threshold) continue;
+      }
+      if (item.source === "eab" && item.kind === "deposit_review") {
+        const [, , chainId, router, depositId] = item.id.split(":");
+        const approval = normalizeOptionalHash(await getDepositReviewApproval(chainId, router, depositId));
+        if (approval) {
+          const digest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(config.externalAssetBridge.address!, "getReviewedDepositDigest", [chainId, `0x${normalize(router)}`, depositId])));
+          if (normalize(approval) === normalize(digest)) {
+            if (saved[item.id]) {
+              await sendBridgeReviewEmail({ ...item, approvalStatus: "approved" }, true);
+              delete saved[item.id]; await persist();
+            }
+            continue;
+          }
+        }
+      }
+      if (JSON.stringify(saved[item.id]) === JSON.stringify(item)) continue;
+      await sendBridgeReviewEmail(item); saved[item.id] = item; await persist();
+    }
     catch (error) { failed = true; logError("BridgeReviewNotification", error as Error, { reviewId: item.id }); }
   }
   for (const [id, item] of Object.entries(saved)) {
     if (present.has(id)) continue;
-    try { await sendBridgeReviewEmail(item, true); delete saved[id]; await persist(); }
+    try {
+      const outcome = await getBridgeReviewOutcome(item);
+      if (!outcome) continue;
+      await sendBridgeReviewEmail({ ...item, outcome }, true); delete saved[id]; await persist();
+    }
     catch (error) { failed = true; logError("BridgeReviewNotification", error as Error, { reviewId: id }); }
   }
   if (failed) throw new Error("Bridge review email delivery failed; unsent notifications will be retried");

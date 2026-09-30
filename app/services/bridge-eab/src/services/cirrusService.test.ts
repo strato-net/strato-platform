@@ -71,6 +71,36 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
   return calls;
 }
 
+test("email token metadata batches and paginates, retaining precision without guessing malformed decimals", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getBridgeEmailTokens } = await import("./cirrusService");
+  const { EMAIL_METADATA_TIMEOUT_MS } = await import("../config");
+  const addresses = Array.from({ length: 45 }, (_, i) => i.toString(16).padStart(40, "a"));
+  const decimals = [0, "6", 18, null, "NaN", "", -1, 256, "1.5"];
+  const rows = addresses.map((address, i) => ({ address, _symbol: i === 9 ? "bad\nsymbol" : `TOKEN${i}`,
+    customDecimals: i < decimals.length ? decimals[i] : 18 }));
+  let calls = 0;
+  t.mock.method(cirrus, "get", async (url: string, { params, timeout }: any) => {
+    calls++;
+    assert.ok(calls < 30);
+    assert.equal(url, "/BlockApps-Token");
+    assert.equal(timeout, EMAIL_METADATA_TIMEOUT_MS);
+    assert.equal(params.select, "address,_symbol,customDecimals");
+    assert.equal(params.order, "address.asc");
+    const ids = params.address.slice(4, -1).split(",");
+    assert.ok(ids.length <= 20);
+    return rows.filter(row => ids.includes(row.address)).slice(params.offset, params.offset + 3);
+  });
+  const tokens = await getBridgeEmailTokens([...addresses.map(a => `0x${a.toUpperCase()}`), addresses[0], "invalid"]);
+  assert.equal(tokens.size, 44);
+  assert.equal(tokens.get(addresses[0])?.decimals, 0);
+  assert.equal(tokens.get(addresses[1])?.decimals, 6);
+  assert.equal(tokens.get(addresses[2])?.decimals, 18);
+  for (const address of addresses.slice(3, 9)) assert.equal(tokens.get(address)?.decimals, undefined);
+  assert.equal(tokens.get(addresses[44])?.symbol, "TOKEN44");
+  assert.ok(calls > 3, "all batches must read beyond the server row cap");
+});
+
 test("admin review queries paginate both bridges and exclude automatic native delays", async t => {
   const withdrawals = Array.from({ length: 45 }, (_, i) => ({ ...withdrawal(i), value: { ...withdrawal(i).value, status: i % 2 ? "3" : "2" } }));
   const deposits = Array.from({ length: 7 }, (_, i) => ({ ...deposit(i), value: { ...deposit(i).value, status: "2" } }));
@@ -89,6 +119,37 @@ test("admin review queries paginate both bridges and exclude automatic native de
   assert.equal(records.authorizations.length, 22);
   assert.deepEqual(records.nativeWithdrawals.map(row => row.key), ["0"]);
   assert.ok(calls.every(call => call.params.address === `eq.${"1".repeat(40)}`));
+});
+
+test("review outcomes require a terminal funds state, never just a rejected or absent record", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getBridgeReviewOutcome } = await import("./cirrusService");
+  let value: any;
+  const calls: any[] = [];
+  t.mock.method(cirrus, "get", async (path: string, { params }: any) => {
+    calls.push({ path, params });
+    return value ? [{ value }] : [];
+  });
+  const item: any = { id: `eab:deposit:1:0x${router}:2`, source: "eab", kind: "deposit_recovery", reference: "2" };
+  for (const status of [undefined, "0", "2", "7", "8", "garbled"]) {
+    value = status ? { status } : undefined;
+    assert.equal(await getBridgeReviewOutcome(item), undefined);
+  }
+  value = { status: "6" };
+  assert.equal(await getBridgeReviewOutcome(item), "refunded");
+  value = { status: "4" };
+  assert.equal(await getBridgeReviewOutcome(item), "delivered");
+  assert.equal(calls[0].params.address, `eq.${"1".repeat(40)}`);
+  assert.equal(calls[0].params.key, "eq.1");
+  assert.equal(calls[0].params.key2, `eq.${router}`);
+  assert.equal(calls[0].params.key3, "eq.2");
+  const native = { ...item, id: "native:deposit:8:", reference: "8", source: "native" as const };
+  value = { bridgeStatus: "4" };
+  assert.equal(await getBridgeReviewOutcome(native), undefined, "native abort did not restore burned assets");
+  value = { bridgeStatus: "3" };
+  assert.equal(await getBridgeReviewOutcome(native), "delivered");
+  value = { status: "6" };
+  assert.equal(await getBridgeReviewOutcome({ ...item, id: "eab:withdrawal:2", kind: "withdrawal_refund" }), "refunded");
 });
 
 test("malformed indexed attestation counts cannot enable refund preparation", async t => {
@@ -120,11 +181,14 @@ test("paused and disabled chains retain READY recovery using the committed vault
 });
 
 test("review approval scan ignores zero and malformed values and preserves large IDs", async t => {
-  await mockCirrus(t, { [`${external}-depositReviewApprovals`]: [
+  await mockCirrus(t, {
+    [`${external}-deposits`]: ["2", "2", "2", "2", "8", "7", "4"].map((status, index) => ({ key: "1", key2: router, key3: id(index + 1), value: { status } })),
+    [`${external}-depositReviewApprovals`]: [
     { key: "1", key2: router, key3: id(1), value: "a".repeat(64) },
     { key: "1", key2: router, key3: id(2), value: "0x" + "b".repeat(64) },
     { key: "1", key2: router, key3: id(3), value: "0x" + "0".repeat(64) },
     { key: "1", key2: router, key3: id(4), value: "invalid" },
+    ...[5, 6, 7].map(index => ({ key: "1", key2: router, key3: id(index), value: "a".repeat(64) })),
   ] });
   const { getDepositReviewApprovals } = await import("./cirrusService");
   assert.deepEqual([...await getDepositReviewApprovals(1)], [`${router}:${id(1)}`, `${router}:${id(2)}`]);
@@ -289,4 +353,25 @@ test("review approval reads use the stored mapping and preserve the composite id
   });
   assert.equal(await getDepositReviewApproval(1, "0x" + router.toUpperCase(), id(1)), "0x" + "a".repeat(64));
   for (approval of [undefined, 1, "invalid"]) assert.equal(await getDepositReviewApproval(1, router, id(1)), undefined);
+});
+
+
+test("native refund evidence is indexed into the review queue without implying completion", async t => {
+  const key = "e".repeat(64), hash = "0x" + "f".repeat(64);
+  const calls = await mockCirrus(t, {
+    [`${native}-deposits`]: [{ key, value: { bridgeStatus: "7", externalChainId: "1" } }],
+    [`${native}-depositRefundEvidence`]: [{ key, value: hash }],
+    [`${native}-withdrawals`]: [{ key: "7", value: { bridgeStatus: "3", externalTxHash: hash } }],
+  });
+  const { getBridgeReviewRecords, getNativeDepositRefundEvidence, getNativeWithdrawalById } = await import("./cirrusService");
+  const { buildBridgeReviewQueue } = await import("@strato/shared-types");
+  const item = buildBridgeReviewQueue(await getBridgeReviewRecords()).find(item => item.source === "native")!;
+  assert.equal(item.refundEvidenceHash, hash);
+  assert.equal(item.recoveryStatus, "refund_pending");
+  assert.deepEqual(item.actions, ["confirm_refund"]);
+  assert.equal(await getNativeDepositRefundEvidence(key), hash);
+  assert.equal((await getNativeWithdrawalById("7"))?.externalTxHash, hash);
+  assert.equal(await getNativeWithdrawalById("8"), undefined);
+  await assert.rejects(getNativeWithdrawalById("7,8"), /Invalid/);
+  assert.ok(calls.every(call => call.params.address === `eq.${"1".repeat(40)}`));
 });

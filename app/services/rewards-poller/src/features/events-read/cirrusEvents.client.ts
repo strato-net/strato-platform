@@ -5,6 +5,7 @@ import {
   EventCursor,
   PositionActivityRoutes,
   PositionEventSource,
+  RoutedExecution,
 } from "../../shared/types";
 import { logDebug, logInfo } from "../../infra/observability/logger";
 import { config } from "../../infra/config/runtimeConfig";
@@ -30,11 +31,13 @@ import {
   reassembleStructArrayRows,
   shouldTrackActivity,
 } from "./mappingRow.parser";
-import { resolveRoutedActivityUser } from "./routeAttribution";
+import { indexRouteExecutions, getRoutedActivityCaller, resolveRoutedActivityUser } from "./routeAttribution";
 import {
   addPositionActivityRoute,
   mapPositionSourceEvent,
 } from "./positionEvent.adapter";
+
+import { ROUTE_EVENT_PAGE_SIZE, ROUTE_EVENT_TRANSACTION_BATCH_SIZE } from "../../infra/config/constants";
 
 const STRATO_PREFIX = "BlockApps-";
 
@@ -67,7 +70,7 @@ const queryRegularEvents = async (
   const normalizedTokenRouter = tokenRouterAddress
     ?.toLowerCase()
     .replace(/^0x/, "");
-  const hasRoutedActivities = events.some((item) => {
+  const routedActivities = events.filter((item) => {
     const attributes = parseJson(item.attributes);
     const userAttr = mapping[item.address]?.[item.event_name]?.user;
     const user = userAttr
@@ -78,26 +81,28 @@ const queryRegularEvents = async (
       user?.toLowerCase().replace(/^0x/, "") === normalizedTokenRouter
     );
   });
-  const routedCallers = new Map<string, string>();
-  if (
-    tokenRouterAddress &&
-    config.externalAssetBridge.address &&
-    hasRoutedActivities
-  ) {
-    const routeEvents = await cirrus.get("/event", {
-      params: {
-        address: `eq.${tokenRouterAddress}`,
-        event_name: "eq.RouteExecuted",
-        block_timestamp: `gte.${cursor.block_timestamp}`,
-        select: "transaction_hash,attributes",
-      },
-    });
-    for (const routeEvent of Array.isArray(routeEvents) ? routeEvents : []) {
-      const attributes = parseJson(routeEvent.attributes);
-      if (routeEvent.transaction_hash && attributes.caller) {
-        routedCallers.set(routeEvent.transaction_hash, attributes.caller);
+  let routedExecutions = new Map<string, RoutedExecution[]>();
+  if (tokenRouterAddress && config.externalAssetBridge.address && routedActivities.length) {
+    const transactionHashes = [...new Set(routedActivities.map(item => item.transaction_hash))];
+    if (transactionHashes.some(hash => !/^(0x)?[a-f0-9]{64}$/i.test(hash || ""))) {
+      throw new Error("Invalid routed activity transaction hash");
+    }
+    const routeEvents: CirrusEvent[] = [];
+    for (let start = 0; start < transactionHashes.length; start += ROUTE_EVENT_TRANSACTION_BATCH_SIZE) {
+      for (let offset = 0; ;) {
+        const page = await cirrus.get("/event", { params: {
+          address: `eq.${tokenRouterAddress}`, event_name: "eq.RouteExecuted",
+          transaction_hash: buildFilter(transactionHashes.slice(start, start + ROUTE_EVENT_TRANSACTION_BATCH_SIZE)),
+          select: "transaction_hash,event_index,attributes", order: "id.asc",
+          limit: ROUTE_EVENT_PAGE_SIZE, offset,
+        } });
+        if (!Array.isArray(page)) throw new Error("Router events are unavailable; cannot attribute rewards safely");
+        if (!page.length) break;
+        routeEvents.push(...page);
+        offset += page.length;
       }
     }
+    routedExecutions = indexRouteExecutions(routeEvents);
   }
 
   const results = await Promise.all(
@@ -134,7 +139,7 @@ const queryRegularEvents = async (
         : item.transaction_sender;
       const user = resolveRoutedActivityUser({
         attributedUser,
-        routedCaller: routedCallers.get(item.transaction_hash),
+        routedCaller: getRoutedActivityCaller(routedExecutions, item.transaction_hash, eventIndex),
         tokenRouter: tokenRouterAddress,
         externalAssetBridge: config.externalAssetBridge.address,
         nativeBridge: config.nativeBridge.address,

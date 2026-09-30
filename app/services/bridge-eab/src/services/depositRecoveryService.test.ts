@@ -69,11 +69,16 @@ test("reconstructs recorded reviews after cache loss without authorizing settlem
   let rpcCalls = 0;
   let sourceReviewed = true;
   let sourceCompleted = false;
+  let sourceReopened = false;
   (cirrus as any).get = async (table: string, { params }: any) => {
     assert.equal(params.key, "eq.1");
     if (params.offset) return [];
     if (table.endsWith("-deposits")) {
       if (params["value->>status"] === "eq.4") return sourceCompleted ? [{ key2: router, key3: "2" }] : [];
+      if (params["value->>status"] === `in.(0,${"0".repeat(40)})`) {
+        assert.equal(params["value->>requestedAt"], "gt.0");
+        return sourceReopened ? [{ key2: router, key3: "2", value }] : [];
+      }
       assert.equal(params["value->>status"], "eq.2");
       assert.equal(params.offset, 0);
       if (params.key2) assert.equal(params.key2, `eq.${router}`);
@@ -124,6 +129,28 @@ test("reconstructs recorded reviews after cache loss without authorizing settlem
     await reconcileRecordedDepositReviews(1);
     assert.equal((await state.listReviews(1)).length, 1);
     sourceReviewed = false;
+    sourceReopened = true;
+    intent.action = "0";
+    intent.actionToken = "0".repeat(40);
+    intent.minFinalOut = "0";
+    await reconcileRecordedDepositReviews(1);
+    const reopened = await state.getByIdentity(1, router, "2");
+    assert.equal(reopened?.status, "pending");
+    assert.equal(reopened?.reviewRecordedOnchain, undefined);
+    assert.equal((reopened?.deposit as any).action, "4", "reopen recovers the original route intent from external evidence");
+    assert.equal((reopened?.deposit as any).minFinalOut, "90");
+    await state.markSettlementFailed(reopened!.deposit, new Error("blocked"), 0);
+    const failed = await state.getByIdentity(1, router, "2");
+    await reconcileRecordedDepositReviews(1);
+    assert.deepEqual(await state.getByIdentity(1, router, "2"), failed, "stale NONE must not keep resetting retry/review state");
+    await fs.unlink(statePath);
+    receiptAvailable = false;
+    await reconcileRecordedDepositReviews(1);
+    assert.equal((await state.list(1)).length, 0, "reopen cannot proceed without source evidence");
+    receiptAvailable = true;
+    await reconcileRecordedDepositReviews(1);
+    assert.equal((await state.list(1)).length, 1, "reopen survives complete cache loss");
+    sourceReopened = false;
     sourceCompleted = true;
     await reconcileRecordedDepositReviews(1);
     assert.equal((await state.listReviews(1)).length, 0, "Indexed completion clears recovered phantom reviews");

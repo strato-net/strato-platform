@@ -90,6 +90,51 @@ contract ExternalBridgeVault is
     uint8 public attestationSignerCount;
     uint256 public signerSetVersion;
     uint256 public maxAuthorizationValiditySeconds;
+    mapping(bytes32 => bool) public refundedDeposits;
+
+    struct DepositRefundAuthorization {
+        uint256 sourceChainId;
+        address sourceBridge;
+        uint256 destinationChainId;
+        address destinationVault;
+        address depositRouter;
+        uint256 depositId;
+        address token;
+        address recipient;
+        uint256 amount;
+        uint256 deadline;
+        uint256 signerSetVersion;
+    }
+    bytes32 private constant DEPOSIT_REFUND_TYPEHASH = keccak256(
+        "DepositRefundAuthorization(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationVault,address depositRouter,uint256 depositId,address token,address recipient,uint256 amount,uint256 deadline,uint256 signerSetVersion)"
+    );
+    event DepositRefunded(bytes32 indexed refundId, address indexed depositRouter, uint256 indexed depositId, address token, address recipient, uint256 amount);
+
+    function depositRefundId(address depositRouter, uint256 depositId) public pure returns (bytes32) {
+        // A physical deposit is refundable once, even across source-bridge migrations.
+        return keccak256(abi.encode(depositRouter, depositId));
+    }
+
+    function refundDeposit(DepositRefundAuthorization calldata a, bytes[] calldata signatures) external nonReentrant whenNotPaused {
+        if (a.destinationChainId != block.chainid || a.destinationVault != address(this) ||
+            a.depositRouter == address(0) || a.depositId == 0 || a.recipient == address(0) || a.amount == 0) revert InvalidAuthorization();
+        if (!sourceBridges[a.sourceChainId][a.sourceBridge]) revert SourceBridgeDisabled();
+        if (a.deadline < block.timestamp) revert AuthorizationExpired();
+        if (a.deadline > block.timestamp + maxAuthorizationValiditySeconds) revert AuthorizationValidityTooLong();
+        if (a.signerSetVersion != signerSetVersion) revert StaleSignerSet();
+        bytes32 refundId = depositRefundId(a.depositRouter, a.depositId);
+        if (refundedDeposits[refundId]) revert InvalidReservationState();
+        _verifyAttestationSignatures(_hashTypedDataV4(keccak256(abi.encode(DEPOSIT_REFUND_TYPEHASH, a))), signatures);
+        if (availableLiquidity(a.token) < a.amount) revert InsufficientLiquidity();
+        refundedDeposits[refundId] = true;
+        if (a.token == address(0)) {
+            (bool sent,) = payable(a.recipient).call{value: a.amount}("");
+            if (!sent) revert ETHTransferFailed();
+        } else {
+            IERC20(a.token).safeTransfer(a.recipient, a.amount);
+        }
+        emit DepositRefunded(refundId, a.depositRouter, a.depositId, a.token, a.recipient, a.amount);
+    }
 
     event TokenPolicyUpdated(
         address indexed token,
@@ -508,7 +553,7 @@ contract ExternalBridgeVault is
             );
     }
 
-    function availableLiquidity(address token) external view returns (uint256) {
+    function availableLiquidity(address token) public view returns (uint256) {
         uint256 balance = _assetBalance(token);
         uint256 reserved = totalReserved[token];
         return balance > reserved ? balance - reserved : 0;

@@ -95,6 +95,7 @@ test("transient grace, failed delivery, and recovery delivery retain durable pen
   await f.service.notify(f.send);
   assert.equal(f.sent.length, 0);
   f.advance(5 * 60_000);
+  await f.service.record(context(), issue("DEPENDENCY_UNAVAILABLE"));
   const fail = async () => { throw new Error("mail unavailable"); };
   await assert.rejects(f.service.notify(fail), /delivery failed/);
   await f.open().notify(f.send);
@@ -108,7 +109,7 @@ test("progress clears the old alert while normal confirmation waits stay quiet a
   const f = await fixture(t);
   const processing = context("6");
   const confirmations = { ...processing, stage: "release-confirmations" };
-  await f.service.run(processing, async () => { throw new Error("release receipt unavailable"); });
+  await f.service.run(processing, async () => { throw new Error("bridge configuration mismatch"); });
   await f.service.notify(f.send);
   assert.deepEqual(f.sent.map(s => s.resolved), [false]);
   f.advance(60_000);
@@ -154,7 +155,7 @@ test("stalled indexing alerts after grace and sends recovery only for an alerted
   await f.open().notify(f.send);
   assert.equal(f.sent.length, 0);
   f.advance(1);
-  await f.open().record(waiting, issue("INDEXING_PENDING", { available: "1", required: "2" }));
+  await f.open().record(waiting, issue("INDEXING_PENDING", { available: "0", required: "2" }));
   await f.open().notify(f.send);
   await f.open().notify(f.send);
   assert.deepEqual(f.sent.map(s => s.resolved), [false]);
@@ -169,6 +170,58 @@ test("an expected wait does not suppress an accompanying actionable failure", as
   await f.service.record(context(), { issues: [processingIssue("INDEXING_PENDING"), processingIssue("FUNDING_REQUIRED")] });
   await f.service.notify(f.send);
   assert.deepEqual(f.sent.map(s => s.resolved), [false]);
+});
+
+test("progress suppresses alerts and reminders without resetting incident age or accepting oscillation as progress", async t => {
+  const f = await fixture(t);
+  const waiting = { ...context(), stage: "release-confirmations" };
+  const pending = (count: string) => issue("CONFIRMATIONS_PENDING", { observedConfirmations: count, requiredConfirmations: "100", verifier: "1" });
+  await f.service.record(waiting, pending("1"));
+  const firstSeen = (await f.service.snapshot()).records[processingKey(waiting)].firstSeenAt;
+  for (const count of ["2", "3", "4"]) {
+    f.advance(4 * 60_000);
+    await f.open().record(waiting, pending(count));
+    await f.open().notify(f.send);
+  }
+  assert.equal(f.sent.length, 0, "ongoing progress remains quiet beyond the grace period");
+  assert.equal((await f.open().snapshot()).records[processingKey(waiting)].firstSeenAt, firstSeen);
+  f.advance(3 * 60_000);
+  await f.open().record(waiting, pending("3"));
+  f.advance(2 * 60_000);
+  await f.open().record(waiting, pending("4"));
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 1, "returning to the previous high-water mark is not progress");
+  f.advance(60 * 60_000);
+  await f.open().record(waiting, pending("5"));
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 1, "new progress suppresses a due reminder");
+  await f.open().resolve(waiting);
+  await f.open().notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false, true]);
+});
+
+test("a single unknown failure or stale journal entry cannot trigger an alert", async t => {
+  const f = await fixture(t);
+  await f.service.record(context(), issue("UNKNOWN"));
+  f.advance(5 * 60_000);
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 0);
+  await f.open().record(context(), issue("UNKNOWN"));
+  f.advance(11 * 60_000);
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 0, "stale observations require a fresh failed retry");
+  await f.open().record(context(), issue("UNKNOWN"));
+  await f.open().notify(f.send);
+  assert.equal(f.sent.length, 1);
+});
+
+test("reclassification does not send a false recovery email for an unresolved transfer", async t => {
+  const f = await fixture(t);
+  await f.service.record(context(), issue("FUNDING_REQUIRED"));
+  await f.service.notify(f.send);
+  await f.service.record(context(), issue("CONFIGURATION"));
+  await f.service.notify(f.send);
+  assert.deepEqual(f.sent.map(s => s.resolved), [false, false]);
 });
 
 test("policy changes alert immediately and governance review uses its existing notification channel", async t => {
@@ -308,6 +361,8 @@ test("processing emails use existing recipients and distinguish recovery from co
   config.email.approverEmails = ["reviewer@example.com"];
   t.after(() => { config.email.approverEmails = previous; });
   const sent: any[] = [];
+  const cirrus = await import("./cirrusService");
+  t.mock.method(cirrus, "getBridgeEmailTokens", async () => new Map([["2".repeat(40), { symbol: "ETH", decimals: 18 }]]));
   t.mock.method(mail, "send", async (message: any) => { sent.push(message); return [] as any; });
   await f.service.record(context(), issue("FUNDING_REQUIRED", { account: "operator", available: "0" }));
   const records = Object.values((await f.service.snapshot()).records);
@@ -316,14 +371,18 @@ test("processing emails use existing recipients and distinguish recovery from co
   assert.deepEqual(sent[0].to, ["reviewer@example.com"]);
   assert.match(sent[0].text, /FUNDING_REQUIRED/);
   assert.match(sent[1].text, /Processing may still be in progress/);
-  assert.match(sent[1].text, /Cleared issue: FUNDING_REQUIRED/);
-  assert.match(sent[1].text, /Previous diagnostics:/);
+  assert.match(sent[1].subject, /Previously reported issue resolved/);
+  assert.doesNotMatch(sent[1].subject, /funding needed|Action required/);
+  assert.match(sent[1].text, /Previous issue code: FUNDING_REQUIRED/);
+  assert.match(sent[0].text, /Withdrawal #1 — ETH/);
+  assert.match(sent[0].text, /Action required\nFund/);
   assert.doesNotMatch(sent[1].text, /needs funding/);
   await f.service.record(context("2"), issue("UNKNOWN"));
   await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("2"))]], true);
-  assert.match(sent[2].text, /Cleared issue: UNKNOWN/);
+  assert.match(sent[2].text, /Previous issue code: UNKNOWN/);
   assert.doesNotMatch(sent[2].text, /needs operator investigation|\{\}/);
   assert.doesNotMatch(sent[0].text + sent[1].text, /https?:\/\//);
+  assert.doesNotMatch(sent[0].text + sent[1].text, /\{"|\{\}/);
 });
 
 test("admin listing paginates active and cleared records without exposing notification state or changing retries", async t => {

@@ -460,4 +460,50 @@ describe("StratoNativeRepresentationBridge", function () {
     );
     expect(await bridge.routeFrozen(stratoToken)).to.equal(true);
   });
+  describe("redemption refunds", function () {
+    const refundTypes = { RedemptionRefund: [
+      ["sourceChainId", "uint256"], ["sourceBridge", "address"], ["destinationChainId", "uint256"],
+      ["destinationBridge", "address"], ["redemptionId", "uint256"], ["representationToken", "address"],
+      ["recipient", "address"], ["amount", "uint256"], ["deadline", "uint256"],
+    ].map(([name, type]) => ({ name, type })) };
+    async function refund() {
+      await mintWithAttestation();
+      await token.connect(user).approve(await bridge.getAddress(), 200n);
+      await bridge.connect(user).requestRedemption(await token.getAddress(), 200n, stratoRecipient.address);
+      const a = { ...await buildAttestation(), redemptionId: 1n, amount: 200n };
+      const signature = await attestationSigner.signTypedData({ name: "StratoNativeRepresentationBridge", version: "1",
+        chainId: a.destinationChainId, verifyingContract: await bridge.getAddress() }, refundTypes, a);
+      return [a, [signature]];
+    }
+    it("restores burned representations exactly once without consuming an outbound mint", async function () {
+      const args = await refund();
+      expect(await token.totalSupply()).to.equal(50n);
+      await expect(bridge.connect(mintExecutor).refundRedemption(...args)).to.emit(bridge, "RedemptionRefunded")
+        .withArgs(1n, await token.getAddress(), user.address, 200n);
+      expect(await token.totalSupply()).to.equal(250n);
+      expect(await token.balanceOf(user.address)).to.equal(250n);
+      await expect(bridge.connect(mintExecutor).refundRedemption(...args)).to.be.revertedWithCustomError(bridge, "DuplicateMint");
+    });
+    it("requires the executor and binds every refund field to the signatures", async function () {
+      const [a, signatures] = await refund();
+      await expect(bridge.connect(user).refundRedemption(a, signatures)).to.be.revertedWithCustomError(bridge, "AccessControlUnauthorizedAccount");
+      await expect(bridge.connect(mintExecutor).refundRedemption(a, [])).to.be.reverted;
+      for (const { name, type } of refundTypes.RedemptionRefund) {
+        const value = type === "address" ? otherSigner.address : BigInt(a[name]) + 1n;
+        await expect(bridge.connect(mintExecutor).refundRedemption({ ...a, [name]: value }, signatures)).to.be.reverted;
+      }
+      expect(await token.totalSupply()).to.equal(50n);
+      expect(await bridge.refundedRedemptions(1)).to.equal(false);
+    });
+    it("does not mint while paused or after a refund expires", async function () {
+      const args = await refund();
+      await bridge.pause();
+      await expect(bridge.connect(mintExecutor).refundRedemption(...args)).to.be.reverted;
+      await bridge.unpause();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(args[0].deadline) + 1]);
+      await expect(bridge.connect(mintExecutor).refundRedemption(...args)).to.be.revertedWithCustomError(bridge, "AttestationExpired");
+      expect(await token.totalSupply()).to.equal(50n);
+    });
+  });
+
 });

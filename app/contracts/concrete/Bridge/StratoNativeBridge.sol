@@ -167,6 +167,14 @@ contract record StratoNativeBridge is Ownable {
     uint256 public constant MAX_ROUTE_STEPS = 6;
     uint256 public constant ROUTE_EXECUTION_DEADLINE = 300;
     mapping(address => mapping(uint256 => bool)) public record autoRouteEnabled;
+    mapping(string => string) public record depositRefundTransactions;
+    mapping(string => string) public record depositRefundProposals;
+    mapping(string => string) public record depositRefundEvidence;
+    event NativeDepositRefundEvidence(string depositId, string refundTxHash);
+    event NativeDepositReopened(string depositId);
+    event NativeDepositRefundRequested(string depositId);
+    event NativeDepositRefunded(string depositId, string refundTxHash);
+    event NativeDepositRefundProposal(string depositId, string proposalHash);
 
     event TokenRouterUpdated(address tokenRouter);
     event AutoRouteAvailabilityUpdated(address stratoToken, uint256 externalChainId, bool enabled);
@@ -828,6 +836,49 @@ contract record StratoNativeBridge is Ownable {
         emit NativeDepositCompleted(d.depositId, d.externalChainId, d.externalBridge,
             d.externalRedemptionId, d.externalSender, d.externalTxHash, d.stratoRecipient,
             d.stratoToken, amount);
+    }
+
+    function reopenDeposit(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == BridgeStatus.ABORTED, "SNB: not rejected");
+        d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+        d.timestamp = block.timestamp;
+        emit NativeDepositReopened(depositId);
+    }
+
+    function requestDepositRefund(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW ||
+            d.bridgeStatus == BridgeStatus.ABORTED, "SNB: not refundable");
+        d.bridgeStatus = BridgeStatus.REFUND_PENDING;
+        d.timestamp = block.timestamp;
+        emit NativeDepositRefundRequested(depositId);
+    }
+
+    function recordDepositRefundEvidence(string depositId, string refundTxHash) external onlyBridgeOperator {
+        require(deposits[depositId].bridgeStatus == BridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(refundTxHash.length > 0, "SNB: empty refund hash");
+        depositRefundEvidence[depositId] = refundTxHash.normalizeHex();
+        emit NativeDepositRefundEvidence(depositId, refundTxHash.normalizeHex());
+    }
+
+    function finalizeDepositRefund(string depositId, string refundTxHash) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == BridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(refundTxHash.length > 0, "SNB: empty refund hash");
+        require(depositRefundEvidence[depositId] == refundTxHash.normalizeHex(), "SNB: refund evidence changed");
+        d.bridgeStatus = BridgeStatus.REFUNDED;
+        d.timestamp = block.timestamp;
+        depositRefundTransactions[depositId] = refundTxHash.normalizeHex();
+        // Restoring the external representation keeps the original STRATO custody locked.
+        emit NativeDepositRefunded(depositId, refundTxHash.normalizeHex());
+    }
+
+    function recordDepositRefundProposal(string depositId, string proposalHash) external onlyBridgeOperator {
+        require(deposits[depositId].bridgeStatus == BridgeStatus.REFUND_PENDING, "SNB: not refund pending");
+        require(proposalHash.length > 0, "SNB: empty proposal hash");
+        depositRefundProposals[depositId] = proposalHash.normalizeHex();
+        emit NativeDepositRefundProposal(depositId, proposalHash.normalizeHex());
     }
 
     function abortDeposit(

@@ -39,6 +39,7 @@ async function setup(t: any, records: any) {
   const { cirrus: client } = await import("../utils/api");
   t.mock.method(client, "get", async () => { throw new Error("Unexpected network request"); });
   t.mock.method(cirrus, "getBridgeReviewRecords", async () => records);
+  t.mock.method(cirrus, "getDepositReviewApproval", async () => undefined);
   t.mock.method(bridge, "getStratoNetworkId", async () => 10n ** 60n);
   return { cirrus, bridge, service: await import("./bridgeReviewService") };
 }
@@ -99,12 +100,11 @@ test("bridge operations cannot prepare governance votes and reject stale settlem
   let settlements = 0;
   t.mock.method(bridge, "confirmReviewedDeposit", async () => { settlements++; return hash; });
   const id = `eab:deposit:11155111:${address}:7`;
-  for (const action of ["approve", "reject"]) await assert.rejects(service.prepareBridgeOperation(id, action), /Unsupported/);
+  for (const action of ["approve", "reject", "settle"]) await assert.rejects(service.prepareBridgeOperation(id, action), /Unsupported/);
   assert.equal(settlements, 0);
-  assert.deepEqual(await service.prepareBridgeOperation(id, "settle"), { transactionHash: hash });
   records.deposits = [];
-  await assert.rejects(service.prepareBridgeOperation(id, "settle"), /unavailable/);
-  assert.equal(settlements, 1);
+  await assert.rejects(service.prepareBridgeOperation(id, "settle"), /Unsupported/);
+  assert.equal(settlements, 0);
 });
 
 test("refund votes require indexed attestations; subsequent voters reuse the same quorum", async t => {
@@ -204,11 +204,80 @@ test("email journal deduplicates, retries failed delivery, and never resolves it
   assert.deepEqual(sends, [false]);
   reader.mock.restore();
   records.deposits = [];
+  let outcome: "delivered" | undefined;
+  t.mock.method(cirrus, "getBridgeReviewOutcome", async () => outcome);
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.deepEqual(sends, [false], "disappearance alone cannot resolve a funds recovery alert");
+  outcome = "delivered";
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
   assert.deepEqual(sends, [false, true]);
   await fs.writeFile(journal, "null");
   await assert.rejects(service.notifyBridgeReviews(), /Invalid.*journal/);
+});
+
+test("rejection retains a recovery alert and reopening never sends a premature cleared email", async t => {
+  await fs.rm(path.join(directory, "data", "bridgeReviewNotifications.json"), { force: true });
+  const records = empty();
+  records.deposits = [{ ...deposit, value: { ...deposit.value } }];
+  const { service, cirrus } = await setup(t, records);
+  const email = await import("./emailService");
+  const sent: any[] = [];
+  t.mock.method(email, "sendBridgeReviewEmail", async (item, resolved = false) => { sent.push({ item, resolved }); });
+  t.mock.method(cirrus, "getBridgeReviewOutcome", async () => undefined);
+  await service.notifyBridgeReviews();
+  records.deposits[0].value.status = "7";
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].item.kind, "deposit_recovery");
+  assert.equal(sent[1].resolved, false);
+  records.deposits[0].value.status = "0".repeat(40);
+  await service.notifyBridgeReviews();
+  records.deposits = [];
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 2, "neither reopening nor absent indexing proves delivery");
+  const saved = JSON.parse(await fs.readFile(path.join(directory, "data", "bridgeReviewNotifications.json"), "utf8"));
+  assert.equal(Object.values(saved).length, 1);
+  assert.equal((Object.values(saved)[0] as any).recoveryStatus, "reopened");
+});
+
+test("review notifications wait for refund quorum and Safe proposals and stop requesting approved deposits", async t => {
+  await fs.rm(path.join(directory, "data", "bridgeReviewNotifications.json"), { force: true });
+  const records = empty();
+  records.deposits = [deposit]; records.withdrawals = [withdrawal("2")];
+  records.nativeWithdrawals = [{ key: "3", value: { ...withdrawal("3").value } }];
+  const { service, cirrus } = await setup(t, records);
+  const { rpc } = await import("../utils/api");
+  const email = await import("./emailService");
+  const attestation = await import("./settlementAttestationService");
+  const submit = t.mock.method(attestation, "attestWithdrawalRefund", async () => { throw new Error("Notifications must not submit attestations"); });
+  let count = 0, fail = false, approval: string | undefined;
+  t.mock.method(rpc, "post", async () => ({ result: hash }));
+  t.mock.method(cirrus, "getSettlementAttestationCount", async () => { if (fail) throw new Error("index unavailable"); return count; });
+  t.mock.method(cirrus, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: [address] }));
+  t.mock.method(cirrus, "getDepositReviewApproval", async () => approval);
+  const sent: Array<{ id: string; resolved: boolean }> = [];
+  t.mock.method(email, "sendBridgeReviewEmail", async (item, resolved = false) => { sent.push({ id: item.id, resolved }); });
+  await service.notifyBridgeReviews();
+  assert.deepEqual(sent.map(s => s.id), [`eab:deposit:11155111:${address}:7`]);
+  count = 2; records.nativeWithdrawals[0].value.nativeMintProposalHash = hash;
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.deepEqual(sent.map(s => s.id), [`eab:deposit:11155111:${address}:7`, "eab:withdrawal:2", "native:withdrawal:3"]);
+  fail = true;
+  await assert.rejects(service.notifyBridgeReviews(), /delivery failed/);
+  assert.equal(sent.length, 3, "a failed readiness check cannot send a recovery email");
+  fail = false; approval = hash;
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.deepEqual(sent[3], { id: `eab:deposit:11155111:${address}:7`, resolved: true });
+  assert.equal(sent.length, 4, "an approved deposit must not keep asking for approval");
+  count = 0; delete records.nativeWithdrawals[0].value.nativeMintProposalHash;
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 4, "readiness loss alone is not completion or recovery");
+  assert.equal(submit.mock.callCount(), 0);
 });
 
 test("review emails use existing recipients and contain no URL links", async t => {
@@ -218,22 +287,66 @@ test("review emails use existing recipients and contain no URL links", async t =
   const previousRecipients = config.email.approverEmails;
   config.email.approverEmails = ["reviewer@example.com"];
   const sent: any[] = [];
+  const cirrus = await import("./cirrusService");
+  const lookup = t.mock.method(cirrus, "getBridgeEmailTokens", async () => new Map([[address, { symbol: "TEST", decimals: 6 }]]));
   t.mock.method(sgMail, "send", async (message: any) => { sent.push(message); return [] as any; });
   const item = { id: "eab:withdrawal:2", source: "eab" as const, kind: "withdrawal_review" as const,
     chainId: "11155111", reference: "2", token: address, amount, account: address,
     reason: "Review required", actions: [], safeProposalHash: hash };
   try {
     await sendBridgeReviewEmail(item);
-    await sendBridgeReviewEmail(item, true);
+    await assert.rejects(sendBridgeReviewEmail(item, true), /confirmed outcome/);
+    await sendBridgeReviewEmail({ ...item, outcome: "refunded" }, true);
     assert.equal(sent.length, 2);
     for (const message of sent) {
       assert.deepEqual(message.to, ["reviewer@example.com"]);
-      assert.match(message.text, /Review in Safe/);
       assert.match(message.text, /Reference: eab:withdrawal:2/);
       assert.doesNotMatch(message.text, /https?:\/\//);
     }
+    assert.match(sent[0].text, /Review in Safe/);
+    assert.match(sent[0].text, /Amount: 9007199254740993123\.456789 TEST/);
+    assert.match(sent[1].text, /funds were returned/);
+    assert.doesNotMatch(sent[1].text, /Action required|Review in Safe/);
+    lookup.mock.mockImplementation(async () => { throw new Error("metadata unavailable"); });
+    await sendBridgeReviewEmail(item);
+    assert.match(sent[2].text, /raw token units; decimals unavailable/);
+    lookup.mock.mockImplementation(async () => new Map([[address, { symbol: "TEST", decimals: 255 }]]));
+    await sendBridgeReviewEmail(item);
+    assert.match(sent[3].text, /raw token units; decimals unavailable/);
     config.email.approverEmails = [];
     await assert.rejects(sendBridgeReviewEmail(item), /TRANSACTION_APPROVER_EMAILS/);
-    assert.equal(sent.length, 2);
+    assert.equal(sent.length, 4);
   } finally { config.email.approverEmails = previousRecipients; }
+});
+
+test("deposit refund processing is quiet until a Safe action or confirmed refund exists", async t => {
+  await fs.rm(path.join(directory, "data", "bridgeReviewNotifications.json"), { force: true });
+  const records = empty();
+  records.deposits = [{ ...deposit, value: { ...deposit.value, status: "7" } }];
+  const { service, cirrus } = await setup(t, records);
+  const email = await import("./emailService");
+  const sent: any[] = [];
+  t.mock.method(email, "sendBridgeReviewEmail", async (item, resolved = false) => { sent.push({ item, resolved }); });
+  await service.notifyBridgeReviews();
+  records.deposits[0].value.status = "8";
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 1, "automatic return processing needs no fresh action email");
+  records.deposits = [];
+  t.mock.method(cirrus, "getBridgeReviewOutcome", async () => "refunded");
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 2); assert.equal(sent[1].item.outcome, "refunded"); assert.equal(sent[1].resolved, true);
+  records.nativeDeposits = [{ key: "e".repeat(64), value: { ...deposit.value, bridgeStatus: "7", refundProposalHash: hash } }];
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 3); assert.equal(sent[2].item.safeProposalHash, hash); assert.equal(sent[2].resolved, false);
+  records.nativeDeposits[0].value.refundEvidenceHash = hash;
+  await service.notifyBridgeReviews();
+  await service.notifyBridgeReviews();
+  assert.equal(sent.length, 4, "governance confirmation gets one new action email");
+  assert.equal(sent[3].item.safeProposalHash, undefined);
+  assert.equal(sent[3].item.refundEvidenceHash, hash);
+  assert.deepEqual(sent[3].item.actions, ["confirm_refund"]);
+  assert.equal(sent[3].resolved, false);
+
 });

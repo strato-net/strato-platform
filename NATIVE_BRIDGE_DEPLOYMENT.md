@@ -15,6 +15,12 @@ The native bridge is split across:
 - STRATO: `StratoNativeBridge` and `StratoNativeCustodyVault`
 - Ethereum Sepolia: `StratoNativeRepresentationBridge` and `StratoNativeRepresentationToken`
 
+## Rejected deposit recovery update
+
+Native refund completion requires a separate governance vote on `finalizeDepositRefund(depositId, refundTxHash)` after the operator records confirmed external evidence. Verify the bridge is owned by AdminRegistry (not the hot operator), its finalization voting threshold is correct, the operator has no whitelist bypass for `finalizeDepositRefund`, and `depositRefundEvidence` is indexed. Deploy backend/UI with the Confirm refund action; keep the item pending until that vote executes.
+
+Before enabling **Complete delivery** or **Return funds** in Admin, upgrade StratoNativeBridge and StratoNativeRepresentationBridge and follow the [deposit recovery upgrade gate](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds). Native refunds restore representations to the original external sender and retain STRATO backing. They use the existing native attestors and mint executor/Safe; no EAB verifier service is required for native refunds. Preserve `data/native-refunds/` across service replacements and test Safe expiry/retry if execution requires Safe approval.
+
 ## Naming
 
 This guide uses different admin names on each side on purpose:

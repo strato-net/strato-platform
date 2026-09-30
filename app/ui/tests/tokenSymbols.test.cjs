@@ -71,7 +71,37 @@ test('legacy statuses stay separate from EAB and normalized native history', () 
   assert.equal(label(5, 'legacy').text, 'Swept');
   assert.equal(label(3, 'legacy').text, 'Unknown');
   assert(bridgeUtils.LEGACY_DEPOSIT_STATUS_OPTIONS.some(o => o.value === 6 && o.label === 'On Hold'));
-  assert(!bridgeUtils.DEPOSIT_STATUS_OPTIONS.some(o => o.value === 6));
+  assert(bridgeUtils.DEPOSIT_STATUS_OPTIONS.some(o => o.value === 6 && o.label === 'Refunded'));
+  assert(bridgeUtils.DEPOSIT_STATUS_OPTIONS.some(o => o.value === 8 && o.label === 'Refund processing'));
+  assert(!bridgeUtils.LEGACY_DEPOSIT_STATUS_OPTIONS.some(o => o.value === 8));
+});
+
+test('EAB deposit rejection and reuse explain recovery without changing withdrawal or legacy statuses', () => {
+  const label = bridgeUtils.getDepositStatusLabel;
+  assert.equal(label('7', 'external').text, 'Rejected');
+  assert.match(label('7', 'external').description, /Funds have not yet been returned/);
+  assert.match(label('7', 'external').description, /no action is needed from you/);
+  for (const status of [0, '0', '0'.repeat(40)]) {
+    assert.equal(label(status, 'external').text, 'Reopened');
+    assert.match(label(status, 'external').description, /retry automatically/);
+  }
+  for (const status of [undefined, null, '', 'garbled', 99]) {
+    assert.equal(label(status, 'external').text, 'Unknown');
+    assert.equal(label(status, 'external').description, undefined);
+  }
+  for (const source of ['native', 'legacy']) {
+    assert.equal(label(7, source).text, source === 'native' ? 'Rejected' : 'Aborted');
+    assert.equal(label(0, source).text, 'Unknown');
+  }
+  assert.equal(label(4, 'external').text, 'Complete');
+  assert.equal(label(4, 'external').description, undefined);
+  assert.equal(bridgeUtils.WITHDRAWAL_STATUS_LABELS[7], 'Canceled');
+  for (const source of ['native', 'external']) {
+    assert.equal(label(8, source).text, 'Refund processing');
+    assert.match(label(8, source).description, /No action is needed/);
+    assert.equal(label(6, source).text, 'Refunded');
+    assert.match(label(6, source).description, /returned to the sending wallet/);
+  }
 });
 
 test('metal activity retains separate payment and output decimals, including zero', async () => {
@@ -85,10 +115,17 @@ test('metal activity retains separate payment and output decimals, including zer
   assert.equal(numberUtils.formatBalance(tx.metalAmount, undefined, tx.metalDecimals, 2, 4), '2.00');
 });
 
-async function recentRows({ deposits = [], routes = [], metals = [], pending = [], unified = false }) {
+async function recentSession({ deposits = [], routes = [], metals = [], pending = [], unified = false,
+  userAddress = '0x' + 'ef'.repeat(20), storageFails = false, fetchDeposits } = {}) {
   const exports = {};
   const states = [];
-  let stateIndex = 0, firstRender = true, loaded;
+  let stateIndex = 0, firstRender = true, loaded, cleanup, interval;
+  const listeners = new Map();
+  const document = { visibilityState: 'visible',
+    addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) };
+  const window = { addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name),
+    setInterval: (fn, ms) => { assert.equal(ms, bridgeConstants.RECENT_TRANSACTIONS_REFRESH_MS); interval = fn; return 1; },
+    clearInterval: () => { interval = undefined; } };
   const ready = new Promise((resolve) => { loaded = resolve; });
   const input = 'ab'.repeat(20), output = 'cd'.repeat(20);
   const metadataModule = load(async () => ({ data: [
@@ -97,7 +134,7 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
   ] }));
   const jsx = (type, props) => ({ type, props });
   vm.runInNewContext(transpile(fs.readFileSync(path.join(__dirname, '../src/components/bridge/RecentTransactions.tsx'), 'utf8')), {
-    exports, require: (id) => {
+    exports, window, document, require: (id) => {
       if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx };
       if (id === 'react') return {
         useState: (initial) => {
@@ -105,16 +142,17 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
           if (firstRender) states[index] = initial;
           return [states[index], (value) => { states[index] = value; if (index === (metals.length && !unified ? 3 : 1) && value === false) loaded(); }];
         },
-        useEffect: (callback) => { if (firstRender) callback(); },
+        useEffect: (callback) => { if (firstRender) cleanup = callback(); },
         useMemo: (callback) => callback(), useCallback: (callback) => callback,
         useRef: (current) => ({ current }),
       };
-      if (id === '@/context/UserContext') return { useUser: () => ({ isLoggedIn: true }) };
+      if (id === '@/context/UserContext') return { useUser: () => ({ isLoggedIn: true, userAddress }) };
       if (id === '@/context/BridgeContext') return { useBridgeContext: () => ({
-        fetchDepositTransactions: async () => ({ data: deposits }), fetchWithdrawTransactions: async () => ({ data: [] }),
+        fetchDepositTransactions: fetchDeposits || (async () => ({ data: deposits })), fetchWithdrawTransactions: async () => ({ data: [] }),
         availableNetworks: [], bridgeableTokens: [],
       }) };
-      if (id === '@/lib/bridge/utils') return { ...bridgeUtils, mergePendingDeposits: () => ({ remaining: pending }) };
+      if (id === '@/lib/bridge/constants') return bridgeConstants;
+      if (id === '@/lib/bridge/utils') return { ...bridgeUtils, mergePendingDeposits: () => { if (storageFails) throw new Error('unavailable'); return { remaining: pending }; } };
       if (id === '@/lib/metalActivity') return metadataModule;
       if (id === '@/utils/numberUtils') return numberUtils;
       if (id === '@/hooks/use-mobile') return { useIsMobile: () => false };
@@ -125,20 +163,99 @@ async function recentRows({ deposits = [], routes = [], metals = [], pending = [
   const props = { includeRoutes: true, fundingMode: metals.length && !unified ? 'metals' : 'bridge' };
   exports.default(props);
   await ready;
-  firstRender = false; stateIndex = 0;
-  const tree = exports.default(props);
-  const rows = [];
-  function visit(node) {
-    if (Array.isArray(node)) return node.forEach(visit);
-    if (!node || !node.props) return;
-    if (node.type?.name === 'TxRow') rows.push(node.props);
-    visit(node.props.children);
-  }
-  visit(tree);
+  await new Promise(setImmediate);
+  firstRender = false;
+  const render = () => {
+    stateIndex = 0;
+    const tree = exports.default(props);
+    const rows = [];
+    function visit(node) {
+      if (Array.isArray(node)) return node.forEach(visit);
+      if (!node || !node.props) return;
+      if (node.type?.name === 'TxRow') rows.push(node.props);
+      visit(node.props.children);
+    }
+    visit(tree);
+    return rows;
+  };
+  return { render, tick: () => interval?.(), focus: () => listeners.get('focus')?.(),
+    visibility: (state) => { document.visibilityState = state; listeners.get('visibilitychange')?.(); },
+    close: () => cleanup?.(), listeners, states };
+}
+
+async function recentRows(options) {
+  const session = await recentSession(options);
+  const rows = session.render();
+  session.close();
   return rows;
 }
 
 const input = 'ab'.repeat(20), output = 'cd'.repeat(20);
+test('rejected deposits become Reopened after governance reuse on refresh and in another session', async () => {
+  const deposits = [{ bridgeSource: 'external', externalSymbol: 'ETH', stratoTokenSymbol: 'ETH',
+    DepositInfo: { stratoTokenAmount: '1000000000000000000', bridgeStatus: '7' } }];
+  const first = await recentSession({ deposits });
+  assert.equal(first.render()[0].status.text, 'Rejected');
+  assert.equal(first.render()[0].toAmount, '0');
+  assert.match(first.render()[0].status.description, /Funds have not yet been returned/);
+  deposits[0].DepositInfo.bridgeStatus = '0'.repeat(40);
+  first.tick();
+  await new Promise(setImmediate);
+  const second = await recentSession({ deposits });
+  for (const session of [first, second]) {
+    assert.equal(session.render()[0].status.text, 'Reopened');
+    assert.equal(session.render()[0].toAmount, '0');
+    assert.match(session.render()[0].status.description, /retry automatically/);
+    session.close();
+  }
+});
+
+test('independent sessions discover indexed bridge deposits without local submissions', async () => {
+  const deposits = [];
+  const first = await recentSession({ deposits });
+  const second = await recentSession({ deposits });
+  assert.equal(first.render().length, 0);
+  assert.equal(second.render().length, 0);
+  deposits.push({ depositOutcome: 'route', finalToken: output, finalAmount: '250',
+    DepositInfo: { stratoToken: input, stratoTokenAmount: '1250000', bridgeStatus: '4' } });
+  first.focus(); second.tick();
+  await new Promise(setImmediate);
+  assert.equal(first.render()[0].status.text, 'Complete');
+  assert.deepEqual(JSON.parse(JSON.stringify(second.render())), JSON.parse(JSON.stringify(first.render())));
+  first.close(); second.close();
+});
+
+test('background tabs refresh on return and do not overlap requests or accept results after unmount', async () => {
+  let calls = 0, complete;
+  const session = await recentSession({ fetchDeposits: async () => {
+    calls++;
+    if (calls === 1) return { data: [] };
+    return new Promise(resolve => { complete = resolve; });
+  } });
+  session.visibility('hidden'); session.tick(); session.focus();
+  assert.equal(calls, 1);
+  session.visibility('visible'); session.tick(); session.focus();
+  assert.equal(calls, 2, 'only one refresh can be in flight');
+  session.close();
+  assert.equal(session.listeners.size, 0);
+  complete({ data: [{ DepositInfo: { stratoToken: input, stratoTokenAmount: '1', bridgeStatus: '4' } }] });
+  await new Promise(setImmediate);
+  assert.equal(session.render().length, 0, 'late results cannot repopulate a previous wallet session');
+  session.tick(); session.focus();
+  assert.equal(calls, 2);
+});
+
+test('indexed history survives local storage failure and pending rows belong to the current wallet', async () => {
+  const deposit = { DepositInfo: { stratoToken: input, stratoTokenAmount: '1250000', bridgeStatus: '4' } };
+  const rows = await recentRows({ deposits: [deposit], storageFails: true });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status.text, 'Complete');
+  const pending = ['ef'.repeat(20), '01'.repeat(20)].map(stratoRecipient => ({
+    ...deposit, DepositInfo: { ...deposit.DepositInfo, stratoRecipient },
+  }));
+  assert.equal((await recentRows({ pending, userAddress: '0x' + 'EF'.repeat(20) })).length, 1);
+});
+
 test('routed trade amounts use address-specific input and output decimals', async () => {
   const [row] = await recentRows({ routes: [{ attributes: { tokenIn: `0x${input.toUpperCase()}`, tokenOut: output, amountIn: '1250000', amountOut: '250' } }] });
   assert.equal(row.label, 'Trade');
@@ -149,7 +266,7 @@ test('routed trade amounts use address-specific input and output decimals', asyn
 for (const source of ['deposits', 'pending']) {
   test(`${source} routed deposits retain output token decimals`, async () => {
     const [row] = await recentRows({ [source]: [{ type: 'route', depositOutcome: 'route', finalToken: output, finalAmount: '250',
-      DepositInfo: { stratoToken: input, stratoTokenAmount: '1250000', bridgeStatus: '4' } }] });
+      DepositInfo: { stratoRecipient: 'ef'.repeat(20), stratoToken: input, stratoTokenAmount: '1250000', bridgeStatus: '4' } }] });
     assert.equal(row.label, 'Bridge & Trade');
     assert.equal(row.fromAmount, '1.25');
     assert.equal(row.toAmount, '2.50');

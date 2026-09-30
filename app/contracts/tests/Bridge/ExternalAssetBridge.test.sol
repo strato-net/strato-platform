@@ -2594,4 +2594,65 @@ contract Describe_ExternalAssetBridge is Authorizable {
         require(rejected, "Verifier must never attest different source state than it validated");
     }
 
+    function it_deposit_refund_decision_blocks_delivery_and_requires_confirmed_quorum() {
+        relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        _attestDeposit(depositRouter, 1, address(0x1111), externalToken, 10e18,
+            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
+        bytes32 approval = bridge.getReviewedDepositDigest(externalChainId, depositRouter, 1);
+        bridge.approveReviewedDeposit(externalChainId, depositRouter, 1, approval);
+        bool rejected = false;
+        try relayer.do(address(bridge), "requestDepositRefund", externalChainId, depositRouter, 1, externalVault) {} catch { rejected = true; }
+        require(rejected, "Operator cannot authorize external refunds");
+        bridge.requestDepositRefund(externalChainId, depositRouter, 1, externalVault);
+        rejected = false;
+        try user.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1) {} catch { rejected = true; }
+        require(rejected, "An old approved delivery cannot mint after a refund decision");
+        rejected = false;
+        try bridge.authorizeDepositReuse(externalChainId, depositRouter, 1) {} catch { rejected = true; }
+        require(rejected, "Refund decision cannot be reopened");
+        rejected = false;
+        try bridge.finalizeDepositRefund(externalChainId, depositRouter, 1, "0xcccc") {} catch { rejected = true; }
+        require(rejected, "Refund cannot complete before evidence quorum");
+        verifierOne.do(address(bridge), "attestDepositRefund", externalChainId, depositRouter, 1, "0xcccc");
+        rejected = false;
+        try bridge.finalizeDepositRefund(externalChainId, depositRouter, 1, "0xcccc") {} catch { rejected = true; }
+        require(rejected, "One verifier is not quorum");
+        verifierTwo.do(address(bridge), "attestDepositRefund", externalChainId, depositRouter, 1, "0xcccc");
+        rejected = false;
+        try bridge.finalizeDepositRefund(externalChainId, depositRouter, 1, "0xdddd") {} catch { rejected = true; }
+        require(rejected, "Refund proof binds the transaction hash");
+        user.do(address(bridge), "finalizeDepositRefund", externalChainId, depositRouter, 1, "0xcccc");
+        require(bridge.depositRefundTransactions(externalChainId, depositRouter, 1) == "0xcccc", "Refund hash must persist");
+        require(stratoToken.balanceOf(address(user)) == 0, "External refund must never mint STRATO tokens");
+        rejected = false;
+        try bridge.finalizeDepositRefund(externalChainId, depositRouter, 1, "0xcccc") {} catch { rejected = true; }
+        require(rejected, "Refund completion is one-shot");
+    }
+
+    function it_rejected_deposit_can_be_reopened_for_delivery_but_completed_cannot_refund() {
+        relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        bridge.abortDeposit(externalChainId, depositRouter, 1);
+        bridge.authorizeDepositDelivery(externalChainId, depositRouter, 1);
+        bool changed = false;
+        try relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 11e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0) {} catch { changed = true; }
+        require(changed, "Delivery approval cannot authorize different evidence");
+        relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        require(bridge.depositReviewApprovals(externalChainId, depositRouter, 1) == bridge.getReviewedDepositDigest(externalChainId, depositRouter, 1), "Delivery decision must carry approval forward");
+        _attestDeposit(depositRouter, 1, address(0x1111), externalToken, 10e18,
+            "0xaaaa", address(user), address(stratoToken), uint256(DepositAction.NONE), address(0), 0);
+        relayer.do(address(bridge), "confirmReviewedDeposit", externalChainId, depositRouter, 1);
+        require(stratoToken.balanceOf(address(user)) == 10e18, "Reopened delivery must mint once");
+        bool rejected = false;
+        try bridge.requestDepositRefund(externalChainId, depositRouter, 1, externalVault) {} catch { rejected = true; }
+        require(rejected, "Delivered deposit cannot also return external funds");
+    }
+
 }

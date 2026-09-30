@@ -256,6 +256,12 @@ contract record ExternalAssetBridge is Ownable {
     mapping(address => MintPolicy) public record mintPolicies;
     mapping(uint256 => mapping(address => bool)) public record nativeAutoRouteEnabled;
     string public lastDepositActionFailureReason;
+    mapping(uint256 => mapping(address => mapping(uint256 => address))) public record depositRefundVaults;
+    mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositRefundTransactions;
+    mapping(uint256 => mapping(address => mapping(uint256 => bytes32))) public record depositDeliveryApprovals;
+    mapping(uint256 => mapping(address => mapping(uint256 => bool))) public record depositDeliveryAuthorized;
+    event DepositRefundRequested(uint256 externalChainId, address depositRouter, uint256 depositId, address vault);
+    event DepositRefunded(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash);
     event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
 
     function setMintPolicy(address token, uint256 capacity, uint256 refillRate) external onlyOwner {
@@ -892,6 +898,11 @@ contract record ExternalAssetBridge is Ownable {
         ][depositRouter][depositId];
         depositInfo.status = Status.PENDING_REVIEW;
         depositInfo.timestamp = block.timestamp;
+        if (depositDeliveryAuthorized[externalChainId][depositRouter][depositId]) {
+            bytes32 digest = getReviewedDepositDigest(externalChainId, depositRouter, depositId);
+            depositReviewApprovals[externalChainId][depositRouter][depositId] = digest;
+            emit DepositReviewApproved(externalChainId, depositRouter, depositId, digest);
+        }
         emit DepositPendingReview(
             externalChainId,
             depositInfo.externalTxHash
@@ -1086,6 +1097,8 @@ contract record ExternalAssetBridge is Ownable {
                 Status.PENDING_REVIEW,
             "EAB: bad state"
         );
+        depositDeliveryAuthorized[externalChainId][depositRouter][depositId] = false;
+        depositReviewApprovals[externalChainId][depositRouter][depositId] = bytes32(0);
         depositInfo.status = Status.ABORTED;
         depositInfo.timestamp = block.timestamp;
         _deleteDepositAction(
@@ -1108,7 +1121,7 @@ contract record ExternalAssetBridge is Ownable {
         uint256 externalChainId,
         address depositRouter,
         uint256 depositId
-    ) external onlyOwner {
+    ) public onlyOwner {
         DepositInfo depositInfo = deposits[
             externalChainId
         ][depositRouter][depositId];
@@ -1121,6 +1134,60 @@ contract record ExternalAssetBridge is Ownable {
             depositRouter,
             depositId
         );
+    }
+
+    function _depositSourceIdentity(DepositInfo d) internal view returns (bytes32) {
+        return keccak256(abi.encode(d.externalSender, d.externalToken, d.externalTokenAmount,
+            keccak256(bytes(d.externalTxHash.normalizeHex())), d.stratoRecipient, d.stratoToken));
+    }
+
+    function authorizeDepositDelivery(uint256 externalChainId, address depositRouter, uint256 depositId) external onlyOwner {
+        authorizeDepositReuse(externalChainId, depositRouter, depositId);
+        depositDeliveryAuthorized[externalChainId][depositRouter][depositId] = true;
+        depositDeliveryApprovals[externalChainId][depositRouter][depositId] =
+            _depositSourceIdentity(deposits[externalChainId][depositRouter][depositId]);
+    }
+
+    function requestDepositRefund(uint256 externalChainId, address depositRouter, uint256 depositId, address vault) external onlyOwner {
+        DepositInfo d = deposits[externalChainId][depositRouter][depositId];
+        require(d.status == Status.PENDING_REVIEW || d.status == Status.ABORTED ||
+            (d.status == Status.NONE && d.requestedAt > 0), "EAB: not refundable");
+        require(vault != address(0), "EAB: zero vault");
+        // This decision is irreversible: old settlement votes can no longer mint.
+        depositDeliveryAuthorized[externalChainId][depositRouter][depositId] = false;
+        depositReviewApprovals[externalChainId][depositRouter][depositId] = bytes32(0);
+        d.status = Status.REFUND_PENDING;
+        d.timestamp = block.timestamp;
+        depositGenerations[externalChainId][depositRouter][depositId]++;
+        depositRefundVaults[externalChainId][depositRouter][depositId] = vault;
+        emit DepositRefundRequested(externalChainId, depositRouter, depositId, vault);
+    }
+
+    function getDepositRefundDigest(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash) public view returns (bytes32) {
+        DepositInfo d = deposits[externalChainId][depositRouter][depositId];
+        return keccak256(abi.encode(keccak256("EAB_DEPOSIT_REFUND_V1"), block.chainid, address(this),
+            settlementVerifierSetVersion, externalChainId, depositRouter, depositId,
+            depositGenerations[externalChainId][depositRouter][depositId],
+            depositRefundVaults[externalChainId][depositRouter][depositId],
+            d.externalToken, d.externalSender, d.externalTokenAmount,
+            keccak256(bytes(refundTxHash.normalizeHex()))));
+    }
+
+    function attestDepositRefund(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash) external {
+        require(deposits[externalChainId][depositRouter][depositId].status == Status.REFUND_PENDING, "EAB: not refund pending");
+        require(refundTxHash.length > 0, "EAB: empty refund hash");
+        _recordSettlementAttestation(getDepositRefundDigest(externalChainId, depositRouter, depositId, refundTxHash));
+    }
+
+    function finalizeDepositRefund(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash) external {
+        DepositInfo d = deposits[externalChainId][depositRouter][depositId];
+        require(d.status == Status.REFUND_PENDING, "EAB: not refund pending");
+        require(refundTxHash.length > 0, "EAB: empty refund hash");
+        _requireSettlementAttestations(getDepositRefundDigest(externalChainId, depositRouter, depositId, refundTxHash));
+        d.status = Status.REFUNDED;
+        d.timestamp = block.timestamp;
+        depositRefundTransactions[externalChainId][depositRouter][depositId] = refundTxHash.normalizeHex();
+        emit DepositRefunded(externalChainId, depositRouter, depositId, refundTxHash.normalizeHex());
     }
 
     function requestWithdrawal(
@@ -1782,6 +1849,8 @@ contract record ExternalAssetBridge is Ownable {
                 minFinalOut
             );
         }
+        bytes32 deliveryApproval = depositDeliveryApprovals[externalChainId][depositRouter][depositId];
+        require(!depositDeliveryAuthorized[externalChainId][depositRouter][depositId] || deliveryApproval == _depositSourceIdentity(depositInfo), "EAB: delivery evidence changed");
         emit DepositInitiated(
             externalChainId,
             externalSender,

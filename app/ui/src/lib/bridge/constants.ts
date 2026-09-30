@@ -22,6 +22,28 @@ export const EXTERNAL_BRIDGE_STATUS_LABELS: Record<number, { text: string; color
   7: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
 };
 export const UNKNOWN_BRIDGE_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
+export const EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS: Record<number, { text: string; color: string; description: string }> = {
+  6: {
+    text: "Refunded",
+    color: "bg-emerald-500/15 text-emerald-500",
+    description: "The original asset was returned to the sending wallet on the source network.",
+  },
+  8: {
+    text: "Refund processing",
+    color: "bg-blue-500/15 text-blue-500",
+    description: "Your original asset is being returned to the sending wallet. No action is needed from you.",
+  },
+  0: {
+    text: "Reopened",
+    color: "bg-amber-500/15 text-amber-500",
+    description: "Reopened by governance. Processing will retry automatically; no action is needed from you.",
+  },
+  7: {
+    text: "Rejected",
+    color: "bg-red-500/15 text-red-500",
+    description: "The deposit was rejected and is awaiting recovery by the bridge administrators. Funds have not yet been returned; no action is needed from you.",
+  },
+};
 
 // Legacy/native Completed and Aborted are normalized to 4 and 7 by the history API.
 export const LEGACY_BRIDGE_STATUS_LABELS: Record<number, { text: string; color: string }> = {
@@ -36,6 +58,7 @@ export const LEGACY_DEPOSIT_ON_HOLD = 6;
 
 // UI Constants
 export const ITEMS_PER_PAGE = 10;
+export const RECENT_TRANSACTIONS_REFRESH_MS = 15_000;
 
 export const BRIDGE_MODE_LABELS = {
   convert: {

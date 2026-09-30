@@ -7,7 +7,8 @@ library ExternalBridgeTypes {
         COMPLETED,
         CANCELLED, // Reserved for status-number compatibility; cancellation leaves withdrawals READY until refund.
         REFUNDED,
-        ABORTED
+        ABORTED,
+        REFUND_PENDING
     }
 
     enum DepositAction {

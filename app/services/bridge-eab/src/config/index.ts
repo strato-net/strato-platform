@@ -1,4 +1,5 @@
 import { id } from "ethers";
+import type { ProcessingIssueCode } from "@strato/shared-types";
 
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -46,8 +47,24 @@ export const HEALTH_POLL_TIMEOUT_MS = 15 * 60_000;
 export const PROCESSING_RETRY_BASE_MS = 30_000;
 export const PROCESSING_RETRY_MAX_MS = 5 * 60_000;
 export const PROCESSING_ALERT_GRACE_MS = 5 * 60_000;
+export const PROCESSING_DEFERRED_ALERT_CODES: readonly string[] = ["DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING", "INDEXING_PENDING", "UNKNOWN"];
 export const PROCESSING_REMINDER_MS = 60 * 60_000;
 export const PROCESSING_HISTORY_MS = 7 * 24 * 60 * 60_000;
+export const EMAIL_METADATA_TIMEOUT_MS = 5_000;
+
+export const PROCESSING_EMAIL_CONTENT: Record<ProcessingIssueCode, { title: string; action: string }> = {
+  MINT_CAPACITY: { title: "Mint allowance reached", action: "Check the mint allowance and refill rate. Review the policy if the transfer cannot fit within the limit." },
+  WITHDRAWAL_CAPACITY: { title: "Withdrawal capacity reached", action: "Check available withdrawal capacity, pending reservations, and the refill policy." },
+  FUNDING_REQUIRED: { title: "Transaction fee funding needed", action: "Fund the submitting account shown in the details with the required fee asset." },
+  MANUAL_REVIEW: { title: "Governance review required", action: "Use the existing bridge review notification." },
+  POLICY_RESTRICTED: { title: "Transfer blocked by policy", action: "Review the route or token policy before allowing this transfer to proceed." },
+  DEPENDENCY_UNAVAILABLE: { title: "Connection failure persists", action: "Check the RPC, verifier, and authentication services. Automatic retries are continuing." },
+  CONFIRMATIONS_PENDING: { title: "Confirmations have stopped progressing", action: "Check external-chain progress and the verifier RPCs. Do not resubmit the transfer." },
+  INDEXING_PENDING: { title: "Attestation indexing has stopped progressing", action: "Check STRATO indexing and verifier transaction results. Do not bypass the quorum requirement." },
+  PAUSED: { title: "Bridge processing is paused", action: "Confirm whether the pause is intentional. Resume through the approved controls when appropriate." },
+  CONFIGURATION: { title: "Bridge configuration needs review", action: "Check bridge configuration and authorization evidence for the referenced transfer." },
+  UNKNOWN: { title: "Processing failure persists", action: "Investigate the referenced operation in the service and verifier logs." },
+};
 
 const config = {
   auth: {

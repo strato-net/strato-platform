@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import { ensureHexPrefix } from "../../utils/utils";
 import JSONBig from "json-bigint";
 import { normalizeLegacyEscapes } from "./jsonStringParsing.helper";
-import { BridgePolicyField, BridgePolicyRecords, BridgePolicyRow, BridgeReviewGovernanceAction, BridgeToken } from "@strato/shared-types";
+import { BridgePolicyField, BridgePolicyRecords, BridgePolicyRow, BridgeReviewGovernanceAction, BridgeReviewItem, BridgeToken } from "@strato/shared-types";
 import type { BridgeHistorySource } from "../../types/types";
 import { keccak256 } from "../../utils/keccak256";
 
@@ -31,16 +31,37 @@ const bridgeIssueJson = JSONBig({ storeAsString: true });
 
 export const parseBridgePolicyJson = (raw: string): unknown => bridgeIssueJson.parse(raw);
 
-export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: string; action: BridgeReviewGovernanceAction; digest?: string } | undefined => {
+export const bridgeReviewFunction = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction): string =>
+  action === "confirm_refund" ? "finalizeDepositRefund" : action === "refund" ? item.kind === "withdrawal_refund" ? "refundWithdrawal" : "requestDepositRefund"
+    : action === "reject" ? "abortDeposit" : item.kind === "deposit_recovery"
+      ? item.source === "native" ? "reopenDeposit" : "authorizeDepositDelivery" : "approveReviewedDeposit";
+
+export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: string; action: BridgeReviewGovernanceAction; digest?: string; vault?: string; refundEvidenceHash?: string } | undefined => {
+  const uint = (value: unknown) => {
+    if ((typeof value === "number" && !Number.isSafeInteger(value)) || !/^\d+$/.test(String(value))) throw new Error("Invalid bridge governance identifier");
+    return BigInt(String(value)).toString();
+  };
+  if (func === "finalizeDepositRefund") {
+    const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
+    if (!Array.isArray(args) || args.length !== 2 || args.some(arg => typeof arg !== "string" || !/^(0x)?[a-f0-9]{64}$/i.test(arg) || /^(0x)?0+$/i.test(arg))) throw new Error("Invalid native refund confirmation arguments");
+    return { id: `native:deposit:${args[0]}:`, action: "confirm_refund", refundEvidenceHash: args[1].replace(/^0x/i, "").toLowerCase() };
+  }
+  if (["reopenDeposit", "authorizeDepositDelivery", "requestDepositRefund"].includes(func)) {
+    const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
+    if (!Array.isArray(args)) throw new Error("Invalid recovery arguments");
+    const action = func === "requestDepositRefund" ? "refund" as const : "approve" as const;
+    if (func !== "authorizeDepositDelivery" && args.length === 1 && /^(0x)?[0-9a-f]{64}$/i.test(String(args[0]))) return { id: `native:deposit:${args[0]}:`, action };
+    if (func === "reopenDeposit" || args.length !== (action === "refund" ? 4 : 3) || !/^\d+$/.test(String(args[0])) || !/^\d+$/.test(String(args[2])) ||
+        !/^(0x)?[0-9a-f]{40}$/i.test(String(args[1])) || (action === "refund" && !/^(0x)?[0-9a-f]{40}$/i.test(String(args[3])))) throw new Error("Invalid recovery arguments");
+    return { id: `eab:deposit:${uint(args[0])}:${String(args[1]).toLowerCase().replace(/^0x/, "")}:${uint(args[2])}`, action,
+      ...(action === "refund" ? { vault: String(args[3]).toLowerCase().replace(/^0x/, "") } : {}) };
+  }
   const action: BridgeReviewGovernanceAction | undefined = func === "approveReviewedDeposit" ? "approve"
     : func === "abortDeposit" ? "reject" : func === "refundWithdrawal" ? "refund" : undefined;
   if (!action) return undefined;
   const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
   if (!Array.isArray(args) || args.length !== (action === "refund" ? 1 : action === "approve" ? 4 : 3)) throw new Error("Invalid bridge governance arguments");
-  const uint = (value: unknown) => {
-    if ((typeof value === "number" && !Number.isSafeInteger(value)) || !/^\d+$/.test(String(value))) throw new Error("Invalid bridge governance identifier");
-    return BigInt(String(value)).toString();
-  };
+
   if (action === "refund") return { id: `eab:withdrawal:${uint(args[0])}`, action };
   if (!/^(0x)?[0-9a-f]{40}$/i.test(String(args[1]))) throw new Error("Invalid bridge governance router");
   if (action === "approve" && !/^(0x)?[0-9a-f]{64}$/i.test(String(args[3]))) throw new Error("Invalid bridge governance digest");

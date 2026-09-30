@@ -20,6 +20,7 @@ import {
   initializeSafeForChain,
 } from "../utils/safeHelper";
 import { retry } from "../utils/api";
+import { NATIVE_MINT_EVENT_ABI } from "../config/bridgeAbi";
 
 export interface NativeMintAttestation {
   sourceChainId: string;
@@ -45,7 +46,7 @@ export interface NativeMintRequest extends NativeMintAttestation {
 const NATIVE_MINT_ABI = [
   "function mintRepresentationWithAttestation((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline) attestation, bytes[] signatures)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
-  "event RepresentationMinted(uint256 sourceChainId,address indexed sourceBridge,uint256 indexed sourceWithdrawalId,address indexed stratoToken,address representationToken,address recipient,uint256 amount,bytes32 mintId)",
+  ...NATIVE_MINT_EVENT_ABI,
 ];
 
 const nativeMintInterface = new Interface(NATIVE_MINT_ABI);

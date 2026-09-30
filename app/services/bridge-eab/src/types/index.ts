@@ -4,6 +4,11 @@ import type { RouteStep } from "@strato/shared-types";
 
 export type TransactionTraceResult = any[] | Error;
 
+export interface BridgeEmailToken {
+  symbol: string;
+  decimals?: number;
+}
+
 // ---------------- Utility Types ----------------
 export type NonEmptyArray<T> = [T, ...T[]];
 
@@ -197,6 +202,28 @@ export interface WithdrawalInfo {
 
   withdrawalId: string;
   vault?: string;
+}
+
+export interface DepositRefundAuthorization {
+  sourceChainId: string;
+  sourceBridge: string;
+  destinationChainId: string;
+  destinationVault: string;
+  depositRouter: string;
+  depositId: string;
+  token: string;
+  recipient: string;
+  amount: string;
+  deadline: string;
+  signerSetVersion: string;
+}
+
+export interface NativeRefundProposal {
+  hash: string;
+  deadline: string;
+  nonce: number;
+  data: ProposeTransactionProps["safeTransactionData"];
+  signature: string;
 }
 
 export interface NativeWithdrawalInfo {

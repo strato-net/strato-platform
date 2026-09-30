@@ -70,6 +70,7 @@ export enum ExternalBridgeStatus {
   CANCELLED = 5,
   REFUNDED = 6,
   ABORTED = 7,
+  REFUND_PENDING = 8,
 }
 
 export interface ExternalWithdrawalInfo {
@@ -153,6 +154,7 @@ export interface BridgeTransaction {
   bridgeSource?: "external" | "legacy" | "native";
   depositRouter?: string;
   depositId?: string;
+  refundTxHash?: string;
   WithdrawalInfo?: ExternalWithdrawalInfo;
   DepositInfo?: {
     status?: string;
@@ -248,7 +250,16 @@ export interface CreditCardTopUpExecuteParams {
 export interface BridgeReviewItem {
   id: string;
   source: "eab" | "native" | "legacy";
-  kind: "deposit_review" | "withdrawal_review" | "withdrawal_refund";
+  kind: "deposit_review" | "deposit_recovery" | "withdrawal_review" | "withdrawal_refund";
+  outcome?: "delivered" | "refunded";
+  recoveryStatus?: "rejected" | "reopened" | "refund_pending";
+  refundVault?: string;
+  refundEvidenceHash?: string;
+  refundBridge?: string;
+  refundRedemptionId?: string;
+  refundRecipient?: string;
+  refundToken?: string;
+  refundAmount?: string;
   chainId: string;
   reference: string;
   token: string;
@@ -256,11 +267,12 @@ export interface BridgeReviewItem {
   account: string;
   reason: string;
   safeProposalHash?: string;
+  reviewDigest?: string;
   approvalStatus?: "pending" | "approved" | "unavailable";
   refundStatus?: "pending" | "ready" | "unavailable";
   governanceStatus?: "available" | "unavailable";
   governance?: Partial<Record<BridgeReviewGovernanceAction, BridgeReviewGovernance>>;
-  actions: Array<"approve" | "reject" | "refund" | "settle">;
+  actions: BridgeReviewGovernanceAction[];
 }
 
 export interface BridgeReviewVote {
@@ -286,7 +298,7 @@ export interface BridgeReviewRecords {
   legacyWithdrawals: BridgeReviewRow[];
 }
 
-export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund";
+export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "confirm_refund";
 
 export interface BridgeReviewGovernance {
   issueId?: string;
@@ -320,6 +332,8 @@ export interface ProcessingRecord {
   context: ProcessingContext;
   issues: ProcessingIssue[];
   firstSeenAt: number;
+  lastProgressAt?: number;
+  progress?: Record<string, string>;
   lastSeenAt: number;
   attempts: number;
   nextRetryAt: number;

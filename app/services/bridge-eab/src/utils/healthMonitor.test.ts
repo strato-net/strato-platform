@@ -102,6 +102,8 @@ test("external withdrawal polling reports query failures and isolates item rejec
   t.mock.method(bridge, "processExternalWithdrawal", async () => { throw new Error("policy rejection"); });
   const reviews = await import("../services/bridgeReviewService");
   const refunds = t.mock.method(reviews, "preparePendingWithdrawalRefunds", async () => {});
+  const deposits = await import("../services/depositRefundService");
+  t.mock.method(deposits, "processPendingDepositRefunds", async () => {});
   startExternalWithdrawalPolling();
   await flush();
   assert.equal(healthMonitor.snapshot().checks.startExternalWithdrawalPolling, "failed");

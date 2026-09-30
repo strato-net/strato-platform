@@ -38,7 +38,7 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
         res.status(403).json({ error: "Administrator access is required" });
         return;
       }
-      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund"].includes(req.body?.action))) {
+      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund", "confirm_refund"].includes(req.body?.action))) {
         res.status(400).json({ error: "Invalid review action" });
         return;
       }

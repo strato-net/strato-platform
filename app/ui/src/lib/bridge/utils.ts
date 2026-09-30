@@ -1,7 +1,7 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { WAD } from "@/lib/constants";
-import { BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
+import { BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
 import type { BridgeToken, CompositeRouteQuoteResponse, BridgeTransaction } from "@strato/shared-types";
 import { AutoRouteQuoteBinding, BridgeError, WithdrawalPreview } from "./types";
 
@@ -14,11 +14,20 @@ export const ExternalBridgeStatus = {
   CANCELLED: 5,
   REFUNDED: 6,
   ABORTED: 7,
+  REFUND_PENDING: 8,
 } as const;
 
 export const getBridgeStatusLabel = (status?: string | number, source?: BridgeTransaction["bridgeSource"]) => {
   const labels = source === "legacy" ? LEGACY_BRIDGE_STATUS_LABELS : EXTERNAL_BRIDGE_STATUS_LABELS;
   return labels[Number(status || 0)] || UNKNOWN_BRIDGE_STATUS;
+};
+
+export const getDepositStatusLabel = (status?: string | number, source?: BridgeTransaction["bridgeSource"]): { text: string; color: string; description?: string } => {
+  if ((source === "external" || (source === "native" && Number(status) !== 0)) && status != null && String(status).trim() !== "") {
+    const review = EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS[Number(status)];
+    if (review) return review;
+  }
+  return getBridgeStatusLabel(status, source);
 };
 
 /**
@@ -276,10 +285,13 @@ export const BRIDGE_STATUS_OPTIONS = [
 
 export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
   [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.PENDING_REVIEW, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
-);
+).map(option => ({ ...option, label: option.value === ExternalBridgeStatus.ABORTED ? "Rejected / Aborted" : option.label })).concat([
+  { value: ExternalBridgeStatus.REFUND_PENDING, label: "Refund processing" },
+  { value: ExternalBridgeStatus.REFUNDED, label: "Refunded" },
+]);
 
 export const LEGACY_DEPOSIT_STATUS_OPTIONS = [
-  ...DEPOSIT_STATUS_OPTIONS.map(option => ({ ...option, label: option.value === 2 ? "Pending" : option.label })),
+  ...DEPOSIT_STATUS_OPTIONS.filter(option => ![6, 8].includes(option.value)).map(option => ({ ...option, label: option.value === 2 ? "Pending" : option.value === ExternalBridgeStatus.ABORTED ? "Aborted" : option.label })),
   { value: LEGACY_DEPOSIT_ON_HOLD, label: "On Hold" },
 ];
 

@@ -18,8 +18,9 @@ export const recoverReviewedDeposit = async (
 };
 
 export const reconcileRecordedDepositReviews = async (externalChainId: number): Promise<void> => {
-  const [records, localEntries] = await Promise.all([
+  const [records, reopened, localEntries] = await Promise.all([
     getRecordedDepositReviews(externalChainId),
+    getRecordedDepositReviews(externalChainId, undefined, "0"),
     depositStateService.listTracked(externalChainId),
   ]);
   const indexed = await getIndexedDepositSettlements(externalChainId,
@@ -33,8 +34,13 @@ export const reconcileRecordedDepositReviews = async (externalChainId: number): 
     const deposit = cached.get(identity(record.depositRouter, record.depositId));
     return !deposit || !matchesRecordedDepositReview(deposit, record);
   });
-  if (!missing.length) return;
-  const hashes = [...new Set(missing.map((record) => record.externalTxHash))];
+  const tracked = new Map(localEntries.map(entry => [identity(entry.deposit.depositRouter, entry.deposit.depositId), entry]));
+  const reopenable = reopened.filter(record => {
+    const local = tracked.get(identity(record.depositRouter, record.depositId));
+    return !local || (local.status === "review" && local.reviewRecordedOnchain);
+  });
+  if (!missing.length && !reopenable.length) return;
+  const hashes = [...new Set([...missing, ...reopenable].map((record) => record.externalTxHash))];
   const receipts = await getTransactionReceiptsBatch(externalChainId, hashes);
   for (const record of missing) {
     try {
@@ -44,6 +50,18 @@ export const reconcileRecordedDepositReviews = async (externalChainId: number): 
     } catch (error) {
       logError("DepositRecovery", error as Error, {
         externalChainId, depositRouter: record.depositRouter, depositId: record.depositId,
+      });
+    }
+  }
+  for (const record of reopenable) {
+    try {
+      await depositStateService.restoreReopenedDeposit(
+        recoverDepositObservation(record, receipts.get(record.externalTxHash), true),
+      );
+    } catch (error) {
+      logError("DepositRecovery", error as Error, {
+        operation: "recoverReopenedDeposit", externalChainId,
+        depositRouter: record.depositRouter, depositId: record.depositId,
       });
     }
   }

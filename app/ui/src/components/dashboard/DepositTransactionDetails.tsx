@@ -3,7 +3,7 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, LEGACY_DEPOSIT_STATUS_OPTIONS, getBridgeStatusLabel, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
+import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, LEGACY_DEPOSIT_STATUS_OPTIONS, getDepositStatusLabel, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
@@ -159,6 +159,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       title: "Received",
       key: "received",
       render: (_: any, record: any) => {
+        if (getDepositStatusLabel(record?.DepositInfo?.bridgeStatus, record.bridgeSource).description) return <span className="text-sm text-muted-foreground">Not received</span>;
         const outcome = record.depositOutcome;
         const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "fallback") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
@@ -179,16 +180,20 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       title: "Status",
       key: "depositStatus",
       render: (_: any, record: any) => {
-        const statusStr = record?.DepositInfo?.bridgeStatus || "0";
+        const statusStr = record?.DepositInfo?.bridgeStatus;
         const statusNum = parseInt(statusStr);
-        const status = getBridgeStatusLabel(statusNum, record.bridgeSource);
+        const status = getDepositStatusLabel(statusStr, record.bridgeSource);
         const StatusIcon = statusNum === ExternalBridgeStatus.COMPLETED ? CheckCircle2
           : (statusNum === ExternalBridgeStatus.INITIATED || statusNum === ExternalBridgeStatus.PENDING_REVIEW) ? Clock : AlertCircle;
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {status.text === "Complete" ? "Completed" : status.text}
-          </span>
+          <div>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {status.text === "Complete" ? "Completed" : status.text}
+            </span>
+            {status.description && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{status.description}</p>}
+            {record.refundTxHash && <a className="text-xs text-primary" href={getExplorerUrl(String(record.externalChainId), record.refundTxHash)} target="_blank" rel="noopener noreferrer">View refund ↗</a>}
+          </div>
         );
       },
       width: 80,

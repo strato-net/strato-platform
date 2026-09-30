@@ -103,3 +103,15 @@ export const verifierFailureDetails = (error: unknown, policyVersion: string, po
 export const processingKey = (context: ProcessingContext): string => JSON.stringify([
   context.source, context.chainId, context.bridge.toLowerCase().replace(/^0x/, ""), context.reference, context.stage,
 ]);
+
+export const processingProgress = (issues: ProcessingIssue[], previous: Record<string, string> = {}): Record<string, string> => {
+  const progress = { ...previous };
+  for (const issue of issues) {
+    const observed = issue.code === "CONFIRMATIONS_PENDING" ? issue.details.observedConfirmations
+      : issue.code === "INDEXING_PENDING" ? issue.details.available : undefined;
+    if (!observed || !/^\d+$/.test(observed)) continue;
+    const key = JSON.stringify([issue.code, issue.details.verifier || "", issue.details.transactionHash || ""]);
+    if (BigInt(observed) > BigInt(progress[key] || "0")) progress[key] = observed;
+  }
+  return progress;
+};

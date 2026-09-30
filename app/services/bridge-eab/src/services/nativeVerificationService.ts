@@ -1,11 +1,62 @@
 import { getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
-import { getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, ZERO_ADDRESS } from "../config";
-import { NativeDepositInfo } from "../types";
+import { getDepositConfirmationPolicy, ZERO_ADDRESS } from "../config";
+import { NativeDepositInfo, NativeWithdrawalInfo } from "../types";
+import { AbiCoder, Interface, keccak256 } from "ethers";
+import { NATIVE_MINT_EVENT_ABI } from "../config/bridgeAbi";
+import { processingIssue } from "../utils/processingIssues";
 import { parseNativeDepositLog } from "../utils/nativeRedemption";
 import { logError } from "../utils/logger";
 
 const normalizeAddress = (value: string) =>
   value.toLowerCase().replace(/^0x/, "");
+
+const mintInterface = new Interface(NATIVE_MINT_EVENT_ABI);
+
+export const verifyNativeMint = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+  sourceBridge: string,
+  transactionHash: string,
+): Promise<void> => {
+  const chainId = Number(withdrawal.externalChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid native destination chain configuration");
+  const confirmations = getDepositConfirmationPolicy(chainId);
+  const [receipts, latestBlock] = await Promise.all([
+    getTransactionReceiptsBatch(chainId, [transactionHash]),
+    getVerificationBlockNumber(chainId),
+  ]);
+  const receipt = receipts.get(transactionHash);
+  const blockNumber = receipt?.blockNumber;
+  if (!receipt || receipt.__rpcDisagreement ||
+      typeof blockNumber !== "string" || !/^0x[0-9a-f]+$/i.test(blockNumber) ||
+      BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)) {
+    throw Object.assign(new Error("Native mint awaiting confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
+      transactionHash, requiredConfirmations: String(confirmations),
+      observedConfirmations: typeof blockNumber === "string" && /^0x[0-9a-f]+$/i.test(blockNumber)
+        ? String(BigInt(latestBlock) > BigInt(blockNumber) ? BigInt(latestBlock) - BigInt(blockNumber) : 0n) : "0",
+    })] });
+  }
+  const mintId = keccak256(AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "address", "uint256"], [sourceChainId, `0x${normalizeAddress(sourceBridge)}`, withdrawal.withdrawalId],
+  ));
+  const matches = String(receipt.transactionHash || "").toLowerCase() === transactionHash.toLowerCase() &&
+    /^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") && receipt.status === "0x1" && receipt.logs?.some((log: any) => {
+    if (normalizeAddress(log.address || "") !== normalizeAddress(withdrawal.externalBridge) || log.removed) return false;
+    try {
+      const args = mintInterface.parseLog(log)?.args;
+      return args && BigInt(args.sourceChainId) === sourceChainId &&
+        normalizeAddress(args.sourceBridge) === normalizeAddress(sourceBridge) &&
+        BigInt(args.sourceWithdrawalId) === BigInt(withdrawal.withdrawalId) &&
+        normalizeAddress(args.stratoToken) === normalizeAddress(withdrawal.stratoToken) &&
+        normalizeAddress(args.representationToken) === normalizeAddress(withdrawal.representationToken) &&
+        normalizeAddress(args.recipient) === normalizeAddress(withdrawal.externalRecipient) &&
+        BigInt(args.amount) === BigInt(withdrawal.externalTokenAmount) && args.mintId === mintId;
+    } catch { return false; }
+  });
+  if (!matches) throw Object.assign(new Error("Native mint evidence does not match the withdrawal"), {
+    issues: [processingIssue("CONFIGURATION", { transactionHash, operation: "verifyNativeMint" })],
+  });
+};
 
 export const verifyNativeRedemptionsBatch = async (
   deposits: NativeDepositInfo[],
@@ -39,9 +90,7 @@ export const verifyNativeRedemptionsBatch = async (
 
     for (const deposit of chainDeposits) {
       try {
-        const expectedBridgeAddress = getNativeRepresentationBridgeAddress(
-          externalChainId,
-        );
+        const expectedBridgeAddress = deposit.externalBridge;
         if (!expectedBridgeAddress) {
           results.set(deposit.depositId, false);
           continue;

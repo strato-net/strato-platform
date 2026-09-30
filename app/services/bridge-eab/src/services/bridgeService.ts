@@ -1,16 +1,16 @@
 import { processingIssueService, withdrawalProcessingContext } from "./processingIssueService";
 import { processingIssue, classifyProcessingError } from "../utils/processingIssues";
 import { recoverReviewedDeposit } from "./depositRecoveryService";
+import { verifyNativeMint } from "./nativeVerificationService";
 import {
   config,
   getChainRpcUrl,
-  getNativeRepresentationBridgeAddress,
 } from "../config";
 import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import { FunctionInput, NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, RouteDepositArgs, NativeDepositArgs, ConfirmNativeDepositArgs, WithdrawalReleasePendingError } from "../types";
 import { logInfo, logError } from "../utils/logger";
-import { normalizeOptionalHash } from "../utils/utils";
+import { normalizeOptionalHash, normalizeHex } from "../utils/utils";
 import { mintVouchersForDeposits } from "./voucherService";
 import { eth, rpc } from "../utils/api";
 import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authorizationValidation";
@@ -41,6 +41,7 @@ import {
   getDepositReviewApproval,
   getDepositSettlementInfoByIdentity,
   getEnabledChains,
+  getNativeWithdrawalById,
 } from "./cirrusService";
 import { depositStateService } from "./depositStateService";
 import { getCurrentBlockNumber } from "./rpcService";
@@ -79,12 +80,10 @@ const getNativeMintRequest = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
 ) => {
-  const bridgeAddress = getNativeRepresentationBridgeAddress(
-    Number(withdrawal.externalChainId),
-  );
+  const bridgeAddress = withdrawal.externalBridge;
   if (!bridgeAddress) {
     throw new Error(
-      `CHAIN_${Number(withdrawal.externalChainId)}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS is not configured`,
+      `Native withdrawal ${withdrawal.withdrawalId} has no committed destination bridge`,
     );
   }
   return buildNativeMintRequest(
@@ -122,7 +121,8 @@ const isDestinationMintReady = async (
   const latestTimestamp = await getDestinationChainLatestTimestamp(
     withdrawal.externalChainId,
   );
-  if (latestTimestamp == null || latestTimestamp >= notBefore) {
+  if (latestTimestamp == null) throw new Error("Native destination RPC unavailable: latest block is missing");
+  if (latestTimestamp >= notBefore) {
     return true;
   }
 
@@ -147,6 +147,24 @@ const proposeManualNativeMint = async (
 ): Promise<string> => {
   const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return proposeNativeMint(payload);
+};
+
+const finalizeVerifiedNativeWithdrawal = async (
+  withdrawal: NativeWithdrawalInfo, externalTxHash: string, nativeMintProposalHash: string,
+): Promise<void> => {
+  try {
+    await execute({
+      contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
+      method: "finalizeWithdrawal",
+      args: { id: Number(withdrawal.withdrawalId), externalTxHash, nativeMintProposalHash },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("SNB: bad state") && !message.includes("SNB: tx hash already set")) throw error;
+    const current = await getNativeWithdrawalById(withdrawal.withdrawalId);
+    const hash = normalizeOptionalHash(externalTxHash);
+    if (String(current?.bridgeStatus) !== "3" || !hash || normalizeHex(current?.externalTxHash || "") !== normalizeHex(hash)) throw error;
+  }
 };
 
 const syncManualNativeMintProposal = async (
@@ -183,16 +201,8 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  await execute({
-    contractName: "StratoNativeBridge",
-    contractAddress: config.nativeBridge.address!,
-    method: "finalizeWithdrawal",
-    args: {
-      id: Number(withdrawal.withdrawalId),
-      externalTxHash: result.txHash,
-      nativeMintProposalHash: proposalReference,
-    },
-  });
+  await verifyNativeMint(withdrawal, await getStratoNetworkId(), config.nativeBridge.address!, result.txHash);
+  await finalizeVerifiedNativeWithdrawal(withdrawal, result.txHash, proposalReference);
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
   return true;
 };
@@ -1064,33 +1074,13 @@ export const finalizeNativeWithdrawalBatch = async (
         externalTxHash,
       );
 
-      await execute({
-        contractName: "StratoNativeBridge",
-        contractAddress: config.nativeBridge.address!,
-        method: "finalizeWithdrawal",
-        args: {
-          id: Number(withdrawal.withdrawalId),
-          externalTxHash,
-          nativeMintProposalHash: "",
-        },
-      });
+      await verifyNativeMint(withdrawal, sourceChainId, config.nativeBridge.address!, externalTxHash);
+      await finalizeVerifiedNativeWithdrawal(withdrawal, externalTxHash, "");
 
       pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
       successful += 1;
     } catch (error) {
       const errorMessage = (error as Error).message;
-
-      if (
-        errorMessage.includes("SNB: bad state") ||
-        errorMessage.includes("SNB: tx hash already set")
-      ) {
-        pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
-        logInfo(
-          "BridgeService",
-          `Native withdrawal already finalized by another server: ${withdrawal.withdrawalId}`,
-        );
-        continue;
-      }
 
       failures.push({
         withdrawalId: withdrawal.withdrawalId,
@@ -1154,14 +1144,6 @@ export const queueManualNativeWithdrawalBatch = async (
         );
         await processingIssueService.resolve(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"));
       } catch (error) {
-        const errorMessage = (error as Error).message;
-        if (
-          errorMessage.includes("SNB: bad state") ||
-          errorMessage.includes("SNB: tx hash already set")
-        ) {
-          announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
-          continue;
-        }
         await processingIssueService.record(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"), error);
       }
       continue;

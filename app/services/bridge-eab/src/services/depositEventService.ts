@@ -190,6 +190,7 @@ export const buildActionDepositBatchArgs = (
 export const recoverDepositObservation = (
   review: RecordedDepositReview,
   receipt: any,
+  reopened = false,
 ): DepositArgs | ActionDepositArgs => {
   if (!receipt || receipt.__rpcDisagreement || BigInt(receipt.status || 0) !== 1n ||
       String(receipt.transactionHash || "").toLowerCase().replace(/^0x/, "") !== review.externalTxHash.toLowerCase().replace(/^0x/, "")) {
@@ -211,7 +212,8 @@ export const recoverDepositObservation = (
     throw new Error("Review receipt does not contain a unique deposit identity");
   }
   const deposit = matches[0];
-  if (!matchesRecordedDepositReview(deposit, review)) {
+  // Reopening clears STRATO's action; recover the original intent from the receipt.
+  if (!matchesRecordedDepositReview(deposit, review, !reopened)) {
     throw new Error("Review receipt fields, amount or action do not match STRATO");
   }
   return deposit;
@@ -220,6 +222,7 @@ export const recoverDepositObservation = (
 export const matchesRecordedDepositReview = (
   deposit: DepositArgs | ActionDepositArgs,
   review: RecordedDepositReview,
+  includeAction = true,
 ): boolean => {
   const action = deposit as Partial<ActionDepositArgs>;
   return String(deposit.externalChainId) === String(review.externalChainId) &&
@@ -228,7 +231,7 @@ export const matchesRecordedDepositReview = (
     (["depositRouter", "externalSender", "externalToken", "stratoRecipient", "targetStratoToken"] as const)
       .every((field) => normalizeAddress(deposit[field]) === normalizeAddress(review[field])) &&
     BigInt(deposit.externalTokenAmount) === BigInt(review.externalTokenAmount) &&
-    (action.action || "0") === review.action &&
+    (!includeAction || ((action.action || "0") === review.action &&
     normalizeAddress(action.actionToken || "0".repeat(40)) === normalizeAddress(review.actionToken) &&
-    BigInt(action.minFinalOut || "0") === BigInt(review.minFinalOut);
+    BigInt(action.minFinalOut || "0") === BigInt(review.minFinalOut)));
 };

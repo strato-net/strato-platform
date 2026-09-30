@@ -336,6 +336,19 @@ export const depositStateService = {
       return state[identity(deposit)];
     }),
 
+  restoreReopenedDeposit: (deposit: DetectedDeposit) =>
+    updateState((state) => {
+      const key = identity(deposit);
+      const existing = state[key];
+      if (existing?.status === "settled") return existing;
+      if (!existing) state[key] = { deposit, status: "pending" };
+      else if (existing.status === "review" && existing.reviewRecordedOnchain) {
+        existing.deposit = deposit;
+        resetPendingForRetry(existing);
+      }
+      return state[key];
+    }),
+
   markForReview: (deposit: DepositArgs, reviewReason: string) =>
     updateState((state) => {
       const pending = state[identity(deposit)];

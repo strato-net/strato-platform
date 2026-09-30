@@ -1,7 +1,6 @@
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
-import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Bridge/StratoNativeBridge.sol";
 import "../../concrete/Bridge/StratoNativeCustodyVault.sol";
 import "../../concrete/Proxy/Proxy.sol";
@@ -14,7 +13,6 @@ import "../Util.sol";
 contract Describe_StratoNativeBridge is Authorizable {
     using BridgeTypes for *;
 
-    Mercata mercata;
     AdminRegistry adminRegistry;
     TokenFactory tokenFactory;
     StratoNativeBridge nativeBridge;
@@ -55,9 +53,10 @@ contract Describe_StratoNativeBridge is Authorizable {
     function beforeEach() {
         address implOwnerIgnored = address(0xdeadbeef);
 
-        mercata = new Mercata();
-        adminRegistry = mercata.adminRegistry();
-        tokenFactory = mercata.tokenFactory();
+        adminRegistry = new AdminRegistry();
+        address[] admins = [address(this)];
+        adminRegistry.initialize(admins);
+        tokenFactory = new TokenFactory(address(adminRegistry));
 
         nativeBridge = StratoNativeBridge(
             address(
@@ -761,4 +760,80 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(stratoTokenAmount == 150e18, "Locked amount should match request");
         require(!useInstantPath, "Amount above threshold should require approval lane");
     }
+    function it_rejected_native_deposit_can_be_reopened_and_delivered_once() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 100e18);
+        user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 100e18);
+        relayer.do(nativeBridgeAddress, "recordDeposit", externalChainId, externalBridge, externalRedemptionId,
+            externalSender, externalTxHash, representationToken, address(user2), 60e18);
+        string depositId = nativeBridge.getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        relayer.do(nativeBridgeAddress, "abortDeposit", externalChainId, externalBridge, externalRedemptionId);
+        nativeBridge.reopenDeposit(depositId);
+        relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, externalRedemptionId);
+        require(nativeToken.balanceOf(address(user2)) == 60e18, "Reopened deposit must deliver");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 40e18, "Delivery releases custody exactly once");
+        bool rejected = false;
+        try nativeBridge.requestDepositRefund(depositId) {} catch { rejected = true; }
+        require(rejected, "Delivered deposit cannot refund");
+    }
+
+    function it_native_deposit_refund_keeps_custody_locked_and_blocks_delivery() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 100e18);
+        user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 100e18);
+        relayer.do(nativeBridgeAddress, "recordDeposit", externalChainId, externalBridge, externalRedemptionId,
+            externalSender, externalTxHash, representationToken, address(user2), 60e18);
+        string depositId = nativeBridge.getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        bool rejected = false;
+        try relayer.do(nativeBridgeAddress, "requestDepositRefund", depositId) {} catch { rejected = true; }
+        require(rejected, "Only governance may select a refund");
+        nativeBridge.requestDepositRefund(depositId);
+        rejected = false;
+        try relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, externalRedemptionId) {} catch { rejected = true; }
+        require(rejected, "Refund decision blocks source delivery");
+        rejected = false;
+        try nativeBridge.reopenDeposit(depositId) {} catch { rejected = true; }
+        require(rejected, "Refund decision cannot reopen");
+        rejected = false;
+        try user2.do(nativeBridgeAddress, "finalizeDepositRefund", depositId, "0xaaaa") {} catch { rejected = true; }
+        require(rejected, "User cannot finalize without verified evidence");
+        relayer.do(nativeBridgeAddress, "recordDepositRefundProposal", depositId, "0xbbbb");
+        rejected = false;
+        try relayer.do(nativeBridgeAddress, "finalizeDepositRefund", depositId, "0xaaaa") {} catch { rejected = true; }
+        require(rejected, "Hot operator cannot declare funds returned");
+        rejected = false;
+        try nativeBridge.finalizeDepositRefund(depositId, "0xaaaa") {} catch { rejected = true; }
+        require(rejected, "Governance must review recorded evidence");
+        relayer.do(nativeBridgeAddress, "recordDepositRefundEvidence", depositId, "0xaaaa");
+        rejected = false;
+        try user2.do(nativeBridgeAddress, "recordDepositRefundEvidence", depositId, "0xbbbb") {} catch { rejected = true; }
+        require(rejected, "User cannot replace evidence");
+        rejected = false;
+        try nativeBridge.finalizeDepositRefund(depositId, "0xbbbb") {} catch { rejected = true; }
+        require(rejected, "Confirmation binds exact reviewed hash");
+        relayer.do(nativeBridgeAddress, "recordDepositRefundEvidence", depositId, "0xbbbb");
+        rejected = false;
+        try nativeBridge.finalizeDepositRefund(depositId, "0xaaaa") {} catch { rejected = true; }
+        require(rejected, "Changed evidence invalidates old confirmation");
+        relayer.do(nativeBridgeAddress, "recordDepositRefundEvidence", depositId, "0xaaaa");
+        Admin secondAdmin = new Admin();
+        adminRegistry.addAdmin(address(secondAdmin));
+        nativeBridge.finalizeDepositRefund(depositId, "0xaaaa");
+        (BridgeStatus pendingStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(pendingStatus == BridgeStatus.REFUND_PENDING, "One vote cannot declare a refund completed");
+        rejected = false;
+        try relayer.do(nativeBridgeAddress, "finalizeDepositRefund", depositId, "0xaaaa") {} catch { rejected = true; }
+        require(rejected, "Operator cannot replace the second governance vote");
+        secondAdmin.do(nativeBridgeAddress, "finalizeDepositRefund", depositId, "0xaaaa");
+        (BridgeStatus refundedStatus,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(refundedStatus == BridgeStatus.REFUNDED, "Governance quorum completes refund");
+        require(nativeBridge.depositRefundTransactions(depositId) == "0xaaaa", "Refund proof must persist");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 100e18, "Refund restores representations and must retain backing");
+        require(nativeToken.balanceOf(address(user2)) == 0, "Refund cannot unlock on STRATO");
+        rejected = false;
+        try {
+            nativeBridge.finalizeDepositRefund(depositId, "0xaaaa");
+            secondAdmin.do(nativeBridgeAddress, "finalizeDepositRefund", depositId, "0xaaaa");
+        } catch { rejected = true; }
+        require(rejected, "Refund finalization is one-shot");
+    }
+
 }

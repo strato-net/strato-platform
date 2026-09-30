@@ -3,7 +3,7 @@ import { tmpdir as issueTmpdir } from "node:os";
 import { join as issuePath } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Interface } from "ethers";
+import { AbiCoder, Interface, keccak256 } from "ethers";
 for (const name of [
   "ALCHEMY_API_KEY",
   "BA_USERNAME",
@@ -54,6 +54,141 @@ test("native polling decoder distinguishes plain and routed events and rejects i
   assert.equal(parseNativeDepositLog(1, log(false))!.minFinalOut, "0");
   assert.throws(() => parseNativeDepositLog(1, { ...log(true), data: log(false).data }), /Invalid native/);
   assert.equal(parseNativeDepositLog(1, { ...log(true), topics: ["0xother"] }), null);
+});
+
+test("native mint completion requires independent finality and every committed withdrawal field", async t => {
+  const rpc = await import("./rpcService");
+  const { verifyNativeMint } = await import("./nativeVerificationService");
+  const { NATIVE_MINT_EVENT_ABI } = await import("../config/bridgeAbi");
+  const mint = new Interface(NATIVE_MINT_EVENT_ABI);
+  const sourceChain = 9007199254740993123n;
+  const sourceBridge = address("1");
+  const txHash = `0x${"a".repeat(64)}`;
+  const withdrawal = {
+    withdrawalId: "7", externalChainId: "1", externalBridge: address("2"),
+    stratoToken: address("3"), representationToken: address("4"), externalRecipient: address("5"),
+    externalTokenAmount: "100", bridgeStatus: "2", externalTxHash: "", requestedAt: "1",
+    stratoSender: address("6"), stratoTokenAmount: "100", timestamp: "1",
+  };
+  const mintId = keccak256(AbiCoder.defaultAbiCoder().encode(
+    ["uint256", "address", "uint256"], [sourceChain, sourceBridge, 7],
+  ));
+  const fields = [sourceChain, sourceBridge, 7, address("3"), address("4"), address("5"), 100, mintId];
+  const event = (values = fields) => ({ address: address("2"),
+    ...mint.encodeEventLog(mint.getEvent("RepresentationMinted")!, values) });
+  const valid = { status: "0x1", blockNumber: "0x64", blockHash: `0x${"b".repeat(64)}`, transactionHash: txHash, logs: [event()] };
+  let receipt: any = valid, head = 111;
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => head);
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[txHash, receipt]]));
+  const verify = () => verifyNativeMint(withdrawal, sourceChain, sourceBridge, txHash);
+  const pending = (error: any) => error.issues?.[0]?.code === "CONFIRMATIONS_PENDING";
+  await assert.rejects(verify(), pending);
+  head = 112;
+  await verify();
+  for (const incomplete of [undefined, { ...valid, __rpcDisagreement: true },
+    { ...valid, blockNumber: "invalid" }, { ...valid, blockNumber: "0xffff" }]) {
+    receipt = incomplete;
+    await assert.rejects(verify(), pending);
+  }
+  for (let index = 0; index < fields.length; index++) {
+    const values = [...fields];
+    values[index] = [0, 2, 6].includes(index) ? 999 : index === 7 ? `0x${"f".repeat(64)}` : address("9");
+    receipt = { ...valid, logs: [event(values)] };
+    await assert.rejects(verify(), /does not match/);
+  }
+  for (const bad of [{ ...valid, status: "0x0" }, { ...valid, logs: [] },
+    { ...valid, transactionHash: `0x${"c".repeat(64)}` }, { ...valid, blockHash: undefined },
+    { ...valid, logs: [{ ...event(), address: address("9") }] },
+    { ...valid, logs: [{ ...event(), removed: true }] }]) {
+    receipt = bad;
+    await assert.rejects(verify(), /does not match/);
+  }
+  receipt = valid;
+  await verify();
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () => { throw new Error("RPC unavailable"); });
+  await assert.rejects(verify(), /RPC unavailable/);
+});
+
+test("native instant retries reuse submitted mints and Safe execution cannot bypass verification", async t => {
+  const { config } = await import("../config");
+  const api = await import("../utils/api");
+  const strato = await import("../utils/stratoHelper");
+  const mint = await import("./nativeMintService");
+  const verification = await import("./nativeVerificationService");
+  const bridge = await import("./bridgeService");
+  const { JsonRpcProvider } = await import("ethers");
+  const source = config.nativeBridge.address;
+  config.nativeBridge.address = address("1");
+  t.after(() => { config.nativeBridge.address = source; });
+  process.env.CHAIN_1_RPC_URL = "https://rpc.test";
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("9");
+  t.mock.method(api.eth, "get", async () => ({ networkID: "9007199254740993123" }));
+  t.mock.method(JsonRpcProvider.prototype, "getBlock", async () => ({ timestamp: 1000 } as any));
+  const record = {
+    withdrawalId: "501", externalChainId: "1", externalBridge: address("2"),
+    stratoToken: address("3"), representationToken: address("4"), externalRecipient: address("5"),
+    externalTokenAmount: "100", bridgeStatus: "2", externalTxHash: "", requestedAt: "1",
+    stratoSender: address("6"), stratoTokenAmount: "100", timestamp: "1", nativeMintNotBefore: "1", useInstantPath: true,
+  };
+  t.mock.method(mint, "buildNativeMintRequest", async (withdrawal, _chain, _source, destination) => {
+    assert.equal(destination, record.externalBridge, "use the committed bridge, not mutable environment routing");
+    return { idempotencyKey: withdrawal.withdrawalId } as any;
+  });
+  t.mock.method(mint, "getExistingNativeMintTxHash", async () => null);
+  const submitted = t.mock.method(mint, "executeNativeMint", async () => "mint-hash");
+  let confirmed = false;
+  const verified: string[] = [];
+  t.mock.method(verification, "verifyNativeMint", async (_withdrawal, chain, source, hash) => {
+    assert.equal(chain, 9007199254740993123n);
+    assert.equal(source, address("1"));
+    verified.push(hash);
+    if (!confirmed) throw new Error("Native mint awaiting confirmations");
+  });
+  const calls: any[] = [];
+  t.mock.method(strato, "execute", async (call: any) => { calls.push(call); return {} as any; });
+  await assert.rejects(bridge.finalizeNativeWithdrawalBatch([record]), /awaiting confirmations/);
+  assert.equal(calls.length, 0);
+  confirmed = true;
+  await bridge.finalizeNativeWithdrawalBatch([record]);
+  assert.equal(submitted.mock.callCount(), 1, "confirmation polling must not submit another mint");
+  assert.deepEqual(verified, ["mint-hash", "mint-hash"]);
+  assert.equal(calls[0].method, "finalizeWithdrawal");
+  assert.equal(calls[0].args.externalTxHash, "mint-hash");
+  calls.length = 0;
+  t.mock.method(mint, "getNativeMintProposalExecution", async () => ({ status: "executed", txHash: "safe-hash" }));
+  const manual = { ...record, withdrawalId: "502", useInstantPath: false, nativeMintProposalHash: "a".repeat(64) };
+  confirmed = false;
+  await bridge.queueManualNativeWithdrawalBatch([manual]);
+  assert.equal(calls.length, 0, "Safe API success alone must not finalize custody accounting");
+  confirmed = true;
+  await bridge.queueManualNativeWithdrawalBatch([manual]);
+  assert.equal(calls[0].method, "finalizeWithdrawal");
+  assert.equal(calls[0].args.externalTxHash, "safe-hash");
+  const cirrus = await import("./cirrusService");
+  const processing = await import("./processingIssueService");
+  let current: any = { bridgeStatus: "3", externalTxHash: "0xMINT-HASH" };
+  t.mock.method(cirrus, "getNativeWithdrawalById", async () => current);
+  t.mock.method(strato, "execute", async () => { throw new Error("SNB: bad state"); });
+  t.mock.method(mint, "getExistingNativeMintTxHash", async () => "mint-hash");
+  assert.equal(await bridge.finalizeNativeWithdrawalBatch([record]), true, "matching completed mint is success");
+  for (const state of [undefined, { bridgeStatus: "4", externalTxHash: "mint-hash" }, { bridgeStatus: "3", externalTxHash: "other-hash" }, { bridgeStatus: "2", externalTxHash: "mint-hash" }]) {
+    current = state;
+    await assert.rejects(bridge.finalizeNativeWithdrawalBatch([record]), /SNB: bad state/);
+  }
+  current = { bridgeStatus: "3", externalTxHash: "0xMINT-HASH" };
+  t.mock.method(strato, "execute", async () => { throw new Error("SNB: tx hash already set"); });
+  assert.equal(await bridge.finalizeNativeWithdrawalBatch([record]), true);
+  const failures: unknown[] = [];
+  t.mock.method(processing.processingIssueService, "record", async (_context, error) => { failures.push(error); return {} as any; });
+  t.mock.method(processing.processingIssueService, "resolve", async () => {});
+  current = { bridgeStatus: "3", externalTxHash: "0xSAFE-HASH" };
+  await bridge.queueManualNativeWithdrawalBatch([manual]);
+  assert.equal(failures.length, 0, "matching Safe completion must not create a processing failure");
+  current = { bridgeStatus: "4", externalTxHash: "safe-hash" };
+  await bridge.queueManualNativeWithdrawalBatch([manual]);
+  assert.equal(failures.length, 1, "Safe abort must not be treated as completion");
+
 });
 
 test("verification binds every native route intent field and selects the correct redemption in multi-log receipts", async (t) => {

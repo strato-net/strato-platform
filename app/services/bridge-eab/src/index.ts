@@ -63,7 +63,7 @@ app.get("/operations/reviews/processing-issues", async (req, res) => {
 });
 
 app.post("/operations/reviews/prepare", async (req, res) => {
-  if (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["refund", "settle"].includes(req.body?.action)) {
+  if (typeof req.body?.id !== "string" || req.body.id.length > 256 || req.body?.action !== "refund") {
     res.status(400).json({ error: "Invalid review action" });
     return;
   }

@@ -20,6 +20,7 @@ import { verifyNativeRedemptionsBatch } from "../services/nativeVerificationServ
 import { checkBalances } from "../utils/balanceCheck";
 import { healthMonitor } from "../utils/healthMonitor";
 import { notifyBridgeReviews, preparePendingWithdrawalRefunds } from "../services/bridgeReviewService";
+import { processPendingDepositRefunds } from "../services/depositRefundService";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -82,6 +83,7 @@ export const startExternalWithdrawalPolling = (): void => {
         () => processExternalWithdrawal(withdrawal, true), String(withdrawal.bridgeStatus) !== "1");
     }
     await preparePendingWithdrawalRefunds();
+    await processPendingDepositRefunds();
   };
 
   startNonOverlappingPolling(

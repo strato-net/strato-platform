@@ -626,7 +626,7 @@ test("legacy On Hold filtering does not change EAB or native status semantics", 
       if (table.includes("MercataBridge")) {
         assert.equal(params["value->>bridgeStatus"], source === "legacy" ? "eq.6" : "eq.-1");
       } else if (table.includes("StratoNativeBridge")) {
-        assert.equal(params["value->>bridgeStatus"], "eq.-1");
+        assert.equal(params["value->>bridgeStatus"], "eq.8");
       } else if (table.includes("ExternalAssetBridge")) {
         assert.notEqual(source, "legacy");
         assert.equal(params["value->>status"], "eq.6");
@@ -641,4 +641,31 @@ test("legacy On Hold filtering does not change EAB or native status semantics", 
   assert(queried.has(`/${constants.MercataBridge}-deposits`));
   assert(queried.has(`/${constants.ExternalAssetBridge}-deposits`));
   assert(queried.has(`/${constants.StratoNativeBridge}-deposits`));
+});
+
+test("native deposit refunds normalize pending/completed states and expose the confirmed return hash", async t => {
+  const service = await import("./bridge.service");
+  const helpers = await import("../helpers/bridge.helper");
+  t.mock.getter(constants, "stratoNativeBridge", () => "9".repeat(40));
+  const id = "a".repeat(64), refundHash = "b".repeat(64);
+  let rawStatus = "7";
+  t.mock.method(helpers, "enrichTransactionData", async (_token: string, rows: any[]) => rows);
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    if (table.endsWith("StratoNativeBridge-deposits")) {
+      if (params.select === "count()") return { data: [{ count: 1 }] };
+      return { data: [{ key: id, value: { bridgeStatus: rawStatus, externalChainId: "1", externalTxHash: "c".repeat(64) }, block_timestamp: "2026-09-30T00:00:00Z" }] };
+    }
+    if (table.endsWith("StratoNativeBridge-depositRefundTransactions")) {
+      assert.equal(params.address, `eq.${"9".repeat(40)}`); assert.equal(params.key, `in.(${id})`);
+      return { data: [{ key: id, value: refundHash }] };
+    }
+    return { data: params.select === "count()" ? [{ count: 0 }] : [] };
+  });
+  const pending = await service.getBridgeTransactions("token", "deposit", "user", {}, "external");
+  assert.equal(pending.data[0].DepositInfo?.bridgeStatus, "8");
+  assert.equal(pending.data[0].refundTxHash, undefined);
+  rawStatus = "8";
+  const complete = await service.getBridgeTransactions("token", "deposit", "user", {}, "external");
+  assert.equal(complete.data[0].DepositInfo?.bridgeStatus, "6");
+  assert.equal(complete.data[0].refundTxHash, `0x${refundHash}`);
 });

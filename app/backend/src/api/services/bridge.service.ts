@@ -3,7 +3,7 @@ import type { BridgeProtocol, BridgeHistorySource } from "../../types/types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/appApiHelper";
-import { StratoPaths, constants } from "../../config/constants";
+import { StratoPaths, constants, BRIDGE_REVIEW_ID_BATCH_SIZE } from "../../config/constants";
 import { getRpcUpstream } from "../../config/rpc.config";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 import { getTokenMetadata } from "../helpers/cirrusHelpers";
@@ -82,6 +82,7 @@ const toLegacyStatusFilter = (statusFilter?: string): string | undefined =>
       ? "eq.4"
       : statusFilter === "eq.3" ||
           statusFilter === "eq.5" ||
+          statusFilter === "eq.8" ||
           statusFilter === "eq.6"
         ? "eq.-1"
         : statusFilter;
@@ -96,7 +97,8 @@ const nativeTransactionParams = (
   const statusFilter = params["value->>bridgeStatus"];
   delete params.key;
   delete params["value->>bridgeStatus"];
-  const nativeStatusFilter = toLegacyStatusFilter(statusFilter);
+  const nativeStatusFilter = type === "deposit" && statusFilter === "eq.8" ? "eq.7"
+    : type === "deposit" && statusFilter === "eq.6" ? "eq.8" : toLegacyStatusFilter(statusFilter);
 
   return {
     ...params,
@@ -167,7 +169,8 @@ const normalizeNativeTransactions = (
           ? "4"
           : String(value.bridgeStatus) === "4"
             ? "7"
-            : String(value.bridgeStatus ?? "0"),
+            : String(value.bridgeStatus) === "7" ? "8"
+              : String(value.bridgeStatus) === "8" ? "6" : String(value.bridgeStatus ?? "0"),
       externalToken: value.representationToken,
     },
     block_timestamp: row.block_timestamp,
@@ -429,6 +432,27 @@ export const getBridgeTransactions = async (
   }
 
   const page = isDeposit ? allResults : applyPagination(allResults, rawParams);
+  if (isDeposit) {
+    for (const bridgeSource of ["external", "native"] as const) {
+      const refunded = page.filter(row => row.bridgeSource === bridgeSource && String(row.DepositInfo?.bridgeStatus ?? row.DepositInfo?.status) === "6");
+      for (let offset = 0; offset < refunded.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+        const batch = refunded.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
+        const external = bridgeSource === "external";
+        const { data } = await cirrus.get(accessToken, `/${external ? ExternalAssetBridge : StratoNativeBridge}-depositRefundTransactions`, { params: {
+          address: `eq.${external ? constants.externalAssetBridge : constants.stratoNativeBridge}`,
+          select: external ? "key,key2,key3,value" : "key,value",
+          ...(external ? { or: `(${batch.map(row => `and(key.eq.${row.externalChainId},key2.eq.${normalizeAddress(row.depositRouter)},key3.eq.${row.depositId})`).join(",")})` }
+            : { key: `in.(${batch.map(row => row.depositId).join(",")})` }),
+        } });
+        for (const row of batch) {
+          const match = data.find((entry: any) => external
+            ? String(entry.key) === String(row.externalChainId) && normalizeAddress(entry.key2) === normalizeAddress(row.depositRouter) && String(entry.key3) === String(row.depositId)
+            : String(entry.key) === String(row.depositId));
+          if (/^(0x)?[0-9a-f]{64}$/i.test(match?.value || "")) row.refundTxHash = ensureHexPrefix(match.value);
+        }
+      }
+    }
+  }
   const enrichedData = await enrichTransactionData(accessToken, page, type, source);
   return { data: enrichedData, totalCount };
 };

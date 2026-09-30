@@ -16,7 +16,7 @@ const signerHeaders = (token: string) => ({
 
 export class SettlementVerifierManualReviewRequired extends Error {}
 
-const requestVerifierQuorum = async (
+export const requestVerifierQuorum = async (
   chainId: string | number,
   path: string,
   payload: unknown,

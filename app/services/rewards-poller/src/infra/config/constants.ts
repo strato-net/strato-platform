@@ -42,3 +42,6 @@ export const API_ERROR_CODES = {
   ENOTFOUND: "DNS lookup failed",
   ETIMEDOUT: "Request timeout",
 } as const;
+
+export const ROUTE_EVENT_PAGE_SIZE = 200;
+export const ROUTE_EVENT_TRANSACTION_BATCH_SIZE = 20;

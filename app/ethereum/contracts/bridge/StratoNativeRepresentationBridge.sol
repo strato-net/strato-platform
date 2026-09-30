@@ -66,6 +66,37 @@ contract StratoNativeRepresentationBridge is
     uint256 public maxAttestationValiditySeconds;
     bool public mintsPaused;
     bool public redemptionsPaused;
+    mapping(uint256 => bool) public refundedRedemptions;
+
+    struct RedemptionRefund {
+        uint256 sourceChainId;
+        address sourceBridge;
+        uint256 destinationChainId;
+        address destinationBridge;
+        uint256 redemptionId;
+        address representationToken;
+        address recipient;
+        uint256 amount;
+        uint256 deadline;
+    }
+    bytes32 private constant REDEMPTION_REFUND_TYPEHASH = keccak256(
+        "RedemptionRefund(uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 redemptionId,address representationToken,address recipient,uint256 amount,uint256 deadline)"
+    );
+    event RedemptionRefunded(uint256 indexed redemptionId, address indexed representationToken, address indexed recipient, uint256 amount);
+
+    function refundRedemption(RedemptionRefund calldata a, bytes[] calldata signatures)
+        external onlyRole(MINT_EXECUTOR_ROLE) whenNotPaused whenMintsNotPaused {
+        if (a.sourceChainId == 0 || a.sourceBridge == address(0) || a.destinationChainId != block.chainid ||
+            a.destinationBridge != address(this) || a.redemptionId == 0 || a.redemptionId > redemptionId ||
+            a.representationToken == address(0) || a.recipient == address(0) || a.amount == 0) revert InvalidAttestation();
+        if (a.deadline < block.timestamp) revert AttestationExpired();
+        if (a.deadline > block.timestamp + maxAttestationValiditySeconds) revert InvalidAttestation();
+        if (refundedRedemptions[a.redemptionId]) revert DuplicateMint();
+        _verifyAttestationSignatures(_hashTypedDataV4(keccak256(abi.encode(REDEMPTION_REFUND_TYPEHASH, a))), signatures);
+        refundedRedemptions[a.redemptionId] = true;
+        StratoNativeRepresentationToken(a.representationToken).mint(a.recipient, a.amount);
+        emit RedemptionRefunded(a.redemptionId, a.representationToken, a.recipient, a.amount);
+    }
 
     event RepresentationMinted(
         uint256 sourceChainId,

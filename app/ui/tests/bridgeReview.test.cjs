@@ -17,10 +17,11 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../s
   require: id => id === 'axios' ? { default: { create: () => ({ interceptors: { request: { use() {} }, response: { use: (...args) => responseInterceptors.push(args) } } }) } } : id === '@/hooks/use-toast' ? { toast: value => globalToasts.push(value) } : {},
 });
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready' } = {}) {
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready', refundEvidenceHash } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
+  if (action === 'confirm_refund') { item.source = 'native'; item.recoveryStatus = 'refund_pending'; item.refundEvidenceHash = refundEvidenceHash; }
   item.governanceStatus = governanceStatus;
   item.approvalStatus = approvalStatus;
   item.refundStatus = refundStatus;
@@ -44,7 +45,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
   const render = () => { cursor = 0; return exports.default(); };
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => !tree || typeof tree !== 'object' ? String(tree ?? '') : Array.isArray(tree) ? tree.map(text).join(' ') : text(tree.props?.children);
-  const select = () => nodes(render()).find(node => node.props?.children === (action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : action === 'approve' ? 'Approve deposit / vote' : 'Refund / vote')).props.onClick();
+  const select = () => nodes(render()).find(node => node.props?.children === (action === 'confirm_refund' ? 'Confirm refund / vote' : action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : action === 'approve' ? kind === 'deposit_recovery' ? 'Complete delivery / vote' : 'Approve deposit / vote' : kind === 'withdrawal_refund' ? 'Refund / vote' : 'Return funds / vote')).props.onClick();
   const confirm = () => nodes(render()).find(node => node.type === 'Button' && text(node).includes(action === 'settle' ? 'Confirm settlement' : 'Confirm vote')).props.onClick();
   return { select, confirm, render, text, nodes, votes, requests };
 }
@@ -225,4 +226,35 @@ test('failed policy reads retain an explicit unavailable state and never claim n
     assert.doesNotMatch(h.text(h.render()), /No token policies or routes are indexed/);
     if (data) assert.match(h.text(h.render()), /displayed values may be stale/);
   }
+});
+
+
+test('deposit recovery presents delivery and return as distinct governance decisions', async () => {
+  for (const action of ['approve', 'refund']) {
+    const func = action === 'approve' ? 'authorizeDepositDelivery' : 'requestDepositRefund';
+    const h = harness({ kind: 'deposit_recovery', action, response: { target: 'bridge', func, args: ['1', 'router', '7'] } });
+    assert.match(h.text(h.render()), action === 'approve' ? /Complete delivery/ : /Return funds/);
+    h.select();
+    assert.match(h.text(h.render()), action === 'approve' ? /verified delivery/ : /permanently disables STRATO delivery/);
+    await h.confirm();
+    assert.equal(h.votes[0][1], func);
+  }
+});
+
+
+test('native refund confirmation shows proof, casts its exact vote and rejects changed proof', async () => {
+  const hash = '0x' + 'a'.repeat(64);
+  const response = { target: 'bridge', func: 'finalizeDepositRefund', args: ['2', hash] };
+  const h = harness({ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: hash, response });
+  h.select();
+  assert.match(h.text(h.render()), /Independently verify this transaction/);
+  assert.match(h.text(h.render()), new RegExp(hash));
+  assert.doesNotMatch(h.text(h.render()), /Reopen this deposit/);
+  await h.confirm();
+  assert.deepEqual(h.votes, [['bridge', response.func, response.args]]);
+  const changed = harness({ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: hash,
+    response: { ...response, args: ['2', '0x' + 'b'.repeat(64)] } });
+  changed.select(); await changed.confirm();
+  assert.equal(changed.votes.length, 0);
+  assert.match(changed.text(changed.render()), /Refund evidence changed/);
 });

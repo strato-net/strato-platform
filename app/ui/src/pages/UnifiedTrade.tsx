@@ -11,7 +11,7 @@ import { useTradeBridgeCatalog } from "@/hooks/trade/useTradeTokens";
 import { useSearchParams } from "react-router-dom";
 
 const UnifiedTrade = () => {
-  const { isLoggedIn } = useUser();
+  const { isLoggedIn, userAddress } = useUser();
   const [searchParams] = useSearchParams();
   const [routeRefreshKey, setRouteRefreshKey] = useState(0);
   const { userRewards } = useRewardsUserInfo();
@@ -47,6 +47,7 @@ const UnifiedTrade = () => {
               </div>
               <div className="xl:col-span-5">
                 <RecentTransactions
+                  key={userAddress}
                   fundingMode="bridge"
                   includeRoutes
                   routeRefreshKey={routeRefreshKey}

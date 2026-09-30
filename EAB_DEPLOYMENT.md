@@ -19,6 +19,12 @@ for the UI/backend release even when native routing is out of scope.
 Wait for each AdminRegistry issue or Safe transaction to execute. Stop on
 failure. Run the command `status` prints; do not invent flags.
 
+## Deposit recovery upgrade gate
+
+Native refund completion now requires a separate governance vote on `finalizeDepositRefund(depositId, refundTxHash)` after the operator records confirmed external evidence. Verify the native bridge is owned by AdminRegistry (not the hot operator), its finalization voting threshold is correct, the operator has no whitelist bypass for `finalizeDepositRefund`, and `depositRefundEvidence` is indexed. Deploy backend/UI with the Confirm refund action; keep the item pending until that vote executes.
+
+For rejected-deposit delivery/refunds, follow [Deposit delivery and source-network refunds](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds) before releasing the Admin actions. These changes require upgrades of the **EAB** vault, external native representation bridge, and both STRATO bridges, followed by verifiers, `bridge-eab`, and backend/UI. This is an upgrade of this branch's EAB contracts, not an upgrade of a legacy MercataBridge vault. Preserve addresses, signer configuration, and durable service data; do not migrate liquidity. Validate both decisions on testnet before production rollout.
+
 ## Service build boundary
 
 EAB runtime and verifiers are built from `app/services/bridge-eab`, using its

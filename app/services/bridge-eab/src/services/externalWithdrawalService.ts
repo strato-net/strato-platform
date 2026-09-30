@@ -530,18 +530,21 @@ export const getEventTransactionHash = async (
   eventName:
     | "WithdrawalReserved"
     | "WithdrawalReleased"
-    | "WithdrawalCancelled",
+    | "WithdrawalCancelled"
+    | "DepositRefunded"
+    | "RedemptionRefunded",
   reservationId: string,
   notBefore: string,
+  eventInterface: Interface = vaultInterface,
 ): Promise<string> => {
   const latest = await provider.getBlock("latest");
-  if (!latest) throw new Error("Latest block unavailable for withdrawal recovery");
+  if (!latest) throw new Error("Latest block unavailable for bridge recovery");
   let lower = 0;
   let upper = latest.number;
   while (lower < upper) {
     const middle = Math.floor((lower + upper) / 2);
     const block = await provider.getBlock(middle);
-    if (!block) throw new Error(`Block ${middle} unavailable for withdrawal recovery`);
+    if (!block) throw new Error(`Block ${middle} unavailable for bridge recovery`);
     if (BigInt(block.timestamp) < BigInt(notBefore)) lower = middle + 1;
     else upper = middle;
   }
@@ -553,7 +556,7 @@ export const getEventTransactionHash = async (
     try {
       logs = await provider.getLogs({
         address: vaultAddress,
-        topics: vaultInterface.encodeFilterTopics(eventName, [reservationId]),
+        topics: eventInterface.encodeFilterTopics(eventName, [reservationId]),
         fromBlock,
         toBlock,
       });

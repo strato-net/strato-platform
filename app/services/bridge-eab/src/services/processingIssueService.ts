@@ -2,10 +2,10 @@ import type { BridgeProcessingIssuesPage } from "@strato/shared-types";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { PROCESSING_RETRY_BASE_MS, PROCESSING_RETRY_MAX_MS, PROCESSING_ALERT_GRACE_MS,
+import { PROCESSING_RETRY_BASE_MS, PROCESSING_RETRY_MAX_MS, PROCESSING_ALERT_GRACE_MS, PROCESSING_DEFERRED_ALERT_CODES,
   PROCESSING_REMINDER_MS, PROCESSING_HISTORY_MS, config, getExternalBridgeExecutorKmsConfig } from "../config";
 import { ProcessingContext, ProcessingIssue, ProcessingJournal, ProcessingRecord, DepositArgs, WithdrawalInfo, NativeWithdrawalInfo } from "../types";
-import { classifyProcessingError, processingKey } from "../utils/processingIssues";
+import { classifyProcessingError, processingKey, processingProgress } from "../utils/processingIssues";
 import { logInfo } from "../utils/logger";
 import { sendProcessingIssueEmail } from "./emailService";
 
@@ -35,7 +35,10 @@ export class ProcessingIssueService {
         Array.isArray(state.records) || Array.isArray(state.notifications) ||
         Object.entries(state.records).some(([key, r]) => !r?.context || processingKey(r.context) !== key ||
           !Array.isArray(r.issues) || !r.issues.length || r.issues.some(i => !i?.code || !i.details) ||
-          ![r.firstSeenAt, r.lastSeenAt, r.attempts, r.nextRetryAt].every(Number.isSafeInteger)) ||
+          ![r.firstSeenAt, r.lastSeenAt, r.attempts, r.nextRetryAt].every(Number.isSafeInteger) ||
+          (r.lastProgressAt != null && !Number.isSafeInteger(r.lastProgressAt)) ||
+          (r.progress != null && (typeof r.progress !== "object" || Array.isArray(r.progress) ||
+            Object.values(r.progress).some(value => typeof value !== "string" || !/^\d+$/.test(value))))) ||
         Object.values(state.notifications).some(n => !n?.record?.context || !Number.isSafeInteger(n.sentAt) || typeof n.fingerprint !== "string")) {
       throw new Error("Invalid processing issue journal; restore it before resuming retries");
     }
@@ -106,13 +109,17 @@ export class ProcessingIssueService {
       const key = processingKey(context), old = state.records[key], now = this.now();
       const changed = !old || !!old.resolvedAt || fingerprint(old.issues) !== fingerprint(issues);
       const attempts = changed ? 1 : old.attempts + 1;
+      const previousProgress = changed ? {} : old.progress || processingProgress(old.issues);
+      const progress = processingProgress(issues, previousProgress);
+      const advanced = Object.keys(progress).some(key => BigInt(progress[key]) > BigInt(previousProgress[key] || "0"));
+      const lastProgressAt = changed || advanced ? now : old.lastProgressAt ?? old.firstSeenAt;
       const transient = issues.every(i => ["DEPENDENCY_UNAVAILABLE", "UNKNOWN", "CONFIRMATIONS_PENDING", "INDEXING_PENDING"].includes(i.code));
       let delay = transient ? Math.min(PROCESSING_RETRY_MAX_MS, PROCESSING_RETRY_BASE_MS * 2 ** Math.min(attempts - 1, 10)) : PROCESSING_RETRY_MAX_MS;
       const refill = issues.map(i => Number(i.details.retryAfterSeconds)).filter(n => Number.isFinite(n) && n > 0);
       if (refill.length) delay = Math.min(PROCESSING_RETRY_MAX_MS, Math.max(PROCESSING_RETRY_BASE_MS, Math.min(...refill) * 1000));
       delay = Math.min(PROCESSING_RETRY_MAX_MS, Math.round(delay * (0.9 + this.random() * 0.2)));
       state.records[key] = { context, issues, firstSeenAt: changed ? now : old.firstSeenAt,
-        lastSeenAt: now, attempts, nextRetryAt: now + delay };
+        lastSeenAt: now, lastProgressAt, progress, attempts, nextRetryAt: now + delay };
       return changed;
     });
     if (changed) logInfo("ProcessingIssue", "Processing blocked", { ...context, issues });
@@ -155,8 +162,10 @@ export class ProcessingIssueService {
         const record = records[0], saved = state.notifications[key];
         const signature = fingerprint(records.flatMap(r => r.issues).filter((issue, i, all) =>
           all.findIndex(other => fingerprint([other]) === fingerprint([issue])) === i));
-        const immediate = records.some(r => r.issues.some(i => !["DEPENDENCY_UNAVAILABLE", "CONFIRMATIONS_PENDING", "INDEXING_PENDING"].includes(i.code)));
-        if (!immediate && records.every(r => this.now() - r.firstSeenAt < PROCESSING_ALERT_GRACE_MS)) continue;
+        const immediate = records.some(r => r.issues.some(i => !PROCESSING_DEFERRED_ALERT_CODES.includes(i.code)));
+        if (!immediate && records.every(r => r.attempts < 2 ||
+          r.lastSeenAt - (r.lastProgressAt ?? r.firstSeenAt) < PROCESSING_ALERT_GRACE_MS ||
+          this.now() - r.lastSeenAt > PROCESSING_RETRY_MAX_MS + PROCESSING_ALERT_GRACE_MS)) continue;
         if (saved?.fingerprint === signature && this.now() - saved.sentAt < PROCESSING_REMINDER_MS) continue;
         try {
           await send(records, false);
@@ -167,7 +176,7 @@ export class ProcessingIssueService {
         if (groups.has(key)) continue;
         const current = state.records[processingKey(saved.record.context)];
         try {
-          await send([current || saved.record], true);
+          if (current?.resolvedAt) await send([{ ...saved.record, resolvedAt: current.resolvedAt, outcome: current.outcome }], true);
           await this.update(s => { delete s.notifications[key]; });
         } catch { failed = true; }
       }

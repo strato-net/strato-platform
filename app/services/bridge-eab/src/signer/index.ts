@@ -6,6 +6,9 @@ import { verifierFailureDetails } from "../utils/processingIssues";
 import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
 import { WithdrawalReleasePendingError } from "../types";
+import type { DepositRefundAuthorization } from "../types";
+import { DEPOSIT_REFUND_TYPES } from "../config/bridgeAbi";
+import { validateDepositRefundSource, validateDepositRefundEvidence, validateDepositRefundCompletion } from "./depositRefundValidation";
 import { ConsensusProvider } from "./consensusProvider";
 import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
 import { verifierAccessControl } from "./accessControl";
@@ -659,6 +662,41 @@ app.get("/health", (_, res) => {
 
 app.use(verifierAccessControl(verifierApiToken));
 app.use(express.json({ limit: "32kb" }));
+
+for (const action of ["sign", "attest"] as const) {
+  app.post(`/v1/${action}-deposit-refund`, async (req, res) => {
+    try {
+      const a = req.body.authorization as DepositRefundAuthorization;
+      const deposit = req.body.deposit as DepositSettlementAttestation;
+      if (!a || !/^(0x)?[0-9a-f]{40}$/i.test(a.depositRouter) || typeof a.depositId !== "string" || !/^\d+$/.test(a.depositId)) throw new Error("Invalid deposit refund identity");
+      const params = { address: `eq.${sourceBridge}`, key: `eq.${destinationChainId}`,
+        key2: `eq.${normalize(a.depositRouter)}`, key3: `eq.${a.depositId}`, select: "value", limit: "1" };
+      const [record, refundVault] = await Promise.all([
+        stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-deposits", params),
+        stratoGet("/cirrus/search/BlockApps-ExternalAssetBridge-depositRefundVaults", params),
+      ]);
+      validateDepositRefundSource(a, deposit, record.data?.[0]?.value, refundVault.data?.[0]?.value,
+        sourceChainId, sourceBridge, destinationChainId, destinationVault);
+      if (action === "sign") {
+        await validateDepositRefundEvidence(provider, a, deposit, verifierConfirmations);
+        const signature = await kmsSigner.signTypedData({ name: "ExternalBridgeVault", version: "1",
+          chainId: destinationChainId, verifyingContract: destinationVault }, DEPOSIT_REFUND_TYPES, a);
+        res.json({ authorizationSigner: authorizationSignerAddress, signature });
+      } else {
+        const refundTxHash = String(req.body.refundTxHash || "");
+        await validateDepositRefundCompletion(provider, a, refundTxHash, verifierConfirmations);
+        const digest = await readSourceDigest("getDepositRefundDigest", [a.destinationChainId, a.depositRouter, a.depositId, refundTxHash]);
+        const transactionHash = await submitStratoAttestation("attestDepositRefund", {
+          externalChainId: a.destinationChainId, depositRouter: a.depositRouter, depositId: a.depositId, refundTxHash,
+        });
+        res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
+      }
+    } catch (error) {
+      res.status(422).json({ decision: "reject", error: (error as Error).message,
+        ...verifierFailureDetails(error, verifierPolicy.version, verifierPolicyDigest, settlementAttestorAddress) });
+    }
+  });
+}
 
 app.post("/v1/sign-withdrawal", async (req, res) => {
   try {

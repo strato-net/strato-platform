@@ -155,3 +155,8 @@ export interface CirrusEvent {
   transaction_sender: string;
   attributes: Record<string, any>;
 }
+
+export interface RoutedExecution {
+  eventIndex: number;
+  caller?: string;
+}

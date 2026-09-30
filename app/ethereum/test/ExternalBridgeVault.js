@@ -505,4 +505,57 @@ describe("ExternalBridgeVault", function () {
     expect(await vault.maxAuthorizationValiditySeconds()).to.equal(900);
   });
 
+  describe("deposit refunds", function () {
+    const refundTypes = { DepositRefundAuthorization: [
+      ["sourceChainId", "uint256"], ["sourceBridge", "address"], ["destinationChainId", "uint256"],
+      ["destinationVault", "address"], ["depositRouter", "address"], ["depositId", "uint256"],
+      ["token", "address"], ["recipient", "address"], ["amount", "uint256"],
+      ["deadline", "uint256"], ["signerSetVersion", "uint256"],
+    ].map(([name, type]) => ({ name, type })) };
+    async function refund(overrides = {}) {
+      const a = { ...await buildAuthorization(), depositRouter: other.address, depositId: 1n, ...overrides };
+      const domain = { name: "ExternalBridgeVault", version: "1", chainId: a.destinationChainId, verifyingContract: await vault.getAddress() };
+      const signers = [signerOne, signerTwo].sort((x, y) => x.address.toLowerCase().localeCompare(y.address.toLowerCase()));
+      return [a, await Promise.all(signers.map(signer => signer.signTypedData(domain, refundTypes, a)))];
+    }
+    it("returns the original asset once and prevents replay after source-bridge migration", async function () {
+      const [a, signatures] = await refund();
+      await expect(vault.connect(executor).refundDeposit(a, signatures)).to.changeTokenBalances(token, [vault, recipient], [-100n, 100n]);
+      await expect(vault.refundDeposit(a, signatures)).to.be.revertedWithCustomError(vault, "InvalidReservationState");
+      await vault.connect(policyAdmin).setSourceBridge(sourceChainId, other.address, true);
+      const migrated = await refund({ sourceBridge: other.address });
+      await expect(vault.refundDeposit(...migrated)).to.be.revertedWithCustomError(vault, "InvalidReservationState");
+    });
+    it("requires quorum and rejects mutation of every signed field", async function () {
+      const [a, signatures] = await refund();
+      await expect(vault.refundDeposit(a, signatures.slice(0, 1))).to.be.reverted;
+      await expect(vault.refundDeposit(a, [signatures[0], signatures[0]])).to.be.reverted;
+      for (const { name, type } of refundTypes.DepositRefundAuthorization) {
+        const value = type === "address" ? executor.address : BigInt(a[name]) + 1n;
+        await expect(vault.refundDeposit({ ...a, [name]: value }, signatures)).to.be.reverted;
+      }
+      expect(await token.balanceOf(recipient.address)).to.equal(0n);
+    });
+    it("protects reserved liquidity and leaves a failed refund retryable", async function () {
+      await reserve(await buildAuthorization());
+      const args = await refund({ amount: 4950n });
+      await expect(vault.refundDeposit(...args)).to.be.revertedWithCustomError(vault, "InsufficientLiquidity");
+      expect(await vault.refundedDeposits(await vault.depositRefundId(other.address, 1))).to.equal(false);
+      await token.mint(await vault.getAddress(), 100n);
+      await vault.refundDeposit(...args);
+      expect(await token.balanceOf(recipient.address)).to.equal(4950n);
+    });
+    it("returns ETH and respects pause and expiration", async function () {
+      await admin.sendTransaction({ to: await vault.getAddress(), value: 1000n });
+      const args = await refund({ token: ethers.ZeroAddress });
+      await vault.connect(guardian).pause();
+      await expect(vault.refundDeposit(...args)).to.be.reverted;
+      await vault.connect(unpauser).unpause();
+      await expect(vault.connect(executor).refundDeposit(...args)).to.changeEtherBalances([vault, recipient], [-100n, 100n]);
+      const expired = await refund({ depositId: 2n });
+      await time.increaseTo(expired[0].deadline + 1n);
+      await expect(vault.refundDeposit(...expired)).to.be.revertedWithCustomError(vault, "AuthorizationExpired");
+    });
+  });
+
 });
