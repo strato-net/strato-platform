@@ -89,7 +89,6 @@ import Control.Applicative ((<|>))
 import Control.Lens hiding (filtered)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base ()
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -216,13 +215,7 @@ addBlock b@OutputBlock {obBlockData = bd, obReceiptTransactions = otxs} =
             ++ "TXs)."
 
         bSum <- setParentStateRoot b
-        A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) (bSumStateRoot bSum)
-        -- Retained block-map entries are only valid if this block starts from the root they were flushed into.
-        startSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-        fr <- _flushedRoot <$> Mod.get (Mod.Proxy @MemDBs)
-        when (startSR /= fr) $ do
-          putAddressStateBlockDBMap emptyBlockMap
-          putMemRawStorageBlockMap emptyBlockMap
+        startFromStateRoot (bSumStateRoot bSum)
         -- TODO: PLEASE REMOVE THIS FORK WHEN MERCATA-HYDROGEN IS OBSOLETE
         when (Conf.networkID (networkConfig ethConf) == 7596898649924658542 && number bd == 32624) runTheDAOFork -- Only run this if connected to mercata-hydrogen
 

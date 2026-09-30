@@ -94,10 +94,6 @@ export type ApiAction =
   | 'nft_burn'
   // money in / rewards / referral
   | 'onramp_session'
-  | 'credit_card_top_up'
-  | 'credit_card_add'
-  | 'credit_card_update'
-  | 'credit_card_remove'
   | 'contact_submit'
   | 'rewards_claim'
   | 'rewards_claim_all'
@@ -235,10 +231,6 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
 
   // money in / rewards / referral
   'POST /onramp/session': 'onramp_session',
-  'POST /credit-card/manual-top-up': 'credit_card_top_up',
-  'POST /credit-card/add-card': 'credit_card_add',
-  'POST /credit-card/update-card': 'credit_card_update',
-  'POST /credit-card/remove-card': 'credit_card_remove',
   'POST /contact': 'contact_submit',
   'POST /rewards/claim-all': 'rewards_claim_all',
   'POST /rewards/claim/*': 'rewards_claim',

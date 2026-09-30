@@ -169,11 +169,6 @@ export const defaultMetalForgeFor: Record<string, string> = {
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
 };
 
-export const defaultCreditCardTopUpFor: Record<string, string> = {
-  "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
-  "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
-};
-
 export const defaultVaultFor: Record<string, string> = {
   "114784819836269": "d556695364551c8c7eb336f0bed9aed9e1acd69d", // Helium testnet
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
@@ -242,7 +237,6 @@ export let poolV3Factory: string = '';
 export let positionManagerV3: string = '';
 export let nftFactory: string = '';
 export let metalForge: string = '';
-export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
@@ -362,14 +356,6 @@ function setMetalForgeConfig(networkId: string) {
   }
 }
 
-export function setCreditCardTopUpConfig(networkId: string) {
-  if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
-    creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
-  } else {
-    creditCardTopUp = defaultCreditCardTopUpFor[networkId] || "";
-  }
-}
-
 export function setSaveUsdstVaultConfig(networkId: string) {
   if (process.env.SAVE_USDST_VAULT) {
     saveUsdstVault = process.env.SAVE_USDST_VAULT;
@@ -435,7 +421,6 @@ export async function initNetworkConfig() {
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);
   setMetalForgeConfig(networkId);
-  setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);

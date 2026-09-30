@@ -18,7 +18,7 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import Data.List (elemIndex, intercalate, partition)
+import Data.List (elemIndex, intercalate)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -58,14 +58,17 @@ valueToArgText v = T.pack $ show v
 
 encodeReturnABI :: [SVMType.Type] -> String -> B.ByteString
 encodeReturnABI [] _ = B.empty
-encodeReturnABI [t] retStr = encodeSingleReturn t (stripParens retStr)
-encodeReturnABI ts retStr = encodeMultiReturn ts (stripParens retStr)
+encodeReturnABI [t] retStr = encodeReturnTuple [(t, stripParens retStr)]
+encodeReturnABI ts retStr = encodeReturnTuple $ zip ts (splitReturnTuple (stripParens retStr))
 
 stripParens :: String -> String
 stripParens ('(' : rest)
   | not (null rest) && last rest == ')' = init rest
 stripParens s = s
 
+-- | One value's bytes: a 32-byte word for static types; for dynamic types the
+-- tail form (length word + right-padded contents) whose head offset is written
+-- by 'encodeReturnTuple'.
 encodeSingleReturn :: SVMType.Type -> String -> B.ByteString
 encodeSingleReturn (SVMType.Int (Just True) _) s = encodeInt256 (read s)
 encodeSingleReturn (SVMType.Int _ _) s = encodeUint256 (read s)
@@ -74,10 +77,10 @@ encodeSingleReturn (SVMType.Address _) s =
   padLeft32 $ addressToByteString (read $ stripQuotes s)
 encodeSingleReturn (SVMType.String _) s =
   let bs = BC.pack $ readStringLiteral s
-   in encodeUint256 32 <> encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+   in encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
 encodeSingleReturn (SVMType.Bytes _ Nothing) s =
   let bs = either (const B.empty) (\x -> x) $ B16.decode $ BC.pack $ stripQuotes s
-   in encodeUint256 32 <> encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
+   in encodeUint256 (fromIntegral $ B.length bs) <> padRight32 bs
 encodeSingleReturn (SVMType.Bytes _ (Just n)) s =
   let bs = either (const B.empty) (\x -> x) $ B16.decode $ BC.pack $ stripQuotes s
    in padLeft32 $ B.take (fromIntegral n) bs
@@ -94,10 +97,11 @@ encodeSingleReturn _ s = case reads s :: [(Integer, String)] of
   [(n, _)] -> encodeUint256 n
   _ -> encodeUint256 0
 
-encodeMultiReturn :: [SVMType.Type] -> String -> B.ByteString
-encodeMultiReturn types str =
-  let pairs = zip types (splitReturnTuple str)
-      staticSize = length types * 32
+-- | ABI-encode typed return strings as a tuple (static values inline in the
+-- head, dynamic values as head offsets pointing into the tail).
+encodeReturnTuple :: [(SVMType.Type, String)] -> B.ByteString
+encodeReturnTuple pairs =
+  let staticSize = length pairs * 32
       encodePass [] _ headAcc tailAcc = headAcc <> tailAcc
       encodePass ((t, v) : rest) tailOff headAcc tailAcc
         | isDynamic t =
@@ -207,7 +211,7 @@ encodeSingleValue _ SNULL = encodeUint256 0
 encodeSingleValue _ _ = B.empty
 
 --------------------------------------------------------------------------------
--- Event log encoding: decoded Cirrus attributes -> EVM topics + data
+-- Event log encoding: rendered event args (name -> value) -> EVM topics + data
 --------------------------------------------------------------------------------
 
 encodeEventToLog :: SolidString -> EventF a -> M.Map T.Text T.Text -> ([B.ByteString], B.ByteString)
@@ -218,20 +222,24 @@ encodeEventToLog evName eventDef attrs =
                else let sig = T.unpack (labelToText evName)
                             ++ "(" ++ intercalate "," (map svmTypeToCanonical allTypes) ++ ")"
                     in [keccak256ToByteString $ hash $ BC.pack sig]
-      (indexedLogs, nonIndexedLogs) = partition _eventLogIndexed logs
-      indexedTopics = map (encodeLogParam attrs) indexedLogs
-      nonIndexedData = B.concat $ map (encodeLogParam attrs) nonIndexedLogs
+      params = [ (indexedTypeType (_eventLogType l), _eventLogIndexed l, maybe "0" T.unpack (M.lookup (_eventLogName l) attrs))
+               | l <- logs ]
+      indexedTopics = [encodeTopic t s | (t, True, s) <- params]
+      nonIndexedData = encodeReturnTuple [(t, s) | (t, False, s) <- params]
   in (topic0 ++ indexedTopics, nonIndexedData)
 
-encodeLogParam :: M.Map T.Text T.Text -> EventLog -> B.ByteString
-encodeLogParam attrs (EventLog name _ idxType) =
-  let typ = indexedTypeType idxType
-  in case M.lookup name attrs of
-    Just s  -> encodeSingleReturn typ (T.unpack s)
-    Nothing -> encodeUint256 0
+-- | An indexed parameter is one 32-byte topic; dynamic types are stored as the
+-- keccak256 of their contents rather than inline.
+encodeTopic :: SVMType.Type -> String -> B.ByteString
+encodeTopic (SVMType.String _) s = keccak256ToByteString . hash . BC.pack $ readStringLiteral s
+encodeTopic (SVMType.Bytes _ Nothing) s =
+  keccak256ToByteString . hash . either (const B.empty) id . B16.decode . BC.pack $ stripQuotes s
+encodeTopic t s = encodeSingleReturn t s
 
-findEventDef :: CC.CodeCollection -> SolidString -> Maybe (CC.Event)
-findEventDef cc evName =
-  case concatMap (\(_, c) -> maybe [] (:[]) $ M.lookup evName (CC._events c)) (M.toList $ CC._contracts cc) of
-    (ev : _) -> Just ev
-    []       -> Nothing
+-- | The event declared by a specific contract in the collection. Events are
+-- resolved by (contract, event) rather than event name alone: several contracts
+-- in one collection may declare same-named events with different parameters
+-- (e.g. Pool.Swap vs PoolV3.Swap).
+findEventDef :: CC.CodeCollection -> SolidString -> SolidString -> Maybe CC.Event
+findEventDef cc contractName evName =
+  M.lookup contractName (CC._contracts cc) >>= M.lookup evName . CC._events

@@ -90,6 +90,18 @@ executables:
       - seqevents
       - strato-conf
 
+tests:
+  dependent-block-db-test:
+    source-dirs: test-db
+    main: Main.hs
+    ghc-options: -dynamic
+    dependencies:
+      - composable-monads-base
+      - hspec
+      - strato-model
+      - strato-sequencer
+      - temporary
+
 #For now, these tests are causing me more trouble than are useful, so I'm turning them off
 #tests:
 #  strato-sequencer-spec:
