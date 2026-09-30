@@ -15,6 +15,7 @@ module Control.Monad.Composable.CodeDB
     runCodeDBM,
     lookupCodeCollection,
     lookupCodeHash,
+    lookupDelegatecallCodeHashes,
     queryEvents,
     queryEventsByTxHash,
     EventRow (..),
@@ -28,8 +29,8 @@ import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.DataDefs (AddressStateRef (..), CodeRef (..), EntityField (..))
 import Blockchain.EthConf (connStr, cirrusConnStr)
 import Blockchain.SolidVM.CodeCollectionDB (codeCollectionFromHash)
-import Blockchain.Strato.Model.Address (Address)
-import Blockchain.Strato.Model.Keccak256 (Keccak256)
+import Blockchain.Strato.Model.Address (Address, formatAddressWithoutColor)
+import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256FromHex)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Class
@@ -115,6 +116,18 @@ lookupCodeHash addr = do
       return asr
   return $ listToMaybe rows >>= addressStateRefCodeHash . E.entityVal
 
+-- | Code hashes of every logic contract named @contractName@ that has run at
+-- @addr@ via delegatecall, from the Cirrus @contract@ table (one row per
+-- @(address, code_hash, contract_name)@, written by slipstream from the VM's
+-- delegatecall records). Lets a proxy's events be resolved against the
+-- implementation's code even after the implementation is upgraded.
+lookupDelegatecallCodeHashes :: Address -> Text -> CodeDBM '[] [Keccak256]
+lookupDelegatecallCodeHashes addr contractName = do
+  rows <- cirrusQuery $ SQL.rawSql
+    "SELECT code_hash FROM contract WHERE address = ? AND contract_name = ?"
+    [SQL.PersistText (T.pack $ formatAddressWithoutColor addr), SQL.PersistText contractName]
+  return [keccak256FromHex (T.unpack h) | SQL.Single h <- rows]
+
 data EventRow = EventRow
   { erAddress           :: Text
   , erBlockHash         :: Text
@@ -124,6 +137,7 @@ data EventRow = EventRow
   , erEventIndex        :: Int
   , erEventName         :: Text
   , erAttributes        :: Map.Map Text Value
+  , erContractName      :: Maybe Text -- ^ emitting (logic) contract; NULL on rows indexed before the column existed
   } deriving (Show)
 
 -- | The Cirrus @event@ table stores @address@ without a @0x@ prefix, so any
@@ -143,7 +157,7 @@ queryEvents mAddr0 fromBlock toBlock mEventName limit = do
           "CAST(block_number AS numeric) <= ?"
         ]
       baseQuery =
-        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text, contract_name \
         \FROM \"event\" WHERE "
           ++ intercalate " AND " (addressFilter ++ eventNameFilter ++ blockFilters)
           ++ " ORDER BY CAST(block_number AS numeric), event_index LIMIT ?"
@@ -164,15 +178,15 @@ queryEventsByTxHash :: Text -> Int -> CodeDBM '[] [EventRow]
 queryEventsByTxHash txHash limit = do
   let norm = if T.isPrefixOf "0x" txHash then T.drop 2 txHash else txHash
       q =
-        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text \
+        "SELECT address, block_hash, transaction_hash, block_number, transaction_sender, event_index::int, event_name, attributes::text, contract_name \
         \FROM \"event\" WHERE LOWER(transaction_hash) = LOWER(?) ORDER BY event_index LIMIT ?"
       params = [SQL.PersistText norm, SQL.PersistInt64 (fromIntegral limit)]
   rows <- cirrusQuery $ SQL.rawSql (T.pack q) params
   return $ map toEventRow rows
 
-toEventRow :: (SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text) -> EventRow
-toEventRow (SQL.Single addr, SQL.Single bHash, SQL.Single txHash, SQL.Single bNum, SQL.Single txSender, SQL.Single eIdx, SQL.Single eName, SQL.Single attrsText) =
-  EventRow addr bHash txHash bNum txSender eIdx eName attrs
+toEventRow :: ((SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Text, SQL.Single Int, SQL.Single Text, SQL.Single Text), SQL.Single (Maybe Text)) -> EventRow
+toEventRow ((SQL.Single addr, SQL.Single bHash, SQL.Single txHash, SQL.Single bNum, SQL.Single txSender, SQL.Single eIdx, SQL.Single eName, SQL.Single attrsText), SQL.Single cName) =
+  EventRow addr bHash txHash bNum txSender eIdx eName attrs cName
   where
     attrs = case decode (BL.fromStrict $ Text.encodeUtf8 attrsText) of
       Just m  -> m

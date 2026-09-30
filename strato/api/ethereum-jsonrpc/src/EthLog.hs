@@ -6,9 +6,7 @@
 
 module EthLog
   ( EthLog(..)
-  , eventRowToLog
   , eventRowToLogMaybe
-  , eventToLog
   , ethLogsBloom
   , matchesTopics
   ) where
@@ -16,7 +14,7 @@ module EthLog
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLog, findEventDef)
 import Blockchain.Data.LogsBloom (bloomFromItems)
 import Blockchain.Strato.Model.Address (addressFromHex)
-import Control.Monad.Composable.CodeDB (CodeDBM, EventRow(..), lookupCodeCollection, lookupCodeHash)
+import Control.Monad.Composable.CodeDB (CodeDBM, EventRow(..), lookupCodeCollection, lookupCodeHash, lookupDelegatecallCodeHashes)
 import Data.Aeson (ToJSON(..), Value(..), object, (.=))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -25,7 +23,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import GHC.Generics (Generic)
 import Numeric (showHex)
-import SolidVM.Model.CodeCollection (CodeCollection)
+import SolidVM.Model.CodeCollection (Event)
 import SolidVM.Model.SolidString (stringToLabel)
 
 data EthLog = EthLog
@@ -57,26 +55,33 @@ instance ToJSON EthLog where
       hexBytes bs = T.pack $ "0x" ++ BC.unpack (B16.encode bs)
       hexInt n = T.pack $ "0x" ++ showHex n ""
 
-eventRowToLog :: EventRow -> CodeDBM '[] EthLog
-eventRowToLog row = do
-  let addrText = erAddress row
-  addr <- case addressFromHex (BC.pack $ T.unpack addrText) of
-    Left err -> error $ "eth_getLogs: corrupt address in event table: " ++ T.unpack addrText ++ " (" ++ err ++ ")"
-    Right a -> return a
-  cHash <- lookupCodeHash addr >>= \case
-    Nothing -> error $ "eth_getLogs: no code hash for contract " ++ T.unpack addrText ++ " — address_state_ref is missing or has no codeHash"
-    Just h -> return h
-  cc <- lookupCodeCollection cHash >>= \case
-    Nothing -> error $ "eth_getLogs: no CodeCollection for code hash of contract " ++ T.unpack addrText ++ " — code_ref table is corrupt"
-    Just c -> return c
-  return $ eventToLog cc row
+-- | The event definition for a row, resolved by the emitting contract's name
+-- (stored on the row) rather than by event name alone, so same-named events in
+-- one CodeCollection (Pool.Swap vs PoolV3.Swap) are told apart. The
+-- CodeCollection is taken from the address's own code first; under a proxy
+-- that is the factory bundle, which normally also contains the implementation.
+-- If it does not (implementation upgraded to separately compiled code), fall
+-- back to the code hashes recorded for @(address, contract_name)@ in the
+-- Cirrus @contract@ table by the VM's delegatecall records.
+resolveEventDef :: EventRow -> CodeDBM '[] (Maybe Event)
+resolveEventDef row =
+  case (addressFromHex (BC.pack $ T.unpack (erAddress row)), erContractName row) of
+    (Right addr, Just cName) -> do
+      own <- maybe [] pure <$> lookupCodeHash addr
+      delegated <- lookupDelegatecallCodeHashes addr cName
+      firstJustM (own ++ delegated) $ \cHash ->
+        fmap (\cc -> findEventDef cc (stringToLabel $ T.unpack cName) evName) <$> lookupCodeCollection cHash
+    _ -> pure Nothing
+  where
+    evName = stringToLabel $ T.unpack (erEventName row)
+    firstJustM [] _ = pure Nothing
+    firstJustM (x : xs) f = f x >>= \case
+      Just (Just r) -> pure (Just r)
+      _ -> firstJustM xs f
 
-eventToLog :: CodeCollection -> EventRow -> EthLog
-eventToLog cc row =
+eventToLog :: Event -> EventRow -> EthLog
+eventToLog eventDef row =
   let evName = stringToLabel $ T.unpack (erEventName row)
-      eventDef = case findEventDef cc evName of
-        Nothing -> error $ "eth_getLogs: event " ++ T.unpack (erEventName row) ++ " not found in CodeCollection for contract " ++ T.unpack (erAddress row)
-        Just e -> e
       textAttrs = M.mapMaybe extractText (erAttributes row)
       (topicBytes, dataBytes) = encodeEventToLog evName eventDef textAttrs
       blockNum = case reads (T.unpack $ erBlockNumber row) :: [(Integer, String)] of
@@ -97,24 +102,11 @@ eventToLog cc row =
     extractText (String s) = Just s
     extractText _          = Nothing
 
--- | Like 'eventRowToLog', but yields 'Nothing' instead of throwing when the
--- contract code, code collection, or event definition cannot be resolved.
--- Used where a single unresolvable event must not fail the whole request
--- (e.g. bloom computation over every event in a transaction or block).
+-- | Yields 'Nothing' when the contract code, code collection, or event
+-- definition cannot be resolved, so a single unresolvable event does not fail
+-- the whole request.
 eventRowToLogMaybe :: EventRow -> CodeDBM '[] (Maybe EthLog)
-eventRowToLogMaybe row =
-  case addressFromHex (BC.pack $ T.unpack (erAddress row)) of
-    Left _ -> pure Nothing
-    Right addr ->
-      lookupCodeHash addr >>= \case
-        Nothing -> pure Nothing
-        Just cHash ->
-          lookupCodeCollection cHash >>= \case
-            Nothing -> pure Nothing
-            Just cc -> pure $
-              case findEventDef cc (stringToLabel $ T.unpack (erEventName row)) of
-                Nothing -> Nothing
-                Just _  -> Just (eventToLog cc row)
+eventRowToLogMaybe row = fmap (`eventToLog` row) <$> resolveEventDef row
 
 -- | Ethereum logs bloom over a set of reconstructed logs (address + topics).
 ethLogsBloom :: [EthLog] -> B.ByteString
