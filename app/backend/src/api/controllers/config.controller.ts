@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { networkId, networkName, creditCardTopUp, featuredEarnOpportunity } from "../../config/config";
+import { networkId, networkName, featuredEarnOpportunity } from "../../config/config";
 
 class ConfigController {
   static async getConfig(req: Request, res: Response) {
@@ -11,7 +11,6 @@ class ConfigController {
           projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
           networkId: networkId,
           networkName: networkName,
-          creditCardTopUpAddress: creditCardTopUp || undefined,
           featuredEarnOpportunity: featuredEarnOpportunity || undefined,
           stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null,
           contactEnabled: !!process.env.SENDGRID_API_KEY,

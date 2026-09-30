@@ -159,13 +159,14 @@ handleVmTasks InBatch {..} = do
   traverse_ (emitOut . OutPreprepareResponse) mPreDec
 
   mSelfAddress <- _selfAddress <$> Mod.get (Mod.Proxy @ContextState)
+  proposing <- _isProposer <$> Mod.get (Mod.Proxy @ContextState)
   mNewBlock <- do
     -- todo: perhaps we shouldnt even add TXs to the mempool, it might make for a VERY large checkpoint
     -- todo: which may fail
     bState <- Bagger.getBaggerState
     let pending = B.pending bState
         hasTxs = (numPoolable > 0) || not (M.null pending)
-        shouldOutputBlocks = hasTxs
+        shouldOutputBlocks = hasTxs && proposing
     $logInfoS "evm/loop/newBlock" . T.pack $
       printf
         "Num poolable: %d, num pending: %d"
@@ -175,6 +176,7 @@ handleVmTasks InBatch {..} = do
       boringBox
         [ CL.yellow "Decision making for block creation:",
           "hasTxs: " ++ formatBool hasTxs,
+          "isProposer: " ++ formatBool proposing,
           "shouldOutputBlocks: " ++ formatBool shouldOutputBlocks
         ]
     $logDebugS "evm/loop/newBlock" $ T.pack $ "Queued: " ++ show numPoolable
