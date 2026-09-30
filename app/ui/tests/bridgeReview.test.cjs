@@ -8,6 +8,10 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 
 const axiosExports = {};
+const bridgeUtils = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/bridge/utils.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText, { exports: bridgeUtils, require: () => ({ SUPPORTED_CHAINS: {} }) });
 const responseInterceptors = [], globalToasts = [];
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/axios.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -17,7 +21,7 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../s
   require: id => id === 'axios' ? { default: { create: () => ({ interceptors: { request: { use() {} }, response: { use: (...args) => responseInterceptors.push(args) } } }) } } : id === '@/hooks/use-toast' ? { toast: value => globalToasts.push(value) } : {},
 });
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready', refundEvidenceHash } = {}) {
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, stale = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready', refundEvidenceHash, overrides = {} } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
@@ -27,6 +31,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
   item.refundStatus = refundStatus;
   item.governance = { [action]: progress ?? { votesCast: 0, votesRequired: 2, hasVoted: false } };
   if (!approved) item.actions = item.actions.filter(action => action !== 'settle');
+  Object.assign(item, overrides);
   const exports = {};
   const jsx = (type, props) => ({ type, props });
   const source = fs.readFileSync(path.join(__dirname, '../src/components/admin/BridgeReviewQueue.tsx'), 'utf8');
@@ -34,10 +39,10 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
     exports, require: id => {
       if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx };
       if (id === 'react') return { useState: initial => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; } };
-      if (id === '@tanstack/react-query') return { useQuery: () => ({ data: unavailable ? undefined : [item], isError: unavailable, refetch: async () => {} }) };
+      if (id === '@tanstack/react-query') return { useQuery: () => ({ data: unavailable && !stale ? undefined : [item], isError: unavailable, refetch: async () => {} }) };
       if (id === '@/context/UserContext') return { useUser: () => ({ userAddress: 'admin', castVoteOnIssue: async (...args) => votes.push(args) }) };
       if (id === '@/lib/axios') return { extractApiErrorMessage: axiosExports.extractApiErrorMessage, api: { post: async (...args) => { requests.push(args); if (failure) throw { response: { status, data: { error: failure } } }; return { data: response }; } } };
-      if (id === '@/lib/bridge/utils') return { getChainName: () => 'Sepolia' };
+      if (id === '@/lib/bridge/utils') return { ...bridgeUtils, getChainName: () => 'Sepolia' };
       if (id === '@/utils/numberUtils') return { truncateAddress: value => value, formatUnits: require('ethers').formatUnits };
       return new Proxy({}, { get: (_, name) => String(name) });
     },
@@ -121,8 +126,49 @@ test('refund votes stay disabled until indexed attestations are ready', () => {
     const h = harness({ refundStatus });
     const tree = h.render();
     assert.equal(h.nodes(tree).find(node => node.type === 'Button' && node.props.children === 'Refund / vote').props.disabled, true);
-    assert.match(h.text(tree), refundStatus === 'pending' ? /Awaiting verifier attestations/ : /attestation status is unavailable/);
+    assert.match(h.text(tree), refundStatus === 'pending' ? /Verifiers — confirm.*no admin vote is needed yet/ : /Verifier confirmation is unavailable/);
+    assert.doesNotMatch(h.text(tree), /STRATO admins: remaining votes required|STRATO admin must execute/);
     assert.equal(h.requests.length, 0);
+  }
+});
+
+test('ready refunds replace the generic rule with the current admin action and destination', () => {
+  const h = harness({ overrides: { reason: 'Authorization expired. Refund requires verifier confirmation that no external payment occurred; expiry alone is not proof of non-payment.' } });
+  const tree = h.render();
+  assert.match(h.text(tree), /Verifier checks complete\. STRATO admins — select Refund \/ vote/);
+  assert.match(h.text(tree), /user's STRATO wallet/);
+  assert.doesNotMatch(h.text(tree), /Refund requires verifier confirmation|expiry alone/);
+  assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Refund / vote').props.disabled, false);
+  h.select();
+  assert.match(h.text(h.render()), /contract rechecks verifier confirmation/);
+});
+
+test('unavailable or stale readiness never tells admins that a refund is ready to vote', () => {
+  for (const options of [
+    { refundStatus: 'unavailable' }, { overrides: { refundStatus: undefined } },
+    { governanceStatus: 'unavailable' }, { overrides: { governance: undefined } },
+    { unavailable: true, stale: true },
+  ]) {
+    const h = harness(options), tree = h.render();
+    assert.match(h.text(tree), /Next step:.*Admin — refresh/);
+    assert.doesNotMatch(h.text(tree), /Verifier checks complete/);
+    assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Refund / vote').props.disabled, true);
+  }
+});
+
+test('deposit and Safe stages name the next actor without requesting an unnecessary STRATO vote', () => {
+  for (const [options, expected] of [
+    [{ kind: 'deposit_review', action: 'approve', approvalStatus: 'approved' }, /Bridge service — retry verification and delivery.*No further admin vote/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'reopened' } }, /Bridge service — retry verification and delivery/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending' } }, /Bridge service — verify the original deposit.*No admin vote is needed yet/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending', source: 'native', safeProposalHash: 'a'.repeat(64) } }, /Safe signers — review and execute the refund proposal in Safe/],
+    [{ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: 'a'.repeat(64) }, /STRATO admins — independently verify the external refund transaction/],
+    [{ kind: 'withdrawal_review' }, /Safe signers — review and execute the proposal in Safe/],
+    [{ kind: 'withdrawal_review', overrides: { safeProposalHash: undefined } }, /Bridge service — prepare the Safe proposal/],
+    [{ kind: 'deposit_review', overrides: { actions: [], source: 'legacy' } }, /Bridge operator — investigate the deposit evidence/],
+  ]) {
+    const h = harness(options);
+    assert.match(h.text(h.render()), expected);
   }
 });
 
@@ -130,10 +176,12 @@ test('review actions reflect your vote and quorum without claiming approval', ()
   const h = harness({ progress: { votesCast: 1, votesRequired: 2, hasVoted: true } });
   const tree = h.render();
   assert.match(h.text(tree), /Refund\s*:.*1.*of.*2.*votes.*You voted/);
+  assert.match(h.text(tree), /Next step:.*Other STRATO admins.*Your vote is recorded/);
   assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'You voted').props.disabled, true);
   const quorum = harness({ progress: { votesCast: 2, votesRequired: 2, hasVoted: true } });
   const ready = quorum.render();
-  assert.match(quorum.text(ready), /Quorum reached; execution pending/);
+  assert.match(quorum.text(ready), /Quorum reached; STRATO admin must execute/);
+  assert.match(quorum.text(ready), /Next step:.*STRATO admin — select Execute/);
   assert.equal(quorum.nodes(ready).find(node => node.type === 'Button' && h.text(node) === 'Execute refund').props.disabled, false);
   assert.doesNotMatch(quorum.text(ready), /Approved · awaiting settlement/);
 });
@@ -153,6 +201,8 @@ test('submitted vote stays distinct while Cirrus still returns the old vote coun
   h.select(); await h.confirm();
   const tree = h.render();
   assert.match(h.text(tree), /Waiting for indexed status/);
+  assert.match(h.text(tree), /Next step:.*STRATO indexing/);
+  assert.doesNotMatch(h.text(tree), /STRATO admins: remaining votes required/);
   assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Vote submitted').props.disabled, true);
   assert.equal(h.votes.length, 1);
   progress.votesCast = 1; progress.hasVoted = true;

@@ -2,7 +2,7 @@ import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { WAD } from "@/lib/constants";
 import { BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
-import type { BridgeToken, CompositeRouteQuoteResponse, BridgeTransaction } from "@strato/shared-types";
+import type { BridgeToken, CompositeRouteQuoteResponse, BridgeTransaction, BridgeReviewItem } from "@strato/shared-types";
 import { AutoRouteQuoteBinding, BridgeError, WithdrawalPreview } from "./types";
 
 export const ExternalBridgeStatus = {
@@ -28,6 +28,41 @@ export const getDepositStatusLabel = (status?: string | number, source?: BridgeT
     if (review) return review;
   }
   return getBridgeStatusLabel(status, source);
+};
+
+export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = false): string => {
+  if (item.kind === "withdrawal_refund") {
+    if (item.refundStatus === "pending") return "Verifiers — confirm that no external payment occurred. The bridge requests these checks automatically; no admin vote is needed yet.";
+    if (item.refundStatus !== "ready") return "Admin — refresh the queue. Verifier confirmation is unavailable; do not vote until refund readiness is confirmed.";
+  }
+  if (item.approvalStatus === "unavailable") return "Admin — refresh the queue to confirm whether the deposit is already approved before taking another action.";
+  if (item.approvalStatus === "approved" || item.recoveryStatus === "reopened") {
+    return "Bridge service — retry verification and delivery on STRATO automatically. No further admin vote is needed for delivery; the transfer is not complete yet.";
+  }
+  if (item.kind === "withdrawal_review") return item.safeProposalHash
+    ? "Safe signers — review and execute the proposal in Safe. The bridge then continues withdrawal processing; no STRATO admin vote is needed here."
+    : "Bridge service — prepare the Safe proposal. Safe signers can act once the proposal is available.";
+  if (item.recoveryStatus === "refund_pending" && !item.refundEvidenceHash) return item.safeProposalHash
+    ? "Safe signers — review and execute the refund proposal in Safe. The bridge will verify the external transaction before requesting STRATO admin confirmation."
+    : "Bridge service — verify the original deposit and process its external refund. No admin vote is needed yet; funds have not been confirmed returned.";
+  if (!item.actions.length) return "Bridge operator — investigate the deposit evidence and complete the required review. No STRATO admin vote is available here.";
+  if (votePending) return "STRATO indexing — wait for the submitted vote or execution to appear. Do not submit it again while the queue refreshes.";
+  if (item.governanceStatus !== "available" || item.actions.some(action => !item.governance?.[action])) {
+    return "Admin — refresh the queue. Voting status is unavailable; do not submit another vote until it is confirmed.";
+  }
+  const progress = item.actions.map(action => item.governance![action]!);
+  const verified = item.kind === "withdrawal_refund" ? "Verifier checks complete. " : "";
+  if (progress.some(vote => vote.votesCast >= vote.votesRequired)) {
+    return `${verified}STRATO admin — select Execute for the decision that has reached quorum. The decision is not complete until execution succeeds.`;
+  }
+  if (progress.every(vote => vote.hasVoted)) {
+    return `${verified}Other STRATO admins — review and cast the remaining votes. Your vote is recorded; no further vote is needed from you.`;
+  }
+  if (item.kind === "withdrawal_refund") return "Verifier checks complete. STRATO admins — select Refund / vote to approve returning the escrowed tokens to the user's STRATO wallet. Funds return when the approved refund executes.";
+  if (item.refundEvidenceHash) return "STRATO admins — independently verify the external refund transaction, then select Confirm refund / vote. Execution marks the refund complete; it does not send funds.";
+  return item.actions.includes("approve")
+    ? "STRATO admins — review the deposit evidence and vote using the available delivery or return actions below. Submitting a vote does not complete delivery or refund."
+    : "STRATO admins — review the deposit evidence before voting to return the original funds. The bridge operator handles delivery verification; no delivery approval is offered here.";
 };
 
 /**

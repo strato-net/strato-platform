@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import CopyButton from '@/components/ui/copy';
-import { getChainName } from '@/lib/bridge/utils';
+import { getBridgeReviewNextStep, getChainName } from '@/lib/bridge/utils';
 import { truncateAddress } from '@/utils/numberUtils';
 import { AlertCircle, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 
@@ -21,6 +21,8 @@ const BridgeReviewQueue = () => {
   const { castVoteOnIssue, userAddress } = useUser();
   const [submittedVotes, setSubmittedVotes] = useState<Record<string, number>>({});
   const voteKey = (item: BridgeReviewItem, action: string) => `${userAddress}:${item.id}:${action}`;
+  const isVotePending = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction) =>
+    !item.governance?.[action]?.hasVoted && Date.now() - (submittedVotes[voteKey(item, action)] ?? 0) < 60_000;
   const [selected, setSelected] = useState<{ item: BridgeReviewItem; action: BridgeReviewGovernanceAction } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
@@ -44,7 +46,7 @@ const BridgeReviewQueue = () => {
       }
       await castVoteOnIssue(data.target, data.func, data.args);
       setSubmittedVotes(previous => ({ ...previous, [voteKey(selected.item, selected.action)]: Date.now() }));
-      setMessage(selected.action === 'confirm_refund' ? 'Vote submitted. The refund is marked Refunded once governance executes this confirmation.' : 'Vote submitted. Once the decision executes, the bridge continues processing automatically.');
+      setMessage('Governance transaction submitted. Refreshing the queue to show the next step; submission alone does not confirm that funds were delivered or returned.');
       setSelected(null);
       await reviews.refetch();
     } catch (e: unknown) {
@@ -77,7 +79,11 @@ const BridgeReviewQueue = () => {
       {message && <p role="status" className="text-sm text-green-700 dark:text-green-400">{message}</p>}
       {reviews.isError && <p role="alert" className="text-sm text-destructive">The review queue is unavailable. Check the STRATO connection; this does not mean there are no pending reviews.</p>}
       {reviews.isLoading ? <div role="status" className="flex min-h-24 items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading review items…</div> : !reviews.isError && !reviews.data?.length ? <p className="text-sm text-muted-foreground">No transactions currently require review.</p> : null}
-      {reviews.data?.map(item => <div key={item.id} className="border rounded-lg p-4 space-y-3">
+      {reviews.data?.map(item => {
+        const unavailable = reviews.isError || item.approvalStatus === 'unavailable' ||
+          (item.kind === 'withdrawal_refund' && !['pending', 'ready'].includes(item.refundStatus || '')) ||
+          (item.actions.length > 0 && (item.governanceStatus !== 'available' || item.actions.some(action => !item.governance?.[action])));
+        return <div key={item.id} className="border rounded-lg p-4 space-y-3">
         <div className="flex flex-wrap justify-between gap-2">
           <h3 className="font-medium">{item.kind === 'withdrawal_refund' ? 'Withdrawal refund review' : item.kind === 'deposit_recovery' ? 'Deposit recovery pending' : item.kind === 'deposit_review' ? 'Deposit review' : 'Withdrawal pending review'} #{item.reference}</h3>
           <span className="text-sm text-muted-foreground">{item.source === 'eab' ? 'EAB' : item.source === 'native' ? 'Native bridge' : 'Legacy bridge'} · {getChainName(Number(item.chainId))} ({item.chainId})</span>
@@ -86,7 +92,8 @@ const BridgeReviewQueue = () => {
         {item.recoveryStatus === 'refund_pending' && <p role="status" className="text-sm font-medium">{item.refundEvidenceHash ? 'Refund confirmation requires governance approval' : `Refund processing${item.safeProposalHash ? ' · Safe approval required' : ''}`}</p>}
         {item.approvalStatus === 'unavailable' && <p role="alert" className="text-sm text-destructive">Deposit approval status is unavailable.</p>}
         {item.actions.some(action => Object.prototype.hasOwnProperty.call(actionLabels, action)) && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
-        <p className="text-sm">{item.reason}</p>
+        <p className="text-sm">{item.kind === 'withdrawal_refund' ? 'Withdrawal authorization expired. The refund is not complete.' : item.reason}</p>
+        <p role={unavailable ? 'alert' : 'status'} className={`text-sm font-medium${unavailable ? ' text-destructive' : ''}`}>Next step: {reviews.isError ? 'Admin — refresh the queue. Displayed transaction and voting status may be stale.' : getBridgeReviewNextStep(item, item.actions.some(action => isVotePending(item, action)))}</p>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">Account: {truncateAddress(item.account)}<CopyButton address={item.account} /></span>
           <span className="inline-flex items-center gap-2">Token: {truncateAddress(item.token)}<CopyButton address={item.token} /></span>
@@ -99,21 +106,24 @@ const BridgeReviewQueue = () => {
           {item.actions.filter((action): action is BridgeReviewGovernanceAction => Object.prototype.hasOwnProperty.call(actionLabels, action) && (action !== 'approve' || item.approvalStatus !== 'approved')).map(action => {
             const progress = item.governance?.[action];
             const quorum = progress && progress.votesCast >= progress.votesRequired;
-            const pending = !progress?.hasVoted && Date.now() - (submittedVotes[voteKey(item, action)] ?? 0) < 60_000;
-            const disabled = submitting || reviews.isError || !progress || item.governanceStatus !== 'available' || pending ||
-              (progress?.hasVoted && !quorum) || (action === 'refund' && item.kind === 'withdrawal_refund' && item.refundStatus !== 'ready');
+            const pending = isVotePending(item, action);
+            const readinessUnavailable = reviews.isError || !progress || item.governanceStatus !== 'available' ||
+              (action === 'refund' && item.kind === 'withdrawal_refund' && item.refundStatus !== 'ready');
+            const disabled = submitting || readinessUnavailable || pending || (progress?.hasVoted && !quorum);
+            const nextVoteStep = pending ? 'Awaiting STRATO indexing'
+              : readinessUnavailable ? 'Voting unavailable until readiness is confirmed'
+              : quorum ? 'Quorum reached; STRATO admin must execute'
+              : progress.hasVoted ? 'Awaiting votes from other STRATO admins' : 'STRATO admins: remaining votes required';
             return <div key={action} className="space-y-1">
               <Button variant={action === 'reject' ? 'destructive' : 'outline'} size="sm" disabled={!!disabled} onClick={() => { setError(''); setSelected({ item, action }); }}>
-                {pending ? 'Vote submitted' : quorum ? `Execute ${action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : action === 'confirm_refund' ? 'refund confirmation' : item.kind === 'withdrawal_refund' ? 'refund' : 'return decision'}` : progress?.hasVoted ? 'You voted' : reviewActionLabel(item, action)}
+                {pending ? quorum ? 'Execution submitted' : 'Vote submitted' : quorum ? `Execute ${action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : action === 'confirm_refund' ? 'refund confirmation' : item.kind === 'withdrawal_refund' ? 'refund' : 'return decision'}` : progress?.hasVoted ? 'You voted' : reviewActionLabel(item, action)}
               </Button>
-              {progress && <p className="text-xs text-muted-foreground">{action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : action === 'confirm_refund' ? 'Refund confirmation' : 'Refund'}: {progress.votesCast} of {progress.votesRequired} votes{progress.hasVoted ? ' · You voted' : ''}{quorum ? ' · Quorum reached; execution pending' : ' · Awaiting votes'}</p>}
+              {progress && <p className="text-xs text-muted-foreground">{action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : action === 'confirm_refund' ? 'Refund confirmation' : 'Refund'}: {progress.votesCast} of {progress.votesRequired} votes{progress.hasVoted ? ' · You voted' : ''} · {nextVoteStep}</p>}
               {pending && <p role="status" className="text-xs text-muted-foreground">Waiting for indexed status…</p>}
             </div>;
           })}
-          {item.kind === 'withdrawal_refund' && item.refundStatus === 'pending' && <p role="status" className="text-sm text-muted-foreground">Awaiting verifier attestations. The bridge prepares refund evidence automatically.</p>}
-          {item.kind === 'withdrawal_refund' && (!item.refundStatus || item.refundStatus === 'unavailable') && <p role="alert" className="text-sm text-destructive">Refund attestation status is unavailable. Refresh before voting.</p>}
         </div>
-      </div>)}
+      </div>; })}
     </CardContent>
     </CollapsibleContent>
     </Collapsible>
@@ -123,7 +133,7 @@ const BridgeReviewQueue = () => {
           {selected?.action === 'confirm_refund' ? 'Independently verify this transaction on the source network: successful execution, sufficient confirmations, the original bridge and redemption ID, representation token, sender and exact amount. The hash is an operator report, not independent proof. This vote marks the refund completed; it does not send funds.'
             : selected?.action === 'reject' ? 'Rejecting marks this deposit canceled on STRATO. It does not refund external funds. Confirm the recovery plan before voting.'
             : selected?.action === 'refund' ? selected.item.kind === 'withdrawal_refund'
-              ? 'On-chain verifier attestations must confirm external non-payment. A refund executes only after the required governance approvals.'
+              ? 'Verifier checks are complete. STRATO admin approval is now required to return the escrowed tokens to the user’s STRATO wallet. The contract rechecks verifier confirmation when the refund executes.'
               : 'This permanently disables STRATO delivery for this deposit. After governance approval, the bridge verifies the original deposit and returns the original asset to its sender on the source network. Native STRATO custody remains locked when external representations are restored. Completion requires a confirmed refund transaction.'
             : selected?.item.kind === 'deposit_recovery' ? 'Reopen this deposit for verified delivery on STRATO. This does not bypass custody checks, policy limits or verifier requirements. The original route and fallback protections still apply.'
             : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, the bridge automatically retries settlement.'}
