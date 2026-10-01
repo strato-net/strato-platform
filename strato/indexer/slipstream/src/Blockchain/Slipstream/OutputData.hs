@@ -1259,7 +1259,7 @@ initialSlipstreamQueries =
       ]
       ["address", "path"]
       Nothing -- (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
-      [("mapping_idx", ["address","path"])]
+      []
   , CreateTable
       mappingHistoryTableName
       [ ("address", SqlText)
@@ -1314,6 +1314,7 @@ initialSlipstreamQueries =
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
   , RawSQL genericBaseTableIndexesSQL
+  , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
@@ -1348,10 +1349,6 @@ genericBaseTableIndexesSQL = T.unlines
   , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
   , "    AND jsonb_typeof(value) IS NOT NULL;"
   , ""
-  , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
-  , "  ON storage (((data->>'status')), address)"
-  , "  WHERE jsonb_exists(data, 'status');"
-  , ""
   , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
   , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
   , ""
@@ -1360,6 +1357,9 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_name_timestamp_idx"
   , "  ON event (event_name, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_timestamp_idx"
+  , "  ON event (block_timestamp DESC);"
   ]
 
 jsonbMergeDeepSQL :: Text
