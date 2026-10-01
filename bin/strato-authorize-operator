@@ -372,10 +372,16 @@ def step6_summary_and_confirm(ctx, args):
 
 
 def _ask(prompt):
+    # Prefer the controlling terminal so the prompt works even when stdout is piped; fall
+    # back to stdin when /dev/tty cannot be opened (some remote sessions) but stdin is a tty.
     try:
         tty = open("/dev/tty", "r+", encoding="utf-8")
-    except OSError:
-        die(10, "no terminal to confirm on; pass --yes to sign without a prompt")
+    except OSError as e:
+        if sys.stdin.isatty():
+            sys.stderr.write(prompt)
+            sys.stderr.flush()
+            return sys.stdin.readline().strip().lower()
+        die(10, f"no terminal to confirm on ({e.strerror or e}); pass --yes to sign without a prompt")
     with tty:
         tty.write(prompt)
         tty.flush()
