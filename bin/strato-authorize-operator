@@ -441,8 +441,9 @@ def main():
     args = p.parse_args()
 
     self_test()
+    operator = address("operator", args.operator)  # cheapest check first
     ctx = step1_read_node_files(args)
-    ctx["operator"] = address("operator", args.operator)
+    ctx["operator"] = operator
     step1d_registry_address(ctx, args)
     step2_token(ctx)
     step3_validator(ctx)
