@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
@@ -14,6 +15,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
+  const [historyError, setHistoryError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number>(0);
@@ -42,6 +45,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setHistoryError(false);
       try {
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
@@ -82,14 +86,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         setTransactions(merged as DepositTransaction[]);
         setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
-        console.error("Error loading transactions:", error);
+        setHistoryError(true);
         setTransactions([]);
         setTotalCount(0);
       }
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
+  }, [retryKey, currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
 
   
 
@@ -269,7 +273,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      {historyError ? <div role="alert" className="rounded-lg border border-destructive/40 p-4 text-destructive">
+        <p>Unable to load transaction history. Please try again.</p>
+        <Button variant="outline" className="mt-2" onClick={() => setRetryKey(value => value + 1)}>Retry</Button>
+      </div> : <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
@@ -299,7 +306,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           }}
           rowKey={(_, index) => index}
         />
-      </div>
+      </div>}
     </div>
   );
 };

@@ -164,42 +164,6 @@ test("ordinary wallet transaction preparation retains external signing context",
   assert.equal(entered, true);
 });
 
-test("personal bridge history requires verified identity and ignores supplied account filters", async t => {
-  const auth = await import("../../utils/authHelper");
-  const account = "a".repeat(40), other = "b".repeat(40);
-  t.mock.method(auth, "getServiceToken", async () => { throw new Error("History must not use anonymous service identity"); });
-  t.mock.method(auth, "verifyAccessTokenSignature", async () => ({ preferred_username: "user" }));
-  t.mock.method(auth, "createOrGetKey", async () => ({ address: account, isNew: false }));
-  t.mock.method(userService, "isUserAdmin", async () => false);
-  const reads = t.mock.method(service, "getBridgeTransactions", async (_token: string, _type: any, address: any) => {
-    assert.equal(address, account);
-    return { data: [], totalCount: 0 };
-  });
-  for (const [router, path] of [[tradeRouter, "/bridge/transactions/:type"], [bridgeRouter, "/transactions/:type"]] as const) {
-    const route = router.stack.find((layer: any) => layer.route?.path === path)!.route!;
-    for (const authenticated of [false, true]) {
-      let status = 200, entered = false;
-      const req: any = { method: "GET", headers: { "x-wallet-address": other,
-        ...(authenticated ? { authorization: "Bearer valid" } : {}) }, params: { type: "deposit" }, query: { context: "admin" } };
-      const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
-      const before = reads.mock.callCount();
-      await route.stack[0].handle(req, res, (error?: any) => { if (error) throw error; entered = true; });
-      if (entered) await route.stack[1].handle(req, res, (error?: any) => { if (error) throw error; });
-      assert.equal(status, authenticated ? 200 : 401);
-      assert.equal(reads.mock.callCount() - before, authenticated ? 1 : 0);
-    }
-  }
-  for (const controller of [BridgeController, TradeBridgeController]) {
-    let status = 200;
-    const res: any = { status: (n: number) => { status = n; return res; }, json: () => res };
-    const before = reads.mock.callCount();
-    await controller.getTransactions({ accessToken: "service", params: { type: "deposit" }, query: {} } as any, res, error => { if (error) throw error; });
-    assert.equal(status, 401);
-    assert.equal(reads.mock.callCount(), before);
-  }
-});
-
-
 test("admin review prepare route accepts withdrawal cancellation actions", async t => {
   const auth = await import("../../utils/authHelper");
   const account = "a".repeat(40);
@@ -229,29 +193,43 @@ test("admin review prepare route accepts withdrawal cancellation actions", async
 });
 
 
-test("cancellation eligibility requires verified identity and ignores a spoofed wallet header", async t => {
+test("bridge history and cancellation reads support app and wallet identities without unfiltered history", async t => {
   const auth = await import("../../utils/authHelper");
-  const account = "a".repeat(40), other = "b".repeat(40);
-  t.mock.method(auth, "getServiceToken", async () => { throw new Error("Eligibility must not use anonymous service identity"); });
-  t.mock.method(auth, "verifyAccessTokenSignature", async (token: string) => {
-    if (token === "invalid") throw new Error("Invalid token");
-    return { preferred_username: "user" };
-  });
+  const { requestContext } = await import("../../utils/requestContext");
+  const account = "a".repeat(40), wallet = "b".repeat(40);
+  t.mock.method(auth, "getServiceToken", async () => "service");
+  t.mock.method(auth, "verifyAccessTokenSignature", async () => ({ preferred_username: "user" }));
   t.mock.method(auth, "createOrGetKey", async () => ({ address: account, isNew: false }));
-  const reads = t.mock.method(service, "getWithdrawalCancellation", async (...args: any[]) => {
-    assert.deepEqual(args, ["valid", "native", "17", account]);
-    return { eligible: false } as any;
-  });
-  const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === "/withdrawalCancellation" && layer.route.methods.get)!.route!;
-  for (const token of [undefined, "invalid", "valid"]) {
-    let status = 200, entered = false;
-    const req: any = { method: "GET", headers: { "x-wallet-address": other,
-      ...(token ? { authorization: `Bearer ${token}` } : {}) }, query: { source: "native", withdrawalId: "17" } };
-    const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
-    const before = reads.mock.callCount();
-    await route.stack[0].handle(req, res, (error?: any) => { if (!error) entered = true; });
-    if (entered) await route.stack[1].handle(req, res, (error?: any) => { if (error) throw error; });
-    assert.equal(status, token === "valid" ? 200 : 401);
-    assert.equal(reads.mock.callCount() - before, token === "valid" ? 1 : 0);
+  t.mock.method(userService, "isUserAdmin", async () => true);
+  const reads: any[][] = [];
+  t.mock.method(service, "getBridgeTransactions", async (...args: any[]) => { reads.push(args); return { data: [], totalCount: 0 }; });
+  t.mock.method(service, "getWithdrawalCancellation", async (...args: any[]) => { reads.push(args); return { eligible: false } as any; });
+  for (const [router, path] of [[tradeRouter, "/bridge/transactions/:type"], [bridgeRouter, "/transactions/:type"], [bridgeRouter, "/withdrawalCancellation"]] as const) {
+    const route = router.stack.find((layer: any) => layer.route?.path === path && layer.route.methods.get)!.route!;
+    const cancellation = path === "/withdrawalCancellation";
+    for (const mode of ["app", "wallet", "anonymous"]) {
+      let status = 200, completion: Promise<any> | undefined;
+      const req: any = { method: "GET", headers: mode === "app" ? { authorization: "Bearer valid" }
+        : mode === "wallet" ? { "x-wallet-address": "0x" + wallet.toUpperCase() } : {},
+        params: { type: "withdrawal" }, query: { source: "native", withdrawalId: "17", ...(mode === "wallet" ? { context: "admin" } : {}) } };
+      const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
+      const before = reads.length;
+      await requestContext.run({ externalSigning: false, userAddress: account }, async () => {
+        await route.stack[0].handle(req, res, (error?: any) => {
+          if (error) throw error;
+          completion = route.stack[1].handle(req, res, (err?: any) => { if (err) status = err.status || 500; });
+        });
+        await completion;
+      });
+      if (mode === "anonymous") {
+        assert.equal(status, 401); assert.equal(reads.length, before);
+        continue;
+      }
+      assert.equal(status, 200);
+      const expected = mode === "app" ? account : wallet;
+      const args = reads.at(-1)!;
+      assert.equal(args[cancellation ? 3 : 2], expected);
+      if (!cancellation) assert.notEqual(args.at(-1), "all", "wallet-supplied admin identity cannot broaden history");
+    }
   }
 });

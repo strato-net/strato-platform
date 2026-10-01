@@ -6,7 +6,7 @@ const router = Router();
 const adminAuth = authHandler.authorizeRequest({ requireAuthenticatedIdentity: true });
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
-router.get("/withdrawalCancellation", authHandler.authorizeRequest({ requireAuthenticatedIdentity: true }), BridgeController.cancelWithdrawal);
+router.get("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
 router.post("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
 
 router.get("/admin/policies", adminAuth, BridgeController.policies);
@@ -275,7 +275,7 @@ router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeControll
  *                 totalCount:
  *                   type: integer
  */
-router.get("/transactions/:type", authHandler.authorizeRequest({ requireAuthenticatedIdentity: true }), BridgeController.getTransactions);
+router.get("/transactions/:type", walletAuth, BridgeController.getTransactions);
 
 /**
  * @openapi

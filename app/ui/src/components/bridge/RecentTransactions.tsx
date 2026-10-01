@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
@@ -172,6 +173,8 @@ const RecentTransactions = ({
   const isMobile = useIsMobile();
   const recentLimit = isMobile ? 6 : 8;
 
+  const [bridgeError, setBridgeError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [bridgeTxs, setBridgeTxs] = useState<RecentTx[]>([]);
   const [bridgeLoading, setBridgeLoading] = useState(false);
   const bridgeLoadedRef = useRef(false);
@@ -232,11 +235,13 @@ const RecentTransactions = ({
           tx.stratoTokenSymbol = input?._symbol || tx.stratoTokenSymbol;
           tx.finalTokenSymbol = output?._symbol || tx.finalTokenSymbol;
         }
+        setBridgeError(false);
         setBridgeTxs(all);
         setBridgeLoading(false);
         bridgeLoadedRef.current = true;
       }).catch(() => {
         if (disposed) return;
+        setBridgeError(true);
         setBridgeLoading(false); bridgeLoadedRef.current = true;
       }).finally(() => { fetching = false; });
     };
@@ -255,7 +260,7 @@ const RecentTransactions = ({
         document.removeEventListener("visibilitychange", refresh);
       }
     };
-  }, [isLoggedIn, userAddress, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey, pendingDepositsKey]);
+  }, [retryKey, isLoggedIn, userAddress, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey, pendingDepositsKey]);
 
   if (fundingMode === "metals" && isLoggedIn && lastMetalRefreshKey !== metalRefreshKey) {
     setLastMetalRefreshKey(metalRefreshKey);
@@ -360,6 +365,11 @@ const RecentTransactions = ({
 
         {!isLoggedIn
           ? <p className="text-sm text-muted-foreground px-4 py-4">Sign in to view your recent activity.</p>
+          : isBridge && bridgeError
+            ? <div role="alert" className="p-4 text-sm text-destructive">
+                <p>Unable to load recent activity. Please try again.</p>
+                <Button variant="outline" className="mt-2" onClick={() => { setBridgeError(false); setBridgeLoading(true); setRetryKey(value => value + 1); }}>Retry</Button>
+              </div>
           : activeLoading
             ? skeleton
             : !activeTxs.length

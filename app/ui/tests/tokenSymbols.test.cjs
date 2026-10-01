@@ -140,7 +140,7 @@ async function recentSession({ deposits = [], routes = [], metals = [], pending 
         useState: (initial) => {
           const index = stateIndex++;
           if (firstRender) states[index] = initial;
-          return [states[index], (value) => { states[index] = value; if (index === (metals.length && !unified ? 3 : 1) && value === false) loaded(); }];
+          return [states[index], (value) => { states[index] = value; if (index === (metals.length && !unified ? 5 : 3) && value === false) loaded(); }];
         },
         useEffect: (callback) => { if (firstRender) cleanup = callback(); },
         useMemo: (callback) => callback(), useCallback: (callback) => callback,

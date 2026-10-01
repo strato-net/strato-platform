@@ -23,6 +23,7 @@ import {
 import { isUserAdmin } from "../services/user.service";
 import { getAdminBridgePolicies, getAdminBridgeReviews, prepareAdminBridgeReview } from "../services/bridgeReview.service";
 import { StratoError } from "../../errors";
+import { requestContext } from "../../utils/requestContext";
 import type { BridgeProtocol } from "../../types/types";
 
 const createBridgeController = (protocol: BridgeProtocol) => class BridgeController {
@@ -59,6 +60,7 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
 
   static async cancelWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      if (!req.address) throw new StratoError("Account required", 401);
       const input = req.method === "GET" ? req.query : req.body;
       if (!input || typeof input.source !== "string" || typeof input.withdrawalId !== "string") throw new StratoError("Source and withdrawal ID are required", 400);
       const result = req.method === "GET"
@@ -194,7 +196,7 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
       
       const isAdmin = await isUserAdmin(accessToken, userAddress);
       
-      const adminHistory = context === 'admin' && isAdmin;
+      const adminHistory = context === 'admin' && isAdmin && !requestContext.getStore()?.externalSigning;
       const addressToUse = adminHistory ? undefined : userAddress;
       
       const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, addressToUse, queryParams, adminHistory ? "all" : protocol);

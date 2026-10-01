@@ -381,11 +381,6 @@ export const BridgeProvider = ({ children, scope = "fund" }: { children: ReactNo
           data: responseData?.data || responseData || [],
           totalCount: responseData?.totalCount || responseData?.length || 0
         };
-      } catch (err) {
-        return {
-          data: [],
-          totalCount: 0
-        };
       } finally {
         setLoading(false);
       }
@@ -414,11 +409,6 @@ export const BridgeProvider = ({ children, scope = "fund" }: { children: ReactNo
         return {
           data: responseData?.data || responseData || [],
           totalCount: responseData?.totalCount || responseData?.length || 0
-        };
-      } catch (err) {
-        return {
-          data: [],
-          totalCount: 0
         };
       } finally {
         setLoading(false);

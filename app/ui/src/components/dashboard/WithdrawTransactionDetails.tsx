@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import WithdrawalCancellation from "@/components/bridge/WithdrawalCancellation";
 import { useUser } from "@/context/UserContext";
 import { useEffect, useState, useMemo } from 'react';
@@ -19,6 +20,8 @@ const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
   const { userAddress } = useUser();
+  const [historyError, setHistoryError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
@@ -47,6 +50,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setHistoryError(false);
       setIsLoading(true);
       try {
         const params: Record<string, string> = {
@@ -73,7 +77,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
-        console.error('Error loading transactions:', error);
+        setHistoryError(true);
         setTransactions([]);
         setTotalCount(0);
       } finally {
@@ -82,7 +86,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
+  }, [retryKey, currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions, context, selectedType, withdrawalRefreshKey]);
 
   const columns = [
     {
@@ -316,7 +320,10 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      {historyError ? <div role="alert" className="rounded-lg border border-destructive/40 p-4 text-destructive">
+        <p>Unable to load transaction history. Please try again.</p>
+        <Button variant="outline" className="mt-2" onClick={() => setRetryKey(value => value + 1)}>Retry</Button>
+      </div> : <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
@@ -345,7 +352,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
           }}
           rowKey={(_, index) => index}
         />
-      </div>
+      </div>}
     </div>
   );
 };

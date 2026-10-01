@@ -9,7 +9,7 @@ const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 router.get("/bridge/networkConfigs", authHandler.authorizeRequest(true), TradeBridgeController.getNetworkConfigs);
 router.get("/bridge/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), TradeBridgeController.getBridgeableTokens);
 router.get("/bridge/depositActions", authHandler.authorizeRequest(), TradeBridgeController.getDepositActions);
-router.get("/bridge/transactions/:type", authHandler.authorizeRequest({ requireAuthenticatedIdentity: true }), TradeBridgeController.getTransactions);
+router.get("/bridge/transactions/:type", walletAuth, TradeBridgeController.getTransactions);
 router.get("/bridge/withdrawalSummary", authHandler.authorizeRequest(), TradeBridgeController.getWithdrawalSummary);
 router.post("/bridge/requestWithdrawal", walletAuth, TradeBridgeController.requestWithdrawal);
 router.post("/bridge/requestNativeWithdrawal", walletAuth, TradeBridgeController.requestNativeWithdrawal);

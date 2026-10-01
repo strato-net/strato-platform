@@ -14,7 +14,8 @@ function load(file, imports) {
   } }).outputText, { exports, require: imports });
   return exports;
 }
-const utils = load('lib/bridge/utils.ts', id => id === '@/lib/constants' ? { WAD } : { SUPPORTED_CHAINS: {} });
+const bridgeConstants = load('lib/bridge/constants.ts', () => ({ defineChain: value => value }));
+const utils = load('lib/bridge/utils.ts', id => id === '@/lib/constants' ? { WAD } : id === './constants' ? bridgeConstants : {});
 const standard = {
   id: 'standard', routeType: 'standard', enabled: true, withdrawalsEnabled: true,
   stratoToken: address('1'), stratoTokenSymbol: 'USDC', stratoTokenName: 'USD Coin', stratoTokenDecimals: 18,
