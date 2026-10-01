@@ -162,9 +162,11 @@ nonce. Beyond that the two cases differ:
 ## 4. Component A: `bin/strato-authorize-operator`
 
 **Implemented 2026-09-29.** `bin/strato-authorize-operator` (python3, stdlib only, ~330 lines),
-installed by `make install` / removed by `make uninstall` (Makefile), tests in
-`bin/tests/test_strato_authorize_operator.py` (24 cases, mock Keycloak + vault + app host),
-operator docs in `techdocs/node/operations.md` ("Bind an operator to your validator").
+installed by `make install` / removed by `make uninstall` (Makefile), operator docs in
+`techdocs/node/operations.md` ("Bind an operator to your validator"). Verified by the start-up
+Keccak self-test, a mock-server suite that was run during development and then dropped by decision
+on 2026-10-01 (no other `bin/` tool carries tests and nothing runs them automatically), and the
+hybrid run against the real helium registry described below.
 
 ### Usage
 
@@ -219,8 +221,8 @@ Exit codes: 0 ok / nothing to do · 2 usage · 3 node files · 4 token · 5 vaul
   `0c4c…` and its current operator the script exits 0 with "nothing to do"; for a new operator it
   passes the chain check, signs (mock) and prints the link. The helium registry logic had been
   swapped to `52735600…` since 2026-09-24 and now computes the digest with the nonce, so the check
-  passes; against the old logic it exits 7 as designed (covered by the mock test
-  `test_registry_logic_that_drops_the_nonce_is_refused`).
+  passes; against the old logic it exits 7 as designed (exercised against a mock registry
+  during development).
 
 ### Deliberately not done
 
@@ -381,12 +383,9 @@ Tests to add in `tests/Staking/ValidatorRegistry.test.sol` (§9 items 3–5) and
    validator `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`, operator `0x2222…`, nonce 7, and a
    signature (r `0xb5eefa7d…d121`, s `0x545274b8…939f`, v 27) recovering to that validator. The
    script's Keccak and recovery code must reproduce both (`--digest-only` plus a hidden self-test).
-2. **Script integration test** with a python `http.server` mock for discovery, token, vault and
-   the app host, covering every row of the exit-code table, plus: a registry state with the
-   `operatorAuthorizationDigest` entry and **no** `authorizationNonce` key (must proceed with
-   nonce 0; this is helium's real shape as of 2026-09-23); a V1 state (entry absent, exit 7); first
-   registration, operator change, and already-bound records; and the `vaultUrl` with and without
-   the `/strato/v2.3` suffix.
+2. **Script**: start-up Keccak self-test against the contract vector; a mock-server suite covered
+   every exit code during development and was dropped on 2026-10-01 (decision: no tests for `bin/`
+   tools); the hybrid run against the live helium registry (§4) is the standing check.
 3. **Contract: third-party submission.** A `User` that is neither validator nor operator submits a
    valid `setOperator` signature; the binding changes and the outgoing self-bond is queued. This
    documents the execute-now property in §3.

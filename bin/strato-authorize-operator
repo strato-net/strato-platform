@@ -372,9 +372,6 @@ def step6_summary_and_confirm(ctx, args):
 
 
 def _ask(prompt):
-    if os.environ.get("STRATO_CONFIRM_FROM_STDIN") == "1":  # test hook only
-        say(prompt)
-        return sys.stdin.readline().strip().lower()
     try:
         tty = open("/dev/tty", "r+", encoding="utf-8")
     except OSError:
