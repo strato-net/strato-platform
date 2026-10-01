@@ -1,6 +1,8 @@
+import { ExternalBridgeStatus } from "@strato/shared-types";
 import { processingIssueService, withdrawalProcessingContext, notifyProcessingIssues } from "../services/processingIssueService";
 import { config } from "../config";
 import {
+  recoverNativeWithdrawalCancellation,
   confirmNativeDepositBatch,
   reviewNativeDepositBatch,
   finalizeNativeWithdrawalBatch,
@@ -223,6 +225,11 @@ export const startNativeWithdrawalTxPolling = (): void => {
 
   const poll = async () => {
     try {
+      const cancellations = await getNativeWithdrawalsByStatus(String(ExternalBridgeStatus.CANCELLATION_PENDING));
+      for (const withdrawal of cancellations) {
+        await processingIssueService.run(withdrawalProcessingContext("native", withdrawal, "withdrawal-refund"),
+          () => recoverNativeWithdrawalCancellation(withdrawal));
+      }
       const pending: NativeWithdrawalInfo[] = await getNativeWithdrawalsByStatus("2");
       if (!Array.isArray(pending) || pending.length === 0) return;
 

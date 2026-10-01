@@ -1,3 +1,11 @@
+import { ExternalBridgeStatus } from "@strato/shared-types";
+import { AbiCoder, keccak256, id } from "ethers";
+import { NATIVE_CANCELLATION_ABI } from "../config/bridgeAbi";
+import { getChainProvider, getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
+import { getDepositConfirmationPolicy } from "../config";
+import { getEventTransactionHash } from "./externalWithdrawalService";
+import { execute } from "../utils/stratoHelper";
+import { processingIssue } from "../utils/processingIssues";
 import { withSafeProposalQueue } from "./safeProposalService";
 import {
   Contract,
@@ -9,6 +17,7 @@ import {
 import { OperationType } from "@safe-global/types-kit";
 import {
   config,
+  EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
   getChainRpcUrl,
   getNativeBridgePrivateKeys,
 } from "../config";
@@ -242,9 +251,15 @@ export const executeNativeMint = async (
 };
 
 export const getExistingNativeMintTxHash = async (
-  request: NativeMintRequest,
+  withdrawal: NativeWithdrawalInfo, sourceChainId: bigint, sourceBridge: string,
 ): Promise<string | null> => {
-  const attestation = normalizeAttestation(request.attestation);
+  const attestation = {
+    sourceChainId: sourceChainId.toString(), sourceBridge: safeChecksum(sourceBridge),
+    destinationChainId: String(withdrawal.externalChainId), destinationBridge: safeChecksum(withdrawal.externalBridge),
+    sourceWithdrawalId: withdrawal.withdrawalId, stratoToken: safeChecksum(withdrawal.stratoToken),
+    representationToken: safeChecksum(withdrawal.representationToken), recipient: safeChecksum(withdrawal.externalRecipient),
+    amount: withdrawal.externalTokenAmount,
+  };
   const provider = new JsonRpcProvider(
     getChainRpcUrl(BigInt(attestation.destinationChainId)),
   );
@@ -261,25 +276,44 @@ export const getExistingNativeMintTxHash = async (
       null,
     ],
   );
-  const logs = await provider.getLogs({
-    address: safeChecksum(attestation.destinationBridge),
-    topics,
-    fromBlock: 0,
-    toBlock: "latest",
-  });
-
-  for (const log of logs.reverse()) {
-    const parsed = nativeMintInterface.parseLog(log);
-    if (!parsed) continue;
-    const args = parsed.args;
-    if (
-      BigInt(args.sourceChainId.toString()) === BigInt(attestation.sourceChainId) &&
-      safeChecksum(args.representationToken) === safeChecksum(attestation.representationToken) &&
-      safeChecksum(args.recipient) === safeChecksum(attestation.recipient) &&
-      BigInt(args.amount.toString()) === BigInt(attestation.amount)
-    ) {
-      return log.transactionHash;
+  const latest = await provider.getBlock("latest");
+  if (!latest) throw new Error("Latest block unavailable for native mint recovery");
+  // Include a clock-skew margin between STRATO and the destination chain.
+  const notBefore = BigInt(withdrawal.requestedAt) > 3600n ? BigInt(withdrawal.requestedAt) - 3600n : 0n;
+  let lower = 0, upper = latest.number;
+  while (lower < upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const block = await provider.getBlock(middle);
+    if (!block) throw new Error(`Block ${middle} unavailable for native mint recovery`);
+    if (BigInt(block.timestamp) < notBefore) lower = middle + 1;
+    else upper = middle;
+  }
+  let toBlock = latest.number;
+  let range = EXTERNAL_BRIDGE_LOG_BLOCK_RANGE;
+  while (toBlock >= lower) {
+    const fromBlock = Math.max(lower, toBlock - range + 1);
+    let logs;
+    try {
+      logs = await provider.getLogs({ address: safeChecksum(attestation.destinationBridge), topics, fromBlock, toBlock });
+    } catch (error) {
+      if (range === 1) throw error;
+      range = Math.max(1, Math.floor(range / 2));
+      continue;
     }
+    for (const log of logs.reverse()) {
+      const parsed = nativeMintInterface.parseLog(log);
+      if (!parsed) continue;
+      const args = parsed.args;
+      if (
+        BigInt(args.sourceChainId.toString()) === BigInt(attestation.sourceChainId) &&
+        safeChecksum(args.representationToken) === safeChecksum(attestation.representationToken) &&
+        safeChecksum(args.recipient) === safeChecksum(attestation.recipient) &&
+        BigInt(args.amount.toString()) === BigInt(attestation.amount)
+      ) {
+        return log.transactionHash;
+      }
+    }
+    toBlock = fromBlock - 1;
   }
 
   return null;
@@ -380,4 +414,74 @@ export const getNativeMintProposalExecution = async (
   }
 
   return { status: "pending" };
+};
+
+export const processNativeMintCancellation = async (w: NativeWithdrawalInfo, sourceChainId: string): Promise<void> => {
+  if (String(w.bridgeStatus) !== String(ExternalBridgeStatus.CANCELLATION_PENDING)) throw new Error("Native withdrawal cancellation is not requested");
+  const chainId = toSafeNumberChainId(String(w.externalChainId));
+  const destination = safeChecksum(w.externalBridge);
+  const source = safeChecksum(config.nativeBridge.address!);
+  const provider = getChainProvider(BigInt(chainId));
+  const iface = new Interface(NATIVE_CANCELLATION_ABI);
+  const bridge = new Contract(destination, NATIVE_CANCELLATION_ABI, provider);
+  const mintId = keccak256(AbiCoder.defaultAbiCoder().encode(["uint256", "address", "uint256"], [sourceChainId, source, w.withdrawalId]));
+  if (!await bridge.canceledMints(mintId)) {
+    if (await bridge.processedMints(mintId)) throw new Error("Native mint already executed; finalize the withdrawal instead of refunding");
+    const safe = safeChecksum(config.safe.address!);
+    if (!await bridge.hasRole(id("MINT_CANCELLER_ROLE"), safe)) throw new Error("Native cancellation requires the configured Safe to hold MINT_CANCELLER_ROLE");
+    const proposalHash = await withSafeProposalQueue(chainId, `cancel-mint:${destination}:${mintId}`, async ({ apiKit, protocolKit }, saved) => {
+      const currentNonce = Number(await protocolKit.getNonce());
+      if (saved && (saved.safeTransactionData.to.toLowerCase() !== destination.toLowerCase() ||
+          saved.safeTransactionData.data !== iface.encodeFunctionData("cancelMint", [sourceChainId, source, w.withdrawalId]) ||
+          String(saved.safeTransactionData.value) !== "0" || Number(saved.safeTransactionData.operation) !== OperationType.Call)) {
+        throw new Error("Persisted native cancellation proposal does not match the withdrawal");
+      }
+      if (saved && currentNonce <= saved.safeTransactionData.nonce) {
+        try { await apiKit.getTransaction(saved.safeTxHash); }
+        catch (error: any) {
+          if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
+          await apiKit.proposeTransaction(saved);
+        }
+        return saved.safeTxHash;
+      }
+      const nonce = Number(await apiKit.getNextNonce(safe));
+      const tx = await protocolKit.createTransaction({ transactions: [{ to: destination, value: "0",
+        data: iface.encodeFunctionData("cancelMint", [sourceChainId, source, w.withdrawalId]), operation: OperationType.Call }], options: { nonce } });
+      const safeTxHash = await protocolKit.getTransactionHash(tx);
+      const signature = await protocolKit.signHash(safeTxHash);
+      await apiKit.proposeTransaction({ safeAddress: safe, safeTransactionData: tx.data, safeTxHash,
+        senderAddress: config.safe.safeProposerAddress!, senderSignature: signature.data });
+      return safeTxHash;
+    });
+    if (w.cancellationProposalHash?.replace(/^0x/i, "").toLowerCase() !== proposalHash.slice(2).toLowerCase()) {
+      await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
+        method: "recordWithdrawalCancellationProposal", args: { id: w.withdrawalId, proposalHash } });
+    }
+    return;
+  }
+  const hash = await getEventTransactionHash(provider, destination, "NativeMintCanceled", mintId, w.requestedAt, iface);
+  const [receipts, head] = await Promise.all([getTransactionReceiptsBatch(chainId, [hash]), getVerificationBlockNumber(chainId)]);
+  const receipt = receipts.get(hash);
+  if (receipt?.__rpcDisagreement) throw new Error("Native cancellation RPC disagreement");
+  const requiredConfirmations = getDepositConfirmationPolicy(chainId);
+  if (!receipt || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
+      BigInt(receipt.blockNumber) + BigInt(requiredConfirmations) > BigInt(head)) {
+    throw Object.assign(new Error("Native cancellation awaits confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", { transactionHash: hash, requiredConfirmations: String(requiredConfirmations),
+      ...(receipt && /^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ? { observedConfirmations: String(BigInt(head) > BigInt(receipt.blockNumber) ? BigInt(head) - BigInt(receipt.blockNumber) : 0n) } : {}),
+    })] });
+  }
+  if (receipt.status !== "0x1" || receipt.transactionHash?.toLowerCase() !== hash.toLowerCase() ||
+      !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") || !receipt.logs.some((log: any) => {
+        if (log.removed || safeChecksum(log.address) !== destination) return false;
+        try {
+          const event = iface.parseLog(log);
+          return event?.name === "NativeMintCanceled" && event.args.mintId === mintId &&
+            String(event.args.sourceChainId) === sourceChainId && safeChecksum(event.args.sourceBridge) === source &&
+            String(event.args.sourceWithdrawalId) === w.withdrawalId;
+        } catch { return false; }
+      })) throw new Error("Native mint cancellation evidence mismatch");
+  if (w.cancellationTxHash?.replace(/^0x/i, "").toLowerCase() !== hash.replace(/^0x/i, "").toLowerCase()) {
+    await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
+      method: "recordWithdrawalCancellationEvidence", args: { id: w.withdrawalId, txHash: hash } });
+  }
 };

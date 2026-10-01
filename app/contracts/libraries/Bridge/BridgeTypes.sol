@@ -11,7 +11,9 @@ library BridgeTypes {
         QUARANTINED,  // deposit: received in custody but not mintable as requested; governance
                       // resolves it with rerouteDeposit or abortDeposit
         REFUND_PENDING,
-        REFUNDED
+        REFUNDED,
+        REJECTED_NO_FUNDS,
+        CANCELLATION_PENDING
     }
 
     struct DepositInfo {

@@ -33,6 +33,7 @@ contract StratoNativeRepresentationBridge is
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UNPAUSER_ROLE = keccak256("UNPAUSER_ROLE");
     bytes32 public constant ATTESTATION_ADMIN_ROLE = keccak256("ATTESTATION_ADMIN_ROLE");
+    bytes32 public constant MINT_CANCELLER_ROLE = keccak256("MINT_CANCELLER_ROLE");
     // Grant this role only to the custody Safe.
     bytes32 public constant MINT_EXECUTOR_ROLE = keccak256("MINT_EXECUTOR_ROLE");
     bytes32 private constant NATIVE_MINT_ATTESTATION_TYPEHASH = keccak256(
@@ -67,6 +68,17 @@ contract StratoNativeRepresentationBridge is
     bool public mintsPaused;
     bool public redemptionsPaused;
     mapping(uint256 => bool) public refundedRedemptions;
+    mapping(bytes32 => bool) public canceledMints;
+
+    event NativeMintCanceled(bytes32 indexed mintId, uint256 sourceChainId, address sourceBridge, uint256 sourceWithdrawalId);
+
+    function cancelMint(uint256 sourceChainId, address sourceBridge, uint256 sourceWithdrawalId) external onlyRole(MINT_CANCELLER_ROLE) {
+        if (sourceChainId == 0 || sourceBridge == address(0) || sourceWithdrawalId == 0) revert InvalidAttestation();
+        bytes32 mintId = keccak256(abi.encode(sourceChainId, sourceBridge, sourceWithdrawalId));
+        if (processedMints[mintId]) revert DuplicateMint();
+        canceledMints[mintId] = true;
+        emit NativeMintCanceled(mintId, sourceChainId, sourceBridge, sourceWithdrawalId);
+    }
 
     struct RedemptionRefund {
         uint256 sourceChainId;
@@ -212,7 +224,7 @@ contract StratoNativeRepresentationBridge is
         bytes32 mintId = _validateMintAttestation(attestation);
         _verifyAttestationSignatures(attestationDigest(attestation), signatures);
 
-        if (processedMints[mintId]) revert DuplicateMint();
+        if (processedMints[mintId] || canceledMints[mintId]) revert DuplicateMint();
         processedMints[mintId] = true;
 
         StratoNativeRepresentationToken(attestation.representationToken).mint(

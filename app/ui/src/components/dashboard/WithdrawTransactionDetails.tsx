@@ -1,3 +1,5 @@
+import WithdrawalCancellation from "@/components/bridge/WithdrawalCancellation";
+import { useUser } from "@/context/UserContext";
 import { useEffect, useState, useMemo } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Table, Select, Space, Card } from 'antd';
@@ -16,6 +18,7 @@ const normalizeStratoAccount = (account?: string) => (account || '').replace(/^0
 
 const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
+  const { userAddress } = useUser();
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number>(0);
@@ -28,6 +31,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
     fetchWithdrawTransactions,
     availableNetworks,
     withdrawalRefreshKey,
+    triggerWithdrawalRefresh,
     bridgeableTokens,
   } = useBridgeContext();
 
@@ -196,7 +200,7 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
               {statusLabel}
             </span>
           );
-        } else if (statusNum === ExternalBridgeStatus.READY) {
+        } else if (statusNum === ExternalBridgeStatus.READY || statusNum === ExternalBridgeStatus.CANCELLATION_PENDING) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
@@ -241,6 +245,13 @@ const WithdrawTransactionDetails = ({ context }: { context?: string }) => {
       key: 'block_timestamp',
       render: (text: string) => formatDate(text),
       width: 200,
+    },
+    {
+      title: 'Action', key: 'cancel', render: (_: unknown, record: any) =>
+        ['external', 'native'].includes(record.bridgeSource) &&
+        normalizeStratoAccount(record.WithdrawalInfo?.stratoSender).toLowerCase() === normalizeStratoAccount(userAddress).toLowerCase() &&
+        (String(record.WithdrawalInfo?.bridgeStatus) === '1' || String(record.WithdrawalInfo?.bridgeStatus) === '2')
+          ? <WithdrawalCancellation source={record.bridgeSource} withdrawalId={String(record.withdrawalId)} onCanceled={triggerWithdrawalRefresh} /> : null,
     },
   ];
 

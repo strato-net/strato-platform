@@ -20,6 +20,7 @@ import {
   getExistingNativeMintTxHash,
   getNativeMintProposalExecution,
   proposeNativeMint,
+  processNativeMintCancellation,
 } from "./nativeMintService";
 import {
   buildWithdrawalReview,
@@ -97,7 +98,9 @@ const getNativeMintRequest = async (
 const submitNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
-): Promise<string> => {
+): Promise<string | null> => {
+  const current = await getNativeWithdrawalById(withdrawal.withdrawalId);
+  if (String(current?.bridgeStatus) !== "2") return null;
   const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return executeNativeMint(payload);
 };
@@ -137,14 +140,15 @@ const findExistingNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
 ): Promise<string | null> => {
-  const payload = await getNativeMintRequest(withdrawal, sourceChainId);
-  return getExistingNativeMintTxHash(payload);
+  return getExistingNativeMintTxHash(withdrawal, sourceChainId, config.nativeBridge.address!);
 };
 
 const proposeManualNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
-): Promise<string> => {
+): Promise<string | null> => {
+  const current = await getNativeWithdrawalById(withdrawal.withdrawalId);
+  if (String(current?.bridgeStatus) !== "2") return null;
   const payload = await getNativeMintRequest(withdrawal, sourceChainId);
   return proposeNativeMint(payload);
 };
@@ -1068,6 +1072,7 @@ export const finalizeNativeWithdrawalBatch = async (
         await findExistingNativeMint(withdrawal, sourceChainId);
       if (!externalTxHash) {
         externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
+        if (!externalTxHash) continue;
       }
       pendingNativeInstantWithdrawalTxHashes.set(
         withdrawal.withdrawalId,
@@ -1162,6 +1167,7 @@ export const queueManualNativeWithdrawalBatch = async (
         withdrawal,
         sourceChainId,
       );
+      if (!proposalReference) continue;
       announcedManualNativeWithdrawals.set(
         withdrawal.withdrawalId,
         proposalReference,
@@ -1179,4 +1185,15 @@ export const queueManualNativeWithdrawalBatch = async (
       await processingIssueService.record(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"), error);
     }
   }
+};
+
+export const recoverNativeWithdrawalCancellation = async (withdrawal: NativeWithdrawalInfo): Promise<void> => {
+  const sourceChainId = await getStratoNetworkId();
+  const hash = await findExistingNativeMint(withdrawal, sourceChainId);
+  if (hash) {
+    await verifyNativeMint(withdrawal, sourceChainId, config.nativeBridge.address!, hash);
+    await finalizeVerifiedNativeWithdrawal(withdrawal, hash, withdrawal.nativeMintProposalHash || "");
+    return;
+  }
+  await processNativeMintCancellation(withdrawal, String(sourceChainId));
 };

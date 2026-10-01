@@ -32,8 +32,11 @@ export const sendBridgeReviewEmail = async (item: BridgeReviewItem): Promise<voi
   if (!recipients.length) throw new Error("TRANSACTION_APPROVER_EMAILS is required for bridge review notifications");
   const asset = (await tokenMetadata([item.token])).get(tokenKey(item.token));
   const amount = tokenAmount(item.amount, asset);
-  const title = item.kind === "deposit_recovery" ? "Deposit recovery" : item.kind === "deposit_review" ? "Deposit review" : item.kind === "withdrawal_refund" ? "Withdrawal refund" : "Withdrawal review";
-  const action = item.refundEvidenceHash ? "Open Admin > Bridge. Independently verify the external refund transaction and vote to confirm the refund. The operator report alone is not proof of payment."
+  const title = item.kind === "withdrawal_cancellation" ? "Withdrawal cancellation" : item.kind === "deposit_recovery" ? "Deposit recovery" : item.kind === "deposit_review" ? "Deposit review" : item.kind === "withdrawal_refund" ? "Withdrawal refund" : "Withdrawal review";
+  const action = item.kind === "withdrawal_cancellation" ? item.refundEvidenceHash
+    ? "Open Admin > Bridge. Independently verify permanent external mint cancellation and its confirmations, then vote to return STRATO escrow. The operator report alone is not proof."
+    : "Safe signers: execute the mint cancellation proposal. Reject any older mint proposal blocking its nonce first. Funds remain locked until cancellation is verified."
+    : item.refundEvidenceHash ? "Open Admin > Bridge. Independently verify the external refund transaction and vote to confirm the refund. The operator report alone is not proof of payment."
     : item.kind === "withdrawal_review" || (item.recoveryStatus === "refund_pending" && item.safeProposalHash) ? "Review in Safe. Inspect and vote on the proposal shown below."
     : item.kind === "withdrawal_refund" ? "Open Admin > Bridge to review and vote on this refund."
     : "Open Admin > Bridge and review the deposit evidence.";
@@ -49,7 +52,7 @@ export const sendBridgeReviewEmail = async (item: BridgeReviewItem): Promise<voi
       `Asset: ${asset?.symbol || "Token metadata unavailable"}`, `Amount: ${amount}`,
       "", "Reference details", `Reference: ${item.id}`, `Account: ${item.account}`, `Token address: ${item.token}`,
       ...(item.recoveryStatus === "refund_pending" ? [`Return to: ${item.refundRecipient}`, `Original asset: ${item.refundToken}`, `Original amount (raw units): ${item.refundAmount}`] : []),
-      ...(item.refundEvidenceHash ? [`External refund transaction to verify: ${item.refundEvidenceHash}`, `External bridge: ${item.refundBridge}`, `Redemption ID: ${item.refundRedemptionId}`] : []),
+      ...(item.refundEvidenceHash ? [`External transaction to verify: ${item.refundEvidenceHash}`, `External bridge: ${item.refundBridge}`, `${item.kind === "withdrawal_cancellation" ? "Withdrawal" : "Redemption"} ID: ${item.kind === "withdrawal_cancellation" ? item.reference : item.refundRedemptionId}`] : []),
       ...(item.safeProposalHash ? [`Safe proposal: ${item.safeProposalHash}`] : []),
       ...(item.reviewDigest ? [`Review digest: ${item.reviewDigest}`] : []),
     ].join("\n"),

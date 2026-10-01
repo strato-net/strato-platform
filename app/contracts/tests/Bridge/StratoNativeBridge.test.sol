@@ -511,6 +511,91 @@ contract Describe_StratoNativeBridge is Authorizable {
         require(custodyVault.lockedBalance(nativeTokenAddress) == 0, "Vault locked balance should be released on abort");
     }
 
+    function it_native_pending_withdrawal_cannot_unlock_escrow_even_for_whitelisted_operator() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 50e18);
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", id);
+        bool rejected = false;
+        try relayer.do(nativeBridgeAddress, "abortWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "Pending mint authorization must prevent direct escrow release");
+        relayer.do(nativeBridgeAddress, "recordWithdrawalProposal", id, "0xaaaa");
+        rejected = false;
+        try relayer.do(nativeBridgeAddress, "abortWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "An executable Safe proposal must prevent direct escrow release");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Escrow must remain locked");
+    }
+
+    function it_native_initiated_withdrawal_can_be_canceled_while_bridge_is_paused() {
+        uint256 beforeBalance = nativeToken.balanceOf(address(user1));
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 50e18);
+        nativeBridge.setPause(true, true);
+        relayer.do(nativeBridgeAddress, "abortWithdrawal", id);
+        require(nativeToken.balanceOf(address(user1)) == beforeBalance, "Paused bridge must permit safe cancellation");
+        bool rejected = false;
+        try relayer.do(nativeBridgeAddress, "abortWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "Cancellation must not return escrow twice");
+    }
+
+    function it_native_user_can_request_pending_cancellation_only_after_delay() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 50e18);
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", id);
+        bool rejected = false;
+        try user1.do(nativeBridgeAddress, "requestUserWithdrawalCancellation", id) {} catch { rejected = true; }
+        require(rejected, "User must wait for cancellation delay");
+        fastForward(172800);
+        rejected = false;
+        try user2.do(nativeBridgeAddress, "requestUserWithdrawalCancellation", id) {} catch { rejected = true; }
+        require(rejected, "Only the original sender can request user cancellation");
+        user1.do(nativeBridgeAddress, "requestUserWithdrawalCancellation", id);
+        (BridgeStatus status,,,,,,,,,,,) = nativeBridge.getWithdrawalInfo(id);
+        require(status == BridgeStatus.CANCELLATION_PENDING, "User requests proof-backed cancellation");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Request must never release escrow");
+    }
+
+    function it_native_cancellation_requires_governance_and_exact_external_evidence() {
+        uint256 beforeBalance = nativeToken.balanceOf(address(user1));
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 50e18);
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", id);
+        bool rejected = false;
+        try relayer.do(nativeBridgeAddress, "requestWithdrawalCancellation", id) {} catch { rejected = true; }
+        require(rejected, "Operator cannot make governance cancellation decision");
+        nativeBridge.requestWithdrawalCancellation(id);
+        rejected = false;
+        try nativeBridge.refundCanceledWithdrawal(id, "aaaa") {} catch { rejected = true; }
+        require(rejected, "No escrow release before cancellation evidence");
+        relayer.do(nativeBridgeAddress, "recordWithdrawalCancellationProposal", id, "0xaaaa");
+        string evidence = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        relayer.do(nativeBridgeAddress, "recordWithdrawalCancellationEvidence", id, evidence);
+        rejected = false;
+        try relayer.do(nativeBridgeAddress, "refundCanceledWithdrawal", id, evidence) {} catch { rejected = true; }
+        require(rejected, "Operator evidence is not governance verification");
+        rejected = false;
+        try nativeBridge.refundCanceledWithdrawal(id, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {} catch { rejected = true; }
+        require(rejected, "Votes must bind the exact cancellation evidence");
+        nativeBridge.setPause(true, true);
+        nativeBridge.refundCanceledWithdrawal(id, evidence);
+        require(nativeToken.balanceOf(address(user1)) == beforeBalance, "Governance refund restores escrow while paused");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 0, "Cancellation releases escrow exactly once");
+        rejected = false;
+        try nativeBridge.refundCanceledWithdrawal(id, evidence) {} catch { rejected = true; }
+        require(rejected, "Refund must not execute twice");
+    }
+
+    function it_native_external_mint_winning_cancellation_race_completes_without_refund() {
+        user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user1.do(nativeBridgeAddress, "requestWithdrawal", externalChainId, externalRecipient, nativeTokenAddress, 50e18);
+        relayer.do(nativeBridgeAddress, "markWithdrawalPending", id);
+        nativeBridge.requestWithdrawalCancellation(id);
+        relayer.do(nativeBridgeAddress, "finalizeWithdrawal", id, "0xaaaa", "");
+        bool rejected = false;
+        try nativeBridge.refundCanceledWithdrawal(id, "aaaa") {} catch { rejected = true; }
+        require(rejected, "Executed mint must never refund STRATO escrow");
+        require(custodyVault.lockedBalance(nativeTokenAddress) == 50e18, "Minted representations remain backed");
+    }
+
     function it_native_deposit_review_then_confirm_unlocks_to_recipient() {
         user1.do(nativeTokenAddress, "approve", custodyVaultAddress, 100e18);
         user1.do(
@@ -774,6 +859,26 @@ contract Describe_StratoNativeBridge is Authorizable {
         bool rejected = false;
         try nativeBridge.requestDepositRefund(depositId) {} catch { rejected = true; }
         require(rejected, "Delivered deposit cannot refund");
+    }
+
+    function it_native_no_funds_rejection_is_governance_only_and_terminal() {
+        relayer.do(nativeBridgeAddress, "recordDeposit", externalChainId, externalBridge, externalRedemptionId,
+            externalSender, externalTxHash, representationToken, address(user2), 60e18);
+        relayer.do(nativeBridgeAddress, "reviewDeposit", externalChainId, externalBridge, externalRedemptionId);
+        string depositId = nativeBridge.getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        bool rejected = false;
+        try relayer.do(nativeBridgeAddress, "rejectDepositNoFunds", depositId) {} catch { rejected = true; }
+        require(rejected, "Only governance may reject without refund");
+        nativeBridge.rejectDepositNoFunds(depositId);
+        (BridgeStatus status,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(status == BridgeStatus.REJECTED_NO_FUNDS, "No-funds rejection has distinct status");
+        rejected = false;
+        try nativeBridge.requestDepositRefund(depositId) {} catch { rejected = true; }
+        require(rejected, "Closed no-funds record cannot refund");
+        rejected = false;
+        try nativeBridge.reopenDeposit(depositId) {} catch { rejected = true; }
+        require(rejected, "Closed no-funds record cannot reopen");
+        require(nativeToken.balanceOf(address(user2)) == 0, "No-funds rejection must not unlock custody");
     }
 
     function it_native_deposit_refund_keeps_custody_locked_and_blocks_delivery() {

@@ -6,6 +6,9 @@ const router = Router();
 const adminAuth = authHandler.authorizeRequest({ requireAuthenticatedIdentity: true });
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
+router.get("/withdrawalCancellation", authHandler.authorizeRequest({ requireAuthenticatedIdentity: true }), BridgeController.cancelWithdrawal);
+router.post("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
+
 router.get("/admin/policies", adminAuth, BridgeController.policies);
 router.get("/admin/reviews", adminAuth, BridgeController.reviews);
 router.post("/admin/reviews/prepare", adminAuth, BridgeController.reviews);

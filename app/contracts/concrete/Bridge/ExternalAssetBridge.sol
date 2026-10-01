@@ -260,6 +260,7 @@ contract record ExternalAssetBridge is Ownable {
     mapping(uint256 => mapping(address => mapping(uint256 => string))) public record depositRefundTransactions;
     mapping(uint256 => mapping(address => mapping(uint256 => bytes32))) public record depositDeliveryApprovals;
     mapping(uint256 => mapping(address => mapping(uint256 => bool))) public record depositDeliveryAuthorized;
+    event DepositRejectedNoFunds(uint256 externalChainId, address depositRouter, uint256 depositId);
     event DepositRefundRequested(uint256 externalChainId, address depositRouter, uint256 depositId, address vault);
     event DepositRefunded(uint256 externalChainId, address depositRouter, uint256 depositId, string refundTxHash);
     event MintPolicyUpdated(address token, uint256 capacity, uint256 refillRate);
@@ -1117,6 +1118,19 @@ contract record ExternalAssetBridge is Ownable {
         );
     }
 
+    function rejectDepositNoFunds(uint256 externalChainId, address depositRouter, uint256 depositId) external onlyOwner {
+        DepositInfo d = deposits[externalChainId][depositRouter][depositId];
+        require(d.status == Status.PENDING_REVIEW || d.status == Status.ABORTED, "EAB: not reviewable");
+        depositDeliveryAuthorized[externalChainId][depositRouter][depositId] = false;
+        depositReviewApprovals[externalChainId][depositRouter][depositId] = bytes32(0);
+        depositGenerations[externalChainId][depositRouter][depositId]++;
+        d.status = Status.REJECTED_NO_FUNDS;
+        d.timestamp = block.timestamp;
+        _deleteDepositAction(externalChainId, depositRouter, depositId);
+        _deleteDepositRoute(externalChainId, depositRouter, depositId);
+        emit DepositRejectedNoFunds(externalChainId, depositRouter, depositId);
+    }
+
     function authorizeDepositReuse(
         uint256 externalChainId,
         address depositRouter,
@@ -1617,6 +1631,19 @@ contract record ExternalAssetBridge is Ownable {
         withdrawal.status = Status.REFUNDED;
         withdrawal.timestamp = block.timestamp;
         emit WithdrawalRefunded(withdrawalId);
+    }
+
+    function cancelWithdrawal(uint256 withdrawalId) external {
+        WithdrawalInfo withdrawal = withdrawals[withdrawalId];
+        require(msg.sender == withdrawal.stratoSender, "EAB: not sender");
+        require(block.timestamp >= withdrawal.requestedAt + WITHDRAWAL_ABORT_DELAY, "EAB: withdrawal abort delay not elapsed");
+        if (withdrawal.status == Status.PENDING_REVIEW) {
+            require(block.timestamp > withdrawalManualReviews[withdrawalId].approvalDeadline, "EAB: review active");
+            withdrawalManualReviews[withdrawalId] = WithdrawalManualReview("", 0, "");
+            withdrawal.status = Status.INITIATED;
+            emit WithdrawalReviewExpired(withdrawalId);
+        }
+        abortWithdrawal(withdrawalId);
     }
 
     function abortWithdrawal(uint256 withdrawalId) public {

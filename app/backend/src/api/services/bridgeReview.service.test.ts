@@ -74,7 +74,7 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   assert.deepEqual(review.actions, [], "Safe decisions stay in Safe");
   assert.equal(operations.mock.callCount(), 0);
   assert.equal(state.rpcCalls, 1, "only the refund needs a digest read");
-  assert.ok(items.filter(item => item.kind === "deposit_review").every(item => item.actions.every(action => action === "approve" || action === "refund")));
+  assert.ok(items.filter(item => item.kind === "deposit_review").every(item => item.actions.every(action => action === "approve" || action === "refund" || action === "reject")));
 });
 
 test("rejected and reopened deposits remain visible until recovery completes", async t => {
@@ -139,7 +139,7 @@ test("approved deposits retain their approval status but never expose manual set
   for (const approval of ["0x" + "0".repeat(64), hash, "invalid", digest]) {
     state.approval = approval;
     const item = (await getAdminBridgeReviews("token")).find(item => item.id === depositKey)!;
-    assert.deepEqual(item.actions, ["approve", "refund"]);
+    assert.deepEqual(item.actions, ["approve", "refund", "reject"]);
     assert.equal(item.approvalStatus, approval === digest ? "approved" : "pending");
     await assert.rejects(prepareAdminBridgeReview("token", depositKey, "settle"), /automatically/);
   }
@@ -340,4 +340,36 @@ test("native refund confirmation requires recorded evidence and tracks votes for
   state.tables["/BlockApps-StratoNativeBridge-deposits"][0].value.bridgeStatus = "8";
   await assert.rejects(prepareAdminBridgeReview("token", key, "confirm_refund"), /unavailable/);
   assert.equal(operations.mock.callCount(), 0, "preparation must not submit transactions");
+});
+
+test("no-funds rejection uses a distinct governance method and closes both bridge queues", async t => {
+  const { state } = setup(t);
+  assert.deepEqual(await prepareAdminBridgeReview("token", depositKey, "reject"), {
+    target: address, func: "rejectDepositNoFunds", args: ["11155111", `0x${address}`, depositId],
+  });
+  assert.deepEqual(parseBridgeReviewIssue("rejectDepositNoFunds", ["11155111", address, depositId]), { id: depositKey, action: "reject" });
+  const nativeId = "c".repeat(64);
+  state.tables["/BlockApps-StratoNativeBridge-deposits"] = [{ key: nativeId, value: { ...deposit.value, bridgeStatus: "2" } }];
+  assert.deepEqual(await prepareAdminBridgeReview("token", `native:deposit:${nativeId}:`, "reject"), {
+    target: address, func: "rejectDepositNoFunds", args: [nativeId],
+  });
+  assert.deepEqual(parseBridgeReviewIssue("rejectDepositNoFunds", [nativeId]), { id: `native:deposit:${nativeId}:`, action: "reject" });
+  state.tables["/BlockApps-ExternalAssetBridge-deposits"] = [{ ...deposit, value: { ...deposit.value, status: "9" } }];
+  state.tables["/BlockApps-StratoNativeBridge-deposits"] = [{ key: nativeId, value: { ...deposit.value, bridgeStatus: "9" } }];
+  assert.ok(!(await getAdminBridgeReviews("token")).some(item => item.kind.startsWith("deposit")));
+  for (const action of ["approve", "refund", "reject"]) await assert.rejects(prepareAdminBridgeReview("token", depositKey, action), /unavailable/);
+});
+
+test("native cancellation queue waits for evidence and binds the final refund vote to its hash", async t => {
+  const { state } = setup(t);
+  const key = "native:withdrawal:17";
+  const w = { key: "17", value: { ...withdrawal("17").value, bridgeStatus: "2", useInstantPath: false, nativeMintProposalHash: hash } };
+  state.tables["/BlockApps-StratoNativeBridge-withdrawals"] = [w];
+  assert.deepEqual(await prepareAdminBridgeReview("token", key, "cancel_withdrawal"), { target: address, func: "requestWithdrawalCancellation", args: ["17"] });
+  w.value.bridgeStatus = "10";
+  await assert.rejects(prepareAdminBridgeReview("token", key, "confirm_cancellation"), /unavailable/);
+  Object.assign(w.value, { cancellationTxHash: hash });
+  assert.deepEqual(await prepareAdminBridgeReview("token", key, "confirm_cancellation"), { target: address, func: "refundCanceledWithdrawal", args: ["17", hash] });
+  assert.deepEqual(parseBridgeReviewIssue("refundCanceledWithdrawal", ["17", hash]), { id: key, action: "confirm_cancellation", refundEvidenceHash: hash.replace(/^0x/, "") });
+  await assert.rejects(prepareAdminBridgeReview("token", key, "refund"), /unavailable/);
 });

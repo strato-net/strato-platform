@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { 
   requestWithdrawal,
+  getWithdrawalCancellation,
+  cancelUserWithdrawal,
   requestNativeWithdrawal as requestNativeWithdrawalService,
   getDepositActions,
   getBridgeableTokens,
@@ -38,7 +40,7 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
         res.status(403).json({ error: "Administrator access is required" });
         return;
       }
-      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund", "confirm_refund"].includes(req.body?.action))) {
+      if (req.method === "POST" && (typeof req.body?.id !== "string" || req.body.id.length > 256 || !["approve", "reject", "refund", "confirm_refund", "cancel_withdrawal", "confirm_cancellation"].includes(req.body?.action))) {
         res.status(400).json({ error: "Invalid review action" });
         return;
       }
@@ -53,6 +55,17 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
       }
       next(new Error("Bridge review request failed; check STRATO connectivity or the requested operation"));
     }
+  }
+
+  static async cancelWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input = req.method === "GET" ? req.query : req.body;
+      if (!input || typeof input.source !== "string" || typeof input.withdrawalId !== "string") throw new StratoError("Source and withdrawal ID are required", 400);
+      const result = req.method === "GET"
+        ? await getWithdrawalCancellation(req.accessToken, input.source, input.withdrawalId, req.address as string)
+        : await cancelUserWithdrawal(req.accessToken, input.source, input.withdrawalId, req.address as string);
+      res.json(result);
+    } catch (error) { next(error); }
   }
 
   static async requestWithdrawal(

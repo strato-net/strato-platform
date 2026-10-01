@@ -1,3 +1,4 @@
+import { ExternalBridgeStatus } from "@strato/shared-types";
 import { BridgePolicyOverview, BridgePolicyRecords, buildBridgeReviewQueue, BridgeReviewItem, BridgeReviewRow, BridgeReviewVote } from "@strato/shared-types";
 import axios from "axios";
 import { nodeUrl, adminRegistry } from "../../config/config";
@@ -26,7 +27,7 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawals", { "value->>status": "in.(2,3)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
-    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { "value->>bridgeStatus": "eq.2", "value->>useInstantPath": "eq.false" }),
+    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { or: `(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
     readReviewRows(accessToken, MercataBridge, mercataBridge, "deposits", { select: "key,key2,value", order: "key.asc,key2.asc", "value->>bridgeStatus": "eq.2" }),
     readReviewRows(accessToken, MercataBridge, mercataBridge, "withdrawals", { "value->>bridgeStatus": "eq.2" }),
   ]);
@@ -132,7 +133,7 @@ const enrichReviewGovernance = async (
       const batch = ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
       const events = await readReviewRows(accessToken, AdminRegistry, adminRegistry, "IssueCreated", {
         issueId: `in.(${batch.join(",")})`, target: `in.(${[externalAssetBridge, stratoNativeBridge].filter(Boolean).join(",")})`,
-        func: "in.(approveReviewedDeposit,abortDeposit,refundWithdrawal,authorizeDepositDelivery,reopenDeposit,requestDepositRefund,finalizeDepositRefund)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
+        func: "in.(approveReviewedDeposit,rejectDepositNoFunds,abortDeposit,refundWithdrawal,authorizeDepositDelivery,reopenDeposit,requestDepositRefund,finalizeDepositRefund,requestWithdrawalCancellation,refundCanceledWithdrawal)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
       }) as unknown as Array<{ issueId: string; target: string; func: string; args: unknown }>;
       const matched = await Promise.all(events.map(async event => {
         if (!batch.includes(event.issueId)) return undefined;
@@ -187,10 +188,21 @@ const hasRefundQuorum = async (accessToken: string, digest: string): Promise<boo
 };
 
 export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote> => {
-  if (!["approve", "reject", "refund", "confirm_refund"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
+  if (!["approve", "reject", "refund", "confirm_refund", "cancel_withdrawal", "confirm_cancellation"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
   const item = (await getAdminBridgeReviews(accessToken)).find(entry => entry.id === id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
   const target = item.source === "native" ? constants.stratoNativeBridge : constants.externalAssetBridge;
+  if (action === "cancel_withdrawal" || action === "confirm_cancellation") {
+    if (item.source !== "native") throw new StratoError("Native cancellation is unavailable", 409);
+    if (action === "confirm_cancellation" && !item.refundEvidenceHash) throw new StratoError("Cancellation evidence is unavailable", 409);
+    return { target, func: action === "cancel_withdrawal" ? "requestWithdrawalCancellation" : "refundCanceledWithdrawal",
+      args: action === "cancel_withdrawal" ? [item.reference] : [item.reference, item.refundEvidenceHash!] };
+  }
+  if (action === "reject") {
+    if (item.source === "native") return { target, func: "rejectDepositNoFunds", args: [item.reference] };
+    const [, , chainId, router, depositId] = id.split(":");
+    return { target, func: "rejectDepositNoFunds", args: [chainId, `0x${router.replace(/^0x/i, "")}`, depositId] };
+  }
   if (action === "confirm_refund") {
     if (item.source !== "native" || !item.refundEvidenceHash) throw new StratoError("Native refund evidence is unavailable", 409);
     return { target, func: "finalizeDepositRefund", args: [item.reference, item.refundEvidenceHash] };
@@ -208,7 +220,6 @@ export const prepareAdminBridgeReview = async (accessToken: string, id: string, 
   if (item.kind === "deposit_review") {
     const [, , chainId, router, depositId] = id.split(":");
     const args = [chainId, `0x${router.replace(/^0x/i, "")}`, depositId];
-    if (action === "reject") return { target, func: "abortDeposit", args };
     const digest = await getReviewDigest(accessToken, "getReviewedDepositDigest(uint256,address,uint256)", args);
     return { target, func: "approveReviewedDeposit", args: [...args, digest] };
   }

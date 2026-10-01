@@ -50,7 +50,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
   const render = () => { cursor = 0; return exports.default(); };
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => !tree || typeof tree !== 'object' ? String(tree ?? '') : Array.isArray(tree) ? tree.map(text).join(' ') : text(tree.props?.children);
-  const select = () => nodes(render()).find(node => node.props?.children === (action === 'confirm_refund' ? 'Confirm refund / vote' : action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject / vote' : action === 'approve' ? kind === 'deposit_recovery' ? 'Complete delivery / vote' : 'Approve deposit / vote' : kind === 'withdrawal_refund' ? 'Refund / vote' : 'Return funds / vote')).props.onClick();
+  const select = () => nodes(render()).find(node => node.props?.children === (action === 'cancel_withdrawal' ? 'Request cancellation / vote' : action === 'confirm_cancellation' ? 'Verify cancellation and refund / vote' : action === 'confirm_refund' ? 'Confirm refund / vote' : action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject — no funds received / vote' : action === 'approve' ? kind === 'deposit_recovery' ? 'Complete delivery / vote' : 'Approve deposit / vote' : kind === 'withdrawal_refund' ? 'Refund / vote' : 'Reject and refund / vote')).props.onClick();
   const confirm = () => nodes(render()).find(node => node.type === 'Button' && text(node).includes(action === 'settle' ? 'Confirm settlement' : 'Confirm vote')).props.onClick();
   return { select, confirm, render, text, nodes, votes, requests };
 }
@@ -92,9 +92,15 @@ test('governance API errors render an alert without crashing or closing confirma
 });
 
 test('deposit rejection explains the lack of external refund', async () => {
-  const rejection = harness({ kind: 'deposit_review', action: 'reject' });
+  const rejection = harness({ kind: 'deposit_review', action: 'reject', response: { target: 'bridge', func: 'rejectDepositNoFunds', args: ['11155111', 'router', '2'] } });
   rejection.select();
-  assert.match(rejection.text(rejection.render()), /does not refund external funds/);
+  assert.match(rejection.text(rejection.render()), /without crediting STRATO assets or issuing a refund/);
+  assert.equal(rejection.nodes(rejection.render()).find(node => node.type === 'Button' && rejection.text(node).includes('Confirm vote')).props.disabled, true);
+  await rejection.confirm();
+  assert.equal(rejection.requests.length, 0);
+  rejection.nodes(rejection.render()).find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: true } });
+  await rejection.confirm();
+  assert.deepEqual(rejection.votes, [['bridge', 'rejectDepositNoFunds', ['11155111', 'router', '2']]]);
 });
 
 test('unavailable queue is never presented as an empty healthy queue', () => {
@@ -283,7 +289,7 @@ test('deposit recovery presents delivery and return as distinct governance decis
   for (const action of ['approve', 'refund']) {
     const func = action === 'approve' ? 'authorizeDepositDelivery' : 'requestDepositRefund';
     const h = harness({ kind: 'deposit_recovery', action, response: { target: 'bridge', func, args: ['1', 'router', '7'] } });
-    assert.match(h.text(h.render()), action === 'approve' ? /Complete delivery/ : /Return funds/);
+    assert.match(h.text(h.render()), action === 'approve' ? /Complete delivery/ : /Reject and refund/);
     h.select();
     assert.match(h.text(h.render()), action === 'approve' ? /verified delivery/ : /permanently disables STRATO delivery/);
     await h.confirm();
@@ -307,4 +313,25 @@ test('native refund confirmation shows proof, casts its exact vote and rejects c
   changed.select(); await changed.confirm();
   assert.equal(changed.votes.length, 0);
   assert.match(changed.text(changed.render()), /Refund evidence changed/);
+});
+
+test('native cancellation refund cannot vote with changed external evidence', async () => {
+  const hash = 'a'.repeat(64);
+  const h = harness({ kind: 'withdrawal_cancellation', action: 'confirm_cancellation',
+    overrides: { source: 'native', refundEvidenceHash: hash },
+    response: { target: 'bridge', func: 'refundCanceledWithdrawal', args: ['2', 'b'.repeat(64)] } });
+  h.select();
+  assert.match(h.text(h.render()), /Independently verify the successful NativeMintCanceled/);
+  await h.confirm();
+  assert.equal(h.votes.length, 0);
+  assert.match(h.text(h.render()), /evidence changed/);
+});
+
+test('native cancellation refund votes bind to the reviewed external evidence', async () => {
+  const hash = 'a'.repeat(64);
+  const h = harness({ kind: 'withdrawal_cancellation', action: 'confirm_cancellation',
+    overrides: { source: 'native', refundEvidenceHash: hash },
+    response: { target: 'bridge', func: 'refundCanceledWithdrawal', args: ['2', hash] } });
+  h.select(); await h.confirm();
+  assert.deepEqual(h.votes, [['bridge', 'refundCanceledWithdrawal', ['2', hash]]]);
 });

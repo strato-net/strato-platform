@@ -113,9 +113,9 @@ const WithdrawalsPage = () => {
             </div>
           </div>
 
-          {/* Withdrawal History - hidden on mobile and for guests */}
+          {/* Withdrawal History */}
           {isLoggedIn && (
-            <Card className="shadow-sm hidden md:block">
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Bridge Out History</CardTitle>
               </CardHeader>

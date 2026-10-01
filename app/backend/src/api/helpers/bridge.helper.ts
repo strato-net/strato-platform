@@ -32,8 +32,8 @@ const bridgeIssueJson = JSONBig({ storeAsString: true });
 export const parseBridgePolicyJson = (raw: string): unknown => bridgeIssueJson.parse(raw);
 
 export const bridgeReviewFunction = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction): string =>
-  action === "confirm_refund" ? "finalizeDepositRefund" : action === "refund" ? item.kind === "withdrawal_refund" ? "refundWithdrawal" : "requestDepositRefund"
-    : action === "reject" ? "abortDeposit" : item.kind === "deposit_recovery"
+  action === "cancel_withdrawal" ? "requestWithdrawalCancellation" : action === "confirm_cancellation" ? "refundCanceledWithdrawal" : action === "confirm_refund" ? "finalizeDepositRefund" : action === "refund" ? item.kind === "withdrawal_refund" ? "refundWithdrawal" : "requestDepositRefund"
+    : action === "reject" ? "rejectDepositNoFunds" : item.kind === "deposit_recovery"
       ? item.source === "native" ? "reopenDeposit" : "authorizeDepositDelivery" : "approveReviewedDeposit";
 
 export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: string; action: BridgeReviewGovernanceAction; digest?: string; vault?: string; refundEvidenceHash?: string } | undefined => {
@@ -46,10 +46,17 @@ export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: st
     if (!Array.isArray(args) || args.length !== 2 || args.some(arg => typeof arg !== "string" || !/^(0x)?[a-f0-9]{64}$/i.test(arg) || /^(0x)?0+$/i.test(arg))) throw new Error("Invalid native refund confirmation arguments");
     return { id: `native:deposit:${args[0]}:`, action: "confirm_refund", refundEvidenceHash: args[1].replace(/^0x/i, "").toLowerCase() };
   }
-  if (["reopenDeposit", "authorizeDepositDelivery", "requestDepositRefund"].includes(func)) {
+  if (func === "requestWithdrawalCancellation" || func === "refundCanceledWithdrawal") {
+    const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
+    if (!Array.isArray(args) || args.length !== (func === "requestWithdrawalCancellation" ? 1 : 2) || !/^[1-9][0-9]*$/.test(String(args[0])) ||
+        (args.length === 2 && !/^(0x)?[a-f0-9]{64}$/i.test(String(args[1])))) throw new Error("Invalid withdrawal cancellation arguments");
+    return { id: `native:withdrawal:${args[0]}`, action: func === "requestWithdrawalCancellation" ? "cancel_withdrawal" : "confirm_cancellation",
+      ...(args.length === 2 ? { refundEvidenceHash: String(args[1]).replace(/^0x/i, "").toLowerCase() } : {}) };
+  }
+  if (["reopenDeposit", "authorizeDepositDelivery", "requestDepositRefund", "rejectDepositNoFunds"].includes(func)) {
     const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
     if (!Array.isArray(args)) throw new Error("Invalid recovery arguments");
-    const action = func === "requestDepositRefund" ? "refund" as const : "approve" as const;
+    const action = func === "requestDepositRefund" ? "refund" as const : func === "rejectDepositNoFunds" ? "reject" as const : "approve" as const;
     if (func !== "authorizeDepositDelivery" && args.length === 1 && /^(0x)?[0-9a-f]{64}$/i.test(String(args[0]))) return { id: `native:deposit:${args[0]}:`, action };
     if (func === "reopenDeposit" || args.length !== (action === "refund" ? 4 : 3) || !/^\d+$/.test(String(args[0])) || !/^\d+$/.test(String(args[2])) ||
         !/^(0x)?[0-9a-f]{40}$/i.test(String(args[1])) || (action === "refund" && !/^(0x)?[0-9a-f]{40}$/i.test(String(args[3])))) throw new Error("Invalid recovery arguments");

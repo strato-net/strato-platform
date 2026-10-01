@@ -2369,6 +2369,26 @@ contract Describe_ExternalAssetBridge is Authorizable {
         );
     }
 
+    function it_user_cancellation_expires_review_and_refunds_atomically() {
+        stratoToken.mint(address(user), 150e18);
+        user.do(address(stratoToken), "approve", address(bridge), 150e18);
+        bridge.setWithdrawalAbortDelay(0);
+        uint256 id = user.do(address(bridge), "requestWithdrawal", externalChainId, externalRecipient, externalToken, address(stratoToken), 150e18);
+        relayer.do(address(bridge), "recordWithdrawalReview", id, "0xaaaa", block.timestamp + 100, "0xbbbb");
+        bool rejected = false;
+        try user.do(address(bridge), "cancelWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "Active review cannot cancel");
+        fastForward(101);
+        rejected = false;
+        try relayer.do(address(bridge), "cancelWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "User cancellation belongs to the original sender");
+        user.do(address(bridge), "cancelWithdrawal", id);
+        require(stratoToken.balanceOf(address(user)) == 150e18, "Expired review returns escrow atomically");
+        rejected = false;
+        try user.do(address(bridge), "cancelWithdrawal", id) {} catch { rejected = true; }
+        require(rejected, "Cancellation cannot refund twice");
+    }
+
     function it_allows_requested_reclaim_but_blocks_ready_reclaim() {
         stratoToken.mint(address(user), 100e18);
         user.do(address(stratoToken), "approve", address(bridge), 100e18);
@@ -2592,6 +2612,26 @@ contract Describe_ExternalAssetBridge is Authorizable {
         bool rejected = false;
         try verifierOne.do(address(refundBridge), "attestWithdrawalRefund", 1, digest) {} catch { rejected = true; }
         require(rejected, "Verifier must never attest different source state than it validated");
+    }
+
+    function it_no_funds_rejection_is_governance_only_and_terminal() {
+        relayer.do(address(bridge), "recordDepositForReview", externalChainId, depositRouter, 1,
+            address(0x1111), externalToken, 10e18, "0xaaaa", address(user), address(stratoToken),
+            uint256(DepositAction.NONE), address(0), 0);
+        bool rejected = false;
+        try relayer.do(address(bridge), "rejectDepositNoFunds", externalChainId, depositRouter, 1) {} catch { rejected = true; }
+        require(rejected, "Only governance may reject without refund");
+        bridge.rejectDepositNoFunds(externalChainId, depositRouter, 1);
+        require(stratoToken.balanceOf(address(user)) == 0, "No-funds rejection must not mint");
+        rejected = false;
+        try bridge.requestDepositRefund(externalChainId, depositRouter, 1, externalVault) {} catch { rejected = true; }
+        require(rejected, "Closed no-funds record cannot refund");
+        rejected = false;
+        try bridge.authorizeDepositDelivery(externalChainId, depositRouter, 1) {} catch { rejected = true; }
+        require(rejected, "Closed no-funds record cannot reopen");
+        rejected = false;
+        try bridge.rejectDepositNoFunds(externalChainId, depositRouter, 1) {} catch { rejected = true; }
+        require(rejected, "No-funds rejection is one-shot");
     }
 
     function it_deposit_refund_decision_blocks_delivery_and_requires_confirmed_quorum() {

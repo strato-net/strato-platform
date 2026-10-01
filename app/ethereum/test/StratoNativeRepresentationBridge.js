@@ -73,6 +73,31 @@ describe("StratoNativeRepresentationBridge", function () {
     return attestation;
   }
 
+  it("permanently cancels a mint identity even while paused and rejects old and renewed signatures", async function () {
+    const a = await buildAttestation();
+    const signature = await signAttestation(attestationSigner, a);
+    await expect(bridge.connect(user).cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId)).to.be.reverted;
+    await expect(bridge.connect(mintExecutor).cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId)).to.be.reverted;
+    await bridge.setMintPaused(true);
+    await bridge.cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId);
+    await bridge.setMintPaused(false);
+    await expect(bridge.connect(mintExecutor).mintRepresentationWithAttestation(a, [signature])).to.be.revertedWithCustomError(bridge, "DuplicateMint");
+    await expect(mintWithAttestation()).to.be.revertedWithCustomError(bridge, "DuplicateMint");
+    await bridge.cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId);
+    expect(await token.balanceOf(user.address)).to.equal(0);
+    await mintWithAttestation({ sourceWithdrawalId: sourceWithdrawalId + 1n });
+    await mintWithAttestation({ sourceChainId: sourceChainId + 1n });
+    expect(await token.balanceOf(user.address)).to.equal(500);
+  });
+
+  it("does not certify cancellation after a mint already executed", async function () {
+    await mintWithAttestation();
+    await expect(bridge.cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId)).to.be.revertedWithCustomError(bridge, "DuplicateMint");
+    const mintId = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["uint256", "address", "uint256"], [sourceChainId, sourceBridge, sourceWithdrawalId]));
+    expect(await bridge.canceledMints(mintId)).to.equal(false);
+    expect(await token.balanceOf(user.address)).to.equal(250);
+  });
+
   beforeEach(async function () {
     [admin, user, stratoRecipient, attestationSigner, otherSigner, mintExecutor] =
       await ethers.getSigners();
@@ -90,6 +115,7 @@ describe("StratoNativeRepresentationBridge", function () {
       initializer: "initialize",
     });
     await bridge.waitForDeployment();
+    await bridge.grantRole(await bridge.MINT_CANCELLER_ROLE(), admin.address);
 
     const bridgeRole = await token.BRIDGE_ROLE();
 

@@ -198,3 +198,60 @@ test("personal bridge history requires verified identity and ignores supplied ac
     assert.equal(reads.mock.callCount(), before);
   }
 });
+
+
+test("admin review prepare route accepts withdrawal cancellation actions", async t => {
+  const auth = await import("../../utils/authHelper");
+  const account = "a".repeat(40);
+  t.mock.method(auth, "verifyAccessTokenSignature", async () => ({ preferred_username: "admin" }));
+  t.mock.method(auth, "createOrGetKey", async () => ({ address: account, isNew: false }));
+  t.mock.method(userService, "isUserAdmin", async () => true);
+  const prepared = { target: "bridge", func: "governanceAction", args: ["17"] };
+  const prepare = t.mock.method(reviewService, "prepareAdminBridgeReview", async () => prepared);
+  const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === "/admin/reviews/prepare")!.route!;
+  for (const action of ["cancel_withdrawal", "confirm_cancellation", "settle", "setOwner"]) {
+    let status = 200, body: any, entered = false;
+    const req: any = { method: "POST", headers: { authorization: "Bearer valid" },
+      body: { id: "native:withdrawal:17", action } };
+    const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: (value: any) => { body = value; return res; } };
+    const before = prepare.mock.callCount();
+    await route.stack[0].handle(req, res, (error?: any) => { if (error) throw error; entered = true; });
+    assert.equal(entered, true);
+    await route.stack[1].handle(req, res, (error?: any) => { if (error) throw error; });
+    const valid = action === "cancel_withdrawal" || action === "confirm_cancellation";
+    assert.equal(status, valid ? 200 : 400);
+    assert.equal(prepare.mock.callCount() - before, valid ? 1 : 0);
+    if (valid) {
+      assert.deepEqual(prepare.mock.calls.at(-1)?.arguments, ["valid", "native:withdrawal:17", action]);
+      assert.deepEqual(body, prepared);
+    }
+  }
+});
+
+
+test("cancellation eligibility requires verified identity and ignores a spoofed wallet header", async t => {
+  const auth = await import("../../utils/authHelper");
+  const account = "a".repeat(40), other = "b".repeat(40);
+  t.mock.method(auth, "getServiceToken", async () => { throw new Error("Eligibility must not use anonymous service identity"); });
+  t.mock.method(auth, "verifyAccessTokenSignature", async (token: string) => {
+    if (token === "invalid") throw new Error("Invalid token");
+    return { preferred_username: "user" };
+  });
+  t.mock.method(auth, "createOrGetKey", async () => ({ address: account, isNew: false }));
+  const reads = t.mock.method(service, "getWithdrawalCancellation", async (...args: any[]) => {
+    assert.deepEqual(args, ["valid", "native", "17", account]);
+    return { eligible: false } as any;
+  });
+  const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === "/withdrawalCancellation" && layer.route.methods.get)!.route!;
+  for (const token of [undefined, "invalid", "valid"]) {
+    let status = 200, entered = false;
+    const req: any = { method: "GET", headers: { "x-wallet-address": other,
+      ...(token ? { authorization: `Bearer ${token}` } : {}) }, query: { source: "native", withdrawalId: "17" } };
+    const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
+    const before = reads.mock.callCount();
+    await route.stack[0].handle(req, res, (error?: any) => { if (!error) entered = true; });
+    if (entered) await route.stack[1].handle(req, res, (error?: any) => { if (error) throw error; });
+    assert.equal(status, token === "valid" ? 200 : 401);
+    assert.equal(reads.mock.callCount() - before, token === "valid" ? 1 : 0);
+  }
+});

@@ -2,6 +2,20 @@ import type { Chain } from 'viem';
 import { defineChain } from 'viem/utils';
 import { ChainHints } from './types';
 
+export const ExternalBridgeStatus = {
+  NONE: 0,
+  INITIATED: 1,
+  PENDING_REVIEW: 2,
+  READY: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+  REFUNDED: 6,
+  ABORTED: 7,
+  REFUND_PENDING: 8,
+  REJECTED_NO_FUNDS: 9,
+  CANCELLATION_PENDING: 10,
+} as const;
+
 // Core Constants
 export const BRIDGE_SCOPES = {
   fund: { apiBase: "/bridge", pendingDepositsKey: "pendingDeposits" },
@@ -20,9 +34,15 @@ export const EXTERNAL_BRIDGE_STATUS_LABELS: Record<number, { text: string; color
   5: { text: "Canceled", color: "bg-red-500/15 text-red-500" },
   6: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
   7: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
+  [ExternalBridgeStatus.CANCELLATION_PENDING]: { text: "Cancellation pending", color: "bg-amber-500/15 text-amber-600" },
 };
 export const UNKNOWN_BRIDGE_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 export const EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS: Record<number, { text: string; color: string; description: string }> = {
+  9: {
+    text: "Rejected — no funds received",
+    color: "bg-red-500/15 text-red-500",
+    description: "Governance determined that no funds were received for this deposit. No STRATO assets were credited and no refund was issued.",
+  },
   6: {
     text: "Refunded",
     color: "bg-emerald-500/15 text-emerald-500",

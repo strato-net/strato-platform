@@ -1,21 +1,11 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { WAD } from "@/lib/constants";
-import { BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
+import { ExternalBridgeStatus, BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
 import type { BridgeToken, CompositeRouteQuoteResponse, BridgeTransaction, BridgeReviewItem } from "@strato/shared-types";
 import { AutoRouteQuoteBinding, BridgeError, WithdrawalPreview } from "./types";
 
-export const ExternalBridgeStatus = {
-  NONE: 0,
-  INITIATED: 1,
-  PENDING_REVIEW: 2,
-  READY: 3,
-  COMPLETED: 4,
-  CANCELLED: 5,
-  REFUNDED: 6,
-  ABORTED: 7,
-  REFUND_PENDING: 8,
-} as const;
+export { ExternalBridgeStatus } from "./constants";
 
 export const getBridgeStatusLabel = (status?: string | number, source?: BridgeTransaction["bridgeSource"]) => {
   const labels = source === "legacy" ? LEGACY_BRIDGE_STATUS_LABELS : EXTERNAL_BRIDGE_STATUS_LABELS;
@@ -31,6 +21,8 @@ export const getDepositStatusLabel = (status?: string | number, source?: BridgeT
 };
 
 export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = false): string => {
+  if (item.kind === "withdrawal_cancellation" && !item.refundEvidenceHash) return item.safeProposalHash ? "Safe signers — execute the mint cancellation. If an older mint proposal blocks its nonce, reject that proposal in Safe first. Escrow remains locked."
+    : "Bridge service — prepare permanent external mint cancellation. No refund vote is available yet.";
   if (item.kind === "withdrawal_refund") {
     if (item.refundStatus === "pending") return "Verifiers — confirm that no external payment occurred. The bridge requests these checks automatically; no admin vote is needed yet.";
     if (item.refundStatus !== "ready") return "Admin — refresh the queue. Verifier confirmation is unavailable; do not vote until refund readiness is confirmed.";
@@ -39,7 +31,7 @@ export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = fa
   if (item.approvalStatus === "approved" || item.recoveryStatus === "reopened") {
     return "Bridge service — retry verification and delivery on STRATO automatically. No further admin vote is needed for delivery; the transfer is not complete yet.";
   }
-  if (item.kind === "withdrawal_review") return item.safeProposalHash
+  if (item.kind === "withdrawal_review" && !item.governance?.cancel_withdrawal?.votesCast && !votePending) return item.safeProposalHash
     ? "Safe signers — review and execute the proposal in Safe. The bridge then continues withdrawal processing; no STRATO admin vote is needed here."
     : "Bridge service — prepare the Safe proposal. Safe signers can act once the proposal is available.";
   if (item.recoveryStatus === "refund_pending" && !item.refundEvidenceHash) return item.safeProposalHash
@@ -59,10 +51,12 @@ export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = fa
     return `${verified}Other STRATO admins — review and cast the remaining votes. Your vote is recorded; no further vote is needed from you.`;
   }
   if (item.kind === "withdrawal_refund") return "Verifier checks complete. STRATO admins — select Refund / vote to approve returning the escrowed tokens to the user's STRATO wallet. Funds return when the approved refund executes.";
+  if (item.kind === "withdrawal_cancellation") return "STRATO admins — independently verify the confirmed external mint cancellation, then vote to refund the STRATO escrow.";
+  if (item.kind === "withdrawal_review") return "STRATO admins — complete the cancellation vote to stop mint processing and request permanent external cancellation. Escrow remains locked.";
   if (item.refundEvidenceHash) return "STRATO admins — independently verify the external refund transaction, then select Confirm refund / vote. Execution marks the refund complete; it does not send funds.";
   return item.actions.includes("approve")
-    ? "STRATO admins — review the deposit evidence and vote using the available delivery or return actions below. Submitting a vote does not complete delivery or refund."
-    : "STRATO admins — review the deposit evidence before voting to return the original funds. The bridge operator handles delivery verification; no delivery approval is offered here.";
+    ? "STRATO admins — verify whether funds were received, then choose approval, refund, or rejection without refund. Submitting a vote does not complete delivery or refund."
+    : "STRATO admins — verify the redemption evidence. Return funds if a valid burn occurred, or reject without refund if no valid burn occurred. The bridge service handles delivery verification.";
 };
 
 /**
@@ -321,16 +315,18 @@ export const BRIDGE_STATUS_OPTIONS = [
 export const DEPOSIT_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS.filter(({ value }) =>
   [0, ExternalBridgeStatus.INITIATED, ExternalBridgeStatus.PENDING_REVIEW, ExternalBridgeStatus.COMPLETED, ExternalBridgeStatus.ABORTED].includes(value)
 ).map(option => ({ ...option, label: option.value === ExternalBridgeStatus.ABORTED ? "Rejected / Aborted" : option.label })).concat([
+  { value: ExternalBridgeStatus.REJECTED_NO_FUNDS, label: "Rejected — no funds received" },
   { value: ExternalBridgeStatus.REFUND_PENDING, label: "Refund processing" },
   { value: ExternalBridgeStatus.REFUNDED, label: "Refunded" },
 ]);
 
 export const LEGACY_DEPOSIT_STATUS_OPTIONS = [
-  ...DEPOSIT_STATUS_OPTIONS.filter(option => ![6, 8].includes(option.value)).map(option => ({ ...option, label: option.value === 2 ? "Pending" : option.value === ExternalBridgeStatus.ABORTED ? "Aborted" : option.label })),
+  ...DEPOSIT_STATUS_OPTIONS.filter(option => ![6, 8, 9].includes(option.value)).map(option => ({ ...option, label: option.value === 2 ? "Pending" : option.value === ExternalBridgeStatus.ABORTED ? "Aborted" : option.label })),
   { value: LEGACY_DEPOSIT_ON_HOLD, label: "On Hold" },
 ];
 
 export const WITHDRAWAL_STATUS_LABELS: Record<number, string> = {
+  [ExternalBridgeStatus.CANCELLATION_PENDING]: "Cancellation pending",
   [ExternalBridgeStatus.INITIATED]: "Requested",
   [ExternalBridgeStatus.PENDING_REVIEW]: "Pending Review",
   [ExternalBridgeStatus.READY]: "Processing",
@@ -343,7 +339,8 @@ export const WITHDRAWAL_STATUS_LABELS: Record<number, string> = {
 // CANCELLED is reserved; the bridge contracts use ABORTED for cancellations.
 export const WITHDRAWAL_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS
   .filter(({ value }) => value !== ExternalBridgeStatus.CANCELLED)
-  .map(({ value, label }) => ({ value, label: WITHDRAWAL_STATUS_LABELS[value] ?? label }));
+  .map(({ value, label }) => ({ value, label: WITHDRAWAL_STATUS_LABELS[value] ?? label }))
+  .concat([{ value: ExternalBridgeStatus.CANCELLATION_PENDING, label: "Cancellation pending" }]);
 
 /**
  * Chain options for filter dropdowns

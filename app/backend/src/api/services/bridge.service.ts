@@ -1,3 +1,5 @@
+import { StratoError } from "../../errors";
+import type { WithdrawalCancellationStatus } from "@strato/shared-types";
 import axios from "axios";
 import type { BridgeProtocol, BridgeHistorySource } from "../../types/types";
 import { buildFunctionTx } from "../../utils/txBuilder";
@@ -21,7 +23,7 @@ import {
   LEGACY_QUERY_CONFIGS,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
-import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction } from "@strato/shared-types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalSummaryResponse, TransactionResponse, DepositAction, ExternalBridgeStatus } from "@strato/shared-types";
 import { getCompletePriceMap } from "../helpers/oracle.helper";
 import { getRebaseFactors } from "./oracle.service";
 import { getPsmMintState, PsmMintState } from "./psm.service";
@@ -82,7 +84,8 @@ const toLegacyStatusFilter = (statusFilter?: string): string | undefined =>
       : statusFilter === "eq.3" ||
           statusFilter === "eq.5" ||
           statusFilter === "eq.8" ||
-          statusFilter === "eq.6"
+          statusFilter === "eq.6" ||
+          statusFilter === "eq.9"
         ? "eq.-1"
         : statusFilter;
 
@@ -96,7 +99,8 @@ const nativeTransactionParams = (
   const statusFilter = params["value->>bridgeStatus"];
   delete params.key;
   delete params["value->>bridgeStatus"];
-  const nativeStatusFilter = type === "deposit" && statusFilter === "eq.8" ? "eq.7"
+  const nativeStatusFilter = type === "deposit" && statusFilter === "eq.9" ? "eq.9"
+    : type === "deposit" && statusFilter === "eq.8" ? "eq.7"
     : type === "deposit" && statusFilter === "eq.6" ? "eq.8" : toLegacyStatusFilter(statusFilter);
 
   return {
@@ -730,7 +734,7 @@ export const getWithdrawalSummary = async (
             select: "value->>stratoToken,value->>stratoTokenAmount",
             address: `eq.${constants.stratoNativeBridge}`,
             "value->>stratoSender": `eq.${userAddress}`,
-            "value->>bridgeStatus": "in.(1,2)"
+            "value->>bridgeStatus": `in.(1,2,${ExternalBridgeStatus.CANCELLATION_PENDING})`
           }
         })
       : Promise.resolve({ data: [] }),
@@ -1103,4 +1107,49 @@ export const getDepositActions = async (accessToken: string, protocol: BridgePro
     protocol,
     bridgeActionConfig,
   });
+};
+
+export const getWithdrawalCancellation = async (accessToken: string, source: string, withdrawalId: string, userAddress: string): Promise<WithdrawalCancellationStatus> => {
+  if (!["external", "native"].includes(source) || !/^[1-9][0-9]*$/.test(withdrawalId) || !/^(0x)?[a-f0-9]{40}$/i.test(userAddress || "")) {
+    throw new StratoError("Invalid withdrawal cancellation request", 400);
+  }
+  const native = source === "native";
+  const address = native ? constants.stratoNativeBridge : constants.externalAssetBridge;
+  if (!address) throw new StratoError("Bridge is unavailable", 409);
+  const [record, policy] = await Promise.all([
+    cirrus.get(accessToken, "/mapping", { params: { address: `eq.${address}`, collection_name: "eq.withdrawals", "key->>key": `eq.${withdrawalId}`, select: "value" } }),
+    cirrus.get(accessToken, "/storage", { params: { address: `eq.${address}`, select: "data" } }),
+  ]);
+  const w = record.data?.[0]?.value;
+  if (!w || normalizeAddress(w.stratoSender) !== normalizeAddress(userAddress)) throw new StratoError("Withdrawal not found for this account", 404);
+  const delay = policy.data?.[0]?.data?.WITHDRAWAL_ABORT_DELAY;
+  if (!/^\d+$/.test(String(delay ?? "")) || !/^\d+$/.test(String(w.requestedAt ?? ""))) throw new StratoError("Cancellation timing is unavailable; retry after indexing recovers", 503);
+  let availableAt = BigInt(w.requestedAt) + BigInt(delay);
+  const status = String(native ? w.bridgeStatus : w.status);
+  const requestOnly = native && status === "2";
+  let cancelable = status === "1" || requestOnly;
+  if (!native && status === "2") {
+    const { data } = await cirrus.get(accessToken, "/mapping", { params: { address: `eq.${address}`, collection_name: "eq.withdrawalManualReviews", "key->>key": `eq.${withdrawalId}`, select: "value" } });
+    const deadline = data?.[0]?.value?.approvalDeadline;
+    if (!/^[1-9][0-9]*$/.test(String(deadline ?? ""))) throw new StratoError("Review expiry is unavailable", 503);
+    availableAt = availableAt > BigInt(deadline) ? availableAt : BigInt(deadline) + 1n;
+    cancelable = true;
+  }
+  const eligible = cancelable && BigInt(Math.floor(Date.now() / 1000)) >= availableAt;
+  return { eligible, requestOnly, availableAt: availableAt.toString(), message: requestOnly
+    ? "Request cancellation of the external mint. Funds remain locked until Safe signers cancel the mint and STRATO governance verifies it. If the mint already executed, the withdrawal will complete instead. A STRATO transaction fee applies."
+    : eligible
+    ? "Cancel this withdrawal and return the escrowed tokens to your STRATO wallet. A STRATO transaction fee applies."
+    : cancelable ? "Cancellation becomes available after the waiting period and any active review expire."
+    : "This withdrawal has entered processing or is already closed. Any required cancellation must complete the bridge review process." };
+};
+
+export const cancelUserWithdrawal = async (accessToken: string, source: string, withdrawalId: string, userAddress: string): Promise<TransactionResponse> => {
+  const status = await getWithdrawalCancellation(accessToken, source, withdrawalId, userAddress);
+  if (!status.eligible) throw new StratoError(status.message, 409);
+  const native = source === "native";
+  const tx = await buildFunctionTx([{ contractName: extractContractName(native ? StratoNativeBridge : ExternalAssetBridge),
+    contractAddress: native ? constants.stratoNativeBridge : constants.externalAssetBridge,
+    method: native ? status.requestOnly ? "requestUserWithdrawalCancellation" : "abortWithdrawal" : "cancelWithdrawal", args: native ? { id: withdrawalId } : { withdrawalId } }], userAddress, accessToken);
+  return postAndWaitForTx(accessToken, () => strato.post(accessToken, StratoPaths.transactionParallel, tx));
 };

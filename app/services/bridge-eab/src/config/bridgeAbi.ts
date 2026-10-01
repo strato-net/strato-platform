@@ -44,3 +44,11 @@ export const NATIVE_REFUND_ABI = [
   "function hasRole(bytes32,address) view returns (bool)",
   "event RedemptionRefunded(uint256 indexed redemptionId,address indexed representationToken,address indexed recipient,uint256 amount)",
 ];
+
+export const NATIVE_CANCELLATION_ABI = [
+  "function cancelMint(uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId)",
+  "function canceledMints(bytes32) view returns (bool)",
+  "function processedMints(bytes32) view returns (bool)",
+  "function hasRole(bytes32,address) view returns (bool)",
+  "event NativeMintCanceled(bytes32 indexed mintId,uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId)",
+];

@@ -524,7 +524,8 @@ export const getEventTransactionHash = async (
     | "WithdrawalReleased"
     | "WithdrawalCancelled"
     | "DepositRefunded"
-    | "RedemptionRefunded",
+    | "RedemptionRefunded"
+    | "NativeMintCanceled",
   reservationId: string,
   notBefore: string,
   eventInterface: Interface = vaultInterface,

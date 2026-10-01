@@ -44,6 +44,47 @@ const log = (routed: boolean, id = 1) => ({
   address: address("5"), transactionHash: `0x${"6".repeat(64)}`,
 });
 
+test("native mint recovery shrinks capped log ranges without skipping matching mints", async t => {
+  const rpcUrl = process.env.CHAIN_11155111_RPC_URL;
+  process.env.CHAIN_11155111_RPC_URL = "https://rpc.test";
+  t.after(() => { if (rpcUrl === undefined) delete process.env.CHAIN_11155111_RPC_URL; else process.env.CHAIN_11155111_RPC_URL = rpcUrl; });
+  const { JsonRpcProvider } = await import("ethers");
+  const { NATIVE_MINT_EVENT_ABI } = await import("../config/bridgeAbi");
+  const { getExistingNativeMintTxHash } = await import("./nativeMintService");
+  const mintInterface = new Interface(NATIVE_MINT_EVENT_ABI);
+  const w: any = { externalChainId: "11155111", externalBridge: address("5"), withdrawalId: "17",
+    stratoToken: address("1"), representationToken: address("2"), externalRecipient: address("3"),
+    externalTokenAmount: "100", requestedAt: "15600" };
+  const event = mintInterface.encodeEventLog(mintInterface.getEvent("RepresentationMinted")!,
+    [2001, address("4"), 17, w.stratoToken, w.representationToken, w.externalRecipient, 100, `0x${"a".repeat(64)}`]);
+  t.mock.method(JsonRpcProvider.prototype, "getBlock", async (tag: any) => {
+    const number = tag === "latest" ? 3000 : Number(tag);
+    return { number, timestamp: number * 12 } as any;
+  });
+  let present = true, unavailable = false;
+  const covered = new Set<number>();
+  const ranges: number[][] = [];
+  t.mock.method(JsonRpcProvider.prototype, "getLogs", async (filter: any) => {
+    const from = Number(filter.fromBlock), to = Number(filter.toBlock);
+    ranges.push([from, to]);
+    assert.equal(filter.address.toLowerCase(), w.externalBridge);
+    assert.deepEqual(filter.topics, mintInterface.encodeFilterTopics("RepresentationMinted", [null, address("4"), 17, w.stratoToken]));
+    if (unavailable || to - from + 1 > 100) throw new Error("RPC range limit");
+    for (let n = from; n <= to; n++) covered.add(n);
+    return present && from <= 1500 && to >= 1500 ? [{ ...event, transactionHash: "mint-hash" }] as any : [];
+  });
+  assert.equal(await getExistingNativeMintTxHash(w, 2001n, address("4")), "mint-hash");
+  assert.equal(ranges[0][1] - ranges[0][0] + 1, 1000);
+  present = false; covered.clear();
+  assert.equal(await getExistingNativeMintTxHash(w, 2001n, address("4")), null);
+  assert.equal(covered.size, 2001);
+  assert.equal(Math.min(...covered), 1000, "search begins one hour before requestedAt");
+  assert.equal(Math.max(...covered), 3000);
+  unavailable = true;
+  await assert.rejects(getExistingNativeMintTxHash(w, 2001n, address("4")), /RPC range limit/);
+  assert.equal(ranges.at(-1)![0], ranges.at(-1)![1], "single-block failures propagate instead of reporting no mint");
+});
+
 test("native polling decoder distinguishes plain and routed events and rejects incomplete intent", async () => {
   const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
   const routed = parseNativeDepositLog(1, log(true))!;
@@ -131,6 +172,8 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
     externalTokenAmount: "100", bridgeStatus: "2", externalTxHash: "", requestedAt: "1",
     stratoSender: address("6"), stratoTokenAmount: "100", timestamp: "1", nativeMintNotBefore: "1", useInstantPath: true,
   };
+  const cirrus = await import("./cirrusService");
+  t.mock.method(cirrus, "getNativeWithdrawalById", async () => record);
   t.mock.method(mint, "buildNativeMintRequest", async (withdrawal, _chain, _source, destination) => {
     assert.equal(destination, record.externalBridge, "use the committed bridge, not mutable environment routing");
     return { idempotencyKey: withdrawal.withdrawalId } as any;
@@ -165,7 +208,6 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   await bridge.queueManualNativeWithdrawalBatch([manual]);
   assert.equal(calls[0].method, "finalizeWithdrawal");
   assert.equal(calls[0].args.externalTxHash, "safe-hash");
-  const cirrus = await import("./cirrusService");
   const processing = await import("./processingIssueService");
   let current: any = { bridgeStatus: "3", externalTxHash: "0xMINT-HASH" };
   t.mock.method(cirrus, "getNativeWithdrawalById", async () => current);
@@ -476,4 +518,93 @@ test("native sweep recovers old omissions, avoids recorded payouts and detects r
   const count = save.mock.callCount();
   await assert.rejects(pollChainNativeRedemptions(1), /reorg|canonical/);
   assert.equal(save.mock.callCount(), count, "unstable chain cannot advance checkpoint");
+});
+
+test("native cancellation recovers Safe proposals and records only confirmed, matching cancellation evidence", async t => {
+  const rpcService = await import("./rpcService");
+  const safeQueue = await import("./safeProposalService");
+  const external = await import("./externalWithdrawalService");
+  const strato = await import("../utils/stratoHelper");
+  const { config } = await import("../config");
+  const { NATIVE_CANCELLATION_ABI } = await import("../config/bridgeAbi");
+  const { processNativeMintCancellation } = await import("./nativeMintService");
+  process.env.CHAIN_11155111_DEPOSIT_CONFIRMATIONS = "12";
+  const cancellation = new Interface(NATIVE_CANCELLATION_ABI);
+  const source = `0x${config.nativeBridge.address!.replace(/^0x/i, "")}`;
+  const w: any = { bridgeStatus: "10", externalChainId: "11155111", externalBridge: address("5"), withdrawalId: "17", requestedAt: "1" };
+  const mintId = keccak256(AbiCoder.defaultAbiCoder().encode(["uint256", "address", "uint256"], [2001, source, 17]));
+  const hash = `0x${"a".repeat(64)}`;
+  let canceled = false, minted = false, role = true, head = 1000000, saved: any, published = 0;
+  const calls: any[] = [];
+  const event = cancellation.encodeEventLog(cancellation.getEvent("NativeMintCanceled")!, [mintId, 2001, source, 17]);
+  let receipt: any = { status: "0x1", blockNumber: "0x1", blockHash: `0x${"b".repeat(64)}`, transactionHash: hash,
+    logs: [{ ...event, address: w.externalBridge }] };
+  t.mock.method(rpcService, "getChainProvider", () => ({ call: async (tx: any) => {
+    const name = cancellation.parseTransaction(tx)!.name;
+    return cancellation.encodeFunctionResult(name, [name === "canceledMints" ? canceled : name === "processedMints" ? minted : role]);
+  } }) as any);
+  t.mock.method(rpcService, "getTransactionReceiptsBatch", async () => new Map([[hash, receipt]]));
+  t.mock.method(rpcService, "getVerificationBlockNumber", async () => head);
+  t.mock.method(external, "getEventTransactionHash", async () => hash);
+  t.mock.method(strato, "execute", async (call: any) => { calls.push(call); });
+  t.mock.method(safeQueue, "withSafeProposalQueue", async (_chain: number, _key: string, work: any) => work({
+    apiKit: { getNextNonce: async () => "4", getTransaction: async () => { throw { status: 404 }; },
+      proposeTransaction: async (p: any) => { saved = p; published++; } },
+    protocolKit: { getNonce: async () => 4, createTransaction: async ({ transactions, options }: any) => ({ data: { ...transactions[0], nonce: options.nonce } }),
+      getTransactionHash: async () => hash, signHash: async () => ({ data: "signature" }) },
+  }, saved));
+  await assert.rejects(processNativeMintCancellation({ ...w, bridgeStatus: "2" }, "2001"), /not requested/);
+  role = false;
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /configured Safe/);
+  role = true;
+  await processNativeMintCancellation(w, "2001");
+  assert.equal(calls.pop().method, "recordWithdrawalCancellationProposal");
+  const original = saved;
+  await processNativeMintCancellation(w, "2001");
+  assert.equal(saved, original, "restart republishes the same durable proposal");
+  assert.equal(published, 2);
+  calls.length = 0; minted = true;
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /already executed/);
+  assert.equal(calls.length, 0);
+  minted = false; canceled = true; head = 1;
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /awaits confirmations/);
+  head = 1000000; receipt.__rpcDisagreement = true;
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /disagreement/);
+  delete receipt.__rpcDisagreement;
+  receipt.logs[0].address = address("6");
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /evidence mismatch/);
+  assert.equal(calls.length, 0);
+  receipt.logs[0].address = w.externalBridge;
+  await processNativeMintCancellation(w, "2001");
+  assert.equal(calls.pop().method, "recordWithdrawalCancellationEvidence");
+  await processNativeMintCancellation({ ...w, cancellationTxHash: hash }, "2001");
+  assert.equal(calls.length, 0, "indexed evidence is not recorded twice");
+});
+
+test("native cancellation recovery finalizes a verified winning mint instead of proposing a refund", async t => {
+  const mint = await import("./nativeMintService");
+  const verification = await import("./nativeVerificationService");
+  const strato = await import("../utils/stratoHelper");
+  const api = await import("../utils/api");
+  const { recoverNativeWithdrawalCancellation } = await import("./bridgeService");
+  t.mock.method(api.eth, "get", async () => ({ networkID: "2001" }));
+  t.mock.method(mint, "buildNativeMintRequest", async () => ({} as any));
+  let hash: string | null = "mint-hash";
+  t.mock.method(mint, "getExistingNativeMintTxHash", async () => hash);
+  let verified = false;
+  t.mock.method(verification, "verifyNativeMint", async () => { if (!verified) throw new Error("awaiting confirmations"); });
+  const calls: any[] = [];
+  t.mock.method(strato, "execute", async call => { calls.push(call); });
+  const cancel = t.mock.method(mint, "processNativeMintCancellation", async () => {});
+  const w: any = { withdrawalId: "917", bridgeStatus: "10", externalBridge: address("5") };
+  await assert.rejects(recoverNativeWithdrawalCancellation(w), /awaiting confirmations/);
+  assert.equal(calls.length, 0);
+  assert.equal(cancel.mock.callCount(), 0);
+  verified = true;
+  await recoverNativeWithdrawalCancellation(w);
+  assert.equal(calls[0].method, "finalizeWithdrawal");
+  assert.equal(cancel.mock.callCount(), 0);
+  hash = null;
+  await recoverNativeWithdrawalCancellation(w);
+  assert.equal(cancel.mock.callCount(), 1);
 });

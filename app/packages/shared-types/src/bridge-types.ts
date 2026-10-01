@@ -71,6 +71,8 @@ export enum ExternalBridgeStatus {
   REFUNDED = 6,
   ABORTED = 7,
   REFUND_PENDING = 8,
+  REJECTED_NO_FUNDS = 9,
+  CANCELLATION_PENDING = 10,
 }
 
 export interface ExternalWithdrawalInfo {
@@ -250,8 +252,8 @@ export interface CreditCardTopUpExecuteParams {
 export interface BridgeReviewItem {
   id: string;
   source: "eab" | "native" | "legacy";
-  kind: "deposit_review" | "deposit_recovery" | "withdrawal_review" | "withdrawal_refund";
-  outcome?: "delivered" | "refunded";
+  kind: "deposit_review" | "deposit_recovery" | "withdrawal_review" | "withdrawal_refund" | "withdrawal_cancellation";
+  outcome?: "delivered" | "refunded" | "rejected_no_funds";
   recoveryStatus?: "rejected" | "reopened" | "refund_pending";
   refundVault?: string;
   refundEvidenceHash?: string;
@@ -298,7 +300,7 @@ export interface BridgeReviewRecords {
   legacyWithdrawals: BridgeReviewRow[];
 }
 
-export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "confirm_refund";
+export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "confirm_refund" | "cancel_withdrawal" | "confirm_cancellation";
 
 export interface BridgeReviewGovernance {
   issueId?: string;
@@ -390,4 +392,11 @@ export interface BridgePolicyRecords {
   nativeAutoRoute: BridgeReviewRow<unknown>[];
   locked: BridgeReviewRow<unknown>[];
   tokens: Array<{ address: string; _symbol?: string; customDecimals?: unknown }>;
+}
+
+export interface WithdrawalCancellationStatus {
+  eligible: boolean;
+  requestOnly: boolean;
+  availableAt: string;
+  message: string;
 }

@@ -13,6 +13,8 @@ import {
   getDepositRouterMajor,
   getNetworkConfigs,
   getWithdrawalSummary,
+  getWithdrawalCancellation,
+  cancelUserWithdrawal,
   validateNativeWithdrawalRoute,
 } from "./bridge.service";
 import {
@@ -450,6 +452,7 @@ test("keeps pending and completed withdrawal totals separate across bridge types
   const { cirrus } = await import("../../utils/appApiHelper");
   const token = "9".repeat(40);
   const wad = constants.DECIMALS;
+  let cancellationStatus = 10;
   const originalRoutes = bridge.getBridgeableTokens;
   const originalPrices = oracle.getCompletePriceMap;
   const originalGet = cirrus.get;
@@ -470,7 +473,13 @@ test("keeps pending and completed withdrawal totals separate across bridge types
       amount = params["value->>bridgeStatus"] === "eq.3" ? 20n : 10n;
     } else {
       assert.equal(path, `/${constants.StratoNativeBridge}-withdrawals`);
-      amount = params["value->>bridgeStatus"] === "eq.3" ? 2n : 1n;
+      const filter = params["value->>bridgeStatus"];
+      if (filter !== "eq.3") {
+        assert.equal(filter, "in.(1,2,10)");
+        assert.equal(params["value->>stratoSender"], "eq.user");
+        assert.equal(params.address, `eq.${"8".repeat(40)}`);
+      }
+      amount = filter === "eq.3" ? 2n : 1n + (filter.slice(4, -1).split(",").includes(String(cancellationStatus)) ? 4n : 0n);
     }
     const completed = params["value->>status"] === "eq.4" || params["value->>bridgeStatus"] === "eq.3";
     assert.equal(typeof params.block_timestamp === "string", completed);
@@ -478,9 +487,13 @@ test("keeps pending and completed withdrawal totals separate across bridge types
   };
   try {
     const summary = await bridge.getWithdrawalSummary("token", "user");
-    assert.equal(summary.pendingWithdrawals, (111n * wad).toString());
+    assert.equal(summary.pendingWithdrawals, (115n * wad).toString());
     assert.equal(summary.totalWithdrawn30d, (222n * wad).toString());
     assert.equal(summary.availableToWithdraw, "0");
+    for (cancellationStatus of [3, 4]) {
+      const resolved = await bridge.getWithdrawalSummary("token", "user");
+      assert.equal(resolved.pendingWithdrawals, (111n * wad).toString(), "completed or refunded escrow is no longer pending");
+    }
   } finally {
     (bridge as any).getBridgeableTokens = originalRoutes;
     (oracle as any).getCompletePriceMap = originalPrices;
@@ -689,4 +702,39 @@ test("native deposit refunds normalize pending/completed states and expose the c
   const complete = await service.getBridgeTransactions("token", "deposit", "user", {}, "external");
   assert.equal(complete.data[0].DepositInfo?.bridgeStatus, "6");
   assert.equal(complete.data[0].refundTxHash, `0x${refundHash}`);
+});
+
+test("user cancellation reads stored ownership and policy, and fails closed on missing data", async t => {
+  const address = "a".repeat(40), user = "b".repeat(40);
+  t.mock.getter(constants, "externalAssetBridge", () => address);
+  t.mock.getter(constants, "stratoNativeBridge", () => address);
+  let state = "1", native = false, missingDelay = false, deadline = "1";
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    assert.equal(params.address, `eq.${address}`);
+    if (table === "/storage") return { data: [{ data: missingDelay ? {} : { WITHDRAWAL_ABORT_DELAY: "172800" } }] } as any;
+    assert.equal(table, "/mapping");
+    assert.equal(params["key->>key"], "eq.17");
+    return { data: [{ value: params.collection_name === "eq.withdrawalManualReviews" ? { approvalDeadline: deadline }
+      : { stratoSender: user, requestedAt: "1", [native ? "bridgeStatus" : "status"]: state } }] } as any;
+  });
+  assert.equal((await getWithdrawalCancellation("token", "external", "17", user)).eligible, true);
+  await assert.rejects(getWithdrawalCancellation("token", "external", "17", address), /not found/);
+  await assert.rejects(getWithdrawalCancellation("token", "external", "17 or true", user), /Invalid/);
+  missingDelay = true;
+  await assert.rejects(getWithdrawalCancellation("token", "external", "17", user), /timing is unavailable/);
+  missingDelay = false; state = "2"; deadline = String(Math.floor(Date.now() / 1000) + 3600);
+  assert.equal((await getWithdrawalCancellation("token", "external", "17", user)).eligible, false);
+  deadline = "1";
+  assert.equal((await getWithdrawalCancellation("token", "external", "17", user)).eligible, true);
+  for (const status of ["3", "4", "6", "7"]) {
+    state = status;
+    assert.equal((await getWithdrawalCancellation("token", "external", "17", user)).eligible, false);
+    await assert.rejects(cancelUserWithdrawal("token", "external", "17", user), /entered processing/);
+  }
+  native = true; state = "2";
+  const pending = await getWithdrawalCancellation("token", "native", "17", user);
+  assert.equal(pending.eligible, true);
+  assert.equal(pending.requestOnly, true);
+  state = "10";
+  assert.equal((await getWithdrawalCancellation("token", "native", "17", user)).eligible, false);
 });

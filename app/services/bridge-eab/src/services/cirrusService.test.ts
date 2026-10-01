@@ -51,7 +51,9 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
         rows = rows.filter((row) => String(row[column]) === filter.slice(3));
       }
     }
-    if (params.or) {
+    if (params.or === "(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.10)") {
+      rows = rows.filter(row => String(row.value.bridgeStatus) === "10" || (String(row.value.bridgeStatus) === "2" && String(row.value.useInstantPath) === "false"));
+    } else if (params.or) {
       const identities = [...params.or.matchAll(/and\(key2.eq.([^,]+),key3.eq.([^)]+)\)/g)] as RegExpMatchArray[];
       assert.ok(identities.length > 0 && identities.length <= 20);
       rows = rows.filter((row) => identities.some((match) => row.key2 === match[1] && String(row.key3) === match[2]));

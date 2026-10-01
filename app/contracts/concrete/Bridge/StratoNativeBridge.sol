@@ -70,6 +70,8 @@ contract record StratoNativeBridge is Ownable {
         string nativeMintProposalHash;
         uint256 nativeMintNotBefore;
         bool useInstantPath;
+        string cancellationProposalHash;
+        string cancellationTxHash;
     }
 
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
@@ -172,6 +174,7 @@ contract record StratoNativeBridge is Ownable {
     mapping(string => string) public record depositRefundEvidence;
     event NativeDepositRefundEvidence(string depositId, string refundTxHash);
     event NativeDepositReopened(string depositId);
+    event NativeDepositRejectedNoFunds(string depositId);
     event NativeDepositRefundRequested(string depositId);
     event NativeDepositRefunded(string depositId, string refundTxHash);
     event NativeDepositRefundProposal(string depositId, string proposalHash);
@@ -537,7 +540,9 @@ contract record StratoNativeBridge is Ownable {
             block.timestamp,
             "",
             0,
-            useInstantPath
+            useInstantPath,
+            "",
+            ""
         );
 
         emit NativeWithdrawalRequested(
@@ -590,7 +595,7 @@ contract record StratoNativeBridge is Ownable {
         require(bytes(externalTxHash).length > 0, "SNB: invalid external tx hash");
 
         NativeWithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: bad state");
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW || w.bridgeStatus == BridgeStatus.CANCELLATION_PENDING, "SNB: bad state");
         require(bytes(w.externalTxHash).length == 0, "SNB: tx hash already set");
 
         string normalizedExternalTxHash = externalTxHash.normalizeHex();
@@ -612,7 +617,59 @@ contract record StratoNativeBridge is Ownable {
         emit NativeWithdrawalCompleted(id, w.externalTxHash, w.nativeMintProposalHash);
     }
 
-    function abortWithdrawal(uint256 id) public whenWithdrawalsOpen {
+    event NativeWithdrawalCancellationRequested(uint256 id);
+    event NativeWithdrawalCancellationProposal(uint256 id, string proposalHash);
+    event NativeWithdrawalCancellationEvidence(uint256 id, string txHash);
+
+    function requestWithdrawalCancellation(uint256 id) external onlyOwner {
+        _requestWithdrawalCancellation(id);
+    }
+
+    function requestUserWithdrawalCancellation(uint256 id) external {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(msg.sender == w.stratoSender, "SNB: not sender");
+        require(block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "SNB: wait 48h");
+        _requestWithdrawalCancellation(id);
+    }
+
+    function _requestWithdrawalCancellation(uint256 id) internal {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "SNB: not pending");
+        require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
+        w.bridgeStatus = BridgeStatus.CANCELLATION_PENDING;
+        w.timestamp = block.timestamp;
+        emit NativeWithdrawalCancellationRequested(id);
+    }
+
+    function recordWithdrawalCancellationProposal(uint256 id, string proposalHash) external onlyBridgeOperator {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(proposalHash).length > 0, "SNB: missing proposal");
+        w.cancellationProposalHash = proposalHash.normalizeHex();
+        emit NativeWithdrawalCancellationProposal(id, w.cancellationProposalHash);
+    }
+
+    function recordWithdrawalCancellationEvidence(uint256 id, string txHash) external onlyBridgeOperator {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(txHash).length == 64 || bytes(txHash).length == 66, "SNB: invalid cancellation hash");
+        w.cancellationTxHash = txHash.normalizeHex();
+        emit NativeWithdrawalCancellationEvidence(id, w.cancellationTxHash);
+    }
+
+    function refundCanceledWithdrawal(uint256 id, string cancellationTxHash) external onlyOwner {
+        NativeWithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.CANCELLATION_PENDING, "SNB: no cancellation requested");
+        require(bytes(w.cancellationTxHash).length > 0 && w.cancellationTxHash == cancellationTxHash.normalizeHex(), "SNB: cancellation evidence mismatch");
+        require(bytes(w.externalTxHash).length == 0, "SNB: external tx set");
+        w.bridgeStatus = BridgeStatus.ABORTED;
+        w.timestamp = block.timestamp;
+        uint256 amount = StratoNativeCustodyVault(custodyVault).unlock(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(amount > 0, "SNB: no tokens unlocked");
+        emit NativeWithdrawalAborted(id);
+    }
+
+    function abortWithdrawal(uint256 id) public {
         require(id > 0, "SNB: invalid withdrawal id");
         require(custodyVault != address(0), "SNB: vault not set");
 
@@ -622,7 +679,7 @@ contract record StratoNativeBridge is Ownable {
         AdminRegistry admin = AdminRegistry(owner());
         if (admin.whitelist(address(this), "abortWithdrawal", msg.sender)) {
             require(
-                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+                w.bridgeStatus == BridgeStatus.INITIATED,
                 "SNB: not abortable"
             );
         } else {
@@ -836,6 +893,14 @@ contract record StratoNativeBridge is Ownable {
         emit NativeDepositCompleted(d.depositId, d.externalChainId, d.externalBridge,
             d.externalRedemptionId, d.externalSender, d.externalTxHash, d.stratoRecipient,
             d.stratoToken, amount);
+    }
+
+    function rejectDepositNoFunds(string depositId) external onlyOwner {
+        NativeDepositInfo d = deposits[depositId];
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW || d.bridgeStatus == BridgeStatus.ABORTED, "SNB: not reviewable");
+        d.bridgeStatus = BridgeStatus.REJECTED_NO_FUNDS;
+        d.timestamp = block.timestamp;
+        emit NativeDepositRejectedNoFunds(depositId);
     }
 
     function reopenDeposit(string depositId) external onlyOwner {

@@ -1,3 +1,4 @@
+import { ExternalBridgeStatus } from "@strato/shared-types";
 import { cirrus } from "../utils/api";
 import { ensureHexPrefix, normalizeOptionalHash } from "../utils/utils";
 import { config, CIRRUS_PAGE_SIZE, CIRRUS_FILTER_BATCH_SIZE, EMAIL_METADATA_TIMEOUT_MS } from "../config";
@@ -774,6 +775,7 @@ export const getBridgeReviewOutcome = async (item: BridgeReviewItem): Promise<Br
   if (!Array.isArray(rows)) throw new Error("Invalid bridge outcome response");
   const value = rows[0]?.value;
   const status = String(external ? value?.status : value?.bridgeStatus);
+  if (deposit && status === "9") return "rejected_no_funds";
   if (status === (external ? "4" : "3")) return "delivered";
   if (deposit && status === (external ? "6" : "8")) return "refunded";
   if (!deposit && (external ? ["6", "7"] : ["4"]).includes(status)) return "refunded";
@@ -789,7 +791,7 @@ export const getBridgeReviewRecords = async () => {
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "withdrawals", { "value->>status": "in.(2,3)" }),
     read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
-    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { "value->>bridgeStatus": "eq.2", "value->>useInstantPath": "eq.false" }),
+    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { or: `(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
   ]);
   const [reviews, authorizations, refundProposals, refundEvidence] = await Promise.all([getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
     withdrawals.filter(row => String(row.value.status) === "2").map(row => String(row.key)),
@@ -852,7 +854,7 @@ export const getCompletedProcessingContexts = async (contexts: ProcessingContext
     const first = group[0], isDeposit = first.stage.startsWith("deposit");
     const contract = first.source === "eab" ? EXTERNAL_ASSET_BRIDGE_URL : NATIVE_BRIDGE_URL;
     const statusField = first.source === "eab" ? "status" : "bridgeStatus";
-    const terminal = first.source === "eab" ? ["4", "6", "7"] : isDeposit ? ["3", "4", "8"] : ["3", "4", "5"];
+    const terminal = first.source === "eab" ? isDeposit ? ["4", "6", "9"] : ["4", "6", "7"] : isDeposit ? ["3", "8", "9"] : ["3", "4", "5"];
     for (let offset = 0; offset < group.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
       const batch = group.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
       const filters = batch.flatMap(c => {
