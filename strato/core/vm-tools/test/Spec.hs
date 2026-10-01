@@ -44,6 +44,7 @@ import Control.Monad
 import qualified Data.Map.Strict as M
 import Executable.EVMFlags ()
 import HFlags
+import qualified ActionEncodeSpec
 import qualified CrossLangFixtureSpec
 import qualified ReceiptSpec
 import qualified TypedArgConversionSpec
@@ -79,6 +80,7 @@ main = do
 spec :: Spec
 spec = do
   describe "VMContext" $ pure ()
+  ActionEncodeSpec.spec
   ReceiptSpec.spec
   TypedArgConversionSpec.spec
   CrossLangFixtureSpec.spec

@@ -1,10 +1,14 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS -fno-warn-incomplete-uni-patterns #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- Store [ByteString]
 
 module SolidVM.Model.Storable where
 
@@ -14,6 +18,7 @@ import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Exception
 import Control.Lens.Operators
+import Control.Monad (replicateM)
 import qualified Data.Aeson as JSON
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
@@ -27,17 +32,27 @@ import qualified Data.ByteString.UTF8 as UTF8
 import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
+import Data.List (foldl')
+import Data.Map.Strict (Map)
+import qualified Data.Map.Internal as MI
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import qualified Data.OpenApi as OPENAPI
 import Data.Scientific (isInteger, toBoundedInteger)
+import qualified Data.Sequence as Seq
+import Data.Store (Peek, Size (..), Store (..))
+import Data.Store.Core (Poke (..), pokeStatePtr)
+import Data.Store.Internal (getSize, peekOrdMapWith)
 import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
+import qualified Data.Vector as V
 import qualified Database.Esqueleto.Internal.Internal as E
 import Database.Persist.Sql
+import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr
-import Foreign.Storable
+import Foreign.Storable (peekByteOff, pokeByteOff)
 import GHC.Generics
 import SolidVM.Model.SolidString
 import System.IO.Unsafe
@@ -457,3 +472,136 @@ storageValueByteStringToBasic bs =
 
 storageValueToText :: BasicValue -> Text
 storageValueToText = formatBasicValueForSQL
+
+-- ---------------------------------------------------------------------------
+-- Store instances
+--
+-- Actions go to the slipstream as their Store encoding (Blockchain.Stream.Action). The
+-- derived instances are store's own; the container and byte encodings below replace
+-- store's generic ones for the concrete types on that path, with the same wire layout:
+--
+--   * store writes every container through one generic fold that threads the offset
+--     through the Poke monad per element, which GHC cannot flatten, so each element
+--     costs a boxed offset. These loops carry the offset as a plain accumulator.
+--   * store copies bytes under 'withForeignPtr' (a keepAlive# frame per copy). These use
+--     'unsafeWithForeignPtr', which is safe for a single non-diverging memcpy.
+--
+-- store's own container instances cannot be replaced wholesale (same instance head), only
+-- overlapped per concrete type, so each container type on the path gets one line:
+--
+-- > deriving via (StoreList Value) instance {-# OVERLAPPING #-} Store [Value]
+--
+-- The newtype pokes are written as lambdas (@poke = \(StoreList xs) -> ...@), not clauses:
+-- the derived instance applies them to the dictionary alone, and an INLINE method is only
+-- inlined when saturated. As clauses they stay out-of-line generic loops (+0.08 s, +0.6 GB).
+--
+-- The derived pokes for BasicValue and Value still allocate ~60-80 B per value (a thunk
+-- for `from x`, the returned Poke closure and a boxed (Offset, ()) result): GHC treats
+-- these large recursive writers as loop breakers, so INLINE has no effect. Measured at
+-- ~0.6 GB per recorded stream with no time difference, so left as is; a writer returning
+-- a bare offset (PokeState -> Offset -> IO Offset) instead of a Poke would avoid it.
+
+instance Store BasicValue
+
+peekElems :: Store a => Peek [a]
+peekElems = do n <- peek :: Peek Int; replicateM n peek
+{-# INLINE peekElems #-}
+
+newtype StoreList a = StoreList [a]
+
+instance Store a => Store (StoreList a) where
+  size = VarSize (\(StoreList xs) -> foldl' (\n x -> n + getSize x) 8 xs)
+  poke = \(StoreList xs) -> Poke $ \ps o0 -> do
+    (o1, ()) <- runPoke (poke (length xs)) ps o0
+    let go [] !o = pure (o, ())
+        go (x : rest) !o = do (o2, ()) <- runPoke (poke x) ps o; go rest o2
+    go xs o1
+  peek = StoreList <$> peekElems
+  {-# INLINE size #-}
+  {-# INLINE poke #-}
+  {-# INLINE peek #-}
+
+newtype StoreSeq a = StoreSeq (Seq.Seq a)
+
+instance Store a => Store (StoreSeq a) where
+  size = VarSize (\(StoreSeq xs) -> foldl' (\n x -> n + getSize x) 8 xs)
+  poke = \(StoreSeq xs) -> Poke $ \ps o0 -> do
+    (o1, ()) <- runPoke (poke (Seq.length xs)) ps o0
+    o2 <- foldr (\x k !o -> do (o3, ()) <- runPoke (poke x) ps o; k o3) pure xs o1
+    pure (o2, ())
+  peek = StoreSeq . Seq.fromList <$> peekElems
+  {-# INLINE size #-}
+  {-# INLINE poke #-}
+  {-# INLINE peek #-}
+
+newtype StoreVector a = StoreVector (V.Vector a)
+
+instance Store a => Store (StoreVector a) where
+  size = VarSize (\(StoreVector xs) -> V.foldl' (\n x -> n + getSize x) 8 xs)
+  poke = \(StoreVector xs) -> Poke $ \ps o0 -> do
+    (o1, ()) <- runPoke (poke (V.length xs)) ps o0
+    o2 <- V.foldM' (\o x -> do (o3, ()) <- runPoke (poke x) ps o; pure o3) o1 xs
+    pure (o2, ())
+  peek = StoreVector . V.fromList <$> peekElems
+  {-# INLINE size #-}
+  {-# INLINE poke #-}
+  {-# INLINE peek #-}
+
+-- Same layout as store's Map: ascending-order marker, count, then key/value pairs in order.
+-- The marker is store's unexported 'markMapPokedInAscendingOrder'; 'peekOrdMapWith' checks it.
+mapAscendingMarker :: Word32
+mapAscendingMarker = 1217678090
+
+newtype StoreMap k v = StoreMap (Map k v)
+
+instance (Store k, Store v) => Store (StoreMap k v) where
+  size = VarSize (\(StoreMap m) -> go m 12)
+    where
+      go MI.Tip !n = n
+      go (MI.Bin _ k v l r) !n = go r (go l n + getSize k + getSize v)
+  poke = \(StoreMap m) -> Poke $ \ps o0 -> do
+    (o1, ()) <- runPoke (poke mapAscendingMarker >> poke (Map.size m)) ps o0
+    let go MI.Tip !o = pure o
+        go (MI.Bin _ k v l r) !o = do
+          oa <- go l o
+          (ob, ()) <- runPoke (poke k) ps oa
+          (oc, ()) <- runPoke (poke v) ps ob
+          go r oc
+    o2 <- go m o1
+    pure (o2, ())
+  peek = StoreMap <$> peekOrdMapWith Map.fromDistinctAscList
+  {-# INLINE size #-}
+  {-# INLINE poke #-}
+  {-# INLINE peek #-}
+
+-- | Length-prefixed bytes, as store writes a ByteString.
+bytesPoke :: B.ByteString -> Poke ()
+bytesPoke (BI.BS fp len) = Poke $ \ps o0 -> do
+  (o1, ()) <- runPoke (poke len) ps o0
+  BI.unsafeWithForeignPtr fp $ \src -> copyBytes (pokeStatePtr ps `plusPtr` o1) src len
+  pure (o1 + len, ())
+{-# INLINE bytesPoke #-}
+
+instance {-# OVERLAPPING #-} Store [B.ByteString] where
+  size = VarSize (foldl' (\n b -> n + 8 + B.length b) 8)
+  poke xs = Poke $ \ps o0 -> do
+    (o1, ()) <- runPoke (poke (length xs)) ps o0
+    let go [] !o = pure (o, ())
+        go (b : rest) !o = do (o2, ()) <- runPoke (bytesPoke b) ps o; go rest o2
+    go xs o1
+  peek = peekElems
+
+-- Same layout as the derived instance: Word8 tag, then length-prefixed bytes.
+instance Store StoragePathPiece where
+  size = VarSize (\p -> case p of Field b -> 9 + B.length b; Index b -> 9 + B.length b)
+  poke (Field b) = poke (0 :: Word8) >> bytesPoke b
+  poke (Index b) = poke (1 :: Word8) >> bytesPoke b
+  peek =
+    (peek :: Peek Word8) >>= \case
+      0 -> Field <$> peek
+      1 -> Index <$> peek
+      t -> fail ("StoragePathPiece: bad tag " ++ show t)
+
+deriving via (StoreList StoragePathPiece) instance {-# OVERLAPPING #-} Store [StoragePathPiece]
+
+instance Store StoragePath

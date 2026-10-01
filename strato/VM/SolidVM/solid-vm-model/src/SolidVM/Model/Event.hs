@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module SolidVM.Model.Event
@@ -23,9 +25,11 @@ import qualified Data.Aeson as Aeson
 import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
+import Data.Store (Store)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import GHC.Generics
+import SolidVM.Model.Storable (StoreList (..))
 import SolidVM.Model.Value (Value (..), renderValue)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -85,6 +89,10 @@ instance Format Event where
       ++ "\n"
 
 instance Binary Event
+
+deriving via (StoreList (T.Text, Value)) instance {-# OVERLAPPING #-} Store [(T.Text, Value)]
+
+instance Store Event
 
 instance ToJSON Event where
   toJSON Event {..} =

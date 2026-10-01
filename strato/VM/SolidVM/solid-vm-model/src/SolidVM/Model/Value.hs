@@ -1,5 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- Generic/Store (DecimalRaw i)
 
 module SolidVM.Model.Value
   ( Variable (..),
@@ -47,15 +52,19 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Store (Size (VarSize), Store (..))
+import Data.Store.Internal (getSize)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
+import GHC.Generics (Generic)
 import Numeric
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
+import SolidVM.Model.Storable (StoreList (..), StoreMap (..), StoreVector (..))
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 
@@ -116,7 +125,33 @@ data Value
   | SContinue
   | SBytes ByteString
   | SVariadic [Value]
-  deriving (Show)
+  deriving (Show, Generic)
+
+-- See the note on the Store instances in SolidVM.Model.Storable.
+instance Store Value
+
+deriving via (StoreList Value) instance {-# OVERLAPPING #-} Store [Value]
+
+deriving via (StoreVector Variable) instance {-# OVERLAPPING #-} Store (Vector Variable)
+
+deriving via (StoreMap SolidString Variable) instance {-# OVERLAPPING #-} Store (Map SolidString Variable)
+
+deriving via (StoreMap Value Variable) instance {-# OVERLAPPING #-} Store (Map Value Variable)
+
+-- IORef-backed variables are stored as snapshots, as in the Binary and JSON instances:
+-- 'Constant' is its value, 'Variable' is SNULL; reading back gives a 'Constant'.
+instance Store Variable where
+  size = VarSize (getSize . snapshotVariable)
+  poke = poke . snapshotVariable
+  peek = Constant <$> peek
+
+snapshotVariable :: Variable -> Value
+snapshotVariable (Constant c) = c
+snapshotVariable (Variable _) = SNULL
+
+deriving instance Generic (DecimalRaw i)
+
+instance Store i => Store (DecimalRaw i)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
 --This only allows for comparison within the same type of values
