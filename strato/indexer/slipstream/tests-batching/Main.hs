@@ -1,16 +1,21 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+import BlockApps.Logging (runNoLoggingT)
+import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Slipstream.MessageConsumer (sinkSlipstreamOutputChunks, slipstreamOutputChunkSize)
 import Blockchain.Slipstream.SQL
 import Blockchain.Slipstream.SolidityValue
+import Blockchain.Strato.Model.Keccak256 (unsafeCreateKeccak256FromWord256)
 import qualified BlockApps.Solidity.Value as V
 import Conduit
 import qualified Data.ByteString as B
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
+import Data.Time (UTCTime (..), fromGregorian)
 import Test.Hspec
 
 main :: IO ()
@@ -89,6 +94,20 @@ main = hspec $ do
           T.isInfixOf "OLD.block_hash = NEW.block_hash" (slipstreamQueryPostgres storageHistoryQuery)
             `shouldBe` False
         [] -> expectationFailure "initialSlipstreamQueries is empty"
+
+    it "lets only a newer block overwrite storage and mapping rows" $ do
+      let ts = UTCTime (fromGregorian 2026 10 1) 0
+          bh = unsafeCreateKeccak256FromWord256 1
+          contract = E.ProcessedContract 0xabc bh ts 7 Map.empty
+          row = ProcessedCollectionRow 0xabc Nothing "_balances" "Mapping" bh bh ts 7
+            [V.SimpleValue $ V.ValueString "u"] "_balances[u]" (V.SimpleValue $ V.ValueString "5")
+      queries <- runNoLoggingT . runConduit $
+        (insertIndexTable contract >> insertCollectionTable [row]) .| sinkList
+      map slipstreamQueryPostgres queries `shouldSatisfy` \case
+        [storageUpsert, mappingUpsert] ->
+          " WHERE excluded.block_number::numeric > \"storage\".block_number::numeric;" `T.isSuffixOf` storageUpsert
+            && " WHERE excluded.block_number::numeric > \"mapping\".block_number::numeric;" `T.isSuffixOf` mappingUpsert
+        _ -> False
 
 insertRowCount :: SlipstreamQuery -> Int
 insertRowCount InsertTable {values = rows} = length rows
