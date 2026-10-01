@@ -281,8 +281,7 @@ local wallet_auth_route_prefixes = {
     "/api/swap-pools/",
     "/api/tokens/",
     "/api/trade/",
-    "/api/user/admin/",
-    "/api/vault/"
+    "/api/user/admin/"
 }
 
 -- STRATO node endpoints used by self-custody (external wallet) signing flows,
