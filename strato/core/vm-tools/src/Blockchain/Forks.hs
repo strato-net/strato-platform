@@ -19,6 +19,7 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
+    isFeeConsensusDeltaForkActive,
     isOperatorPrecedenceForkActive,
     forkNotScheduled
   )
@@ -83,6 +84,33 @@ isBlockRewardReceiptForkActive blockNum =
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
    in blockNum >= switchAt
+
+-- | Block from which validator-set and stake changes published while paying a
+-- transaction's fee, or by the block-reward call, reach the block header.
+--
+-- The fee payment runs as its own call ahead of the transaction, and only its
+-- events, logs and action were folded into the transaction's results. Its
+-- ValidatorAdded / ValidatorRemoved / ValidatorStakeUpdated deltas were dropped,
+-- so governance changed while the header, and with it the consensus layer,
+-- never heard of it. The block-reward call's results were folded into the
+-- block's first transaction the same way.
+--
+-- Proposer and verifier both derive the header's deltas from those results, so
+-- they have to start carrying these calls' at the same block. Helium has
+-- blocks sealed without them and needs a height of its own; upquark switches
+-- with staking, the flag day it already has.
+heliumFeeConsensusDeltaForkBlock :: Integer
+heliumFeeConsensusDeltaForkBlock = 1000000
+
+forktestFeeConsensusDeltaForkBlock :: Integer
+forktestFeeConsensusDeltaForkBlock = forkNotScheduled
+
+isFeeConsensusDeltaForkActive :: Integer -> Bool
+isFeeConsensusDeltaForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumFeeConsensusDeltaForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestFeeConsensusDeltaForkBlock)
 
 -- | Sentinel height for a fork that a live network has not scheduled yet: the
 -- old behaviour holds for every block a node will actually see. Replace it with
