@@ -105,3 +105,96 @@ test("Cirrus policy overview is admin-only and never reports failed reads as an 
   const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === "/admin/policies")?.route;
   assert.ok(route && route.stack.length > 1);
 });
+
+
+test("bridge admin routes bind identity to OAuth, never the wallet header", async t => {
+  const auth = await import("../../utils/authHelper");
+  const { requestContext } = await import("../../utils/requestContext");
+  const admin = "a".repeat(40), user = "b".repeat(40);
+  let principal = user, calls = 0;
+  t.mock.method(auth, "getServiceToken", async () => { throw new Error("Admin routes must not use service identity"); });
+  t.mock.method(auth, "verifyAccessTokenSignature", async (token: string) => {
+    if (token === "invalid") throw new Error("invalid token");
+    return { preferred_username: "test" };
+  });
+  t.mock.method(auth, "createOrGetKey", async () => ({ address: principal, isNew: false }));
+  t.mock.method(userService, "isUserAdmin", async (_token: string, address: string) => {
+    assert.equal(address, principal);
+    assert.equal(requestContext.getStore()?.externalSigning, undefined);
+    return address === admin;
+  });
+  t.mock.method(reviewService, "getAdminBridgePolicies", async () => { calls++; return [] as any; });
+  t.mock.method(reviewService, "getAdminBridgeReviews", async () => { calls++; return [] as any; });
+  t.mock.method(reviewService, "prepareAdminBridgeReview", async () => { calls++; return {} as any; });
+  for (const path of ["/admin/policies", "/admin/reviews", "/admin/reviews/prepare"]) {
+    const route = bridgeRouter.stack.find((layer: any) => layer.route?.path === path)!.route!;
+    const middleware = route.stack[0].handle, controller = route.stack[1].handle;
+    for (const scenario of ["anonymous", "invalid", "nonadmin", "admin"]) {
+      principal = scenario === "admin" ? admin : user;
+      let status = 200, entered = false;
+      const req: any = { method: path.endsWith("prepare") ? "POST" : "GET",
+        headers: { "x-wallet-address": "0x" + (scenario === "admin" ? user : admin),
+          ...(scenario === "anonymous" ? {} : { authorization: "Bearer " + (scenario === "invalid" ? "invalid" : "valid") }) },
+        body: { id: "eab:withdrawal:1", action: "refund" } };
+      const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
+      const before = calls;
+      await middleware(req, res, (error?: any) => { if (!error) entered = true; });
+      if (entered) await controller(req, res, (error?: any) => { if (error) throw error; });
+      assert.equal(status, scenario === "admin" ? 200 : scenario === "nonadmin" ? 403 : 401);
+      assert.equal(calls - before, scenario === "admin" ? 1 : 0);
+    }
+  }
+});
+
+test("ordinary wallet transaction preparation retains external signing context", async t => {
+  const auth = await import("../../utils/authHelper");
+  const { requestContext } = await import("../../utils/requestContext");
+  const { default: AuthHandler } = await import("../middleware/authHandler");
+  t.mock.method(auth, "getServiceToken", async () => "service");
+  t.mock.method(auth, "verifyAccessTokenSignature", async () => ({ preferred_username: "service" }));
+  const address = "a".repeat(40);
+  const req: any = { method: "POST", headers: { "x-wallet-address": "0x" + address } };
+  let entered = false;
+  await AuthHandler.authorizeRequest({ allowWalletAuth: true })(req, {} as any, (error?: any) => {
+    if (error) throw error;
+    entered = true;
+    assert.equal(req.address, address);
+    assert.equal(requestContext.getStore()?.externalSigning, true);
+  });
+  assert.equal(entered, true);
+});
+
+test("personal bridge history requires verified identity and ignores supplied account filters", async t => {
+  const auth = await import("../../utils/authHelper");
+  const account = "a".repeat(40), other = "b".repeat(40);
+  t.mock.method(auth, "getServiceToken", async () => { throw new Error("History must not use anonymous service identity"); });
+  t.mock.method(auth, "verifyAccessTokenSignature", async () => ({ preferred_username: "user" }));
+  t.mock.method(auth, "createOrGetKey", async () => ({ address: account, isNew: false }));
+  t.mock.method(userService, "isUserAdmin", async () => false);
+  const reads = t.mock.method(service, "getBridgeTransactions", async (_token: string, _type: any, address: any) => {
+    assert.equal(address, account);
+    return { data: [], totalCount: 0 };
+  });
+  for (const [router, path] of [[tradeRouter, "/bridge/transactions/:type"], [bridgeRouter, "/transactions/:type"]] as const) {
+    const route = router.stack.find((layer: any) => layer.route?.path === path)!.route!;
+    for (const authenticated of [false, true]) {
+      let status = 200, entered = false;
+      const req: any = { method: "GET", headers: { "x-wallet-address": other,
+        ...(authenticated ? { authorization: "Bearer valid" } : {}) }, params: { type: "deposit" }, query: { context: "admin" } };
+      const res: any = { set: () => res, status: (n: number) => { status = n; return res; }, json: () => res };
+      const before = reads.mock.callCount();
+      await route.stack[0].handle(req, res, (error?: any) => { if (error) throw error; entered = true; });
+      if (entered) await route.stack[1].handle(req, res, (error?: any) => { if (error) throw error; });
+      assert.equal(status, authenticated ? 200 : 401);
+      assert.equal(reads.mock.callCount() - before, authenticated ? 1 : 0);
+    }
+  }
+  for (const controller of [BridgeController, TradeBridgeController]) {
+    let status = 200;
+    const res: any = { status: (n: number) => { status = n; return res; }, json: () => res };
+    const before = reads.mock.callCount();
+    await controller.getTransactions({ accessToken: "service", params: { type: "deposit" }, query: {} } as any, res, error => { if (error) throw error; });
+    assert.equal(status, 401);
+    assert.equal(reads.mock.callCount(), before);
+  }
+});

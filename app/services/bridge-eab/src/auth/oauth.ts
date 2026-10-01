@@ -1,6 +1,5 @@
-import axios from "axios";
 import simpleOauth2 from "simple-oauth2";
-import { fetch } from "../utils/api";
+import { readOAuthDiscovery } from "./discovery";
 
 interface OAuthConfig {
   clientId: string;
@@ -48,7 +47,7 @@ class OAuthUtil {
       const oauth = new OAuthUtil(config);
 
       // Fetch OpenID configuration
-      const openIdConfig = await fetch.get(oauth.openIdDiscoveryUrl);
+      const openIdConfig = await readOAuthDiscovery(oauth.openIdDiscoveryUrl);
       oauth.tokenEndpoint = openIdConfig.token_endpoint;
 
       // Initialize OAuth2 client
@@ -57,9 +56,10 @@ class OAuthUtil {
           id: oauth.clientId,
           secret: oauth.clientSecret,
         },
+        http: { redirects: 0 },
         auth: {
           tokenHost: new URL(oauth.tokenEndpoint).origin,
-          tokenPath: new URL(oauth.tokenEndpoint).pathname,
+          tokenPath: new URL(oauth.tokenEndpoint).pathname + new URL(oauth.tokenEndpoint).search,
         },
       };
 
@@ -99,9 +99,9 @@ class OAuthUtil {
           statusText: error?.response?.statusText,
           contentType: error?.response?.headers?.["content-type"],
           responseDataType: typeof error?.response?.data,
-          responseDataPreview: error?.response?.data ? 
-            (typeof error?.response?.data === 'string' ? 
-              error.response.data.substring(0, 300) : 
+          responseDataPreview: error?.response?.data ?
+            (typeof error?.response?.data === 'string' ?
+              error.response.data.substring(0, 300) :
               JSON.stringify(error.response.data).substring(0, 300)
             ) : 'No response data'
         });
@@ -131,12 +131,12 @@ class OAuthUtil {
         responseDataFull: error?.response?.data,
         stackTrace: error?.stack
       });
-      
+
       // Check if it's an axios error with response data
       if (error.response?.data) {
         const contentType = error.response.headers["content-type"] || "";
         console.error(`[OAuth Debug] Processing HTTP response error - Content-Type: ${contentType}`);
-        
+
         if (!contentType.includes("application/json")) {
           console.error(`[OAuth Debug] Non-JSON response detected!`);
           throw new Error(

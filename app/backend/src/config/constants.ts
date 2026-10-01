@@ -12,7 +12,6 @@ export const MAX_UINT256 = (1n << 256n) - 1n;
 export const ANONYMOUS_QUOTE_TTL_MS = 1_000;
 export const ANONYMOUS_QUOTE_CACHE_SIZE = 128;
 export const ROUTE_TOPOLOGY_TTL_MS = 5_000;
-export const ROUTE_CANDIDATES_PER_HOP = 12;
 export const ROUTE_QUOTE_CONCURRENCY = 4;
 export const BRIDGE_REVIEW_PAGE_SIZE = 200;
 export const BRIDGE_REVIEW_ID_BATCH_SIZE = 20;
@@ -236,3 +235,6 @@ export const constants = (() => {
     voucher,
   };
 })();
+
+export const EVENT_ENRICHMENT_HASH_BATCH_SIZE = 20;
+export const EVENT_ENRICHMENT_PAGE_SIZE = 200;

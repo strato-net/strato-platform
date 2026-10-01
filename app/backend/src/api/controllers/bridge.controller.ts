@@ -168,6 +168,10 @@ const createBridgeController = (protocol: BridgeProtocol) => class BridgeControl
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress } = req;
+      if (!userAddress || !/^(0x)?[a-f0-9]{40}$/i.test(userAddress)) {
+        res.status(401).json({ error: "Authenticated account required" });
+        return;
+      }
       const { type } = req.params;
       const rawQueryParams = validateRawParams(req.query);
       

@@ -27,7 +27,7 @@ const processingContent = (code: keyof typeof PROCESSING_EMAIL_CONTENT) => PROCE
 const detailLines = (details: Record<string, string>) => Object.entries(details).map(([key, value]) =>
   `${key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, c => c.toUpperCase())}: ${value}`);
 
-export const sendBridgeReviewEmail = async (item: BridgeReviewItem, resolved = false): Promise<void> => {
+export const sendBridgeReviewEmail = async (item: BridgeReviewItem): Promise<void> => {
   const recipients = config.email.approverEmails;
   if (!recipients.length) throw new Error("TRANSACTION_APPROVER_EMAILS is required for bridge review notifications");
   const asset = (await tokenMetadata([item.token])).get(tokenKey(item.token));
@@ -37,20 +37,14 @@ export const sendBridgeReviewEmail = async (item: BridgeReviewItem, resolved = f
     : item.kind === "withdrawal_review" || (item.recoveryStatus === "refund_pending" && item.safeProposalHash) ? "Review in Safe. Inspect and vote on the proposal shown below."
     : item.kind === "withdrawal_refund" ? "Open Admin > Bridge to review and vote on this refund."
     : "Open Admin > Bridge and review the deposit evidence.";
-  if (resolved && !item.outcome && item.approvalStatus !== "approved") throw new Error("Review resolution requires a confirmed outcome");
-  const explanation = resolved
-    ? item.approvalStatus === "approved" ? "Governance approval is recorded. The bridge will retry settlement automatically."
-      : item.outcome === "refunded" ? "The bridge records that the funds were returned to the sender."
-        : "The bridge records that delivery completed."
-    : item.kind === "withdrawal_refund" ? "The withdrawal authorization expired. The required verifier attestations for a refund are now indexed."
-      : item.reason;
+  const explanation = item.kind === "withdrawal_refund"
+    ? "The withdrawal authorization expired. The required verifier attestations for a refund are now indexed."
+    : item.reason;
   await retry(() => sgMail.send({
     to: recipients, from: "info@blockapps.net",
-    subject: `Bridge: ${resolved ? item.approvalStatus === "approved" ? "Approval recorded; settlement pending" : item.outcome === "refunded" ? "Refund confirmed" : "Transfer completed" : "Action required"} — ${title.toLowerCase()} #${item.reference} (${item.source.toUpperCase()})`,
+    subject: `Bridge: Action required — ${title.toLowerCase()} #${item.reference} (${item.source.toUpperCase()})`,
     text: [`${title} #${item.reference}`, "", "What happened", explanation, "",
-      resolved ? "Next step" : "Action required",
-      resolved ? item.approvalStatus === "approved" ? "No further approval is needed. This is not confirmation that funds were transferred."
-        : "No further recovery action is needed for this transfer." : action,
+      "Action required", action,
       "", "Transfer", `Bridge: ${item.source.toUpperCase()}`, `Network: ${networkLabel(item.chainId)}`,
       `Asset: ${asset?.symbol || "Token metadata unavailable"}`, `Amount: ${amount}`,
       "", "Reference details", `Reference: ${item.id}`, `Account: ${item.account}`, `Token address: ${item.token}`,
@@ -69,18 +63,27 @@ export const sendProcessingIssueEmail = async (
   const record = records[0];
   const displayed = records.slice(0, 20);
   const tokens = await tokenMetadata(displayed.flatMap(r => r.context.token ? [r.context.token] : []));
-  const titles = [...new Set(records.flatMap(r => r.issues.map(i => processingContent(i.code).title)))];
-  const event = resolved ? "Previously reported issue resolved" : "Action required";
+  const contents = [...new Set(records.flatMap(r => r.issues.map(i => i.code)))].map(processingContent);
+  const titles = [...new Set(contents.map(content => content.title))];
+  const event = resolved ? "Previously reported issue resolved" : "Operations check needed";
   await sgMail.send({
     to: config.email.approverEmails, from: "info@blockapps.net",
     subject: `Bridge: ${event} — ${resolved ? `reference ${record.context.reference}` : titles.length === 1 ? titles[0] : "multiple processing issues"} (${record.context.source.toUpperCase()}, chain ${record.context.chainId})`,
-    text: [event, "", resolved ? "Original issue" : "What happened", ...titles,
-      "", resolved ? "What this means" : "Action required",
+    text: [event, "", resolved ? "Original issue" : "What we observed",
+      ...(resolved ? titles : contents.map(content => content.observation || content.title)),
+      ...(resolved ? [] : ["", "Who acts next", "Platform operations team.", "", "Next steps"]),
+      ...(resolved ? ["", "What this means"] : []),
       ...(resolved ? ["The previously reported blocker is no longer active. No further action is needed for that blocker.",
         "Processing may still be in progress or require a separate governance review. Check transaction history for the final outcome."]
-        : [...new Set(records.flatMap(r => r.issues.map(i => processingContent(i.code).action)))]),
+        : contents.map(content => content.action)),
+      ...(resolved ? [] : ["", "Automatic processing", "The bridge continues scheduled retries. The user should not resubmit the transfer.",
+        "This email requests an operations check, not an admin vote. For transaction approval or refund votes, follow the separate governance review notification."]),
       "", "Affected transfers", `Operations: ${records.length}`, `Network: ${networkLabel(record.context.chainId)}`,
-      ...displayed.map(r => `${r.context.stage.startsWith("deposit") ? "Deposit" : "Withdrawal"} #${r.context.reference.split(":").at(-1)} — ${tokens.get(tokenKey(r.context.token || ""))?.symbol || "token metadata unavailable"}`),
+      ...displayed.flatMap(r => [
+        `${r.context.stage.startsWith("deposit") ? "Deposit" : "Withdrawal"} #${r.context.reference.split(":").at(-1)} — ${tokens.get(tokenKey(r.context.token || ""))?.symbol || "token metadata unavailable"}`,
+        ...r.issues.filter(i => i.code === "INDEXING_PENDING" && /^\d+$/.test(i.details.available || "") && /^\d+$/.test(i.details.required || ""))
+          .map(i => `${resolved ? "Previously observed" : "Verifier confirmations visible in Cirrus"}: ${i.details.available} of ${i.details.required}`),
+      ]),
       ...(records.length > displayed.length ? [`${records.length - displayed.length} additional operations are recorded in the service journal.`] : []),
       "", "Technical details", `First reported: ${new Date(record.firstSeenAt).toISOString()}`,
       ...displayed.flatMap(r => [`Reference: ${r.context.reference}`, `Stage: ${r.context.stage.replace(/-/g, " ")}`,

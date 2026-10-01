@@ -852,12 +852,12 @@ export const getCompletedProcessingContexts = async (contexts: ProcessingContext
     const first = group[0], isDeposit = first.stage.startsWith("deposit");
     const contract = first.source === "eab" ? EXTERNAL_ASSET_BRIDGE_URL : NATIVE_BRIDGE_URL;
     const statusField = first.source === "eab" ? "status" : "bridgeStatus";
-    const terminal = first.source === "eab" ? ["4", "6", "7"] : ["3", "4", "5"];
+    const terminal = first.source === "eab" ? ["4", "6", "7"] : isDeposit ? ["3", "4", "8"] : ["3", "4", "5"];
     for (let offset = 0; offset < group.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
       const batch = group.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE);
       const filters = batch.flatMap(c => {
         if (isDeposit && c.source === "eab") {
-          const [router, id] = c.reference.split(":");
+          const [router, id] = (c.reference.startsWith(`${c.chainId}:`) ? c.reference.slice(c.chainId.length + 1) : c.reference).split(":");
           return /^[a-f0-9]{40}$/i.test(router) && /^\d+$/.test(id) ? [`and(key.eq.${c.chainId},key2.eq.${router},key3.eq.${id})`] : [];
         }
         return /^(0x)?[a-f0-9]+$/i.test(c.reference) ? [`key.eq.${c.reference}`] : [];
@@ -870,9 +870,22 @@ export const getCompletedProcessingContexts = async (contexts: ProcessingContext
       } });
       for (const c of batch) {
         if (rows.some(row => terminal.includes(String(row.value?.[statusField])) &&
-          (isDeposit && c.source === "eab" ? `${toCirrusAddress(row.key2)}:${row.key3}` === c.reference && String(row.key) === c.chainId : String(row.key) === c.reference))) completed.push(c);
+          (isDeposit && c.source === "eab" ? `${toCirrusAddress(row.key2)}:${row.key3}` === (c.reference.startsWith(`${c.chainId}:`) ? c.reference.slice(c.chainId.length + 1) : c.reference) && String(row.key) === c.chainId : String(row.key) === c.reference))) completed.push(c);
       }
     }
   }
   return completed;
+};
+
+
+export const getRecordedNativeRedemptions = async (chainId: number, bridge: string, ids: string[]): Promise<NativeDepositInfo[]> => {
+  const rows: Array<{ value: NativeDepositInfo }> = [];
+  for (let offset = 0; offset < ids.length; offset += CIRRUS_FILTER_BATCH_SIZE) {
+    rows.push(...await getPaginatedRows(`/${NATIVE_BRIDGE_URL}-deposits`, { params: {
+      address: `eq.${toCirrusAddress(nativeBridgeAddress)}`, select: "value", order: "key.asc",
+      "value->>externalChainId": `eq.${chainId}`, "value->>externalBridge": `eq.${toCirrusAddress(bridge)}`,
+      "value->>externalRedemptionId": `in.(${ids.slice(offset, offset + CIRRUS_FILTER_BATCH_SIZE).join(",")})`,
+    } }));
+  }
+  return rows.map(row => row.value);
 };

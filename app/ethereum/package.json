@@ -19,7 +19,7 @@
     "deployExternalBridge:base": "HARDHAT_NETWORK=base node scripts/deployExternalBridge.js",
     "deployExternalBridge:linea": "HARDHAT_NETWORK=linea node scripts/deployExternalBridge.js",
     "deployExternalBridge": "node scripts/deployExternalBridge.js",
-    "external:deploy:test": "node --test test/ExternalBridgeDeploymentConfig.test.js",
+    "external:deploy:test": "node --test test/ExternalBridgeDeploymentConfig.test.js test/DeploymentCheckpoint.test.js",
     "router:ops": "node scripts/depositRouterOps.js",
     "router:ops:testnet": "node scripts/depositRouterOps.js --env testnet",
     "router:ops:prod": "node scripts/depositRouterOps.js --env prod",

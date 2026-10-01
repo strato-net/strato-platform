@@ -35,7 +35,6 @@ const {
   StratoNativeCustodyVault,
   SaveUSDSTVault,
   Token,
-  DECIMALS,
   USDST,
 } = constants;
 
@@ -748,12 +747,30 @@ export const getWithdrawalSummary = async (
       : Promise.resolve({ data: [] })
   ]);
 
+  const tokenDecimals = new Map(routes.map(route => [normalizeAddress(route.stratoToken), route.stratoTokenDecimals ?? 18]));
+  const withdrawals = [...(pending.data || []), ...(legacyPending.data || []), ...(nativePending.data || []),
+    ...(completed.data || []), ...(legacyCompleted.data || []), ...(nativeCompleted.data || [])];
+  const missingTokens = [...new Set<string>(withdrawals.map(row => normalizeAddress(row.stratoToken))
+    .filter(address => address && !tokenDecimals.has(address)))];
+  const historicalMetadata = await getTokenMetadata(accessToken, missingTokens);
+  for (const address of missingTokens) {
+    const metadata = historicalMetadata.get(address) as { decimals?: number } | undefined;
+    if (!metadata) throw new Error(`Withdrawal token metadata unavailable: ${address}`);
+    tokenDecimals.set(address, metadata.decimals ?? 18);
+  }
+  const tokenScales = new Map<string, bigint>();
+  for (const [address, decimals] of tokenDecimals) {
+    const value = Number(decimals);
+    if (!Number.isInteger(value) || value < 0 || value > 77) throw new Error(`Invalid token decimals: ${address}`);
+    tokenScales.set(address, 10n ** BigInt(value));
+  }
+
   let availableUSD = 0n;
   for (const b of [...(balances.data || []), ...(saveUsdstBalances.data || [])]) {
     const balance = BigInt(b.balance || "0");
     const price = BigInt(prices.get(b.address) || "0");
     if (balance > 0n && price > 0n) {
-      availableUSD += (balance * price) / DECIMALS;
+      availableUSD += (balance * price) / tokenScales.get(normalizeAddress(b.address))!;
     }
   }
 
@@ -767,7 +784,7 @@ export const getWithdrawalSummary = async (
     const amount = BigInt(p.stratoTokenAmount || "0");
     const price = BigInt(prices.get(p.stratoToken) || "0");
     if (amount > 0n && price > 0n) {
-      pendingUSD += (amount * price) / DECIMALS;
+      pendingUSD += (amount * price) / tokenScales.get(normalizeAddress(p.stratoToken))!;
     }
   }
 
@@ -781,7 +798,7 @@ export const getWithdrawalSummary = async (
     const amount = BigInt(w.stratoTokenAmount || "0");
     const price = BigInt(prices.get(w.stratoToken) || "0");
     if (amount > 0n && price > 0n) {
-      withdrawnUSD += (amount * price) / DECIMALS;
+      withdrawnUSD += (amount * price) / tokenScales.get(normalizeAddress(w.stratoToken))!;
     }
   }
   

@@ -117,7 +117,10 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   await assert.rejects(recoverNativeDepositRefund(d), /Invalid native refund proposal journal/);
   await writeFile(journal, saved);
   refunded = true;
-  await assert.rejects(recoverNativeDepositRefund(d), (e: any) => e.issues?.[0]?.code === "CONFIRMATIONS_PENDING");
+  await assert.rejects(recoverNativeDepositRefund(d), (e: any) => e.issues?.[0]?.code === "CONFIRMATIONS_PENDING" && e.issues[0].details.observedConfirmations === String(head - 100));
+  receipt.__rpcDisagreement = true;
+  await assert.rejects(recoverNativeDepositRefund(d), (e: any) => e.issues?.[0]?.code === "DEPENDENCY_UNAVAILABLE");
+  delete receipt.__rpcDisagreement;
   assert.equal(evidenceRecords, 0);
   head = 112; receipt = { ...receipt, logs: [] };
   await assert.rejects(recoverNativeDepositRefund(d), /does not match/);

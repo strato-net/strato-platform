@@ -7,7 +7,7 @@ import {
   TransactionResponse,
   TradeQuote,
 } from "@strato/shared-types";
-import { constants, ROUTE_TOPOLOGY_TTL_MS, ROUTE_OUTPUT_TOLERANCE_BPS, ROUTE_CANDIDATES_PER_HOP, ROUTE_QUOTE_CONCURRENCY, MAX_UINT256 } from "../../config/constants";
+import { constants, ROUTE_TOPOLOGY_TTL_MS, ROUTE_OUTPUT_TOLERANCE_BPS, ROUTE_QUOTE_CONCURRENCY, MAX_UINT256 } from "../../config/constants";
 import * as config from "../../config/config";
 import { FunctionInput, RouteEdge, RouteQuoteRejection, RouteStepCandidate, RouteTopologyCache, StratoRouteStep } from "../../types/types";
 import { cirrus } from "../../utils/appApiHelper";
@@ -475,18 +475,13 @@ export const findRoutePaths = (
     visited: Set<string>;
   }> = [{ token: start, path: [], visited: new Set([start]) }];
   const routes: RouteEdge[][] = [];
-  const countsByHop = new Map<number, number>();
   for (let head = 0; head < queue.length; head++) {
     const current = queue[head];
     for (const edge of adjacency.get(current.token) || []) {
       if (current.visited.has(edge.tokenOut)) continue;
       const path = [...current.path, edge];
       if (edge.tokenOut === destination) {
-        const count = countsByHop.get(path.length) || 0;
-        if (count < ROUTE_CANDIDATES_PER_HOP) {
-          routes.push(path);
-          countsByHop.set(path.length, count + 1);
-        }
+        routes.push(path);
       } else if (path.length < MAX_ROUTE_STEPS && queue.length < MAX_SEARCH_STATES) {
         queue.push({
           token: edge.tokenOut,

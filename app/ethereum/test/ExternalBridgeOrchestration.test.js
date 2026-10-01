@@ -320,10 +320,14 @@ test("operator guidance identifies first and second administrator vote state", (
   writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`),
     { "call-id": { status: "VOTED" } });
   guidance = operatorGuidance(report, args, artifacts);
+  assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED", "historical journals cannot override current lifecycle counts");
+  report.calls[0].recordedAdminVotes = 1;
+  guidance = operatorGuidance(report, args, artifacts);
   assert.equal(guidance.voteState, "WAITING_ON_SECOND_ADMIN");
   assert.match(guidance.action, /waiting on the second administrator/);
   writeJson(path.join(directory, `votes-${"2".repeat(40)}.json`),
     { "call-id": { status: "VOTED" } });
+  report.calls[0].recordedAdminVotes = 2;
   guidance = operatorGuidance(report, args, artifacts);
   assert.equal(guidance.voteState, "WAITING_FOR_EXECUTION");
   assert.equal(guidance.voteCommand, undefined);
@@ -485,62 +489,37 @@ test("live AdminRegistry policy determines required vote count", async () => {
   assert.equal(requiredAdminVotes(policy, { args: { _target: addr("2"), _func: "setRoute" } }), 3);
 });
 
-test("live AdminRegistry events include votes cast outside this rollout directory", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-live-votes-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const directory = path.join(root, "revision");
-  fs.mkdirSync(directory);
-  const issueId = "a".repeat(64);
-  const transactionHash = "b".repeat(64);
-  writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`), {
-    "call-id": { status: "VOTED", hashes: [transactionHash] },
-  });
-  const counts = await fetchLiveAdminVoteCounts(
-    { adminRegistry: addr("9") }, "https://node.example", "token",
-    [{ id: "call-id" }], { directory },
-    async (url) => ({ ok: true, json: async () => url.includes("transaction_hash")
-      ? [{ issueId, transaction_hash: transactionHash }]
-      : [
-        { issueId, voter: addr("1") },
-        { issueId, voter: addr("2") },
-      ] }),
-  );
-  assert.equal(counts.get("call-id"), 2);
-});
-
-test("coordinator status counts live votes without a local journal", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-live-votes-remote-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const issueId = "c".repeat(64);
-  const target = addr("2");
-  const stratoToken = addr("3");
-  const calls = [{
-    id: "call-id",
-    call: { args: { _target: target, _func: "setRoute", _args: [
-      { type: "address", value: stratoToken },
-      { type: "bool", value: true },
-    ] } },
-  }];
-  const counts = await fetchLiveAdminVoteCounts(
-    { adminRegistry: addr("9") }, "https://node.example", "token",
-    calls, { directory: path.join(root, "revision") },
-    async (url) => ({ ok: true, json: async () => {
-      if (url.includes("IssueCreated")) {
-        return [{
-          issueId, target: target.slice(2), func: "setRoute",
-          args: [stratoToken, true],
-        }];
-      }
-      if (url.includes("issueId=")) {
-        return [
-          { issueId, voter: addr("1") },
-          { issueId, voter: addr("4") },
-        ];
-      }
-      return [];
-    } }),
-  );
-  assert.equal(counts.get("call-id"), 2);
+test("live governance uses the latest active lifecycle and current voters", async t => {
+  const issueId = "a".repeat(64), target = addr("2"), token = addr("3");
+  const calls = [{ id: "call-id", call: { args: { _target: target, _func: "setRoute", _args: [{ value: token }, { value: true }] } } }];
+  const creation = block => ({ issueId, target, func: "setRoute", args: [token, true], block_number: String(block), event_index: 0 });
+  let active = true, invalidVoter = false, staleLifecycle = false, missingCreation = false;
+  const fetchImpl = async url => {
+    const parsed = new URL(url), params = parsed.searchParams;
+    const offset = Number(params.get("offset"));
+    let rows;
+    if (parsed.pathname.endsWith("-currentIssues")) rows = active ? [{ key: issueId, value: true }] : [];
+    else if (parsed.pathname.endsWith("-admins")) rows = [1, 4].map(value => ({ value: addr(String(value)) }));
+    else if (parsed.pathname.endsWith("-IssueCreated")) {
+      assert.equal(params.get("order"), "block_number.desc,event_index.desc");
+      rows = missingCreation ? [] : [creation(1), creation(3)];
+    } else if (parsed.pathname.endsWith("-IssueExecuted")) rows = [{ issueId, block_number: staleLifecycle ? "4" : "2", event_index: 1 }];
+    else if (parsed.pathname.endsWith("-votes")) rows = [{ key: issueId, key2: "0", value: addr(invalidVoter ? "9" : "4") }];
+    else throw new Error(`Unexpected query: ${url}`);
+    return { ok: true, json: async () => rows.slice(offset, offset + 1) };
+  };
+  const read = () => fetchLiveAdminVoteCounts({ adminRegistry: addr("9") }, "https://node.example", "token", calls, {}, fetchImpl);
+  assert.equal((await read()).get("call-id"), 1);
+  assert.deepEqual(calls[0].governanceVoters, [addr("4").slice(2)]);
+  invalidVoter = true;
+  await assert.rejects(read(), /stale voter/);
+  invalidVoter = false; staleLifecycle = true;
+  await assert.rejects(read(), /lifecycle is inconsistent/);
+  staleLifecycle = false; missingCreation = true;
+  await assert.rejects(read(), /lifecycle is inconsistent/);
+  missingCreation = false; active = false;
+  assert.equal((await read()).get("call-id"), 0);
+  assert.deepEqual(calls[0].governanceVoters, []);
 });
 
 test("unavailable live vote counts do not produce first-admin vote guidance", () => {
@@ -636,6 +615,7 @@ test("receipt-backed retry waits for quorum after a crash rather than submitting
     submit: async (_token, _call, onSubmitted) => { await onSubmitted(["0xreceipt"]); throw new Error("response lost"); },
   };
   await assert.rejects(vote(f.context, f.artifacts, inspection, "reviewed", options), /response lost/);
+  calls[0].governanceVoters = [addr("8").slice(2)];
   let sent = false;
   const recovered = await vote(f.context, f.artifacts, inspection, "reviewed", {
     ...options, submit: async () => { sent = true; }, receipts: async () => [{ status: "Success", hash: "0xreceipt" }],

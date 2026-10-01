@@ -1,3 +1,4 @@
+import { withSafeProposalQueue } from "./safeProposalService";
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -27,7 +28,6 @@ import {
 import { PersistedWithdrawalReview, WithdrawalInfo, ProcessingIssue } from "../types";
 import { ensureHexPrefix, safeChecksum } from "../utils/utils";
 import { fetch as http, retry } from "../utils/api";
-import { initializeSafeForChain } from "../utils/safeHelper";
 import { DigestKmsSigner } from "../utils/kmsSigner";
 import { logError } from "../utils/logger";
 
@@ -187,10 +187,7 @@ const createWithdrawalReviewProposal = async (
   const reviewDigest = getWithdrawalReviewDigest(review);
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeProposerAddress || "";
-  const { protocolKit, apiKit } = await initializeSafeForChain(
-    chainId,
-    safeAddress,
-  );
+  return withSafeProposalQueue(chainId, `review:${reviewDigest}`, async ({ protocolKit, apiKit }) => {
   const journalPath = path.join(process.cwd(), "data", "safe-reviews", `${chainId}-${safeAddress.toLowerCase()}-${reviewDigest}.json`);
   let saved: PersistedWithdrawalReview | undefined;
   try {
@@ -269,21 +266,16 @@ const createWithdrawalReviewProposal = async (
     approvalDeadline: approvalDeadline.toString(),
     proposalHash,
   };
+  });
 };
-
-const safeReviewQueues = new Map<string, Promise<unknown>>();
 
 export const proposeWithdrawalReview = (review: WithdrawalReview) => {
   const key = `${config.safe.address}:${getWithdrawalReviewDigest(review)}`;
   const existing = pendingReviewProposals.get(key);
   if (existing) return existing;
-  const safeKey = `${review.destinationChainId}:${(config.safe.address || "").toLowerCase()}`;
-  const previous = safeReviewQueues.get(safeKey) || Promise.resolve();
-  const pending = previous.catch(() => undefined).then(() => createWithdrawalReviewProposal(review)).finally(() => {
+  const pending = createWithdrawalReviewProposal(review).finally(() => {
     pendingReviewProposals.delete(key);
-    if (safeReviewQueues.get(safeKey) === pending) safeReviewQueues.delete(safeKey);
   });
-  safeReviewQueues.set(safeKey, pending);
   pendingReviewProposals.set(key, pending);
   return pending;
 };

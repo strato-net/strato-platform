@@ -3,11 +3,12 @@ import authHandler from "../middleware/authHandler";
 import BridgeController from "../controllers/bridge.controller";
 
 const router = Router();
+const adminAuth = authHandler.authorizeRequest({ requireAuthenticatedIdentity: true });
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
-router.get("/admin/policies", authHandler.authorizeRequest(), BridgeController.policies);
-router.get("/admin/reviews", authHandler.authorizeRequest(), BridgeController.reviews);
-router.post("/admin/reviews/prepare", authHandler.authorizeRequest(), BridgeController.reviews);
+router.get("/admin/policies", adminAuth, BridgeController.policies);
+router.get("/admin/reviews", adminAuth, BridgeController.reviews);
+router.post("/admin/reviews/prepare", adminAuth, BridgeController.reviews);
 
 /**
  * @openapi
@@ -271,7 +272,7 @@ router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeControll
  *                 totalCount:
  *                   type: integer
  */
-router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
+router.get("/transactions/:type", authHandler.authorizeRequest({ requireAuthenticatedIdentity: true }), BridgeController.getTransactions);
 
 /**
  * @openapi

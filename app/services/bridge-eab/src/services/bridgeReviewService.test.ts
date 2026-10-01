@@ -212,7 +212,8 @@ test("email journal deduplicates, retries failed delivery, and never resolves it
   outcome = "delivered";
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
-  assert.deepEqual(sends, [false, true]);
+  assert.deepEqual(sends, [false], "confirmed delivery cleans the journal without an outcome email");
+  assert.equal(Object.keys(JSON.parse(await fs.readFile(journal, "utf8"))).length, 0);
   await fs.writeFile(journal, "null");
   await assert.rejects(service.notifyBridgeReviews(), /Invalid.*journal/);
 });
@@ -272,11 +273,10 @@ test("review notifications wait for refund quorum and Safe proposals and stop re
   fail = false; approval = hash;
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
-  assert.deepEqual(sent[3], { id: `eab:deposit:11155111:${address}:7`, resolved: true });
-  assert.equal(sent.length, 4, "an approved deposit must not keep asking for approval");
+  assert.equal(sent.length, 3, "approval is silent and must not keep asking for approval");
   count = 0; delete records.nativeWithdrawals[0].value.nativeMintProposalHash;
   await service.notifyBridgeReviews();
-  assert.equal(sent.length, 4, "readiness loss alone is not completion or recovery");
+  assert.equal(sent.length, 3, "readiness loss alone is not completion or recovery");
   assert.equal(submit.mock.callCount(), 0);
 });
 
@@ -295,9 +295,7 @@ test("review emails use existing recipients and contain no URL links", async t =
     reason: "Review required", actions: [], safeProposalHash: hash };
   try {
     await sendBridgeReviewEmail(item);
-    await assert.rejects(sendBridgeReviewEmail(item, true), /confirmed outcome/);
-    await sendBridgeReviewEmail({ ...item, outcome: "refunded" }, true);
-    assert.equal(sent.length, 2);
+    assert.equal(sent.length, 1);
     for (const message of sent) {
       assert.deepEqual(message.to, ["reviewer@example.com"]);
       assert.match(message.text, /Reference: eab:withdrawal:2/);
@@ -305,17 +303,15 @@ test("review emails use existing recipients and contain no URL links", async t =
     }
     assert.match(sent[0].text, /Review in Safe/);
     assert.match(sent[0].text, /Amount: 9007199254740993123\.456789 TEST/);
-    assert.match(sent[1].text, /funds were returned/);
-    assert.doesNotMatch(sent[1].text, /Action required|Review in Safe/);
     lookup.mock.mockImplementation(async () => { throw new Error("metadata unavailable"); });
     await sendBridgeReviewEmail(item);
-    assert.match(sent[2].text, /raw token units; decimals unavailable/);
+    assert.match(sent[1].text, /raw token units; decimals unavailable/);
     lookup.mock.mockImplementation(async () => new Map([[address, { symbol: "TEST", decimals: 255 }]]));
     await sendBridgeReviewEmail(item);
-    assert.match(sent[3].text, /raw token units; decimals unavailable/);
+    assert.match(sent[2].text, /raw token units; decimals unavailable/);
     config.email.approverEmails = [];
     await assert.rejects(sendBridgeReviewEmail(item), /TRANSACTION_APPROVER_EMAILS/);
-    assert.equal(sent.length, 4);
+    assert.equal(sent.length, 3);
   } finally { config.email.approverEmails = previousRecipients; }
 });
 
@@ -335,18 +331,18 @@ test("deposit refund processing is quiet until a Safe action or confirmed refund
   records.deposits = [];
   t.mock.method(cirrus, "getBridgeReviewOutcome", async () => "refunded");
   await service.notifyBridgeReviews();
-  assert.equal(sent.length, 2); assert.equal(sent[1].item.outcome, "refunded"); assert.equal(sent[1].resolved, true);
+  assert.equal(sent.length, 1, "confirmed refund sends no outcome email");
   records.nativeDeposits = [{ key: "e".repeat(64), value: { ...deposit.value, bridgeStatus: "7", refundProposalHash: hash } }];
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
-  assert.equal(sent.length, 3); assert.equal(sent[2].item.safeProposalHash, hash); assert.equal(sent[2].resolved, false);
+  assert.equal(sent.length, 2); assert.equal(sent[1].item.safeProposalHash, hash); assert.equal(sent[1].resolved, false);
   records.nativeDeposits[0].value.refundEvidenceHash = hash;
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
-  assert.equal(sent.length, 4, "governance confirmation gets one new action email");
-  assert.equal(sent[3].item.safeProposalHash, undefined);
-  assert.equal(sent[3].item.refundEvidenceHash, hash);
-  assert.deepEqual(sent[3].item.actions, ["confirm_refund"]);
-  assert.equal(sent[3].resolved, false);
+  assert.equal(sent.length, 3, "governance confirmation gets one new action email");
+  assert.equal(sent[2].item.safeProposalHash, undefined);
+  assert.equal(sent[2].item.refundEvidenceHash, hash);
+  assert.deepEqual(sent[2].item.actions, ["confirm_refund"]);
+  assert.equal(sent[2].resolved, false);
 
 });

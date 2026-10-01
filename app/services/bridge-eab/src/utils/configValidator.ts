@@ -156,8 +156,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
   ) {
     try {
       // Test OAuth discovery URL
-      const discovery = await readOAuthDiscovery(process.env.OPENID_DISCOVERY_URL,
-        process.env.OPENID_EXPECTED_ISSUER, process.env.OPENID_EXPECTED_TOKEN_ENDPOINT);
+      const discovery = await readOAuthDiscovery(process.env.OPENID_DISCOVERY_URL);
       if (!discovery.jwks_uri || !discovery.issuer) {
         errors.push(
           "OAuth discovery response is invalid - missing jwks_uri or issuer",

@@ -1,5 +1,5 @@
 import { cirrus } from "../../utils/appApiHelper";
-import { constants } from "../../config/constants";
+import { constants, EVENT_ENRICHMENT_HASH_BATCH_SIZE, EVENT_ENRICHMENT_PAGE_SIZE } from "../../config/constants";
 import { getInternalAddresses } from "../../config/config";
 import type {
   EventData,
@@ -22,20 +22,40 @@ const enrichRoutedDepositEvents = async (
     .map((event) => event.transaction_hash);
   if (routedDepositTxHashes.length === 0) return;
 
-  const { data: routedEvents } = await cirrus.get(
-    accessToken,
-    `/${constants.Event}`,
-    {
-      params: {
-        address: `in.(${[constants.externalAssetBridge, constants.stratoNativeBridge].filter(Boolean).join(",")})`,
-        event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted,NativeDepositCompleted)",
-        transaction_hash: `in.(${[
-          ...new Set(routedDepositTxHashes),
-        ].join(",")})`,
-        select: "address,event_index,transaction_hash,event_name,attributes",
-      },
+  const hashes = [...new Set<string>(routedDepositTxHashes)];
+  const routedEvents: any[] = [];
+  const identities = new Set<string>();
+  const identity = (event: any): string => [event.address?.toLowerCase().replace(/^0x/, ""),
+    event.transaction_hash?.toLowerCase().replace(/^0x/, ""), event.event_name, event.event_index].join(":");
+  for (let start = 0; start < hashes.length; start += EVENT_ENRICHMENT_HASH_BATCH_SIZE) {
+    for (let offset = 0; ;) {
+      const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
+        params: {
+          address: `in.(${[constants.externalAssetBridge, constants.stratoNativeBridge].filter(Boolean).map(address => address.toLowerCase().replace(/^0x/, "")).join(",")})`,
+          event_name: "in.(AutoRouted,DepositActionFallback,DepositCompleted,NativeDepositCompleted)",
+          transaction_hash: `in.(${hashes.slice(start, start + EVENT_ENRICHMENT_HASH_BATCH_SIZE).join(",")})`,
+          select: "address,event_index,transaction_hash,event_name,attributes",
+          order: "id.asc", limit: EVENT_ENRICHMENT_PAGE_SIZE, offset,
+        },
+      });
+      if (!Array.isArray(data)) throw new Error("Deposit attribution events unavailable; retry enrichment");
+      if (!data.length) break;
+      for (const event of data) {
+        const key = identity(event);
+        if (identities.has(key)) throw new Error("Duplicate deposit attribution event; pagination is inconsistent");
+        identities.add(key);
+        routedEvents.push(event);
+      }
+      offset += data.length;
     }
-  );
+  }
+  for (const event of events) {
+    if (((event.contract_name === "ExternalAssetBridge" && event.event_name === "DepositCompleted") ||
+         (event.contract_name === "StratoNativeBridge" && event.event_name === "NativeDepositCompleted")) &&
+        !identities.has(identity(event))) {
+      throw new Error("Deposit completion missing from attribution events; retry enrichment");
+    }
+  }
   applyDepositActionOutcomes(events, routedEvents || []);
 };
 

@@ -52,18 +52,18 @@ export const PROCESSING_REMINDER_MS = 60 * 60_000;
 export const PROCESSING_HISTORY_MS = 7 * 24 * 60 * 60_000;
 export const EMAIL_METADATA_TIMEOUT_MS = 5_000;
 
-export const PROCESSING_EMAIL_CONTENT: Record<ProcessingIssueCode, { title: string; action: string }> = {
-  MINT_CAPACITY: { title: "Mint allowance reached", action: "Check the mint allowance and refill rate. Review the policy if the transfer cannot fit within the limit." },
-  WITHDRAWAL_CAPACITY: { title: "Withdrawal capacity reached", action: "Check available withdrawal capacity, pending reservations, and the refill policy." },
-  FUNDING_REQUIRED: { title: "Transaction fee funding needed", action: "Fund the submitting account shown in the details with the required fee asset." },
-  MANUAL_REVIEW: { title: "Governance review required", action: "Use the existing bridge review notification." },
-  POLICY_RESTRICTED: { title: "Transfer blocked by policy", action: "Review the route or token policy before allowing this transfer to proceed." },
-  DEPENDENCY_UNAVAILABLE: { title: "Connection failure persists", action: "Check the RPC, verifier, and authentication services. Automatic retries are continuing." },
-  CONFIRMATIONS_PENDING: { title: "Confirmations have stopped progressing", action: "Check external-chain progress and the verifier RPCs. Do not resubmit the transfer." },
-  INDEXING_PENDING: { title: "Attestation indexing has stopped progressing", action: "Check STRATO indexing and verifier transaction results. Do not bypass the quorum requirement." },
-  PAUSED: { title: "Bridge processing is paused", action: "Confirm whether the pause is intentional. Resume through the approved controls when appropriate." },
-  CONFIGURATION: { title: "Bridge configuration needs review", action: "Check bridge configuration and authorization evidence for the referenced transfer." },
-  UNKNOWN: { title: "Processing failure persists", action: "Investigate the referenced operation in the service and verifier logs." },
+export const PROCESSING_EMAIL_CONTENT: Record<ProcessingIssueCode, { title: string; action: string; observation?: string }> = {
+  MINT_CAPACITY: { title: "Mint allowance is insufficient", action: "Compare the transfer amount with the token's available mint allowance and refill rate. If it cannot fit within the configured limit, ask STRATO admins to review the mint policy." },
+  WITHDRAWAL_CAPACITY: { title: "Withdrawal capacity or liquidity is insufficient", action: "Check available withdrawal capacity, external liquidity, and pending reservations. If capacity cannot recover through refill or completed withdrawals, escalate to the bridge policy owner." },
+  FUNDING_REQUIRED: { title: "Transaction fee funding needed", action: "Fund the submitting account shown in the details with the required fee asset. If the account is absent, identify the failed transaction sender before funding." },
+  MANUAL_REVIEW: { title: "Governance review required", action: "Follow the separate review notification, which identifies whether STRATO admins or Safe signers must act. This processing alert does not authorize a transfer or refund." },
+  POLICY_RESTRICTED: { title: "Transfer blocked by policy", action: "Identify the blocking route, token, or verifier policy in the diagnostics. Ask its policy owner to review the restriction before changing it." },
+  DEPENDENCY_UNAVAILABLE: { title: "A required service is unavailable", action: "Check the failed RPC, verifier, or authentication request in the diagnostics and restore access to that dependency." },
+  CONFIRMATIONS_PENDING: { title: "External confirmations still pending", observation: "The observed external confirmation count remains below the required count. This does not by itself establish that the external network has stalled.", action: "Check the external transaction receipt and current block height, then compare the verifier RPC responses. Investigate any disagreement or lack of chain progress." },
+  INDEXING_PENDING: { title: "Verifier confirmations still pending", observation: "The verifier confirmation count visible in Cirrus remains below the required count. This does not establish whether STRATO transaction processing or Cirrus indexing is delayed.", action: "Check whether the verifiers' attestation transactions succeeded on STRATO. Then compare the on-chain confirmations with Cirrus. Refund voting must wait until the required confirmations are visible; do not bypass that check." },
+  PAUSED: { title: "Bridge processing is paused", action: "Confirm with the bridge policy owner whether the pause is intentional. If it should be lifted, use the authorized governance controls." },
+  CONFIGURATION: { title: "Bridge configuration needs review", action: "Compare the referenced transfer's authorization and reservation with the configured bridge, vault, and signer set. Correct the identified configuration issue through its authorized owner." },
+  UNKNOWN: { title: "Processing needs investigation", action: "Inspect the bridge service and verifier logs for the reference and stage below. The cause has not yet been identified; determine it before taking a recovery action." },
 };
 
 const config = {
@@ -325,3 +325,5 @@ if (missingEnvVars.length > 0) {
   console.error(error);
   process.exit(2);
 }
+
+export const NATIVE_SCAN_WINDOW_BLOCKS = 2_000;

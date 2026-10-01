@@ -8,6 +8,8 @@ const {
   parseDeployArgs,
 } = require("./lib/externalBridgeDeploymentConfig");
 
+const { writeCheckpoint, openDeploymentCheckpoint, resumeProxyDeployment } = require("./lib/deploymentCheckpoint");
+
 const DEFAULT_PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 function requiredChainAddress(chainId, name, fallback) {
@@ -28,19 +30,12 @@ function writeOutput(payload, artifactPrefix, rolloutDir) {
     `${artifactPrefix}_${timestamp}.json`,
   );
   const latestPath = path.join(directory, `${artifactPrefix}_latest.json`);
-  const serialized = `${JSON.stringify(payload, null, 2)}\n`;
-  for (const file of [outputPath, latestPath]) {
-    const temporaryPath = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(temporaryPath, serialized);
-    fs.renameSync(temporaryPath, file);
-  }
+  for (const file of [outputPath, latestPath]) writeCheckpoint(file, payload);
   let rolloutPath;
   if (rolloutDir) {
     fs.mkdirSync(path.resolve(rolloutDir), { recursive: true, mode: 0o700 });
     rolloutPath = path.resolve(rolloutDir, "external-deployment.json");
-    const temporaryPath = `${rolloutPath}.${process.pid}.tmp`;
-    fs.writeFileSync(temporaryPath, serialized, { mode: 0o600 });
-    fs.renameSync(temporaryPath, rolloutPath);
+    writeCheckpoint(rolloutPath, payload);
   }
   return { outputPath, latestPath, rolloutPath };
 }
@@ -150,44 +145,53 @@ async function main() {
     return;
   }
 
-  const vault = await upgrades.deployProxy(
-    vaultFactory,
-    [
-      vaultDefaultAdminAddress,
-      vaultUpgraderAddress,
-      vaultPolicyAdminAddress,
-      guardianAddress,
-      vaultUnpauserAddress,
-      vaultAttestationAdminAddress,
-      largeWithdrawalApproverAddress,
-    ],
-    { kind: "uups" },
+  const artifactDirectory = path.resolve(__dirname, "../deployments");
+  const latestPath = path.join(artifactDirectory, `${profile.artifactPrefix}_latest.json`);
+  const artifactFiles = [latestPath, ...(rolloutDir ? [path.resolve(rolloutDir, "external-deployment.json")] : [])];
+  const journal = openDeploymentCheckpoint(
+    path.join(artifactDirectory, `${profile.artifactPrefix}_checkpoint.json`),
+    { chainId: String(chainId), deployerAddress, safeAddress, permit2Address, roles: preflight.roles,
+      deploymentConfirmations, vaultBuild: ethers.keccak256(vaultFactory.bytecode), routerBuild: ethers.keccak256(routerFactory.bytecode) },
+    artifactFiles,
   );
-  await vault.waitForDeployment();
-  const vaultDeploymentReceipt =
-    await vault.deploymentTransaction()?.wait(deploymentConfirmations);
-  if (!vaultDeploymentReceipt) {
-    throw new Error("ExternalBridgeVault deployment receipt is unavailable");
+  try {
+  for (const file of artifactFiles) {
+    if (!fs.existsSync(file)) continue;
+    const artifact = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (artifact.chainId !== String(chainId) || artifact.externalBridgeVault?.proxy !== journal.state.steps.vault?.proxy ||
+        artifact.depositRouter?.proxy !== journal.state.steps.router?.proxy) {
+      throw new Error("Canonical deployment artifact conflicts with checkpoint; refusing to overwrite");
+    }
   }
+  const vaultRoles = [
+    ["DEFAULT_ADMIN_ROLE", vaultDefaultAdminAddress], ["UPGRADER_ROLE", vaultUpgraderAddress],
+    ["POLICY_ADMIN_ROLE", vaultPolicyAdminAddress], ["PAUSER_ROLE", guardianAddress],
+    ["UNPAUSER_ROLE", vaultUnpauserAddress], ["ATTESTATION_ADMIN_ROLE", vaultAttestationAdminAddress],
+    ["LARGE_WITHDRAWAL_APPROVER_ROLE", largeWithdrawalApproverAddress],
+  ];
+  const vaultDeployment = await resumeProxyDeployment(journal, "vault", () => upgrades.deployProxy(
+    vaultFactory, vaultRoles.map(([, address]) => address), { kind: "uups" },
+  ), vaultFactory, ethers.provider, upgrades, deploymentConfirmations, async contract => {
+    for (const [role, address] of vaultRoles) {
+      if (!await contract.hasRole(await contract[role](), address)) throw new Error(`Vault ${role} configuration mismatch`);
+    }
+  });
+  const vault = vaultDeployment.contract;
   const vaultAddress = await vault.getAddress();
-  const vaultImplementation = await upgrades.erc1967.getImplementationAddress(
-    vaultAddress,
-  );
-
-  const router = await upgrades.deployProxy(
-    routerFactory,
-    [permit2Address, vaultAddress, safeAddress],
-    { kind: "uups" },
-  );
-  await router.waitForDeployment();
-  const routerDeploymentReceipt =
-    await router.deploymentTransaction()?.wait(deploymentConfirmations);
-  if (!routerDeploymentReceipt) {
-    throw new Error("DepositRouter deployment receipt is unavailable");
-  }
+  const vaultDeploymentReceipt = vaultDeployment.receipt;
+  const vaultImplementation = vaultDeployment.implementation;
+  const routerDeployment = await resumeProxyDeployment(journal, "router", () => upgrades.deployProxy(
+    routerFactory, [permit2Address, vaultAddress, safeAddress], { kind: "uups" },
+  ), routerFactory, ethers.provider, upgrades, deploymentConfirmations, async contract => {
+    if (await contract.version() !== "3.2.0" || await contract.owner() !== safeAddress ||
+        await contract.externalBridgeVault() !== vaultAddress || await contract.PERMIT2() !== permit2Address) {
+      throw new Error("Router configuration mismatch");
+    }
+  });
+  const router = routerDeployment.contract;
   const depositRouterAddress = await router.getAddress();
-  const depositRouterImplementation =
-    await upgrades.erc1967.getImplementationAddress(depositRouterAddress);
+  const routerDeploymentReceipt = routerDeployment.receipt;
+  const depositRouterImplementation = routerDeployment.implementation;
 
   const verification = {
     depositRouterVersion: await router.version(),
@@ -241,7 +245,7 @@ async function main() {
     network: profile.network,
     chainId: network.chainId.toString(),
     production: profile.production,
-    deployedAt: new Date().toISOString(),
+    deployedAt: journal.state.deployedAt || new Date().toISOString(),
     safeAddress,
     vaultDefaultAdminAddress,
     vaultUpgraderAddress,
@@ -264,11 +268,17 @@ async function main() {
     },
     verification,
   };
+  journal.state.deployedAt = payload.deployedAt;
+  journal.state.verification = verification;
+  journal.save();
   const paths = writeOutput(payload, profile.artifactPrefix, rolloutDir);
+  journal.state.status = "complete";
+  journal.save();
   console.log(JSON.stringify(payload, null, 2));
   console.log(`Output: ${paths.outputPath}`);
   console.log(`Latest: ${paths.latestPath}`);
   if (paths.rolloutPath) console.log(`Rollout: ${paths.rolloutPath}`);
+  } finally { journal.close(); }
 }
 
 if (require.main === module) {

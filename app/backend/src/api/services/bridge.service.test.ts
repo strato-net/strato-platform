@@ -298,7 +298,9 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
   const custodyVault = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
   const stratoToken = "1111111111111111111111111111111111111111";
   const user = "2222222222222222222222222222222222222222";
-  const balance = "2000000000000000000";
+  let decimals = 18;
+  let balance = "2000000000000000000";
+  let includeHistory = false;
   const price = "3000000000000000000";
 
   const previousNativeBridge = config.stratoNativeBridge;
@@ -362,6 +364,7 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
         status: 200,
         data: [{
           address: stratoToken,
+          customDecimals: decimals,
           _name: "Native Token",
           _symbol: "NATIVE",
           status: "2",
@@ -380,6 +383,10 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
       return { status: 200, data: [{ address: stratoToken, balance }] };
     }
 
+    if (includeHistory && path === `/${constants.StratoNativeBridge}-withdrawals`) {
+      return { data: [{ stratoToken, stratoTokenAmount: String((params["value->>bridgeStatus"] === "eq.3" ? 3n : 1n) * 10n ** BigInt(decimals)) }] };
+    }
+
     if (
       path === `/${constants.MercataBridge}-withdrawals`
       || path === `/${constants.ExternalAssetBridge}-withdrawals`
@@ -396,6 +403,15 @@ test("withdrawal summary uses normalized route balances with WAD-scaled USD valu
   assert.equal(summary.availableToWithdraw, "6000000000000000000");
   assert.equal(summary.pendingWithdrawals, "0");
   assert.equal(summary.totalWithdrawn30d, "0");
+
+  includeHistory = true;
+  for (decimals of [0, 6, 8, 18]) {
+    balance = String(2n * 10n ** BigInt(decimals));
+    const result = await getWithdrawalSummary("access-token", user);
+    assert.equal(result.availableToWithdraw, "6000000000000000000");
+    assert.equal(result.pendingWithdrawals, "3000000000000000000");
+    assert.equal(result.totalWithdrawn30d, "9000000000000000000");
+  }
 
   // The catalog joins the on-chain auto-route flag onto each route.
   const [route] = await getBridgeableTokens("access-token");
@@ -442,6 +458,11 @@ test("keeps pending and completed withdrawal totals separate across bridge types
   (oracle as any).getCompletePriceMap = async () => new Map([[token, wad.toString()]]);
   Object.defineProperty(constants, "stratoNativeBridge", { configurable: true, get: () => "8".repeat(40) });
   (cirrus as any).get = async (_accessToken: string, path: string, { params }: any) => {
+    if (path === `/${constants.Token}`) {
+      assert.equal(params.address, `in.(${token})`);
+      assert.match(params.select, /customDecimals/);
+      return { data: [{ address: token, customDecimals: 6 }] };
+    }
     let amount: bigint;
     if (path === `/${constants.ExternalAssetBridge}-withdrawals`) {
       amount = params["value->>status"] === "eq.4" ? 200n : 100n;
@@ -453,7 +474,7 @@ test("keeps pending and completed withdrawal totals separate across bridge types
     }
     const completed = params["value->>status"] === "eq.4" || params["value->>bridgeStatus"] === "eq.3";
     assert.equal(typeof params.block_timestamp === "string", completed);
-    return { data: [{ stratoToken: token, stratoTokenAmount: (amount * wad).toString() }] };
+    return { data: [{ stratoToken: token, stratoTokenAmount: (amount * 10n ** 6n).toString() }] };
   };
   try {
     const summary = await bridge.getWithdrawalSummary("token", "user");

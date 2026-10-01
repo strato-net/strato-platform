@@ -1,3 +1,4 @@
+import { withSafeProposalQueue } from "./safeProposalService";
 import {
   Contract,
   Interface,
@@ -292,7 +293,15 @@ export const proposeNativeMint = async (
   const chainId = toSafeNumberChainId(attestation.destinationChainId);
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeProposerAddress || "";
-  const { protocolKit, apiKit } = await initializeSafeForChain(chainId, safeAddress);
+  return withSafeProposalQueue(chainId, `mint:${request.idempotencyKey}`, async ({ protocolKit, apiKit }, saved) => {
+  if (saved) {
+    try { await apiKit.getTransaction(saved.safeTxHash); }
+    catch (error: any) {
+      if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
+      await apiKit.proposeTransaction(saved);
+    }
+    return saved.safeTxHash;
+  }
   const nonce = Number(await retry(
     () => apiKit.getNextNonce(safeAddress),
     { logPrefix: "NativeMintService" },
@@ -326,6 +335,7 @@ export const proposeNativeMint = async (
   );
 
   return safeTxHash;
+  });
 };
 
 export const getNativeMintProposalExecution = async (

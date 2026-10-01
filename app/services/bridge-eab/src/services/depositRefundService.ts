@@ -1,3 +1,4 @@
+import { withSafeProposalQueue } from "./safeProposalService";
 import { Contract, Interface, Wallet, id, verifyTypedData } from "ethers";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -12,7 +13,6 @@ import { recoverDepositObservation } from "./depositEventService";
 import { getStratoNetworkId } from "./bridgeService";
 import { execute } from "../utils/stratoHelper";
 import { safeChecksum, ensureHexPrefix } from "../utils/utils";
-import { initializeSafeForChain } from "../utils/safeHelper";
 import { DigestKmsSigner } from "../utils/kmsSigner";
 import { getEventTransactionHash } from "./externalWithdrawalService";
 import { requestVerifierQuorum } from "./settlementAttestationService";
@@ -56,7 +56,7 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
     } else {
       const safe = safeChecksum(config.safe.address!);
       if (!await bridge.hasRole(id("MINT_EXECUTOR_ROLE"), safe)) throw new Error("Native refund Safe is not an authorized mint executor");
-      const { apiKit, protocolKit } = await initializeSafeForChain(chainId, safe);
+      await withSafeProposalQueue(chainId, `refund:${destination}:${d.externalRedemptionId}`, async ({ apiKit, protocolKit }) => {
       const journal = path.join(process.cwd(), "data", "native-refunds", `${chainId}-${destination}-${d.externalRedemptionId}.json`);
       let proposal: NativeRefundProposal | undefined;
       try { proposal = JSON.parse(await fs.readFile(journal, "utf8")); }
@@ -74,7 +74,7 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
         if (await protocolKit.getTransactionHash({ data: proposal.data } as any) !== proposal.hash) throw new Error("Native refund proposal hash mismatch");
         const currentNonce = Number(await protocolKit.getNonce());
         if (BigInt(proposal.deadline) <= BigInt(block.timestamp) || currentNonce > proposal.nonce) {
-          nonce = Math.max(currentNonce, proposal.nonce);
+          nonce = currentNonce > proposal.nonce ? undefined : proposal.nonce;
           proposal = undefined;
         }
       }
@@ -99,15 +99,24 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
         await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
           method: "recordDepositRefundProposal", args: { depositId: d.depositId, proposalHash: proposal.hash } });
       }
+      });
       return;
     }
   }
   const [receipts, head] = await Promise.all([getTransactionReceiptsBatch(chainId, [hash]), getVerificationBlockNumber(chainId)]);
   const receipt = receipts.get(hash);
   const confirmations = getDepositConfirmationPolicy(chainId);
-  if (!receipt || receipt.__rpcDisagreement || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
+  if (receipt?.__rpcDisagreement) throw Object.assign(new Error("Native refund RPC disagreement"), {
+    issues: [processingIssue("DEPENDENCY_UNAVAILABLE", { transactionHash: hash })],
+  });
+  if (!receipt || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
       BigInt(receipt.blockNumber) + BigInt(confirmations) > BigInt(head)) throw Object.assign(new Error("Native refund awaiting confirmations"), {
-    issues: [processingIssue("CONFIRMATIONS_PENDING", { transactionHash: hash, requiredConfirmations: String(confirmations) })],
+    issues: [processingIssue("CONFIRMATIONS_PENDING", {
+      transactionHash: hash, requiredConfirmations: String(confirmations),
+      ...(receipt && /^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ? {
+        observedConfirmations: String(BigInt(head) > BigInt(receipt.blockNumber) ? BigInt(head) - BigInt(receipt.blockNumber) : 0n),
+      } : {}),
+    })],
   });
   if (receipt.status !== "0x1" || receipt.transactionHash?.toLowerCase() !== hash.toLowerCase() ||
       !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") || !receipt.logs.some((log: any) => {
@@ -185,7 +194,7 @@ export const processPendingDepositRefunds = async (): Promise<void> => {
   const records = await getBridgeReviewRecords();
   for (const row of records.deposits.filter(row => Number(row.value.status) === 8)) {
     await processingIssueService.run({ source: "eab", chainId: String(row.key), bridge: config.externalAssetBridge.address!,
-      reference: `${row.key}:${row.key2}:${row.key3}`, stage: "deposit-refund", token: row.value.stratoToken }, async () => {
+      reference: `${row.key2}:${row.key3}`, stage: "deposit-refund", token: row.value.stratoToken }, async () => {
       const chainId = Number(row.key);
       if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid refund chain configuration");
       await recoverExternalDepositRefund(chainId, row.key2!, String(row.key3));

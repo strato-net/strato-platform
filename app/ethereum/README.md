@@ -349,3 +349,9 @@ rm -rf .openzeppelin/chain-*.lock
 - Use single quotes around INIT_PARAMS JSON: `'["param1", "param2"]'`
 - Check your `.env` file for correct values
 - Ensure sufficient ETH balance for gas fees
+
+### Resuming External Bridge deployments
+
+`deployExternalBridge.js --execute` persists a fsynced checkpoint at `deployments/<artifactPrefix>_checkpoint.json` before submission, after receiving each proxy transaction hash, after validating each proxy, and after publishing the final artifacts. Re-run the same command with the same chain, signer, contract build, role addresses, and confirmation count to resume. The script verifies receipts, deployed code, implementation addresses, vault roles, and router wiring before continuing. Preserve the checkpoint and OpenZeppelin manifest together.
+
+An existing canonical artifact without a matching checkpoint blocks deployment; do not delete it to retry. Reconcile/import the prior deployment first. A failure inside proxy submission before its hash is saved leaves a `deploying` step: inspect the deployer's transactions and the OpenZeppelin manifest, then record the confirmed proxy and transaction hash in that step before resuming. Never clear that step until absence of a deployment has been established. After a process crash, remove the checkpoint's `.lock` only after confirming no deployment process remains. A rerun cannot overwrite a canonical artifact identifying a different proxy pair.

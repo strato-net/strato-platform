@@ -73,7 +73,7 @@ async function activityHarness(t: any, configuredBridge = `0x${'ab'.repeat(20).t
   const queries: any[] = [];
   t.mock.method(cirrus, 'get', async (_token: string, _path: string, { params }: any) => {
     if (params.event_name === 'in.(AutoRouted,DepositActionFallback,DepositCompleted,NativeDepositCompleted)') {
-      return { data: [
+      return { data: params.offset ? [] : [
         { ...event(0, 'AutoRouted', { finalToken: 'metal', finalAmount: '250' }), address: bridge },
         completion,
       ] };
@@ -159,4 +159,37 @@ test("native activity enrichment binds routed and fallback outcomes to their dep
   const mismatch = event(6, "NativeDepositCompleted", { depositId: "native4" });
   applyDepositActionOutcomes([mismatch], [event(5, "AutoRouted", { depositId: "wrong" }), mismatch]);
   assert.equal(mismatch.depositOutcome, undefined);
+});
+
+test("deposit enrichment chunks hashes, exhausts capped pages, and rejects unresolved completions", async t => {
+  const { cirrus } = await import("../../utils/appApiHelper");
+  const { constants, EVENT_ENRICHMENT_HASH_BATCH_SIZE } = await import("../../config/constants");
+  const { getEvents } = await import("./events.service");
+  const rows = Array.from({ length: EVENT_ENRICHMENT_HASH_BATCH_SIZE + 1 }, (_, i) => ({
+    ...event(1, "DepositCompleted"), address: constants.externalAssetBridge,
+    transaction_hash: i.toString(16).padStart(64, "0"), storage: { contract: [{ contract_name: "ExternalAssetBridge" }] },
+  }));
+  let missing = false, failing = false;
+  const firstPages: string[] = [];
+  t.mock.method(cirrus, "get", async (_token: string, _path: string, { params }: any) => {
+    if (params.select.includes("count()")) return { data: [{ count: rows.length }] };
+    if (params.select.startsWith("*,")) return { data: rows };
+    assert.equal(params.order, "id.asc");
+    assert.equal(params.limit, 200);
+    const hashes = params.transaction_hash.slice(4, -1).split(",");
+    assert.ok(hashes.length <= EVENT_ENRICHMENT_HASH_BATCH_SIZE);
+    if (!params.offset) firstPages.push(params.transaction_hash);
+    if (failing && params.offset) throw new Error("Cirrus unavailable");
+    const history = rows.filter(row => hashes.includes(row.transaction_hash) && !(missing && row === rows.at(-1)))
+      .flatMap(row => [{ ...row, event_index: 0, event_name: "AutoRouted", attributes: { ...row.attributes, finalToken: "metal", finalAmount: "25" } }, row]);
+    return { data: history.slice(params.offset, params.offset + 1) };
+  });
+  const result = await getEvents("token");
+  assert.equal(firstPages.length, 2);
+  assert.equal(result.events.length, rows.length);
+  assert.ok(result.events.every((row: any) => row.depositOutcome === "route" && row.finalAmount === "25"));
+  missing = true;
+  await assert.rejects(getEvents("token"), /completion missing/);
+  missing = false; failing = true;
+  await assert.rejects(getEvents("token"), /Cirrus unavailable/);
 });

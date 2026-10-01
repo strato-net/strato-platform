@@ -385,7 +385,7 @@ The service logs important events and errors using Winston logger:
 
 ## License
 
-MIT 
+MIT
 
 Withdrawal capacity is enforced by per-token buckets in the external vault for both routine and Safe-approved withdrawals. The service checks `withdrawalCapacity` before issuing a new authorization, leaves capacity-constrained requests pending, and logs available units and estimated retry seconds. Outstanding reservations hold capacity until release or cancellation; only released consumption refills. Existing READY withdrawals continue through the original expiry/recovery flow. Configure `bucketCapacity` in raw token units and `refillRate` in raw units per second; Safe policy changes remain immediate.
 
@@ -487,3 +487,30 @@ Upgrade order for an existing deployment:
 5. On testnet, exercise plain and routed rejected deposits through **both** decisions on both bridges. Include a restart after external execution but before source finalization, a Safe proposal expiry/replacement, disabled routing (verified fallback delivery), and a temporarily unavailable verifier. Confirm one delivery or one refund, unchanged native backing on refund, cross-session activity, and no premature completion email. Unit/integration tests do not substitute for this deployed run.
 
 Do not roll back the STRATO contract implementation after recording a refund decision: older code does not understand these new states. Keep the upgraded state machine and pause/recover the runtime if a rollout issue occurs. This release does not add native withdrawal cancellation invalidation or a user cancellation UI; deposit refunds are distinct from withdrawal refunds.
+
+
+### Native redemption scan recovery
+
+Native scans compare log sets and block hashes across configured RPCs, then verify the range hash again before committing progress. Each poll scans at most 2,000 blocks for forward/overlap discovery and 2,000 for a rotating historical sweep from genesis. The overlap uses `DEPOSIT_RECONCILIATION_BLOCKS` (default 64; must be below 2,000). The historical sweep catches omissions outside that overlap; a large chain history can take multiple days to sweep. Identical omissions by every RPC remain undetectable until a later scan returns the missing log.
+
+`nativeLastProcessedBlocks.json` now stores block/hash, external bridge address and historical sweep position per chain. Existing numeric cursors are accepted and retain their forward position while starting historical reconciliation at genesis. Writes are atomic and serialized; malformed journals fail closed. A changed checkpoint hash or external bridge address resets scanning to genesis. Preserve the file during upgrade; old images cannot read the new format, so rollback requires restoring the saved pre-upgrade cursor and replaying overlap/history.
+
+Already indexed redemption evidence is skipped without another recording transaction. Conflicting evidence for an existing redemption stops the scan for investigation; it does not reverse completed transfers or authorize another payout. Receipt verification and confirmation requirements still apply before custody unlock. No contract or verifier update is required.
+
+### Safe proposal queue
+
+Withdrawal reviews, native mints, and native refunds share one proposal-creation queue per chain and Safe. Signed proposals and nonce reservations are persisted under `data/safe-proposals` before publication. Preserve this directory together with `safe-reviews` and `native-refunds` across deployments. Existing review/refund journals also reserve nonces during migration. Proposals can await signatures concurrently; Safe execution still follows nonce order.
+
+Run only one proposer service per chain/Safe, including legacy services and manual automation. Separate data volumes do not coordinate nonce allocation. A shared-volume writer lock fails closed on competing writers. After an abrupt process termination, verify that every previous writer has stopped before removing its `data/safe-proposals/<chain>-<safe>/writer.lock`; retain all JSON journals. Before the first upgrade, reconcile outstanding native mint proposals with the Safe transaction service (older versions did not persist their signed payloads), and wait for indexing before resuming proposals.
+
+### OAuth endpoint pinning
+
+Operator, relayer and verifier discovery URLs must use the Keycloak format `<issuer>/.well-known/openid-configuration`. The service derives the expected issuer and `<issuer>/protocol/openid-connect/token` endpoint from that configured URL and requires exact matches in the discovery response. No separate expected-issuer or expected-token-endpoint environment variables are needed. Other identity-provider endpoint layouts are not supported by this validation.
+
+Discovery and token requests require HTTPS and do not follow redirects. Configure the final discovery URL without credentials, query parameters or fragments.
+
+### RPC organizational independence
+
+Deployment reviewers must verify that verification RPCs use independent upstream providers and administrative operators, and record the providers/operators and supporting evidence in the deployment record. Different hostnames, regions, accounts, or resellers do not establish independence when they share an upstream provider or administrator. Repeat this review whenever RPC configuration changes.
+
+Runtime checks enforce HTTPS, distinct hosts, chain identity, and agreement on verification evidence. They cannot prove organizational independence; no provider/operator identity mappings are required at startup.

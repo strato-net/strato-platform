@@ -43,6 +43,41 @@ test("route API validation requires at least one basis point of slippage", async
   await assert.rejects(getRouteQuote("token", tokens.tokenIn, tokens.tokenOut, 100n, 0), /slippageBps/);
 });
 
+test("trade validation failures return HTTP 400 with actionable messages", async (t) => {
+  const validators = await import("../validators/trade.validator");
+  const { errorHandler } = await import("../middleware/errorHandler");
+  const { StratoError } = await import("../../errors");
+  t.mock.method(console, "error", () => {});
+  const tokens = { tokenIn: "1".repeat(40), tokenOut: "2".repeat(40) };
+  const quote = { ...tokens, amount: "100" };
+  const execute = { ...tokens, amountIn: "100", minFinalOut: "99" };
+  const cases: Array<[(args: any) => void, object]> = [
+    ...Object.values(validators).map((validate): [(args: any) => void, object] => [validate, { unexpected: true }]),
+    [validators.validateRouteQuoteArgs, { ...quote, tokenIn: "invalid" }],
+    [validators.validateRouteQuoteArgs, { ...quote, amount: "-1" }],
+    [validators.validateRouteQuoteArgs, { ...quote, slippageBps: 0 }],
+    [validators.validateRouteQuoteArgs, { ...quote, tokenOut: tokens.tokenIn }],
+    [validators.validateRouteExecuteArgs, { ...execute, tokenOut: tokens.tokenIn }],
+    [validators.validateTradeQuoteArgs, { ...quote, type: "EXACT_INPUT", tokenOut: tokens.tokenIn }],
+  ];
+  for (const [validate, args] of cases) {
+    assert.throws(() => validate(args), (error: unknown) => {
+      assert.ok(error instanceof StratoError);
+      let status: number | undefined;
+      let body: any;
+      const response = {
+        status: (value: number) => { status = value; return response; },
+        json: (value: any) => { body = value; },
+      };
+      errorHandler(error, {} as any, response as any, () => assert.fail("unexpected next"));
+      assert.equal(status, 400);
+      assert.equal(body.error.message, error.message);
+      assert.match(body.error.message, /Validation Error:/);
+      return true;
+    });
+  }
+});
+
 test("finds direct routes before longer alternatives", () => {
   const routes = findRoutePaths(
     [swap("a", "c"), swap("c", "b"), swap("a", "b")],
@@ -52,11 +87,11 @@ test("finds direct routes before longer alternatives", () => {
   assert.equal(routes[0].length, 1);
 });
 
-test("reserves candidates for every hop count after shorter paths fill their quota", async () => {
-  const { ROUTE_CANDIDATES_PER_HOP } = await import("../../config/constants");
+test("retains paths beyond the former per-hop quota for executable quoting", () => {
+  const alternatives = 13;
   const edges = [swap("a", "z")];
   for (let hops = 2; hops <= 6; hops++) {
-    for (let route = 0; route <= ROUTE_CANDIDATES_PER_HOP; route++) {
+    for (let route = 0; route < alternatives; route++) {
       const tokens = ["a", ...Array.from({ length: hops - 1 }, (_, step) => `h${hops}r${route}s${step}`), "z"];
       for (let step = 1; step < tokens.length; step++) edges.push(swap(tokens[step - 1], tokens[step]));
     }
@@ -64,9 +99,9 @@ test("reserves candidates for every hop count after shorter paths fill their quo
   const routes = findRoutePaths(edges, "a", "z");
   assert.deepEqual(routes[0], [swap("a", "z")]);
   for (let hops = 2; hops <= 6; hops++) {
-    assert.equal(routes.filter((path) => path.length === hops).length, ROUTE_CANDIDATES_PER_HOP);
+    assert.equal(routes.filter((path) => path.length === hops).length, alternatives);
   }
-  assert.equal(routes.length, 1 + 5 * ROUTE_CANDIDATES_PER_HOP);
+  assert.equal(routes.length, 1 + 5 * alternatives);
 });
 
 test("bounds search work on a dense cyclic graph and still checks the direct edge", () => {
@@ -304,6 +339,7 @@ test("selects the shortest route within the output tolerance of the global best"
     return { tokenA, tokenB };
   });
   let outputs: string[];
+  let onlyLatePath = false;
   let measureConcurrency = false;
   let activeQuotes = 0;
   let peakQuotes = 0;
@@ -313,6 +349,9 @@ test("selects the shortest route within the output tolerance of the global best"
       peakQuotes = Math.max(peakQuotes, activeQuotes);
       await new Promise<void>((resolve) => setImmediate(resolve));
       activeQuotes--;
+    }
+    if (onlyLatePath && !((tokenIn === "a" && tokenOut === "x12") || (tokenIn === "x12" && tokenOut === "d"))) {
+      throw new Error("Pool paused or capacity exhausted");
     }
     const pair = tokenIn + tokenOut;
     const amountOut = pair === "ad" ? outputs[0] : pair === "bd" ? outputs[1]
@@ -353,13 +392,21 @@ test("selects the shortest route within the output tolerance of the global best"
 
   (settings as any).ROUTE_OUTPUT_TOLERANCE_BPS = originalTolerance;
   (config as any).networkId = "route-expanded-search-test";
-  for (let i = 0; i < settings.ROUTE_CANDIDATES_PER_HOP; i++) pairs.push(["a", `x${i}`], [`x${i}`, "d"]);
+  for (let i = 0; i < 13; i++) pairs.push(["a", `x${i}`], [`x${i}`, "d"]);
   outputs = ["100000", "100000", "100000", "200000"];
   measureConcurrency = true;
   const expanded = await getRouteQuote("token", "a", "d", 100n);
   assert.deepEqual(expanded.steps.map(({ target }) => target), ["ab", "bc", "cd"],
     "a materially better longer route survives a full set of shorter candidates");
   assert.equal(expanded.amountOut, "200000");
+  onlyLatePath = true;
+  const late = await getRouteQuote("token", "a", "d", 100n);
+  assert.deepEqual(late.steps.map(({ target }) => target), ["ax12", "x12d"],
+    "failed early paths cannot hide the only executable path beyond the former quota");
+  pairs.reverse();
+  (config as any).networkId = "route-reversed-search-test";
+  assert.deepEqual((await getRouteQuote("token", "a", "d", 100n)).steps, late.steps,
+    "reversing Cirrus pool order retains the executable route");
   assert.ok(peakQuotes > 1 && peakQuotes <= settings.ROUTE_QUOTE_CONCURRENCY,
     "expanded route evaluation keeps concurrent pair-quote requests bounded");
 });

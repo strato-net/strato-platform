@@ -115,8 +115,6 @@ const { policy: verifierPolicy, digest: verifierPolicyDigest } =
 const signerOpenIdDiscoveryUrl = required(
   "SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL",
 );
-const signerExpectedIssuer = required("SETTLEMENT_ATTESTOR_OPENID_EXPECTED_ISSUER");
-const signerExpectedTokenEndpoint = required("SETTLEMENT_ATTESTOR_OPENID_EXPECTED_TOKEN_ENDPOINT");
 const signerClientId = required("SETTLEMENT_ATTESTOR_CLIENT_ID");
 const signerClientSecret = required("SETTLEMENT_ATTESTOR_CLIENT_SECRET");
 const signerBaUsername = required("SETTLEMENT_ATTESTOR_BA_USERNAME");
@@ -165,7 +163,7 @@ const getStratoToken = async (): Promise<string> => {
   if (stratoTokenPromise) return stratoTokenPromise;
   stratoTokenPromise = (async () => {
     if (!tokenEndpoint) {
-      const discovery = await readOAuthDiscovery(signerOpenIdDiscoveryUrl, signerExpectedIssuer, signerExpectedTokenEndpoint);
+      const discovery = await readOAuthDiscovery(signerOpenIdDiscoveryUrl);
       tokenEndpoint = discovery.token_endpoint;
       if (!tokenEndpoint) throw new Error("OpenID token endpoint is unavailable");
     }

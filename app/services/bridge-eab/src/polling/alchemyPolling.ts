@@ -201,7 +201,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   const blockchainLastProcessedBlock = chainInfo.lastProcessedBlock;
   // Get the effective last processed block (max of blockchain and local storage)
   const lastProcessedBlock = await blockTrackingService.getEffectiveLastProcessedBlock(
-    externalChainId, 
+    externalChainId,
     blockchainLastProcessedBlock
   );
   const oldestPendingAtStart =
@@ -210,7 +210,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
     lastProcessedBlock,
     oldestPendingAtStart,
   );
-  
+
   if (!isChainConfigured(externalChainId)) return;
 
   const currentBlock = await getCurrentBlockNumber(externalChainId);

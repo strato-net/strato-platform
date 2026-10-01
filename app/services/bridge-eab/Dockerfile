@@ -51,4 +51,4 @@ USER node
 
 RUN node -e "require('./dist/utils/routeQuoteUtils')"
 
-CMD ["node", "dist/index.js"] 
+CMD ["node", "dist/index.js"]

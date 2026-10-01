@@ -117,7 +117,6 @@ export const notifyBridgeReviews = async (): Promise<void> => {
           const digest = parseBridgeDigest(await rpc.post("", buildBridgeDigestRequest(config.externalAssetBridge.address!, "getReviewedDepositDigest", [chainId, `0x${normalize(router)}`, depositId])));
           if (normalize(approval) === normalize(digest)) {
             if (saved[item.id]) {
-              await sendBridgeReviewEmail({ ...item, approvalStatus: "approved" }, true);
               delete saved[item.id]; await persist();
             }
             continue;
@@ -134,7 +133,7 @@ export const notifyBridgeReviews = async (): Promise<void> => {
     try {
       const outcome = await getBridgeReviewOutcome(item);
       if (!outcome) continue;
-      await sendBridgeReviewEmail({ ...item, outcome }, true); delete saved[id]; await persist();
+      delete saved[id]; await persist();
     }
     catch (error) { failed = true; logError("BridgeReviewNotification", error as Error, { reviewId: id }); }
   }

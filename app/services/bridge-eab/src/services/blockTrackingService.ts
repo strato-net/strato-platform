@@ -67,7 +67,7 @@ class BlockTrackingService {
     const data = await this.loadBlockData();
     data[chainId.toString()] = blockNumber;
     await this.saveBlockData(data);
-    
+
     logInfo('BlockTrackingService', `Updated local lastProcessedBlock for chain ${chainId}: ${blockNumber}`);
   }
 
@@ -93,7 +93,7 @@ class BlockTrackingService {
         lastProcessedBlock: blockNumber,
       },
     });
-    
+
     logInfo(
       "BlockTrackingService",
       `Updated lastProcessedBlock on blockchain for chain ${chainId}: ${blockNumber}`,

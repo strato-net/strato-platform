@@ -228,71 +228,77 @@ function sameGovernanceArgs(call, eventArgs) {
 }
 
 async function fetchLiveAdminVoteCounts(settings, nodeUrl, token, calls, artifacts, fetchImpl = fetch) {
-  const metadata = recordedVoteMetadata(calls, artifacts);
+  if (!calls.length) return new Map();
   const registry = address(settings.adminRegistry);
-  const createdUrl = `${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry-IssueCreated`;
-  const votedUrl = `${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry-IssueVoted`;
-  const unmatched = calls.filter(({ id, call }) => !metadata.get(id)?.issueId && call?.args?._target && call?.args?._func);
-  if (unmatched.length) {
-    const pairs = [...new Map(unmatched.flatMap(({ call }) => {
-      const target = address(call.args._target);
-      const func = call.args._func;
-      return [
-        [`${target}:${func}`, `and(target.eq.${target},func.eq.${func})`],
-        [`0x${target}:${func}`, `and(target.eq.0x${target},func.eq.${func})`],
-      ];
-    })).values()];
-    const created = await jsonFetch(`${createdUrl}?${new URLSearchParams({
-      address: `eq.${registry}`,
-      or: `(${pairs.join(",")})`,
-      select: "issueId,target,func,args",
-      limit: 10000,
-    })}`, token, fetchImpl);
-    for (const item of unmatched) {
-      const match = created.find((row) =>
-        address(row.target) === address(item.call.args._target) &&
-        String(row.func || "") === item.call.args._func &&
-        sameGovernanceArgs(item.call, row.args));
-      if (!match?.issueId) continue;
-      const current = metadata.get(item.id) || { hashes: new Set() };
-      current.issueId = String(match.issueId).toLowerCase();
-      metadata.set(item.id, current);
+  const read = async (table, params) => {
+    const rows = [];
+    for (let offset = 0; ;) {
+      const page = await jsonFetch(`${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry${table}?${new URLSearchParams({
+        address: `eq.${registry}`, order: "key.asc", ...params, limit: 200, offset,
+      })}`, token, fetchImpl);
+      if (!Array.isArray(page)) throw new Error("Governance state unavailable");
+      if (!page.length) return rows;
+      rows.push(...page);
+      offset += page.length;
+    }
+  };
+  const [active, adminRows] = await Promise.all([
+    read("-currentIssues", { value: "eq.true", select: "key,value" }),
+    read("-admins", { select: "key,value" }),
+  ]);
+  const admins = new Set(adminRows.map(row => address(row.value)));
+  if (!admins.size || [...admins].some(value => !/^[a-f0-9]{40}$/.test(value) || /^0+$/.test(value))) {
+    throw new Error("Current governance voter set is unavailable");
+  }
+  const ids = [...new Set(active.filter(row => bool(row.value)).map(row => String(row.key)))];
+  if (ids.some(id => !/^(0x)?[a-f0-9]{64}$/i.test(id))) throw new Error("Invalid active governance issue ID");
+  const created = [], executed = [], votes = [];
+  for (let start = 0; start < ids.length; start += 20) {
+    const filter = `in.(${ids.slice(start, start + 20).join(",")})`;
+    const pages = await Promise.all([
+      read("-IssueCreated", { issueId: filter, select: "issueId,target,func,args,block_number,event_index", order: "block_number.desc,event_index.desc" }),
+      read("-IssueExecuted", { issueId: filter, select: "issueId,block_number,event_index", order: "block_number.desc,event_index.desc" }),
+      read("-votes", { key: filter, select: "key,key2,value", order: "key.asc,key2.asc" }),
+    ]);
+    created.push(...pages[0]); executed.push(...pages[1]); votes.push(...pages[2]);
+  }
+  const position = row => {
+    if (!/^\d+$/.test(String(row.block_number)) || !/^\d+$/.test(String(row.event_index))) throw new Error("Governance lifecycle ordering unavailable");
+    return [BigInt(row.block_number), BigInt(row.event_index)];
+  };
+  const compare = (a, b) => {
+    const x = position(a), y = position(b);
+    return x[0] === y[0] ? (x[1] > y[1] ? -1 : x[1] < y[1] ? 1 : 0) : x[0] > y[0] ? -1 : 1;
+  };
+  created.forEach(position);
+  executed.forEach(position);
+  created.sort(compare);
+  const latest = new Map();
+  for (const row of created) if (!latest.has(row.issueId)) latest.set(row.issueId, row);
+  for (const id of ids) {
+    const creation = latest.get(id);
+    if (!creation || executed.some(row => row.issueId === id && compare(row, creation) <= 0)) {
+      throw new Error("Governance issue lifecycle is inconsistent; wait for indexing before voting");
     }
   }
-  const transactionToCall = new Map([...metadata].flatMap(([id, value]) =>
-    [...value.hashes].map((hash) => [hash, id])));
-  const missingIssueHashes = [...transactionToCall.keys()]
-    .filter((hash) => !metadata.get(transactionToCall.get(hash)).issueId);
-  if (missingIssueHashes.length) {
-    const rows = await jsonFetch(`${votedUrl}?${new URLSearchParams({
-      address: `eq.${registry}`,
-      transaction_hash: `in.(${missingIssueHashes.join(",")})`,
-      select: "issueId,transaction_hash",
-      limit: 10000,
-    })}`, token, fetchImpl);
-    for (const row of rows) {
-      const id = transactionToCall.get(String(row.transaction_hash || "").toLowerCase());
-      if (id && row.issueId) metadata.get(id).issueId = String(row.issueId).toLowerCase();
+  const counts = new Map();
+  for (const item of calls) {
+    if (!item.call?.args?._target || !item.call?.args?._func) throw new Error("Governance call identity unavailable");
+    const match = [...latest.values()].find(row => address(row.target) === address(item.call.args._target) &&
+      row.func === item.call.args._func && sameGovernanceArgs(item.call, row.args));
+    const voters = new Set();
+    if (match) for (const row of votes.filter(row => row.key === match.issueId)) {
+      const voter = address(row.value);
+      if (/^0{40}$/.test(voter)) continue;
+      if (!admins.has(voter) || voters.has(voter)) throw new Error("Governance issue contains an invalid or stale voter set");
+      voters.add(voter);
     }
+    if (match && voters.size === 0) throw new Error("Active governance issue has no indexed votes; retry before voting");
+    item.governanceIssueId = match?.issueId;
+    item.governanceVoters = [...voters];
+    counts.set(item.id, voters.size);
   }
-  const issues = new Map([...metadata].filter(([, value]) => value.issueId)
-    .map(([id, value]) => [id, value.issueId]));
-  if (issues.size === 0) return new Map();
-  const issueIds = [...new Set(issues.values())];
-  const rows = await jsonFetch(
-    `${votedUrl}?${new URLSearchParams({
-      address: `eq.${registry}`,
-      issueId: `in.(${issueIds.join(",")})`,
-      select: "issueId,voter",
-      limit: 10000,
-    })}`, token, fetchImpl);
-  const voters = new Map();
-  for (const { issueId, voter } of rows) {
-    const key = String(issueId || "").toLowerCase();
-    if (!voters.has(key)) voters.set(key, new Set());
-    voters.get(key).add(address(voter));
-  }
-  return new Map([...issues].map(([id, issueId]) => [id, voters.get(issueId)?.size || 0]));
+  return counts;
 }
 
 async function sourceState(context, artifacts, fetchImpl = fetch) {
@@ -586,8 +592,12 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
       if (!Array.isArray(results) || results.length !== previous.hashes.length || results.some((result) => result.status !== "Success" || !previous.hashes.includes(result.hash)) || new Set(results.map((result) => result.hash)).size !== results.length) throw new Error(`Prior vote ${item.id} is pending, failed, or unavailable; reconcile before retrying`);
       journal[item.id] = { ...previous, status: "VOTED", receipt: results };
       writeJson(journalFile, journal);
-      submitted.push({ id: item.id, status: "WAITING_FOR_QUORUM", hashes: previous.hashes });
-      continue;
+      const live = fresh.calls.find(call => call.id === item.id);
+      if (!Array.isArray(live?.governanceVoters)) throw new Error("Live governance voter set unavailable; reconcile before retrying");
+      if (live.governanceVoters.includes(address(identity.address))) {
+        submitted.push({ id: item.id, status: "WAITING_FOR_QUORUM", hashes: previous.hashes });
+        continue;
+      }
     }
     journal[item.id] = { status: "SUBMITTING", call: item.call };
     writeJson(journalFile, journal);
@@ -685,8 +695,7 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
         resumeCommand,
       };
     }
-    const voteCounts = recordedVoteCounts(ready, artifacts)
-      .map((count, index) => Math.max(count, ready[index].recordedAdminVotes || 0));
+    const voteCounts = ready.map(item => item.recordedAdminVotes || 0);
     const requirementsKnown = ready.every(({ requiredAdminVotes }) =>
       Number.isSafeInteger(requiredAdminVotes) && requiredAdminVotes > 0);
     const voteRequirements = ready.map((item, index) => ({
