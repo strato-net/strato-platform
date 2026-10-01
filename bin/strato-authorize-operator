@@ -372,20 +372,23 @@ def step6_summary_and_confirm(ctx, args):
 
 
 def _ask(prompt):
-    # Prefer the controlling terminal so the prompt works even when stdout is piped; fall
-    # back to stdin when /dev/tty cannot be opened (some remote sessions) but stdin is a tty.
+    # Prefer the controlling terminal so the prompt works even when stdout is piped. Open it
+    # twice (read, write): a single "r+" handle needs a seekable file and a Linux tty is not
+    # (io.UnsupportedOperation: File or stream is not seekable). Fall back to stdin when there
+    # is no /dev/tty but stdin is a terminal.
     try:
-        tty = open("/dev/tty", "r+", encoding="utf-8")
-    except OSError as e:
+        tty_in = open("/dev/tty", "r", encoding="utf-8")
+        tty_out = open("/dev/tty", "w", encoding="utf-8")
+    except (OSError, ValueError) as e:
         if sys.stdin.isatty():
             sys.stderr.write(prompt)
             sys.stderr.flush()
             return sys.stdin.readline().strip().lower()
-        die(10, f"no terminal to confirm on ({e.strerror or e}); pass --yes to sign without a prompt")
-    with tty:
-        tty.write(prompt)
-        tty.flush()
-        return tty.readline().strip().lower()
+        die(10, f"no terminal to confirm on ({e}); pass --yes to sign without a prompt")
+    with tty_in, tty_out:
+        tty_out.write(prompt)
+        tty_out.flush()
+        return tty_in.readline().strip().lower()
 
 
 def step7_sign(ctx):
