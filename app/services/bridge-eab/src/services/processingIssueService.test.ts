@@ -84,6 +84,7 @@ test("grouped alerts and reminders survive restarts; recovery waits until every 
   await f.open().notify(f.send);
   await f.open().notify(f.send);
   assert.deepEqual(f.sent.map(s => s.resolved), [false, false, true]);
+  assert.equal(f.sent[2].records.length, 2, "recovery identifies every alerted operation");
   await f.service.record(context(), issue("FUNDING_REQUIRED", { account: "executor" }));
   await f.service.notify(f.send);
   assert.equal(f.sent.length, 4, "a new incident must alert again");
@@ -375,7 +376,9 @@ test("processing emails use existing recipients and distinguish recovery from co
   assert.doesNotMatch(sent[1].subject, /funding needed|Action required/);
   assert.match(sent[1].text, /Previous issue code: FUNDING_REQUIRED/);
   assert.match(sent[0].text, /Withdrawal #1 — ETH/);
-  assert.match(sent[0].text, /Action required\nFund/);
+  assert.match(sent[0].subject, /Operations check needed/);
+  assert.match(sent[0].text, /Who acts next\nPlatform operations team/);
+  assert.match(sent[0].text, /Next steps\nFund/);
   assert.doesNotMatch(sent[1].text, /needs funding/);
   await f.service.record(context("2"), issue("UNKNOWN"));
   await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("2"))]], true);
@@ -383,6 +386,49 @@ test("processing emails use existing recipients and distinguish recovery from co
   assert.doesNotMatch(sent[2].text, /needs operator investigation|\{\}/);
   assert.doesNotMatch(sent[0].text + sent[1].text, /https?:\/\//);
   assert.doesNotMatch(sent[0].text + sent[1].text, /\{"|\{\}/);
+});
+
+test("confirmation alerts report observed counts and assign investigation without asserting an indexing or chain failure", async t => {
+  const f = await fixture(t);
+  const { config } = await import("../config");
+  const { default: mail } = await import("@sendgrid/mail");
+  const { sendProcessingIssueEmail } = await import("./emailService");
+  const cirrus = await import("./cirrusService");
+  const previous = config.email.approverEmails;
+  config.email.approverEmails = ["reviewer@example.com"];
+  t.after(() => { config.email.approverEmails = previous; });
+  t.mock.method(cirrus, "getBridgeEmailTokens", async () => new Map());
+  const sent: any[] = [];
+  t.mock.method(mail, "send", async (message: any) => { sent.push(message); return [] as any; });
+  const waiting = { ...context(), source: "eab" as const, stage: "withdrawal-refund" };
+  await f.service.record(waiting, issue("INDEXING_PENDING", { available: "1", required: "2" }));
+  const records = Object.values((await f.service.snapshot()).records);
+  await sendProcessingIssueEmail(records, false);
+  assert.match(sent[0].subject, /Operations check needed — Verifier confirmations still pending/);
+  assert.match(sent[0].text, /does not establish whether STRATO transaction processing or Cirrus indexing is delayed/);
+  assert.match(sent[0].text, /Who acts next\nPlatform operations team/);
+  assert.match(sent[0].text, /Check whether the verifiers' attestation transactions succeeded/);
+  assert.match(sent[0].text, /Verifier confirmations visible in Cirrus: 1 of 2/);
+  assert.match(sent[0].text, /bridge continues scheduled retries/);
+  assert.match(sent[0].text, /user should not resubmit/);
+  assert.match(sent[0].text, /operations check, not an admin vote/);
+  assert.doesNotMatch(sent[0].text + sent[0].subject, /has stopped progressing|have stopped progressing|0 of 2/);
+
+  await sendProcessingIssueEmail(records, true);
+  assert.match(sent[1].text, /Previously observed: 1 of 2/);
+  assert.match(sent[1].text, /Processing may still be in progress/);
+  assert.doesNotMatch(sent[1].text + sent[1].subject, /Operations check needed|Who acts next|Next steps|continues scheduled retries|Verifier confirmations visible in Cirrus/);
+
+  await f.service.record(waiting, issue("INDEXING_PENDING"));
+  await sendProcessingIssueEmail(Object.values((await f.service.snapshot()).records), false);
+  assert.doesNotMatch(sent[2].text, /Verifier confirmations visible in Cirrus:|undefined/);
+
+  await f.service.record(waiting, issue("CONFIRMATIONS_PENDING", { observedConfirmations: "10", requiredConfirmations: "12" }));
+  await sendProcessingIssueEmail(Object.values((await f.service.snapshot()).records), false);
+  assert.match(sent[3].subject, /Operations check needed — External confirmations still pending/);
+  assert.match(sent[3].text, /does not by itself establish that the external network has stalled/);
+  assert.match(sent[3].text, /Check the external transaction receipt and current block height/);
+  assert.doesNotMatch(sent[3].text + sent[3].subject, /have stopped progressing|has stopped progressing/);
 });
 
 test("admin listing paginates active and cleared records without exposing notification state or changing retries", async t => {
@@ -410,4 +456,57 @@ test("admin listing paginates active and cleared records without exposing notifi
   }
   writeFileSync(f.file, "null");
   await assert.rejects(f.open().list("active", 0, 25), /Invalid processing issue journal/);
+});
+
+
+test("refilling capacity stays quiet while progressing; impossible capacity alerts immediately", async t => {
+  const f = await fixture(t);
+  await f.service.record(context(), issue("WITHDRAWAL_CAPACITY", { available: "1", retryAfterSeconds: "600" }));
+  await f.service.notify(f.send);
+  assert.equal(f.sent.length, 0);
+  f.advance(6 * 60_000);
+  await f.service.record(context(), issue("WITHDRAWAL_CAPACITY", { available: "2", retryAfterSeconds: "240" }));
+  await f.service.notify(f.send);
+  assert.equal(f.sent.length, 0);
+  f.advance(6 * 60_000);
+  await f.service.record(context(), issue("WITHDRAWAL_CAPACITY", { available: "2", retryAfterSeconds: "240" }));
+  await f.service.notify(f.send);
+  assert.equal(f.sent.length, 1);
+  await f.service.record({ ...context("2"), token: "3".repeat(40) }, issue("WITHDRAWAL_CAPACITY"));
+  await f.service.notify(f.send);
+  assert.equal(f.sent.length, 2);
+});
+
+test("unknown funding account is not guessed from withdrawal stage", async t => {
+  const f = await fixture(t);
+  const issues = await f.service.record({ ...context(), source: "eab" }, issue("FUNDING_REQUIRED"));
+  assert.equal(issues[0].details.account, undefined);
+  const known = await f.service.record({ ...context(), source: "eab" }, issue("FUNDING_REQUIRED", { account: "relayer", feeAsset: "USDST-or-vouchers" }));
+  assert.equal(known[0].details.account, "relayer");
+});
+
+test("refund reconciliation accepts historical EAB references and native refunded status", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getCompletedProcessingContexts } = await import("./cirrusService");
+  const router = "a".repeat(40);
+  const inputs = [
+    { ...context(`${router}:18`), source: "eab" as const, stage: "deposit-refund" },
+    { ...context(`11155111:${router}:18`), source: "eab" as const, stage: "deposit-refund" },
+    { ...context("42"), stage: "deposit-refund" },
+  ];
+  t.mock.method(cirrus, "get", async (table: string, { params }: any) => {
+    if (params.offset) return [];
+    if (table.includes("ExternalAssetBridge")) return [{ key: "11155111", key2: router, key3: "18", value: { status: "6" } }];
+    assert.match(params["value->>bridgeStatus"], /8/);
+    return [{ key: "42", value: { bridgeStatus: "8" } }];
+  });
+  assert.equal((await getCompletedProcessingContexts(inputs)).length, 3);
+});
+
+
+test("mint refill eligibility requires enough maximum capacity", async () => {
+  const { capacityCanRefill } = await import("../utils/processingIssues");
+  assert.equal(capacityCanRefill(processingIssue("MINT_CAPACITY", { required: "100", capacity: "100", refillRate: "1" })), true);
+  assert.equal(capacityCanRefill(processingIssue("MINT_CAPACITY", { required: "101", capacity: "100", refillRate: "1" })), false);
+  assert.equal(capacityCanRefill(processingIssue("MINT_CAPACITY", { required: "100", capacity: "100", refillRate: "0" })), false);
 });

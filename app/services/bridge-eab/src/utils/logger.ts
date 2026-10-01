@@ -26,12 +26,12 @@ const write = async (data: object, isError: boolean) => {
   const d = data as any;
   const dt = new Date(d.ts);
   const ts = `${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getDate().toString().padStart(2,'0')} ${dt.toTimeString().slice(0,8)}`;
-  
+
   console[isError ? 'error' : 'log'](
     `\x1b[90m${ts}\x1b[0m \x1b[3${isError ? 1 : 6}m[${d.level?.toUpperCase()}]\x1b[0m ${d.context}: ${d.msg}`,
     d.data || ""
   );
-  
+
   if (isError) {
     await healthMonitor.appendToErrorFile(data)
   }

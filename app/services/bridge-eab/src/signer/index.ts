@@ -1,3 +1,4 @@
+import { readOAuthDiscovery } from "../auth/discovery";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -114,6 +115,8 @@ const { policy: verifierPolicy, digest: verifierPolicyDigest } =
 const signerOpenIdDiscoveryUrl = required(
   "SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL",
 );
+const signerExpectedIssuer = required("SETTLEMENT_ATTESTOR_OPENID_EXPECTED_ISSUER");
+const signerExpectedTokenEndpoint = required("SETTLEMENT_ATTESTOR_OPENID_EXPECTED_TOKEN_ENDPOINT");
 const signerClientId = required("SETTLEMENT_ATTESTOR_CLIENT_ID");
 const signerClientSecret = required("SETTLEMENT_ATTESTOR_CLIENT_SECRET");
 const signerBaUsername = required("SETTLEMENT_ATTESTOR_BA_USERNAME");
@@ -162,8 +165,8 @@ const getStratoToken = async (): Promise<string> => {
   if (stratoTokenPromise) return stratoTokenPromise;
   stratoTokenPromise = (async () => {
     if (!tokenEndpoint) {
-      const discovery = await axios.get(signerOpenIdDiscoveryUrl);
-      tokenEndpoint = discovery.data?.token_endpoint;
+      const discovery = await readOAuthDiscovery(signerOpenIdDiscoveryUrl, signerExpectedIssuer, signerExpectedTokenEndpoint);
+      tokenEndpoint = discovery.token_endpoint;
       if (!tokenEndpoint) throw new Error("OpenID token endpoint is unavailable");
     }
     const body = new URLSearchParams({
@@ -173,6 +176,7 @@ const getStratoToken = async (): Promise<string> => {
       scope: "openid email profile",
     });
     const response = await axios.post(tokenEndpoint, body.toString(), {
+      maxRedirects: 0,
       auth: {
         username: signerClientId,
         password: signerClientSecret,

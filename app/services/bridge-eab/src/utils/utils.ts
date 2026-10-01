@@ -166,7 +166,7 @@ export function decodeTopicAddr(topic: string): string {
  * @returns true if transaction was successful
  */
 export function isOkStatus(receipt: any): boolean {
-  return receipt.status === 1 || receipt.status === true || 
+  return receipt.status === 1 || receipt.status === true ||
     (typeof receipt.status === "string" && receipt.status.toLowerCase() === "0x1");
 }
 

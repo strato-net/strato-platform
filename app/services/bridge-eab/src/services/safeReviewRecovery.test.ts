@@ -37,12 +37,13 @@ async function worker() {
   const safe = await import("../utils/safeHelper");
   (safe as any).initializeSafeForChain = async () => ({
     protocolKit: {
+      getNonce: async () => 0,
       createTransaction: async (input: any) => ({ data: { ...input.transactions[0], nonce: input.options.nonce } }),
       getTransactionHash: async (tx: any) => `0x${String(tx.data.nonce).padStart(64, "0")}`,
       signHash: async () => ({ data: "0xsigned" }),
     },
     apiKit: {
-      getNextNonce: async () => { state.nonces++; persist(); return phase === "concurrent" || phase === "queued-failure" ? 1 : state.nonces; },
+      getNextNonce: async () => { state.nonces++; persist(); return phase === "concurrent" || phase === "queued-failure" || phase === "mixed" ? 1 : state.nonces; },
       getTransaction: async () => {
         if (phase === "missing") throw Object.assign(Error("Not Found"), { statusCode: 404 });
         if (phase === "outage") throw Object.assign(Error("Unavailable"), { statusCode: 503 });
@@ -55,6 +56,16 @@ async function worker() {
       },
     },
   });
+  if (phase === "mixed") {
+    const { withSafeProposalQueue } = await import("./safeProposalService");
+    await Promise.all(["review", "mint", "refund"].map(operation => withSafeProposalQueue(1, operation, async ({ apiKit }, saved) => {
+      if (saved) { await apiKit.proposeTransaction(saved); return; }
+      const nonce = Number(await apiKit.getNextNonce(config.safe.address!));
+      await apiKit.proposeTransaction({ safeAddress: config.safe.address!, safeTransactionData: { nonce } as any,
+        safeTxHash: `0x${String(nonce).padStart(64, "0")}`, senderAddress: config.safe.safeProposerAddress!, senderSignature: "0xsigned" });
+    })));
+    return;
+  }
   const { proposeWithdrawalReview } = await import("./externalWithdrawalService");
   const review = { sourceChainId: "9", sourceBridge: `0x${"3".repeat(40)}`, sourceWithdrawalId: "7",
     destinationChainId: "1", destinationVault: `0x${"4".repeat(40)}`, token: `0x${"5".repeat(40)}`,
@@ -76,14 +87,19 @@ async function worker() {
 if (process.argv[2] === "worker") {
   worker().catch((error) => { console.error(error); process.exitCode = 1; });
 } else {
-  for (const phase of ["concurrent", "queued-failure"]) test(`queued Safe reviews preserve nonce reservations (${phase})`, () => {
+  for (const phase of ["concurrent", "queued-failure", "mixed"]) test(`queued Safe reviews preserve nonce reservations (${phase})`, () => {
     const directory = mkdtempSync(join(tmpdir(), "safe-concurrent-"));
     writeFileSync(join(directory, "remote.json"), JSON.stringify({ nonces: 0, hashes: [] }));
     try {
       const child = spawnSync(process.execPath, [__filename, "worker", phase], { cwd: directory, encoding: "utf8" });
       assert.equal(child.status, 0, child.stderr + child.stdout);
+      if (phase === "mixed") {
+        const restarted = spawnSync(process.execPath, [__filename, "worker", phase], { cwd: directory, encoding: "utf8" });
+        assert.equal(restarted.status, 0, restarted.stderr + restarted.stdout);
+      }
       const state = JSON.parse(readFileSync(join(directory, "remote.json"), "utf8"));
-      assert.equal(new Set(state.hashes).size, 2);
+      if (phase === "mixed") assert.equal(state.nonces, 3, "restart must reuse all three reservations despite stale remote nonce");
+      assert.equal(new Set(state.hashes).size, phase === "mixed" ? 3 : 2);
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 

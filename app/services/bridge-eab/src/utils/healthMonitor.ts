@@ -70,7 +70,7 @@ export class HealthMonitor {
       checks,
     };
   }
-  
+
   async appendToErrorFile(error_data) {
     try {
       const errorJsonString = JSON.stringify({timestamp: new Date().toISOString(), error: error_data})
@@ -80,7 +80,7 @@ export class HealthMonitor {
       console.error('WARNING! Error occurred while appending to the file:', err);
     }
   }
-  
+
   async errorFileExists() {
     try {
       const stats = await fs.stat(ERROR_FILE_PATH);

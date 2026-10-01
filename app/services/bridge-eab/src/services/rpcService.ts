@@ -268,3 +268,38 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
     }
   }));
 };
+
+
+export const getVerifiedBlockHash = async (chainId: number, block: number): Promise<string> => {
+  const hashes = await Promise.all([...new Set(getChainRpcUrls(chainId))].map(async url => {
+    const result = unwrapRpcResult(await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber",
+      params: [decimalToHex(String(block)), false] }), "eth_getBlockByNumber", chainId);
+    if (!/^0x[0-9a-f]{64}$/i.test(result?.hash || "") || BigInt(result.number) !== BigInt(block)) throw new Error("Invalid native scan block");
+    return result.hash.toLowerCase();
+  }));
+  if (!hashes.length || hashes.some(hash => hash !== hashes[0])) throw new Error("Native scan RPC block disagreement");
+  return hashes[0];
+};
+
+export const getVerifiedNativeLogs = async (chainId: number, from: number, to: number, address: string, topics: string[]): Promise<any[]> => {
+  const responses = await Promise.all([...new Set(getChainRpcUrls(chainId))].map(async url => {
+    const logs = unwrapRpcResult(await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
+      fromBlock: decimalToHex(String(from)), toBlock: decimalToHex(String(to)), address: ensureHexPrefix(address), topics: [topics],
+    }] }), "eth_getLogs", chainId);
+    if (!Array.isArray(logs)) throw new Error("Invalid native scan logs");
+    for (const log of logs) {
+      if (log.removed || log.address?.toLowerCase() !== ensureHexPrefix(address).toLowerCase() ||
+          !topics.map(t => t.toLowerCase()).includes(log.topics?.[0]?.toLowerCase()) ||
+          !/^0x[0-9a-f]+$/i.test(log.blockNumber || "") || BigInt(log.blockNumber) < BigInt(from) || BigInt(log.blockNumber) > BigInt(to) ||
+          !/^0x[0-9a-f]{64}$/i.test(log.blockHash || "") || !/^0x[0-9a-f]{64}$/i.test(log.transactionHash || "") ||
+          !/^0x[0-9a-f]+$/i.test(log.logIndex || "")) throw new Error("Invalid native scan log evidence");
+    }
+    return logs;
+  }));
+  const fingerprint = (logs: any[]) => JSON.stringify(logs.map(l => JSON.stringify([
+    l.address.toLowerCase(), BigInt(l.blockNumber).toString(), l.blockHash.toLowerCase(), l.transactionHash.toLowerCase(),
+    BigInt(l.logIndex).toString(), l.topics.map((t: string) => t.toLowerCase()), l.data.toLowerCase(),
+  ])).sort());
+  if (!responses.length || responses.some(logs => fingerprint(logs) !== fingerprint(responses[0]))) throw new Error("Native scan RPC log disagreement");
+  return responses[0];
+};

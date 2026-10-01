@@ -96,3 +96,13 @@ test("rejects a signature from an unexpected KMS key", async () => {
   );
   await assert.rejects(() => signer.signMessage("safe proposal"), /unexpected key/);
 });
+
+
+test("external funding failures identify the actual KMS signer", async t => {
+  const wallet = Wallet.createRandom();
+  const signer = new DigestKmsSigner({ address: wallet.address, keyId: "alias/test", region: "us-east-1" }, new JsonRpcProvider());
+  t.mock.method(signer, "populateTransaction", async () => { throw new Error("insufficient funds for gas"); });
+  await assert.rejects(signer.sendTransaction({ to: wallet.address }), (error: any) =>
+    error.issues[0].code === "FUNDING_REQUIRED" && error.issues[0].details.account === wallet.address &&
+    error.issues[0].details.feeAsset === "external-native-gas");
+});

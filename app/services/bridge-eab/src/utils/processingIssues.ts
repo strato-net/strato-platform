@@ -1,3 +1,4 @@
+import { MaxUint256 } from "ethers";
 import { ProcessingContext, ProcessingIssue, ProcessingIssueCode, WithdrawalReleasePendingError } from "../types";
 
 const messages: Record<ProcessingIssueCode, string> = {
@@ -108,10 +109,18 @@ export const processingProgress = (issues: ProcessingIssue[], previous: Record<s
   const progress = { ...previous };
   for (const issue of issues) {
     const observed = issue.code === "CONFIRMATIONS_PENDING" ? issue.details.observedConfirmations
-      : issue.code === "INDEXING_PENDING" ? issue.details.available : undefined;
+      : ["INDEXING_PENDING", "MINT_CAPACITY", "WITHDRAWAL_CAPACITY"].includes(issue.code) ? issue.details.available : undefined;
     if (!observed || !/^\d+$/.test(observed)) continue;
     const key = JSON.stringify([issue.code, issue.details.verifier || "", issue.details.transactionHash || ""]);
     if (BigInt(observed) > BigInt(progress[key] || "0")) progress[key] = observed;
   }
   return progress;
+};
+
+export const capacityCanRefill = (issue: ProcessingIssue): boolean => {
+  if (!["MINT_CAPACITY", "WITHDRAWAL_CAPACITY"].includes(issue.code)) return false;
+  const { retryAfterSeconds, required, capacity, refillRate } = issue.details;
+  if (/^\d+$/.test(retryAfterSeconds || "")) return BigInt(retryAfterSeconds) > 0n && BigInt(retryAfterSeconds) < MaxUint256;
+  return issue.code === "MINT_CAPACITY" && [required, capacity, refillRate].every(v => /^\d+$/.test(v || "")) &&
+    BigInt(required) <= BigInt(capacity) && BigInt(refillRate) > 0n;
 };

@@ -1,3 +1,4 @@
+import { readOAuthDiscovery } from "../auth/discovery";
 import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
 import { validateVerificationRpcEndpoints } from "../services/rpcService";
 import { logInfo, logError } from "./logger";
@@ -155,62 +156,56 @@ export async function validateBridgeConfig(): Promise<boolean> {
   ) {
     try {
       // Test OAuth discovery URL
-      const response = await fetch(process.env.OPENID_DISCOVERY_URL);
-      if (!response.ok) {
+      const discovery = await readOAuthDiscovery(process.env.OPENID_DISCOVERY_URL,
+        process.env.OPENID_EXPECTED_ISSUER, process.env.OPENID_EXPECTED_TOKEN_ENDPOINT);
+      if (!discovery.jwks_uri || !discovery.issuer) {
         errors.push(
-          `OAuth discovery failed with status ${response.status}: ${response.statusText}`,
+          "OAuth discovery response is invalid - missing jwks_uri or issuer",
         );
       } else {
-        const discovery = (await response.json()) as any;
-        if (!discovery.jwks_uri || !discovery.issuer) {
-          errors.push(
-            "OAuth discovery response is invalid - missing jwks_uri or issuer",
+        // Test actual user authentication
+        try {
+          const {
+            initOpenIdConfig,
+            getBAUserAddress,
+            getBAUserToken,
+            getRelayerToken,
+          } = await import(
+            "../auth"
           );
-        } else {
-          // Test actual user authentication
-          try {
-            const {
-              initOpenIdConfig,
-              getBAUserAddress,
-              getBAUserToken,
-              getRelayerToken,
-            } = await import(
-              "../auth"
-            );
 
-            // Initialize OAuth
-            await initOpenIdConfig();
-            oauthInitialized = true;
+          // Initialize OAuth
+          await initOpenIdConfig();
+          oauthInitialized = true;
 
-            // Test user authentication by getting a token
-            const token = await getBAUserToken();
-            const relayerToken = await getRelayerToken();
-            if (!token) {
-              errors.push("User authentication failed - no token received");
-            } else if (!relayerToken) {
-              errors.push("Relayer authentication failed - no token received");
-            } else {
-              const { relayerStrato } = await import("./api");
-              const [operatorKey, relayerKey] = await Promise.all([
-                getBAUserAddress(),
-                relayerStrato.get<{ address: string }>("/key"),
-              ]);
-              operatorAddress = operatorKey.toLowerCase().replace(/^0x/, "");
-              relayerAddress = relayerKey.address
-                .toLowerCase()
-                .replace(/^0x/, "");
-              if (relayerAddress === operatorAddress) {
-                errors.push(
-                  "STRATO relayer and bridge operator must use different accounts",
-                );
-              }
-              logInfo("ConfigValidator", "User authentication test passed");
+          // Test user authentication by getting a token
+          const token = await getBAUserToken();
+          const relayerToken = await getRelayerToken();
+          if (!token) {
+            errors.push("User authentication failed - no token received");
+          } else if (!relayerToken) {
+            errors.push("Relayer authentication failed - no token received");
+          } else {
+            const { relayerStrato } = await import("./api");
+            const [operatorKey, relayerKey] = await Promise.all([
+              getBAUserAddress(),
+              relayerStrato.get<{ address: string }>("/key"),
+            ]);
+            operatorAddress = operatorKey.toLowerCase().replace(/^0x/, "");
+            relayerAddress = relayerKey.address
+              .toLowerCase()
+              .replace(/^0x/, "");
+            if (relayerAddress === operatorAddress) {
+              errors.push(
+                "STRATO relayer and bridge operator must use different accounts",
+              );
             }
-          } catch (authError) {
-            errors.push(
-              `User authentication error: ${(authError as Error).message}`,
-            );
+            logInfo("ConfigValidator", "User authentication test passed");
           }
+        } catch (authError) {
+          errors.push(
+            `User authentication error: ${(authError as Error).message}`,
+          );
         }
       }
     } catch (error) {

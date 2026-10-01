@@ -201,6 +201,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
       )];
       const tokenSymbolMap = new Map<string, string>();
       const tokenImageMap = new Map<string, string>();
+      const tokenDecimalsMap = new Map<string, number>();
       if (
         response.events.some(
           (event) =>
@@ -212,6 +213,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
           const { data: routeAssets } = await api.get("/trade/route/assets");
           for (const asset of routeAssets || []) {
             const address = normalizeAddress(asset.address);
+            tokenDecimalsMap.set(address, asset.customDecimals ?? 18);
             if (asset._symbol) tokenSymbolMap.set(address, asset._symbol);
             if (asset.images?.[0]?.value) {
               tokenImageMap.set(address, asset.images[0].value);
@@ -281,13 +283,15 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
               const token = Array.isArray(res.data) ? res.data[0] : res.data;
               const symbol = token?._symbol || token?.token?._symbol || "";
               const image = token?.images?.[0]?.value || token?.token?.images?.[0]?.value || "";
-              return { address, symbol, image };
+              const decimals = token?.customDecimals ?? token?.token?.customDecimals;
+              return { address, symbol, image, decimals };
             } catch {
               return { address, symbol: "", image: "" };
             }
           });
           const tokenResults = await Promise.all(tokenPromises);
-          tokenResults.forEach(({ address, symbol, image }) => {
+          tokenResults.forEach(({ address, symbol, image, decimals }) => {
+            if (decimals !== undefined && decimals !== null) tokenDecimalsMap.set(normalizeAddress(address), Number(decimals));
             // Normalize address to lowercase for consistent lookup
             const normalizedAddress = address.toLowerCase();
             if (symbol) {
@@ -359,7 +363,7 @@ const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
             const assetSymbol = vaultAssetSymbolMap.get(normalizeAddress(event.address));
             if (assetSymbol) tokenSymbolsMap.set(event.address, assetSymbol);
           }
-          const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap);
+          const cardData = config.handler(event, tokenSymbolsMap, userAddress, tokenImagesMap, tokenDecimalsMap);
           // Handlers return null for bookkeeping-only events that shouldn't be shown
           if (cardData) {
             // Add iconConfig from the activity type config unless the handler set one

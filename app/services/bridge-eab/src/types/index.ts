@@ -311,5 +311,12 @@ export type { ProcessingIssueCode, ProcessingIssue, ProcessingContext, Processin
 export interface ProcessingJournal {
   version: 1;
   records: Record<string, ProcessingRecord>;
-  notifications: Record<string, { fingerprint: string; sentAt: number; record: ProcessingRecord }>;
+  notifications: Record<string, { fingerprint: string; sentAt: number; record: ProcessingRecord; records?: ProcessingRecord[] }>;
+}
+
+export interface NativeScanCheckpoint {
+  block: number;
+  hash?: string;
+  reconciliationBlock: number;
+  bridge?: string;
 }

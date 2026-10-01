@@ -1,3 +1,4 @@
+import { classifyProcessingError } from "./processingIssues";
 import {
   GetPublicKeyCommand,
   KMSClient,
@@ -186,6 +187,15 @@ export class DigestKmsSigner extends AbstractSigner<Provider> {
   connect(provider: null | Provider): DigestKmsSigner {
     if (!provider) throw new Error("KMS signer requires a provider");
     return new DigestKmsSigner(this.kmsConfig, provider);
+  }
+
+  async sendTransaction(tx: TransactionRequest) {
+    try { return await super.sendTransaction(tx); }
+    catch (error) {
+      const issues = classifyProcessingError(error).map(issue => issue.code === "FUNDING_REQUIRED"
+        ? { ...issue, details: { ...issue.details, account: this.kmsConfig.address, feeAsset: "external-native-gas" } } : issue);
+      throw Object.assign(error instanceof Error ? error : new Error(String(error)), { issues });
+    }
   }
 
   async signTransaction(tx: TransactionRequest): Promise<string> {

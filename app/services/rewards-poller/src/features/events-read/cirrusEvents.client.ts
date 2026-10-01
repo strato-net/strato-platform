@@ -1,3 +1,4 @@
+import { normalizeAddressNoPrefix } from "../../shared/core/address";
 import { cirrus } from "../../infra/http/api";
 import {
   ProtocolEvent,
@@ -66,10 +67,7 @@ const queryRegularEvents = async (
     return [];
   }
   const events = data as CirrusEvent[];
-  const tokenRouterAddress = config.tokenRouter.address;
-  const normalizedTokenRouter = tokenRouterAddress
-    ?.toLowerCase()
-    .replace(/^0x/, "");
+  const tokenRouterAddress = normalizeAddressNoPrefix(config.tokenRouter.address || "");
   const routedActivities = events.filter((item) => {
     const attributes = parseJson(item.attributes);
     const userAttr = mapping[item.address]?.[item.event_name]?.user;
@@ -77,12 +75,12 @@ const queryRegularEvents = async (
       ? attributes[userAttr] || item.transaction_sender
       : item.transaction_sender;
     return (
-      normalizedTokenRouter &&
-      user?.toLowerCase().replace(/^0x/, "") === normalizedTokenRouter
+      tokenRouterAddress &&
+      normalizeAddressNoPrefix(user || "") === tokenRouterAddress
     );
   });
   let routedExecutions = new Map<string, RoutedExecution[]>();
-  if (tokenRouterAddress && config.externalAssetBridge.address && routedActivities.length) {
+  if (tokenRouterAddress && routedActivities.length) {
     const transactionHashes = [...new Set(routedActivities.map(item => item.transaction_hash))];
     if (transactionHashes.some(hash => !/^(0x)?[a-f0-9]{64}$/i.test(hash || ""))) {
       throw new Error("Invalid routed activity transaction hash");
@@ -145,7 +143,7 @@ const queryRegularEvents = async (
         nativeBridge: config.nativeBridge.address,
       });
       if (!user) {
-        logDebug("RouteAttribution", "Skipped router-attributed activity: bridge configuration or routed caller is unavailable, or the caller is the bridge", { transactionHash: item.transaction_hash });
+        logDebug("RouteAttribution", "Skipped bridge-originated routed activity to avoid duplicate rewards", { transactionHash: item.transaction_hash });
         return null;
       }
 

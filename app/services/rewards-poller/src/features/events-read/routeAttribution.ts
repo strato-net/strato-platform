@@ -18,19 +18,17 @@ export const resolveRoutedActivityUser = ({
   if (normalizeAddressNoPrefix(attributedUser || "") !== normalizeAddressNoPrefix(tokenRouter || "")) {
     return attributedUser || null;
   }
-  const bridge = normalizeAddressNoPrefix(externalAssetBridge || "");
-  const native = normalizeAddressNoPrefix(nativeBridge || "");
-  if (
-    !/^[a-f0-9]{40}$/.test(native) || native === ZERO_ADDRESS ||
-    !/^[a-f0-9]{40}$/.test(bridge) ||
-    bridge === ZERO_ADDRESS ||
-    !routedCaller ||
-    normalizeAddressNoPrefix(routedCaller) === bridge ||
-    normalizeAddressNoPrefix(routedCaller) === native
-  ) {
-    return null;
+  const caller = normalizeAddressNoPrefix(routedCaller || "");
+  if (!/^[a-f0-9]{40}$/.test(caller) || caller === ZERO_ADDRESS) {
+    throw new Error("Routed activity caller is unresolved; retry before advancing rewards cursor");
   }
-  return routedCaller;
+  const bridges = [externalAssetBridge, nativeBridge].filter((address): address is string => !!address)
+    .map(normalizeAddressNoPrefix);
+  if (bridges.includes(caller)) return null;
+  if (bridges.some(address => !/^[a-f0-9]{40}$/.test(address) || address === ZERO_ADDRESS)) {
+    throw new Error("Invalid configured bridge address; cannot attribute routed rewards safely");
+  }
+  return routedCaller!;
 };
 
 

@@ -39,4 +39,3 @@ export const traceFingerprint = (traces: any[]): string => JSON.stringify(traces
   action: Object.fromEntries(Object.entries(trace.action || {}).sort().map(([key, value]) => [key, normalizeHex(value)])),
   result: Object.fromEntries(Object.entries(trace.result || {}).sort().map(([key, value]) => [key, normalizeHex(value)])),
 })));
-

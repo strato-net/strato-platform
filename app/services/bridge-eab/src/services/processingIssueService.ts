@@ -3,9 +3,9 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { PROCESSING_RETRY_BASE_MS, PROCESSING_RETRY_MAX_MS, PROCESSING_ALERT_GRACE_MS, PROCESSING_DEFERRED_ALERT_CODES,
-  PROCESSING_REMINDER_MS, PROCESSING_HISTORY_MS, config, getExternalBridgeExecutorKmsConfig } from "../config";
+  PROCESSING_REMINDER_MS, PROCESSING_HISTORY_MS, config } from "../config";
 import { ProcessingContext, ProcessingIssue, ProcessingJournal, ProcessingRecord, DepositArgs, WithdrawalInfo, NativeWithdrawalInfo } from "../types";
-import { classifyProcessingError, processingKey, processingProgress } from "../utils/processingIssues";
+import { classifyProcessingError, processingKey, processingProgress, capacityCanRefill } from "../utils/processingIssues";
 import { logInfo } from "../utils/logger";
 import { sendProcessingIssueEmail } from "./emailService";
 
@@ -88,13 +88,6 @@ export class ProcessingIssueService {
     // Withdrawal workers retry unknown failures; deposits retain their review decision.
     const withdrawal = context.stage.startsWith("withdrawal-") || context.stage === "release-confirmations";
     let issues = classifyProcessingError(error).map(issue => withdrawal && issue.code === "UNKNOWN" ? { ...issue, retryable: true } : issue);
-    if (context.source === "eab" && context.stage.startsWith("withdrawal") && /^\d+$/.test(context.chainId)) {
-      issues = issues.map(issue => issue.code === "FUNDING_REQUIRED" && !issue.details.account
-        ? { ...issue, details: { ...issue.details,
-          account: getExternalBridgeExecutorKmsConfig(BigInt(context.chainId))?.address || "external-executor",
-          feeAsset: "external-native-gas",
-        } } : issue);
-    }
     if (context.source === "eab" && context.token && issues.some(issue => issue.code === "MINT_CAPACITY")) {
       try {
         const { getMintPolicyDiagnostics, getDepositSettlementInfoByIdentity } = await import("./cirrusService");
@@ -162,21 +155,24 @@ export class ProcessingIssueService {
         const record = records[0], saved = state.notifications[key];
         const signature = fingerprint(records.flatMap(r => r.issues).filter((issue, i, all) =>
           all.findIndex(other => fingerprint([other]) === fingerprint([issue])) === i));
-        const immediate = records.some(r => r.issues.some(i => !PROCESSING_DEFERRED_ALERT_CODES.includes(i.code)));
+        const immediate = records.some(r => r.issues.some(i => !PROCESSING_DEFERRED_ALERT_CODES.includes(i.code) && !capacityCanRefill(i)));
         if (!immediate && records.every(r => r.attempts < 2 ||
           r.lastSeenAt - (r.lastProgressAt ?? r.firstSeenAt) < PROCESSING_ALERT_GRACE_MS ||
           this.now() - r.lastSeenAt > PROCESSING_RETRY_MAX_MS + PROCESSING_ALERT_GRACE_MS)) continue;
         if (saved?.fingerprint === signature && this.now() - saved.sentAt < PROCESSING_REMINDER_MS) continue;
         try {
           await send(records, false);
-          await this.update(s => { s.notifications[key] = { fingerprint: signature, sentAt: this.now(), record }; });
+          await this.update(s => { s.notifications[key] = { fingerprint: signature, sentAt: this.now(), record,
+            records: [...new Map([...(saved?.records || (saved ? [saved.record] : [])), ...records]
+              .map(r => [processingKey(r.context), r])).values()] }; });
         } catch { failed = true; }
       }
       for (const [key, saved] of Object.entries(state.notifications)) {
         if (groups.has(key)) continue;
         const current = state.records[processingKey(saved.record.context)];
         try {
-          if (current?.resolvedAt) await send([{ ...saved.record, resolvedAt: current.resolvedAt, outcome: current.outcome }], true);
+          const recovered = (saved.records || [saved.record]).map(r => ({ ...r, resolvedAt: state.records[processingKey(r.context)]?.resolvedAt, outcome: state.records[processingKey(r.context)]?.outcome }));
+          if (current?.resolvedAt && recovered.every(r => r.resolvedAt)) await send(recovered, true);
           await this.update(s => { delete s.notifications[key]; });
         } catch { failed = true; }
       }

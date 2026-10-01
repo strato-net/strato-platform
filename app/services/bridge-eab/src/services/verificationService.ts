@@ -6,9 +6,9 @@ import {
   TRANSFER_EVENT_SIGNATURE,
   WAD,
 } from "../config";
-import { 
-  getTransactionReceiptsBatch, 
-  getInternalTransactionsBatch 
+import {
+  getTransactionReceiptsBatch,
+  getInternalTransactionsBatch
 } from "./rpcService";
 import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
@@ -19,7 +19,7 @@ import { parseDepositLog, RawDepositLog } from "./depositEventService";
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
   if (typeof log.topics[0] !== "string" || log.topics[0].toLowerCase() !== sig) return null;
-  
+
   return {
     tokenAddr: normalizeAddress(log.address),
     fromAddr: decodeTopicAddr(log.topics[1]),
@@ -29,7 +29,7 @@ const decodeTransferLog = (log: any, sig: string) => {
   };
 };
 
-const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: bigint): boolean => 
+const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: bigint): boolean =>
   traces.some((trace: any) => {
     if (trace.type === 'call' && trace.action?.to) {
       const traceTo = normalizeAddress(trace.action.to);
@@ -50,7 +50,7 @@ export const validateDeposit = (deposit: DepositInfo, chainId: Number, rebaseFac
   if (!custodyAddress) {
     return new Error(`Custody address not configured for chain ${chainId}`);
   }
-  
+
   return {
     custodyAddress,
     isETH: externalToken === ZERO_ADDRESS,
@@ -64,7 +64,7 @@ export const validateDeposit = (deposit: DepositInfo, chainId: Number, rebaseFac
 
 export const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
   const to = receipt.to ? normalizeAddress(receipt.to) : "";
-  
+
   if (to === ctx.custodyAddress) {
     return null;
   }
@@ -72,11 +72,11 @@ export const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error |
   if (to !== ctx.depositRouter) {
     return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }
-  
+
   if (!findInternalEthTransfer(traces, ctx.custodyAddress, ctx.stratoTokenAmount)) {
     return new Error(`No internal ETH transfer to custody ${ctx.custodyAddress} found`);
   }
-  
+
   return null;
 };
 
@@ -85,7 +85,7 @@ export const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   const logs = Array.isArray(receipt.logs) ? receipt.logs : [];
 
   logInfo("Verification", `ERC20 check: token=${ctx.externalToken} custody=${ctx.custodyAddress} expected=${ctx.stratoTokenAmount} decimals=${ctx.externalDecimals} rebaseFactor=${ctx.rebaseFactor ?? 'none'} logCount=${logs.length}`);
-  
+
   const validTransfer = logs.some(log => {
     const decoded = decodeTransferLog(log, sig);
     if (!decoded) return false;
@@ -94,7 +94,7 @@ export const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
       logInfo("Verification", `  skip log: addr=${decoded.tokenAddr} to=${decoded.toAddr} amount=${decoded.amount}`);
       return false;
     }
-    
+
     const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals);
     logInfo("Verification", `  match log: amount=${decoded.amount} converted=${convertedAmount} stored=${ctx.stratoTokenAmount}`);
 
@@ -106,14 +106,14 @@ export const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
       logInfo("Verification", `  rebased=${rebasedAmount} truncated=${truncatedRebasedAmount} match=${truncatedRebasedAmount === ctx.stratoTokenAmount}`);
       return truncatedRebasedAmount === ctx.stratoTokenAmount;
     }
-    
+
     return convertedAmount === ctx.stratoTokenAmount;
   });
-  
+
   if (!validTransfer) {
     return new Error(`No ERC20 Transfer to custody ${ctx.custodyAddress} for token ${ctx.externalToken}`);
   }
-  
+
   return null;
 };
 
@@ -419,14 +419,14 @@ export const verifyDetectedDepositsBatch = async (
 // Batched verification for multiple deposits
 export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<string, Error | null>> => {
   const results = new Map<string, Error | null>();
-  
+
   // Group deposits by chain for batch processing
   const depositsByChain = new Map<number, DepositInfo[]>();
   deposits.forEach(deposit => {
-    const externalChainId = typeof deposit.externalChainId === "number" 
-      ? deposit.externalChainId 
+    const externalChainId = typeof deposit.externalChainId === "number"
+      ? deposit.externalChainId
       : Number(deposit.externalChainId);
-    
+
     if (!depositsByChain.has(externalChainId)) {
       depositsByChain.set(externalChainId, []);
     }
@@ -442,7 +442,7 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
     // Dedupe txHashes
     const txHashes = [...new Set(chainDeposits.map(d => d.externalTxHash))];
     if (txHashes.length === 0) continue;
-    
+
     // Batch fetch receipts and internal transactions
     const [receipts, internalTxsMap] = await Promise.all([
       getTransactionReceiptsBatch(chainId, txHashes),
@@ -479,7 +479,7 @@ export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<
           results.set(deposit.externalTxHash, traces);
           continue;
         }
-        const error = ctx.isETH 
+        const error = ctx.isETH
           ? verifyEthDeposit(receipt, Array.isArray(traces) ? traces : [], ctx)
           : verifyErc20Deposit(receipt, ctx);
 

@@ -5,7 +5,7 @@ import { logInfo, logError } from "../utils/logger";
 export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
   const voucherContractAddress = config.voucher.contractAddress;
   const voucherCount = config.voucher.mintCount;
-  
+
   const voucherAmount = (voucherCount * Math.pow(10, STRATO_DECIMALS)).toString();
 
   logInfo("VoucherService", `Minting vouchers for ${stratoRecipients.length} successful bridge-in deposits`);
@@ -25,7 +25,7 @@ export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
 
     logInfo("VoucherService", `Successfully minted ${voucherCount} vouchers for ${stratoRecipients.length} users, tx: ${result.hash}`);
   } catch (error) {
-    logError("VoucherService", error as Error, { 
+    logError("VoucherService", error as Error, {
       stratoRecipientsCount: stratoRecipients.length
     });
   }

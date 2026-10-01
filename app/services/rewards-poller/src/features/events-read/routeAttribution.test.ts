@@ -3,8 +3,8 @@ import test from "node:test";
 import { resolveRoutedActivityUser, indexRouteExecutions, getRoutedActivityCaller } from "./routeAttribution";
 
 const route = {
-  attributedUser: "0x1111111111111111111111111111111111111111",
-  tokenRouter: "1111111111111111111111111111111111111111",
+  attributedUser: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  tokenRouter: "abcdefabcdefabcdefabcdefabcdefabcdefabcd",
   externalAssetBridge: "2222222222222222222222222222222222222222",
   nativeBridge: "4".repeat(40),
 };
@@ -29,14 +29,19 @@ test("skips ExternalAssetBridge routes to avoid duplicate rewards", () => {
   );
 });
 
-test("fails closed when the bridge address is missing, zero, or malformed", () => {
-  for (const externalAssetBridge of [
-    undefined, "", " ", "0".repeat(40), `0x${"0".repeat(40)}`, `0X${"0".repeat(40)}`,
-    "2".repeat(39), "2".repeat(41), "g".repeat(40), ` ${route.externalAssetBridge}`,
-  ]) {
-    for (const routedCaller of [route.externalAssetBridge, "3".repeat(40)]) {
-      assert.equal(resolveRoutedActivityUser({ ...route, routedCaller, externalAssetBridge }), null);
-    }
+test("optional bridges do not block direct routes or the configured bridge", () => {
+  for (const missing of [undefined, ""]) {
+    assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: missing, routedCaller: "3".repeat(40) }), "3".repeat(40));
+    assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: missing, routedCaller: route.externalAssetBridge }), null);
+    assert.equal(resolveRoutedActivityUser({ ...route, externalAssetBridge: missing, routedCaller: route.nativeBridge }), null);
+    assert.equal(resolveRoutedActivityUser({ ...route, externalAssetBridge: missing, nativeBridge: missing, routedCaller: "3".repeat(40) }), "3".repeat(40));
+  }
+});
+
+test("malformed configured bridges stop attribution instead of dropping rewards", () => {
+  for (const invalid of [" ", "0".repeat(40), `0x${"0".repeat(40)}`, "2".repeat(39), "g".repeat(40)]) {
+    assert.throws(() => resolveRoutedActivityUser({ ...route, externalAssetBridge: invalid, routedCaller: "3".repeat(40) }), /Invalid configured bridge/);
+    assert.throws(() => resolveRoutedActivityUser({ ...route, nativeBridge: invalid, routedCaller: "3".repeat(40) }), /Invalid configured bridge/);
   }
 });
 
@@ -60,20 +65,13 @@ test("keeps non-routed activity attribution when bridge configuration is invalid
 });
 
 test("fails closed when the routed caller is unavailable", () => {
-  assert.equal(resolveRoutedActivityUser(route), null);
+  assert.throws(() => resolveRoutedActivityUser(route), /caller is unresolved/);
 });
 
 
 test("skips native bridge routes rather than rewarding the bridge contract", () => {
   assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: "4".repeat(40), routedCaller: `0x${"4".repeat(40)}` }), null);
   assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge: "4".repeat(40), routedCaller: "3".repeat(40) }), "3".repeat(40));
-});
-
-
-test("fails closed for routed rewards until native bridge attribution is configured", () => {
-  for (const nativeBridge of [undefined, "", "0".repeat(40), "malformed"]) {
-    assert.equal(resolveRoutedActivityUser({ ...route, nativeBridge, routedCaller: "4".repeat(40) }), null);
-  }
 });
 
 
@@ -143,16 +141,43 @@ test("event ingestion attributes batched routes independently and fully paginate
   });
   const cursor = { blockNumber: 0, eventIndex: -1, block_timestamp: "2026-01-01T00:00:00Z" };
   const read = () => getEventsBatch([pool], ["Deposit"], cursor, new Set([makeEventPairKey(pool, "Deposit")]), new Map(), []);
+  const client = await import("./cirrusEvents.client");
+  const balance = await import("../rewards-cycle/rewardsBalance.guard");
+  const writer = await import("../rewards-cycle/rewardsBatch.writer");
+  const { blockTrackingService } = await import("../../infra/state/blockTracking.repo");
+  const logger = await import("../../infra/observability/logger");
+  const { processRewardsCycle } = await import("../rewards-cycle/rewardsCycle.processor");
+  t.mock.method(balance, "checkBalances", async () => undefined);
+  t.mock.method(client, "getEventQueryParams", async () => ({ contractAddresses: [pool], eventNames: ["Deposit"], cursor,
+    validPairs: new Set([makeEventPairKey(pool, "Deposit")]), positionActivityRoutes: new Map() }));
+  const writes = t.mock.method(writer, "batchHandleAction", async () => undefined);
+  const advances = t.mock.method(blockTrackingService, "updateCursor", async () => undefined);
+  t.mock.method(logger, "logError", () => undefined);
+  await processRewardsCycle([]);
+  assert.equal(writes.mock.callCount(), 0, "unresolved attribution must not submit any rewards");
+  assert.equal(advances.mock.callCount(), 0, "unresolved attribution must not advance the stored cursor");
+  await assert.rejects(read(), /caller is unresolved/, "missing completion must block the batch, including later ordinary activity");
+  activities.splice(activities.findIndex(event => event.event_index === 10), 1);
+  calls.length = 0;
   let events = await read();
   assert.equal(events.length, 45);
   assert.equal(events.filter(event => event.transaction_sender === bob).length, 22);
   assert.equal(events.filter(event => event.transaction_sender === alice).length, 23);
   assert.ok(events.every(event => event.event_index !== 4 && event.event_index !== 10));
   assert.equal(calls.filter(params => params.offset === 0).length, 2, "transaction hashes use bounded batches");
+  for (const configured of [`0x${route.tokenRouter}`, `0X${route.tokenRouter.toUpperCase()}`]) {
+    config.tokenRouter.address = configured;
+    assert.deepEqual(await read(), events, "prefixed router configuration must preserve every attributed reward and normalized Cirrus filter");
+  }
   cursor.blockNumber = 100; cursor.eventIndex = 3;
   events = await read();
   assert.equal(events.length, 44);
   assert.equal(events.find(event => event.block_number === 100)?.transaction_sender, bob);
+  config.nativeBridge.address = undefined;
+  for (const completion of completions) {
+    if (completion.attributes.caller === route.nativeBridge) completion.attributes.caller = route.externalAssetBridge;
+  }
+  assert.equal((await read()).length, 44, "EAB-only ingestion retains ordinary routed rewards");
   unavailable = true;
   await assert.rejects(read(), /Route lookup unavailable/, "incomplete boundary reads must not produce partial rewards");
 });
