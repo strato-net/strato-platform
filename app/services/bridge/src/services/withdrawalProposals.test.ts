@@ -9,6 +9,7 @@ import * as stratoHelper from "../utils/stratoHelper";
 import { proposeTransactions } from "../utils/safeHelper";
 import { buildWithdrawalOrigin, parseWithdrawalOrigin } from "../utils/withdrawalOrigin";
 import * as safeService from "./safeService";
+import * as cirrusService from "./cirrusService";
 import * as emailService from "./emailService";
 import { confirmWithdrawalBatch, proposeRecordedCustodyTxs } from "./bridgeService";
 import { withdrawalProposalJournal } from "./withdrawalProposalJournal";
@@ -77,8 +78,11 @@ const withStubs = async (
     propose: safeService.proposeSafeTransactions,
     nonce: safeService.getSafeOnChainNonce,
     payouts: safeService.findWithdrawalPayouts,
+    feeTerms: cirrusService.getWithdrawalFeeTerms,
     email: emailService.default,
   };
+  // No withdrawal here committed a solver fee schedule, so every payout is a direct transfer
+  (cirrusService as any).getWithdrawalFeeTerms = async () => new Map();
   (stratoHelper as any).execute = async (input: FunctionInput) => {
     seen.executed.push(input);
     await stubs.execute(input);
@@ -112,6 +116,7 @@ const withStubs = async (
     (safeService as any).proposeSafeTransactions = originals.propose;
     (safeService as any).getSafeOnChainNonce = originals.nonce;
     (safeService as any).findWithdrawalPayouts = originals.payouts;
+    (cirrusService as any).getWithdrawalFeeTerms = originals.feeTerms;
     (emailService as any).default = originals.email;
   }
 };
