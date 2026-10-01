@@ -111,7 +111,8 @@ const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: strin
     case "lending":
       return "/dashboard/earn-lending";
     case "vault":
-      return "/dashboard/earn-vault";
+      // Yield vaults are listed on the Earn page
+      return "/dashboard/earn";
     case "swap":
     case "weighted_swap":
       return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
