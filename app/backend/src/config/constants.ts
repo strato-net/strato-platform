@@ -42,7 +42,6 @@ export const constants = (() => {
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const Rewards = `${CONTRACT_PREFIX}Rewards`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
-  const Vault = `${CONTRACT_PREFIX}Vault`;
   const VaultFactory = `${CONTRACT_PREFIX}VaultFactory`;
   const SaveUSDSTVault = `${CONTRACT_PREFIX}SaveUSDSTVault`;
   const YieldVault = `${CONTRACT_PREFIX}YieldVault`;
@@ -164,7 +163,6 @@ export const constants = (() => {
     CDPRegistry,
     Rewards,
     Voucher,
-    Vault,
     VaultFactory,
     SaveUSDSTVault,
     YieldVault,
@@ -175,7 +173,6 @@ export const constants = (() => {
     get metalForge() { return config.metalForge; },
     get saveUsdstVault() { return config.saveUsdstVault; },
     get vaultFactory() { return config.vaultFactory; },  // Use getter to get current value after init
-    get vault() { return config.vault; },  // Use getter to get current value after init
     priceOracle,
     liquidityPool,
     lendingPool,
