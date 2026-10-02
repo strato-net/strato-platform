@@ -261,12 +261,14 @@ the prompt, `--digest-only` to print the digest without signing (for keys held o
 | Exit | Meaning |
 |---|---|
 | 0 | signed, or the operator is already bound (nothing to do) |
+| 2 | bad operator address or usage |
 | 3 | node directory, credentials or `ethconf.yaml` missing; run `strato-login` / `strato-setup` |
 | 4 | Keycloak rejected the client id or secret |
 | 5 | the vault has no key for this client, or is sealed |
 | 6 | the app host is unreachable; pass `--api-url` / `--registry` |
 | 7 | the registry on this network is not ready for signed authorizations yet (not upgraded, or its logic computes a different digest); ask the admins |
 | 8 | unknown network; pass `--api-url` and `--registry` |
+| 9 | the built-in hash self-test failed; do not use this copy of the script |
 | 10 | you declined, or there is no terminal to confirm on (pass `--yes`) |
 
 ## Troubleshooting

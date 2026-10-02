@@ -318,7 +318,8 @@ def step6a_chain_check(ctx):
     }
     status, res = http("POST", f"{ctx['api']}/bloc/v2.2/transaction/simulate", body=body, timeout=60)
     try:
-        chain = str(res[0]["data"]["contents"][0]).lower().removeprefix("0x")
+        chain = str(res[0]["data"]["contents"][0]).lower()
+        chain = chain[2:] if chain.startswith("0x") else chain  # no str.removeprefix: python 3.6 hosts
         ok = status == 200 and res[0].get("status") == "Success"
     except (KeyError, IndexError, TypeError):
         chain, ok = "", False
@@ -411,7 +412,9 @@ def step7_sign(ctx):
 
 def step8_print(ctx):
     sig, v, o = ctx["signature"], ctx["validator"], ctx["operator"]
-    link = f"{ctx['api']}{STAKING_PAGE}?validator=0x{v}&operator=0x{o}&signature={sig}&nonce={ctx['nonce']}"
+    # Fragment, not query string: fragments never leave the browser, so the signature stays out of
+    # nginx/Cloudflare access logs and the login round trip.
+    link = f"{ctx['api']}{STAKING_PAGE}#validator=0x{v}&operator=0x{o}&signature={sig}&nonce={ctx['nonce']}"
     print(sig)
     say(f"Signature: {sig}")
     say()

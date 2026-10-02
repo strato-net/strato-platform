@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
@@ -245,6 +245,20 @@ const formatNotice = (seconds: string): string => {
   if (n >= 86400) { const d = Math.round(n / 86400); return `${d} day${d === 1 ? "" : "s"}`; }
   if (n >= 3600) { const h = Math.round(n / 3600); return `${h} hour${h === 1 ? "" : "s"}`; }
   const m = Math.max(1, Math.round(n / 60)); return `${m} minute${m === 1 ? "" : "s"}`;
+};
+
+const DEEP_LINK_STORAGE_KEY = "staking.deepLink";
+
+// strato-authorize-operator links to this page with validator/operator/signature/nonce in the URL
+// fragment. Read it once: stash it for the login round trip, strip it from the address bar.
+const readStakingDeepLink = (): string => {
+  const fromHash = window.location.hash.replace(/^#/, "");
+  if (fromHash) {
+    try { sessionStorage.setItem(DEEP_LINK_STORAGE_KEY, fromHash); } catch { /* storage unavailable */ }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return fromHash;
+  }
+  try { return sessionStorage.getItem(DEEP_LINK_STORAGE_KEY) || ""; } catch { return ""; }
 };
 
 // V2: minStake is a self-bond requirement.
@@ -649,7 +663,6 @@ const EarnStaking = () => {
   const { fetchUsdstBalance, usdstBalance, voucherBalance } = useTokenContext();
   const { tokenApys } = useEarnContext();
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
   const [info, setInfo] = useState<StakingInfo | null>(null);
   // Inline error for the validator card's register / operator-change actions (the toast shows it too).
   const [bindingError, setBindingError] = useState<string | null>(null);
@@ -794,13 +807,24 @@ const EarnStaking = () => {
   // Deep link printed by strato-authorize-operator: ?validator=&operator=&signature=&nonce=.
   // The signature only works from the operator account named in it, so a different login gets a
   // notice instead of a prefilled form. The card itself decides between registering a new validator
-  // and taking over a listed one. Login preserves the query string via redirectToLogin's returnTo.
-  const deepLink = useMemo(() => ({
-    validator: searchParams.get("validator") || "",
-    operator: searchParams.get("operator") || "",
-    signature: searchParams.get("signature") || "",
-    nonce: searchParams.get("nonce") || "",
-  }), [searchParams]);
+  // and taking over a listed one. The link carries its parameters in the URL fragment, which never
+  // reaches a server (no access-log or returnTo copies); the fragment is stashed in sessionStorage
+  // and stripped from the URL on arrival so it survives the login round trip but not history.
+  const [deepLinkRaw] = useState<string>(readStakingDeepLink);
+  useEffect(() => {
+    if (isLoggedIn && deepLinkRaw) {
+      try { sessionStorage.removeItem(DEEP_LINK_STORAGE_KEY); } catch { /* storage unavailable */ }
+    }
+  }, [isLoggedIn, deepLinkRaw]);
+  const deepLink = useMemo(() => {
+    const params = new URLSearchParams(deepLinkRaw);
+    return {
+      validator: params.get("validator") || "",
+      operator: params.get("operator") || "",
+      signature: params.get("signature") || "",
+      nonce: params.get("nonce") || "",
+    };
+  }, [deepLinkRaw]);
   const deepLinkOperatorMismatch = isLoggedIn && !!deepLink.operator && !sameAddress(deepLink.operator, userAddress || undefined);
   const deepLinkProps = isV2 && !deepLinkOperatorMismatch && deepLink.validator
     ? {

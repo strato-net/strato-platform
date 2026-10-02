@@ -162,7 +162,7 @@ nonce. Beyond that the two cases differ:
 ## 4. Component A: `bin/strato-authorize-operator`
 
 **Implemented 2026-09-29.** `bin/strato-authorize-operator` (python3, stdlib only, ~330 lines),
-installed by `make install` / removed by `make uninstall` (Makefile), operator docs in
+installed by `make` (the `build_common` target copies the bin scripts to `~/.local/bin`) / removed by `make uninstall`, operator docs in
 `techdocs/node/operations.md` ("Bind an operator to your validator"). Verified by the start-up
 Keccak self-test, a mock-server suite that was run during development and then dropped by decision
 on 2026-10-01 (no other `bin/` tool carries tests and nothing runs them automatically), and the
@@ -205,7 +205,8 @@ strato-authorize-operator <operator-address> [--node-dir DIR] [--registry ADDR] 
    32 bytes, `v` passed through (0/1); output `0x`+r+s+v (132 chars). One retry on connection
    errors only.
 8. **Print.** Signature alone on stdout; on stderr the next steps and
-   `<api>/dashboard/earn-staking?validator=0x…&operator=0x…&signature=0x…&nonce=N`, with the
+   `<api>/dashboard/earn-staking#validator=0x…&operator=0x…&signature=0x…&nonce=N` (a fragment, so the
+   signature never reaches nginx, Cloudflare or the login `returnTo`; review finding 2026-10-02), with the
    self-bond and activate reminder for operator changes (the "anyone holding this link" caution was
    dropped on 2026-10-02: the signature names the operator, so a third party can only make that
    operator the operator).
@@ -299,7 +300,9 @@ Verified with `npm run build`, `tsc -b` clean on touched files, eslint clean exc
   account is the validator → no signature needed. Manual entry of validator and signature is a
   toggle; the raw digest (with nonce) sits under an "Advanced: key held outside a vault"
   disclosure. After success the card collapses to a status row (badge + next step).
-- **Deep link** `/dashboard/earn-staking?validator&operator&signature&nonce`
+- **Deep link** `/dashboard/earn-staking#validator&operator&signature&nonce` (URL fragment: never sent to a
+  server; the page stashes it in sessionStorage so it survives the login round trip and strips it from
+  the address bar on arrival)
   (`pages/EarnStaking.tsx`): if the connected account is not `operator`, a page-level banner says
   to log in as that account and nothing is prefilled; otherwise the card opens at step 3 with the
   validator and signature as read-only rows ("Change" reveals manual entry) and steps 1–2 marked
