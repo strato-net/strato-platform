@@ -176,6 +176,13 @@ export const getAssetInfo = async (
   );
 };
 
+export const getNativeRepresentationTokens = async (chainId: number): Promise<string[]> => {
+  const rows = await getPaginatedRows(`/${NATIVE_BRIDGE_URL}-assets`, {
+    params: { address: `eq.${nativeBridgeAddress}`, key2: `eq.${chainId}`, select: "value", order: "key.asc,key2.asc" },
+  });
+  return [...new Set(rows.map((row: any) => String(row.value?.representationToken || "")))];
+};
+
 export const getEnabledNativeChainIds = async (): Promise<number[]> => {
   if (!nativeBridgeAddress) return [];
 

@@ -314,7 +314,9 @@ Before running the native flow end to end, update the bridge service environment
 - `STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>`
 - `CHAIN_11155111_RPC_URL=<sepolia-rpc-url>` if it is not already configured
-- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>`; this key must not be an attestation signer
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_ADDRESS=<gas-paying-executor-address>`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<full-key-arn>`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION=<aws-region>`
 - `CHAIN_11155111_NATIVE_VERIFIER_URLS=<comma-separated-independent-verifiers>`
 - `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<matching-comma-separated-tokens>`
 
@@ -325,7 +327,9 @@ Native withdrawal authorization is immediately valid when the withdrawal becomes
 The native runtime is `bridge-eab`; the legacy `/bridge` service remains unchanged. If `bridge-eab` is deployed through `docker-compose.bridge-eab.tpl.yml`, these values must be present in its runtime env file. The template forwards:
 - `STRATO_NATIVE_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`
-- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_ADDRESS`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION`
 - `CHAIN_11155111_NATIVE_VERIFIER_URLS`
 - `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS`
 
@@ -734,7 +738,9 @@ Set:
 STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
 CHAIN_11155111_RPC_URL=<sepolia-rpc-url>
 CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
-CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>
+CHAIN_11155111_NATIVE_MINT_EXECUTOR_ADDRESS=<gas-paying-executor-address>
+CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<full-key-arn>
+CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION=<aws-region>
 CHAIN_11155111_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
 CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 ```
@@ -742,6 +748,8 @@ CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 Each verifier process additionally needs:
 
 ```bash
+STRATO_NODE_URL=<eab-strato-node-url>
+NATIVE_STRATO_NODE_URL=<native-strato-node-url>
 NATIVE_VERIFIER_POLICY_PATH=/run/secrets/native-verifier-policy.json
 NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
 NATIVE_ATTESTATION_SIGNER_ADDRESS=<this-verifier-kms-address>
@@ -808,3 +816,34 @@ claim. This source must not reintroduce methods that consume those flags. Before
 any other deployment, check for outstanding solver claims and bonds: this upgrade
 does not migrate or settle them. Ethereum upgrade validation covers the
 pre-solver layout; it does not authorize replacing a deployed solver layout.
+
+## Native security activation checks
+
+- Native executor signing uses AWS KMS for both instant mints and direct redemption
+  refunds. Use an asymmetric `ECC_SECG_P256K1` / `SIGN_VERIFY` key. Grant the
+  runtime role signing/public-key access to that exact key; keep key management
+  separate. The public address must match the KMS public key. Do not configure
+  `CHAIN_<id>_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`; startup rejects it.
+- Grant the executor only `MINT_EXECUTOR_ROLE` on the representation bridge.
+  Startup rejects bridge administrative, pause, mapping, attestation and
+  cancellation roles on the executor, and token admin/upgrade/transfer-admin/
+  `BRIDGE_ROLE` permissions on configured representation tokens. Never grant
+  direct token minting permission to an executor or verifier.
+- The custody Safe must hold `DEFAULT_ADMIN_ROLE` for manual mints and
+  `MINT_CANCELLER_ROLE` for cancellation. Existing proxies require an explicit
+  `grantRole(MINT_CANCELLER_ROLE, <SAFE>)` governance transaction; upgrading does
+  not rerun initialization. New deployments grant both during initialization.
+- Each token must grant `BRIDGE_ROLE` to the representation bridge proxy.
+  Verify role assignments again after any governance permission change.
+- Every native refund verifier independently checks the original confirmed
+  redemption event and policy route, in addition to the STRATO refund decision.
+  Missing, disputed, immature or mismatched evidence cannot receive signatures.
+- `STRATO_NODE_URL` serves EAB reads and attestation submissions;
+  `NATIVE_STRATO_NODE_URL` serves all native reads, digest calls, submissions and
+  receipt polling. If omitted, native uses `STRATO_NODE_URL`. Both must serve
+  the configured STRATO network and the same OAuth account identity. Independent
+  URLs support independent nodes; a shared upstream remains a common dependency.
+- Upgrade/configure contracts and roles, then verifiers, then the bridge runtime.
+  Do not restart the new runtime until KMS configuration and role checks pass.
+  Run native plain/routed deposit and fallback, instant/manual withdrawal,
+  cancellation-vs-mint, and refund acceptance tests before production activation.

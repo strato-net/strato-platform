@@ -1,10 +1,10 @@
 import { withSafeProposalQueue } from "./safeProposalService";
-import { Contract, Interface, Wallet, id, verifyTypedData } from "ethers";
+import { Contract, Interface, id, verifyTypedData } from "ethers";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
-import { config, getNativeMintExecutorPrivateKey, getNativeVerifierUrls, getNativeVerifierApiTokens, getDepositConfirmationPolicy, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
+import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getNativeVerifierApiTokens, getDepositConfirmationPolicy, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES, NATIVE_REFUND_ABI, NATIVE_REFUND_TYPES } from "../config/bridgeAbi";
 import { DepositRefundAuthorization, NativeDepositInfo, NativeRefundProposal } from "../types";
 import { getChainProvider, getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
@@ -12,7 +12,7 @@ import { getRecordedDepositReviews, getBridgeReviewRecords, getDepositRefundVaul
 import { recoverDepositObservation } from "./depositEventService";
 import { getStratoNetworkId } from "./bridgeService";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
-import { safeChecksum, ensureHexPrefix } from "../utils/utils";
+import { safeChecksum } from "../utils/utils";
 import { DigestKmsSigner } from "../utils/kmsSigner";
 import { getEventTransactionHash } from "./externalWithdrawalService";
 import {
@@ -118,13 +118,13 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
       a,
     );
     const data = iface.encodeFunctionData("refundRedemption", [a, signatures]);
-    const executorKey = getNativeMintExecutorPrivateKey(chainId);
-    const executor = executorKey
-      ? new Wallet(ensureHexPrefix(executorKey), provider)
+    const executorKms = getNativeMintExecutorKmsConfig(chainId);
+    const executor = executorKms
+      ? new DigestKmsSigner(executorKms, provider)
       : undefined;
     if (
       executor &&
-      await bridge.hasRole(id("MINT_EXECUTOR_ROLE"), executor.address)
+      await bridge.hasRole(id("MINT_EXECUTOR_ROLE"), await executor.getAddress())
     ) {
       const tx = await (bridge.connect(executor) as Contract).refundRedemption(
         a,

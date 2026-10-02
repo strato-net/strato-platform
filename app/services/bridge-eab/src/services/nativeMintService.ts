@@ -11,7 +11,6 @@ import {
   Contract,
   Interface,
   JsonRpcProvider,
-  Wallet,
   verifyTypedData,
 } from "ethers";
 import axios from "axios";
@@ -20,7 +19,7 @@ import {
   config,
   EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
   getChainRpcUrl,
-  getNativeMintExecutorPrivateKey,
+  getNativeMintExecutorKmsConfig,
   getNativeVerifierApiTokens,
   getNativeVerifierUrls,
   NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
@@ -35,6 +34,7 @@ import {
 } from "../utils/safeHelper";
 import { attestNativeCancellation } from "./settlementAttestationService";
 import { retry } from "../utils/api";
+import { DigestKmsSigner } from "../utils/kmsSigner";
 import { NATIVE_MINT_EVENT_ABI } from "../config/bridgeAbi";
 
 export interface NativeMintAttestation {
@@ -88,14 +88,6 @@ const NATIVE_MINT_ATTESTATION_TYPES = {
     { name: "useInstantPath", type: "bool" },
     { name: "signerSetVersion", type: "uint256" },
   ],
-};
-
-const normalizePrivateKey = (privateKey: string): string => {
-  const prefixed = ensureHexPrefix(privateKey.trim());
-  if (!/^0x[a-fA-F0-9]{64}$/.test(prefixed)) {
-    throw new Error("Invalid native mint private key format");
-  }
-  return prefixed;
 };
 
 const toSafeNumberChainId = (chainId: string): number => {
@@ -283,10 +275,10 @@ export const executeNativeMint = async (
 ): Promise<string> => {
   const attestation = normalizeAttestation(request.attestation);
   const destinationChainId = BigInt(attestation.destinationChainId);
-  const bridgeKey = getNativeMintExecutorPrivateKey(destinationChainId);
-  if (!bridgeKey) {
+  const kms = getNativeMintExecutorKmsConfig(destinationChainId);
+  if (!kms) {
     throw new Error(
-      `CHAIN_${destinationChainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY is not configured`,
+      `CHAIN_${destinationChainId}_NATIVE_MINT_EXECUTOR KMS is not configured`,
     );
   }
 
@@ -297,10 +289,7 @@ export const executeNativeMint = async (
   const provider = new JsonRpcProvider(
     getChainRpcUrl(destinationChainId),
   );
-  const wallet = new Wallet(
-    normalizePrivateKey(bridgeKey),
-    provider,
-  );
+  const wallet = new DigestKmsSigner(kms, provider);
   const bridge = new Contract(
     attestation.destinationBridge,
     NATIVE_MINT_ABI,

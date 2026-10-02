@@ -1,11 +1,14 @@
+import { validateAwsKmsAddress } from "./kmsSigner";
+import { NATIVE_EXECUTOR_FORBIDDEN_BRIDGE_ROLES, NATIVE_EXECUTOR_FORBIDDEN_TOKEN_ROLES } from "../config/bridgeAbi";
 import { readOAuthDiscovery } from "../auth/discovery";
 import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
 import { validateVerificationRpcEndpoints } from "../services/rpcService";
 import { logInfo, logError } from "./logger";
-import { Contract, id, JsonRpcProvider, Wallet } from "ethers";
+import { Contract, id, JsonRpcProvider, ZeroHash } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
+  getNativeRepresentationTokens,
   getSettlementVerifierConfig,
   getTokenRouterWiring,
 } from "../services/cirrusService";
@@ -15,15 +18,12 @@ import {
   getExternalBridgeExecutorPrivateKey,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
-  getNativeMintExecutorPrivateKey,
+  getNativeMintExecutorKmsConfig,
   getNativeVerifierApiTokens,
   getNativeVerifierUrls,
   NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
 } from "../config";
 import { ensureHexPrefix } from "./utils";
-
-const isPrivateKey = (value: string): boolean =>
-  /^(0x)?[a-fA-F0-9]{64}$/.test(value);
 
 const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
@@ -31,6 +31,38 @@ const REPRESENTATION_BRIDGE_ABI = [
   "function maxAttestationValiditySeconds() view returns (uint256)",
   "function hasRole(bytes32,address) view returns (bool)",
 ];
+
+export const validateNativeExecutorRoles = async (
+  bridge: Contract,
+  provider: JsonRpcProvider,
+  executor: string,
+  safe: string,
+  representationTokens: string[],
+): Promise<void> => {
+  const roleId = (role: string) => role === "DEFAULT_ADMIN_ROLE" ? ZeroHash : id(role);
+  for (const role of NATIVE_EXECUTOR_FORBIDDEN_BRIDGE_ROLES) {
+    if (await bridge.hasRole(roleId(role), executor)) {
+      throw new Error(`Native executor must not hold bridge ${role}`);
+    }
+  }
+  for (const role of ["DEFAULT_ADMIN_ROLE", "MINT_CANCELLER_ROLE"]) {
+    if (!await bridge.hasRole(roleId(role), safe)) {
+      throw new Error(`Native Safe must hold ${role}`);
+    }
+  }
+  for (const address of representationTokens) {
+    if (!isAddress(address)) throw new Error("Invalid native representation token address");
+    const token = new Contract(ensureHexPrefix(address), ["function hasRole(bytes32,address) view returns (bool)"], provider);
+    for (const role of NATIVE_EXECUTOR_FORBIDDEN_TOKEN_ROLES) {
+      if (await token.hasRole(roleId(role), executor)) {
+        throw new Error(`Native executor must not hold token ${role}: ${address}`);
+      }
+    }
+    if (!await token.hasRole(id("BRIDGE_ROLE"), await bridge.getAddress())) {
+      throw new Error(`Native representation bridge lacks token BRIDGE_ROLE: ${address}`);
+    }
+  }
+};
 
 const EXTERNAL_VAULT_ABI = [
   "function attestationSigners(address) view returns (bool)",
@@ -40,9 +72,6 @@ const EXTERNAL_VAULT_ABI = [
 
 const isAddress = (value: string): boolean =>
   /^(0x)?[a-fA-F0-9]{40}$/.test(value);
-
-const normalizePrivateKey = (value: string): string =>
-  value.startsWith("0x") ? value : `0x${value}`;
 
 interface ExternalBridgeExecutorValidationResult {
   executorAddress?: string;
@@ -645,12 +674,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
         for (const chainId of nativeChainIds) {
           const representationBridgeEnv =
             `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`;
-          const executorEnv = `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`;
+          const executorEnv = `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR`;
           const verifierUrlsEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_URLS`;
           const verifierTokensEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS`;
           const rpcEnv = `CHAIN_${chainId}_RPC_URL`;
           const representationBridgeAddress = process.env[representationBridgeEnv];
-          const executorKey = getNativeMintExecutorPrivateKey(chainId);
+          const executorKms = getNativeMintExecutorKmsConfig(chainId);
           const verifierUrls = getNativeVerifierUrls(chainId);
           const verifierTokens = getNativeVerifierApiTokens(chainId);
 
@@ -660,10 +689,12 @@ export async function validateBridgeConfig(): Promise<boolean> {
             errors.push(`Invalid native representation bridge address format: ${representationBridgeEnv}`);
           }
 
-          if (!executorKey) {
-            missingNativeBridgeEnvVars.push(executorEnv);
-          } else if (!isPrivateKey(executorKey)) {
-            errors.push(`Invalid native mint executor private key format: ${executorEnv}`);
+          if (!executorKms?.address || !isAddress(executorKms.address) ||
+              !executorKms.keyId || !executorKms.region) {
+            errors.push(`${executorEnv} requires a valid ADDRESS, KMS_KEY_ID and KMS_REGION`);
+          }
+          if (process.env[`${executorEnv}_PRIVATE_KEY`]?.trim()) {
+            errors.push(`${executorEnv}_PRIVATE_KEY must not be configured; use AWS workload-identity KMS`);
           }
           if (verifierUrls.length === 0) {
             missingNativeBridgeEnvVars.push(verifierUrlsEnv);
@@ -676,8 +707,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
             process.env[rpcEnv] &&
             representationBridgeAddress &&
             isAddress(representationBridgeAddress) &&
-            executorKey &&
-            isPrivateKey(executorKey)
+            executorKms?.keyId && executorKms.region &&
+            isAddress(executorKms.address)
           ) {
             try {
               const provider = new JsonRpcProvider(process.env[rpcEnv]);
@@ -686,6 +717,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 REPRESENTATION_BRIDGE_ABI,
                 provider,
               );
+              await validateAwsKmsAddress(executorKms);
+              const representationTokens = await getNativeRepresentationTokens(chainId);
+              await validateNativeExecutorRoles(nativeBridge, provider, ensureHexPrefix(executorKms.address),
+                ensureHexPrefix(config.safe.address!), representationTokens);
               const [
                 threshold,
                 maxAttestationValiditySeconds,
@@ -695,11 +730,11 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 nativeBridge.attestationThreshold(),
                 nativeBridge.maxAttestationValiditySeconds(),
                 nativeBridge.attestationSigners(
-                  new Wallet(normalizePrivateKey(executorKey)).address,
+                  ensureHexPrefix(executorKms.address),
                 ),
                 nativeBridge.hasRole(
                   id("MINT_EXECUTOR_ROLE"),
-                  new Wallet(normalizePrivateKey(executorKey)).address,
+                  ensureHexPrefix(executorKms.address),
                 ),
               ]);
 

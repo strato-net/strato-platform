@@ -93,3 +93,11 @@ export const NATIVE_CANCELLATION_ABI = [
   "function hasRole(bytes32,address) view returns (bool)",
   "event NativeMintCanceled(bytes32 indexed mintId,uint256 sourceChainId,address sourceBridge,uint256 sourceWithdrawalId)",
 ];
+
+export const NATIVE_EXECUTOR_FORBIDDEN_BRIDGE_ROLES = [
+  "DEFAULT_ADMIN_ROLE", "UPGRADER_ROLE", "MAPPING_ADMIN_ROLE", "PAUSER_ROLE",
+  "UNPAUSER_ROLE", "ATTESTATION_ADMIN_ROLE", "MINT_CANCELLER_ROLE",
+] as const;
+export const NATIVE_EXECUTOR_FORBIDDEN_TOKEN_ROLES = [
+  "DEFAULT_ADMIN_ROLE", "UPGRADER_ROLE", "TRANSFER_ADMIN_ROLE", "BRIDGE_ROLE",
+] as const;

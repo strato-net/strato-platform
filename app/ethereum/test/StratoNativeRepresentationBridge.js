@@ -138,7 +138,7 @@ describe("StratoNativeRepresentationBridge", function () {
     await bridge.setAttestationSigner(attestationSigner.address, true);
     await bridge.setAttestationSigner(quorumSigner.address, true);
     await bridge.setAttestationThreshold(2);
-    await bridge.grantRole(await bridge.MINT_CANCELLER_ROLE(), admin.address);
+    expect(await bridge.hasRole(await bridge.MINT_CANCELLER_ROLE(), admin.address)).to.equal(true);
 
     mintExecutorRole = ethers.id("MINT_EXECUTOR_ROLE");
     await bridge.grantRole(mintExecutorRole, mintExecutor.address);

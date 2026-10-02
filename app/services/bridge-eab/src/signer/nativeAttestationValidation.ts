@@ -1,4 +1,5 @@
 import { AbiCoder, Contract, getAddress, keccak256 } from "ethers";
+import { NativeDepositInfo } from "../types";
 import { NativeVerifierPolicy } from "./nativeVerifierPolicy";
 
 export interface NativeMintAttestation {
@@ -154,7 +155,7 @@ export const validateNativeRedemptionRefund = async (
   stratoGet: StratoGet,
   bridge: Contract,
   latestTimestamp: bigint,
-): Promise<void> => {
+): Promise<NativeDepositInfo> => {
   if (
     uint(refund.sourceChainId, "sourceChainId") !== policy.sourceChainId ||
     bare(refund.sourceBridge) !== policy.sourceBridge ||
@@ -174,6 +175,7 @@ export const validateNativeRedemptionRefund = async (
     "Native deposit",
   );
   if (
+    bare(deposit.depositId) !== bare(depositId) ||
     String(deposit.bridgeStatus) !== "7" ||
     uint(deposit.externalChainId, "deposit.externalChainId") !==
       policy.destinationChainId ||
@@ -204,6 +206,7 @@ export const validateNativeRedemptionRefund = async (
   if (await bridge.refundedRedemptions(refund.redemptionId)) {
     throw new Error("Native redemption was already refunded");
   }
+  return deposit as NativeDepositInfo;
 };
 
 export const parseNativeSourceRecord = (

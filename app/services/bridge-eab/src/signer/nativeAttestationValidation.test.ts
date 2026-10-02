@@ -65,6 +65,7 @@ const withdrawal = {
   useInstantPath: true,
 };
 const deposit = {
+  depositId: "7",
   bridgeStatus: "7",
   externalChainId: policy.destinationChainId,
   externalBridge: destinationBridge,

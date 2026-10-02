@@ -125,6 +125,7 @@ const kmsConfig = {
 };
 const kmsSigner = new DigestKmsSigner(kmsConfig, provider);
 const stratoNodeUrl = required("STRATO_NODE_URL").replace(/\/$/, "");
+const nativeStratoNodeUrl = (process.env.NATIVE_STRATO_NODE_URL?.trim() || stratoNodeUrl).replace(/\/$/, "");
 const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 // Cirrus stores contract addresses as bare lowercase hex and its eq. filters are case-sensitive,
 // so accept 0x-prefixed and checksummed input but always query with the lowercase form.
@@ -292,9 +293,9 @@ const getStratoToken = async (): Promise<string> => {
   }
 };
 
-const stratoGet = async (path: string, params: Record<string, string>) => {
+const stratoGet = async (path: string, params: Record<string, string>, nodeUrl = stratoNodeUrl) => {
   const request = async () =>
-    axios.get(`${stratoNodeUrl}${path}`, {
+    axios.get(`${nodeUrl}${path}`, {
       headers: authHeaders(await getStratoToken()),
       params,
     });
@@ -307,12 +308,16 @@ const stratoGet = async (path: string, params: Record<string, string>) => {
   }
 };
 
+const nativeStratoGet = (path: string, params: Record<string, string>) =>
+  stratoGet(path, params, nativeStratoNodeUrl);
+
 const readSourceDigest = async (
   method: string,
   args: unknown[],
   contractAddress = sourceBridge,
+  nodeUrl = stratoNodeUrl,
 ): Promise<string> => {
-  const request = async () => axios.post(`${stratoNodeUrl}/rpc`,
+  const request = async () => axios.post(`${nodeUrl}/rpc`,
     buildBridgeDigestRequest(contractAddress, method, args),
     { headers: authHeaders(await getStratoToken()), timeout: 30_000 });
   try { return parseBridgeDigest((await request()).data); }
@@ -328,10 +333,11 @@ const submitStratoAttestation = async (
   args: Record<string, unknown>,
   contractName = "ExternalAssetBridge",
   contractAddress = sourceBridge,
+  nodeUrl = stratoNodeUrl,
 ): Promise<string> => {
   const request = async () =>
     axios.post(
-      `${stratoNodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
+      `${nodeUrl}/strato/v2.3/transaction/parallel?resolve=true`,
       {
         txs: [
           {
@@ -366,7 +372,7 @@ const submitStratoAttestation = async (
     await new Promise((resolve) => setTimeout(resolve, 5_000));
     try {
       const polled = await axios.post(
-        `${stratoNodeUrl}/bloc/v2.2/transactions/results`,
+        `${nodeUrl}/bloc/v2.2/transactions/results`,
         [result.hash],
         { headers: authHeaders(await getStratoToken()) },
       );
@@ -431,8 +437,14 @@ const validateSettlementVerifier = async (): Promise<string> => {
     throw new Error(`STRATO account ${address} is not a settlement verifier`);
   }
   if (nativeVerifier) {
+    const nativeIdentity = await nativeStratoGet("/strato/v2.3/key", {});
+    const nativeMetadata = await nativeStratoGet("/strato-api/eth/v1.2/metadata", {});
+    if (normalize(nativeIdentity.data?.address || "") !== address ||
+        String(nativeMetadata.data?.networkID) !== nativeVerifier.policy.sourceChainId) {
+      throw new Error("Native STRATO node identity or network mismatch");
+    }
     const [nativeVerifierResponse, nativeBridgeResponse] = await Promise.all([
-      stratoGet(
+      nativeStratoGet(
         "/cirrus/search/BlockApps-StratoNativeBridge-settlementVerifiers",
         {
           address: `eq.${nativeVerifier.sourceBridge}`,
@@ -441,7 +453,7 @@ const validateSettlementVerifier = async (): Promise<string> => {
           select: "key",
         },
       ),
-      stratoGet("/cirrus/search/BlockApps-StratoNativeBridge", {
+      nativeStratoGet("/cirrus/search/BlockApps-StratoNativeBridge", {
         address: `eq.${nativeVerifier.sourceBridge}`,
         select: "settlementVerifierThreshold,settlementVerifierCount",
         limit: "1",
@@ -818,7 +830,7 @@ app.post("/v1/sign-native-mint", async (req, res) => {
     await validateNativeMintAttestation(
       attestation,
       nativeVerifier.policy,
-      stratoGet,
+      nativeStratoGet,
       nativeVerifier.bridge,
       BigInt(latest.timestamp),
     );
@@ -874,14 +886,19 @@ app.post("/v1/sign-native-refund", async (req, res) => {
     }
     const latest = await provider.getBlock("latest");
     if (!latest) throw new Error("Native destination head is unavailable");
-    await validateNativeRedemptionRefund(
+    const deposit = await validateNativeRedemptionRefund(
       depositId.replace(/^0x/i, ""),
       refund,
       nativeVerifier.policy,
-      stratoGet,
+      nativeStratoGet,
       nativeVerifier.bridge,
       BigInt(latest.timestamp),
     );
+    validateNativeSettlementRoute(deposit);
+    const verified = await verifyNativeRedemptionsBatch([deposit], nativeEvidenceRpc);
+    if (verified.get(deposit.depositId) !== true) {
+      throw new Error("Native refund requires confirmed original redemption evidence");
+    }
     const signature = await nativeVerifier.signer.signTypedData(
       {
         name: "StratoNativeRepresentationBridge",
@@ -927,7 +944,7 @@ const getNativeSourceRecord = async <T>(
   key: string,
 ): Promise<T> => {
   if (!nativeVerifier) throw new Error("Native verification is not configured");
-  const response = await stratoGet(
+  const response = await nativeStratoGet(
     `/cirrus/search/BlockApps-StratoNativeBridge-${mapping}`,
     {
       address: `eq.${nativeVerifier.sourceBridge}`,
@@ -994,12 +1011,14 @@ app.post("/v1/attest-native-withdrawal", async (req, res) => {
       "getWithdrawalSettlementDigest",
       [withdrawalId, externalTxHash, nativeMintProposalHash],
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     const transactionHash = await submitStratoAttestation(
       "attestWithdrawalSettlement",
       { id: withdrawalId, externalTxHash, nativeMintProposalHash },
       "StratoNativeBridge",
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
   } catch (error) {
@@ -1039,12 +1058,14 @@ app.post("/v1/attest-native-deposit", async (req, res) => {
       "getDepositSettlementDigest",
       [depositId],
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     const transactionHash = await submitStratoAttestation(
       "attestDepositSettlement",
       { depositId },
       "StratoNativeBridge",
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
   } catch (error) {
@@ -1096,12 +1117,14 @@ app.post("/v1/attest-native-cancellation", async (req, res) => {
       "getWithdrawalCancellationDigest",
       [withdrawalId, cancellationTxHash],
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     const transactionHash = await submitStratoAttestation(
       "attestWithdrawalCancellation",
       { id: withdrawalId, cancellationTxHash },
       "StratoNativeBridge",
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
   } catch (error) {
@@ -1139,12 +1162,14 @@ app.post("/v1/attest-native-refund", async (req, res) => {
       "getDepositRefundDigest",
       [depositId, refundTxHash],
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     const transactionHash = await submitStratoAttestation(
       "attestDepositRefund",
       { depositId, refundTxHash },
       "StratoNativeBridge",
       nativeVerifier.sourceBridge,
+      nativeStratoNodeUrl,
     );
     res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
   } catch (error) {

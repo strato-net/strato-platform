@@ -247,10 +247,16 @@ export const getNativeVerifierApiTokens = (
     .map((token) => token.trim())
     .filter(Boolean);
 
-export const getNativeMintExecutorPrivateKey = (
+export const getNativeMintExecutorKmsConfig = (
   chainId: number | bigint,
-): string | undefined =>
-  process.env[`CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`]?.trim();
+): ExternalBridgeExecutorKmsConfig | undefined => {
+  const prefix = `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR`;
+  const address = process.env[`${prefix}_ADDRESS`]?.trim();
+  const keyId = process.env[`${prefix}_KMS_KEY_ID`]?.trim();
+  const region = process.env[`${prefix}_KMS_REGION`]?.trim();
+  if (!address && !keyId && !region) return undefined;
+  return { address: address || "", keyId: keyId || "", region: region || "" };
+};
 
 export const getExternalBridgeExecutorPrivateKey = (
   chainId: number | bigint,

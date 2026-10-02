@@ -67,7 +67,7 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   const wallets = [Wallet.createRandom(), Wallet.createRandom()];
   t.mock.method(configModule, "getNativeVerifierUrls", () => ["https://native-verifier-1.test", "https://native-verifier-2.test"]);
   t.mock.method(configModule, "getNativeVerifierApiTokens", () => ["token-1", "token-2"]);
-  t.mock.method(configModule, "getNativeMintExecutorPrivateKey", () => undefined);
+  t.mock.method(configModule, "getNativeMintExecutorKmsConfig", () => undefined);
   t.mock.method(axios.default, "post", async (url: string, body: any) => {
     const wallet = wallets[url.includes("-1.") ? 0 : 1];
     return ({

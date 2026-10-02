@@ -101,7 +101,7 @@ MercataBridge withdrawals are handled only by the legacy service. `BRIDGE_ADDRES
 
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
 - `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
-- `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY` - Gas-paying executor key; it must not be an attestation signer
+- `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_ADDRESS`, `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_KMS_KEY_ID`, `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_KMS_REGION` - KMS-backed gas-paying executor; no attestation signer, bridge admin, or direct token mint privileges. Plaintext native executor keys are rejected.
 - `CHAIN_${chainId}_NATIVE_VERIFIER_URLS` - Comma-separated independent native verifier endpoints
 - `CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS` - Matching comma-separated verifier bearer tokens
 
@@ -531,3 +531,10 @@ After the operator records the confirmed external cancellation hash, each config
 If minting won the race, the service verifies that mint and finalizes instead; escrow remains locked as backing. Paused withdrawals may delay that finalization until unpaused. Bridge pause does not block safe cancellation/refund, but a separate custody-vault pause still blocks unlocks until governance unpauses that vault.
 
 Before rollout acceptance, exercise: cancellation before mint; mint before cancellation; lost Safe API response and service restart; a rejected/replaced Safe nonce; insufficient confirmations and RPC disagreement; wrong cancellation evidence; duplicate refund; paused bridge; and both OAuth and wallet-signed user cancellation. Contract/unit tests cover these boundaries in isolation; the full Safe/Cirrus/governance path still requires testnet verification.
+
+Native verifiers accept `NATIVE_STRATO_NODE_URL` independently of the EAB
+`STRATO_NODE_URL` (defaults to the EAB URL if omitted). Native reads and
+attestation writes use the native node; startup verifies its network and account
+identity. Native refund signatures require independently confirmed original
+redemption evidence and an allowed policy route. See `NATIVE_BRIDGE_DEPLOYMENT.md`
+for executor KMS permissions and Safe cancellation-role grants before rollout.

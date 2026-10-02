@@ -219,6 +219,7 @@ contract StratoNativeRepresentationBridge is
         _grantRole(UNPAUSER_ROLE, admin);
         _grantRole(ATTESTATION_ADMIN_ROLE, admin);
         _grantRole(MINT_EXECUTOR_ROLE, admin);
+        _grantRole(MINT_CANCELLER_ROLE, admin);
         maxAttestationValiditySeconds = 7 days;
     }
 

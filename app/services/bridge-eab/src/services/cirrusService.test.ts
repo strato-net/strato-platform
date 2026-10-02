@@ -377,3 +377,15 @@ test("native refund evidence is indexed into the review queue without implying c
   await assert.rejects(getNativeWithdrawalById("7,8"), /Invalid/);
   assert.ok(calls.every(call => call.params.address === `eq.${"1".repeat(40)}`));
 });
+
+test("native role checks load all representation tokens for the chain, including disabled routes", async t => {
+  const { getNativeRepresentationTokens } = await import("./cirrusService");
+  const rows = Array.from({ length: 7 }, (_, i) => ({ key: String(i), key2: "11155111", value: {
+    enabled: i % 2 === 0, representationToken: i.toString(16).padStart(40, "a"),
+  } }));
+  const calls = await mockCirrus(t, { [`${native}-assets`]: [
+    ...rows, { key: "other", key2: "1", value: { representationToken: "wrong-chain" } },
+  ] }, 2);
+  assert.deepEqual(await getNativeRepresentationTokens(11155111), rows.map(row => row.value.representationToken));
+  assert.ok(calls.length > 1);
+});
