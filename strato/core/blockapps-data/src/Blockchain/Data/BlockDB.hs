@@ -18,15 +18,16 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
-import Blockchain.Data.Transaction (insertTXIfNew', transactionHash)
+import Blockchain.Data.Transaction (transactionHash, txAndTime2RawTX)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Control.Monad (forM, forM_)
+import Control.Monad (forM)
 import qualified Data.ByteString.Short as BSS
+import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
@@ -94,45 +95,44 @@ putBlocks ::
   m [Key BlockDataRef]
 putBlocks blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
-  sqlQuery $
+  sqlQuery $ do
+    -- One lookup for the whole batch instead of a SELECT per block.
+    existing <- M.fromList . map (\e -> (blockDataRefHash (entityVal e), entityKey e))
+      <$> SQL.selectList [BlockDataRefHash SQL.<-. map snd blocksWithHashes] []
     forM blocksWithHashes $ \(b, hash') -> do
-      insertTXIfNew' (BlockHash $ blockHash b) (Just $ number $ blockBlockData b) (timestamp $ blockBlockData b) (blockReceiptTransactions b)
+      let bd = blockBlockData b
+      txIDs <- forM (blockReceiptTransactions b) $ \tx -> do
+        -- Fetch only the id (the full row carries code/args/tx_data). Transactions
+        -- submitted through the API already exist with block_number -1.
+        mKey <- listToMaybe <$> SQL.selectKeysList [RawTransactionTxHash SQL.==. transactionHash tx] [LimitTo 1]
+        case mKey of
+          Just key -> key <$ SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (number bd)]
+          Nothing -> SQL.insert $ txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd)
 
-      existingBlockData <- SQL.selectList [BlockDataRefHash SQL.==. blockHash b] []
-
-      case existingBlockData of
-        [] -> do
+      case M.lookup hash' existing of
+        Just key -> return key
+        Nothing -> do
           let (toInsert, vs, va, vr, ps, sigs, stakes) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
-          forM_ (blockReceiptTransactions b) $ \tx -> do
-            txID <- updateBlockNumber b (transactionHash tx)
-            SQL.insert $ BlockTransaction blkDataRefId txID
-          forM_ vs $ \v -> SQL.insert $ BlockValidatorRef blkDataRefId v
-          forM_ va $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
-          forM_ vr $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
-          forM_ stakes $ \(val, st, isUpd) -> SQL.insert $ BlockStakeRef blkDataRefId val st isUpd
-          forM_ ps $ \(Signature sig) -> do
-            let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
-                s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
-                v = getCompactRecSigV sig
-                signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
-            SQL.insert $ ProposalSignatureRef blkDataRefId signer' r s v
-          forM_ sigs $ \(Signature sig) -> do
-            let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
-                s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
-                v = getCompactRecSigV sig
-                signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
-            SQL.insert $ CommitmentSignatureRef blkDataRefId signer' r s v
-
+          SQL.insertMany_ $ map (BlockTransaction blkDataRefId) txIDs
+          SQL.insertMany_ $ map (BlockValidatorRef blkDataRefId) vs
+          SQL.insertMany_ $ map (\v -> ValidatorDeltaRef blkDataRefId v True) va
+          SQL.insertMany_ $ map (\v -> ValidatorDeltaRef blkDataRefId v False) vr
+          SQL.insertMany_ $ map (\(val, st, isUpd) -> BlockStakeRef blkDataRefId val st isUpd) stakes
+          SQL.insertMany_
+            [ ProposalSignatureRef blkDataRefId signer' r s v
+            | Signature sig <- maybeToList ps
+            , let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
+                  s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
+                  v = getCompactRecSigV sig
+                  signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
+            ]
+          SQL.insertMany_
+            [ CommitmentSignatureRef blkDataRefId signer' r s v
+            | Signature sig <- sigs
+            , let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
+                  s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
+                  v = getCompactRecSigV sig
+                  signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
+            ]
           return blkDataRefId
-        [bd] -> return $ SQL.entityKey bd
-        _ -> error "DB has multiple blocks with the same hash"
-  where
-    updateBlockNumber b txHash' = do
-      ret <- SQL.getBy (UniqueTXHash txHash')
-      key <-
-        case ret of
-          Just x -> return $ entityKey x
-          Nothing -> error "error in putBlocks: no transaction exists in the DB, even though I just inserted it"
-      SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (number (blockBlockData b))]
-      return key
