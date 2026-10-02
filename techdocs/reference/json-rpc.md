@@ -45,6 +45,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | `eth_getTransactionCount` | The account's current nonce. The block parameter is ignored. |
 | `eth_getCode` | `0x01` if the address is a contract, otherwise `0x`. SolidVM contracts have no EVM bytecode to return. |
 | `eth_call` | Runs a read-only call in the VM. Block tag: `latest`, `pending`, a block number or a block hash. Returns error code `3` if the VM doesn't answer within 30 s. |
+| `eth_getProof` | EIP-1186 account and storage proofs against a block's state root. Block tag: `latest`, a block number or a block hash. A storage key is the hex of the raw key bytes, which for SolidVM is the ASCII storage path (`0x` + hex of `balances[<address>]`), not a 32-byte slot. `value` is the leaf's RLP item as stored. See [State proofs](strato-node-api.md#state-proofs). |
 | `eth_getTransactionByHash`, `eth_getTransactionByBlockHashAndIndex`, `eth_getTransactionByBlockNumberAndIndex` | |
 | `eth_getTransactionReceipt`, `eth_getBlockReceipts` | Receipts include `status` and `logs` |
 | `eth_getLogs` | Filter by `address`, `topics`, `fromBlock` and `toBlock`. At most 10,000 blocks per query and at most 1,000 matching events. Narrow the range if you hit a limit. |
@@ -94,6 +95,7 @@ Any method not listed here returns `Method not found`. That includes `eth_subscr
 | `strato_traceBlock` | `rlpBlock`, `traceConfig` | Traces an RLP-encoded block |
 | `strato_getFinalizedHeader` | `blockNumber` | Signed block header for light-client verification |
 | `strato_getReceiptProof` | `blockNumber`, `txIndex` | Receipt inclusion proof |
+| `strato_getStateProof` | `stateRoot`, `address`, `keys` | Account and storage proofs against an explicit state root (the primitive behind `eth_getProof` and the REST [state proof](strato-node-api.md#state-proofs) route) |
 
 !!! warning "Blocked on public `/rpc`"
     `strato_*` methods re-execute transactions in the VM, so nginx blocks the whole namespace on `/rpc` by default. They return HTTP `403` with JSON-RPC error `-32601` ("method not available on the public RPC endpoint"). A batch that includes any `strato_*` call is rejected as a whole.
