@@ -10,6 +10,10 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -234,6 +238,15 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
   return `Ended ${formatReleaseTime(finishTime || "0")}`;
 };
 
+// "24 hours" / "7 days" from a seconds string, for the exit confirmation.
+const formatNotice = (seconds: string): string => {
+  const n = Number(seconds || "0");
+  if (!Number.isFinite(n) || n <= 0) return "the notice period";
+  if (n >= 86400) { const d = Math.round(n / 86400); return `${d} day${d === 1 ? "" : "s"}`; }
+  if (n >= 3600) { const h = Math.round(n / 3600); return `${h} hour${h === 1 ? "" : "s"}`; }
+  const m = Math.max(1, Math.round(n / 60)); return `${m} minute${m === 1 ? "" : "s"}`;
+};
+
 // V2: minStake is a self-bond requirement.
 const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
 
@@ -309,6 +322,7 @@ type OperatorPanelProps = {
   onSelfBond: (amount: bigint) => Promise<boolean>;
   onSelfUnbond: (amount: bigint) => Promise<boolean>;
   onActivate: () => Promise<boolean>;
+  exitNoticeSeconds: string;
   onRequestExit: () => Promise<boolean>;
   onCancelExit: () => Promise<boolean>;
   onUpdateProfile?: (profile: OperatorProfileInput) => Promise<boolean>;
@@ -342,6 +356,7 @@ const OperatorPanel = ({
   onSelfBond,
   onSelfUnbond,
   onActivate,
+  exitNoticeSeconds,
   onRequestExit,
   onCancelExit,
   onUpdateProfile,
@@ -350,6 +365,7 @@ const OperatorPanel = ({
   const [selfBondAmount, setSelfBondAmount] = useState("");
   const [selfUnbondAmount, setSelfUnbondAmount] = useState("");
   const [profileDraft, setProfileDraft] = useState<OperatorProfileInput | null>(null);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
 
   const active = Boolean(validator?.active);
   const inSet = Boolean(validator?.isValidator);
@@ -452,9 +468,31 @@ const OperatorPanel = ({
               </Button>
             )}
             {validatorSetDeployed && inSet && !exiting && (
-              <Button size="sm" variant="outline" onClick={onRequestExit} disabled={submitting || !canCoverActionFee}>
-                {buttonLabel("exit", "Request exit", "Requesting")}
-              </Button>
+              <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+                <Button size="sm" variant="destructive" onClick={() => setExitDialogOpen(true)} disabled={submitting || !canCoverActionFee}>
+                  {buttonLabel("exit", "Request exit", "Requesting")}
+                </Button>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Request exit for {validator?.name || "this validator"}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      After {formatNotice(exitNoticeSeconds)} this validator leaves the validator set and stops proposing
+                      blocks and earning rewards. Its self-bond stays bonded until you unbond it. You can cancel the exit
+                      before the notice period ends.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={submitting}>Keep validating</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={submitting}
+                      onClick={() => { setExitDialogOpen(false); void onRequestExit(); }}
+                    >
+                      Request exit
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
             {validatorSetDeployed && inSet && exiting && (
               <Button size="sm" variant="outline" onClick={onCancelExit} disabled={submitting || !canCoverActionFee}>
@@ -463,13 +501,13 @@ const OperatorPanel = ({
             )}
             {onUpdateProfile && validator && !profileDraft && (
               <Button size="sm" variant="outline" onClick={openProfile} disabled={submitting}>
-                Edit profile
+                Edit
               </Button>
             )}
           </div>
         </div>
 
-        <div className={`mt-4 grid gap-3 ${active ? "lg:grid-cols-3" : selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
@@ -489,30 +527,6 @@ const OperatorPanel = ({
               </>
             )}
           </div>
-
-          {active && (
-            <div className="rounded-md bg-muted/30 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Commission</p>
-                  <p className="mt-1 font-semibold">{formatPercentFromBps(currentCommissionBps)}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Max {formatPercentFromBps(maxCommissionBps)}</p>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Input
-                  value={commissionPercent}
-                  onChange={(event) => setCommissionPercent(event.target.value)}
-                  placeholder="New %"
-                  inputMode="decimal"
-                  disabled={submitting}
-                />
-                <Button size="sm" onClick={submitCommission} disabled={!commissionReady || submitting}>
-                  {buttonLabel("commission", "Update", "Updating")}
-                </Button>
-              </div>
-            </div>
-          )}
 
           {(active || selfBond > 0n) && (
             <div className="rounded-md bg-muted/30 p-3">
@@ -596,6 +610,30 @@ const OperatorPanel = ({
                 Cancel
               </Button>
             </div>
+            {active && (
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Commission</p>
+                    <p className="mt-1 font-semibold">{formatPercentFromBps(currentCommissionBps)}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Max {formatPercentFromBps(maxCommissionBps)}</p>
+                </div>
+                <div className="mt-2 flex gap-2 md:max-w-sm">
+                  <Input
+                    value={commissionPercent}
+                    onChange={(event) => setCommissionPercent(event.target.value)}
+                    placeholder="New %"
+                    inputMode="decimal"
+                    disabled={submitting}
+                  />
+                  <Button size="sm" onClick={submitCommission} disabled={!commissionReady || submitting}>
+                    {buttonLabel("commission", "Update", "Updating")}
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Commission changes are a separate transaction from the profile.</p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -1203,6 +1241,7 @@ const EarnStaking = () => {
       onSelfBond={(amount) => handleSelfBond(key, amount)}
       onSelfUnbond={(amount) => handleSelfUnbond(key, amount)}
       onActivate={() => handleActivate(key)}
+      exitNoticeSeconds={info?.exitNoticeSeconds || "0"}
       onRequestExit={() => handleRequestExit(key)}
       onCancelExit={() => handleCancelExit(key)}
       onUpdateProfile={isV2 ? (profile) => handleUpdateProfile(key, profile) : undefined}
