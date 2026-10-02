@@ -71,7 +71,7 @@ authorize = \case
 isAuthorized :: StateMachineM m => InEvent -> m AuthResult
 isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ do
   doAuthn <- use productionAuth
-  authenticated <- authenticate iev
+  authenticated <- flip authenticate iev =<< use chainId
   let raiseInProd reason = when doAuthn $ do
         $logWarnS "blockstanbul/auth" . T.pack $ reason
         throwE reason --debug statement?
@@ -82,6 +82,10 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
+      -- Dropped here, before it can become the round's proposal: the sender did
+      -- not sign this body, and its real PREPREPARE must still be acceptable.
+      unless (bodyMatchesHeader pp) $
+        raiseInProd "Rejecting Preprepare; transactions or uncles do not match the block header"
       valSet <- use validators -- this is _validators from bloctanbul context?
       let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
