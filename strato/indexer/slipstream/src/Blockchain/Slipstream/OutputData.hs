@@ -101,6 +101,7 @@ data OnConflict = DoNothing
   { conflictCols       :: [Text]
   , conflictUpdateCols :: [Text]
   , extraSQL           :: Maybe Text
+  , conflictWhere      :: Maybe Text
   } deriving (Eq, Ord, Show)
 
 data SlipstreamQuery = CreateTable
@@ -471,12 +472,13 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
   ] ++ (case onConflict of
     Nothing -> []
     Just DoNothing -> ["\n ON CONFLICT DO NOTHING;"]
-    Just (OnConflict conflictCols conflictUpdateCols mExtraSQL) ->
+    Just (OnConflict conflictCols conflictUpdateCols mExtraSQL mWhere) ->
       [ "\n ON CONFLICT ",
         wrapAndEscapeDouble conflictCols,
         " DO UPDATE SET ",
         tableUpsert conflictUpdateCols,
         maybe "" (", " <>) mExtraSQL,
+        maybe "" (" WHERE " <>) mWhere,
         ";"
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
@@ -778,7 +780,7 @@ insertIndexTable cs =
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
-          in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
+          in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL) (Just $ newerBlockClause tblText)
              ]
    in yieldMany $ processContract cs'
 
@@ -832,6 +834,14 @@ eventBaseColumnsQuery =
 
 keyColumnNames :: [a] -> [(Text, a)]
 keyColumnNames = zipWith (\i t -> ("key" <> (if i == 1 then "" else T.pack $ show i), t)) [(1 :: Int)..]
+
+-- A replayed batch re-sends rows Cirrus already holds. Only a newer block may
+-- overwrite a row, so a replay updates nothing and the history triggers add no
+-- duplicate rows. PBFT finality gives one block per height, so the number alone
+-- identifies the block.
+newerBlockClause :: Text -> Text
+newerBlockClause tblText =
+  "excluded.block_number::bigint > " <> tblText <> ".block_number::bigint"
 
 jsonbUpdateClause :: Text -> Text -> Text
 jsonbUpdateClause tblText colText = T.concat
@@ -939,7 +949,7 @@ insertCollectionTableQuery rows =
                 "collection_name",
                 "collection_type"
               ]
-       in [InsertTable tblName columns valueTuples . Just $ OnConflict onConflictCols updateSet (Just valueUpdateSQL)]
+       in [InsertTable tblName columns valueTuples . Just $ OnConflict onConflictCols updateSet (Just valueUpdateSQL) (Just $ newerBlockClause tblText)]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 insertEventArrayTableQuery [] = []
@@ -1234,9 +1244,10 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      ["address", "block_hash"]
+      []
       Nothing
       [("storage_history_idx", ["address","valid_to"])]
+  , RawSQL $ dropHistoryPrimaryKeySQL "history@storage"
 {-  , CreateTable
       contractTableName
       [ ("address", SqlText)
@@ -1274,9 +1285,10 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      ["address", "block_hash", "path"]
+      []
       Nothing
       [("mapping_history_idx", ["address","path","valid_to"])]
+  , RawSQL $ dropHistoryPrimaryKeySQL "history@mapping"
   , CreateTable
       globalEventTableName
       [ ("id", SqlSerial)
@@ -1323,6 +1335,15 @@ initialSlipstreamQueries =
   , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
+  ]
+
+-- History rows are deduplicated by newerBlockClause, so the old primary keys
+-- only cost writes. The check keeps later startups from locking the table.
+dropHistoryPrimaryKeySQL :: Text -> Text
+dropHistoryPrimaryKeySQL tbl = T.concat
+  [ "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = '\"", tbl, "\"'::regclass"
+  , " AND conname = '", tbl, "_pkey') THEN "
+  , "ALTER TABLE \"", tbl, "\" DROP CONSTRAINT IF EXISTS \"", tbl, "_pkey\"; END IF; END $$;"
   ]
 
 genericBaseTableIndexesSQL :: Text
