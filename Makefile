@@ -451,6 +451,10 @@ docker-compose:
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml > docker-compose.bridge-eab.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml > docker-compose.bridge-eab.push.ecr.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.ecr.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
@@ -458,6 +462,8 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.bridge-eab.push.yml > docker-compose.bridge-eab.yml
+	awk '/build: ./{getline} 1' docker-compose.bridge-eab.push.ecr.yml > docker-compose.bridge-eab.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
@@ -527,5 +533,5 @@ uninstall:
 
 .PHONY: bridge-eab bridge-eab-nginx bridge-eab-force bridge-eab-nginx-force docker-compose-bridge-eab
 docker-compose-bridge-eab:
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml > docker-compose.bridge-eab.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-eab.tpl.yml | awk '/build: ./{getline} 1' > docker-compose.bridge-eab.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge-signer.tpl.yml > docker-compose.bridge-signer.yml

@@ -14,7 +14,11 @@ docker-compose.bridge.push.ecr.yml
 docker-compose.bridge.yml
 docker-compose.bridge.ecr.yml
 docker-compose.bridge-eab.yml
+docker-compose.bridge-eab.ecr.yml
+docker-compose.bridge-eab.push.yml
+docker-compose.bridge-eab.push.ecr.yml
 docker-compose.bridge-signer.yml
+docker-compose.bridge-signer.ecr.yml
 docker-compose.highway.push.yml
 docker-compose.highway.push.ecr.yml
 docker-compose.highway.yml
