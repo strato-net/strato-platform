@@ -391,7 +391,7 @@
           "url": "https://sandbox.api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
           "parse": "pure",
-          "apiKeyEnvVar": "PURE_API_KEY",
+          "apiKeyEnvVar": "PURE_SANDBOX_API_KEY",
           "comment": "Pure (collectpure.com) bullion marketplace spot feed: {data:[{material,bid,ask}]} in USD cents per troy ounce for Gold, Silver, Platinum, Palladium and Bitcoin; the adapter submits the bid/ask mid. Key from the collectpure.com API Keys dashboard (x-api-key); 60 requests/min sustained, 120 burst.",
           "assets": [
             "XAU",
@@ -1037,7 +1037,7 @@
           "url": "https://sandbox.api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
           "parse": "pure",
-          "apiKeyEnvVar": "PURE_API_KEY",
+          "apiKeyEnvVar": "PURE_SANDBOX_API_KEY",
           "comment": "Pure (collectpure.com) bullion marketplace spot feed: {data:[{material,bid,ask}]} in USD cents per troy ounce for Gold, Silver, Platinum, Palladium and Bitcoin; the adapter submits the bid/ask mid. Key from the collectpure.com API Keys dashboard (x-api-key); 60 requests/min sustained, 120 burst.",
           "assets": [
             "XAU",
