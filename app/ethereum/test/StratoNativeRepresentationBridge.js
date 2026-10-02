@@ -31,9 +31,6 @@ describe("StratoNativeRepresentationBridge", function () {
       { name: "notBefore", type: "uint256" },
       { name: "deadline", type: "uint256" },
       { name: "useInstantPath", type: "bool" },
-      { name: "maxFee", type: "uint256" },
-      { name: "requestedAt", type: "uint256" },
-      { name: "feeHalfLife", type: "uint256" },
       { name: "signerSetVersion", type: "uint256" },
     ],
   };
@@ -55,9 +52,6 @@ describe("StratoNativeRepresentationBridge", function () {
       notBefore: BigInt(block.timestamp),
       deadline: BigInt(block.timestamp + 3600),
       useInstantPath: false,
-      maxFee: 0n,
-      requestedAt: BigInt(block.timestamp),
-      feeHalfLife: 0n,
       signerSetVersion: await bridge.signerSetVersion(),
       ...overrides,
     };
@@ -89,6 +83,31 @@ describe("StratoNativeRepresentationBridge", function () {
     await bridge.connect(admin).mintRepresentationWithAttestationV2(attestation, signature);
     return attestation;
   }
+
+  it("preserves the pre-solver proxy storage layout", async function () {
+    await upgrades.validateUpgrade(
+      await ethers.getContractFactory("StratoNativeRepresentationBridgeLegacy"),
+      await ethers.getContractFactory("StratoNativeRepresentationBridge"),
+      { kind: "uups" },
+    );
+  });
+
+  it("does not expose solver or fee-bearing redemption entry points", async function () {
+    for (const name of ["fillWithdrawal", "announceWithdrawal", "initializeFastPath",
+      "setFeeConfig", "setAnnouncementConfig", "requestRedemptionWithFee"]) {
+      expect(bridge.interface.getFunction(name), name).to.equal(null);
+    }
+    const solver = new ethers.Interface([
+      "function requestRedemptionWithFee(address,uint256,address,uint256)",
+    ]);
+    const balance = await token.balanceOf(user.address);
+    await expect(user.sendTransaction({
+      to: await bridge.getAddress(),
+      data: solver.encodeFunctionData("requestRedemptionWithFee",
+        [await token.getAddress(), 1n, user.address, 0n]),
+    })).to.be.reverted;
+    expect(await token.balanceOf(user.address)).to.equal(balance);
+  });
 
   beforeEach(async function () {
     [admin, user, stratoRecipient, attestationSigner, otherSigner, mintExecutor, quorumSigner] =

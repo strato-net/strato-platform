@@ -35,31 +35,18 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       { name: "amount", type: "uint256" },
       { name: "notBefore", type: "uint256" },
       { name: "deadline", type: "uint256" },
-      { name: "useInstantPath", type: "bool" },
       { name: "maxFee", type: "uint256" },
       { name: "requestedAt", type: "uint256" },
       { name: "feeHalfLife", type: "uint256" },
-      { name: "signerSetVersion", type: "uint256" },
     ],
   };
 
-  const refundTypes = {
-    RedemptionRefund: [
-      { name: "sourceChainId", type: "uint256" },
-      { name: "sourceBridge", type: "address" },
-      { name: "destinationChainId", type: "uint256" },
-      { name: "destinationBridge", type: "address" },
-      { name: "redemptionId", type: "uint256" },
-      { name: "representationToken", type: "address" },
-      { name: "recipient", type: "address" },
-      { name: "amount", type: "uint256" },
-      { name: "deadline", type: "uint256" },
-      { name: "signerSetVersion", type: "uint256" },
-    ],
+  const attestationV1Types = {
+    NativeMintAttestation: attestationV2Types.NativeMintAttestationV2.slice(0, 11),
   };
 
   async function fixture() {
-    const [admin, user, signer, mintExecutor, solverA, solverB, announcer, treasury, quorumSigner] =
+    const [admin, user, signer, mintExecutor, solverA, solverB, announcer, treasury] =
       await ethers.getSigners();
 
     const token = await upgrades.deployProxy(
@@ -86,12 +73,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
     const sourceBridge = ethers.Wallet.createRandom().address;
     await bridge.setTokenMapping(stratoToken, await token.getAddress());
     await bridge.setAttestationSigner(signer.address, true);
-    await bridge.setAttestationSigner(quorumSigner.address, true);
-    await bridge.setAttestationThreshold(2);
-    await bridge.grantRole(
-      ethers.id("MINT_EXECUTOR_ROLE"),
-      mintExecutor.address,
-    );
+    await bridge.setAttestationThreshold(1);
 
     await bridge.initializeFastPath(
       HALF_LIFE, FEE_BPS, await bond.getAddress(), BOND, treasury.address, TTL
@@ -108,7 +90,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
     await bond.connect(announcer).approve(await bridge.getAddress(), BOND * 5n);
 
     return {
-      admin, user, signer, quorumSigner, mintExecutor, solverA, solverB, announcer, treasury,
+      admin, user, signer, mintExecutor, solverA, solverB, announcer, treasury,
       token, bridge, bond, feeMath, stratoToken, sourceBridge,
     };
   }
@@ -146,35 +128,43 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       amount: terms.amount,
       notBefore: now,
       deadline: now + 3600n,
-      useInstantPath: false,
       maxFee: terms.maxFee,
       requestedAt: terms.requestedAt,
       feeHalfLife: terms.feeHalfLife,
-      signerSetVersion: await ctx.bridge.signerSetVersion(),
       ...overrides,
     };
   }
 
   async function signV2(ctx, attestation) {
     const network = await ethers.provider.getNetwork();
-    const signatures = await Promise.all(
-      [ctx.signer, ctx.quorumSigner].map(async (signer) => ({
-        signer: signer.address.toLowerCase(),
-        signature: await signer.signTypedData(
-          {
-            name: "StratoNativeRepresentationBridge",
-            version: "1",
-            chainId: network.chainId,
-            verifyingContract: await ctx.bridge.getAddress(),
-          },
-          attestationV2Types,
-          attestation,
-        ),
-      })),
+    return ctx.signer.signTypedData(
+      {
+        name: "StratoNativeRepresentationBridge",
+        version: "1",
+        chainId: network.chainId,
+        verifyingContract: await ctx.bridge.getAddress(),
+      },
+      attestationV2Types,
+      attestation
     );
-    return signatures
-      .sort((a, b) => a.signer.localeCompare(b.signer))
-      .map(({ signature }) => signature);
+  }
+
+  async function signV1(ctx, attestation) {
+    const network = await ethers.provider.getNetwork();
+    const { maxFee, requestedAt, feeHalfLife, ...v1 } = attestation;
+    return [
+      v1,
+      await ctx.signer.signTypedData(
+        {
+          name: "StratoNativeRepresentationBridge",
+          version: "1",
+          chainId: network.chainId,
+          verifyingContract: await ctx.bridge.getAddress(),
+        },
+        attestationV1Types,
+        v1
+      ),
+    ];
   }
 
   async function fillRungZero(ctx, solver, terms, opts = {}) {
@@ -235,86 +225,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
   // ------------------------------------------------- the mint honours claims
 
-  it("allows the authorized executor to submit verifier-authorized refunds", async function () {
-    const ctx = await fixture();
-    await ctx.token.connect(ctx.admin).mint(ctx.user.address, AMOUNT);
-    await ctx.token.connect(ctx.user).approve(await ctx.bridge.getAddress(), AMOUNT);
-    await ctx.bridge.connect(ctx.user).requestRedemption(
-      await ctx.token.getAddress(),
-      AMOUNT,
-      ctx.user.address,
-    );
-    const network = await ethers.provider.getNetwork();
-    const refund = {
-      sourceChainId: SOURCE_CHAIN_ID,
-      sourceBridge: ctx.sourceBridge,
-      destinationChainId: network.chainId,
-      destinationBridge: await ctx.bridge.getAddress(),
-      redemptionId: 1n,
-      representationToken: await ctx.token.getAddress(),
-      recipient: ctx.user.address,
-      amount: AMOUNT,
-      deadline: BigInt(await time.latest()) + 3600n,
-      signerSetVersion: await ctx.bridge.signerSetVersion(),
-    };
-    const signatures = await Promise.all(
-      [ctx.signer, ctx.quorumSigner].map(async (signer) => ({
-        signer: signer.address.toLowerCase(),
-        signature: await signer.signTypedData(
-          {
-            name: "StratoNativeRepresentationBridge",
-            version: "1",
-            chainId: network.chainId,
-            verifyingContract: await ctx.bridge.getAddress(),
-          },
-          refundTypes,
-          refund,
-        ),
-      })),
-    );
-    const sortedSignatures = signatures
-      .sort((a, b) => a.signer.localeCompare(b.signer))
-      .map(({ signature }) => signature);
-
-    await expect(ctx.bridge.connect(ctx.mintExecutor).refundRedemption(refund, sortedSignatures))
-      .to.emit(ctx.bridge, "RedemptionRefunded")
-      .withArgs(refund.redemptionId, refund.representationToken, refund.recipient, refund.amount);
-    await expect(ctx.bridge.connect(ctx.mintExecutor).refundRedemption(refund, sortedSignatures))
-      .to.be.revertedWithCustomError(ctx.bridge, "DuplicateMint");
-  });
-
   describe("the V2 mint honours claims", function () {
-    it("binds the verifier signature to the lane and separates executor permissions", async function () {
-      const ctx = await fixture();
-      const terms = await termsFor(ctx);
-      const manual = await attestationFor(ctx, terms);
-      const manualSignature = await signV2(ctx, manual);
-
-      await expect(
-        ctx.bridge
-          .connect(ctx.mintExecutor)
-          .mintRepresentationWithAttestationV2(manual, manualSignature)
-      )
-        .to.be.revertedWithCustomError(ctx.bridge, "AccessControlUnauthorizedAccount")
-        .withArgs(ctx.mintExecutor.address, ethers.ZeroHash);
-
-      const instant = { ...manual, useInstantPath: true };
-      await expect(
-        ctx.bridge
-          .connect(ctx.mintExecutor)
-          .mintRepresentationWithAttestationV2(instant, manualSignature)
-      ).to.be.revertedWithCustomError(ctx.bridge, "BadAttestationSignatures");
-
-      await expect(
-        ctx.bridge
-          .connect(ctx.mintExecutor)
-          .mintRepresentationWithAttestationV2(
-            instant,
-            await signV2(ctx, instant),
-          )
-      ).to.emit(ctx.bridge, "RepresentationMinted");
-    });
-
     it("mints to the recipient when nobody claimed", async function () {
       const ctx = await fixture();
       const terms = await termsFor(ctx);
@@ -323,7 +234,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       const before = await ctx.token.balanceOf(ctx.user.address);
       await ctx.bridge
         .connect(ctx.admin)
-        .mintRepresentationWithAttestationV2(attestation, await signV2(ctx, attestation));
+        .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
       expect(await ctx.token.balanceOf(ctx.user.address)).to.equal(before + AMOUNT);
     });
 
@@ -349,7 +260,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(attestation, signature)
+          .mintRepresentationWithAttestationV2(attestation, [signature])
       ).to.emit(ctx.bridge, "WithdrawalClaimSettled");
 
       // Net for the solver is exactly the fee they earned.
@@ -373,7 +284,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await ctx.bridge
         .connect(ctx.admin)
-        .mintRepresentationWithAttestationV2(attestation, await signV2(ctx, attestation));
+        .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
 
       // A fronted 970 and was bought out at 990: it keeps 20. B paid 990 and is
       // minted 1000, keeping the 10 it asked for.
@@ -403,7 +314,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(attestation, await signV2(ctx, attestation))
+          .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)])
       ).to.emit(ctx.bridge, "WithdrawalClaimVoided");
 
       expect(await ctx.token.balanceOf(ctx.user.address)).to.equal(userAfterFill + AMOUNT);
@@ -418,18 +329,18 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(overFee, await signV2(ctx, overFee))
+          .mintRepresentationWithAttestationV2(overFee, [await signV2(ctx, overFee)])
       ).to.be.revertedWithCustomError(ctx.bridge, "FeeTooLarge");
 
       const badHalfLife = await attestationFor(ctx, terms, { feeHalfLife: 259201n });
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(badHalfLife, await signV2(ctx, badHalfLife))
+          .mintRepresentationWithAttestationV2(badHalfLife, [await signV2(ctx, badHalfLife)])
       ).to.be.revertedWithCustomError(ctx.bridge, "BadHalfLife");
     });
 
-    it("keeps every mint gate: signer threshold, notBefore, deadline, route", async function () {
+    it("keeps every V1 gate: signer threshold, notBefore, deadline, route", async function () {
       const ctx = await fixture();
       const terms = await termsFor(ctx);
 
@@ -437,7 +348,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(unsigned, await signV2(ctx, { ...unsigned, amount: 1n }))
+          .mintRepresentationWithAttestationV2(unsigned, [await signV2(ctx, { ...unsigned, amount: 1n })])
       ).to.be.revertedWithCustomError(ctx.bridge, "BadAttestationSignatures");
 
       const notYet = await attestationFor(ctx, terms, {
@@ -447,13 +358,13 @@ describe("StratoNativeRepresentationBridge fast path", function () {
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(notYet, await signV2(ctx, notYet))
+          .mintRepresentationWithAttestationV2(notYet, [await signV2(ctx, notYet)])
       ).to.be.revertedWithCustomError(ctx.bridge, "AttestationNotReady");
 
       const signed = await attestationFor(ctx, terms);
       const signature = await signV2(ctx, signed);
       await expect(
-        ctx.bridge.connect(ctx.solverA).mintRepresentationWithAttestationV2(signed, signature)
+        ctx.bridge.connect(ctx.solverA).mintRepresentationWithAttestationV2(signed, [signature])
       ).to.be.revertedWithCustomError(ctx.bridge, "AccessControlUnauthorizedAccount");
     });
 
@@ -465,18 +376,51 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await ctx.bridge
         .connect(ctx.admin)
-        .mintRepresentationWithAttestationV2(attestation, signature);
+        .mintRepresentationWithAttestationV2(attestation, [signature]);
 
       await expect(
         ctx.bridge
           .connect(ctx.admin)
-          .mintRepresentationWithAttestationV2(attestation, signature)
+          .mintRepresentationWithAttestationV2(attestation, [signature])
       ).to.be.revertedWithCustomError(ctx.bridge, "DuplicateMint");
       await expect(
         ctx.bridge.connect(ctx.solverA).fillWithdrawal(terms, MAX_FEE, false, 0)
       ).to.be.revertedWithCustomError(ctx.bridge, "DuplicateMint");
     });
 
+    /**
+     * A V1 attestation carries no schedule, so there is nothing to check a
+     * claim against. Minting to the recipient anyway would pay them twice --
+     * once by the solver, once by the mint -- and strand the solver, so a
+     * claimed withdrawal has to go through V2.
+     */
+    it("refuses the V1 mint once a claim exists", async function () {
+      const ctx = await fixture();
+      const terms = await termsFor(ctx);
+      const attestation = await attestationFor(ctx, terms);
+
+      const [v1, v1Signature] = await signV1(ctx, attestation);
+      await fillRungZero(ctx, ctx.solverA, terms);
+
+      await expect(
+        ctx.bridge
+          .connect(ctx.admin)
+          .mintRepresentationWithAttestation(v1, [v1Signature])
+      ).to.be.revertedWithCustomError(ctx.bridge, "ClaimExists");
+    });
+
+    it("still runs the V1 mint when nothing was claimed", async function () {
+      const ctx = await fixture();
+      const terms = await termsFor(ctx);
+      const attestation = await attestationFor(ctx, terms);
+      const [v1, v1Signature] = await signV1(ctx, attestation);
+
+      const before = await ctx.token.balanceOf(ctx.user.address);
+      await ctx.bridge
+        .connect(ctx.admin)
+        .mintRepresentationWithAttestation(v1, [v1Signature]);
+      expect(await ctx.token.balanceOf(ctx.user.address)).to.equal(before + AMOUNT);
+    });
   });
 
   // ------------------------------------------------------------ the ladder
@@ -558,7 +502,7 @@ describe("StratoNativeRepresentationBridge fast path", function () {
 
       await ctx.bridge
         .connect(ctx.admin)
-        .mintRepresentationWithAttestationV2(attestation, await signV2(ctx, attestation));
+        .mintRepresentationWithAttestationV2(attestation, [await signV2(ctx, attestation)]);
 
       // And the mint adds exactly the amount, once.
       expect(await ctx.token.totalSupply()).to.equal(supplyBefore + AMOUNT);

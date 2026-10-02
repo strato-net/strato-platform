@@ -14,9 +14,6 @@ export interface NativeMintAttestation {
   notBefore: string;
   deadline: string;
   useInstantPath: boolean;
-  maxFee: string;
-  requestedAt: string;
-  feeHalfLife: string;
   signerSetVersion: string;
 }
 
@@ -115,28 +112,6 @@ export const validateNativeMintAttestation = async (
   ) {
     throw new Error("Native verifier policy rejects instant execution");
   }
-  const feeTerms = oneValue(
-    await stratoGet(
-      "/cirrus/search/BlockApps-StratoNativeBridge-withdrawalFeeTerms",
-      {
-        address: `eq.${policy.sourceBridge}`,
-        key: `eq.${withdrawalId}`,
-        select: "value",
-        limit: "1",
-      },
-    ),
-    "Native withdrawal fee terms",
-  );
-  if (
-    !bool(feeTerms.set) ||
-    uint(feeTerms.maxFee, "feeTerms.maxFee") !== uint(attestation.maxFee, "maxFee") ||
-    uint(feeTerms.requestedAt, "feeTerms.requestedAt") !==
-      uint(attestation.requestedAt, "requestedAt") ||
-    uint(feeTerms.feeHalfLife, "feeTerms.feeHalfLife") !==
-      uint(attestation.feeHalfLife, "feeHalfLife")
-  ) {
-    throw new Error("Native mint fee terms do not match STRATO");
-  }
   const notBefore = BigInt(attestation.notBefore);
   const deadline = BigInt(attestation.deadline);
   const maxValidity = BigInt(await bridge.maxAttestationValiditySeconds());
@@ -229,4 +204,15 @@ export const validateNativeRedemptionRefund = async (
   if (await bridge.refundedRedemptions(refund.redemptionId)) {
     throw new Error("Native redemption was already refunded");
   }
+};
+
+export const parseNativeSourceRecord = (
+  mapping: "withdrawals" | "deposits", key: string, rows: any,
+): Record<string, any> => {
+  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0]?.value || typeof rows[0].value !== "object" || Array.isArray(rows[0].value) || String(rows[0].key) !== key) {
+    throw new Error(`Native ${mapping === "withdrawals" ? "withdrawal" : "deposit"} is unavailable`);
+  }
+  return mapping === "withdrawals"
+    ? { ...rows[0].value, withdrawalId: key }
+    : rows[0].value;
 };

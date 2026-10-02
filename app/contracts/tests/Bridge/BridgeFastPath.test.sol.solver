@@ -3,6 +3,8 @@ import "../../abstract/ERC20/IERC20.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../concrete/Bridge/MercataBridge.sol";
+import "../../concrete/Bridge/StratoNativeBridge.sol";
+import "../../concrete/Bridge/StratoNativeCustodyVault.sol";
 import "../../concrete/Proxy/Proxy.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
@@ -61,7 +63,6 @@ contract FeeMath {
  */
 contract Describe_BridgeFastPath is Authorizable {
     using BridgeTypes for *;
-    using NativeBridgeTypes for *;
     using StringUtils for string;
 
     // Six hours: twelve halvings across the three-day window.
@@ -77,6 +78,13 @@ contract Describe_BridgeFastPath is Authorizable {
     Token bridgedToken;
     address bridgedTokenAddress;
     address bridgeAddress;
+
+    StratoNativeBridge nativeBridge;
+    StratoNativeCustodyVault custodyVault;
+    Token nativeToken;
+    address nativeBridgeAddress;
+    address custodyVaultAddress;
+    address nativeTokenAddress;
 
     Token bondToken;
     address bondTokenAddress;
@@ -160,8 +168,41 @@ contract Describe_BridgeFastPath is Authorizable {
         bridgedToken.mint(address(solverA), 10000e18);
         bridgedToken.mint(address(solverB), 10000e18);
         bondToken.mint(address(announcer), 100e18);
+
+        _setUpNativeBridge();
     }
 
+    function _setUpNativeBridge() internal {
+        address implOwnerIgnored = address(0xdeadbeef);
+
+        nativeBridge = StratoNativeBridge(
+            address(new Proxy(address(new StratoNativeBridge(implOwnerIgnored)), address(adminRegistry)))
+        );
+        nativeBridgeAddress = address(nativeBridge);
+        custodyVault = StratoNativeCustodyVault(
+            address(new Proxy(address(new StratoNativeCustodyVault(implOwnerIgnored)), address(adminRegistry)))
+        );
+        custodyVaultAddress = address(custodyVault);
+
+        nativeBridge.initialize(address(tokenFactory), custodyVaultAddress, address(relayer), address(this));
+        custodyVault.initialize(nativeBridgeAddress, address(this));
+
+        adminRegistry.addWhitelist(nativeBridgeAddress, "abortWithdrawal", address(relayer));
+
+        nativeTokenAddress = tokenFactory.createToken("Native", "NST", [], [], [], "NST", 0, 18);
+        nativeToken = Token(nativeTokenAddress);
+        nativeToken.setStatus(2);
+        nativeToken.mint(address(user), 1000e18);
+        nativeToken.mint(address(solverA), 1000e18);
+        nativeToken.mint(address(solverB), 1000e18);
+
+        nativeBridge.setAsset(
+            true, externalChainId, externalBridge, representationToken,
+            "Wrapped Native", "wNST", 500e18, 100e18, nativeTokenAddress
+        );
+        nativeBridge.setFeeConfig(HALF_LIFE, FEE_BPS, true);
+        nativeBridge.setAnnouncementConfig(true, bondTokenAddress, 10e18, treasury, 7 * 86400);
+    }
 
     // ============ The fee schedule ============
 
@@ -969,4 +1010,169 @@ contract Describe_BridgeFastPath is Authorizable {
         require(reverted, "a ceiling over 100% is meaningless");
     }
 
+    // ============ StratoNativeBridge: the same shape, a vault instead of a mint ============
+
+    function _recordNativeDeposit(uint256 amount, uint256 maxFee, uint256 requestedAt) internal returns (string) {
+        relayer.do(
+            nativeBridgeAddress, "recordDepositWithFee",
+            externalChainId, externalBridge, 7, externalSender, txHash,
+            representationToken, recipient, amount, maxFee, requestedAt
+        );
+        return nativeBridge.getDepositId(externalChainId, externalBridge, 7);
+    }
+
+    /// @dev The vault can only unlock what it holds, so an inbound deposit has
+    ///      to be backed by a prior outbound lock. That is true in production
+    ///      too: the native bridge is a lock/unlock pair, not a mint.
+    function _lockIntoVault(uint256 amount) internal {
+        user.do(nativeTokenAddress, "approve", custodyVaultAddress, amount);
+        user.do(
+            nativeBridgeAddress, "requestWithdrawal",
+            externalChainId, externalRecipient, nativeTokenAddress, amount
+        );
+    }
+
+    function it_fastpath_native_deposit_fill_redirects_the_vault_unlock() {
+        _lockIntoVault(100e18);
+        string depositId = _recordNativeDeposit(100e18, 3e18, block.timestamp);
+
+        uint256 recipientBefore = IERC20(nativeTokenAddress).balanceOf(recipient);
+        uint256 solverBefore = IERC20(nativeTokenAddress).balanceOf(address(solverA));
+
+        solverA.do(nativeTokenAddress, "approve", nativeBridgeAddress, 100e18);
+        uint256 netPaid = solverA.do(
+            nativeBridgeAddress, "fillDeposit",
+            depositId, recipient, nativeTokenAddress, 100e18, 3e18, false, 0
+        );
+        require(netPaid == 97e18, "the recipient is paid the amount less the fee");
+        require(
+            IERC20(nativeTokenAddress).balanceOf(recipient) == recipientBefore + 97e18,
+            "immediately, out of the solver's own balance"
+        );
+
+        relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, 7);
+
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(solverA)) == solverBefore + 3e18,
+            "the vault unlocks to the solver, netting them the fee"
+        );
+        require(
+            custodyVault.lockedBalance(nativeTokenAddress) == 0,
+            "and the vault's liability is discharged exactly once"
+        );
+    }
+
+    function it_fastpath_native_claim_ladder_respects_the_holder() {
+        _lockIntoVault(100e18);
+        string depositId = _recordNativeDeposit(100e18, 3e18, block.timestamp);
+
+        solverA.do(nativeTokenAddress, "approve", nativeBridgeAddress, 100e18);
+        solverA.do(
+            nativeBridgeAddress, "fillDeposit",
+            depositId, recipient, nativeTokenAddress, 100e18, 3e18, false, 0
+        );
+
+        solverB.do(nativeTokenAddress, "approve", nativeBridgeAddress, 100e18);
+        solverB.doExpectingFailure(
+            nativeBridgeAddress, "fillDeposit", "SNB: claim not transferable",
+            depositId, recipient, nativeTokenAddress, 100e18, 0, false, 0
+        );
+
+        // Quoting above what is on offer is refused even once it is for sale.
+        solverA.do(nativeBridgeAddress, "setDepositClaimExitOffer", depositId, true, 1e18);
+        solverB.doExpectingFailure(
+            nativeBridgeAddress, "fillDeposit", "SNB: fee below your minimum",
+            depositId, recipient, nativeTokenAddress, 100e18, 2e18, false, 0
+        );
+        solverA.do(nativeBridgeAddress, "setDepositClaimExitOffer", depositId, false, 0);
+
+        solverA.do(nativeBridgeAddress, "setDepositClaimExitOffer", depositId, true, 1e18);
+
+        uint256 aBefore = IERC20(nativeTokenAddress).balanceOf(address(solverA));
+        solverB.do(
+            nativeBridgeAddress, "fillDeposit",
+            depositId, recipient, nativeTokenAddress, 100e18, 1e18, false, 0
+        );
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(solverA)) == aBefore + 99e18,
+            "the displaced solver is paid their asking price"
+        );
+
+        relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, 7);
+        (address claimant,,,,,,,,,,,,,) = nativeBridge.depositClaims(depositId);
+        require(claimant == address(solverB), "and the last claimant took the unlock");
+    }
+
+    function it_fastpath_native_user_cannot_abort_a_claimed_withdrawal() {
+        user.do(nativeTokenAddress, "approve", custodyVaultAddress, 50e18);
+        uint256 id = user.do(
+            nativeBridgeAddress, "requestWithdrawalWithFee",
+            externalChainId, externalRecipient, nativeTokenAddress, 50e18, 1e18
+        );
+
+        relayer.do(
+            nativeBridgeAddress, "recordWithdrawalClaim",
+            id, address(solverA), 0, 1e18, 49e18, block.timestamp, "0xabc123"
+        );
+
+        user.doExpectingFailure(
+            nativeBridgeAddress, "abortWithdrawal", "SNB: claimed by solver", id
+        );
+        // As on MercataBridge: the vault unlock follows the claim.
+        uint256 userBefore = nativeToken.balanceOf(address(user));
+        uint256 solverBefore = nativeToken.balanceOf(address(solverA));
+        relayer.do(nativeBridgeAddress, "abortWithdrawal", id);
+        require(
+            nativeToken.balanceOf(address(solverA)) == solverBefore + 50e18,
+            "the unlocked escrow goes to the solver holding the claim"
+        );
+        require(
+            nativeToken.balanceOf(address(user)) == userBefore,
+            "and not back to a sender who was already paid"
+        );
+    }
+
+    function it_fastpath_native_announcement_is_fillable_but_never_confirmable() {
+        _lockIntoVault(100e18);
+
+        announcer.do(bondTokenAddress, "approve", nativeBridgeAddress, 10e18);
+        string depositId = announcer.do(
+            nativeBridgeAddress, "announceDeposit",
+            externalChainId, externalBridge, 7, externalSender, txHash,
+            representationToken, recipient, 100e18, 3e18, block.timestamp
+        );
+
+        (BridgeStatus status,,,,,,,,,,) = nativeBridge.getDepositInfo(depositId);
+        require(status == BridgeStatus.ANNOUNCED, "announced, not initiated");
+
+        relayer.doExpectingFailure(
+            nativeBridgeAddress, "confirmDeposit", "SNB: bad state",
+            externalChainId, externalBridge, 7
+        );
+
+        solverA.do(nativeTokenAddress, "approve", nativeBridgeAddress, 100e18);
+        uint256 netPaid = solverA.do(
+            nativeBridgeAddress, "fillDeposit",
+            depositId, recipient, nativeTokenAddress, 100e18, 3e18, false, 0
+        );
+        require(netPaid == 97e18, "a solver may still front it");
+
+        uint256 announcerBefore = IERC20(bondTokenAddress).balanceOf(address(announcer));
+        relayer.do(
+            nativeBridgeAddress, "recordDepositWithFee",
+            externalChainId, externalBridge, 7, externalSender, txHash,
+            representationToken, recipient, 100e18, 3e18, block.timestamp
+        );
+        require(
+            IERC20(bondTokenAddress).balanceOf(address(announcer)) == announcerBefore + 10e18,
+            "adoption returns the bond"
+        );
+
+        uint256 solverBefore = IERC20(nativeTokenAddress).balanceOf(address(solverA));
+        relayer.do(nativeBridgeAddress, "confirmDeposit", externalChainId, externalBridge, 7);
+        require(
+            IERC20(nativeTokenAddress).balanceOf(address(solverA)) == solverBefore + 100e18,
+            "and the solver is made whole on settlement"
+        );
+    }
 }

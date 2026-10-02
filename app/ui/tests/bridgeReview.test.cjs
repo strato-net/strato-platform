@@ -8,10 +8,14 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 
 const axiosExports = {};
+const bridgeConstants = {};
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/bridge/constants.ts'), 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText, { exports: bridgeConstants, require: () => ({ defineChain: value => value }) });
 const bridgeUtils = {};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/bridge/utils.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
-}).outputText, { exports: bridgeUtils, require: () => ({ SUPPORTED_CHAINS: {} }) });
+}).outputText, { exports: bridgeUtils, require: () => bridgeConstants });
 const responseInterceptors = [], globalToasts = [];
 vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/axios.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },

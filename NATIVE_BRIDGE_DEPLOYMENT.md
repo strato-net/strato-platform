@@ -783,3 +783,28 @@ Keep these in local deployment notes or environment-specific secret/config stora
 - `SEPOLIA_ADMIN_SAFE`
 - `GUARDIAN`
 - `STRATO_TOKEN_ADDRESS`
+
+## Native solver separation
+
+The primary `StratoNativeBridge.sol` and `StratoNativeRepresentationBridge.sol`
+implement standard native bridging, routing/fallback, cancellation/refunds, and
+verifier authorization. They do not expose solver fills, announcements, claims,
+or fee-bearing requests. `bridge-eab` does not read solver fee records.
+
+The `.sol.solver` copies and `.test.js.solver`/`.test.sol.solver` tests preserve
+develop solver source from `3bc358c78b` outside the normal build. They are not
+deployment artifacts. The active Mercata solver tests and legacy `bridge` service remain
+separate; do not point that service's solver flows at these native implementations.
+
+Native V2 mint signatures bind the execution lane and signer-set version but no
+solver fee fields. Upgrade the destination contract and update native verifiers
+and `bridge-eab` together while native processing is stopped. Discard/rebuild
+unexecuted proposals signed for a different ABI after verifying their on-chain
+status. Do not replay old signed payloads against the new implementation.
+
+On the checked testnet deployment, the active implementations are non-solver;
+STRATO retains historical solver storage, including enabled flags and a completed
+claim. This source must not reintroduce methods that consume those flags. Before
+any other deployment, check for outstanding solver claims and bonds: this upgrade
+does not migrate or settle them. Ethereum upgrade validation covers the
+pre-solver layout; it does not authorize replacing a deployed solver layout.

@@ -317,33 +317,6 @@ export const getNativeWithdrawalsByStatus = async (
   }));
 };
 
-export const getNativeWithdrawalFeeTerms = async (
-  ids: string[],
-): Promise<Map<string, NonNullable<NativeWithdrawalInfo["feeTerms"]>>> => {
-  const result = new Map<string, NonNullable<NativeWithdrawalInfo["feeTerms"]>>();
-  const unique = [...new Set(ids)];
-  if (!nativeBridgeAddress || unique.length === 0) return result;
-  const rows = await getPaginatedRows(
-    `/${NATIVE_BRIDGE_URL}-withdrawalFeeTerms`,
-    {
-      params: {
-        address: `eq.${nativeBridgeAddress}`,
-        key: `in.(${unique.join(",")})`,
-        select: "key,value",
-      },
-    },
-  );
-  for (const row of rows) {
-    if (!row?.value?.set) continue;
-    result.set(String(row.key), {
-      maxFee: String(row.value.maxFee ?? "0"),
-      requestedAt: String(row.value.requestedAt ?? "0"),
-      feeHalfLife: String(row.value.feeHalfLife ?? "0"),
-    });
-  }
-  return result;
-};
-
 // Get deposits by status (reusable function)
 export const getDepositsByStatus = async (
   status: string

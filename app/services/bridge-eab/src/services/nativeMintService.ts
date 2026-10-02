@@ -50,9 +50,6 @@ export interface NativeMintAttestation {
   notBefore: string;
   deadline: string;
   useInstantPath: boolean;
-  maxFee: string;
-  requestedAt: string;
-  feeHalfLife: string;
   signerSetVersion: string;
 }
 
@@ -65,7 +62,7 @@ export interface NativeMintRequest extends NativeMintAttestation {
 }
 
 const NATIVE_MINT_ABI = [
-  "function mintRepresentationWithAttestationV2((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,bool useInstantPath,uint256 maxFee,uint256 requestedAt,uint256 feeHalfLife,uint256 signerSetVersion) attestation, bytes[] signatures)",
+  "function mintRepresentationWithAttestationV2((uint256 sourceChainId,address sourceBridge,uint256 destinationChainId,address destinationBridge,uint256 sourceWithdrawalId,address stratoToken,address representationToken,address recipient,uint256 amount,uint256 notBefore,uint256 deadline,bool useInstantPath,uint256 signerSetVersion) attestation, bytes[] signatures)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
   "function attestationThreshold() view returns (uint8)",
   "function attestationSigners(address) view returns (bool)",
@@ -89,9 +86,6 @@ const NATIVE_MINT_ATTESTATION_TYPES = {
     { name: "notBefore", type: "uint256" },
     { name: "deadline", type: "uint256" },
     { name: "useInstantPath", type: "bool" },
-    { name: "maxFee", type: "uint256" },
-    { name: "requestedAt", type: "uint256" },
-    { name: "feeHalfLife", type: "uint256" },
     { name: "signerSetVersion", type: "uint256" },
   ],
 };
@@ -136,9 +130,6 @@ const normalizeAttestation = (
     notBefore: attestation.notBefore.toString(),
     deadline: attestation.deadline.toString(),
     useInstantPath: attestation.useInstantPath === true,
-    maxFee: attestation.maxFee.toString(),
-    requestedAt: attestation.requestedAt.toString(),
-    feeHalfLife: attestation.feeHalfLife.toString(),
     signerSetVersion: attestation.signerSetVersion.toString(),
   });
 
@@ -186,11 +177,6 @@ export const buildNativeMintRequest = async (
       `Native destination bridge ${destinationBridge} has invalid maxAttestationValiditySeconds`,
     );
   }
-  if (!withdrawal.feeTerms) {
-    throw new Error(
-      `Native withdrawal ${withdrawal.withdrawalId} is missing committed fee terms`,
-    );
-  }
   const attestation = normalizeAttestation({
     sourceChainId: sourceChainId.toString(),
     sourceBridge,
@@ -204,9 +190,6 @@ export const buildNativeMintRequest = async (
     notBefore: notBefore.toString(),
     deadline: (notBefore + validitySeconds).toString(),
     useInstantPath: withdrawal.useInstantPath === true,
-    maxFee: withdrawal.feeTerms.maxFee,
-    requestedAt: withdrawal.feeTerms.requestedAt,
-    feeHalfLife: withdrawal.feeTerms.feeHalfLife,
     signerSetVersion: signerSetVersion.toString(),
   });
 

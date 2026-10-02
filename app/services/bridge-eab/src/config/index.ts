@@ -31,13 +31,7 @@ export const DEPOSIT_EVENT_SIGNATURES = [
   ACTION_DEPOSIT_EVENT_SIGNATURE,
 ];
 
-// RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
-export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
-  "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
-
-export const NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE = id(
-  "RedemptionRequestedWithRoute(address,uint256,address,address,uint96,address,uint256)",
-);
+export { NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "./bridgeAbi";
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =

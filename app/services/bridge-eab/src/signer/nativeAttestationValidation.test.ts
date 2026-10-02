@@ -51,9 +51,6 @@ const mint: NativeMintAttestation = {
   notBefore: "1000",
   deadline: "1100",
   useInstantPath: true,
-  maxFee: "10",
-  requestedAt: "900",
-  feeHalfLife: "60",
   signerSetVersion: "3",
 };
 const withdrawal = {
@@ -67,7 +64,6 @@ const withdrawal = {
   nativeMintNotBefore: "1000",
   useInstantPath: true,
 };
-const feeTerms = { set: true, maxFee: "10", requestedAt: "900", feeHalfLife: "60" };
 const deposit = {
   bridgeStatus: "7",
   externalChainId: policy.destinationChainId,
@@ -77,13 +73,12 @@ const deposit = {
   externalSender: recipient,
   stratoTokenAmount: "100",
 };
-const stratoGet = async (path: string, _params: Record<string, string>) => ({
-  data: [{
-    value: path.endsWith("withdrawalFeeTerms")
-      ? feeTerms
-      : path.endsWith("deposits") ? deposit : withdrawal,
-  }],
-});
+const stratoGet = async (path: string, _params: Record<string, string>) => {
+  assert.ok(!path.endsWith("withdrawalFeeTerms"), "standard withdrawals require no solver records");
+  return { data: [{
+    value: path.endsWith("deposits") ? deposit : withdrawal,
+  }] };
+};
 const bridge = {
   maxAttestationValiditySeconds: async () => 300n,
   processedMints: async () => false,
@@ -123,7 +118,7 @@ test("native policy baseline binds routes and bridge identity", () => {
   }
 });
 
-test("native mint validation binds source state, fee terms, lane, and instant cap", async () => {
+test("native mint validation binds source state, lane, and instant cap without solver records", async () => {
   await validateNativeMintAttestation(mint, policy, stratoGet, bridge, 1050n);
   await assert.rejects(
     validateNativeMintAttestation(
@@ -144,16 +139,6 @@ test("native mint validation binds source state, fee terms, lane, and instant ca
       1050n,
     ),
     /instant execution/,
-  );
-  await assert.rejects(
-    validateNativeMintAttestation(
-      { ...mint, maxFee: "11" },
-      policy,
-      stratoGet,
-      bridge,
-      1050n,
-    ),
-    /fee terms/,
   );
   await assert.rejects(
     validateNativeMintAttestation(mint, policy, stratoGet, bridge, 999n),

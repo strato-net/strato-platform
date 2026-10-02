@@ -175,13 +175,6 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   };
   const cirrus = await import("./cirrusService");
   t.mock.method(cirrus, "getNativeWithdrawalById", async () => record);
-  t.mock.method(cirrus, "getNativeWithdrawalFeeTerms", async (ids: string[]) =>
-    new Map(ids.map((id) => [id, {
-      maxFee: "0",
-      requestedAt: "1",
-      feeHalfLife: "21600",
-    }])),
-  );
   t.mock.method(mint, "buildNativeMintRequest", async (withdrawal, _chain, _source, destination) => {
     assert.equal(destination, record.externalBridge, "use the committed bridge, not mutable environment routing");
     return { idempotencyKey: withdrawal.withdrawalId } as any;
@@ -248,7 +241,7 @@ test("verification binds every native route intent field and selects the correct
   const { verifyNativeRedemptionsBatch } = await import("./nativeVerificationService");
   process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
   const event = log(true, 2);
-  let receipt: any = { status: "0x1", blockNumber: "0x64", logs: [log(false), event] };
+  let receipt: any = { status: "0x1", blockNumber: "0x64", transactionHash: event.transactionHash, blockHash: `0x${"b".repeat(64)}`, logs: [log(false), event] };
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
@@ -328,7 +321,7 @@ test("native verification defers disputed, missing and immature receipts without
   const event = log(true, 2);
   const deposit = { ...parseNativeDepositLog(1, event)!, depositId: "native:2", bridgeStatus: "1",
     stratoToken: address("7"), requestedAt: "1", timestamp: "1" };
-  const valid = { status: "0x1", blockNumber: "0x64", logs: [event] };
+  const valid = { status: "0x1", blockNumber: "0x64", transactionHash: event.transactionHash, blockHash: `0x${"b".repeat(64)}`, logs: [event] };
   let receipt: any = valid, head = 111;
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
   t.mock.method(rpc, "getVerificationBlockNumber", async () => head);

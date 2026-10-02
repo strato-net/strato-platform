@@ -1,3 +1,13 @@
+import { id } from "ethers";
+
+// RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)
+export const NATIVE_REDEMPTION_EVENT_SIGNATURE =
+  "0x8c3e37d44910f9975cca29b1cbb70b943d7107cf2091576b3291d4316c74129a";
+
+export const NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE = id(
+  "RedemptionRequestedWithRoute(address,uint256,address,address,uint96,address,uint256)",
+);
+
 export const BRIDGE_DIGEST_ABI = [
   "function getDepositSettlementDigest(uint256,address,uint256,address,address,uint256,string,address,address,uint256,address,uint256) view returns (bytes32)",
   "function getReviewedDepositDigest(uint256,address,uint256) view returns (bytes32)",
@@ -37,8 +47,6 @@ export const NATIVE_MINT_V2_FIELDS = [
   { name: "amount", type: "uint256" }, { name: "notBefore", type: "uint256" },
   { name: "deadline", type: "uint256" },
   { name: "useInstantPath", type: "bool" },
-  { name: "maxFee", type: "uint256" }, { name: "requestedAt", type: "uint256" },
-  { name: "feeHalfLife", type: "uint256" },
   { name: "signerSetVersion", type: "uint256" },
 ];
 

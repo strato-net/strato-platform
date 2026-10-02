@@ -42,7 +42,6 @@ import {
   getDepositReviewApproval,
   getDepositSettlementInfoByIdentity,
   getEnabledChains,
-  getNativeWithdrawalFeeTerms,
   getNativeWithdrawalById,
 } from "./cirrusService";
 import { depositStateService } from "./depositStateService";
@@ -96,23 +95,6 @@ const getNativeMintRequest = async (
     config.nativeBridge.address!,
     bridgeAddress,
   );
-};
-
-const attachNativeFeeTerms = async (
-  withdrawals: NativeWithdrawalInfo[],
-): Promise<void> => {
-  const terms = await getNativeWithdrawalFeeTerms(
-    withdrawals.map((withdrawal) => withdrawal.withdrawalId),
-  );
-  for (const withdrawal of withdrawals) {
-    const feeTerms = terms.get(withdrawal.withdrawalId);
-    if (!feeTerms) {
-      throw new Error(
-        `Native withdrawal ${withdrawal.withdrawalId} is missing committed fee terms`,
-      );
-    }
-    withdrawal.feeTerms = feeTerms;
-  }
 };
 
 const submitNativeMint = async (
@@ -1057,7 +1039,6 @@ export const finalizeNativeWithdrawalBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
-  await attachNativeFeeTerms(withdrawals);
   const sourceChainId = await getStratoNetworkId();
   const failures: Array<{ withdrawalId: string; message: string; error?: unknown }> = [];
   let successful = 0;
@@ -1146,7 +1127,6 @@ export const queueManualNativeWithdrawalBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
-  await attachNativeFeeTerms(withdrawals);
   const sourceChainId = await getStratoNetworkId();
 
   for (const withdrawal of withdrawals) {

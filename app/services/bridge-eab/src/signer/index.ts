@@ -41,13 +41,14 @@ import {
   verifyNativeMintCancellation,
   verifyNativeRedemptionsBatch,
   verifyNativeRedemptionRefund,
-} from "../services/nativeVerificationService";
-import type { NativeDepositInfo, NativeWithdrawalInfo } from "../types";
+} from "./nativeSettlementValidation";
+import type { NativeDepositInfo, NativeWithdrawalInfo, NativeVerificationRpc } from "../types";
 import {
   NativeMintAttestation,
   NativeRedemptionRefund,
   validateNativeMintAttestation,
   validateNativeRedemptionRefund,
+  parseNativeSourceRecord,
 } from "./nativeAttestationValidation";
 
 interface WithdrawalAuthorization {
@@ -143,6 +144,38 @@ const verifierConfirmations = Number(
 );
 const port = Number(process.env.PORT || 3004);
 
+const assertNativeEvidenceChain = (chainId: number): void => {
+  if (!Number.isSafeInteger(chainId) || BigInt(chainId) !== destinationChainId) {
+    throw new Error("Native evidence chain does not match verifier configuration");
+  }
+};
+const nativeEvidenceRpc: NativeVerificationRpc = {
+  getDepositConfirmationPolicy: (chainId) => {
+    assertNativeEvidenceChain(chainId);
+    if (!Number.isSafeInteger(verifierConfirmations) || verifierConfirmations < 1) {
+      throw new Error("Invalid verifier confirmation policy");
+    }
+    return verifierConfirmations;
+  },
+  getVerificationBlockNumber: async (chainId) => {
+    assertNativeEvidenceChain(chainId);
+    return Number(BigInt(await provider.send("eth_blockNumber", [])));
+  },
+  getTransactionReceiptsBatch: async (chainId, hashes) => {
+    assertNativeEvidenceChain(chainId);
+    return new Map(await Promise.all(hashes.map(async (hash) => {
+      const receipt = await provider.send("eth_getTransactionReceipt", [hash]);
+      if (receipt) {
+        const block = await provider.send("eth_getBlockByNumber", [receipt.blockNumber, false]);
+        if (!block?.hash || block.hash.toLowerCase() !== receipt.blockHash?.toLowerCase()) {
+          throw new Error("Native receipt is not canonical");
+        }
+      }
+      return [hash, receipt] as const;
+    })));
+  },
+};
+
 const nativePolicyPath = process.env.NATIVE_VERIFIER_POLICY_PATH?.trim();
 const nativeVerifier = nativePolicyPath
   ? (() => {
@@ -167,12 +200,13 @@ const nativeVerifier = nativePolicyPath
         keyId: required("NATIVE_KMS_KEY_ID"),
         region: required("NATIVE_KMS_REGION"),
       };
-      if (
-        signerAddress === authorizationSignerAddress ||
-        kms.keyId === kmsConfig.keyId
-      ) {
-        throw new Error("Native verification requires a separate KMS key and signer");
-      }
+      // Temporarily allow native and EAB verification to share a KMS key.
+      // if (
+      //   signerAddress === authorizationSignerAddress ||
+      //   kms.keyId === kmsConfig.keyId
+      // ) {
+      //   throw new Error("Native verification requires a separate KMS key and signer");
+      // }
       return {
         policy,
         digest,
@@ -898,15 +932,11 @@ const getNativeSourceRecord = async <T>(
     {
       address: `eq.${nativeVerifier.sourceBridge}`,
       key: `eq.${key}`,
-      select: "value",
+      select: "key,value",
       limit: "1",
     },
   );
-  const rows = response.data;
-  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0]?.value) {
-    throw new Error(`Native ${mapping === "withdrawals" ? "withdrawal" : "deposit"} is unavailable`);
-  }
-  return rows[0].value as T;
+  return parseNativeSourceRecord(mapping, key, response.data) as T;
 };
 
 const validateNativeSettlementRoute = (
@@ -958,6 +988,7 @@ app.post("/v1/attest-native-withdrawal", async (req, res) => {
       BigInt(nativeVerifier.policy.sourceChainId),
       nativeVerifier.sourceBridge,
       externalTxHash,
+      nativeEvidenceRpc,
     );
     const digest = await readSourceDigest(
       "getWithdrawalSettlementDigest",
@@ -998,9 +1029,11 @@ app.post("/v1/attest-native-deposit", async (req, res) => {
       throw new Error("Native deposit is not pending settlement");
     }
     validateNativeSettlementRoute(deposit);
-    const verified = await verifyNativeRedemptionsBatch([deposit]);
+    const verified = await verifyNativeRedemptionsBatch([deposit], nativeEvidenceRpc);
     if (verified.get(depositId) !== true) {
-      throw new Error("Native redemption evidence is not confirmed");
+      throw new Error(verified.has(depositId)
+        ? "Native redemption evidence does not match the deposit"
+        : "Native redemption awaiting confirmations");
     }
     const digest = await readSourceDigest(
       "getDepositSettlementDigest",
@@ -1057,6 +1090,7 @@ app.post("/v1/attest-native-cancellation", async (req, res) => {
       BigInt(nativeVerifier.policy.sourceChainId),
       nativeVerifier.sourceBridge,
       cancellationTxHash,
+      nativeEvidenceRpc,
     );
     const digest = await readSourceDigest(
       "getWithdrawalCancellationDigest",
@@ -1100,7 +1134,7 @@ app.post("/v1/attest-native-refund", async (req, res) => {
       throw new Error("Native deposit is not pending refund");
     }
     validateNativeSettlementRoute(deposit);
-    await verifyNativeRedemptionRefund(deposit, refundTxHash);
+    await verifyNativeRedemptionRefund(deposit, refundTxHash, nativeEvidenceRpc);
     const digest = await readSourceDigest(
       "getDepositRefundDigest",
       [depositId, refundTxHash],

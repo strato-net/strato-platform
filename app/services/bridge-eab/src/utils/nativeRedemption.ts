@@ -1,4 +1,5 @@
-import { NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE, ZERO_ADDRESS } from "../config";
+import { NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE } from "../config/bridgeAbi";
+import { ZeroAddress as ZERO_ADDRESS } from "ethers";
 import { NativeDepositArgs } from "../types";
 
 export const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | null => {

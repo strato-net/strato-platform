@@ -244,11 +244,6 @@ export interface NativeWithdrawalInfo {
   cancellationTxHash?: string;
   nativeMintNotBefore?: string;
   useInstantPath?: boolean;
-  feeTerms?: {
-    maxFee: string;
-    requestedAt: string;
-    feeHalfLife: string;
-  };
 
   withdrawalId: string;
 }
@@ -326,4 +321,11 @@ export interface NativeScanCheckpoint {
   hash?: string;
   reconciliationBlock: number;
   bridge?: string;
+}
+
+export interface NativeVerificationRpc {
+  getDepositConfirmationPolicy(chainId: number): number;
+  getTransactionReceiptsBatch(chainId: number, hashes: string[]): Promise<Map<string, any>>;
+  getVerificationBlockNumber(chainId: number): Promise<number>;
+  logError?(context: string, error: Error, details: Record<string, unknown>): unknown;
 }
