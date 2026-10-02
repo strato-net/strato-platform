@@ -8,8 +8,7 @@
 #                       managed cluster exists
 #   OAUTH_*             the app's own OIDC client
 # Put secrets/session_secret and secrets/postgres_password next to this file.
-volumes:
-    driver: local
+volumes: {}
 services:
   backend:
     image: ${APP_BACKEND_IMAGE:-<REPO_URL>app-backend:<VERSION>-<HASH_APP_BACKEND>}
