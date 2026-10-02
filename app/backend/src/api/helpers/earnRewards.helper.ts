@@ -23,6 +23,80 @@ export function normalizeAddress(value?: string | null): string {
   return (value ?? "").toLowerCase().replace(/^0x/, "");
 }
 
+export type RewardRouteType =
+  | "direct_mint"
+  | "swap_lp"
+  | "save_usdst"
+  | "carry_vault"
+  | "vault"
+  | "lending"
+  | "cdp"
+  | "standalone";
+
+/**
+ * Classify a rewards activity into an explicit earn route so the frontend can
+ * resolve APY without activity-name heuristics.
+ */
+export function inferRewardRoute(
+  activity: { name?: string; sourceContract?: string; stakeAssetAddress?: string | null },
+  ctx: {
+    saveUsdstVaultAddress?: string | null;
+    carryVaultAddresses?: Iterable<string>;
+  } = {},
+): { rewardRouteType: RewardRouteType; rewardRouteId: string } {
+  const source = normalizeAddress(activity.sourceContract);
+  const stake = normalizeAddress(activity.stakeAssetAddress);
+  const lower = (activity.name || "").toLowerCase();
+  const saveUsdst = normalizeAddress(ctx.saveUsdstVaultAddress);
+  const carrySet = new Set(
+    [...(ctx.carryVaultAddresses ?? [])].map(normalizeAddress).filter(Boolean)
+  );
+  const pickId = (...candidates: (string | null | undefined)[]) =>
+    candidates.find((c) => !!c && c.length > 0) || "";
+
+  // Address-first classification (stable across activity renames)
+  if (saveUsdst && source === saveUsdst) {
+    return { rewardRouteType: "save_usdst", rewardRouteId: source };
+  }
+  if (source && carrySet.has(source)) {
+    return { rewardRouteType: "carry_vault", rewardRouteId: source };
+  }
+  if (source && TOKEN_UNITS_SOURCES.has(source)) {
+    return { rewardRouteType: "swap_lp", rewardRouteId: source };
+  }
+  if (source && USD_NOTIONAL_DEPOSIT_COMPLETED_SOURCES.has(source)) {
+    return { rewardRouteType: "direct_mint", rewardRouteId: source };
+  }
+  if (source && USD_NOTIONAL_AMOUNT_USD_SOURCES.has(source)) {
+    return { rewardRouteType: "cdp", rewardRouteId: source };
+  }
+
+  // Name fallbacks for activities that share a sourceContract or aren't address-mapped
+  if (lower.includes("swap lp")) {
+    return { rewardRouteType: "swap_lp", rewardRouteId: pickId(source, stake) };
+  }
+  if (lower.includes("direct mint") || lower.includes("bridge")) {
+    return { rewardRouteType: "direct_mint", rewardRouteId: pickId(source, stake) };
+  }
+  if (lower.includes("save usdst") || lower.includes("saveusdst")) {
+    return { rewardRouteType: "save_usdst", rewardRouteId: pickId(saveUsdst, source, stake) };
+  }
+  if (lower.includes("cdp")) {
+    return { rewardRouteType: "cdp", rewardRouteId: pickId(source, stake) };
+  }
+  if (lower.includes("lend") || lower.includes("borrow") || lower.includes("safety")) {
+    return { rewardRouteType: "lending", rewardRouteId: pickId(stake, source) };
+  }
+  if (lower.includes("vault")) {
+    return { rewardRouteType: "vault", rewardRouteId: pickId(source, stake) };
+  }
+
+  return {
+    rewardRouteType: "standalone",
+    rewardRouteId: pickId(stake, source),
+  };
+}
+
 export function isPositiveApy(s: string | null | undefined): s is string {
   return !!s && s !== APY_UNAVAILABLE && parseFloat(s) > 0;
 }
@@ -72,9 +146,17 @@ export function buildRewardActivitiesFromMappings(
     const emissionRate = String(activity?.emissionRate ?? "0");
 
     const { stakeAssetAddress, totalStakeUsd } = computeRewardStakeUsd(sourceContract, name, totalStake, pricingCtx, saveUsdstSource);
+    const { rewardRouteType, rewardRouteId } = inferRewardRoute(
+      { name, sourceContract, stakeAssetAddress },
+      {
+        saveUsdstVaultAddress: pricingCtx.saveUsdstVaultAddress,
+        carryVaultAddresses: pricingCtx.carryVaultUsdPriceMap?.keys(),
+      }
+    );
 
     activities.push({
       activityId: Number(activityId), name, emissionRate, sourceContract, stakeAssetAddress, totalStake, totalStakeUsd,
+      rewardRouteType, rewardRouteId,
       _srcNorm: normalizeAddress(sourceContract),
       _stakeNorm: normalizeAddress(stakeAssetAddress),
     });

@@ -17,6 +17,7 @@ import {
   fetchBonusRewards,
   fetchAllUsersLeaderboard
 } from "../helpers/rewards/rewards.helpers";
+import { inferRewardRoute, type RewardRouteType } from "../helpers/earnRewards.helper";
 
 const { Token, LendingPool, lendingRegistry, DECIMALS } = constants;
 const ONE_USD_WEI = (10n ** 18n).toString();
@@ -262,6 +263,8 @@ export interface UserActivity {
   stakeDenomination: StakeDenomination;
   stakeAssetAddress: string | null;
   stakeUnitPriceUsd: string | null;
+  rewardRouteType: RewardRouteType;
+  rewardRouteId: string;
   userStake: string;
   userStakeUsd: string | null;
   userIndex: string;
@@ -284,6 +287,8 @@ export interface SystemActivity {
   stakeDenomination: StakeDenomination;
   stakeAssetAddress: string | null;
   stakeUnitPriceUsd: string | null;
+  rewardRouteType: RewardRouteType;
+  rewardRouteId: string;
 }
 
 /**
@@ -478,6 +483,13 @@ export const fetchUserActivities = async (
         stakeDenomination,
         stakeAssetAddress,
       }, userInfo.stake);
+      const { rewardRouteType, rewardRouteId } = inferRewardRoute(
+        { ...baseActivity, stakeAssetAddress },
+        {
+          saveUsdstVaultAddress: getSaveUsdstSource(),
+          carryVaultAddresses: pricingCtx.carryVaultUsdPriceMap.keys(),
+        }
+      );
 
       const personalEmissionRate = calculatePersonalEmissionRate(
         userInfo.stake,
@@ -491,6 +503,8 @@ export const fetchUserActivities = async (
         stakeAssetAddress,
         stakeUnitPriceUsd: stakeUsdInfo.stakeUnitPriceUsd,
         totalStakeUsd: stakeUsdInfo.totalStakeUsd,
+        rewardRouteType,
+        rewardRouteId,
         userStake: userInfo.stake,
         userStakeUsd: stakeUsdInfo.userStakeUsd ?? null,
         userIndex: userInfo.userIndex,
@@ -581,6 +595,13 @@ export const fetchAllActivities = async (
         stakeDenomination,
         stakeAssetAddress,
       });
+      const { rewardRouteType, rewardRouteId } = inferRewardRoute(
+        { ...baseActivity, stakeAssetAddress },
+        {
+          saveUsdstVaultAddress: getSaveUsdstSource(),
+          carryVaultAddresses: pricingCtx.carryVaultUsdPriceMap.keys(),
+        }
+      );
 
       return {
         ...baseActivity,
@@ -588,6 +609,8 @@ export const fetchAllActivities = async (
         stakeAssetAddress,
         stakeUnitPriceUsd: stakeUsdInfo.stakeUnitPriceUsd,
         totalStakeUsd: stakeUsdInfo.totalStakeUsd,
+        rewardRouteType,
+        rewardRouteId,
       };
     }));
 
