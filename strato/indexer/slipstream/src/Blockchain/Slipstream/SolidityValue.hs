@@ -13,6 +13,7 @@
 module Blockchain.Slipstream.SolidityValue
   ( SolidityValue (..),
     valueToSolidityValue,
+    decodeValueBytes,
   )
 where
 
@@ -112,8 +113,9 @@ valueToSolidityValue = \case
     convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
     convertBoth (sv, v) = (simpleValueToText sv,) <$> valueToSolidityValue v
 
+-- Postgres text and jsonb reject NUL, which valid UTF-8 (e.g. bytes32(0)) can contain.
 decodeValueBytes :: B.ByteString -> Text
 decodeValueBytes bytes =
   case decodeUtf8' bytes of
-    Left _ -> decodeUtf8 $ Base16.encode bytes
-    Right text -> text
+    Right text | not (B.elem 0 bytes) -> text
+    _ -> decodeUtf8 $ Base16.encode bytes
