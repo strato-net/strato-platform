@@ -25,7 +25,6 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Control.Monad (forM)
 import qualified Data.ByteString.Short as BSS
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -96,43 +95,55 @@ putBlocks ::
 putBlocks blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
   sqlQuery $ do
-    -- One lookup for the whole batch instead of a SELECT per block.
+    -- Everything is done per batch, table by table: a fixed handful of
+    -- statements however many blocks are in the batch. insertMany returns the
+    -- generated keys in one statement, so nothing is read back row by row.
     existing <- M.fromList . map (\e -> (blockDataRefHash (entityVal e), entityKey e))
       <$> SQL.selectList [BlockDataRefHash SQL.<-. map snd blocksWithHashes] []
-    forM blocksWithHashes $ \(b, hash') -> do
-      let bd = blockBlockData b
-      txIDs <- forM (blockReceiptTransactions b) $ \tx -> do
-        -- Fetch only the id (the full row carries code/args/tx_data). Transactions
-        -- submitted through the API already exist with block_number -1.
-        mKey <- listToMaybe <$> SQL.selectKeysList [RawTransactionTxHash SQL.==. transactionHash tx] [LimitTo 1]
-        case mKey of
-          Just key -> key <$ SQL.update key [RawTransactionBlockNumber SQL.=. fromIntegral (number bd)]
-          Nothing -> SQL.insert $ txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd)
 
-      case M.lookup hash' existing of
-        Just key -> return key
-        Nothing -> do
-          let (toInsert, vs, va, vr, ps, sigs, stakes) = blk2BlkDataRef b hash' makeHashOne
-          blkDataRefId <- SQL.insert toInsert
-          SQL.insertMany_ $ map (BlockTransaction blkDataRefId) txIDs
-          SQL.insertMany_ $ map (BlockValidatorRef blkDataRefId) vs
-          SQL.insertMany_ $ map (\v -> ValidatorDeltaRef blkDataRefId v True) va
-          SQL.insertMany_ $ map (\v -> ValidatorDeltaRef blkDataRefId v False) vr
-          SQL.insertMany_ $ map (\(val, st, isUpd) -> BlockStakeRef blkDataRefId val st isUpd) stakes
-          SQL.insertMany_
-            [ ProposalSignatureRef blkDataRefId signer' r s v
-            | Signature sig <- maybeToList ps
-            , let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
-                  s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
-                  v = getCompactRecSigV sig
-                  signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
-            ]
-          SQL.insertMany_
-            [ CommitmentSignatureRef blkDataRefId signer' r s v
-            | Signature sig <- sigs
-            , let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
-                  s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
-                  v = getCompactRecSigV sig
-                  signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
-            ]
-          return blkDataRefId
+    -- Transactions submitted through the API already exist with block_number -1:
+    -- those get their block number set; the rest are inserted. A tx hash may
+    -- occur more than once in a batch (two blocks carrying the same tx), so
+    -- insert each hash once and let every occurrence resolve to that key.
+    let txsWithBlock = [ (tx, hash', blockBlockData b) | (b, hash') <- blocksWithHashes, tx <- blockReceiptTransactions b ]
+    known <- M.fromList . map (\(E.Value k, E.Value h) -> (h, k))
+      <$> E.select (E.from $ \t -> do
+            E.where_ $ t E.^. RawTransactionTxHash `E.in_` E.valList (map (\(tx, _, _) -> transactionHash tx) txsWithBlock)
+            return (t E.^. RawTransactionId, t E.^. RawTransactionTxHash))
+    let byBlockNumber = M.fromListWith (++)
+          [ (number bd, [k]) | (tx, _, bd) <- txsWithBlock, Just k <- [M.lookup (transactionHash tx) known] ]
+    sequence_ $ M.mapWithKey
+      (\n ks -> SQL.updateWhere [RawTransactionId SQL.<-. ks] [RawTransactionBlockNumber SQL.=. fromIntegral n])
+      byBlockNumber
+    let newTxs = M.elems $ M.fromList
+          [ (transactionHash tx, txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd))
+          | (tx, hash', bd) <- txsWithBlock, M.notMember (transactionHash tx) known ]
+    newKeys <- SQL.insertMany newTxs
+    let txKey = M.union known $ M.fromList (zip (map rawTransactionTxHash newTxs) newKeys)
+
+    let newBlocks = [ (b, hash', blk2BlkDataRef b hash' makeHashOne) | (b, hash') <- blocksWithHashes, M.notMember hash' existing ]
+    blkKeys <- SQL.insertMany [ toInsert | (_, _, (toInsert, _, _, _, _, _, _)) <- newBlocks ]
+    let withKeys = zip blkKeys newBlocks
+        sigParts sig = ( bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
+                       , bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
+                       , getCompactRecSigV sig )
+    SQL.insertMany_ [ BlockTransaction k (txKey M.! transactionHash tx) | (k, (b, _, _)) <- withKeys, tx <- blockReceiptTransactions b ]
+    SQL.insertMany_ [ BlockValidatorRef k v | (k, (_, _, (_, vs, _, _, _, _, _))) <- withKeys, v <- vs ]
+    SQL.insertMany_ $ [ ValidatorDeltaRef k v True | (k, (_, _, (_, _, va, _, _, _, _))) <- withKeys, v <- va ]
+                   ++ [ ValidatorDeltaRef k v False | (k, (_, _, (_, _, _, vr, _, _, _))) <- withKeys, v <- vr ]
+    SQL.insertMany_ [ BlockStakeRef k val st isUpd | (k, (_, _, (_, _, _, _, _, _, stakes))) <- withKeys, (val, st, isUpd) <- stakes ]
+    SQL.insertMany_
+      [ ProposalSignatureRef k signer' r s v
+      | (k, (b, _, (_, _, _, _, ps, _, _))) <- withKeys, Signature sig <- maybeToList ps
+      , let (r, s, v) = sigParts sig
+            signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
+      ]
+    SQL.insertMany_
+      [ CommitmentSignatureRef k signer' r s v
+      | (k, (_, hash', (_, _, _, _, _, sigs, _))) <- withKeys, Signature sig <- sigs
+      , let (r, s, v) = sigParts sig
+            signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
+      ]
+
+    let blockKey = M.union existing $ M.fromList [ (hash', k) | (k, (_, hash', _)) <- withKeys ]
+    return [ blockKey M.! hash' | (_, hash') <- blocksWithHashes ]
