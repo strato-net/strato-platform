@@ -2,7 +2,7 @@ import backfillRows from "../../config/exchangeRateBackfill.json";
 import { constants } from "../../config/constants";
 import { cirrus } from "../../utils/appApiHelper";
 import { totalDebtFromScaled, calculateAPYs } from "./lending.helper";
-import { safeBigInt } from "./vaultPerformance.helper";
+import { safeBigInt } from "./safeBigInt.helper";
 
 const { DECIMALS, DAY_MS, BPS_DIVISOR } = constants;
 const YIELD_ANCHOR_UTC_HOUR = 12;

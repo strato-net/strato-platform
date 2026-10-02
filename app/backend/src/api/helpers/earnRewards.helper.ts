@@ -1,5 +1,5 @@
 import stakeSemanticsConfig from "../services/rewardsStakeSemantics.json";
-import { safeBigInt } from "./vaultPerformance.helper";
+import { safeBigInt } from "./safeBigInt.helper";
 import { constants } from "../../config/constants";
 
 const { DECIMALS, BPS_DIVISOR } = constants;
@@ -57,7 +57,6 @@ export function buildRewardActivitiesFromMappings(
     priceMap: Map<string, string>;
     mTokenAddress: string | null;
     sTokenAddress: string | null;
-    vaultShareTokenAddress: string | null;
     saveUsdstVaultAddress: string | null;
     carryVaultUsdPriceMap?: Map<string, string>;
   },
@@ -84,7 +83,7 @@ export function buildRewardActivitiesFromMappings(
 
 function computeRewardStakeUsd(
   sourceContractRaw: string, name: string, totalStake: string,
-  ctx: { priceMap: Map<string, string>; mTokenAddress: string | null; sTokenAddress: string | null; vaultShareTokenAddress: string | null; carryVaultUsdPriceMap?: Map<string, string> },
+  ctx: { priceMap: Map<string, string>; mTokenAddress: string | null; sTokenAddress: string | null; carryVaultUsdPriceMap?: Map<string, string> },
   saveUsdstSource: string,
 ): { stakeAssetAddress: string | null; totalStakeUsd: string | null } {
   const sourceContract = normalizeAddress(sourceContractRaw);
@@ -112,9 +111,7 @@ function computeRewardStakeUsd(
   if (directStakePrice) return { stakeAssetAddress, totalStakeUsd: toUsdValue(totalStake, directStakePrice) };
 
   // Carry yield vaults (eth-carry, wbtc-carry): stake is in share units and the
-  // USD-per-share is precomputed against the asset's oracle price. Must precede
-  // the generic `lower.includes("vault")` branch, which would otherwise route
-  // the carry vault through the main protocol vault's share-token price.
+  // USD-per-share is precomputed against the asset's oracle price.
   if (ctx.carryVaultUsdPriceMap) {
     const carryUsdPrice = ctx.carryVaultUsdPriceMap.get(sourceContract);
     if (carryUsdPrice && carryUsdPrice !== "0") {
@@ -132,10 +129,6 @@ function computeRewardStakeUsd(
     if (p) return { stakeAssetAddress, totalStakeUsd: toUsdValue(totalStake, p) };
   }
   if (lower.includes("borrow")) return { stakeAssetAddress, totalStakeUsd: totalStake || "0" };
-  if (lower.includes("vault")) {
-    const p = getPriceForAddress(ctx.priceMap, ctx.vaultShareTokenAddress);
-    if (p) return { stakeAssetAddress, totalStakeUsd: toUsdValue(totalStake, p) };
-  }
 
   return { stakeAssetAddress, totalStakeUsd: null };
 }

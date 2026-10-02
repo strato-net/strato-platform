@@ -15,7 +15,7 @@ import {
   buildRewardActivitiesFromMappings, computeRewardsApy,
   findRewardActivity, findPoolRewardActivity,
 } from "../helpers/earnRewards.helper";
-import { computeEquityFromMaps, computeVaultPerformanceMetrics, safeBigInt } from "../helpers/vaultPerformance.helper";
+import { safeBigInt } from "../helpers/safeBigInt.helper";
 import { listVaultDefs, getYieldVaultInfo } from "./yieldVault.service";
 import { getStratoStakingNetworkApy } from "./staking.service";
 import { getPools as getV3Pools } from "./poolV3.service";
@@ -27,12 +27,6 @@ import { ApySource, TokenApyEntry, PoolV3 } from "@strato/shared-types";
 
 const { Pool, DECIMALS, Token, ZERO_ADDRESS, DAY_MS, BPS_DIVISOR } = constants;
 
-/**
- * The Diversified Vault is being sunset (deposits closed, holders withdrawing).
- * While true, its share token publishes no APY at all so nothing in the app
- * advertises yield on a product that no longer accepts deposits.
- */
-const DIVERSIFIED_VAULT_SUNSET = true;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +40,6 @@ export type AddFn = (token: string, entry: ApySource) => void;
 export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]> => {
   const now = Date.now();
   const { windowStart, windowEndExclusive, anchorsMs } = getYieldWindowBounds(now);
-  const vaultAddr = constants.vault ?? "";
   const rewAddr = rewardsAddr ?? "";
   const saveUsdstVault = saveUsdstVaultAddr ?? "";
 
@@ -56,8 +49,8 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
     ? getV3Pools(accessToken).catch(() => [])
     : Promise.resolve([]);
 
-  const phase1 = await fetchPhase1(accessToken, now, windowStart, windowEndExclusive, anchorsMs, vaultAddr, rewAddr, saveUsdstVault);
-  const ctx = parsePhase1(phase1, vaultAddr, rewAddr, saveUsdstVault);
+  const phase1 = await fetchPhase1(accessToken, now, windowStart, windowEndExclusive, anchorsMs, rewAddr, saveUsdstVault);
+  const ctx = parsePhase1(phase1, rewAddr, saveUsdstVault);
   const phase1b = await fetchPhase1b(accessToken, ctx, saveUsdstVault);
 
   const carryVaultUsdPriceMap = await getCarryVaultUsdPriceMap(accessToken, ctx.prices).catch(
@@ -68,15 +61,10 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
       priceMap: ctx.prices,
       mTokenAddress: ctx.lpData?.mToken ?? null,
       sTokenAddress: constants.sToken ?? null,
-      vaultShareTokenAddress: ctx.shareTokenAddress || null,
       saveUsdstVaultAddress: saveUsdstVault || null,
       carryVaultUsdPriceMap,
     },
   );
-
-  const { vaultAPY, vaultRewardApy, currentVaultBalances } = DIVERSIFIED_VAULT_SUNSET
-    ? { vaultAPY: null, vaultRewardApy: null, currentVaultBalances: new Map<string, string>() }
-    : await computeVaultApys(accessToken, vaultAddr, ctx, phase1b, rewardActivities);
 
   const map = new Map<string, ApySource[]>();
   const add: AddFn = (t, e) => { const arr = map.get(t); if (arr) arr.push(e); else map.set(t, [e]); };
@@ -89,22 +77,9 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
   const exchangeRateHistory = indexYieldHistoryRows(mergeBackfillRows(phase1.exchangeRateRows ?? []));
   const baseYieldByAddr = addBaseYieldApys(add, exchangeRateHistory, anchorsMs);
 
-  const vaultWeightedApy = currentVaultBalances.size > 0 && baseYieldByAddr.size > 0
-    ? weightedBaseYield(
-        ctx.filteredVaultAssets,
-        ctx.filteredVaultAssets.map(a => currentVaultBalances.get(a) ?? "0"),
-        ctx.prices, baseYieldByAddr,
-      )
-    : null;
-
   await addPoolApys(accessToken, add, phase1.pools, phase1b.stablePools, ctx, rewardActivities, baseYieldByAddr);
   addV3PoolApys(add, await v3PoolsPromise, ctx.prices, baseYieldByAddr);
 
-  if (ctx.shareTokenAddress && !DIVERSIFIED_VAULT_SUNSET) {
-    if (isPositiveApy(vaultAPY)) add(ctx.shareTokenAddress, { source: "vault", apy: vaultAPY });
-    if (isPositiveApy(vaultWeightedApy)) add(ctx.shareTokenAddress, { source: "vault_weighted", apy: vaultWeightedApy });
-    if (isPositiveApy(vaultRewardApy)) add(ctx.shareTokenAddress, { source: "rewards", apy: vaultRewardApy, meta: "vault" });
-  }
 
   await addCarryVaultApys(accessToken, add, rewardActivities);
 
@@ -119,7 +94,7 @@ export const getTokenApys = async (accessToken: string): Promise<TokenApyEntry[]
 async function fetchPhase1(
   accessToken: string, now: number,
   windowStart: string, windowEndExclusive: string, anchorsMs: number[],
-  vaultAddr: string, rewardsAddr: string, saveUsdstVault: string,
+  rewardsAddr: string, saveUsdstVault: string,
 ) {
   const twentyFourHoursAgo = toUTCTime(new Date(now - DAY_MS));
   const thirtyDaysAgo = toUTCTime(new Date(now - 30 * DAY_MS));
@@ -129,11 +104,10 @@ async function fetchPhase1(
     `and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${constants.liquidityPool})`,
     `and(address.eq.${constants.priceOracle},collection_name.eq.prices)`,
   ];
-  if (vaultAddr) mappingFilters.push(`and(address.eq.${vaultAddr},collection_name.eq.supportedAssets)`);
   if (rewardsAddr) mappingFilters.push(`and(address.eq.${rewardsAddr},collection_name.in.(activities,activityStates))`);
   if (saveUsdstVault) mappingFilters.push(`and(address.eq.${constants.USDST},collection_name.eq._balances,key->>key.eq.${saveUsdstVault})`);
 
-  const storageAddrs = [constants.lendingPool, constants.safetyModule, constants.sToken, vaultAddr, saveUsdstVault].filter(Boolean);
+  const storageAddrs = [constants.lendingPool, constants.safetyModule, constants.sToken, saveUsdstVault].filter(Boolean);
 
   const exchangeRateAddrs = [
     ...yieldBenchmarks.map(b => b.tokenAddress),
@@ -149,7 +123,7 @@ async function fetchPhase1(
   ] = await Promise.all([
     cirrus.get(accessToken, "/storage", { params: {
       address: `in.(${storageAddrs.join(",")})`,
-      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>botExecutor,data->>priceOracle,data->>shareToken,data->>assetToken,data->>perSecondSavingsRate",
+      select: "address,data->>borrowableAsset,data->>mToken,data->>totalScaledDebt,data->>borrowIndex,data->>reservesAccrued,data->>_managedAssets,data->>_totalSupply,data->>assetToken,data->>perSecondSavingsRate",
     }}),
     cirrus.get(accessToken, "/mapping", { params: { select: "address,collection_name,key,value::text", or: `(${mappingFilters.join(",")})` } }),
     cirrus.get(accessToken, `/${constants.Event}`, { params: { select: "address,event_name,attributes,block_timestamp", or: `(and(event_name.eq.Swap,block_timestamp.gte.${twentyFourHoursAgo}),and(address.eq.${constants.safetyModule},event_name.in.(Staked,Redeemed,RewardNotified,ShortfallCovered),block_timestamp.gte.${thirtyDaysAgo}))` } }),
@@ -171,21 +145,17 @@ async function fetchPhase1(
 
 // ── Parse Phase 1 ─────────────────────────────────────────────────────────────
 
-function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string, saveUsdstVault: string) {
+function parsePhase1(phase1: Phase1Data, rewardsAddr: string, saveUsdstVault: string) {
   const storageByAddr = new Map((phase1.storageRows ?? []).map((r: any) => [r.address, r]));
   const lpData: any = storageByAddr.get(constants.lendingPool);
   const smRow = storageByAddr.get(constants.safetyModule);
   const stRow = storageByAddr.get(constants.sToken);
-  const vaultStorage: any = vaultAddr ? storageByAddr.get(vaultAddr) : null;
-  const botExecutor = vaultStorage?.botExecutor;
-  const shareTokenAddress = vaultStorage?.shareToken ?? "";
   const saveUsdstStorage: any = saveUsdstVault ? storageByAddr.get(saveUsdstVault) : null;
 
   const prices = new Map<string, string>();
   let lendingCfg: any = null;
   let liqBalance: string | null = null;
   let saveUsdstBalance: string | null = null;
-  const vaultAssets: string[] = [];
   const rewardActivityCfgById = new Map<string, any>();
   const rewardActivityStateById = new Map<string, any>();
   const rewardsAddrNorm = rewardsAddr ? normalizeAddress(rewardsAddr) : "";
@@ -198,10 +168,7 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
     else if (r.collection_name === "assetConfigs") lendingCfg = JSON.parse(r.value);
     else if (r.collection_name === "_balances" && key1 === constants.liquidityPool) liqBalance = r.value;
     else if (r.collection_name === "_balances" && saveUsdstVault && key1 === saveUsdstVault) saveUsdstBalance = r.value;
-    else if (r.collection_name === "supportedAssets" && r.value) {
-      const addr = r.value.replace(/"/g, "");
-      if (addr) vaultAssets.push(addr);
-    } else if (rewardsAddrNorm && normalizeAddress(r.address) === rewardsAddrNorm && r.value) {
+    else if (rewardsAddrNorm && normalizeAddress(r.address) === rewardsAddrNorm && r.value) {
       if (!key1) continue;
       // Activity structs are spread over several rows (the actionableEvents
       // array is stored one element per row); collect and reassemble below.
@@ -216,7 +183,6 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
     if (activityId) rewardActivityCfgById.set(activityId, activity);
   }
 
-  const filteredVaultAssets = vaultAssets.filter(a => a !== ZERO_ADDRESS);
 
   const swapEvents: any[] = [], smEvents: any[] = [];
   for (const e of phase1.eventRows ?? []) {
@@ -238,9 +204,9 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
   }
 
   return {
-    lpData, smRow, stRow, vaultStorage, botExecutor, shareTokenAddress,
+    lpData, smRow, stRow,
     saveUsdstStorage, saveUsdstBalance,
-    prices, lendingCfg, liqBalance, filteredVaultAssets,
+    prices, lendingCfg, liqBalance,
     rewardActivityCfgById, rewardActivityStateById,
     swapEvents, smEvents,
   };
@@ -248,70 +214,16 @@ function parsePhase1(phase1: Phase1Data, vaultAddr: string, rewardsAddr: string,
 
 // ── Phase 1b: dependent parallel reads ────────────────────────────────────────
 
-async function fetchPhase1b(accessToken: string, ctx: Phase1Ctx, saveUsdstVault: string) {
+async function fetchPhase1b(accessToken: string, ctx: Phase1Ctx, _saveUsdstVault: string) {
   const saveUsdstAsset = ctx.saveUsdstStorage?.assetToken ?? constants.USDST;
   const saveUsdstManagedAssets = safeBigInt(ctx.saveUsdstStorage?._managedAssets);
-  const vaultAddr = constants.vault;
 
-  const [stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult] = await Promise.all([
+  const [stablePools, saveUsdstApyResult] = await Promise.all([
     fetchMultiTokenStablePools(accessToken).catch(() => []),
-    ctx.shareTokenAddress
-      ? (async () => {
-          const { data: rows } = await cirrus.get(accessToken, "/storage", { params: {
-            address: `eq.${ctx.shareTokenAddress}`,
-            select: "data->>_totalSupply",
-          }}).catch(() => ({ data: [] as any[] }));
-          return rows?.[0]?._totalSupply || await getTokenTotalSupply(accessToken, ctx.shareTokenAddress);
-        })()
-      : Promise.resolve("0"),
-    (vaultAddr && ctx.shareTokenAddress && ctx.botExecutor && ctx.filteredVaultAssets.length)
-      ? cirrus.get(accessToken, "/mapping", { params: {
-          address: `in.(${ctx.filteredVaultAssets.join(",")})`,
-          collection_name: "eq._balances",
-          "key->>key": `eq.${ctx.botExecutor}`,
-          select: "address,value::text",
-        }}).then(res => res.data ?? []).catch(() => [])
-      : Promise.resolve([] as any[]),
     Promise.resolve(computePerSecondRateApy(ctx.saveUsdstStorage?.perSecondSavingsRate)),
   ]);
 
-  return { stablePools, shareTokenTotalSupply, vaultBalanceRows, saveUsdstApyResult, saveUsdstManagedAssets, saveUsdstAsset };
-}
-
-// ── Phase 2: vault APY ────────────────────────────────────────────────────────
-
-async function computeVaultApys(
-  accessToken: string, vaultAddr: string, ctx: Phase1Ctx, phase1b: Phase1bData, rewardActivities: any[],
-) {
-  let vaultAPY: string | null = null;
-  let vaultRewardApy: string | null = null;
-  const currentVaultBalances = new Map<string, string>();
-  for (const row of phase1b.vaultBalanceRows ?? []) currentVaultBalances.set(row.address, row.value ?? "0");
-
-  if (vaultAddr && ctx.shareTokenAddress && ctx.botExecutor && ctx.filteredVaultAssets.length) {
-    const vaultEquity = computeEquityFromMaps(ctx.filteredVaultAssets, currentVaultBalances, ctx.prices);
-    const vaultTotalShares = safeBigInt(phase1b.shareTokenTotalSupply ?? "0");
-
-    const vaultMetrics = await computeVaultPerformanceMetrics(
-      accessToken, vaultAddr, vaultEquity, vaultTotalShares, ctx.shareTokenAddress,
-      ctx.botExecutor, ctx.vaultStorage?.priceOracle ?? constants.priceOracle,
-      ctx.filteredVaultAssets, ctx.prices,
-    );
-
-    vaultAPY = vaultMetrics.alpha !== APY_UNAVAILABLE ? vaultMetrics.alpha : null;
-    const vaultRewardsActivity = findRewardActivity(rewardActivities, {
-      sourceContract: ctx.shareTokenAddress,
-      stakeAssetAddress: ctx.shareTokenAddress,
-      nameIncludes: ["vault"],
-    });
-    if (vaultRewardsActivity && !vaultRewardsActivity.totalStakeUsd && vaultTotalShares > 0n && vaultEquity > 0n) {
-      const sharePrice = ((vaultEquity * DECIMALS) / vaultTotalShares).toString();
-      vaultRewardsActivity.totalStakeUsd = toUsdValue(vaultRewardsActivity.totalStake ?? "0", sharePrice);
-    }
-    vaultRewardApy = computeRewardsApy(vaultRewardsActivity?.emissionRate, vaultRewardsActivity?.totalStakeUsd);
-  }
-
-  return { vaultAPY, vaultRewardApy, currentVaultBalances };
+  return { stablePools, saveUsdstApyResult, saveUsdstManagedAssets, saveUsdstAsset };
 }
 
 // ── APY assembly helpers ──────────────────────────────────────────────────────
@@ -637,14 +549,3 @@ function emitPoolApys(
 
 // ── Cirrus helpers ────────────────────────────────────────────────────────────
 
-async function getTokenTotalSupply(accessToken: string, tokenAddress: string): Promise<string> {
-  try {
-    const { data } = await cirrus.get(accessToken, `/${Token}`, { params: {
-      select: "_totalSupply::text",
-      address: `eq.${tokenAddress}`,
-    }});
-    return data?.[0]?._totalSupply ?? "0";
-  } catch {
-    return "0";
-  }
-}
