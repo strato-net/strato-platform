@@ -273,39 +273,39 @@ A real run on a helium validator host (mock-free), then §9.7's end-to-end throu
 
 ## 6. Component C: UI
 
-Implemented 2026-09-29 (`app/ui/src`). Verified with `npm run build`, `npm run lint` on the touched
-files, and `npx tsc -b` (no errors in touched files; pre-existing errors elsewhere untouched).
+Implemented 2026-09-29, redesigned 2026-10-01 after the first real helium run (`app/ui/src`).
+Verified with `npm run build`, `tsc -b` clean on touched files, eslint clean except one pre-existing
+`as any` on the page.
 
-1. **Deep-link parameters** on `/dashboard/earn-staking` (`pages/EarnStaking.tsx`): `validator`,
-   `operator`, `signature`, `nonce`, read with `useSearchParams`. Login already preserves the query
-   string (`redirectToLogin` puts `pathname + search` into `returnTo`, honoured by nginx `/login`).
-   - `operator` present and ≠ connected account → `Alert` "This authorization is for 0x…; log in as
-     that account." Nothing is prefilled.
-   - Otherwise a listed validator (present in `info.validators`) prefills the Change-operator card;
-     an unlisted one prefills Become-a-validator with validator + signature (name and commission are
-     typed by the operator).
-   - Each card fetches the digest and compares its `nonce` with the link's; a mismatch shows
-     "This authorization is no longer valid; re-run the command on the node." and blocks submit.
-2. **Change-operator card**: new `components/staking/ChangeOperatorCard.tsx`, shown for V2 when the
-   validator set is deployed, under Become-a-validator. Validator input (prefilled from the link),
-   current operator + `ValidatorStatusBadge`, digest for (validator, connected account) with copy,
-   the `strato-authorize-operator <connected address>` command with copy, signature input, and the
-   consequence text as information (no checkbox). Status 3 adds the "does not relist" line. Skips
-   the signature when the connected account is the validator, and says "You already operate this
-   validator" when it does. Submits `POST /staking/operator { validator, signature? }` through the
-   page's `runAction` (new `ProcessingAction` "operator"), so external wallets get the usual
-   unsigned-tx handling.
-3. **Become-a-validator card** (`components/staking/BecomeValidatorCard.tsx`): command replaced by
-   `strato-authorize-operator <operator>`; raw digest kept for manual signers; new optional props
-   `initialValidator`, `initialSignature`, `expectedNonce`, `errorMessage`, `validators`,
-   `minStakeRaw`, `joinsPaused`. Shared pieces (digest type, address/signature validation,
-   `CopyValueButton`, `AuthorizationInstructions`, error extraction that accepts both
-   `{ error: "text" }` and `{ error: { message } }`) live in `components/staking/authorization.tsx`.
-4. **After success**: `runAction` refreshes info as before; both cards show the validator's real
-   `ValidatorStatusBadge` plus the next step from `components/staking/validatorNextStep.ts`
-   ("Self-bond at least <minStake>", "Activate to join the validator set", "Relisting needs an admin
-   vote"). Backend 409/404 texts are surfaced inline under the form as well as in the toast
-   (`runAction` gained an optional `onError`).
+- **One card, `components/staking/BecomeValidatorCard.tsx`**, covers both first registration and
+  taking over a listed validator. Collapsed by default: title, one line on what it takes, one
+  button ("Become a validator" / "Add a validator"). Expanded: a three-step guide — 1 run a node
+  (link to https://docs.strato.nexus), 2 run `strato-authorize-operator <connected address>` on it
+  (the command block is the hero; it never mentions registering, since it is the one way to bind a
+  node to this account), 3 finish here via the link the command prints. Step 3 routes by the
+  validator address once known: not listed → name / description / commission + **Register**
+  (`POST /staking/register`); listed under another operator → record, current operator, status
+  badge, consequence text as information (and the delisted line for status 3) + **Change operator**
+  (`POST /staking/operator`); already operated by this account → says so, no action; connected
+  account is the validator → no signature needed. Manual entry of validator and signature is a
+  toggle; the raw digest (with nonce) sits under an "Advanced: key held outside a vault"
+  disclosure. After success the card collapses to a status row (badge + next step).
+- **Deep link** `/dashboard/earn-staking?validator&operator&signature&nonce`
+  (`pages/EarnStaking.tsx`): if the connected account is not `operator`, a page-level banner says
+  to log in as that account and nothing is prefilled; otherwise the card opens at step 3 with the
+  validator and signature as read-only rows ("Change" reveals manual entry) and steps 1–2 marked
+  done. If the fetched digest's nonce differs from the link's, the card says the authorization is
+  no longer valid and blocks submit. The login redirect already preserves the query string.
+- **Errors** from the backend (409/404 registry reverts) render inline in the card via
+  `requestErrorMessage`, which accepts both `{ error: string }` and `{ error: { message } }`.
+- **After success** the page refetches staking info and the card shows the real status via
+  `ValidatorStatusBadge` plus `describeValidatorNextStep` ("Self-bond at least …", "Activate to
+  join the validator set", "In the validator set", "Relisting needs an admin vote").
+- Shared primitives: `components/staking/AuthorizationInstructions.tsx` (CommandBlock,
+  OnboardingStep, PrefilledRow, DigestDisclosure, CopyValueButton), `authorization.ts` (command
+  string, validators, error extractor), `validatorNextStep.ts`.
+- Removed on 2026-10-01 by decision: the separate "Take over a validator" card and the sentence
+  "Validators need 10,000 STRATO of self-bond; delegated stake no longer counts toward it".
 
 ## 7. Security considerations
 
