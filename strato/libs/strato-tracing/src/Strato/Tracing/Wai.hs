@@ -47,24 +47,24 @@ tracingMiddleware service app req respond = do
               attrText "net.peer" (T.pack (show (remoteHost req)))
             ]
       r <- try $ withSpan parent name Server attrs $ \ctx ->
-        withRequestContext ctx $
-          app req $ \resp -> do
+        withRequestContext ctx $ do
+          received <- app req $ \resp -> do
             writeIORef statusRef (Just (statusCode (responseStatus resp)))
             respond resp
-      status <- readIORef statusRef
-      case r of
-        Right received -> do
-          recordStatus parent status
+          status <- readIORef statusRef
+          recordStatus ctx status
           pure received
+      case r of
+        Right received -> pure received
         Left (e :: SomeException) -> throwIO e
   where
     -- withSpan has already recorded the span; the status code arrives too
     -- late to be an attribute of it, so 5xx responses get their own marker
     -- event, which is what the alert rules key on anyway.
-    recordStatus parent status = do
+    recordStatus ctx status = do
       let code = fromMaybe 0 status
       if code >= 500
         then do
           now <- nowNanos
-          recordSpan (maybe "" traceId parent) Nothing "http.server_error" Internal now now [attrInt "http.status_code" code] [] (Just (T.pack ("HTTP " ++ show code)))
+          recordSpan (traceId ctx) (Just (spanId ctx)) "http.server_error" Internal now now [attrInt "http.status_code" code] [] (Just (T.pack ("HTTP " ++ show code)))
         else pure ()
