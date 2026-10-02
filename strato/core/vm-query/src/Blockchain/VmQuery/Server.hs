@@ -241,6 +241,7 @@ routable cmd best = case cmd of
   JRCTraceCall {jrcHeader = Just h} -> latest h
   JRCSimulate {jrcHeader = Nothing} -> Right ()
   JRCSimulate {jrcHeader = Just h} -> latest h
+  JRCGetProof {} -> Right ()
   JRCTraceBlockTxs {} -> Left "vm-query: block replay needs the parent state, which the mirror does not hold"
   _ -> Left "vm-query: command is not served from the mirror"
   where
@@ -381,6 +382,7 @@ commandName = \case
   JRCGetCode {} -> "getCode"
   JRCGetTransactionCount {} -> "getTransactionCount"
   JRCGetStorageAt {} -> "getStorageAt"
+  JRCGetProof {} -> "getProof"
 
 (.=) :: Aeson.ToJSON v => Aeson.Key -> v -> (Aeson.Key, Aeson.Value)
 k .= v = (k, Aeson.toJSON v)
