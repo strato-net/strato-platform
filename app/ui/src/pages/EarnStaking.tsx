@@ -234,18 +234,8 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
   return `Ended ${formatReleaseTime(finishTime || "0")}`;
 };
 
-// V2 phases minStake in as a self-bond requirement: delegated stake counts until the grace
-// deadline ("0" = not yet scheduled), after which only self-bond does.
-const selfBondRequirementText = (info: StakingInfo, minStakeLabel: string): string => {
-  if (info.selfBondRuleActive) {
-    return `Validators need ${minStakeLabel} of self-bond.`;
-  }
-  const grace = Number(info.selfBondGraceUntil || "0");
-  if (Number.isFinite(grace) && grace > 0) {
-    return `Validators need ${minStakeLabel} of self-bond. Delegated stake counts toward it until ${formatReleaseTime(info.selfBondGraceUntil || "0")}.`;
-  }
-  return `Validators need ${minStakeLabel} of self-bond. Delegated stake still counts toward it; the self-bond deadline is not yet scheduled.`;
-};
+// V2: minStake is a self-bond requirement.
+const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
 
 const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) => (
   <TooltipProvider>
@@ -1172,7 +1162,7 @@ const EarnStaking = () => {
   };
 
   const selfBondNote = isV2 && info
-    ? selfBondRequirementText(info, `${formatToken(info.minStake, decimals, 0)} ${symbol}`)
+    ? selfBondRequirementText(`${formatToken(info.minStake, decimals, 0)} ${symbol}`)
     : undefined;
 
   const renderOperatorPanel = (
