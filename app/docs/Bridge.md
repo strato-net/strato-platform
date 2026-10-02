@@ -9,7 +9,7 @@ Deployment scope: this is a fresh ExternalAssetBridge deployment with new proxie
 Key contracts:
 - `ExternalAssetBridge`: STRATO coordinator for non-native assets.
 - `ExternalBridgeVault`: Pooled custody per external token and threshold-authorized releases on each external chain.
-- `DepositRouter`: Emits uniquely numbered external deposits and transfers assets to the route vault.
+- `ExternalAssetDepositRouter`: Emits uniquely numbered external deposits and transfers assets to the route vault.
 - `TokenRouter`: Executes validated, bounded STRATO routes after bridge settlement.
 - `StratoNativeBridge`: Unchanged native-asset bridge.
 - `MercataBridge`: Independent legacy history and operations, outside this fresh deployment.
@@ -19,7 +19,7 @@ Non-native bridge-in:
 2. It waits for the configured confirmations, groups router events by external transaction, and verifies the canonical receipt and traces once. Every event must have one distinct sender/token/custody/amount movement in execution order; exact duplicate RPC evidence is deduplicated, while missing, reused, conflicting, or ambiguous evidence quarantines the entire transaction before any STRATO settlement.
 3. Three independent verifier services validate the external event and custody movement against their own RPC providers and record STRATO attestations. After any two attest, any relayer may settle a plain deposit; recorded reviews additionally require digest-bound AdminRegistry approval. Routed and reviewed-routed deposits additionally require the bridge operator so an arbitrary relayer cannot select route steps or force source-token fallback. Both operations atomically record and complete the deposit while preserving `DepositInitiated` and `DepositCompleted`. ExternalAssetBridge converts the verified raw external amount to STRATO decimals and applies any required inbound rebase factor on-chain.
 4. Save and Forge remain user-facing destinations, but both are TokenRouter routes encoded as `AUTO_ROUTE = 4`. Legacy action ordinals 2 and 3 are not executed by ExternalAssetBridge.
-5. Before external submission the UI requires an authenticated STRATO account as recipient, connects the external wallet only as the external-chain signer, switches it to the selected chain, and states the exact STRATO source token and amount the recipient will receive if routing fails. DepositRouter accepts only `AUTO_ROUTE = 4` with a nonzero destination token and positive `minFinalOut`.
+5. Before external submission the UI requires an authenticated STRATO account as recipient, connects the external wallet only as the external-chain signer, switches it to the selected chain, and states the exact STRATO source token and amount the recipient will receive if routing fails. ExternalAssetDepositRouter accepts only `AUTO_ROUTE = 4` with a nonzero destination token and positive `minFinalOut`.
 6. Deterministic quote or route-execution errors settle through `DepositActionFallback`. Missing route metadata, unavailable quote dependencies, and transport errors remain retryable because data or submission may be ambiguous; RPC conflicts, permanently missing receipts and expired settlement retries enter persistent review/quarantine.
 7. Reviewed deposits are re-verified and resolved through `confirmReviewedDepositWithRoute` (or source-token fallback), or owner-governed `abortDeposit`.
 
@@ -28,7 +28,7 @@ Non-native bridge-in:
 Activity history enriches the canonical completion with `AutoRouted` or `DepositActionFallback` final-token data and labels it `Deposit & Trade` or `Deposit (Fallback)`. Direct STRATO routes are recorded from `TokenRouter.RouteExecuted`; Unified Trade displays those recent routes alongside pending and completed bridge deposits. Its STRATO source catalog includes every graph node with an outgoing route, including PSM-only assets, and reserves both STRATO call fees from maximum transferable USDST. Rewards continue to consume only `DepositCompleted` and its bridged source amount; action outcomes are presentation metadata and do not create a second reward.
 
 
-External action intent is not separately signed by the external wallet; it is emitted by DepositRouter in the externally signed transaction. Each settlement verifier independently binds the deposit identity, STRATO recipient, source route, action, destination token and `minFinalOut` to that canonical event. Route steps are selected by the bridge operator but must execute through TokenRouter's approved dependencies and satisfy the attested destination token and absolute `minFinalOut`. Arbitrary relayers cannot select route steps or force fallback. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback remain the execution bounds.
+External action intent is not separately signed by the external wallet; it is emitted by ExternalAssetDepositRouter in the externally signed transaction. Each settlement verifier independently binds the deposit identity, STRATO recipient, source route, action, destination token and `minFinalOut` to that canonical event. Route steps are selected by the bridge operator but must execute through TokenRouter's approved dependencies and satisfy the attested destination token and absolute `minFinalOut`. Arbitrary relayers cannot select route steps or force fallback. Contract route allowlists, on-chain rebase accounting, replay protection and source-token fallback remain the execution bounds.
 
 Non-native bridge-out:
 1. `requestWithdrawal` escrows the STRATO token.
@@ -46,7 +46,7 @@ Operational controls:
 - Configure the bridge PriceOracle and mark the route rebase-required before enabling xStock. The flag is canonical for inbound division and outbound multiplication; required routes reject zero/missing factors.
 - The service never mutates the observed external amount for rebasing. Missing factors fail only the affected settlement or review-record attempt; the remaining chain batch continues.
 - TokenRouter-originated Forge and vault events are excluded from user activity and rewards attribution. The canonical ExternalAssetBridge completion attributes the deposit to its recipient without double counting.
-- DepositRouter 3.2.0 is required for native ETH `AUTO_ROUTE`.
+- ExternalAssetDepositRouter 1.0.0 supports native ETH `AUTO_ROUTE`.
 
 
 Quote and service boundaries:
@@ -65,9 +65,9 @@ Follow-up TODO:
 
 The operator runbook is [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md).
 
-Use reviewed addresses and chain IDs for the target environment. Deploy new TokenRouter and ExternalAssetBridge proxies under AdminRegistry, then install their implementations; creation and upgrades require the votes listed below. Deploy a new ExternalBridgeVault (version 1.0.0) and DepositRouter (exactly 3.2.0) using the external deployment tool and retain its deployment JSON.
+Use reviewed addresses and chain IDs for the target environment. Deploy new TokenRouter and ExternalAssetBridge proxies under AdminRegistry, then install their implementations; creation and upgrades require the votes listed below. Deploy a new ExternalBridgeVault (version 1.0.0) and ExternalAssetDepositRouter (version 1.0.0) using the external deployment tool and retain its deployment JSON.
 
-Run legacy route discovery without `--apply` and retain the resulting audit JSON as inventory only. Do not execute its discovery-time Safe batches: minimum deposits must come from the reviewed rollout policy. Keep the new DepositRouter paused until configuration, KMS/verifiers, live verification and activation gates pass. Existing legacy custody remains independent; every migration amount stays zero.
+Run legacy route discovery without `--apply` and retain the resulting audit JSON as inventory only. Do not execute its discovery-time Safe batches: minimum deposits must come from the reviewed rollout policy. Keep the new ExternalAssetDepositRouter paused until configuration, KMS/verifiers, live verification and activation gates pass. Existing legacy custody remains independent; every migration amount stays zero.
 
 Run the contract, backend, bridge and rollout test suites before generating production artifacts. The generic runbook uses activation mode to configure reviewed deposit and withdrawal routes while keeping AUTO_ROUTE disabled for the first launch.
 
@@ -139,7 +139,7 @@ vote receipt substitutes for either governance threshold.
 | A4: install ExternalAssetBridge (`upgrade`) | **Admin votes — implementation creation, then separate admin votes — proxy `setLogicContract`.** | Implementation exists, then the proxy's live logic address matches that implementation. |
 | A5: initial external-chain vault/router deployment | Deployer transaction authorization; no STRATO admin votes or Safe signatures for initial deployment. Subsequent upgrades of Safe-controlled proxies require **Safe approvals**. | Deployment receipts, confirmations, code and ownership checks pass. |
 | A6–A9: route discovery, policy review and artifact generation; `init` / `plan` | No on-chain votes. Risk policy still requires operator review. | Validated artifacts match the reviewed manifest. |
-| A10: pause/configure DepositRouter | **Safe approvals** for the pause transaction and each token/route configuration batch. | Each batch executes successfully; paused-state verification passes. |
+| A10: pause/configure ExternalAssetDepositRouter | **Safe approvals** for the pause transaction and each token/route configuration batch. | Each batch executes successfully; paused-state verification passes. |
 | A11: initialize STRATO contracts | **Admin votes for every call:** TokenRouter `initialize`, each `setYieldVault`, ExternalAssetBridge `initialize`, `setPriceOracle`, `setTokenRouter`, each `setSettlementVerifier`, and `setSettlementVerifierThreshold`. | Respect dependencies and wait for each issue to execute; initialization verification passes. |
 | A11: grant token permissions | **Admin votes for every generated AdminRegistry `addWhitelist` call**, including required mint/burn permissions. | Live permission verification passes before route configuration. |
 | A11: configure STRATO chains/routes | **Admin votes for each `setMintPolicy`, each `setChain`, each `setRoute`, and each `setRouteRebaseRequired`**, including an explicit `false`. | Route verification matches the reviewed manifest. |
@@ -149,7 +149,7 @@ vote receipt substitutes for either governance threshold.
 | B/C: register the proposer as a Safe Transaction Service delegate | An existing Safe owner signs the off-chain delegate registration; this does not change on-chain owners or threshold. | The proposer is registered as a delegate and is not a Safe owner. |
 | C: pause/configure external vault after KMS binding | **Safe approvals** for the generated vault pause/configuration transactions: source bridge, signer registrations, threshold, authorization validity and token policies. | Transactions execute; live vault verification passes. Keep the vault paused until activation. |
 | C: deploy service configuration; `resume` / `verify` | Workload deployment authorization; no on-chain votes for configuration files or read-only checks. Any changed STRATO setter still requires **admin votes**; changed Safe-controlled settings require **Safe approvals**. | Services and consolidated live checks pass. |
-| C: `activate` and execute the reviewed unpause batch | `activate --approve` only generates the file. **Safe approvals and execution are required to unpause.** Withdrawal-enabled manifests unpause the vault before DepositRouter; deposit-only manifests unpause only DepositRouter. | Unpause receipt succeeds, then live verification observes the expected active state. |
+| C: `activate` and execute the reviewed unpause batch | `activate --approve` only generates the file. **Safe approvals and execution are required to unpause.** Withdrawal-enabled manifests unpause the vault before ExternalAssetDepositRouter; deposit-only manifests unpause only ExternalAssetDepositRouter. | Unpause receipt succeeds, then live verification observes the expected active state. |
 | C: canary deposit and reconciliation | Depositor transaction authorization; no admin votes for the normal deposit. | Custody and STRATO issuance reconcile before declaring launch complete. |
 
 For A3/A4, creation itself may wait for governance before the script can proceed.
@@ -174,7 +174,7 @@ STRATO dependencies directly in `settings.dependencies`. Do not create or edit a
 bridge or vault template. Required dependency fields are `adminRegistry`,
 `poolFactory`, `poolV3Factory`, `directMintPsm`, `metalForge`, `saveUsdstVault`,
 `yieldVaults`, `tokenFactory`, `usdst`, and `priceOracle`. The deployment artifact
-supplies the external Safe, vault, DepositRouter, implementation addresses, chain
+supplies the external Safe, vault, ExternalAssetDepositRouter, implementation addresses, chain
 ID, and deployment block. No dependency or node URL is selected automatically.
 Set `services.nodeUrl` explicitly in the generated manifest. Execution and
 verification check live network metadata, dependency contract types, and the
@@ -354,7 +354,7 @@ against local Hardhat artifacts; vault pause/configuration/roles; that the Safe
 excludes the proposer delegate and executor; the environment-appropriate Safe
 threshold; router configuration; verifier identity/file digests/baseline/finality;
 and bridge health. Compile the approved external contracts before a live check.
-Reconciliation understands an already-unpaused DepositRouter without weakening the
+Reconciliation understands an already-unpaused ExternalAssetDepositRouter without weakening the
 existing standalone scanner's default paused-state requirement.
 
 Health metadata does not independently prove AWS account separation, IAM controls,

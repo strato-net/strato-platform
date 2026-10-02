@@ -814,7 +814,8 @@ export const getWithdrawalSummary = async (
 };
 
 const DEPOSIT_ROUTER_VERSION_SELECTOR = "0x54fd4d50";
-const MIN_ACTION_ROUTER_MAJOR = 3;
+const MIN_LEGACY_ACTION_ROUTER_MAJOR = 3;
+const MIN_EXTERNAL_ACTION_ROUTER_MAJOR = 1;
 const normalizeCatalogAddress = (value: string | undefined): string =>
   (value || "").toLowerCase().replace(/^0x/, "");
 const depositActionRouteKey = (
@@ -1007,7 +1008,9 @@ export const buildDepositActionCatalog = ({
   for (const source of sources.values()) {
     const common = {
       payToken: source.address,
-      minimumRouterMajorVersion: MIN_ACTION_ROUTER_MAJOR,
+      minimumRouterMajorVersion: protocol === "legacy"
+        ? MIN_LEGACY_ACTION_ROUTER_MAJOR
+        : MIN_EXTERNAL_ACTION_ROUTER_MAJOR,
       psmFeeBps: source.psmFeeBps,
     };
 
@@ -1094,7 +1097,9 @@ export const getDepositActions = async (accessToken: string, protocol: BridgePro
   );
   const actionChainIds = new Set(
     routerMajors
-      .filter(({ major }) => major != null && major >= MIN_ACTION_ROUTER_MAJOR)
+      .filter(({ major }) => major != null && major >= (
+        legacy ? MIN_LEGACY_ACTION_ROUTER_MAJOR : MIN_EXTERNAL_ACTION_ROUTER_MAJOR
+      ))
       .map(({ chainId }) => chainId)
   );
   return buildDepositActionCatalog({

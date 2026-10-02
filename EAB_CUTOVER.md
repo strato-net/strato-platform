@@ -35,7 +35,7 @@ Create one reviewed inventory per STRATO network and external chain. Record:
 
 - Decimal-string STRATO network ID, external chain ID, old/new image digests.
 - MercataBridge, old external deposit entry points and custody addresses, EAB,
-  TokenRouter, new DepositRouter, and new ExternalBridgeVault proxy addresses.
+  TokenRouter, new ExternalAssetDepositRouter, and new ExternalBridgeVault proxy addresses.
 - Every token route: external token, STRATO token, decimals, rebase handling,
   action support, deposit/withdrawal limits, and old/new custody balances.
 - Pending deposits, including external transfers not yet indexed on STRATO,

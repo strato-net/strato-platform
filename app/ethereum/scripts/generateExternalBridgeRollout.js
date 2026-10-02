@@ -107,7 +107,7 @@ function loadSettingsInputs(settingsPath) {
   });
   return {
     depositPlanPath,
-    depositPlan: readJson(depositPlanPath, "DepositRouter plan"),
+    depositPlan: readJson(depositPlanPath, "ExternalAssetDepositRouter plan"),
     ...templates,
   };
 }
@@ -187,7 +187,7 @@ function main() {
   } else {
     chainId = args.chainId;
     depositPlanPath = path.resolve(args["deposit-plan"]);
-    depositPlan = readJson(depositPlanPath, "DepositRouter plan");
+    depositPlan = readJson(depositPlanPath, "ExternalAssetDepositRouter plan");
   }
 
   const inventory = collectInventory(depositPlan, chainId);

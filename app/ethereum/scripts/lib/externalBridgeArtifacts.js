@@ -1,12 +1,16 @@
 const { ethers } = require("ethers");
-const { encodeCall, chunkArray, buildTransactionBuilderBatch } = require("./depositRouterSafeOps");
+const {
+  encodeExternalAssetDepositRouterCall,
+  chunkArray,
+  buildTransactionBuilderBatch,
+} = require("./depositRouterSafeOps");
 
 function buildDepositRouterBatches(rollout) {
   return chunkArray(rollout.depositRouter.updates, 20).map((updates, index) => {
     const transaction = {
       to: rollout.depositRouter.address,
       value: "0",
-      data: encodeCall("batchUpdateTokens", [
+      data: encodeExternalAssetDepositRouterCall("batchUpdateTokens", [
         updates.map(({ token }) => ethers.getAddress(token)),
         updates.map(({ minDepositAmount }) => minDepositAmount),
         updates.map(({ permitted }) => permitted),
@@ -22,7 +26,7 @@ function buildDepositRouterBatches(rollout) {
         rollout.depositRouter.safeAddress,
         [transaction],
         {
-          name: `EAB all-token DepositRouter batch ${index + 1}`,
+          name: `EAB all-token ExternalAssetDepositRouter batch ${index + 1}`,
           description: `${updates.length} synchronized token route updates`,
         },
       ),
@@ -32,7 +36,7 @@ function buildDepositRouterBatches(rollout) {
 
 function buildDepositRouterControl(rollout, action) {
   if (!["pause", "unpause"].includes(action)) {
-    throw new Error(`Unsupported DepositRouter control action: ${action}`);
+    throw new Error(`Unsupported ExternalAssetDepositRouter control action: ${action}`);
   }
   return buildTransactionBuilderBatch(
     rollout.chainId,
@@ -40,12 +44,12 @@ function buildDepositRouterControl(rollout, action) {
     [{
       to: rollout.depositRouter.address,
       value: "0",
-      data: encodeCall(action, []),
+      data: encodeExternalAssetDepositRouterCall(action, []),
       operation: 0,
     }],
     {
-      name: `EAB DepositRouter ${action} (${rollout.chainId})`,
-      description: `${action} the new DepositRouter through Safe`,
+      name: `EAB ExternalAssetDepositRouter ${action} (${rollout.chainId})`,
+      description: `${action} the new ExternalAssetDepositRouter through Safe`,
     },
   );
 }

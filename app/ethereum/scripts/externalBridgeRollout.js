@@ -353,7 +353,7 @@ async function checkImplementations(context, provider) {
   const results = [];
   const slot = ethers.toBeHex(BigInt(ethers.keccak256(ethers.toUtf8Bytes("eip1967.proxy.implementation"))) - 1n, 32);
   const block = await provider.getBlockNumber();
-  for (const [field, name] of [["externalBridgeVault", "ExternalBridgeVault"], ["depositRouter", "DepositRouter"]]) {
+  for (const [field, name] of [["externalBridgeVault", "ExternalBridgeVault"], ["depositRouter", "ExternalAssetDepositRouter"]]) {
     const entry = context.deployment[field];
     const actual = ethers.getAddress(`0x${(await provider.getStorage(entry.proxy, slot, block)).slice(-40)}`);
     if (address(actual) !== address(entry.implementation)) throw new Error(`${name} implementation differs from deployment artifact`);
@@ -436,7 +436,7 @@ async function inspect(context, artifacts, options = {}) {
           const expectedPaused = router?.paused !== false || context.rollout.summary.withdrawalsEnabledCount === 0;
           if (paused !== expectedPaused) {
             throw new Error(expectedPaused ? "External vault must remain paused before activation"
-              : "External vault must be unpaused with a withdrawal-enabled DepositRouter");
+              : "External vault must be unpaused with a withdrawal-enabled ExternalAssetDepositRouter");
           }
           return { paused };
         });
@@ -450,7 +450,7 @@ async function inspect(context, artifacts, options = {}) {
         await check("vault-configuration", async () => {
           const config = normalizeConfig(context.rollout.vaultConfig);
           const base = path.resolve(__dirname, "../artifacts/contracts/bridge");
-          const state = await readState(config, config.chains[0], readJson(`${base}/ExternalBridgeVault.sol/ExternalBridgeVault.json`), readJson(`${base}/DepositRouter.sol/DepositRouter.json`), provider);
+          const state = await readState(config, config.chains[0], readJson(`${base}/ExternalBridgeVault.sol/ExternalBridgeVault.json`), readJson(`${base}/ExternalAssetDepositRouter.sol/ExternalAssetDepositRouter.json`), provider);
           return { ...state, errors: state.configurationMatches && state.routerTargetsVault && state.safeHasGovernanceRoles && state.guardianCanPause && state.routerOwnerIsSafe ? [] : ["Vault policies, signer set, governance roles, or router binding differ"] };
         });
       }
@@ -632,7 +632,7 @@ function activate(context, artifacts, inspection, approval) {
   const file = path.join(artifacts.directory, `activation-unpause-${approval}.json`);
   writeJson(file, buildTransactionBuilderBatch(context.rollout.chainId,
     context.rollout.vaultConfig.chains[0].safeAddress, transactions,
-    { name: "Activate External Asset Bridge", description: "Unpause the reviewed EAB vault and DepositRouter" }));
+    { name: "Activate External Asset Bridge", description: "Unpause the reviewed EAB vault and ExternalAssetDepositRouter" }));
   return file;
 }
 

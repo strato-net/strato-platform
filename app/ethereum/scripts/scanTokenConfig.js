@@ -112,7 +112,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
   }
 
   const artifact =
-    require("../artifacts/contracts/bridge/DepositRouter.sol/DepositRouter.json");
+    require("../artifacts/contracts/bridge/ExternalAssetDepositRouter.sol/ExternalAssetDepositRouter.json");
   const contract = new ethers.Contract(expected.depositRouterAddress, artifact.abi, provider);
   const [network, code, paused, owner, vault, routeEvents] = await Promise.all([
     provider.getNetwork(),
@@ -132,8 +132,8 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
       `Connected chain ${network.chainId} does not match ${expected.chainId}`,
     );
   }
-  if (code === "0x") errors.push("DepositRouter has no deployed bytecode");
-  if (paused !== expectedPaused) errors.push(expectedPaused ? "DepositRouter is not paused" : "DepositRouter is paused");
+  if (code === "0x") errors.push("ExternalAssetDepositRouter has no deployed bytecode");
+  if (paused !== expectedPaused) errors.push(expectedPaused ? "ExternalAssetDepositRouter is not paused" : "ExternalAssetDepositRouter is paused");
   if (keyAddress(owner) !== keyAddress(expected.ownerAddress)) {
     errors.push(`Owner mismatch: expected ${expected.ownerAddress}, got ${owner}`);
   }
@@ -210,7 +210,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
   if (!quiet) console.log(JSON.stringify(report, null, 2));
   if (errors.length && !quiet) {
     throw new Error(
-      `DepositRouter verification failed with ${errors.length} error(s)`,
+      `ExternalAssetDepositRouter verification failed with ${errors.length} error(s)`,
     );
   }
   return report;
@@ -222,7 +222,7 @@ async function scanConfiguredTokens() {
     throw new Error("DEPOSIT_ROUTER_ADDRESS is required");
   }
   const artifact =
-    require("../artifacts/contracts/bridge/DepositRouter.sol/DepositRouter.json");
+    require("../artifacts/contracts/bridge/ExternalAssetDepositRouter.sol/ExternalAssetDepositRouter.json");
   const contract = await ethers.getContractAt(artifact.abi, contractAddress);
   const events = await contract.queryFilter(
     contract.filters.TokenConfigUpdated(),

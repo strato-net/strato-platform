@@ -40,6 +40,24 @@ test("a receipt timeout resumes the saved proxy without redeployment", async t =
   journal.close();
 });
 
+test("polls receipts when the Hardhat provider cannot wait for transactions", async t => {
+  const h = harness(t);
+  h.provider.waitForTransaction = async () => {
+    throw new Error("Method 'HardhatEthersProvider.waitForTransaction' is not implemented");
+  };
+  h.provider.getTransactionReceipt = async () => ({
+    status: 1,
+    contractAddress: "0x" + "1".repeat(40),
+    blockNumber: 12,
+  });
+  h.provider.getBlockNumber = async () => 14;
+  const journal = h.open();
+  await h.run(journal);
+  assert.equal(h.deployments(), 1);
+  assert.equal(journal.state.steps.vault.status, "verified");
+  journal.close();
+});
+
 test("a later configuration failure preserves both deployments and revalidates on restart", async t => {
   const h = harness(t);
   let journal = h.open();

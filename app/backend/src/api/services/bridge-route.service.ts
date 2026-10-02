@@ -22,15 +22,12 @@ const normalizeAddress = (value: string): string =>
   value.toLowerCase().replace(/^0x/, "");
 
 export const supportsAutoRouteRouter = (
-  version: string | null,
-  nativeDeposit: boolean
+  version: string | null
 ): boolean => {
   if (!version) return false;
   const [major, minor = 0] = version.split(".").map(Number);
   if (!Number.isInteger(major) || !Number.isInteger(minor)) return false;
-  return nativeDeposit
-    ? major > 3 || (major === 3 && minor >= 2)
-    : major >= 3;
+  return major >= 1;
 };
 
 export const convertExternalToStratoAmount = (
@@ -192,9 +189,7 @@ export const getCompositeBridgeRouteQuote = async (
           network.chainInfo.depositRouter
         )
       : null;
-    const nativeDeposit =
-      normalizeAddress(route.externalToken) === ZERO_ADDRESS;
-    if (!supportsAutoRouteRouter(version, nativeDeposit)) {
+    if (!supportsAutoRouteRouter(version)) {
       throw new Error(
         "The selected bridge router does not support automatic routing"
       );

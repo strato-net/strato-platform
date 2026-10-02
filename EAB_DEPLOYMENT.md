@@ -4,7 +4,12 @@ One EAB between one STRATO network and one supported external EVM chain. Same
 reviewed commit on every machine. No liquidity migration. Do not upgrade an old
 vault.
 
-ExternalBridgeVault `1.0.0`. DepositRouter `3.2.0`.
+ExternalBridgeVault `1.0.0`. ExternalAssetDepositRouter `1.0.0`.
+
+Deploy ExternalAssetDepositRouter behind a fresh proxy. Do not upgrade a
+Mercata DepositRouter or an earlier EAB router proxy to this contract. Keep
+prior EAB router addresses enabled for historical polling and settlement while
+the new proxy becomes the primary router for new deposits.
 
 For an existing MercataBridge network, also follow [EAB_CUTOVER.md](EAB_CUTOVER.md)
 for intake cutoff, pending transactions, custody, application rollout, and rollback.
@@ -90,7 +95,7 @@ when a threshold is required.
   Coordinator `status` counts live `IssueCreated` / `IssueVoted` events.
 - The `--approve` hash binds the current rollout revision (manifest, policy,
   embedded deployment/plan, and rollout code), each READY call id and status,
-  overall check readiness, and whether DepositRouter is paused. It has no
+  overall check readiness, and whether ExternalAssetDepositRouter is paused. It has no
   wall-clock expiry. It does not by itself bind vault pause, verifier health,
   or vote counts. Never reuse a hash from an older `status` report.
 - `autoRouteEnabled` stays `false` on every route. `migrateAmount` stays `"0"`
@@ -246,8 +251,8 @@ npm run deployExternalBridge:<NETWORK> -- --rollout-dir <ROLLOUT_DIRECTORY>
 npm run deployExternalBridge:<NETWORK> -- --rollout-dir <ROLLOUT_DIRECTORY> --execute
 ```
 
-Writes `external-deployment.json`. Check `version()` is `1.0.0` (vault) and
-`3.2.0` (router). Clear `PRIVATE_KEY`. Both contracts are unpaused until step 5.
+Writes `external-deployment.json`. Check `version()` is `1.0.0` for both the
+vault and router. Clear `PRIVATE_KEY`. Both contracts are unpaused until step 5.
 
 Verify the **implementation** addresses from that JSON (`ETHERSCAN_API_KEY` in
 `app/ethereum/.env`):
@@ -547,7 +552,7 @@ EAB AUTO_ROUTE activation requires separate native-gas-token and ERC-20 canaries
 deployed app, bridge, and verifiers; retain the external and STRATO transaction
 hashes and balance changes for each test:
 
-Here “native-gas-token” means ETH through EAB/DepositRouter. These tests do not
+Here “native-gas-token” means ETH through EAB/ExternalAssetDepositRouter. These tests do not
 cover STRATO-native representation redemptions, which have a separate gate below.
 
 | Test | Required result |

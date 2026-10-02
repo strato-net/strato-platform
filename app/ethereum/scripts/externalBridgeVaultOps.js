@@ -8,7 +8,7 @@ require("dotenv").config({
 const { ethers } = require("ethers");
 const {
   getRpcUrl,
-  loadDepositRouterArtifact,
+  loadExternalAssetDepositRouterArtifact,
   proposeBatch,
   writeOutput,
   buildTransactionBuilderBatch,
@@ -115,7 +115,7 @@ async function readState(config, chain, vaultArtifact, routerArtifact, provider 
     throw new Error(`Chain ${chain.chainId}: vault has no bytecode`);
   }
   if (routerCode === "0x") {
-    throw new Error(`Chain ${chain.chainId}: DepositRouter has no bytecode`);
+    throw new Error(`Chain ${chain.chainId}: ExternalAssetDepositRouter has no bytecode`);
   }
 
   const vault = new ethers.Contract(
@@ -255,7 +255,7 @@ async function main() {
   const config = loadConfig(args.config);
   const chains = selectChains(config, args.chains);
   const vaultArtifact = loadVaultArtifact();
-  const routerArtifact = loadDepositRouterArtifact();
+  const routerArtifact = loadExternalAssetDepositRouterArtifact();
   const vaultInterface = new ethers.Interface(vaultArtifact.abi);
   const routerInterface = new ethers.Interface(routerArtifact.abi);
   const summary = {
@@ -280,7 +280,7 @@ async function main() {
       throw new Error(`Chain ${chain.chainId}: guardian cannot pause the vault`);
     }
     if (!state.routerOwnerIsSafe) {
-      throw new Error(`Chain ${chain.chainId}: Safe is not DepositRouter owner`);
+      throw new Error(`Chain ${chain.chainId}: Safe is not ExternalAssetDepositRouter owner`);
     }
     if (
       args.step === "verify" &&

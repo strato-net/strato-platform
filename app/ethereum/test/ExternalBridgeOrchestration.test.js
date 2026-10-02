@@ -829,7 +829,7 @@ test("router scanner supports active-state reconciliation without changing its p
   assert.equal(active.status, "PASSED");
   const defaultCheck = await verifyFromManifest(f.artifacts.manifestPath, { provider, quiet: true });
   assert.equal(defaultCheck.status, "FAILED");
-  assert(defaultCheck.errors.includes("DepositRouter is not paused"));
+  assert(defaultCheck.errors.includes("ExternalAssetDepositRouter is not paused"));
 });
 
 test("source chain mismatch fails before querying contract state", async (t) => {
@@ -851,7 +851,7 @@ test("implementation gate compares the actual build and rejects stale source or 
   const { ethers } = require("ethers");
   const { checkImplementations } = require("../scripts/externalBridgeRollout");
   const bytecode = new Map();
-  for (const [name, implementation] of [["ExternalBridgeVault", addr("a")], ["DepositRouter", addr("b")]]) {
+  for (const [name, implementation] of [["ExternalBridgeVault", addr("a")], ["ExternalAssetDepositRouter", addr("b")]]) {
     const artifactPath = path.resolve(__dirname, `../artifacts/contracts/bridge/${name}.sol/${name}.json`);
     const artifact = readJson(artifactPath);
     bytecode.set(implementation.toLowerCase(), artifact.deployedBytecode);

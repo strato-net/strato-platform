@@ -58,10 +58,10 @@ test("disabled EAB routing returns a client error and still permits bridge-only 
   assert.equal(quote.depositAction.action, 0);
 });
 
-test("requires DepositRouter 3.2 for routed ETH", () => {
-  assert.equal(supportsAutoRouteRouter("3.1.0", true), false);
-  assert.equal(supportsAutoRouteRouter("3.2.0", true), true);
-  assert.equal(supportsAutoRouteRouter("3.0.0", false), true);
+test("requires ExternalAssetDepositRouter 1.0 or newer", () => {
+  assert.equal(supportsAutoRouteRouter("1.0.0"), true);
+  assert.equal(supportsAutoRouteRouter("0.9.0"), false);
+  assert.equal(supportsAutoRouteRouter("invalid"), false);
 });
 
 test("composite quotes reject zero slippage even for bridge-only deposits", async () => {

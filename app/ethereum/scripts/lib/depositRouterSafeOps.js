@@ -54,15 +54,23 @@ function getRpcUrl(chainId) {
   return process.env[cfg.rpcEnv] || cfg.defaultRpcUrl;
 }
 
-function loadDepositRouterArtifact() {
+function loadRouterArtifact(name) {
   const artifactPath = path.resolve(
     __dirname,
-    "../../artifacts/contracts/bridge/DepositRouter.sol/DepositRouter.json",
+    `../../artifacts/contracts/bridge/${name}.sol/${name}.json`,
   );
   if (!fs.existsSync(artifactPath)) {
-    throw new Error(`DepositRouter artifact missing: ${artifactPath}`);
+    throw new Error(`${name} artifact missing: ${artifactPath}`);
   }
   return JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+}
+
+function loadDepositRouterArtifact() {
+  return loadRouterArtifact("DepositRouter");
+}
+
+function loadExternalAssetDepositRouterArtifact() {
+  return loadRouterArtifact("ExternalAssetDepositRouter");
 }
 
 function getSafeSignerPrivateKey() {
@@ -91,6 +99,12 @@ function getSafeProposerAddress() {
 
 function encodeCall(method, args) {
   const artifact = loadDepositRouterArtifact();
+  const iface = new ethers.Interface(artifact.abi);
+  return iface.encodeFunctionData(method, args);
+}
+
+function encodeExternalAssetDepositRouterCall(method, args) {
+  const artifact = loadExternalAssetDepositRouterArtifact();
   const iface = new ethers.Interface(artifact.abi);
   return iface.encodeFunctionData(method, args);
 }
@@ -231,7 +245,9 @@ module.exports = {
   getChainConfig,
   getRpcUrl,
   loadDepositRouterArtifact,
+  loadExternalAssetDepositRouterArtifact,
   encodeCall,
+  encodeExternalAssetDepositRouterCall,
   proposeBatch,
   chunkArray,
   writeOutput,

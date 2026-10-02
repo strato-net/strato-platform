@@ -37,15 +37,15 @@ function collectInventory(depositPlan, chainId) {
     (item) => Number(item.chainId) === Number(chainId),
   );
   if (!operation) {
-    throw new Error(`DepositRouter plan has no operation for chain ${chainId}`);
+    throw new Error(`ExternalAssetDepositRouter plan has no operation for chain ${chainId}`);
   }
 
   const routes = new Map();
   for (const transaction of operation.transactions || []) {
     for (const item of transaction.meta?.items || []) {
       if (!item.isPermitted) continue;
-      const token = address(item.token, "DepositRouter token");
-      const target = address(item.target, "DepositRouter target");
+      const token = address(item.token, "ExternalAssetDepositRouter token");
+      const target = address(item.target, "ExternalAssetDepositRouter target");
       const stratoTokenStatus = Number(item.stratoTokenStatus);
       if (stratoTokenStatus !== 2) {
         throw new Error(
@@ -79,7 +79,7 @@ function collectInventory(depositPlan, chainId) {
     }
   }
   if (!routes.size) {
-    throw new Error(`DepositRouter plan has no enabled routes for chain ${chainId}`);
+    throw new Error(`ExternalAssetDepositRouter plan has no enabled routes for chain ${chainId}`);
   }
   return [...routes.values()].sort((left, right) =>
     routeKey(left.externalToken, left.stratoToken).localeCompare(

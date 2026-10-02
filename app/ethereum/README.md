@@ -25,7 +25,7 @@ Modular Hardhat setup for deploying STRATO contracts to Ethereum networks with U
 
 4. **Deploy to Sepolia testnet:**
    ```bash
-   CONTRACT_NAME=DepositRouter INIT_PARAMS='["0xYOUR_GNOSIS_SAFE", "0xYOUR_OWNER"]' npm run deployWithProxy:sepolia
+   CONTRACT_NAME=DepositRouter INIT_PARAMS='["0xYOUR_PERMIT2", "0xYOUR_GNOSIS_SAFE", "0xYOUR_OWNER"]' npm run deployWithProxy:sepolia
    ```
 
 ## Available Scripts
@@ -42,9 +42,9 @@ Modular Hardhat setup for deploying STRATO contracts to Ethereum networks with U
 
 ## Utility Scripts
 
-### DepositRouter configuration verification
+### ExternalAssetDepositRouter configuration verification
 
-Pass the finalized rollout manifest to verify the deployed DepositRouter
+Pass the finalized rollout manifest to verify the deployed ExternalAssetDepositRouter
 against every generated token and route:
 
 ```bash
@@ -74,7 +74,7 @@ PRIVATE_KEY=0x1234567890abcdef...
 # Etherscan API key for verification
 ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
 
-# DepositRouter contract address (for utility scripts)
+# ExternalAssetDepositRouter proxy address (for EAB utility scripts)
 DEPOSIT_ROUTER_ADDRESS=0x1234567890123456789012345678901234567890
 ```
 
@@ -95,7 +95,7 @@ CONTRACT_NAME=<contractname> INIT_PARAMS='["param1", "param2", ...]' npm run dep
 **DepositRouter Example:**
 
 ```bash
-CONTRACT_NAME=DepositRouter INIT_PARAMS='["0xGNOSIS_SAFE_ADDRESS", "0xOWNER_ADDRESS"]' npm run deployWithProxy:sepolia
+CONTRACT_NAME=DepositRouter INIT_PARAMS='["0xPERMIT2_ADDRESS", "0xGNOSIS_SAFE_ADDRESS", "0xOWNER_ADDRESS"]' npm run deployWithProxy:sepolia
 ```
 
 ## Verification
@@ -110,8 +110,9 @@ npm run verify:sepolia -- 0xIMPLEMENTATION_ADDRESS
 
 `ExternalBridgeVault` holds route-local external liquidity. Its initializer
 assigns default administration, upgrades, policy, pause, unpause, attestation
-administration, and large-withdrawal approval explicitly. The existing
-`DepositRouter` remains owned by the Safe.
+administration, and large-withdrawal approval explicitly. The new
+`ExternalAssetDepositRouter` is owned by the Safe. The independent
+`DepositRouter` 4.0.0 remains the Mercata solver router.
 
 For new deployments, follow the canonical operator runbook at
 [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md) and use
@@ -121,8 +122,8 @@ artifacts and is not the new-deployment workflow.
 
 ### Pair deployment
 
-The pair deployer creates one `ExternalBridgeVault` proxy and one
-`DepositRouter` proxy, verifies their initial wiring and roles, and records the
+The pair deployer creates one `ExternalBridgeVault` proxy and one new
+`ExternalAssetDepositRouter` proxy, verifies their initial wiring and roles, and records the
 deployment blocks in a network-specific artifact. Set
 `CHAIN_<ID>_DEPLOYMENT_CONFIRMATIONS` to the approved finality depth for each
 network; deployment artifacts are written only after both transactions reach
@@ -165,7 +166,7 @@ Compile and run the contract and rollout-plan tests:
 
 ```bash
 npm run compile
-npx hardhat test test/ExternalBridgeVault.js test/DepositRouter.test.js
+npx hardhat test test/ExternalBridgeVault.js test/ExternalAssetDepositRouter.test.js
 npm run external:deploy:test
 npm run external:vault:ops:test
 npm run external:rollout:test
@@ -180,7 +181,7 @@ discovery can write their stable artifacts directly into the rollout directory;
 `external:rollout:prepare`, `external:rollout:finalize`, and
 `external:rollout:generate` are deprecated compatibility commands.
 
-After Safe configuration, verify DepositRouter against the generated manifest:
+After Safe configuration, verify ExternalAssetDepositRouter against the generated manifest:
 
 ```bash
 cd app/ethereum && ROLLOUT_MANIFEST=/secure/path/eab-rollout/external-bridge-rollout-manifest-11155111.json npm run scan:sepolia
@@ -225,9 +226,8 @@ INIT_PARAMS='["0xDEFAULT_ADMIN","0xUPGRADER","0xPOLICY_ADMIN","0xGUARDIAN","0xUN
 npm run deployWithProxy:sepolia
 ```
 
-Record the proxy address in the rollout configuration. Deploy the current
-`DepositRouter` implementation and use the existing router upgrade proposal
-flow. Execute that Safe proposal before running vault operations.
+Record both new proxy addresses in the rollout configuration. Do not upgrade or
+repurpose an existing `DepositRouter` proxy for EAB.
 
 Dry-run the vault configuration and router destination update:
 
@@ -310,7 +310,7 @@ complete successfully against the new vault.
 
 ```bash
 CONTRACT_NAME=DepositRouter \
-INIT_PARAMS='["0xSAFE", "0xOWNER"]' \
+INIT_PARAMS='["0xPERMIT2", "0xSAFE", "0xOWNER"]' \
 INIT_METHOD=initialize \
 PROXY_KIND=uups \
 npm run deployWithProxy:sepolia

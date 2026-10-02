@@ -98,7 +98,7 @@ async function main() {
     ethers.provider.getCode(safeAddress),
     ethers.provider.getCode(permit2Address),
     ethers.getContractFactory("ExternalBridgeVault"),
-    ethers.getContractFactory("DepositRouter"),
+    ethers.getContractFactory("ExternalAssetDepositRouter"),
   ]);
   if (deployerBalance === 0n) {
     throw new Error(`Deployment signer ${deployerAddress} has zero balance`);
@@ -183,7 +183,7 @@ async function main() {
   const routerDeployment = await resumeProxyDeployment(journal, "router", () => upgrades.deployProxy(
     routerFactory, [permit2Address, vaultAddress, safeAddress], { kind: "uups" },
   ), routerFactory, ethers.provider, upgrades, deploymentConfirmations, async contract => {
-    if (await contract.version() !== "3.2.0" || await contract.owner() !== safeAddress ||
+    if (await contract.version() !== "1.0.0" || await contract.owner() !== safeAddress ||
         await contract.externalBridgeVault() !== vaultAddress || await contract.PERMIT2() !== permit2Address) {
       throw new Error("Router configuration mismatch");
     }
@@ -227,7 +227,7 @@ async function main() {
     ),
   };
   if (
-    verification.depositRouterVersion !== "3.2.0" ||
+    verification.depositRouterVersion !== "1.0.0" ||
     verification.depositRouterOwner !== safeAddress ||
     verification.depositRouterVault !== vaultAddress ||
     !verification.vaultDefaultAdmin ||

@@ -32,6 +32,29 @@ function openDeploymentCheckpoint(file, binding, artifactFiles) {
   } catch (error) { close(); throw error; }
 }
 
+async function waitForTransaction(provider, transactionHash, confirmations, timeout) {
+  if (typeof provider.waitForTransaction === "function") {
+    try {
+      return await provider.waitForTransaction(transactionHash, confirmations, timeout);
+    } catch (error) {
+      if (!String(error?.message || error).includes("waitForTransaction' is not implemented")) {
+        throw error;
+      }
+    }
+  }
+
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    const receipt = await provider.getTransactionReceipt(transactionHash);
+    if (receipt) {
+      const latestBlock = await provider.getBlockNumber();
+      if (latestBlock - receipt.blockNumber + 1 >= confirmations) return receipt;
+    }
+    await new Promise(resolve => setTimeout(resolve, 5_000));
+  }
+  return null;
+}
+
 async function resumeProxyDeployment(journal, name, deploy, factory, provider, upgrades, confirmations, validate) {
   let step = journal.state.steps[name];
   if (!step) {
@@ -48,7 +71,8 @@ async function resumeProxyDeployment(journal, name, deploy, factory, provider, u
   if (!/^0x[0-9a-f]{40}$/i.test(step.proxy || "") || !/^0x[0-9a-f]{64}$/i.test(step.transactionHash || "")) {
     throw new Error(`${name} deployment outcome is uncertain; reconcile the deployer transactions and checkpoint before retrying`);
   }
-  const receipt = await provider.waitForTransaction(step.transactionHash, confirmations, 120000);
+  const timeout = Math.max(120_000, confirmations * 15_000);
+  const receipt = await waitForTransaction(provider, step.transactionHash, confirmations, timeout);
   if (!receipt || receipt.status !== 1 || receipt.contractAddress?.toLowerCase() !== step.proxy.toLowerCase()) {
     throw new Error(`${name} deployment receipt is missing, failed or mismatched`);
   }
