@@ -110,16 +110,20 @@ test-suite slipstream-batching-test
   ghc-options: -Wall -Werror -rtsopts
   build-depends:
       base
+    , base16-bytestring
     , bytestring
     , common-log
     , conduit
     , containers
+    , data-default
     , evm-solidity
     , hspec
     , slipstream
+    , solid-vm-model
     , strato-model
     , text
     , time
+    , vm-tools
   default-language: Haskell2010
 
 test-suite slipstream-test

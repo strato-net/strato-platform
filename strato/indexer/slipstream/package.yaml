@@ -82,15 +82,19 @@ tests:
     source-dirs: tests-batching/
     dependencies:
       - base
+      - base16-bytestring
       - bytestring
       - conduit
       - containers
+      - data-default
       - evm-solidity
       - hspec
       - slipstream
+      - solid-vm-model
       - strato-model
       - text
       - time
+      - vm-tools
 
   slipstream-test:
     main: Main.hs
