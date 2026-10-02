@@ -33,6 +33,7 @@ library:
     - ethereum-discovery
     - filepath
     - format
+    - http-client
     - http-types
     - lens
     - monad-alter

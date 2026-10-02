@@ -21,6 +21,7 @@ executables:
       - blaze-builder
       - blockapps-data
       - blockapps-datadefs
+      - blockapps-mpdbs
       - strato-version
       - blockDB
       - core-api2

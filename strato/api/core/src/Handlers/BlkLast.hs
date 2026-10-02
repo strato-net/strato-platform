@@ -60,18 +60,23 @@ instance (SQLDB Base.:> es) => GetLastBlocks (Base.Eff es) where
         get' = Map.findWithDefault []
     vs <- fmap (buildList blockValidatorRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. BlockValidatorRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. BlockValidatorRefId)]
       pure v
     vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. ValidatorDeltaRefId)]
       pure v
     ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. ProposalSignatureRefId)]
       pure v
     ss <- fmap (buildList commitmentSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. CommitmentSignatureRefId)]
       pure v
     stakes <- fmap (buildList blockStakeRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. BlockStakeRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. BlockStakeRefId)]
       pure v
     txs <- fmap (buildList' (blockTransactionBlockDataRefId . fst) ((: []) . rawTX2TX . snd) . map (E.entityVal *** E.entityVal)) . sqlQuery $
       E.select $ E.from $ \(btx `E.InnerJoin` rawTX) -> do

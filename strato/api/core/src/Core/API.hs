@@ -22,6 +22,7 @@ module Core.API
   , module Handlers.Block
   , module Handlers.Metadata
   , module Handlers.Receipts
+  , module Handlers.StateProof
   , module Handlers.Stats
   , module Handlers.Storage
   , module Handlers.Transaction
@@ -55,6 +56,8 @@ import qualified Handlers.Peers                    as Peers
 import qualified Handlers.QueuedTransactions       as QueuedTransactions
 import           Handlers.Receipts                 hiding (API, server)
 import qualified Handlers.Receipts                 as Receipts
+import           Handlers.StateProof               hiding (API, server)
+import qualified Handlers.StateProof               as StateProof
 import           Handlers.Stats                    hiding (API, server)
 import qualified Handlers.Stats                    as Stats
 import           Handlers.Storage                  hiding (API, server)
@@ -79,6 +82,7 @@ type CoreAPI =
            :<|> Peers.API
            :<|> QueuedTransactions.API
            :<|> Receipts.API
+           :<|> StateProof.API
            :<|> Stats.API
            :<|> Storage.API
            :<|> Transaction.API
@@ -120,6 +124,7 @@ coreApiServer =
     :<|> Peers.server
     :<|> QueuedTransactions.server
     :<|> Receipts.server
+    :<|> StateProof.server
     :<|> Stats.server
     :<|> Storage.server
     :<|> Transaction.server (Conf.txSizeLimit (networkConfig ethConf))

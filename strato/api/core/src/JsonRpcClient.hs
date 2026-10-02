@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | Minimal JSON-RPC 2.0 client for the node's co-located ethereum-jsonrpc
--- service, used by transaction simulation.
-module Bloc.Server.JsonRpc
+-- service, used by transaction simulation and state proofs.
+module JsonRpcClient
   ( jsonRpcCall,
   )
 where

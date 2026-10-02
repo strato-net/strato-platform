@@ -49,6 +49,7 @@ module Blockchain.Database.MerklePatricia
     blankStateRoot,
     addAllKVs,
     getInclusionProof,
+    getProof,
   )
 where
 
@@ -185,7 +186,22 @@ getInclusionProof ::
   -- | Pre-encoded key. For receipts: @byteString2NibbleString (rlpSerialize (rlpEncode txIndex))@.
   Key ->
   m (Maybe (B.ByteString, [B.ByteString]))
-getInclusionProof rootSr key = walkRef (ptrRef rootSr) key []
+getInclusionProof rootSr key = do
+  (mVal, proof) <- getProof rootSr key
+  return $ (\val -> (rlpDecode val, proof)) <$> mVal
+
+-- | Walk the trie from @rootSr@ along a pre-encoded key, collecting the
+-- nodes visited. Returns the value item of the leaf reached (as stored, so
+-- an embedded list stays a list) and the proof nodes in the shape described
+-- for 'getInclusionProof'. When the key is absent the value is @Nothing@ and
+-- the nodes are the path to the point of divergence (an exclusion proof); a
+-- node missing from the backing store also ends the walk with @Nothing@.
+getProof ::
+  (StateRoot `Alters` NodeData) m =>
+  StateRoot ->
+  Key ->
+  m (Maybe Val, [B.ByteString])
+getProof rootSr key = walkRef (ptrRef rootSr) key []
   where
     -- Recurse into a referenced node. Pointer refs (Right StateRoot) require
     -- a DB lookup and contribute the looked-up node's bytes to the proof.
@@ -195,23 +211,21 @@ getInclusionProof rootSr key = walkRef (ptrRef rootSr) key []
     walkRef (Right sr) k acc = do
       mNd <- A.lookup (Proxy @NodeData) sr
       case mNd of
-        Nothing -> return Nothing
+        Nothing -> return (Nothing, acc)
         Just nd ->
           walkNode nd k (acc ++ [rlpSerialize (rlpEncode nd)])
     walkRef (Left bytes) k acc =
       walkNode (rlpDecode (rlpDeserialize bytes) :: NodeData) k acc
 
-    walkNode EmptyNodeData _ _ = return Nothing
-    walkNode (FullNodeData _ (Just val)) k acc
-      | N.null k = return $ Just (rlpDecode val, acc)
-    walkNode (FullNodeData _ Nothing) k _
-      | N.null k = return Nothing
+    walkNode EmptyNodeData _ acc = return (Nothing, acc)
+    walkNode (FullNodeData _ mVal) k acc
+      | N.null k = return (mVal, acc)
     walkNode (FullNodeData cs _) k acc =
       let n = fromIntegral $ N.head k
        in walkRef (cs !! n) (N.tail k) acc
     walkNode (ShortcutNodeData s (Right val)) k acc
-      | s == k = return $ Just (rlpDecode val, acc)
-      | otherwise = return Nothing
+      | s == k = return (Just val, acc)
+      | otherwise = return (Nothing, acc)
     walkNode (ShortcutNodeData s (Left ref)) k acc
       | s `N.isPrefixOf` k = walkRef ref (N.drop (N.length s) k) acc
-      | otherwise = return Nothing
+      | otherwise = return (Nothing, acc)
