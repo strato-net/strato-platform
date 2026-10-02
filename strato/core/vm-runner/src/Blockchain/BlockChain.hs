@@ -776,7 +776,7 @@ printTransactionMessage ::
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
   let tNonce = TD.nonce $ otBaseTx ot
-  multilineLog "printTx/err" $
+  multilineDebugLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
@@ -792,7 +792,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
           then ""
           else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAddress results
 
-  multilineLog "printTx/ok" $
+  multilineDebugLog "printTx/ok" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
