@@ -1,6 +1,6 @@
 import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig } from '../types';
-import { logError, logInfo } from '../utils/logger';
+import { logError, logInfo, logWarning } from '../utils/logger';
 import { ORACLE_CONFIG } from '../utils/constants';
 
 function extractNestedProperty(obj: any, path: string): any {
@@ -42,12 +42,23 @@ export async function fetchPrices(sourceConfig: SourceConfig): Promise<BatchPric
         method: requestOptions.method || 'GET'
     });
 
-    if (response.data && response.data.success === false) {
-        const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
-        throw new Error(`${sourceConfig.url}: ${errorMessage}`);
+    // Provider errors reported inside a 2xx body (success:false, Kraken error[]), a response that prices none of the
+    // configured assets, and parse crashes are reported like a failed request: logError here (error log + health
+    // flag), then the rejection reaches fetchSource, which logs the warning and marks the source failed for the cycle.
+    try {
+        if (response.data && response.data.success === false) {
+            throw new Error(response.data.error?.message || response.data.error || 'API returned error response');
+        }
+        const result = parseResponse(response.data, sourceConfig);
+        if (sourceConfig.assets.length > 0 && Object.keys(result).length === 0) {
+            throw new Error(`no prices parsed for [${sourceConfig.assets.join(', ')}]`);
+        }
+        return result;
+    } catch (err) {
+        const error = new Error(`${sourceConfig.url}: ${(err as Error).message}`);
+        logError('GenericRestAdapter', error);
+        throw error;
     }
-
-    return parseResponse(response.data, sourceConfig);
 }
 
 function buildUrl(sourceConfig: SourceConfig): string {
@@ -294,13 +305,16 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
-            const candidates = data.pairs.filter((p: any) =>
+            const pools = data.pairs.filter((p: any) =>
                 (p.chainId === 'ethereum' || p.chainId === 'base' || p.chainId === 'hyperevm') &&
                 p.baseToken?.address?.toLowerCase() === mappedAddress &&
-                p.priceUsd &&
-                (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0) >= ORACLE_CONFIG.DEXSCREENER_MIN_TXNS_24H
+                p.priceUsd
             );
-            if (candidates.length === 0) return;
+            const candidates = pools.filter((p: any) => (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0) >= ORACLE_CONFIG.DEXSCREENER_MIN_TXNS_24H);
+            if (candidates.length === 0) {
+                if (pools.length > 0) logWarning('GenericRestAdapter', `${symbol}: all ${pools.length} DexScreener pool(s) idle (< ${ORACLE_CONFIG.DEXSCREENER_MIN_TXNS_24H} trades in 24h), price skipped as stale`);
+                return;
+            }
             candidates.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
             const best = candidates[0];
             const priceUSD = parseFloat(best.priceUsd);
