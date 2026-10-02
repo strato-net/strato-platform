@@ -14,6 +14,8 @@ module Blockchain.DB.RawStorageDB
     HasMemRawStorageDB (..),
     --FullRawStorage,
     genericLookupRawStorageDB,
+    genericLookupRawStorageDBWith,
+    getRawStorageKeyValDBMaybe,
     genericInsertRawStorageDB,
     genericInsertManyRawStorageDB,
     genericDeleteRawStorageDB,
@@ -102,14 +104,24 @@ genericLookupRawStorageDB ::
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)
-genericLookupRawStorageDB key = do
+genericLookupRawStorageDB = genericLookupRawStorageDBWith getRawStorageKeyValDBMaybe
+
+-- | The block map first; on a miss, ask @onMiss@ (the trie, or whatever else
+-- holds the state) and remember its answer in the block map.
+genericLookupRawStorageDBWith ::
+  HasMemRawStorageDB m =>
+  (RawStorageKey -> m (Maybe RawStorageValue)) ->
+  RawStorageKey ->
+  m (Maybe RawStorageValue)
+genericLookupRawStorageDBWith onMiss key = do
   theBMap <- getMemRawStorageBlockDB
   case lookupBlockMap key theBMap of
     Just known -> return known
     Nothing -> do
-      mVal <- getRawStorageKeyValDBMaybe key
+      mVal <- onMiss key
       putMemRawStorageBlockMap $ insertReadBlockMap key mVal theBMap
       return mVal
+{-# INLINE genericLookupRawStorageDBWith #-}
 
 genericLookupWithDefaultRawStorageDB ::
   ( HasMemRawStorageDB m,

@@ -19,9 +19,11 @@ executable ethereum-jsonrpc
       Commands
       EthBlock
       EthLog
+      LocalApi
       ResponseDispatcher
       RPC
       Server
+      SqlState
       TransactionReceipt
       Paths_ethereum_jsonrpc
   hs-source-dirs:
@@ -58,6 +60,7 @@ executable ethereum-jsonrpc
     , strato-conf
     , strato-model
     , strato-p2p
+    , strato-tracing
     , strato-version
     , streaming
     , text

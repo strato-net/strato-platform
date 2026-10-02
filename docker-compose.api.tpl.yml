@@ -1,0 +1,131 @@
+#api-version:<VERSION>
+# STRATO API tier: strato-api + ethereum-jsonrpc behind an nginx sidecar, with
+# PostgREST for Cirrus. Stateless; run as many copies as needed behind a load
+# balancer. Everything it needs is reached over the network:
+#   Postgres (eth + cirrus)   postgres_host / postgres_password
+#   Kafka (tx submission)     kafkaHost / kafkaPort
+#   vault                     VAULT_URL
+# Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
+# parameters, and the node's secrets/ (postgres_password, session_secret,
+# oauth_credentials.yaml) at ./secrets/.
+volumes:
+    driver: local
+services:
+  strato-api:
+    image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
+    entrypoint: ["/strato/api-doit.sh"]
+    environment:
+      - postgres_host=${postgres_host:?postgres_host is required}
+      - postgres_port=${postgres_port:-5432}
+      - postgres_user=${postgres_user:-postgres}
+      - postgres_password=${postgres_password:-}
+      - kafkaHost=${kafkaHost:?kafkaHost is required}
+      - kafkaPort=${kafkaPort:-9092}
+      # Shared message bus (optional): submits go there per BUS_SUBMIT_MODE
+      # and resolve=true wakes on its tx_results stream.
+      - BUS_HOST=${BUS_HOST:-}
+      - BUS_PORT=${BUS_PORT:-9096}
+      - BUS_SECURITY=${BUS_SECURITY:-sasl_ssl}
+      - BUS_SASL_USERNAME=${BUS_SASL_USERNAME:-}
+      - BUS_SASL_PASSWORD=${BUS_SASL_PASSWORD:-}
+      - BUS_SUBMIT_MODE=${BUS_SUBMIT_MODE:-shadow}
+      - VAULT_URL=${VAULT_URL:-}
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
+    volumes:
+      - ./config/ethconf.yaml:/config/ethconf.yaml:ro
+      - ./secrets:/run/secrets:ro
+      - ./logs/strato-api:/var/lib/strato-api/logs
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep strato-api && pgrep ethereum-jsonrpc || exit 1"]
+      interval: 5s
+      timeout: 2s
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  postgrest:
+    image: ${POSTGREST_IMAGE:-<REPO_URL>postgrest:<VERSION>-<HASH_POSTGREST>}
+    environment:
+      - PG_ENV_POSTGRES_DB=cirrus
+      # A read replica endpoint serves PostgREST fine; defaults to the writer.
+      - PG_ENV_POSTGRES_HOST=${postgres_reader_host:-${postgres_host}}
+      - PG_ENV_POSTGRES_USER=${postgres_user:-postgres}
+      - PG_PORT_5432_TCP_PORT=${postgres_port:-5432}
+      - POSTGREST_LOG_LEVEL=error
+      # On a replica the writer's schema-reload NOTIFY never arrives; the
+      # entrypoint polls the schema and reloads on change (0 disables).
+      - POSTGREST_SCHEMA_RELOAD_SECONDS=${POSTGREST_SCHEMA_RELOAD_SECONDS:-30}
+    volumes:
+      - ./secrets/postgres_password:/run/secrets/postgres_password:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  docs:
+    image: swaggerapi/swagger-ui:v5.29.2
+    environment:
+      - API_URL=/docs/swagger.yaml
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    image: ${NGINX_IMAGE:-<REPO_URL>nginx:<VERSION>-<HASH_NGINX>}
+    depends_on:
+      - strato-api
+      - postgrest
+      - docs
+    environment:
+      # The sidecar proxies to the strato-api container, not the host in nodeUrl.
+      - API_UPSTREAM_HOST=strato-api
+      - STRATO_PORT_API=3000
+      - RPC_PORT=8545
+      - JSONRPC_ENABLED=${JSONRPC_ENABLED:-true}
+      - PUBLIC_STRATO_RPC_ENABLED=${PUBLIC_STRATO_RPC_ENABLED:-false}
+      - POSTGREST_HOST=postgrest:3001
+      - DOCS_HOST=docs:8080
+      # Node-only surfaces (SMD, apex, prometheus, app) are not served from the
+      # API tier; their locations answer 502. Point them at your own hosts to
+      # serve them from here.
+      - APEX_HOST=${APEX_HOST:-127.0.0.1:1}
+      - SMD_HOST=${SMD_HOST:-127.0.0.1:1}
+      - PROMETHEUS_HOST=${PROMETHEUS_HOST:-127.0.0.1:1}
+      # The app runs on its own tier; "/" redirects there (404 if unset).
+      - BUNDLED_APP=false
+      - APP_URL=${APP_URL:-}
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-}
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-}
+      - TRACKING_ENABLED=${TRACKING_ENABLED:-true}
+      - TRACKING_URL=${TRACKING_URL:-https://go.strato.nexus}
+      - ssl=${ssl:-false}
+      - sslCertFileType=${sslCertFileType:-}
+    ports:
+      # Must match networkConfig.httpPort in the mounted ethconf.yaml (8081 by default).
+      - ${HTTP_PORT:-8081}:${HTTP_PORT:-8081}
+      - ${HTTPS_PORT:-443}:443
+    volumes:
+      - ./config/ethconf.yaml:/config/ethconf.yaml:ro
+      - ./secrets:/run/secrets:ro
+      - ./secrets/ssl:/etc/ssl/strato:ro
+      - ./logs:/logs
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:${HTTP_PORT:-8081}/_ping"]
+      interval: 5s
+      timeout: 1s
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

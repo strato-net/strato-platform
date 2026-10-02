@@ -28,6 +28,7 @@ library
       Blockchain.Init.Options
       Blockchain.Init.RtsFlags
   other-modules:
+      Blockchain.Init.Role
       Paths_strato_init
   hs-source-dirs:
       src/

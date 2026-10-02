@@ -45,6 +45,8 @@ library:
   - network
   - persistent
   - persistent-postgresql
+  - persistent-sqlite
+  - postgresql-simple
   - quickcheck-instances
   - regex-compat
   - resourcet
@@ -56,6 +58,7 @@ library:
   - text
   - time
   - transformers
+  - unix
   - unliftio
   - unliftio-core
 

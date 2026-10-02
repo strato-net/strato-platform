@@ -27,6 +27,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockDB
+    - composable-monads-base
     - conduit
     - containers
     - deepseq
@@ -34,6 +35,7 @@ library:
     - format
     - lens
     - streaming
+    - streaming-kafka-hw
     - network
     - persistent
     - persistent-postgresql
@@ -47,6 +49,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - text
     - time
     - transformers
@@ -64,6 +67,7 @@ executables:
       - composable-monads-base
       - hflags
       - streaming
+      - streaming-kafka-hw
       - persistent-postgresql
       - process-monitor
       - resourcet

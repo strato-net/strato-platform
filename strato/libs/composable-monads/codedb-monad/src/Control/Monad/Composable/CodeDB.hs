@@ -24,7 +24,7 @@ where
 
 import BlockApps.Logging (runNoLoggingT)
 import Blockchain.DB.CodeDB (DBCode)
-import Blockchain.DB.SQLDB (SQLDB (..), CirrusDB (..))
+import Blockchain.DB.SQLDB (SQLDB (..), CirrusDB (..), sqlDB, unSQLDB)
 import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.DataDefs (AddressStateRef (..), CodeRef (..), EntityField (..))
 import Blockchain.EthConf (connStr, cirrusConnStr)
@@ -76,7 +76,7 @@ globalCodeDBEnv :: IORef CodeDBEnv
 globalCodeDBEnv = unsafePerformIO $ do
   sPool <- runNoLoggingT $ PSQL.createPostgresqlPool connStr 5
   cPool <- runNoLoggingT $ PSQL.createPostgresqlPool cirrusConnStr 5
-  newIORef $ CodeDBEnv (SQLDB sPool) (CirrusDB cPool)
+  newIORef $ CodeDBEnv (sqlDB sPool) (CirrusDB cPool)
 {-# NOINLINE globalCodeDBEnv #-}
 
 runCodeDBM :: MonadIO m => CodeDBM '[] a -> m a

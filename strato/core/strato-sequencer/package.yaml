@@ -41,6 +41,7 @@ library:
     - strato-conf
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - text
     - time
     - vault-monad
@@ -73,6 +74,7 @@ executables:
       - strato-genesis
       - strato-model
       - strato-redis-blockdb
+      - strato-tracing
       - strato-sequencer
       - wai-middleware-prometheus
       - warp

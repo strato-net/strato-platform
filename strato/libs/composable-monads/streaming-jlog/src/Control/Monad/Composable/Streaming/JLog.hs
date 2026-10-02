@@ -31,6 +31,7 @@ module Control.Monad.Composable.Streaming.JLog (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  unconnectedStreamEnv,
   closeStreamEnv,
   getStreamEnv,
   -- Producing
@@ -109,6 +110,11 @@ createStreamEnv clientId (basePath, _port) = liftIO $ do
   createDirectoryIfMissing True basePath
   cache <- newIORef Map.empty
   return $ StreamEnv basePath clientId cache
+
+-- | An environment for runs that never touch the stream (in-memory VM
+-- contexts): no directory is created and nothing is opened.
+unconnectedStreamEnv :: MonadIO m => ClientId -> m StreamEnv
+unconnectedStreamEnv clientId = liftIO $ StreamEnv "" clientId <$> newIORef Map.empty
 
 getStreamEnv :: HasStreaming m => m StreamEnv
 getStreamEnv = do

@@ -37,25 +37,40 @@ pidFile = "pids.txt"
 logsDir :: FilePath
 logsDir = "logs"
 
--- Parse a shell-style command line into (cmd, args)
-parseLine :: String -> Maybe (FilePath, [String])
+-- | One line of commands.txt. A leading "@restart" marks a process convoke
+-- keeps restarting for as long as it takes (strato-setup marks the indexers,
+-- API servers and helpers, whose failure should never take the node down).
+-- Any other process is restarted too, but only 'maxRestarts' times in a row
+-- before convoke gives up and shuts the whole directory down.
+data Spec = Spec FilePath [String] Bool  -- command, arguments, restartable
+
+specRestart :: Spec -> Bool
+specRestart (Spec _ _ r) = r
+
+restartMarker :: String
+restartMarker = "@restart"
+
+-- Parse a shell-style command line
+parseLine :: String -> Maybe Spec
 parseLine line =
   case Sh.parse line of
     Left _ -> Nothing
     Right [] -> Nothing
-    Right (cmd:args) -> Just (cmd, args)
+    Right (marker:cmd:args) | marker == restartMarker -> Just (Spec cmd args True)
+    Right [marker] | marker == restartMarker -> Nothing
+    Right (cmd:args) -> Just (Spec cmd args False)
 
 -- | A running child process, with what it takes to relaunch it.
 data Child = Child
-  { childCmd :: (FilePath, [String])
+  { childSpec :: Spec
   , childPid :: ProcessID
   , childStarted :: UTCTime
   , childAsync :: Async (ExitCode, ProcessID, FilePath)
   }
 
 -- Launch a command and track its PID
-launchCommand :: (FilePath, [String]) -> IO Child
-launchCommand cmdArgs@(cmd, args) = do
+launchCommand :: Spec -> IO Child
+launchCommand spec@(Spec cmd args _) = do
   let logFile = logsDir </> cmd
   createDirectoryIfMissing True logsDir
   -- Append so logs survive restarts (like the docker service logs, which use
@@ -87,7 +102,7 @@ launchCommand cmdArgs@(cmd, args) = do
         ec <- waitForProcess ph
         hClose h
         return (ec, pid, cmd)
-      return $ Child cmdArgs pid started a
+      return $ Child spec pid started a
 
 -- | Rewrite pids.txt from the children that are actually running.
 --
@@ -221,7 +236,8 @@ raiseOpenFileLimit = do
     _ -> return ()
 
 -- | How many times in a row a single command may be relaunched before convoke
--- treats its failure as permanent and shuts the node down.
+-- treats its failure as permanent and shuts the node down. Commands marked
+-- "@restart" are exempt: they are relaunched for as long as they keep exiting.
 maxRestarts :: Int
 maxRestarts = 8
 
@@ -241,7 +257,7 @@ restartBudgetReset = 300
 -- a node that only needed to wait. Doubling makes the window grow with the
 -- attempts instead: 2+4+8+16+30+30+30 is about two minutes before the last try.
 restartDelay :: Int -> Int
-restartDelay attempt = min maxRestartDelay (baseRestartDelay * (2 ^ max 0 (attempt - 1)))
+restartDelay attempt = min maxRestartDelay (baseRestartDelay * (2 ^ min 10 (max 0 (attempt - 1))))
 
 baseRestartDelay :: Int
 baseRestartDelay = 2 * 1000 * 1000
@@ -261,15 +277,23 @@ maxRestartDelay = 30 * 1000 * 1000
 -- chain was intact and the nodes were gone, with "docker ps -a" empty on all of
 -- them. A process that dies once is now restarted in place; only one that will
 -- not stay up takes the node down with it.
+--
+-- An interrupt is honoured wherever it lands, not only while waiting on the
+-- children: the pause before a relaunch can last 30 seconds, and an interrupt
+-- escaping from there would skip the caller's killAllProcesses and orphan
+-- every child.
 supervise :: [Child] -> IO Bool
-supervise = go []
+supervise children0 = go [] children0 `catch` onInterrupt
   where
+    onInterrupt UserInterrupt = interrupted
+    onInterrupt e = throwIO e
+    interrupted = do
+      say "Interrupted; stopping all processes"
+      return True
     go budgets children = do
       result <- awaitAnyOrInterrupt (map childAsync children)
       case result of
-        Nothing -> do
-          say "Interrupted by Ctrl-C"
-          return True
+        Nothing -> interrupted
         Just (finished, (exitCode, pid, cmd)) -> do
           now <- getCurrentTime
           let (dead, survivors) = partition ((== finished) . childAsync) children
@@ -282,35 +306,43 @@ supervise = go []
               return False
             (c : _) -> do
               let ranFor = diffUTCTime now (childStarted c)
+                  unlimited = specRestart (childSpec c)
                   attempt
                     | ranFor >= restartBudgetReset = 1
                     | otherwise = 1 + maybe 0 id (lookup cmd budgets)
-              if attempt > maxRestarts
+              if attempt > maxRestarts && not unlimited
                 then do
                   say $ "Giving up on " ++ cmd ++ ": " ++ show maxRestarts
                           ++ " restarts without staying up for " ++ show restartBudgetReset
                           ++ ". Shutting the node down."
                   return False
                 else do
-                  say $ "Restarting " ++ cmd ++ " (attempt " ++ show attempt ++ " of "
-                          ++ show maxRestarts ++ "; it ran for " ++ show ranFor ++ ")"
+                  say $ "Restarting " ++ cmd ++ " (attempt " ++ show attempt
+                          ++ (if unlimited then "" else " of " ++ show maxRestarts)
+                          ++ "; it ran for " ++ show ranFor ++ ")"
                   threadDelay (restartDelay attempt)
                   -- A relaunch can fail outright (launchCommand errors when it
                   -- cannot read the new PID). Treat that as the give-up case
                   -- rather than letting it escape: an exception here would skip
                   -- the caller's killAllProcesses and leave the surviving
                   -- children running with no supervisor and no pid file.
-                  attempted <- try (launchCommand (childCmd c))
+                  -- Masked so an interrupt cannot land between starting the
+                  -- process and recording its PID, which would leave it out of
+                  -- the shutdown.
+                  attempted <- mask_ $ do
+                    r <- try (launchCommand (childSpec c))
+                    case r of
+                      Right restarted -> writePidFile (restarted : survivors)
+                      Left _ -> return ()
+                    return r
                   case attempted of
                     Left e -> do
                       say $ "Could not restart " ++ cmd ++ ": "
                               ++ displayException (e :: SomeException)
                               ++ ". Shutting the node down."
                       return False
-                    Right restarted -> do
-                      let children' = restarted : survivors
-                      writePidFile children'
-                      go ((cmd, attempt) : filter ((/= cmd) . fst) budgets) children'
+                    Right restarted ->
+                      go ((cmd, attempt) : filter ((/= cmd) . fst) budgets) (restarted : survivors)
 
 main :: IO ()
 main = do

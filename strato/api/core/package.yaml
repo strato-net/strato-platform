@@ -25,6 +25,7 @@ library:
     - common-log
     - composable-monads-base
     - conduit
+    - streaming-kafka-hw
     - containers
     - deepseq
     - directory
@@ -51,3 +52,4 @@ library:
     - unliftio
     - unordered-containers
     - strato-redis-blockdb
+    - strato-tracing

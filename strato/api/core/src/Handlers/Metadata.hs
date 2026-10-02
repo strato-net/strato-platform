@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -28,11 +29,10 @@ import Blockchain.Model.SyncState
 import Blockchain.EthConf (ethConf, networkConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Strato.Model.Validator
-import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
-import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo, getBestBlockInfo, getCirrusBestBlockNumber)
+import Blockchain.Data.NodeStatus (CirrusTip (..))
+import Blockchain.SyncDB (SyncStatus (..))
 import Control.Lens
 import Control.Monad.Change.Modify
-import Control.Monad.Reader
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
@@ -41,7 +41,6 @@ import Data.OpenApi hiding (url, server)
 import GHC.Generics
 import Servant
 import Servant.Client
-import UnliftIO
 
 type UrlMap = Map String String
 
@@ -61,10 +60,19 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
+-- | The node's sync scalars, served from the node_status table (see
+-- Blockchain.Data.NodeStatus); the API process never talks to Redis.
+type HasNodeStatus m =
+  ( Accessible (Maybe SyncStatus) m
+  , Accessible (Maybe BestBlock) m
+  , Accessible (Maybe BestSequencedBlock) m
+  , Accessible (Maybe CirrusTip) m
+  )
+
 server
-  :: ( MonadUnliftIO m
-     , MonadLogger m
+  :: ( MonadLogger m
      , Accessible UrlMap m
+     , HasNodeStatus m
      )
   => ServerT API m
 server = getMetaData
@@ -95,13 +103,13 @@ metadataSchemaOptions =
 
 getMetaData ::
   ( MonadLogger m,
-    MonadUnliftIO m,
-    Accessible UrlMap m
+    Accessible UrlMap m,
+    HasNodeStatus m
   ) =>
   m MetadataResponse
 getMetaData =
   do
-    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
+    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> access (Proxy @(Maybe BestSequencedBlock))
     isSynced <- checkIsSynced
     urlMap <- access (Proxy @UrlMap)
     let nc = networkConfig ethConf
@@ -120,15 +128,15 @@ getMetaData =
 -- a node with sqlDiff enabled the mark is only ever absent while Cirrus
 -- indexing is behind (or slipstream is down, which equally should not report
 -- synced).
-checkIsSynced :: MonadIO m => m Bool
-checkIsSynced = runStratoRedisIO $ do
-  baseSynced <- fromMaybe False <$> getSyncStatusNow
+checkIsSynced :: (Monad m, HasNodeStatus m) => m Bool
+checkIsSynced = do
+  baseSynced <- fromMaybe False . fmap unSyncStatus <$> access (Proxy @(Maybe SyncStatus))
   let cirrusEnabled = Conf.sqlDiff . Conf.vmConfig $ ethConf
   if not (baseSynced && cirrusEnabled)
     then pure baseSynced
     else do
-      nodeBest <- getBestBlockInfo
-      cirrusBest <- getCirrusBestBlockNumber
+      nodeBest <- access (Proxy @(Maybe BestBlock))
+      cirrusBest <- fmap unCirrusTip <$> access (Proxy @(Maybe CirrusTip))
       pure $ case (nodeBest, cirrusBest) of
         (Just bb, Just cirrusBlockNumber) -> cirrusBlockNumber + 1 >= bestBlockNumber bb
         (Nothing, _) -> True -- no node tip to compare against; defer to the base status

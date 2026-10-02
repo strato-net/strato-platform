@@ -69,6 +69,8 @@ import           System.Timeout
 
 data ContextLite = ContextLite
   { liteSQLDB    :: SQLDB,
+    -- | Peers; the eth pool itself on a monolith.
+    litePeerDB   :: SQLDB,
     redisBlockDB :: RBDB.RedisConnection,
     sock         :: Socket,
     myUdpPort    :: UDPPort,
@@ -92,6 +94,9 @@ instance Accessible SQLDB DiscoveryM where
 instance AccessibleEnv SQLDB DiscoveryM where
   accessEnv = asks liteSQLDB
 
+instance AccessibleEnv PeerStore DiscoveryM where
+  accessEnv = asks (PeerStore . litePeerDB)
+
 instance Accessible Socket DiscoveryM where
   access _ = asks sock
 
@@ -112,7 +117,7 @@ instance Accessible [Validator] DiscoveryM where
 instance A.Replaceable Host PPeer DiscoveryM where
   replace _ host peer = do
     maybePeer <- getPeerByIP host
-    void . sqlQuery $ actions maybePeer
+    void . peerQuery $ actions maybePeer
     where
       actions mp = case mp of
         Nothing -> SQL.insert peer
@@ -123,7 +128,7 @@ instance A.Replaceable Host PPeer DiscoveryM where
             ]
           return (SQL.entityKey peer')
       getPeerByIP :: Host -> DiscoveryM (Maybe (SQL.Entity PPeer))
-      getPeerByIP host' = listToMaybe <$> sqlQuery actions'
+      getPeerByIP host' = listToMaybe <$> peerQuery actions'
         where
           actions' = SQL.selectList [PPeerHost SQL.==. host'] []
 
@@ -132,7 +137,7 @@ instance A.Selectable IP PPeer DiscoveryM where
     where
       getPeerByIP :: IP -> DiscoveryM (Maybe PPeer)
       getPeerByIP ip' =
-        sqlQuery actions >>= \case
+        peerQuery actions >>= \case
           [] -> return Nothing
           --If multiple Hosts map to the same IP address, choose one arbitrarily, but prefer ones with domain names
           lst -> case sortOn (isIP . pPeerHost . SQL.entityVal) lst of
@@ -218,6 +223,7 @@ initContextLite udpPort tcpPort = do
   return
     ContextLite
       { liteSQLDB = sqlDB' dbs,
+        litePeerDB = peerDB' dbs,
         redisBlockDB = RBDB.RedisConnection redisBDBPool,
         sock = error "initContextLite: Uninitialized socket",
         myUdpPort = udpPort,

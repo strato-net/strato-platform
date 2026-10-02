@@ -59,10 +59,12 @@ HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
 HASH_APP_BACKEND := $(call dir_hash,app/backend)
 HASH_APP_UI := $(call dir_hash,app/ui)
+HASH_APP_NGINX := $(call dir_hash,app/nginx)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
+HASH_HISTORY := $(call dir_hash,app/services/history)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -92,12 +94,13 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_APEX>|$(HASH_APEX)|g' \
             -e 's|<HASH_APP_BACKEND>|$(HASH_APP_BACKEND)|g' \
             -e 's|<HASH_APP_UI>|$(HASH_APP_UI)|g' \
+            -e 's|<HASH_APP_NGINX>|$(HASH_APP_NGINX)|g' \
             -e 's|<HASH_PROMETHEUS>|$(HASH_PROMETHEUS)|g' \
             -e 's|<HASH_SMD>|$(HASH_SMD)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
             -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui prometheus smd bridge bridge-nginx local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
 
 postgrest:
 	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
@@ -130,6 +133,20 @@ app-backend:
 		docker tag $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_AWS_ECR_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND); \
 	else \
 		echo "app-backend up to date"; \
+	fi
+
+# The app tier's nginx shares its OpenID and CSRF Lua with the node's nginx;
+# nginx-packager is the source of truth and the copies in app/nginx are
+# refreshed here before every build (they are committed so that
+# `docker compose build` in app/ works too).
+app-nginx:
+	cp nginx-packager/openid.tpl.lua nginx-packager/csrf.lua nginx-packager/tracing.lua app/nginx/
+	@if $(call image_missing,$(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX)); then \
+		echo "Building app-nginx ($(VERSION)-$(HASH_APP_NGINX))..."; \
+		docker build -t $(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) ./app/nginx && \
+		docker tag $(REPO_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX) $(REPO_AWS_ECR_URL)app-nginx:$(VERSION)-$(HASH_APP_NGINX); \
+	else \
+		echo "app-nginx up to date"; \
 	fi
 
 app-ui:
@@ -175,15 +192,26 @@ bridge-nginx:
 		echo "bridge-nginx up to date"; \
 	fi
 
+# The app history service (phase 7): its own Postgres, fed by the bus and a
+# Cirrus poller, serving chart series under /history-api.
+history:
+	@if $(call image_missing,$(REPO_URL)history:$(VERSION)-$(HASH_HISTORY)); then \
+		echo "Building history ($(VERSION)-$(HASH_HISTORY))..."; \
+		docker build -t $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) ./app/services/history && \
+		docker tag $(REPO_URL)history:$(VERSION)-$(HASH_HISTORY) $(REPO_AWS_ECR_URL)history:$(VERSION)-$(HASH_HISTORY); \
+	else \
+		echo "history up to date"; \
+	fi
+
 all: local
 
 local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui bridge bridge-nginx oracle docker-compose
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui bridge bridge-nginx oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle
 
 .PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
@@ -270,6 +298,7 @@ build_common: generate-version-file
 	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
 	@install -m 755 bin/strato-user-add $(HOME)/.local/bin/
 	@install -m 755 bin/strato-snapshot $(HOME)/.local/bin/
+	@install -m 755 bin/strato-pg-migrate $(HOME)/.local/bin/
 	@install -m 755 bin/strato-logrotate $(HOME)/.local/bin/
 	@mkdir -p $(HOME)/.local/share/strato
 	@install -m 644 strato/tools/airlock/data/english.txt $(HOME)/.local/share/strato/bip39-english.txt
@@ -412,13 +441,17 @@ vault-nginx:
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge compose files...
+	@echo Generating vault, highway, bridge, api compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.ecr.yml
+	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
+	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.ecr.yml
 
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml
@@ -426,6 +459,10 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
+	awk '/build: ./{getline} 1' docker-compose.api.push.ecr.yml > docker-compose.api.ecr.yml
+	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml
+	awk '/build: ./{getline} 1' docker-compose.app.push.ecr.yml > docker-compose.app.ecr.yml
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}
@@ -487,6 +524,7 @@ uninstall:
 	@rm -f $(HOME)/.local/bin/strato-ps
 	@rm -f $(HOME)/.local/bin/strato-patch-app
 	@rm -f $(HOME)/.local/bin/strato-user-add
+	@rm -f $(HOME)/.local/bin/strato-pg-migrate
 	@rm -f $(HOME)/.local/bin/strato-snapshot
 	@rm -f $(HOME)/.local/bin/strato-logrotate
 	@rm -f $(HOME)/.local/bin/strato-setup

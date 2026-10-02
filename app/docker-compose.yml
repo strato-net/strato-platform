@@ -28,6 +28,30 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
+  # App history service (phase 7): prices, swaps and balances over time in
+  # its own database, fed by the bus when BUS_HOST is set and by polling the
+  # node's Cirrus otherwise. Served by nginx under /history-api.
+  history:
+    build: ./services/history
+    image: history:latest
+    environment:
+      - NODE_URL=${NODE_URL}
+      - postgres_host=${postgres_host:-postgres}
+      - postgres_port=${postgres_port:-5432}
+      - postgres_user=${postgres_user:-postgres}
+      - postgres_password=${postgres_password}
+      - HISTORY_DB_NAME=${HISTORY_DB_NAME:-history}
+      - BUS_HOST=${BUS_HOST:-}
+      - BUS_PORT=${BUS_PORT:-9096}
+      - BUS_SECURITY=${BUS_SECURITY:-sasl_ssl}
+      - BUS_SASL_USERNAME=${BUS_SASL_USERNAME:-}
+      - BUS_SASL_PASSWORD=${BUS_SASL_PASSWORD:-}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
   ui:
     depends_on:
       - backend
@@ -56,6 +80,7 @@ services:
         max-file: "3"
   nginx:
     environment:
+      - HISTORY_HOST=${HISTORY_HOST:-history}
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}

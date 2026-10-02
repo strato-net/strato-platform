@@ -20,9 +20,9 @@ import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt,
 import ResponseDispatcher (withPendingResponse)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
-import Blockchain.EthConf (runStreamMConfigured, ethConf)
+import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
 import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState, codePtrToSHA)
@@ -68,7 +68,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find, findIndex)
+import Data.List (find, findIndex, isPrefixOf)
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -78,10 +78,10 @@ import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
-import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
-import Network.HTTP.Types.Status (statusCode, statusMessage)
-import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
-import System.IO.Unsafe (unsafePerformIO)
+import LocalApi (formatClientError, runLocal, sharedManager)
+import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseTimeout, responseTimeoutMicro)
+import qualified Strato.Tracing as Tr
+import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
 
 type Server = IO
@@ -89,33 +89,6 @@ type Server = IO
 protocolVersion :: Integer
 protocolVersion = fromIntegral ethVersion
 
-apiBaseUrl :: BaseUrl
-apiBaseUrl =
-  BaseUrl
-    Http
-    (apiListenAddress $ apiConfig ethConf)
-    (apiPort $ apiConfig ethConf)
-    "/eth/v1.2"
-
--- | A single, process-wide HTTP connection manager. An http-client 'Manager'
--- is a connection pool and is designed to be created once and shared for the
--- lifetime of the process. Creating a new one per request (as this used to do)
--- leaks keep-alive sockets to the backend until GC finalizers run, exhausting
--- file descriptors under load. NOINLINE keeps this a single CAF.
-{-# NOINLINE sharedManager #-}
-sharedManager :: Manager
-sharedManager = unsafePerformIO $ newManager defaultManagerSettings
-
-runLocal :: ClientM a -> IO (Either ClientError a)
-runLocal action = runClientM action (mkClientEnv sharedManager apiBaseUrl)
-
-formatClientError :: ClientError -> T.Text
-formatClientError (FailureResponse _ resp) =
-  let s = responseStatusCode resp
-  in T.pack $ "HTTP " ++ show (statusCode s) ++ " " ++ BC.unpack (statusMessage s)
-formatClientError (ConnectionError _) = "connection error"
-formatClientError (DecodeFailure msg _) = "decode error: " <> msg
-formatClientError _ = "request failed"
 
 methods :: [Method Server]
 methods =
@@ -313,6 +286,51 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
+  case EthConf.vmQueryUrl (EthConf.vmConfig ethConf) of
+    Just url | routableToVmQuery c -> do
+      viaQuery <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      case viaQuery of
+        -- vm-query answers what the mirror holds and declines the rest
+        -- (historical blocks, trie-bound reads) with a "vm-query:" error,
+        -- which means: ask the consensus VM.
+        Right (Error _ msg) | "vm-query:" `isPrefixOf` msg -> do
+          putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
+          callVmRunner waitMicros c
+        Right resp -> pure resp
+        Left e -> do
+          putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ show e ++ "), using vm-runner"
+          callVmRunner waitMicros c
+    _ -> callVmRunner waitMicros c
+
+-- | The read commands the mirror can serve; the rest never leave the queue path.
+routableToVmQuery :: JsonRpcCommand -> Bool
+routableToVmQuery = \case
+  JRCCall {} -> True
+  JRCCallV2 {} -> True
+  JRCTraceCall {} -> True
+  JRCSimulate {} -> True
+  _ -> False
+
+-- | POST the command to vm-query as the same bytes the queue would carry,
+-- with the request's trace so the service's span nests under this one.
+callVmQuery :: String -> Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmQuery url waitMicros c = do
+  initial <- parseRequest (url ++ "/command")
+  ctx <- Tr.currentRequestContext
+  let req =
+        initial
+          { method = "POST",
+            requestHeaders = [("Content-Type", "application/octet-stream")] ++ maybe [] (\t -> [("traceparent", Tr.renderTraceparent t)]) ctx,
+            requestBody = RequestBodyLBS (Bin.encode c),
+            responseTimeout = responseTimeoutMicro waitMicros
+          }
+  resp <- httpLbs req sharedManager
+  case Bin.decodeOrFail (responseBody resp) of
+    Right (_, _, r) -> pure r
+    Left (_, _, err) -> pure $ Error (jrcId c) ("vm-query: undecodable response: " ++ err)
+
+callVmRunner :: Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmRunner waitMicros c = do
   -- Register for the response first, then submit the command. The response
   -- topic has a single consumer per process (see ResponseDispatcher) that
   -- fills the slot registered under the request id; waiting here does not
@@ -320,7 +338,7 @@ callVM' waitMicros c = do
   -- replies.
   result <- withPendingResponse (jrcId c) $ \slot ->
     timeout waitMicros $ do
-      void . runEff $ runStreamMConfigured "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
+      void . runEff $ runStreamMPooled "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
       takeMVar slot
   return $ case result of
     Just val -> Bin.decode (BL.fromStrict val)
@@ -335,6 +353,17 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     f :: Address -> String -> RpcResult Server String
     f addr _blockString = do
+      -- Served from the SQL state mirror (latest block); the vm-runner round
+      -- trip remains only as a fallback for chains the mirror cannot answer.
+      fromSql <- liftIO $ nativeBalanceFromSql addr
+      case fromSql of
+        NativeBalance n -> return $ "0x" ++ showHex n ""
+        NativeBalanceUnavailable why -> do
+          liftIO . putStrLn $ "eth_getBalance: falling back to vm-runner: " ++ why
+          viaVm addr
+
+    viaVm :: Address -> RpcResult Server String
+    viaVm addr = do
           let padding = BC.replicate 24 '0'
               calldataHex = balanceOfSelector <> padding <> addressToHex addr
               calldata = case B16.decode calldataHex of
@@ -390,8 +419,15 @@ eth_getStorageAt :: Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
   where
     f :: String -> String -> String -> RpcResult Server String
-    f _addressString _key _blockString = do
-      throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
+    f addressString key _blockString = case strToAddress addressString of
+      Left err -> throwError $ rpcError (-32602) (T.pack err)
+      Right addr -> do
+        -- Served from the SQL state mirror (latest block). The key is an EVM
+        -- slot or, as a STRATO extension, a SolidVM storage path.
+        r <- liftIO $ storageAtFromSql addr key
+        case r of
+          Right word -> return word
+          Left err -> throwError $ rpcError (-32000) (T.pack err)
 
 -- | Ask the VM for Merkle-Patricia proofs of an account and of raw (unhashed)
 -- keys of its storage against a state root. The VM answers between blocks, so

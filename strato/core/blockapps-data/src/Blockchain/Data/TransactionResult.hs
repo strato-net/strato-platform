@@ -21,6 +21,7 @@ import Control.Arrow ((&&&))
 import Control.DeepSeq
 import Data.Binary
 import Data.Function (on)
+import qualified Data.Set as Set
 import Data.OpenApi hiding (Format, format)
 import qualified Database.Persist.Postgresql as SQL
 import qualified Generic.Random as GR
@@ -120,8 +121,23 @@ putTransactionResult = fmap unsafeHead . putTransactionResults . pure
   where unsafeHead []    = error "putTransactionResult: No keys returned"
         unsafeHead (x:_) = x
 
+-- | Insert results that are not already present, keyed by
+-- @(blockHash, transactionHash)@. slipstream consumes @vmevents@ at least
+-- once, so a batch replayed after a crash (or after a standby core is
+-- promoted and resumes from its progress marker) must not duplicate rows.
+-- The table has no unique constraint to lean on, so this checks first; the
+-- lookup is served by @transaction_result_transaction_hash_idx@. Returns keys
+-- for the rows actually inserted.
 putTransactionResults ::
   HasSQLDB m =>
   [TransactionResult] ->
   m [Key TransactionResult]
-putTransactionResults = sqlQuery . SQL.insertMany
+putTransactionResults [] = pure []
+putTransactionResults trs = sqlQuery $ do
+  existing <-
+    SQL.selectList
+      [TransactionResultTransactionHash SQL.<-. map transactionResultTransactionHash trs]
+      []
+  let resultKey r = (transactionResultBlockHash r, transactionResultTransactionHash r)
+      seen = Set.fromList [resultKey r | SQL.Entity _ r <- existing]
+  SQL.insertMany $ filter ((`Set.notMember` seen) . resultKey) trs
