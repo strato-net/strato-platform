@@ -23,7 +23,7 @@ import {
   type AuthorizationDigest,
 } from "@/components/staking/authorization";
 
-const NODE_DOCS_URL = "https://docs.strato.nexus";
+const NODE_DOCS_URL = "https://docs.strato.nexus/node/";
 
 export type RegisterValidatorInput = {
   // The validator's consensus (node) address. On the operator-keyed contract it is the
@@ -313,8 +313,7 @@ const BecomeValidatorCard = ({
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Run a STRATO node and this account becomes its operator. You will need {minStake} {symbol} to self-bond and a
-              little USDST for fees.
+              Run a STRATO node and this account becomes its operator. You will need {minStake} {symbol} to self-bond.
             </p>
           </div>
           <Button size="sm" onClick={() => setPhase("guide")}>
@@ -337,7 +336,7 @@ const BecomeValidatorCard = ({
           <div>
             <h2 className="text-lg font-semibold">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Three steps. Your node proves it is yours; this account becomes its operator and pays the fees.
+              Three steps. Your node proves it is yours; this account becomes its operator.
             </p>
           </div>
           {!linked && (
@@ -442,9 +441,8 @@ const BecomeValidatorCard = ({
             {mode === "change" && (
               <>
                 <p>
-                  You will take over as operator. Anyone holding the signature can execute this change immediately. The current
-                  operator's self-bond is released for unbonding and the validator may leave the consensus set until you self-bond
-                  at least {minStake} {symbol} and activate.
+                  You will take over as operator. The current operator's self-bond is released for unbonding and the validator
+                  may leave the consensus set until you self-bond at least {minStake} {symbol} and activate.
                 </p>
                 {listed?.status === 3 && (
                   <p>This validator is delisted. Changing its operator does not relist it; relisting needs an admin vote.</p>

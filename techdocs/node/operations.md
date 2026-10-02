@@ -249,8 +249,7 @@ Then self-bond at least the minimum stake and activate.
 
 Two things to know before signing an **operator change**:
 
-- Anyone holding the signature can submit it and the change happens immediately. Send the link
-  only to the new operator, and sign only when they are ready.
+- Sign when the new operator is ready to take over; the change applies as soon as they submit it.
 - The change releases the current operator's self-bond for unbonding, so the validator may leave
   the consensus set until the new operator self-bonds and activates. Bind first, self-bond second.
 

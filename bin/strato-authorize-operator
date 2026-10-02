@@ -17,7 +17,6 @@ import base64
 import json
 import os
 import re
-import stat
 import sys
 import urllib.error
 import urllib.parse
@@ -204,9 +203,6 @@ def step1_read_node_files(args):
     if not os.path.isfile(creds_path):
         die(3, f"no credentials: neither {node_dir}/secrets/oauth_credentials.yaml nor "
                f"~/.secrets/strato_credentials.yaml exists (run strato-login / strato-setup)")
-    mode = stat.S_IMODE(os.stat(creds_path).st_mode)
-    if mode & 0o077:
-        say(f"warning: {creds_path} is readable by other users (mode {mode:o}); consider chmod 600")
     creds = read_yaml_sections(creds_path)[""]
     for key in ("discoveryUrl", "clientId", "clientSecret"):
         if not creds.get(key):
@@ -352,11 +348,10 @@ def step6_summary_and_confirm(ctx, args):
         say("            until it is used or until this validator's nonce moves.")
     else:
         say(f"Action:     operator change from 0x{ctx['current_operator']} to 0x{o}")
-        say("            Once signed, anyone holding the signature can submit it and the change executes")
-        say(f"            immediately: 0x{ctx['current_operator']}'s self-bond is released for unbonding, its pending")
+        say(f"            When submitted, 0x{ctx['current_operator']}'s self-bond is released for unbonding, its pending")
         say("            rewards are paid out, and this validator may leave the consensus set until")
         say(f"            0x{o} self-bonds at least the minimum stake and activates.")
-        say(f"            Sign only if 0x{o} is ready to take over now.")
+        say(f"            Sign when 0x{o} is ready to take over.")
         if not ctx.get("listed_active"):
             say("            This validator is not listed as active. Changing its operator does not relist it;")
             say("            relisting needs an admin vote.")
@@ -428,7 +423,6 @@ def step8_print(ctx):
     else:
         say(f"Next: log in to the staking page as 0x{o} and use Change operator:")
         say(f"  {link}")
-        say(f"Anyone who has this link can execute the change immediately. Send it only to 0x{o}.")
         say(f"After the change, 0x{o} must self-bond at least the minimum stake and activate.")
 
 

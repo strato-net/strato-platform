@@ -179,7 +179,7 @@ strato-authorize-operator <operator-address> [--node-dir DIR] [--registry ADDR] 
 
 1. **Node files.** Node dir from `--node-dir` or `~/.strato/default-node`; credentials from
    `<node>/secrets/oauth_credentials.yaml`, else `~/.secrets/strato_credentials.yaml`
-   (`discoveryUrl`, `clientId`, `clientSecret`; warns if readable by others); from
+   (`discoveryUrl`, `clientId`, `clientSecret`); from
    `<node>/.ethereumH/ethconf.yaml`: `urlConfig.vaultUrl` (appends `/strato/v2.3` only if missing)
    and `networkConfig.network`. Per-network app host: helium → `https://app.testnet.strato.nexus`,
    upquark → `https://app.strato.nexus`; `--api-url` overrides. Registry address from
@@ -206,7 +206,9 @@ strato-authorize-operator <operator-address> [--node-dir DIR] [--registry ADDR] 
    errors only.
 8. **Print.** Signature alone on stdout; on stderr the next steps and
    `<api>/dashboard/earn-staking?validator=0x…&operator=0x…&signature=0x…&nonce=N`, with the
-   "anyone holding this link can execute the change" caution for operator changes.
+   self-bond and activate reminder for operator changes (the "anyone holding this link" caution was
+   dropped on 2026-10-02: the signature names the operator, so a third party can only make that
+   operator the operator).
 
 Exit codes: 0 ok / nothing to do · 2 usage · 3 node files · 4 token · 5 vault · 6 app host ·
 7 registry not ready · 8 unknown network · 9 self-test · 10 declined / no terminal.
