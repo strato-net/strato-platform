@@ -115,21 +115,20 @@ instance ToJSON EthConf where
 
 data ApiConfig = ApiConfig
   { apiPort :: Int
+  -- | Address every host-side listener (strato-api, ethereum-jsonrpc and the
+  -- metrics endpoints) binds to: the address containers reach the host on
+  -- (docker0 gateway on Linux, loopback on macOS), never all interfaces.
   , apiListenAddress :: String
-    -- | Bind address of ethereum-jsonrpc, in Warp's notation: an IP, "*"
-    -- (every interface, IPv4 and IPv6), "*4" or "*6". Kept separate from
-    -- 'apiListenAddress' because bloc reaches the JSON-RPC server on
-    -- localhost while nginx reaches strato-api on the docker bridge.
-  , rpcListenAddress :: String
-  , rpcPort :: Int
   } deriving (Show, Eq, Generic, ToJSON)
 
 instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
-    <*> v .:? "rpcListenAddress" .!= "*"
-    <*> v .:? "rpcPort" .!= 8545
+
+-- | Port of the node's ethereum-jsonrpc listener (not configurable).
+jsonRpcPort :: Int
+jsonRpcPort = 8545
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -388,9 +387,6 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
-  -- | Base URL of the node's ethereum-jsonrpc service, used by transaction
-  -- simulation (same container). Default http://localhost:8545.
-  , vmJsonRpcUrl :: String
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
@@ -408,7 +404,6 @@ instance FromJSON VmConf where
   parseJSON = withObject "VmConf" $ \v -> VmConf
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
-    <*> v .:? "vmJsonRpcUrl" .!= "http://localhost:8545"
     <*> v .:? "simMaxConcurrent" .!= 8
     <*> v .:? "vmQueryUrl"
 
@@ -474,8 +469,6 @@ instance Default ApiConfig where
   def = ApiConfig
     { apiPort = 3000
     , apiListenAddress = "127.0.0.1"
-    , rpcListenAddress = "*"
-    , rpcPort = 8545
     }
 
 instance Default DebugConfig where
@@ -487,7 +480,6 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
-    , vmJsonRpcUrl = "http://localhost:8545"
     , simMaxConcurrent = 8
     , vmQueryUrl = Nothing
     }

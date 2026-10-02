@@ -31,10 +31,10 @@ if [ "$NODE_ENV" == development ]; then
     echo "ERROR: postgres_port is altered and does not match with config/config.json ->development->port value"
     exit 2
   fi
-  ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION test/
+  ./node_modules/.bin/mocha $NODE_DEBUG_OPTION test/
 fi
 
 # When running tests inside the apex container
 if [ "$NODE_ENV" == test ]; then
-  ./node_modules/mocha/bin/mocha $NODE_DEBUG_OPTION test/
+  ./node_modules/.bin/mocha $NODE_DEBUG_OPTION test/
 fi

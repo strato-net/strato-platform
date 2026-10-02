@@ -1,9 +1,12 @@
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import MobileBottomNav from '@/components/dashboard/MobileBottomNav';
 import MetalTransactionDetails from '@/components/dashboard/MetalTransactionDetails';
 
 const MetalTransactionsPage = () => {
+  usePageTitle("Metal Purchases");
+
   return (
     <div className="h-screen bg-background overflow-hidden pb-16 md:pb-0">
       <DashboardSidebar />

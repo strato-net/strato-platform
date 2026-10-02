@@ -17,7 +17,7 @@ For each configured account-pool pair, every poll:
 5. **Recenter alert** when `|oracle/μ − 1| > ε` — the oracle (what the reposition script centers on) has left the ladder's center band. The pool price deliberately does _not_ trigger this: it is supposed to converge to the oracle through the ladder via arbitrage.
 6. **Warnings**: pool price vs oracle divergence beyond `DISLOCATION_PCT` (arb not keeping up / stale oracle), oracle price = 0, pool paused/disabled, no live positions.
 
-Hysteresis: while a condition persists, it re-alerts only after `ALERT_COOLDOWN_HOURS`, if the drift doubles, or after the ladder is re-minted (μ changed). State lives in a small JSON file (`STATE_FILE`), keyed per account-pool pair.
+Dislocation alerts share one cooldown per pool across all account and watch entries: after an alert, no new dislocation alert is sent for `ALERT_COOLDOWN_HOURS`, even if prices recover and diverge again. Other findings retain per-account-pool hysteresis while the condition persists; recenter alerts can also repeat if drift doubles or the ladder is re-minted (μ changed). State lives in a small JSON file (`STATE_FILE`); existing dislocation timestamps are preserved when upgrading.
 
 ## Notifications
 
@@ -26,7 +26,7 @@ Configure either or both (see `env.example`):
 - **Email** — SendGrid HTTP API (`SENDGRID_API_KEY`, same key the backend contact form uses), `ALERT_EMAIL_FROM`/`ALERT_EMAIL_TO`.
 - **Slack** — bot token + channel id via `chat.postMessage` (`SLACK_TOKEN` + `SLACK_CHANNEL_ID`, the same pattern as the org's other services). The bot must be a member of the target channel.
 
-All alerts due in a cycle are combined into **one email and one Slack message** (one section per account-pool pair / watched pool, most severe first in the subject). Each section includes μ, oracle, pool price, the drift vs ε, all current findings, and — for recenter alerts — a copy-paste reposition command. The command's `--widths` come from `LADDER_WIDTHS` when configured, otherwise they are reconstructed from the live positions (see Notes). Hysteresis stays per pair per finding-kind, so a pair joins the digest only when it has something newly due.
+All alerts due in a cycle are combined into **one email and one Slack message** (one section per account-pool pair / watched pool, most severe first in the subject). Each section includes μ, oracle, pool price, the drift vs ε, all current findings, and — for recenter alerts — a copy-paste reposition command. The command's `--widths` come from `LADDER_WIDTHS` when configured, otherwise they are reconstructed from the live positions (see Notes). A pair joins the digest only when it has something newly due; a suppressed dislocation may still appear as context in an alert triggered by another finding.
 
 ## Run
 

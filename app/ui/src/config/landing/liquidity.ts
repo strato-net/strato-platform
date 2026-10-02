@@ -9,7 +9,7 @@ import type { ProductLandingConfig } from "./types";
 
 export const liquidity: ProductLandingConfig = {
   slug: "liquidity",
-  documentTitle: "STRATO V3 Liquidity | Earn Trading Fees | STRATO",
+  documentTitle: "STRATO | V3 Liquidity | Earn Trading Fees",
   accent: "teal",
   appPath: "/dashboard/v3-liquidity",
 

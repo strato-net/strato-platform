@@ -60,6 +60,7 @@ export type ApiAction =
   | 'stake_commission'
   | 'stake_activate'
   | 'stake_register'
+  | 'stake_profile'
   | 'stake_exit'
   | 'stake_exit_cancel'
   | 'stake_claim_fees'
@@ -78,6 +79,7 @@ export type ApiAction =
   | 'yield_vault_claim'
   | 'basket_vault_deposit'
   | 'basket_vault_withdraw'
+  | 'basket_vault_withdraw_all'
   // stablecoin / bridge / metals
   | 'psm_mint'
   | 'psm_redeem'
@@ -92,10 +94,6 @@ export type ApiAction =
   | 'nft_burn'
   // money in / rewards / referral
   | 'onramp_session'
-  | 'credit_card_top_up'
-  | 'credit_card_add'
-  | 'credit_card_update'
-  | 'credit_card_remove'
   | 'contact_submit'
   | 'rewards_claim'
   | 'rewards_claim_all'
@@ -200,6 +198,7 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /staking/commission': 'stake_commission',
   'POST /staking/activate': 'stake_activate',
   'POST /staking/register': 'stake_register',
+  'POST /staking/profile': 'stake_profile',
   'POST /staking/exit': 'stake_exit',
   'POST /staking/exit/cancel': 'stake_exit_cancel',
   'POST /staking/claim-fees': 'stake_claim_fees',
@@ -215,6 +214,7 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
   'POST /earn/yield-vault/*/claim': 'yield_vault_claim',
   'POST /vault/deposit': 'basket_vault_deposit',
   'POST /vault/withdraw': 'basket_vault_withdraw',
+  'POST /vault/withdraw-shares': 'basket_vault_withdraw_all',
 
   // stablecoin / bridge / metals
   'POST /psm/mint': 'psm_mint',
@@ -231,10 +231,6 @@ const API_EVENT_MAP: Record<string, ApiAction> = {
 
   // money in / rewards / referral
   'POST /onramp/session': 'onramp_session',
-  'POST /credit-card/manual-top-up': 'credit_card_top_up',
-  'POST /credit-card/add-card': 'credit_card_add',
-  'POST /credit-card/update-card': 'credit_card_update',
-  'POST /credit-card/remove-card': 'credit_card_remove',
   'POST /contact': 'contact_submit',
   'POST /rewards/claim-all': 'rewards_claim_all',
   'POST /rewards/claim/*': 'rewards_claim',

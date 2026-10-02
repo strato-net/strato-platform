@@ -202,12 +202,12 @@ recordResultSpans started results = do
         let h = transactionResultTransactionHash r
             failed = case transactionResultMessage r of
               "Success!" -> Nothing
-              m -> Just (T.pack m)
+              m -> Just m
         Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString h)) Nothing "tx.result" Tr.Consumer started end
           [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex h)),
             Tr.attrText "strato.block_hash" (T.pack (keccak256ToHex (transactionResultBlockHash r))),
             Tr.attrText "strato.stage" "slipstream",
-            Tr.attrText "strato.result" (T.pack (transactionResultMessage r))
+            Tr.attrText "strato.result" (transactionResultMessage r)
           ]
           []
           failed

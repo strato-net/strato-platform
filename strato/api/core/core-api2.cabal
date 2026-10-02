@@ -44,6 +44,7 @@ library
     , bytestring
     , clock
     , common-log
+    , composable-monads-base
     , conduit
     , containers
     , deepseq

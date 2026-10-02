@@ -1,741 +1,266 @@
-# End-to-End Integration Examples
+# End-to-End Examples
 
-Complete workflow examples for building on STRATO using REST APIs.
+Three complete TypeScript scripts, one per integration style:
 
-!!! danger "Important: ethers.js Does NOT Work"
-    **You CANNOT use ethers.js or web3.js with STRATO.**
-    
-    Use STRATO REST APIs: `/strato/v2.3`, `/cirrus/search`, `/bloc/v2.2`
+1. [Portfolio snapshot](#example-1-portfolio-snapshot-cirrus-no-credentials): reads Cirrus, no credentials
+2. [CDP bot](#example-2-cdp-bot-oidc-token-vault-signing-via-bloc): deposits collateral and mints USDST with Vault signing through Bloc
+3. [Self-custody swap](#example-3-self-custody-swap-json-rpc-with-viem): approves and swaps with your own key over JSON-RPC
 
-!!! note "About STRATO Endpoints"
-    **All examples use `localhost` for local development.**
-    
-    For production, use public endpoints:
-    
-    - **Mainnet:** `https://app.strato.nexus`
-    - **Testnet:** `https://app.testnet.strato.nexus`
-    
-    **In your code:**
-    
-    ```typescript
-    // For local dev:
-    const NODE_URL = 'http://localhost:8080';
-    
-    // For production (replace localhost with):
-    // const NODE_URL = 'https://app.strato.nexus';  // mainnet
-    // const NODE_URL = 'https://app.testnet.strato.nexus';  // testnet
-    
-    const strato = createApiClient(`${NODE_URL}/strato/v2.3`);
-    const cirrus = createApiClient(`${NODE_URL}/cirrus/search`);
-    ```
+All three target testnet. Setup:
+
+```bash
+npm init -y
+npm install viem axios
+npm install -D tsx typescript
+```
+
+!!! info "Fees"
+    Each transaction costs 0.01 USDST, or one voucher. Approve plus an action is two transactions, so it costs 0.02. Reverted transactions still pay. See [Transactions and Fees](../platform/transactions-and-fees.md).
 
 ---
 
-## Example 1: Yield Farming App
+## Example 1: Portfolio snapshot (Cirrus, no credentials)
 
-Build an app that helps users earn yield through lending and liquidity provision.
-
-### User Flow
-
-1. Supply ETHST as collateral to Lending Pool
-2. Borrow USDST against collateral
-3. Swap USDST → sUSDSST
-4. Provide sUSDSST-USDST liquidity
-5. Earn trading fees + Reward Points
-
-### Implementation
+This script prints a user's token balances and CDP vaults. Cirrus `GET` requests need no token.
 
 ```typescript
-import { strato, cirrus, bloc } from './config';
-import { getAccessToken } from './auth';
+// portfolio.ts
+import { formatUnits } from "viem";
 
-interface FunctionInput {
-  contractName: string;
-  contractAddress: string;
-  method: string;
-  args: Record<string, any>;
+const CIRRUS = "https://app.testnet.strato.nexus/cirrus/search";
+const CDP_ENGINE = "0000000000000000000000000000000000001011";
+
+async function cirrus<T>(table: string, params: Record<string, string>): Promise<T[]> {
+  const res = await fetch(`${CIRRUS}/${table}?${new URLSearchParams(params)}`);
+  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  return res.json();
 }
 
-function buildFunctionTx(inputs: FunctionInput | FunctionInput[]) {
-  const inputArray = Array.isArray(inputs) ? inputs : [inputs];
-  
-  const txs = inputArray.map(input => ({
-    type: 'FUNCTION',
-    payload: {
-      contractName: input.contractName,
-      contractAddress: input.contractAddress,
-      method: input.method,
-      args: input.args,
-    },
-  }));
-  
-  return {
-    txs,
-    txParams: {
-      gasLimit: 32_100_000_000,
-      gasPrice: 1,
-    },
-  };
+interface BalanceRow {
+  address: string;
+  balance: string;
+  token: { _name: string; _symbol: string; customDecimals: number } | null;
 }
 
-async function submitTransaction(accessToken: string, tx: any) {
-  const response = await strato.post(
-    '/transaction/parallel?resolve=true',
-    tx,
-    {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    }
+interface VaultRow {
+  asset: string;
+  Vault: { collateral: string; scaledDebt: string };
+}
+
+async function main(user: string) {
+  const who = user.replace(/^0x/, "").toLowerCase();
+
+  const balances = await cirrus<BalanceRow>("BlockApps-Token-_balances", {
+    key: `eq.${who}`,
+    select: "address,balance:value::text,token:BlockApps-Token(_name,_symbol,customDecimals)",
+  });
+  for (const b of balances) {
+    if (b.balance === "0") continue;
+    const decimals = b.token?.customDecimals ?? 18;
+    console.log(`${b.token?._symbol ?? b.address}: ${formatUnits(BigInt(b.balance), decimals)}`);
+  }
+
+  const vaults = await cirrus<VaultRow>("BlockApps-CDPEngine-vaults", {
+    address: `eq.${CDP_ENGINE}`,
+    key: `eq.${who}`,
+    select: "asset:key2,Vault:value",
+  });
+  for (const v of vaults) {
+    console.log(`CDP vault ${v.asset}: collateral=${v.Vault.collateral} scaledDebt=${v.Vault.scaledDebt}`);
+  }
+}
+
+main(process.argv[2]).catch(console.error);
+```
+
+```bash
+npx tsx portfolio.ts <user address>
+```
+
+`scaledDebt` is stored scaled. For current debt, health factor and liquidation data, use the app API (`GET /api/cdp/vaults` with a token), or follow the math in `app/backend/src/api/services/cdp.service.ts`.
+
+---
+
+## Example 2: CDP bot (OIDC token, Vault signing via Bloc)
+
+A service account deposits collateral into a CDP vault and mints USDST. The node signs with the account's Vault key. The script follows the steps in `app/backend/src/api/services/cdp.service.ts`.
+
+Prerequisites:
+
+- OAuth client credentials from [support.blockapps.net](https://support.blockapps.net)
+- The account's address holds the collateral token, plus USDST or vouchers for three fees
+- The collateral is a supported CDP asset (see `GET /api/cdp/assets`)
+
+```typescript
+// cdp-bot.ts
+import axios from "axios";
+
+const HOST = "https://app.testnet.strato.nexus";
+const DISCOVERY_URL =
+  "https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration";
+
+const USDST = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
+const VOUCHER = "000000000000000000000000000000000000100e";
+const CDP_REGISTRY = "0000000000000000000000000000000000001012";
+const FEE = 10n ** 16n; // 0.01 USDST
+
+async function getAccessToken(): Promise<string> {
+  const { data: oidc } = await axios.get(DISCOVERY_URL);
+  const { data } = await axios.post(
+    oidc.token_endpoint,
+    new URLSearchParams({ grant_type: "client_credentials" }),
+    { auth: { username: process.env.OAUTH_CLIENT_ID!, password: process.env.OAUTH_CLIENT_SECRET! } },
   );
-  
-  return response.data;
+  return data.access_token;
 }
 
-class YieldFarmingApp {
-  private accessToken: string;
-  private userAddress: string;
-  
-  constructor(accessToken: string, userAddress: string) {
-    this.accessToken = accessToken;
-    this.userAddress = userAddress;
-  }
-  
-  async executeStrategy(ethstAmount: string) {
-    console.log('Starting yield farming strategy...');
-    
-    // 1. Supply ETHST collateral
-    await this.supplyCollateral(ethstAmount);
-    
-    // 2. Borrow USDST (50% of collateral value)
-    const ethPrice = await this.getETHPrice();
-    const borrowAmount = (BigInt(ethstAmount) * BigInt(ethPrice) * 50n / 100n).toString();
-    await this.borrowUSDST(borrowAmount);
-    
-    // 3. Swap USDST → sUSDSST
-    await this.swapToSUSDSST(borrowAmount);
-    
-    // 4. Provide liquidity
-    const halfAmount = (BigInt(borrowAmount) / 2n).toString();
-    await this.provideLiquidity(halfAmount, halfAmount);
-    
-    // 5. Get position summary
-    return await this.getPositionSummary();
-  }
-  
-  async supplyCollateral(amount: string) {
-    const LENDING_POOL = await this.getLendingPoolAddress();
-    const ETHST_TOKEN = await this.getTokenAddress('ETHST');
-    
-    const tx = buildFunctionTx([
-      {
-        contractName: 'Token',
-        contractAddress: ETHST_TOKEN,
-        method: 'approve',
-        args: { spender: LENDING_POOL, value: amount }
-      },
-      {
-        contractName: 'LendingPool',
-        contractAddress: LENDING_POOL,
-        method: 'supplyCollateral',
-        args: { asset: ETHST_TOKEN, amount }
-      }
-    ]);
-    
-    await submitTransaction(this.accessToken, tx);
-    console.log('✅ Supplied collateral');
-  }
-  
-  async borrowUSDST(amount: string) {
-    const LENDING_POOL = await this.getLendingPoolAddress();
-    const USDST_TOKEN = await this.getTokenAddress('USDST');
-    
-    const tx = buildFunctionTx({
-      contractName: 'LendingPool',
-      contractAddress: LENDING_POOL,
-      method: 'borrow',
-      args: { asset: USDST_TOKEN, amount }
-    });
-    
-    await submitTransaction(this.accessToken, tx);
-    console.log('✅ Borrowed USDST');
-  }
-  
-  async swapToSUSDSST(amount: string) {
-    const ROUTER = await this.getRouterAddress();
-    const USDST_TOKEN = await this.getTokenAddress('USDST');
-    const SUSDST_TOKEN = await this.getTokenAddress('sUSDSST');
-    
-    const tx = buildFunctionTx([
-      {
-        contractName: 'Token',
-        contractAddress: USDST_TOKEN,
-        method: 'approve',
-        args: { spender: ROUTER, value: amount }
-      },
-      {
-        contractName: 'Router',
-        contractAddress: ROUTER,
-        method: 'swapExactTokensForTokens',
-        args: {
-          amountIn: amount,
-          amountOutMin: (BigInt(amount) * 995n / 1000n).toString(), // 0.5% slippage
-          path: [USDST_TOKEN, SUSDST_TOKEN],
-          to: this.userAddress,
-          deadline: Math.floor(Date.now() / 1000) + 1200
-        }
-      }
-    ]);
-    
-    await submitTransaction(this.accessToken, tx);
-    console.log('✅ Swapped to sUSDSST');
-  }
-  
-  async provideLiquidity(amountA: string, amountB: string) {
-    const ROUTER = await this.getRouterAddress();
-    const USDST_TOKEN = await this.getTokenAddress('USDST');
-    const SUSDST_TOKEN = await this.getTokenAddress('sUSDSST');
-    
-    const tx = buildFunctionTx([
-      {
-        contractName: 'Token',
-        contractAddress: USDST_TOKEN,
-        method: 'approve',
-        args: { spender: ROUTER, value: amountA }
-      },
-      {
-        contractName: 'Token',
-        contractAddress: SUSDST_TOKEN,
-        method: 'approve',
-        args: { spender: ROUTER, value: amountB }
-      },
-      {
-        contractName: 'Router',
-        contractAddress: ROUTER,
-        method: 'addLiquidity',
-        args: {
-          tokenA: USDST_TOKEN,
-          tokenB: SUSDST_TOKEN,
-          amountADesired: amountA,
-          amountBDesired: amountB,
-          amountAMin: (BigInt(amountA) * 95n / 100n).toString(),
-          amountBMin: (BigInt(amountB) * 95n / 100n).toString(),
-          to: this.userAddress,
-          deadline: Math.floor(Date.now() / 1000) + 1200
-        }
-      }
-    ]);
-    
-    await submitTransaction(this.accessToken, tx);
-    console.log('✅ Provided liquidity');
-  }
-  
-  async getPositionSummary() {
-    // Query user's positions from Cirrus
-    const collateral = await this.getUserCollateral();
-    const debt = await this.getUserDebt();
-    const lpTokens = await this.getUserLPTokens();
-    
-    return {
-      collateral,
-      debt,
-      lpTokens,
-      healthFactor: await this.calculateHealthFactor()
-    };
-  }
-  
-  // Helper methods
-  async getLendingPoolAddress(): Promise<string> {
-    const response = await cirrus.get('/LendingRegistry', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: 'eq.0000000000000000000000000000000000001007',
-        select: 'lendingPool'
-      }
-    });
-    return response.data[0].lendingPool;
-  }
-  
-  async getTokenAddress(symbol: string): Promise<string> {
-    const response = await cirrus.get('/Token', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        _symbol: `eq.${symbol}`,
-        select: 'address'
-      }
-    });
-    return response.data[0].address;
-  }
-  
-  async getRouterAddress(): Promise<string> {
-    // Router address from pool factory
-    return '0x...'; // Get from your deployment
-  }
-  
-  async getETHPrice(): Promise<number> {
-    // Get from price oracle
-    return 3000; // $3000 per ETHST
-  }
-  
-  async getUserCollateral() {
-    // Query from Cirrus
-    return {};
-  }
-  
-  async getUserDebt() {
-    // Query from Cirrus
-    return {};
-  }
-  
-  async getUserLPTokens() {
-    // Query from Cirrus
-    return {};
-  }
-  
-  async calculateHealthFactor() {
-    // Calculate from collateral and debt
-    return 2.5;
-  }
+async function cirrus(table: string, params: Record<string, string>) {
+  const { data } = await axios.get(`${HOST}/cirrus/search/${table}`, { params });
+  return data;
 }
 
-// Usage
-async function main() {
-  const accessToken = await getAccessToken();
-  const userAddress = '0x...'; // Your address
-  
-  const app = new YieldFarmingApp(accessToken, userAddress);
-  const result = await app.executeStrategy('1000000000000000000'); // 1 ETHST
-  
-  console.log('Position summary:', result);
+async function balanceOf(table: string, contract: string, user: string): Promise<bigint> {
+  const rows = await cirrus(table, { address: `eq.${contract}`, key: `eq.${user}`, select: "value::text" });
+  return BigInt(rows[0]?.value ?? "0");
 }
 
-main().catch(console.error);
-```
-
----
-
-## Example 2: Portfolio Dashboard
-
-Build a dashboard showing user's complete DeFi position.
-
-### Implementation
-
-```typescript
-class PortfolioDashboard {
-  private accessToken: string;
-  private userAddress: string;
-  
-  constructor(accessToken: string, userAddress: string) {
-    this.accessToken = accessToken;
-    this.userAddress = userAddress;
-  }
-  
-  async getCompletePortfolio() {
-    const [tokens, lending, cdp, liquidity, rewards] = await Promise.all([
-      this.getTokenBalances(),
-      this.getLendingPosition(),
-      this.getCDPPosition(),
-      this.getLiquidityPositions(),
-      this.getRewards()
-    ]);
-    
-    return {
-      tokens,
-      lending,
-      cdp,
-      liquidity,
-      rewards,
-      totalValue: await this.calculateTotalValue()
-    };
-  }
-  
-  async getTokenBalances() {
-    const response = await cirrus.get('/Token-_balances', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        key: `eq.${this.userAddress}`,
-        select: 'address,value::text'
-      }
-    });
-    
-    // Enrich with token metadata
-    const balances = response.data;
-    const enriched = await Promise.all(
-      balances.map(async (b: any) => {
-        const token = await this.getTokenMetadata(b.address);
-        return {
-          ...token,
-          balance: b.value
-        };
-      })
-    );
-    
-    return enriched;
-  }
-  
-  async getLendingPosition() {
-    const COLLATERAL_VAULT = await this.getCollateralVaultAddress();
-    
-    const collateral = await cirrus.get('/CollateralVault-userCollaterals', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: `eq.${COLLATERAL_VAULT}`,
-        key: `eq.${this.userAddress}`,
-        select: 'key2,value::text'
-      }
-    });
-    
-    const debt = await cirrus.get('/LendingPool-userDebts', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        key: `eq.${this.userAddress}`,
-        select: 'key2,value::text'
-      }
-    });
-    
-    return {
-      collateral: collateral.data,
-      debt: debt.data
-    };
-  }
-  
-  async getCDPPosition() {
-    const CDP_VAULT = await this.getCDPVaultAddress();
-    
-    const collateral = await cirrus.get('/CDPVault-userCollaterals', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: `eq.${CDP_VAULT}`,
-        key: `eq.${this.userAddress}`,
-        select: 'key2,value::text'
-      }
-    });
-    
-    const debt = await cirrus.get('/CDPEngine-userDebts', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        key: `eq.${this.userAddress}`,
-        select: 'key2,value::text'
-      }
-    });
-    
-    return {
-      collateral: collateral.data,
-      debt: debt.data
-    };
-  }
-  
-  async getLiquidityPositions() {
-    // Get all pools
-    const pools = await cirrus.get('/Pool', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        select: 'address,_token0,_token1'
-      }
-    });
-    
-    // Get user's LP token balances
-    const lpBalances = await Promise.all(
-      pools.data.map(async (pool: any) => {
-        const balance = await cirrus.get('/Pool-_balances', {
-          headers: { Authorization: `Bearer ${this.accessToken}` },
-          params: {
-            address: `eq.${pool.address}`,
-            key: `eq.${this.userAddress}`,
-            select: 'value::text'
-          }
-        });
-        
-        return {
-          pool: pool.address,
-          token0: pool._token0,
-          token1: pool._token1,
-          lpBalance: balance.data[0]?.value || '0'
-        };
-      })
-    );
-    
-    return lpBalances.filter(b => BigInt(b.lpBalance) > 0n);
-  }
-  
-  async getRewards() {
-    const REWARDS_ADDRESS = await this.getRewardsAddress();
-    
-    const response = await cirrus.get('/Rewards-userInfo', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: `eq.${REWARDS_ADDRESS}`,
-        key: `eq.${this.userAddress}`,
-        select: '*'
-      }
-    });
-    
-    return response.data;
-  }
-  
-  async calculateTotalValue() {
-    // Calculate total portfolio value in USD
-    return 0;
-  }
-  
-  // Helper methods
-  async getTokenMetadata(address: string) {
-    const response = await cirrus.get('/Token', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: `eq.${address}`,
-        select: '_name,_symbol,_decimals'
-      }
-    });
-    return response.data[0];
-  }
-  
-  async getCollateralVaultAddress(): Promise<string> {
-    const response = await cirrus.get('/LendingRegistry', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: 'eq.0000000000000000000000000000000000001007',
-        select: 'collateralVault'
-      }
-    });
-    return response.data[0].collateralVault;
-  }
-  
-  async getCDPVaultAddress(): Promise<string> {
-    const response = await cirrus.get('/CDPRegistry', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: 'eq.0000000000000000000000000000000000001012',
-        select: 'cdpVault'
-      }
-    });
-    return response.data[0].cdpVault;
-  }
-  
-  async getRewardsAddress(): Promise<string> {
-    return '0x...'; // Get from your deployment
-  }
+// Same rule as app/backend/src/utils/txBuilder.ts: one voucher (1e18) covers one 0.01 USDST fee.
+async function ensureFees(user: string, txCount: number) {
+  const usdst = await balanceOf("BlockApps-Token-_balances", USDST, user);
+  const vouchers = await balanceOf("BlockApps-Voucher-_balances", VOUCHER, user);
+  if (usdst + vouchers / 100n < FEE * BigInt(txCount)) throw new Error("Not enough USDST or vouchers for fees");
 }
 
-// Usage
-async function main() {
-  const accessToken = await getAccessToken();
-  const userAddress = '0x...';
-  
-  const dashboard = new PortfolioDashboard(accessToken, userAddress);
-const portfolio = await dashboard.getCompletePortfolio();
-  
-  console.log('Complete portfolio:', JSON.stringify(portfolio, null, 2));
-}
-
-main().catch(console.error);
-```
-
----
-
-## Example 3: Liquidation Bot
-
-Monitor positions and execute liquidations when profitable.
-
-### Implementation
-
-```typescript
-class LiquidationBot {
-  private accessToken: string;
-  private botAddress: string;
-  
-  constructor(accessToken: string, botAddress: string) {
-    this.accessToken = accessToken;
-    this.botAddress = botAddress;
-  }
-  
-  async start() {
-    console.log('Starting liquidation bot...');
-    
-    while (true) {
-      try {
-        // 1. Find unhealthy positions
-        const targets = await this.findLiquidationTargets();
-        
-        // 2. Execute liquidations
-        for (const target of targets) {
-          await this.liquidate(target);
-        }
-        
-        // Wait 10 seconds before next check
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        
-      } catch (error) {
-        console.error('Bot error:', error);
-        await new Promise(resolve => setTimeout(resolve, 30000));
-      }
-    }
-  }
-  
-  async findLiquidationTargets() {
-    // Query all users with debt
-    const users = await cirrus.get('/LendingPool-userDebts', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        select: 'key,key2,value::text',
-        value: 'gt.0'
-      }
-    });
-    
-    // Check health factor for each
-    const targets = [];
-    for (const user of users.data) {
-      const healthFactor = await this.calculateHealthFactor(user.key);
-      if (healthFactor < 1.0) {
-        targets.push({
-          user: user.key,
-          asset: user.key2,
-          debt: user.value,
-          healthFactor
-        });
-      }
-    }
-    
-    return targets;
-  }
-  
-  async liquidate(target: any) {
-    console.log(`Liquidating ${target.user}...`);
-    
-    const LENDING_POOL = await this.getLendingPoolAddress();
-    
-    const tx = buildFunctionTx({
-      contractName: 'LendingPool',
-      contractAddress: LENDING_POOL,
-      method: 'liquidationCall',
-      args: {
-        collateralAsset: target.asset,
-        debtAsset: target.asset,
-        user: target.user,
-        debtToCover: target.debt,
-        receiveAToken: false
-      }
-    });
-    
-    await submitTransaction(this.accessToken, tx);
-    console.log('✅ Liquidation successful');
-  }
-  
-  async calculateHealthFactor(userAddress: string): Promise<number> {
-    // Get collateral and debt
-    // Calculate health factor
-    return 1.5;
-  }
-  
-  async getLendingPoolAddress(): Promise<string> {
-    const response = await cirrus.get('/LendingRegistry', {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      params: {
-        address: 'eq.0000000000000000000000000000000000001007',
-        select: 'lendingPool'
-      }
-    });
-    return response.data[0].lendingPool;
-  }
-}
-
-// Usage
-async function main() {
-  const accessToken = await getAccessToken();
-  const botAddress = '0x...';
-  
-  const bot = new LiquidationBot(accessToken, botAddress);
-  await bot.start();
-}
-
-main().catch(console.error);
-```
-
----
-
-## Best Practices
-
-### 1. Error Handling
-
-```typescript
-try {
-  const result = await submitTransaction(accessToken, tx);
-} catch (error: any) {
-  if (error.response?.status === 400) {
-    // Transaction failed - parse error message
-    console.error('Transaction failed:', error.response.data);
-  } else if (error.response?.status === 401) {
-    // Token expired - refresh
-    accessToken = await getAccessToken();
-  }
-}
-```
-
-### 2. Rate Limiting
-
-```typescript
-class RateLimiter {
-  private queue: Array<() => Promise<any>> = [];
-  private processing = false;
-  
-  async add<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.queue.push(async () => {
-        try {
-          const result = await fn();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      
-      this.process();
-    });
-  }
-  
-  private async process() {
-    if (this.processing || this.queue.length === 0) return;
-    
-    this.processing = true;
-    const fn = this.queue.shift()!;
-    
-    await fn();
-    await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
-    
-    this.processing = false;
-    this.process();
-  }
-}
-```
-
-### 3. Batch Operations
-
-```typescript
-async function batchQuery(
-  accessToken: string,
-  queries: Array<{ table: string; params: any }>
-) {
-  const promises = queries.map(({ table, params }) =>
-    cirrus.get(`/${table}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      params
-    })
+async function submit(token: string, calls: { contractAddress: string; method: string; args: object }[]) {
+  const { data } = await axios.post(
+    `${HOST}/bloc/v2.2/transaction/parallel?resolve=true`,
+    { txs: calls.map((payload) => ({ type: "FUNCTION", payload })), txParams: { gasLimit: 32100000000, gasPrice: 1 } },
+    { headers: { Authorization: `Bearer ${token}` } },
   );
-  
-  return await Promise.all(promises);
+  const hashes: string[] = data.map((r: { hash: string }) => r.hash);
+
+  for (const start = Date.now(); Date.now() - start < 60_000; ) {
+    const { data: results } = await axios.post(`${HOST}/bloc/v2.2/transactions/results`, hashes);
+    const failed = results.find((r: any) => r.status === "Failure");
+    if (failed) throw new Error(failed.txResult?.message ?? "Transaction failed");
+    if (results.every((r: any) => r.status !== "Pending")) return results;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  throw new Error("Timed out waiting for results");
 }
+
+async function main() {
+  const [asset, amount, mintAmount] = process.argv.slice(2); // base-unit integer strings
+  const token = await getAccessToken();
+
+  const { data: me } = await axios.get(`${HOST}/api/user/me`, { headers: { Authorization: `Bearer ${token}` } });
+  const user: string = me.userAddress;
+  console.log("Account:", user);
+
+  const [cdp] = await cirrus("BlockApps-CDPRegistry", {
+    address: `eq.${CDP_REGISTRY}`,
+    select: "cdpEngine,cdpVault",
+  });
+
+  await ensureFees(user, 3);
+
+  await submit(token, [
+    { contractAddress: asset, method: "approve", args: { spender: cdp.cdpVault, value: amount } },
+    { contractAddress: cdp.cdpEngine, method: "deposit", args: { asset, amount } },
+  ]);
+  console.log("Deposited collateral");
+
+  await submit(token, [
+    { contractAddress: cdp.cdpEngine, method: "mint", args: { asset, amountUSD: mintAmount } },
+  ]);
+  console.log("Minted USDST");
+}
+
+main().catch((e) => console.error(e.response?.data ?? e.message));
 ```
+
+```bash
+OAUTH_CLIENT_ID=... OAUTH_CLIENT_SECRET=... npx tsx cdp-bot.ts <collateral token address> <amount> <USDST to mint>
+```
+
+`mint` reverts in three cases: the new debt would exceed the collateral's borrowing limit (`CDPEngine: insufficient collateral`), it would exceed the asset's debt ceiling, or it would leave the vault below the asset's debt floor. The app backend's `POST /api/cdp/get-max-mint` endpoint calculates the maximum amount you can mint.
 
 ---
 
-## Next Steps
+## Example 3: Self-custody swap (JSON-RPC with viem)
 
-- **[Quick Start](quickstart.md)** - Build your first app
-- **[API Integration](integration.md)** - Complete integration guide
-- **[Quick Reference](quick-reference.md)** - Code snippets
+This script swaps USDST for ETH in the genesis ETH/USDST pool (`…1017`), signing with a local private key. The pool's `tokenA` is ETH and `tokenB` is USDST, so selling USDST means `isAToB = false`. The signing address pays the fees.
 
-### Study the Reference Implementation
+```typescript
+// swap.ts
+import {
+  createPublicClient, createWalletClient, defineChain, erc20Abi, http, parseAbi, parseUnits,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
-The **STRATO App** (`strato-platform/app/`):
+const stratoTestnet = defineChain({
+  id: 195049586845898,
+  name: "STRATO Testnet",
+  nativeCurrency: { name: "USDST", symbol: "USDST", decimals: 18 }, // label only
+  rpcUrls: { default: { http: ["https://app.testnet.strato.nexus/rpc"] } },
+});
 
-- **Backend** - `app/backend/src/`
-- **Services** - `app/backend/src/api/services/`
-- **Helpers** - `app/backend/src/api/helpers/`
+const USDST = "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
+const POOL = "0x0000000000000000000000000000000000001017"; // ETH / USDST
+const CIRRUS = "https://app.testnet.strato.nexus/cirrus/search";
+
+const poolAbi = parseAbi([
+  "function swap(bool isAToB, uint256 amountIn, uint256 minAmountOut, uint256 deadline) returns (uint256)",
+]);
+
+const legacy = { type: "legacy", gasPrice: 0n, gas: 1_000_000n } as const;
+
+async function main() {
+  const account = privateKeyToAccount(process.env.PRIVATE_KEY as `0x${string}`);
+  const publicClient = createPublicClient({ chain: stratoTestnet, transport: http() });
+  const wallet = createWalletClient({ account, chain: stratoTestnet, transport: http() });
+
+  const amountIn = parseUnits(process.argv[2] ?? "10", 18);
+
+  // Estimate the output from pool balances in Cirrus, then allow 1% slippage.
+  const [pool] = await (
+    await fetch(`${CIRRUS}/BlockApps-Pool?address=eq.${POOL.slice(2)}&select=tokenABalance::text,tokenBBalance::text`)
+  ).json();
+  const reserveIn = BigInt(pool.tokenBBalance);  // USDST
+  const reserveOut = BigInt(pool.tokenABalance); // ETH
+  const estimatedOut = (amountIn * reserveOut) / (reserveIn + amountIn);
+  const minAmountOut = (estimatedOut * 99n) / 100n;
+
+  let nonce = await publicClient.getTransactionCount({ address: account.address, blockTag: "latest" });
+
+  const approveHash = await wallet.writeContract({
+    address: USDST, abi: erc20Abi, functionName: "approve", args: [POOL, amountIn], nonce: nonce++, ...legacy,
+  });
+  await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+  const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
+  const swapHash = await wallet.writeContract({
+    address: POOL, abi: poolAbi, functionName: "swap",
+    args: [false, amountIn, minAmountOut, deadline], nonce: nonce++, ...legacy,
+  });
+  await publicClient.waitForTransactionReceipt({ hash: swapHash });
+
+  console.log("Swapped", swapHash);
+}
+
+main().catch(console.error);
+```
+
+```bash
+PRIVATE_KEY=0x... npx tsx swap.ts 10
+```
+
+The estimate above ignores the pool fee. For exact quotes across all pool types, use `GET /api/trade/quote`.
+
+---
+
+## Next steps
+
+- [Integration Guide](integration.md)
+- [Quick Reference](quick-reference.md)
+- [Contract Addresses](contract-addresses.md)

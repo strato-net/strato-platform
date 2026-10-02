@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -24,9 +26,11 @@ module Control.Monad.Composable.Kafka (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  unconnectedStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBestEffort,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -64,7 +68,6 @@ import Control.Lens
 import Control.Monad (void)
 import Control.Monad.Composable.Base
 import Control.Monad.Loops
-import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.State
 import qualified Data.Aeson as JSON
@@ -87,9 +90,11 @@ import Network.Kafka.Protocol hiding (ClientId)
 
 
 
--- Generic streaming type aliases
-type StreamM = ReaderT (IORef KafkaState)
-type HasStreaming m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
+-- Generic streaming type aliases. The environment a row carries is an
+-- 'IORef StreamEnv', the same shape every backend uses, so that code naming
+-- the row element (ContextRow, SequencerRow, ...) compiles against any of them.
+type StreamM es = Eff (IORef StreamEnv ': es)
+type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 type ClientId = Text
 type StreamAddress = (String, Int)
 
@@ -102,7 +107,7 @@ data StreamEnv = StreamEnv
   }
 
 -- Deprecated aliases for backward compatibility
-type KafkaM = StreamM
+type KafkaM es = StreamM es
 type HasKafka m = HasStreaming m
 type KafkaEnv = StreamEnv
 
@@ -133,13 +138,21 @@ kafkaStateToStreamEnv kafkaState = do
   return $ StreamEnv ksIORef
 
 getStreamEnv :: HasStreaming m => m StreamEnv
-getStreamEnv = StreamEnv <$> accessEnv
+getStreamEnv = do
+  ref <- accessEnv
+  liftIO $ readIORef ref
 
-runStreamMUsingEnv :: StreamEnv -> StreamM m a -> m a
-runStreamMUsingEnv env f =
-  runReaderT f $ streamStateIORef env
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
+runStreamMUsingEnv env f = do
+  ref <- liftIO $ newIORef env
+  provide ref f
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+-- | An environment for runs that never touch the stream (in-memory VM
+-- contexts): nothing is connected until a request is made.
+unconnectedStreamEnv :: MonadIO m => ClientId -> m StreamEnv
+unconnectedStreamEnv clientId = createStreamEnv clientId ("", 0)
+
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
 
 -- Deprecated aliases (accept old types for backward compatibility)
@@ -150,10 +163,10 @@ createKafkaEnv (KString cid) (Host (KString host), Port port) =
 getKafkaEnv :: HasStreaming m => m StreamEnv
 getKafkaEnv = getStreamEnv
 
-runKafkaMUsingEnv :: StreamEnv -> StreamM m a -> m a
+runKafkaMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runKafkaMUsingEnv = runStreamMUsingEnv
 
-runKafkaM :: MonadIO m => KafkaClientId -> KafkaAddress -> StreamM m a -> m a
+runKafkaM :: KafkaClientId -> KafkaAddress -> StreamM es a -> Eff es a
 runKafkaM cid addr f = flip runStreamMUsingEnv f =<< createKafkaEnv cid addr
 
 execKafka ::
@@ -161,7 +174,7 @@ execKafka ::
   StateT KafkaState (ExceptT KafkaClientError IO) a ->
   m a
 execKafka f = do
-  ksIORef <- accessEnv
+  ksIORef <- streamStateIORef <$> getStreamEnv
   ks <- liftIO $ readIORef ksIORef
   result <- liftIO $ runExceptT $ runStateT f ks
   case result of
@@ -215,6 +228,28 @@ produceItems topicName events = do
       (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
   liftIO $ mapM_ parseKafkaResponse results
   return results
+
+-- | Produce, returning a description of every record the broker rejected
+-- instead of throwing on the first one. An empty list means everything landed.
+--
+-- 'produceItems' reports a rejection by throwing the 'KafkaError' from inside
+-- 'liftIO', and nothing along the vm-runner path catches it. At helium block
+-- 595971 that turned one oversized record into a network-wide outage: vm-runner
+-- exited on an uncaught @MessageSizeTooLarge@ and convoke then tore down every
+-- container on all four validators. (The record that fired there was a
+-- @CodeCollectionAdded@ on @vmevents@, which is consensus-relevant and so still
+-- uses 'produceItems' -- this entry point would not have saved it. It exists so
+-- that the indexer-bound topics cannot cause the same outage.)
+--
+-- Use this only for topics nothing in consensus reads back, where dropping a
+-- record costs a downstream resync rather than correctness. Anything the chain
+-- itself depends on must keep using 'produceItems' and fail loudly.
+produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
+produceItemsBestEffort topicName events = do
+  results <-
+    execKafka $ produceMessagesAsSingletonSets $
+      (TopicAndMessage topicName . makeMessage . BL.toStrict . encode) <$> events
+  pure [show e | r <- results, e <- produceResponseErrors r]
 
 -- | Produce to several topics in a SINGLE Kafka request.
 --
@@ -337,10 +372,10 @@ conduitBatchSource :: (MonadIO m, Binary a) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do
   env <- createStreamEnv clientId streamAddress
-  startingOffset <- runStreamMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
+  startingOffset <- liftIO . runEff . runStreamMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      items <- runStreamMUsingEnv env $ fetchItems topicName offset
+      items <- liftIO . runEff . runStreamMUsingEnv env $ fetchItems topicName offset
       yield items
       return $ offset + fromIntegral (length items)
 
@@ -354,16 +389,16 @@ conduitGroupBatchSource :: (MonadIO m, Binary a) =>
                            ClientId -> StreamAddress -> ConsumerGroup -> TopicName -> ConduitT i [a] m b
 conduitGroupBatchSource clientId streamAddress consumerGroup topicName = do
   env <- createStreamEnv clientId streamAddress
-  startingOffset <- runStreamMUsingEnv env $ getKafkaCheckpoint consumerGroup topicName
+  startingOffset <- liftIO . runEff . runStreamMUsingEnv env $ getKafkaCheckpoint consumerGroup topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      items <- runStreamMUsingEnv env $ fetchItems topicName offset
+      items <- liftIO . runEff . runStreamMUsingEnv env $ fetchItems topicName offset
       if null items
         then return offset
         else do
           yield items
           let next = offset + fromIntegral (length items)
-          runStreamMUsingEnv env $ setKafkaCheckpoint consumerGroup topicName next
+          liftIO . runEff . runStreamMUsingEnv env $ setKafkaCheckpoint consumerGroup topicName next
           return next
 
 createTopic :: HasStreaming m =>

@@ -52,17 +52,12 @@ async function storage(address) {
   return out;
 }
 
-// validator address -> display name, from the registry's operator profiles.
+// validator address -> display name, from the registry's profiles (keyed by validator).
 function validatorNames(reg) {
   const names = {};
   for (const [k, v] of Object.entries(reg)) {
-    let m = /^operators\[([0-9a-fA-F]{40})\]\.name$/.exec(k);
+    const m = /^operators\[([0-9a-fA-F]{40})\]\.name$/.exec(k);
     if (m) names[m[1]] = String(v).replace(/^"|"$/g, '');
-  }
-  // An operator may run a validator under a different key; prefer that mapping.
-  for (const [k, v] of Object.entries(reg)) {
-    const m = /^operators\[([0-9a-fA-F]{40})\]\.validatorAddress$/.exec(k);
-    if (m && v && v !== m[1] && names[m[1]]) names[v] = names[m[1]];
   }
   return names;
 }
@@ -120,12 +115,13 @@ async function collect(opts) {
     e.blocksProposed = stake[`blocksProposed[${v}]`] || '0';
     e.missed = stake[`missedProposals[${v}]`] || '0';
   }
-  // Validators in the set that have not earned yet still belong in the report.
-  for (const [k, v] of Object.entries(stake)) {
-    const m = /^operatorOf\[([0-9a-fA-F]{40})\]$/.exec(k);
+  // Listed validators that have not earned yet still belong in the report. A record
+  // without an operator field is operated by its key.
+  for (const k of Object.keys(stake)) {
+    const m = /^operators\[([0-9a-fA-F]{40})\]\.exists$/.exec(k);
     if (m && !byValidator.has(m[1])) {
       byValidator.set(m[1], {
-        validator: m[1], operator: v, fees: 0n, credits: 0,
+        validator: m[1], operator: stake[`operators[${m[1]}].operator`] || m[1], fees: 0n, credits: 0,
         firstBlock: null, lastBlock: null, lastTime: null,
         blocksProposed: stake[`blocksProposed[${m[1]}]`] || '0',
         missed: stake[`missedProposals[${m[1]}]`] || '0',

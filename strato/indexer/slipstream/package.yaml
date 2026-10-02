@@ -27,6 +27,7 @@ library:
     - blockapps-data
     - blockapps-datadefs
     - blockDB
+    - composable-monads-base
     - conduit
     - containers
     - deepseq
@@ -63,6 +64,7 @@ executables:
     dependencies:
       - base
       - blockapps-init
+      - composable-monads-base
       - hflags
       - streaming
       - streaming-kafka-hw
@@ -90,7 +92,9 @@ tests:
       - evm-solidity
       - hspec
       - slipstream
+      - strato-model
       - text
+      - time
 
   slipstream-test:
     main: Main.hs

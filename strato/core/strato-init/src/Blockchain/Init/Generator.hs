@@ -28,7 +28,7 @@ import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter ()
-import BlockApps.Logging (runNoLoggingT)
+import Control.Monad.Composable.Base (runEff, withNoLogger, withResources)
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
@@ -81,9 +81,10 @@ createGenesisInfo network =
     "beryllium" -> HELIUM.berylliumGenesisBlock
     _ -> HELIUM.genesisBlock
 
--- | Processes convoke may restart on their own when they exit. Everything
--- else takes the whole directory down, as before: the sequencer and
--- vm-runner share consensus state that a lone restart cannot recover.
+-- | Processes convoke keeps restarting for as long as they keep exiting.
+-- Everything else (the sequencer and vm-runner, which share consensus state)
+-- is restarted only a bounded number of times before convoke gives up and
+-- takes the whole directory down.
 -- strato-p2p is restartable: its state is the peer store and the
 -- connections it rebuilds from it, and it exits on purpose when the SQLite
 -- peer store is wedged (see 'Blockchain.DB.SQLDB.guardPeerStore').
@@ -390,12 +391,12 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         content <- liftIO $ BS.readFile "genesis.json"
         case JSON.decode (BL.fromStrict content) of
           Nothing -> error "Failed to parse provided genesis.json"
-          Just genesisInfo -> runNoLoggingT . runResourceT . runSetupDBM $ do
+          Just genesisInfo -> liftIO . runEff . withNoLogger . withResources . runSetupDBM $ do
             void $ addCode mempty
             populateMPTFromGenesis genesisInfo
       else do
         let genesisInfo = normalizeGenesisInfo $ createGenesisInfo network
-        runNoLoggingT . runResourceT . runSetupDBM $ do
+        liftIO . runEff . withNoLogger . withResources . runSetupDBM $ do
           void $ addCode mempty
           populateMPTAndWriteGenesis genesisInfo
         liftIO $ putStrLn "  ✓ Created genesis.json"

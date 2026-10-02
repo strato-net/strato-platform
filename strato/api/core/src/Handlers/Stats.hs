@@ -13,7 +13,8 @@
 module Handlers.Stats
   ( API,
     server,
-    TransactionCount(..)
+    TransactionCount(..),
+    getTransactionCount,
   )
 where
 
@@ -26,7 +27,6 @@ import Data.Aeson
 import Data.OpenApi hiding (server)
 import qualified Database.Esqueleto.Legacy as E
 import Servant
-import UnliftIO
 
 newtype TotalDifficulty = TotalDifficulty Integer
 
@@ -70,8 +70,11 @@ server = getStatTx
 
 ---------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible TransactionCount (SQLM m) where
-  access _ = do
+instance {-# OVERLAPPABLE #-} HasSQL m => Accessible TransactionCount m where
+  access _ = getTransactionCount
+
+getTransactionCount :: HasSQL m => m TransactionCount
+getTransactionCount = do
     tx <- sqlQuery $ E.select $ E.from $ \(_ :: E.SqlExpr (E.Entity RawTransaction)) -> return E.countRows
     return . TransactionCount $ myval (tx :: [E.Value Integer])
     where

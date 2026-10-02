@@ -23,6 +23,7 @@ executable strato-ingest
     , blockapps-data
     , blockapps-init
     , common-log
+    , composable-monads-base
     , containers
     , hflags
     , process

@@ -33,6 +33,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Control.Concurrent (forkIO)
 import Control.Monad (void)
+import Control.Monad.Composable.Base (runEff)
 import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp (run)
@@ -62,12 +63,12 @@ main = do
   hostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
   let groupId = T.pack $ "strato-ingest-" ++ hostname
       ingestTopic = fromString (busIngestTopic bus)
-  runLoggingT $ do
+  runEff . runLogging $ do
     $logInfoS "strato-ingest" . T.pack $
       "forwarding " ++ busIngestTopic bus ++ " from " ++ busHost bus ++ ":" ++ show (busPort bus)
         ++ " (" ++ busSecurity bus ++ ", group " ++ T.unpack groupId ++ ") into local " ++ show ingestTxTopicName
     -- Make sure both ends exist before consuming.
-    _ <- liftIO . runStreamMConfigured "strato-ingest" $ Local.createTopicAndWait ingestTxTopicName
+    _ <- runStreamMConfigured "strato-ingest" $ Local.createTopicAndWait ingestTxTopicName
     busEnv <- createBusEnv "strato-ingest" (busSettings bus)
     Bus.runStreamMUsingEnv busEnv $ do
       Bus.createTopicAndWait ingestTopic
@@ -83,7 +84,7 @@ main = do
           then pure ()
           else do
             started <- liftIO Tr.nowNanos
-            _ <- liftIO . runStreamMPooled "strato-ingest" $ writeIngestTx txs
+            _ <- runStreamMPooled "strato-ingest" $ writeIngestTx txs
             liftIO . void $ addCounter forwardedCounter (fromIntegral $ length txs)
             liftIO $ recordForwardSpans started txs
             $logInfoS "strato-ingest" . T.pack $ "forwarded " ++ show (length txs) ++ " transaction(s)"

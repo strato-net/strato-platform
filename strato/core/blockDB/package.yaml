@@ -21,6 +21,7 @@ library:
   - aeson
   - binary
   - blockapps-data
+  - composable-monads-base
   - blockapps-datadefs
   - bytestring
   - common-log

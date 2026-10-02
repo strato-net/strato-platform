@@ -20,7 +20,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction (rawTX2TX)
 import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Trans.Class
 import Data.Int
 import qualified Data.Map as Map
@@ -28,7 +28,6 @@ import qualified Database.Esqueleto.Legacy as E
 import Servant
 import Servant.Client
 import Settings
-import UnliftIO
 
 type API =
   "block" :> "last"
@@ -49,7 +48,7 @@ class GetLastBlocks m where
 instance (Monad m, GetLastBlocks m, MonadTrans t) => GetLastBlocks (t m) where
   getLastBlocks = lift . getLastBlocks
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
+instance (SQLDB Base.:> es) => GetLastBlocks (Base.Eff es) where
   getLastBlocks n = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $ E.from $ \a -> do
       E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit

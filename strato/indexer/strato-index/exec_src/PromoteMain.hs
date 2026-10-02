@@ -14,6 +14,7 @@ import BlockApps.Logging
 import Blockchain.DB.SQLDB (sqlQueryWriter)
 import Blockchain.Data.WriterLease
 import Control.Monad (unless)
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Composable.SQL
 import qualified Data.Text as T
@@ -31,7 +32,7 @@ main :: IO ()
 main = do
   _ <- $initHFlags "Move the writer lease to this core cell"
   cell <- T.pack <$> currentCellId
-  runNoLoggingT $ do
+  runEff . runNoLogging $ do
     db <- createSQLDB 1
     runSQLMWith db $ do
       now <- liftIO getCurrentTime

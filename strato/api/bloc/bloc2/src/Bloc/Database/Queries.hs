@@ -52,6 +52,7 @@ import Data.Source.Map
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as Text
+import SolidVM.Model.SolidString (labelToString, stringToLabel, textToLabel)
 import qualified Data.Text.Encoding as Text
 import Handlers.AccountInfo
 import Handlers.Storage
@@ -219,7 +220,7 @@ getContractDetailsByCodeHash codePtr = runExceptT $ do
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
   (cHash, cc) <- getCodeHashAndCollection False codePtr
-  details <- case Map.lookup nameStr $ _contracts cc of
+  details <- case Map.lookup (stringToLabel nameStr) $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure (SolidVMCode nameStr cHash, d)
   pure $ force details
@@ -243,7 +244,7 @@ getContractWithCodeCollectionByCodePtr codePtr = runExceptT $ do
     SolidVMCode n _ -> pure n
     _ -> throwE "EVM contracts no longer supported"
   (_, cc) <- getCodeHashAndCollection False codePtr
-  contract <- case Map.lookup nameStr $ _contracts cc of
+  contract <- case Map.lookup (stringToLabel nameStr) $ _contracts cc of
     Nothing -> throwE $ "Could not find contract " <> (Text.pack nameStr) <> " in code collection " <> Text.pack (format codePtr)
     Just d -> pure d
   pure $ force (contract, cc)
@@ -289,9 +290,9 @@ getContractDetailsForContract src mContract = do
     Right (ch, CodeCollection {..}) -> case mContract of
       Nothing -> case Map.elems _contracts of
         [] -> pure Nothing
-        [x] -> pure $ Just (SolidVMCode (_contractName x) ch, x)
+        [x] -> pure $ Just (SolidVMCode (labelToString (_contractName x)) ch, x)
         _ -> throwIO $ UserError "When you upload multiple contracts, you need to specify which contract should be uploaded to the chain in the 'contract' key of the given data"
-      Just c -> pure . fmap (SolidVMCode (Text.unpack c) ch,) $ Map.lookup (Text.unpack c) _contracts
+      Just c -> pure . fmap (SolidVMCode (Text.unpack c) ch,) $ Map.lookup (textToLabel c) _contracts
 
 sourceToContractDetails ::
   ( MonadIO m,

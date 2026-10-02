@@ -25,13 +25,12 @@ import Blockchain.DB.RawStorageDB (putRawStorageKeyVal')
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.JsonRpcCommand (runJsonRpcCommand')
-import Blockchain.MemVMContext (runMemContextM)
 import Blockchain.Sequencer.Event (JsonRpcCommand (..), JsonRpcResponse (..))
 import Blockchain.Sequencer.HexData (HexData (..))
 import Blockchain.Sequencer.TxCallObject (TxCallObject (..))
 import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-import Blockchain.VMContext (ContextBestBlockInfo (..), ContextState (..))
+import Blockchain.VMContext (ContextBestBlockInfo (..), ContextState (..), runMemContextM)
 import Blockchain.VMOptions ()
 import Blockchain.VmQuery.Import (importFromNode)
 import Blockchain.VmQuery.Seed
@@ -43,9 +42,9 @@ import Network.HTTP.Client (httpLbs, method, newManager, parseRequest, requestBo
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad (forM, forM_)
+import Control.Monad.Composable.Base (Eff, Logger, runEff, withLogger)
 import Control.Monad.Composable.SQL (createSQLDB, runSQLMWith)
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Logger (filterLogger, runStderrLoggingT, LogLevel (..))
+import Control.Monad.Logger (LogLevel (..), defaultOutput)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -56,6 +55,7 @@ import GHC.Clock (getMonotonicTimeNSec)
 import HFlags
 import System.Environment (lookupEnv)
 import System.Exit (exitFailure)
+import System.IO (stderr)
 import Text.Printf (printf)
 
 defineFlag "port" (8546 :: Int) "Port for `vm-query serve`"
@@ -113,24 +113,26 @@ dispatch = \case
           (k : _) -> read k
           [] -> 1 :: Int
     env <- newSqlQueryEnv db
-    runSqlQueryM env (setCacheMaxRows flags_cacheMaxRows >> setPrefetchMaxRows flags_prefetchMaxRows >> setPrefetchAfterSlots flags_prefetchAfterSlots)
+    setCacheMaxRows env flags_cacheMaxRows
+    setPrefetchMaxRows env flags_prefetchMaxRows
+    setPrefetchAfterSlots env flags_prefetchAfterSlots
     cmd <- either die pure (mkCall toHex dat)
     -- VMQ_CALL_MODE=service resets the context exactly as the service does
     -- between requests, to compare the two entry points.
     mode <- lookupEnv "VMQ_CALL_MODE"
-    best <- runSqlQueryM env bestHeader
-    let prepare = if mode == Just "service" then resetForRequest best else pure ()
-        wrap = if mode == Just "service" then id else withFreshOverlay
-    results <- forM [1 .. n] $ \i -> runSqlQueryM env $ wrap $ do
+    best <- bestHeader env
+    let prepare = if mode == Just "service" then resetForRequest env best else pure ()
+        wrap = if mode == Just "service" then id else withFreshOverlay env
+    results <- forM [1 .. n] $ \i -> wrap $ do
       prepare
-      resetRoundTrips
-      t0 <- liftIO getMonotonicTimeNSec
-      resp <- runJsonRpcCommand' cmd
-      t1 <- liftIO getMonotonicTimeNSec
-      trips <- readRoundTrips
-      sqlNs <- readSqlNanos
+      resetRoundTrips env
+      t0 <- getMonotonicTimeNSec
+      resp <- runSqlQueryM env (runJsonRpcCommand' cmd)
+      t1 <- getMonotonicTimeNSec
+      trips <- readRoundTrips env
+      sqlNs <- readSqlNanos env
       pure (i, resp, trips, fromIntegral (t1 - t0) / 1e6 :: Double, fromIntegral sqlNs / 1e6 :: Double)
-    emptyReads <- runSqlQueryM env readEmptyTrieReads
+    emptyReads <- readEmptyTrieReads env
     forM_ (take 1 results) $ \(_, resp, _, _, _) -> putStrLn ("result: " ++ showResp resp ++ "  (empty-trie root reads over all calls: " ++ show emptyReads ++ ")")
     forM_ (take 3 results) $ \(i, _, trips, ms, sqlMs) -> printf "call %d: %d SQL round trips, %.2f ms (%.2f ms in SQL)\n" i trips ms sqlMs
     let warm = drop 1 results
@@ -144,22 +146,22 @@ dispatch = \case
   ["parity", toHex, dat] -> withDb $ \db -> do
     env <- newSqlQueryEnv db
     cmd <- either die pure (mkCall toHex dat)
-    sqlResp <- runSqlQueryM env (withFreshOverlay (runJsonRpcCommand' cmd))
+    sqlResp <- withFreshOverlay env (runSqlQueryM env (runJsonRpcCommand' cmd))
     -- The same call on the in-memory VM, seeded with exactly the rows the
     -- mirror holds for the target: same engine, same state, must agree.
     toAddr <- either die pure (parseAddr toHex)
-    (mSt, storage, code, header) <- runLog . runSQLMWith db $ do
-      st <- runSqlQueryM' env (loadAddressState toAddr)
+    mSt <- loadAddressState env toAddr
+    (storage, code) <- runLog . runSQLMWith db $ do
       rows <- sqlQuery $ do
         macct <- P.getBy (UniqueAddress toAddr)
         case macct of
           Nothing -> pure []
           Just (P.Entity sid _) -> map P.entityVal <$> P.selectList [StorageAddressStateRefId P.==. sid] []
       codes <- sqlQuery $ map P.entityVal <$> P.selectList [] []
-      h <- runSqlQueryM' env bestHeader
-      pure (st, rows, codes, h)
+      pure (rows, codes)
+    header <- bestHeader env
     memResp <- runLog $ do
-      (r, _) <- runMemContextM Nothing $ do
+      (r, _) <- runMemContextM (const (pure Nothing)) Nothing $ do
         forM_ mSt $ putAddressState toAddr
         forM_ code $ \c -> A.insert (A.Proxy @DBCode) (codeRefCodeHash c) (encodeUtf8 (codeRefCode c))
         forM_ storage $ \s -> putRawStorageKeyVal' (toAddr, storageKey s) (storageValue s)
@@ -171,8 +173,8 @@ dispatch = \case
     if showResp sqlResp == showResp memResp then putStrLn "parity: OK" else putStrLn "parity: MISMATCH" >> exitFailure
   _ -> die "usage: vm-query seed | import <nodeUrl> <address>... | serve | selector <sig> | call <to> <data> [n] | parity <to> <data> | client <url> <to> <data> [n]"
   where
-    runLog = runStderrLoggingT . filterLogger (\_ lvl -> lvl >= LevelWarn)
-    runSqlQueryM' env m = liftIO (runSqlQueryM env m)
+    runLog :: Eff '[Logger] a -> IO a
+    runLog = runEff . withLogger (\loc src lvl msg -> if lvl >= LevelWarn then defaultOutput stderr loc src lvl msg else pure ())
     withDb f = do
       db <- runLog (createSQLDB 4)
       f db

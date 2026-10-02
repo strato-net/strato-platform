@@ -24,6 +24,7 @@ library
       aeson
     , base
     , bytestring
+    , composable-monads-base
     , containers
     , data-default
     , hedis

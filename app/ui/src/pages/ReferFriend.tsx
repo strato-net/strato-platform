@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
@@ -8,9 +8,7 @@ import { useUser } from "@/context/UserContext";
 const ReferFriend = () => {
   const { userName } = useUser();
 
-  useEffect(() => {
-    document.title = "Refer a Friend | STRATO";
-  }, []);
+  usePageTitle("Refer a Friend");
 
   // TODO: These should be fetched from backend or configured via constants
   const escrowContractName = "Escrow";

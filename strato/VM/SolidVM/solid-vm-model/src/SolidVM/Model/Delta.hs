@@ -29,6 +29,7 @@ import Data.Function (on)
 import Data.List (find, foldl')
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
+import qualified Data.Text as T
 import GHC.Generics
 import SolidVM.Model.Event
 import SolidVM.Model.Value (Value (..))
@@ -75,7 +76,7 @@ getDeltasFromEvents = foldr go mempty
               SAddress a _ -> Just (Validator a)
               -- Fallback for legacy/JSON-derived events whose typed Value was
               -- lost on parse: re-parse the rendered string form.
-              SNULL -> case reads (eventArgValueString arg) of
+              SNULL -> case reads (T.unpack $ eventArgValueString arg) of
                 [(addr, "")] -> Just (Validator addr)
                 _ -> Nothing
               _ -> Nothing
@@ -112,8 +113,8 @@ getStakeDeltasFromEvents (Just watchedAddr) = foldl' go M.empty
               maybe acc (\(v, st) -> M.insert v st acc) $
                 (,) <$> (Validator <$> arg "validator" e) <*> arg "stake" e
           | otherwise = acc
-        arg :: Read a => String -> Event -> Maybe a
-        arg name = (>>= readMaybe . eventArgValueString) . find ((== name) . eventArgName) . evArgs
+        arg :: Read a => T.Text -> Event -> Maybe a
+        arg name = (>>= readMaybe . T.unpack . eventArgValueString) . find ((== name) . eventArgName) . evArgs
         -- rendered Bool is "True"/"true" depending on the emitting path
         boolArg name e = case fmap eventArgValueString . find ((== name) . eventArgName) $ evArgs e of
           Just str | str `elem` ["True", "true"] -> Just True

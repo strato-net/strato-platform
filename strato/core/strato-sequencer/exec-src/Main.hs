@@ -25,6 +25,7 @@ import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
+import Control.Monad.Composable.Base (runEff)
 import Data.String
 import qualified Database.Redis as Redis
 import Flags
@@ -110,6 +111,6 @@ main = do
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection conn
           }
-  race_ (runLoggingT (runSequencerM vaultUrl' seqCfg ctx sequencer))
-    . run 8050
+  race_ (runEff . runLogging $ runSequencerM vaultUrl' seqCfg ctx sequencer)
+    . runSettings (setHost (fromString $ Conf.apiListenAddress $ Conf.apiConfig ethConf) $ setPort 8050 defaultSettings)
     $ metricsApp

@@ -19,8 +19,9 @@
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
-#   API_LISTEN_ADDRESS, RPC_LISTEN_ADDRESS        default 0.0.0.0 (container-internal;
-#                                                 only nginx can reach the ports)
+#   API_LISTEN_ADDRESS                            default 0.0.0.0 (container-internal;
+#                                                 only nginx can reach the ports).
+#                                                 ethereum-jsonrpc binds it too.
 set -e
 
 Green='\033[0;32m'
@@ -28,7 +29,6 @@ NC='\033[0m'
 
 : ${STRATO_API_DIR:=/var/lib/strato-api}
 : ${API_LISTEN_ADDRESS:=0.0.0.0}
-: ${RPC_LISTEN_ADDRESS:=0.0.0.0}
 
 # The node config can arrive as a base64 environment value instead of a
 # mounted file (ECS has no bind mounts): ETHCONF_BASE64 is decoded to a
@@ -93,9 +93,8 @@ if [[ -n "${postgres_reader_host:-}" ]]; then
   override   '.sqlReaderConfig.host'           "$postgres_reader_host"
 fi
 override     '.apiConfig.apiListenAddress'     "$API_LISTEN_ADDRESS"
-override     '.apiConfig.rpcListenAddress'     "$RPC_LISTEN_ADDRESS"
-# bloc reaches the JSON-RPC server in this same container for simulations.
-override     '.vmConfig.vmJsonRpcUrl'          "http://127.0.0.1:8545"
+# ethereum-jsonrpc binds apiListenAddress as well, and bloc reaches it in this
+# same container on loopback for simulations (strato-api derives the URL).
 # vm-query (phase 5): latest-state calls served from the mirror in this
 # same container when VM_QUERY=true. It reads through sqlReaderConfig, so
 # with postgres_reader_host set its snapshots run on the replica.

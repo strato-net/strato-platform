@@ -20,6 +20,7 @@ library:
   - blockDB
   - bytestring
   - common-log
+  - composable-monads-base
   - containers
   - format
   - streaming
@@ -43,6 +44,7 @@ executables:
       - blockapps-init
       - blockDB
       - common-log
+      - composable-monads-base
       - containers
       - hflags
       - monad-alter
@@ -66,6 +68,7 @@ executables:
     dependencies:
       - blockapps-data
       - common-log
+      - composable-monads-base
       - hflags
       - sql-monad
       - strato-conf

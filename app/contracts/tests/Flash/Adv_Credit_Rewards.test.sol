@@ -47,7 +47,7 @@ contract FlashHolder {
     uint public unclaimedDuring;
     uint public rewardTokenBalDuring;
     uint public stakeDuring;
-    uint public stakingRewardBalDuring;
+    uint public stakingUntrackedStratoDuring;
 
     function init(address _l, address _u, address _r, address _s) public {
         lender = FlashMint(_l); usdst = _u; rewards = Rewards(_r); staking = StratoStaking(_s);
@@ -63,7 +63,7 @@ contract FlashHolder {
         unclaimedDuring        = rewards.unclaimedRewards(address(this));
         rewardTokenBalDuring   = IERC20(address(rewards.rewardToken())).balanceOf(address(rewards));
         stakeDuring            = staking.delegatedStake(address(this), op);
-        stakingRewardBalDuring = staking.rewardBalance();
+        stakingUntrackedStratoDuring = staking.recoverableUntrackedStrato();
 
         // While holding 2,000,000 USDST, claim everything we can.
         try rewards.claimAllRewards() { } catch { }
@@ -121,12 +121,8 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         cataT.mint(address(rewards), 1000000e18);
         activityId = rewards.addOneTimeDirectPayoutActivity("BonusReward", SRC, "BonusApplied");
 
-        // ── StratoStaking + ValidatorRegistry
-        // NOTE: these calls use the 18.4 signatures, because this test reaches
-        // staking through BaseCodeCollection. When StratoStakingV2.sol /
-        // ValidatorRegistryV2.sol move back into the collection, restore the
-        // V2 shapes: initialize(+usdstToken), addOperator(+validatorAddress),
-        // and the 7-field ValidatorProfile destructure below.
+        // ── StratoStaking + ValidatorRegistry (validator-keyed; opA is a validator
+        //    listed as its own operator)
         address st = m.tokenFactory().createTokenWithInitialOwner(
             "STRATO","STRATO Token",[],[],[],"STRATO",0,18,address(this)
         );
@@ -134,13 +130,13 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
         strato.setStatus(2);
 
         staking = new StratoStaking(address(this));
-        staking.initialize(address(strato), 100, 5000, 1000, 16);
+        staking.initialize(address(strato), USDST, 100, 1000, 16);
         vreg = new ValidatorRegistry(address(this));
         vreg.initialize(address(staking));
         staking.setValidatorRegistry(address(vreg));
 
         opA = new User();
-        vreg.addOperator(address(opA), 500, "Validator A", "first", "", "validator-a");
+        vreg.addValidator(address(opA), address(opA), 500, "Validator A", "first", "", "validator-a");
     }
 
     function beforeEach() public { }
@@ -244,12 +240,12 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
             + string(staking.delegatedStake(address(h), address(opA))));
         log("4e totalRewardableStake before/after: " + string(rewardable0) + " / "
             + string(staking.totalRewardableStake()));
-        log("4e rewardBalance() during        : " + string(h.stakingRewardBalDuring()));
+        log("4e recoverableUntrackedStrato() during: " + string(h.stakingUntrackedStratoDuring()));
 
         require(h.stakeDuring() == stake0, "DEMONSTRATED-NEGATIVE: stake weight unmoved by USDST");
         require(staking.totalRewardableStake() == rewardable0, "totalRewardableStake unmoved");
-        require(h.stakingRewardBalDuring() == 0,
-            "rewardBalance() reads balanceOf(STRATO, self) - a USDST balance is invisible to it");
+        require(h.stakingUntrackedStratoDuring() == 0,
+            "recoverableUntrackedStrato() reads balanceOf(STRATO, self) - a USDST balance is invisible to it");
     }
 
     /// @notice Real staking, for contrast: the weight tracks the STRATO actually moved.
@@ -276,17 +272,17 @@ contract Describe_Adv_Credit_Rewards is Authorizable {
 
     /// @notice ValidatorRegistry: no token balance enters any decision at all.
     function it_da_validator_registry_has_no_balance_dependence() public {
-        (bool exists, bool active, string name,,,) = vreg.operators(address(opA));
-        log("4g operator exists / active      : " + string(exists) + " / " + string(active));
-        log("4g operatorCount                 : " + string(vreg.operatorCount()));
+        (bool exists, bool active, string name,,,,) = vreg.operators(address(opA));
+        log("4g validator exists / active     : " + string(exists) + " / " + string(active));
+        log("4g validatorCount                : " + string(vreg.validatorCount()));
 
         FlashHolder h = new FlashHolder();
         h.init(address(fm), USDST, address(rewards), address(staking));
         usdstT.mint(address(h), 1e18);
-        uint c0 = vreg.operatorCount();
+        uint c0 = vreg.validatorCount();
         h.probe(CAP, address(opA));
-        log("4g operatorCount after 2m flash mint: " + string(vreg.operatorCount()));
-        require(vreg.operatorCount() == c0, "DEMONSTRATED-NEGATIVE: registry is balance-blind");
+        log("4g validatorCount after 2m flash mint: " + string(vreg.validatorCount()));
+        require(vreg.validatorCount() == c0, "DEMONSTRATED-NEGATIVE: registry is balance-blind");
         require(exists && active, "operator state intact");
     }
 }

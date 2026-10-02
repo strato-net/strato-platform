@@ -69,6 +69,7 @@ export const hiddenSwapPools: Set<string> = new Set([
 // Yield-bearing tokens. APY computed from on-chain exchange rate history mapping.
 export const yieldBenchmarks = [
   { tokenSymbol: "wstETH", baseSymbol: "ETH", tokenAddress: "f2aa370405030a434ae07e7826178325c675e925" },
+  { tokenSymbol: "KHYPE", baseSymbol: "WHYPE", tokenAddress: "d885844fd502040326e59d3cd9273bfd3cb78748" },
   { tokenSymbol: "rETH", baseSymbol: "ETH", tokenAddress: "2e4789eb7db143576da25990a3c0298917a8a87d" },
   { tokenSymbol: "sUSDS", baseSymbol: "USDST", tokenAddress: "6e2d93d323edf1b3cc4672a909681b6a430cae64" },
   { tokenSymbol: "syrupUSDC", baseSymbol: "USDC", tokenAddress: "c6c3e9881665d53ae8c222e24ca7a8d069aa56ca" },
@@ -170,11 +171,6 @@ export const defaultMetalForgeFor: Record<string, string> = {
   "33056204878082667": "1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113", // Upquark mainnet
 };
 
-export const defaultCreditCardTopUpFor: Record<string, string> = {
-  "114784819836269": "337bbb2b6e85e8c4903f8cba56bb4e1807db0bc6", // Helium testnet
-  "33056204878082667": "656139504763b2fab4e158ddb1f4ca8eb878305d" // Upquark mainnet
-};
-
 export const defaultVaultFor: Record<string, string> = {
   "114784819836269": "d556695364551c8c7eb336f0bed9aed9e1acd69d", // Helium testnet
   "33056204878082667": "34bc729f66106a146b0864e673a3571b28fa23e1", // Upquark mainnet
@@ -193,6 +189,11 @@ export const defaultSaveUsdstVaultFor: Record<string, string> = {
 export const defaultEthCarryVaultFor: Record<string, string> = {
   "114784819836269": "ac8ce8b3d4aa4b9a359dad3bb792a563f7f2e2f5", // Helium testnet
   "33056204878082667": "a94905d8bd117e9bfbe57aadffd7abbea760e028", // Upquark mainnet
+};
+
+export const defaultHypeYieldVaultFor: Record<string, string> = {
+  "114784819836269": "52042da4c65e8226472b4869019a0aee6d920e21", // Helium testnet
+  "33056204878082667": "fc6b457bf1629c74acd4b33ba49ddc2365d9855b", // Upquark mainnet: populate after deployment
 };
 
 export const defaultWbtcCarryVaultFor: Record<string, string> = {
@@ -238,10 +239,10 @@ export let poolV3Factory: string = '';
 export let positionManagerV3: string = '';
 export let nftFactory: string = '';
 export let metalForge: string = '';
-export let creditCardTopUp: string = '';
 export let vault: string = '';
 export let saveUsdstVault: string = '';
 export let ethCarryVault: string = '';
+export let hypeYieldVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
 export let stratoNativeBridge: string = '';
@@ -357,14 +358,6 @@ function setMetalForgeConfig(networkId: string) {
   }
 }
 
-export function setCreditCardTopUpConfig(networkId: string) {
-  if (process.env.CREDIT_CARD_TOP_UP_ADDRESS) {
-    creditCardTopUp = process.env.CREDIT_CARD_TOP_UP_ADDRESS;
-  } else {
-    creditCardTopUp = defaultCreditCardTopUpFor[networkId] || "";
-  }
-}
-
 export function setSaveUsdstVaultConfig(networkId: string) {
   if (process.env.SAVE_USDST_VAULT) {
     saveUsdstVault = process.env.SAVE_USDST_VAULT;
@@ -391,6 +384,7 @@ export function setVaultConfig(networkId: string) {
 
 export function setCarryVaultConfig(networkId: string) {
   ethCarryVault = process.env.ETH_CARRY_VAULT || defaultEthCarryVaultFor[networkId] || "";
+  hypeYieldVault = process.env.HYPE_YIELD_VAULT || defaultHypeYieldVaultFor[networkId] || "";
   wbtcCarryVault = process.env.WBTC_CARRY_VAULT || defaultWbtcCarryVaultFor[networkId] || "";
 }
 
@@ -429,7 +423,6 @@ export async function initNetworkConfig() {
   setStratoTokenConfig(networkId);
   setStratoStakingConfig(networkId);
   setMetalForgeConfig(networkId);
-  setCreditCardTopUpConfig(networkId);
   setSaveUsdstVaultConfig(networkId);
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
@@ -463,6 +456,7 @@ export async function getInternalAddresses() {
     saveUsdstVault,
     usdcYieldVault,
     ethCarryVault,
+    hypeYieldVault,
     wbtcCarryVault,
     goldstYieldVault,
     silvstYieldVault

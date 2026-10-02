@@ -7,7 +7,10 @@
 # node at --node-dir is up and reachable; create waits for sync, stops writers,
 # archives state, and runs a restore smoke test before publishing.
 #
-# Layout produced in the bucket:
+# Layout produced in the bucket, under the snapshot version this build of
+# strato-snapshot reads and writes (SNAPSHOT_VERSION in bin/strato-snapshot;
+# on this branch v1, the Kafka line, which lives at the bare <network>/ root;
+# later versions publish under <network>/<version>/ instead):
 #   s3://<bucket>/<network>/<network>-<YYYYMMDD-HHmmssZ>.tar.zst (+ .sha256)
 #   s3://<bucket>/<network>/latest.tar.zst                       (+ .sha256)
 
@@ -120,7 +123,15 @@ done
 [[ -x "$SNAPSHOT_TOOL" ]] || die "strato-snapshot not found at $SNAPSHOT_TOOL"
 command -v aws >/dev/null 2>&1 || die "aws CLI is required to publish snapshots"
 
-DESTINATION="s3://${BUCKET}/${NETWORK}/"
+# Publish under the same snapshot version the tool resolves --snapshot from, so
+# publish and restore can never disagree about which line a node uses.
+SNAPSHOT_VERSION="$(sed -n 's/^SNAPSHOT_VERSION="\(.*\)"$/\1/p' "$SNAPSHOT_TOOL" | head -1)"
+[[ -n "$SNAPSHOT_VERSION" ]] || die "could not read SNAPSHOT_VERSION from $SNAPSHOT_TOOL"
+if [[ "$SNAPSHOT_VERSION" == "v1" ]]; then
+  DESTINATION="s3://${BUCKET}/${NETWORK}/"
+else
+  DESTINATION="s3://${BUCKET}/${NETWORK}/${SNAPSHOT_VERSION}/"
+fi
 
 # --publish-only: upload a previously-created (and validated) archive, then exit.
 if [[ -n "$PUBLISH_ONLY" ]]; then

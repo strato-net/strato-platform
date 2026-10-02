@@ -11,6 +11,7 @@ import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Redis
 import qualified Data.Text as T
@@ -38,7 +39,7 @@ main = do
   -- the node's Prometheus and the cell's collector.
   _ <- forkIO $ run 10779 metricsApp
 
-  runLoggingT $ do
+  runEff . runLogging $ do
     bootstrapIndexer
 
     -- The writer lease decides whether this cell's SQL side writes. A
@@ -59,13 +60,13 @@ main = do
                 "cell " ++ T.unpack cell ++ " is configured as writer but " ++ T.unpack holder
                   ++ " holds a fresh lease; running as a standby until promoted (strato-promote)"
         else $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ " is a standby: it follows the chain and writes nothing until promoted"
-    _ <- liftIO . forkIO . runLoggingT $ runSQLMWith leaseDb (heartbeatWriterLease cell)
+    _ <- liftIO . forkIO . runEff . runLogging $ runSQLMWith leaseDb (heartbeatWriterLease cell)
 
     -- Mirror the Redis sync scalars into node_status so the API tier reads
     -- Postgres instead of Redis. Its own small pool: the main loop's pool is
     -- busy committing batches, and the mirror must not queue behind them.
     mirrorDb <- createSQLDB 2
-    _ <- liftIO . forkIO . runLoggingT $ runSQLMWith mirrorDb (nodeStatusMirrorLoop cell)
+    _ <- liftIO . forkIO . runEff . runLogging $ runSQLMWith mirrorDb (nodeStatusMirrorLoop cell)
 
     runStreamMConfigured "strato-indexer-sql" seedSqlConsumerGroup
 

@@ -108,7 +108,7 @@ withContext db (ContextPool ref) best act = bracket acquire release act
         (e : rest) -> writeTVar ref rest >> pure (Just e)
         [] -> pure Nothing
       env <- maybe (newSqlQueryEnvWith db Nothing) pure mEnv
-      runSqlQueryM env (resetForRequest best)
+      resetForRequest env best
       setGauge poolIdle . fromIntegral . length =<< readTVarIO ref
       pure env
     release env = do
@@ -341,15 +341,18 @@ execute :: SQLDB -> ServerConfig -> ContextPool -> Snapshot -> JsonRpcCommand ->
 execute db cfg pool snap cmd = do
   t0 <- getMonotonicTimeNSec
   (r, tAcquired, tRan) <- withContext db pool (snapHeader snap) $ \env -> do
-    runSqlQueryM env (setSnapshot (Just (snapConn snap)) >> setCacheMaxRows (scCacheMaxRows cfg) >> setPrefetchMaxRows (scPrefetchMaxRows cfg) >> setPrefetchAfterSlots (scPrefetchAfterSlots cfg))
+    setSnapshot env (Just (snapConn snap))
+    setCacheMaxRows env (scCacheMaxRows cfg)
+    setPrefetchMaxRows env (scPrefetchMaxRows cfg)
+    setPrefetchAfterSlots env (scPrefetchAfterSlots cfg)
     ta <- getMonotonicTimeNSec
     -- On a bound thread: libpq's calls and socket waits from an unbound
     -- warp thread cost about twice the time of the same round trips from a
     -- bound one (measured 4.4 ms vs 2.3 ms for two queries).
     r <- runInBoundThread $ try $ runSqlQueryM env (runJsonRpcCommand' cmd)
     tr <- getMonotonicTimeNSec
-    trips <- runSqlQueryM env readRoundTrips
-    sqlNs <- runSqlQueryM env readSqlNanos
+    trips <- readRoundTrips env
+    sqlNs <- readSqlNanos env
     pure (r, ta, (tr, (trips, sqlNs)))
   t1 <- getMonotonicTimeNSec
   timing <- lookupEnv "VM_QUERY_TIMING"

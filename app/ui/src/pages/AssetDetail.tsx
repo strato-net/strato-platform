@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
@@ -143,6 +144,9 @@ const AssetDetail = () => {
   const { getToken, earningAssets } = useTokenContext();
   const [lookupComplete, setLookupComplete] = useState(false);
 
+  const assetName = asset?.token?._name || asset?._name;
+  usePageTitle(assetName ? `${assetName} Details` : "Asset Details");
+
   const PRICE_WINDOW = 30; // Number of days to show in the price chart
   
   useEffect(() => {
@@ -184,7 +188,6 @@ const AssetDetail = () => {
       if (cancelled) return;
       setAsset(foundAsset);
       setLookupComplete(true);
-      document.title = `${foundAsset?.token?._name || foundAsset?._name} | Asset Details`;
 
       // Fetch oracle price history if address exists
       if (foundAsset?.address) {

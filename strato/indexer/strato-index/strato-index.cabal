@@ -35,6 +35,7 @@ library
     , blockapps-mpdbs
     , bytestring
     , common-log
+    , composable-monads-base
     , containers
     , format
     , monad-alter
@@ -63,6 +64,7 @@ executable strato-indexer
     , blockapps-data
     , blockapps-init
     , common-log
+    , composable-monads-base
     , containers
     , hflags
     , monad-alter
@@ -89,6 +91,7 @@ executable strato-promote
       base
     , blockapps-data
     , common-log
+    , composable-monads-base
     , hflags
     , sql-monad
     , strato-conf

@@ -155,4 +155,11 @@ strato-snapshot restore mynode \
 strato-up mynode
 ```
 
-Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis, and Kafka state. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.
+To restart an existing node from the latest snapshot with minimal downtime, download the snapshot first while the node is still running. The restore then reuses the cached archive instead of downloading it while the node is down:
+
+```
+strato-snapshot pull mynode
+strato-down mynode && rm -rf mynode && strato-up mynode --network=helium --snapshot
+```
+
+Snapshot artifacts are cold copies of `.ethereumH`, Postgres, Redis, and Kafka state. They are published per snapshot version: this branch builds the Kafka streaming backend and stays on `v1`, which lives at the unversioned `s3://strato-snapshots/<network>/` root; `v2` (jlog, what `develop` builds) is published under `<network>/v2/` and cannot be restored by a Kafka build. See `design-documents/node-snapshot-tool-README.md` for the full CLI and `design-documents/node-snapshot-dev-loop.md` for the create/restore contract and safety checks.

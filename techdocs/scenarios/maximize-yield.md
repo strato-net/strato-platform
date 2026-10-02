@@ -1,450 +1,93 @@
-# Maximize Yield Strategy
+# Maximize Yield
 
-Combine multiple STRATO features to maximize returns on your crypto.
+Put USDST and other assets to work across STRATO's earning products.
 
-!!! warning "Variable Parameters"
-    All interest rates, APRs, fees, and gas costs in this guide are **examples only**.
-    Actual values vary based on:
-    
-    - Pool utilization and trading volume
-    - Market conditions and volatility
-    - Protocol governance decisions
-    - Network congestion (for gas)
-    
-    **Always check current rates in the app before proceeding.**
+!!! warning "Rates are variable"
+    STRATO does not promise fixed returns. APYs, stability fees, swap volume and reward emissions all change. The app shows current figures on each page. Any numbers below are illustrative.
 
 ---
 
-## The Strategy
+## Where Yield Comes From
 
-Use borrowed/minted USDST to provide liquidity and earn multiple income streams.
+| Source | Where in the app | What you earn |
+|--------|------------------|---------------|
+| USDST Savings Vault | **Earn → USDST Savings Vault** | Deposit USDST and receive saveUSDST shares, which grow as the protocol adds savings yield |
+| Swap pool liquidity | **Advanced → Swap Pools**, **V3 Liquidity** | A share of swap fees (standard pools default to a 0.3% fee, 70% of it to LPs) |
+| Yield vaults | **Earn** (listed under All Opportunities) | Vault-specific yield. Vaults not yet live show "Coming Soon". |
+| Staking | **Stake** | Rewards for staking STRATO with validators |
+| Reward Points | **Rewards** | Emissions to eligible positions (LP, savings, vaults and others) |
 
-**Income sources:**
-
-1. ✅ Trading fees from liquidity (example: 8-12% APR)
-2. ✅ Reward Points for all activities (varies)
-3. ✅ Keep your original collateral (potential appreciation)
-
-**Net result (example):** Earn ~10-15% APR while keeping your ETHST
-
----
-
-## Complete Example: 10 ETHST Position
-
-**Your situation:**
-
-- You have: 10 ETHST ($30,000)
-- You want: Maximum yield
-
-**The play:**
-
-1. Supply 10 ETHST as collateral
-2. Borrow 10,000 USDST against it
-3. Provide sUSDSST-USDST liquidity
-4. Earn fees + Reward Points
-5. Net yield: ~10% annually
-
-**Expected returns:**
-
-- Interest cost: -5% on $10k = -$500/year
-- Liquidity fees: +10% on $10k = +$1,000/year
-- Reward Points: +$500/year (estimated)
-- **Net: +$1,000/year (~10% on $10k position)**
-- **Plus:** Keep 10 ETHST exposure
+Which positions currently earn Reward Points, and at what rate, is listed under **Rewards → Activities**. Some activities have emissions switched off.
 
 ---
 
-## Step-by-Step Implementation
+## Strategy: Mint USDST, Then Earn on It
 
-### Step 1: Supply Collateral (2 min)
+If you hold assets you want to keep, you can mint USDST against them and deposit the USDST into an earning product. This is only profitable while **earn yield + reward value > stability fee + fees**.
 
-1. Go to **Borrow** (sidebar)
-2. In Collateral Management table, find **ETHST** → Click **"Supply"**
-3. Enter amount: **10.0**
-4. Click **"Supply"** (approval happens automatically)
-5. Gas: ~$0.10
+### Step 1: Mint USDST
 
-**Result:**
-```
-Collateral: 10 ETHST ($30,000)
-Can borrow: Up to $22,500 (75% LTV)
-```
+1. Open **Borrow**, enter a **Mint Amount**, and keep the risk slider toward **Safer**.
+2. Note the vault's **Stability Fee**. That is your cost of capital.
+3. Click **Mint**.
 
----
+See the [Mint USDST (CDP) Guide](../guides/mint-cdp.md).
 
-### Step 2: Borrow USDST (2 min)
+### Step 2a: Deposit in the Savings Vault (simplest)
 
-**Conservative approach:**
+1. Open **Earn** and select **USDST Savings Vault**.
+2. Click **Deposit**, enter an amount, and confirm.
+3. Withdraw at any time from the same page (unless the vault is paused).
 
-1. Go to **Borrow** (sidebar) → **Borrow** section
-2. Amount: **10,000** USDST (not max!)
-3. Review:
+### Step 2b: Or Provide Liquidity
 
-   - Health Factor: **2.4** (very safe)
-   - Interest: ~5% = $500/year (example rate)
-4. Click **"Borrow"**
-5. Confirm (~$0.10 gas)
+1. Open **Advanced → Swap Pools** and pick a pool. Stablecoin pools (for example USDT-USDC-USDST or sUSDS-USDST) carry less impermanent-loss risk than volatile pairs.
+2. Get the pool's tokens with **Trade**, or use **Advanced → PSM** to mint USDST from USDC/USDT or redeem USDST back to them.
+3. Click **Deposit Liquidity**, enter amounts, and confirm. You receive LP tokens.
 
-**Why not max?**
-- Max is $22,500
-- But borrowing $10k keeps HF at 2.4
-- Large safety buffer for price drops
+For concentrated liquidity, use **V3 Liquidity**. See the [Liquidity Guide](../guides/liquidity.md).
 
-**Result:**
-```
-Borrowed: 10,000 USDST
-Health Factor: 2.4 (very safe)
-Interest cost: ~$500/year
-```
+### Step 3: Claim Rewards
+
+Open **Rewards**. Click **Claim All** at the top of the page, or claim per activity on the **My Active Positions** tab. See the [Rewards Guide](../guides/rewards.md).
+
+!!! example "How to estimate net yield (illustrative)"
+    Mint 10,000 USDST from a vault with stability fee *f*, and deposit it where it earns APY *a* plus reward value *r*:
+
+    Net annual yield ≈ 10,000 × (*a* + *r* − *f*) − transaction fees − swap costs
+
+    If *a* + *r* is below *f*, the strategy loses money even though your collateral is untouched.
 
 ---
 
-### Step 3: Get Matching Assets (5 min)
+## Skip the Minting Step
 
-**You need:** USDST + sUSDSST pair for liquidity
-
-**You have:** 10,000 USDST  
-**You need:** 5,000 sUSDSST
-
-**What is sUSDSST?**
-- Based on Sky protocol's sUSDS (formerly MakerDAO)
-- Yield-bearing stablecoin that earns Sky's savings rate
-- STRATO-wrapped version for use in the ecosystem
-- Maintains ~1:1 peg with USDST
-
-**How to get sUSDSST:**
-
-**Option A: Swap half your USDST**
-1. Go to **Swap Assets**
-2. From: **USDST** → Amount: **5,000**
-3. To: **sUSDSST**
-4. Execute swap
-5. Gas: ~$0.10
-
-**Option B: Bridge from Ethereum (if you have sUSDS)**
-1. Go to **Deposits** → **Bridge In** tab
-2. Bridge sUSDS from Ethereum
-3. Automatically wrapped to sUSDSST
-
-**For this example, use Option A (swap):**
-
-**Result:**
-```
-USDST: 5,000
-sUSDSST: ~5,000 (1:1 ratio typically)
-Ready for liquidity
-```
+If you already hold stablecoins on another network, you can bridge them straight into the Savings Vault. On **Fund → Bridge In**, choose **saveUSDST** under **You Receive On STRATO**. This avoids CDP debt and liquidation risk entirely.
 
 ---
 
-### Step 4: Provide Liquidity (3 min)
+## Risks
 
-1. Go to **Advanced** (sidebar) → **Swap Pools** tab
-2. Select **sUSDSST-USDST pool**
-3. Check stats:
+- **Liquidation:** Your CDP vault can be liquidated if its collateral price falls, regardless of how the USDST is earning. Watch the health factor on **Borrow → Your Vaults**.
+- **Impermanent loss:** LP positions in volatile pairs can underperform simply holding the tokens.
+- **Variable rates:** Savings yield, swap volume and reward emissions can fall below your stability fee.
+- **Pauses and limits:** Vaults, pools and the PSM can be paused, and PSM redemptions depend on available liquidity.
+- **Smart contract risk.**
 
-   - APR: Example 10% (fees - varies by volume)
-   - Volume: Check current 24h volume
-   - Reward Points: Active
-4. Enter amounts:
-
-   - USDST: **5,000**
-   - sUSDSST: **~5,000** (ratio typically 1:1)
-5. Click **"Add Liquidity"** (approvals happen automatically)
-6. Gas: ~$0.10
-
-**Result:**
-```
-Liquidity provided: $10,000
-Pool share: varies
-Earning: ~$3/day in fees (example)
-Plus: Reward Points
-Plus: sUSDSST earns Sky savings rate while in pool
-```
+See the [Safety Guide](../safety.md).
 
 ---
 
-## Your Complete Position
+## Exit
 
-**Assets:**
-
-- Original: 10 ETHST (as collateral)
-- Borrowed: 10,000 USDST (5k in LP as USDST, ~5k in LP as sUSDSST)
-- Liquidity: $10k sUSDSST-USDST LP tokens
-
-**Income streams:**
-
-1. **Trading fees:** ~$3/day = $1,095/year
-2. **Reward Points:** ~$1-2/day = $500/year
-3. **Total income:** ~$1,600/year
-
-**Costs:**
-
-- Interest on 10k USDST: ~$500/year
-
-**Net profit:** ~$1,100/year on $30k position = **3.7% yield**
-
-**Plus:**
-
-- Keep 10 ETHST exposure (if ETHST appreciates 20%, you earn $6k more)
-- Compounding if you reinvest rewards
+1. Withdraw from the Savings Vault, or click **Withdraw Liquidity** on your pool.
+2. Claim any remaining rewards.
+3. On **Borrow → Your Vaults**, click **Repay All USDST**, then **Withdraw Max** on your collateral.
+4. Optionally bridge assets out. See [Withdrawals](withdrawals.md).
 
 ---
 
-## Expected Returns Breakdown
-
-### Income
-
-| Source | Amount | Calculation |
-|--------|--------|-------------|
-| LP fees (10% APR) | $1,000/year | $10k × 10% |
-| Reward Points | $500/year | Estimated |
-| **Total Income** | **$1,500/year** | |
-
-### Costs
-
-| Cost | Amount | Calculation |
-|------|--------|-------------|
-| Borrow interest (5%) | $500/year | $10k × 5% |
-| Gas fees | $50/year | Approx |
-| **Total Cost** | **$550/year** | |
-
-### Net Profit
-
-```
-Net = Income - Cost
-    = $1,500 - $550
-    = $950/year
-
-Return on borrowed capital: 9.5% APR
-Return on total position: 3.2% APR (plus ETHST exposure)
-```
-
----
-
-## Risk Management
-
-### Monitor Health Factor Daily
-
-**Your HF starts at 2.4:**
-
-- Very safe with large buffer
-- If ETHST drops 15% to $2,550: HF drops to ~2.04 (still safe)
-- If ETHST drops 30% to $2,100: HF drops to ~1.68 (getting lower)
-- If ETHST drops 50% to $1,500: HF drops to ~1.20 (risky)
-
-**Liquidation occurs when HF < 1.0:**
-
-- With $10k debt and 80% liquidation threshold
-- Liquidation at ETHST < $1,250 (58% drop from $3,000)
-
-**Actions:**
-
-- Set price alert at $2,100 ETHST (30% drop)
-- If triggered, add collateral or repay debt
-- Keep HF above 1.5 at minimum for safety
-
-### Impermanent Loss Consideration
-
-**sUSDSST-USDST pair:**
-
-- Both are USD-pegged stablecoins
-- sUSDSST is Sky protocol's yield-bearing stablecoin (wrapped on STRATO)
-- Minimal price divergence (both maintain $1 peg)
-- IL risk is very low (~0.1%)
-- Perfect for this leveraged strategy
-
-**Why this pair is ideal:**
-
-- Nearly 1:1 peg maintained between USDST and sUSDSST
-- Small variations only from sUSDSST's accrued Sky savings rate
-- Much safer than volatile pairs
-- You earn Sky's yield on the sUSDSST portion while providing liquidity
-
-**Bonus benefit:**
-
-- Your sUSDSST in the pool continues earning Sky's savings rate
-- This provides additional yield on top of trading fees
-- Triple yield: trading fees + Reward Points + Sky savings rate
-
-**If using volatile pairs (e.g., USDST-ETHST):**
-
-- Higher trading fees, but also higher IL risk
-- Not recommended for leveraged positions
-- Price divergence can erode profits
-
-### Compound Your Rewards
-
-**Weekly routine:**
-
-1. Claim Reward Points
-2. Swap Reward Points → USDST
-3. Convert half to sUSDSST via swap
-4. Add both to liquidity pool
-5. Increases your earning power
-
-**Effect over 1 year:**
-
-- Simple: $1,500 earned
-- Compounded weekly: ~$1,550 earned
-- Extra $50 from compounding
-
----
-
-## Advanced: Scale Up
-
-### 20 ETHST Position
-
-**Double everything:**
-
-- Collateral: 20 ETHST ($60k)
-- Borrow: 20,000 USDST
-- Liquidity: $20k
-- Health Factor: 2.4 (same safety)
-
-**Net earnings:**
-
-- ~$1,900/year (scales linearly)
-- ~3.2% on $60k position
-- Plus 20 ETHST exposure
-
-### Using CDP Instead
-
-**Lower interest costs:**
-
-- CDP stability fee: ~2-3%
-- Lending interest: ~5%
-- **Savings: $200-300/year**
-
-**Trade-off:**
-
-- Lower fees
-- But need to manage CR instead of HF
-
----
-
-## Exit Strategy
-
-### When to Exit
-
-**Exit if:**
-
-- ETHST price dropping significantly
-- Pool fees decrease below interest cost
-- Better opportunities elsewhere
-- Need capital for other uses
-
-### How to Exit
-
-1. **Remove liquidity:**
-
-   - Go to Advanced → Swap Pools → Your Liquidity
-   - Find sUSDSST-USDST position
-   - Click "Remove" to exit LP
-   - Receive USDST + sUSDSST back
-
-2. **Repay debt:**
-
-   - Swap sUSDSST → USDST if needed
-   - Repay full 10,000 USDST debt
-   - Plus accrued interest
-
-3. **Withdraw collateral:**
-
-   - Withdraw your 10 ETHST
-   - Return to wallet
-
-4. **Claim final rewards:**
-
-   - Claim remaining Reward Points
-   - Swap or hold
-
-**See:** [Withdrawals Guide](withdrawals.md)
-
----
-
-## Alternative Strategies
-
-### Strategy 2: Mint + Provide Liquidity
-
-**Use CDP instead of lending:**
-
-- Lower fees (2-3% vs 5%)
-- Better for long-term
-
-### Strategy 3: Borrow → Stake
-
-**Provide liquidity in high-APR pools:**
-
-- Some pools offer 20-30% APR
-- Higher risk (volatile pairs)
-- Can earn more but watch IL
-
-### Strategy 4: Recursive Borrowing
-
-**Advanced:**
-
-- Borrow USDST
-- Swap to more ETHST
-- Supply as collateral
-- Borrow more USDST
-- Repeat 2-3 times
-- **High risk - not recommended for beginners**
-
----
-
-## Real Example: 30-Day Results
-
-**Starting position:**
-
-- 10 ETHST supplied
-- 10k USDST borrowed
-- $10k in sUSDSST-USDST LP
-
-**After 30 days:**
-
-| Metric | Amount |
-|--------|--------|
-| ETHST collateral | 10 ETHST (same) |
-| Debt owed | 10,042 USDST (+$42 interest) |
-| LP value | $10,025 (fees earned) |
-| Reward Points earned | 50 tokens ($100 value) |
-| **Net profit** | $83 for the month |
-
-**Annualized:** $83 × 12 = $996/year (~3.3% yield)
-
-**Plus:** If ETHST appreciated 10% → +$3,000 gain
-
----
-
-## Tips for Success
-
-### DO ✅
-
-- Start with conservative borrowing (HF > 2.0)
-- Use stable-stable pairs (sUSDSST-USDST)
-- Monitor health factor daily
-- Compound rewards weekly
-- Keep safety buffer in USDST
-
-### DON'T ❌
-
-- Max out borrowing capacity
-- Use volatile pairs when leveraged
-- Ignore health factor warnings
-- Forget about accruing interest
-- Over-leverage your position
-
----
-
-## Next Steps
-
-- **[Safety Guide](../safety.md)** - Protect your leveraged position
-- **[Liquidity Guide](../guides/liquidity.md)** - Deep dive on LP
-
-### Need Help?
+## Need Help?
 
 - **Support**: [support.blockapps.net](https://support.blockapps.net)
 - **Telegram**: [t.me/strato_net](https://t.me/strato_net)
-- **Docs**: [docs.strato.nexus](https://docs.strato.nexus)
-

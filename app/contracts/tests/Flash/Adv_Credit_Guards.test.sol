@@ -165,7 +165,7 @@ contract Describe_Adv_Credit_Guards is Authorizable {
         collT.setStatus(2);
         oracle.setAssetPrice(COLL, 100e18);
         // mainnet-shaped: LR 1.50, minCR 1.55, penalty 10%, close factor 50%, no accrual
-        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));

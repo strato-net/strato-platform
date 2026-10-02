@@ -9,6 +9,7 @@ import {
   claimStratoOperatorRewards,
   claimStratoRewards,
   depositStratoRewards,
+  getStratoAuthorizationDigest,
   getStratoStakingInfo,
   moveStratoStake,
   reconcileStratoValidatorSet,
@@ -22,10 +23,12 @@ import {
   setStratoCommission,
   setStratoEmergencyKicker,
   setStratoGovernance,
+  setStratoSelfBondGrace,
   setStratoSetParams,
   setStratoStakingParams,
   setStratoOperatorCommission,
   setStratoValidatorAddress,
+  setStratoValidatorOperator,
   setStratoValidatorParams,
   stakeStrato,
   startStratoRewardSchedule,
@@ -64,6 +67,14 @@ const isNonNegativeAmount = (value: unknown): boolean => {
 const isAddressLike = (value: unknown): boolean =>
   typeof value === "string" && /^(0x)?[0-9a-fA-F]{40}$/.test(value.trim());
 
+// Optional in the body (v1 calls act on the sender's own record), well-formed if present;
+// the service requires it where the contract does.
+const isOptionalAddress = (value: unknown): boolean => value === undefined || isAddressLike(value);
+
+const isOptionalSignature = (value: unknown): boolean =>
+  value === undefined || value === null || value === ""
+  || (typeof value === "string" && /^(0x)?[0-9a-fA-F]{130}$/.test(value.trim()));
+
 const parseOptionalBoolean = (value: unknown): boolean | null => {
   if (value === undefined) return false;
   if (typeof value === "boolean") return value;
@@ -73,6 +84,11 @@ const parseOptionalBoolean = (value: unknown): boolean | null => {
   }
   return null;
 };
+
+// Staking records are keyed by validator. Bodies from clients written against the
+// operator-keyed API still name them `operator`; those keys are accepted as aliases.
+const pick = (...values: unknown[]): any =>
+  values.find((value) => value !== undefined && value !== null && value !== "");
 
 class StakingController {
   static async getInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -93,10 +109,28 @@ class StakingController {
     }
   }
 
+  // What a validator key signs to authorize an operator (register / setOperator).
+  static async getAuthorizationDigest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const validator = req.query?.validator;
+      const operator = pick(req.query?.operator, req.address);
+      if (!isAddressLike(validator) || !isAddressLike(operator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid authorization digest request" });
+        return;
+      }
+
+      const result = await getStratoAuthorizationDigest(req.accessToken, String(validator), String(operator));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async stake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const delegations = Array.isArray(req.body?.delegations) ? req.body.delegations : [];
-      if (!delegations.length || delegations.some((item: any) => !isAddressLike(item?.operator) || !isPositiveAmount(item?.amount))) {
+      const delegations = (Array.isArray(req.body?.delegations) ? req.body.delegations : [])
+        .map((item: any) => ({ validator: pick(item?.validator, item?.operator), amount: item?.amount }));
+      if (!delegations.length || delegations.some((item: any) => !isAddressLike(item.validator) || !isPositiveAmount(item.amount))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid delegations" });
         return;
       }
@@ -110,13 +144,15 @@ class StakingController {
 
   static async moveStake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { fromOperator, toOperator, amount } = req.body || {};
-      if (!isAddressLike(fromOperator) || !isAddressLike(toOperator) || !isPositiveAmount(amount)) {
+      const body = req.body || {};
+      const fromValidator = pick(body.fromValidator, body.fromOperator);
+      const toValidator = pick(body.toValidator, body.toOperator);
+      if (!isAddressLike(fromValidator) || !isAddressLike(toValidator) || !isPositiveAmount(body.amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid move stake request" });
         return;
       }
 
-      const result = await moveStratoStake(req.accessToken, req.address as string, fromOperator, toOperator, amount);
+      const result = await moveStratoStake(req.accessToken, req.address as string, fromValidator, toValidator, body.amount);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -125,33 +161,43 @@ class StakingController {
 
   static async unstake(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { operator, amount } = req.body || {};
-      if (!isAddressLike(operator) || !isPositiveAmount(amount)) {
+      const body = req.body || {};
+      const validator = pick(body.validator, body.operator);
+      if (!isAddressLike(validator) || !isPositiveAmount(body.amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid unstake request" });
         return;
       }
 
-      const result = await unstakeStrato(req.accessToken, req.address as string, operator, amount);
+      const result = await unstakeStrato(req.accessToken, req.address as string, validator, body.amount);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
   }
 
+  // Shared by the STRATO reward and USDST fee claims: `{ validators?, claimAll? }`.
+  private static parseClaimBody(req: Request, res: Response): { validators: string[]; claimAll: boolean } | null {
+    const validators = Array.isArray(req.body?.validators)
+      ? req.body.validators
+      : Array.isArray(req.body?.operators) ? req.body.operators : [];
+    const claimAll = parseOptionalBoolean(req.body?.claimAll);
+    if (claimAll === null) {
+      res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claimAll" });
+      return null;
+    }
+    if (!claimAll && (!validators.length || validators.some((validator: unknown) => !isAddressLike(validator)))) {
+      res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claim request" });
+      return null;
+    }
+    return { validators, claimAll };
+  }
+
   static async claim(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const operators = Array.isArray(req.body?.operators) ? req.body.operators : [];
-      const claimAll = parseOptionalBoolean(req.body?.claimAll);
-      if (claimAll === null) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claimAll" });
-        return;
-      }
-      if (!claimAll && (!operators.length || operators.some((operator: unknown) => !isAddressLike(operator)))) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claim request" });
-        return;
-      }
+      const parsed = StakingController.parseClaimBody(req, res);
+      if (!parsed) return;
 
-      const result = await claimStratoRewards(req.accessToken, req.address as string, operators, claimAll);
+      const result = await claimStratoRewards(req.accessToken, req.address as string, parsed.validators, parsed.claimAll);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -160,7 +206,13 @@ class StakingController {
 
   static async claimOperatorRewards(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await claimStratoOperatorRewards(req.accessToken, req.address as string);
+      const validator = req.body?.validator;
+      if (!isOptionalAddress(validator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator" });
+        return;
+      }
+
+      const result = await claimStratoOperatorRewards(req.accessToken, req.address as string, validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -185,13 +237,13 @@ class StakingController {
 
   static async setCommission(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { commissionBps } = req.body || {};
-      if (commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
+      const { validator, commissionBps } = req.body || {};
+      if (!isOptionalAddress(validator) || commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid commission" });
         return;
       }
 
-      const result = await setStratoCommission(req.accessToken, req.address as string, String(commissionBps));
+      const result = await setStratoCommission(req.accessToken, req.address as string, validator, String(commissionBps));
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -200,13 +252,13 @@ class StakingController {
 
   static async selfBond(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { amount } = req.body || {};
-      if (!isPositiveAmount(amount)) {
+      const { validator, amount } = req.body || {};
+      if (!isOptionalAddress(validator) || !isPositiveAmount(amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid self-bond request" });
         return;
       }
 
-      const result = await selfBondStrato(req.accessToken, req.address as string, amount);
+      const result = await selfBondStrato(req.accessToken, req.address as string, validator, amount);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -215,13 +267,13 @@ class StakingController {
 
   static async unbondSelf(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { amount } = req.body || {};
-      if (!isPositiveAmount(amount)) {
+      const { validator, amount } = req.body || {};
+      if (!isOptionalAddress(validator) || !isPositiveAmount(amount)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid self-unbond request" });
         return;
       }
 
-      const result = await unbondSelfStrato(req.accessToken, req.address as string, amount);
+      const result = await unbondSelfStrato(req.accessToken, req.address as string, validator, amount);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -243,14 +295,25 @@ class StakingController {
     }
   }
 
+  // `{ validator, operator, commissionBps, ... }` or a `validators` batch of those (v2);
+  // `{ operator, commissionBps, ... }` or an `operators` batch (v1, no validator).
   static async addOperator(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const operatorInputs = Array.isArray(req.body?.operators)
-        ? req.body.operators
-        : [req.body || {}];
+      const inputs = Array.isArray(req.body?.validators)
+        ? req.body.validators
+        : Array.isArray(req.body?.operators) ? req.body.operators : [req.body || {}];
+      const listings = inputs.map((item: any) => ({
+        validator: pick(item?.validator, item?.validatorAddress),
+        operator: item?.operator,
+        commissionBps: item?.commissionBps,
+        name: item?.name,
+        description: item?.description,
+        metadataURI: item?.metadataURI,
+        protocolValidatorId: item?.protocolValidatorId,
+      }));
 
-      if (!operatorInputs.length || operatorInputs.some((item: any) =>
-        !isAddressLike(item?.operator) || !isNonNegativeAmount(item?.commissionBps) || !isAddressLike(item?.validatorAddress))) {
+      if (!listings.length || listings.some((item: any) =>
+        !isAddressLike(item.operator) || !isNonNegativeAmount(item.commissionBps) || !isOptionalAddress(item.validator))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator request" });
         return;
       }
@@ -258,15 +321,7 @@ class StakingController {
       const result = await addStratoOperator(
         req.accessToken,
         req.address as string,
-        operatorInputs.map((item: any) => ({
-          operator: item.operator,
-          commissionBps: String(item.commissionBps),
-          name: item.name,
-          description: item.description,
-          metadataURI: item.metadataURI,
-          protocolValidatorId: item.protocolValidatorId,
-          validatorAddress: item.validatorAddress,
-        }))
+        listings.map((item: any) => ({ ...item, commissionBps: String(item.commissionBps) }))
       );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -276,13 +331,13 @@ class StakingController {
 
   static async removeOperator(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { operator } = req.body || {};
-      if (!isAddressLike(operator)) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator" });
+      const validator = pick(req.body?.validator, req.body?.operator);
+      if (!isAddressLike(validator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator" });
         return;
       }
 
-      const result = await removeStratoOperator(req.accessToken, req.address as string, operator);
+      const result = await removeStratoOperator(req.accessToken, req.address as string, validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -291,13 +346,29 @@ class StakingController {
 
   static async setOperatorCommission(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { operator, commissionBps } = req.body || {};
-      if (!isAddressLike(operator) || commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
+      const validator = pick(req.body?.validator, req.body?.operator);
+      const commissionBps = req.body?.commissionBps;
+      if (!isAddressLike(validator) || commissionBps === undefined || !isNonNegativeAmount(commissionBps)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator commission request" });
         return;
       }
 
-      const result = await setStratoOperatorCommission(req.accessToken, req.address as string, operator, String(commissionBps));
+      const result = await setStratoOperatorCommission(req.accessToken, req.address as string, validator, String(commissionBps));
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setValidatorOperator(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { validator, operator } = req.body || {};
+      if (!isAddressLike(validator) || !isAddressLike(operator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator operator request" });
+        return;
+      }
+
+      const result = await setStratoValidatorOperator(req.accessToken, req.address as string, validator, operator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -337,17 +408,21 @@ class StakingController {
     }
   }
 
+  // v2: `{ unbondingSeconds, maxCommissionBps, maxBatchSize }`; v1 also takes baseRewardBps.
   static async setParams(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { unbondingSeconds, baseRewardBps, maxCommissionBps, maxBatchSize } = req.body || {};
-      if ([unbondingSeconds, baseRewardBps, maxCommissionBps, maxBatchSize].some((value) => !isNonNegativeAmount(value))) {
+      if (
+        [unbondingSeconds, maxCommissionBps, maxBatchSize].some((value) => !isNonNegativeAmount(value))
+        || (baseRewardBps !== undefined && !isNonNegativeAmount(baseRewardBps))
+      ) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid params" });
         return;
       }
 
       const result = await setStratoStakingParams(req.accessToken, req.address as string, {
         unbondingSeconds: String(unbondingSeconds),
-        baseRewardBps: String(baseRewardBps),
+        baseRewardBps: baseRewardBps === undefined ? undefined : String(baseRewardBps),
         maxCommissionBps: String(maxCommissionBps),
         maxBatchSize: String(maxBatchSize),
       });
@@ -361,18 +436,10 @@ class StakingController {
 
   static async claimFees(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const operators = Array.isArray(req.body?.operators) ? req.body.operators : [];
-      const claimAll = parseOptionalBoolean(req.body?.claimAll);
-      if (claimAll === null) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claimAll" });
-        return;
-      }
-      if (!claimAll && (!operators.length || operators.some((operator: unknown) => !isAddressLike(operator)))) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid claim request" });
-        return;
-      }
+      const parsed = StakingController.parseClaimBody(req, res);
+      if (!parsed) return;
 
-      const result = await claimStratoFeeRewards(req.accessToken, req.address as string, operators, claimAll);
+      const result = await claimStratoFeeRewards(req.accessToken, req.address as string, parsed.validators, parsed.claimAll);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -381,7 +448,13 @@ class StakingController {
 
   static async claimOperatorFees(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await claimStratoOperatorFeeRewards(req.accessToken, req.address as string);
+      const validator = req.body?.validator;
+      if (!isOptionalAddress(validator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator" });
+        return;
+      }
+
+      const result = await claimStratoOperatorFeeRewards(req.accessToken, req.address as string, validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -392,19 +465,20 @@ class StakingController {
 
   static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { commissionBps, name, description, metadataURI, protocolValidatorId, validatorAddress } = req.body || {};
-      if (!isNonNegativeAmount(commissionBps) || !isAddressLike(validatorAddress)) {
+      const body = req.body || {};
+      const validator = pick(body.validator, body.validatorAddress);
+      if (!isAddressLike(validator) || !isNonNegativeAmount(body.commissionBps) || !isOptionalSignature(body.signature)) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid registration request" });
         return;
       }
 
       const result = await registerStratoOperator(req.accessToken, req.address as string, {
-        commissionBps: String(commissionBps),
-        name,
-        description,
-        metadataURI,
-        protocolValidatorId,
-        validatorAddress,
+        validator,
+        commissionBps: String(body.commissionBps),
+        name: body.name,
+        description: body.description,
+        metadataURI: body.metadataURI,
+        signature: body.signature,
       });
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -414,8 +488,14 @@ class StakingController {
 
   static async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, description, metadataURI, protocolValidatorId } = req.body || {};
+      const { validator, name, description, metadataURI, protocolValidatorId } = req.body || {};
+      if (!isOptionalAddress(validator)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator" });
+        return;
+      }
+
       const result = await updateStratoOperatorProfile(req.accessToken, req.address as string, {
+        validator,
         name,
         description,
         metadataURI,
@@ -427,15 +507,22 @@ class StakingController {
     }
   }
 
+  // `{ validator }` for tryActivate / syncValidator / requestExit / cancelExit.
+  private static lifecycleTarget(req: Request, res: Response): { ok: boolean; validator?: string } {
+    const validator = pick(req.body?.validator, req.body?.operator);
+    if (!isOptionalAddress(validator)) {
+      res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator" });
+      return { ok: false };
+    }
+    return { ok: true, validator };
+  }
+
   static async activate(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { operator } = req.body || {};
-      if (operator !== undefined && !isAddressLike(operator)) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator" });
-        return;
-      }
+      const target = StakingController.lifecycleTarget(req, res);
+      if (!target.ok) return;
 
-      const result = await activateStratoOperator(req.accessToken, req.address as string, operator);
+      const result = await activateStratoOperator(req.accessToken, req.address as string, target.validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -453,13 +540,10 @@ class StakingController {
 
   static async sync(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { operator } = req.body || {};
-      if (operator !== undefined && !isAddressLike(operator)) {
-        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator" });
-        return;
-      }
+      const target = StakingController.lifecycleTarget(req, res);
+      if (!target.ok) return;
 
-      const result = await syncStratoValidator(req.accessToken, req.address as string, operator);
+      const result = await syncStratoValidator(req.accessToken, req.address as string, target.validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -468,7 +552,10 @@ class StakingController {
 
   static async requestExit(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await requestStratoExit(req.accessToken, req.address as string);
+      const target = StakingController.lifecycleTarget(req, res);
+      if (!target.ok) return;
+
+      const result = await requestStratoExit(req.accessToken, req.address as string, target.validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -477,7 +564,10 @@ class StakingController {
 
   static async cancelExit(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const result = await cancelStratoExit(req.accessToken, req.address as string);
+      const target = StakingController.lifecycleTarget(req, res);
+      if (!target.ok) return;
+
+      const result = await cancelStratoExit(req.accessToken, req.address as string, target.validator);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -503,19 +593,33 @@ class StakingController {
 
   static async setValidatorParams(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { minStake, minSelfBond, proposerFeeBps, maxConsecutiveMisses, jailCooldown } = req.body || {};
-      if ([minStake, minSelfBond, proposerFeeBps, maxConsecutiveMisses, jailCooldown].some((value) => !isNonNegativeAmount(value))) {
+      const { minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown } = req.body || {};
+      if ([minStake, proposerFeeBps, maxConsecutiveMisses, jailCooldown].some((value) => !isNonNegativeAmount(value))) {
         res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid validator params" });
         return;
       }
 
       const result = await setStratoValidatorParams(req.accessToken, req.address as string, {
         minStake: String(minStake),
-        minSelfBond: String(minSelfBond),
         proposerFeeBps: String(proposerFeeBps),
         maxConsecutiveMisses: String(maxConsecutiveMisses),
         jailCooldown: String(jailCooldown),
       });
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setSelfBondGrace(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { selfBondGraceUntil } = req.body || {};
+      if (!isPositiveAmount(selfBondGraceUntil)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid selfBondGraceUntil" });
+        return;
+      }
+
+      const result = await setStratoSelfBondGrace(req.accessToken, req.address as string, String(selfBondGraceUntil));
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

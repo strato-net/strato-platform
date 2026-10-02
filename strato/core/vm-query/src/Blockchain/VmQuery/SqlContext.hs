@@ -1,28 +1,21 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- | The SQL-backed VM context: 'VMBase' satisfied by Postgres reads.
+-- | The SQL-backed VM context: the node's 'ContextM' over the state mirror.
 --
--- vm-runner's JSON-RPC handlers ("Blockchain.JsonRpcCommand") are written
--- against the 'VMBase' constraint set, so a query VM is not a second VM but
--- a base monad whose persistent reads come from the state mirror instead of
--- the trie: accounts from @address_state_ref@, SolidVM storage from
+-- vm-runner's JSON-RPC handlers ("Blockchain.JsonRpcCommand") run in
+-- 'ContextM', whose stores are chosen by the context's 'Backend'. A query VM
+-- is therefore not a second VM but a context whose backend is a 'Mirror':
+-- reads that the block maps do not answer come from the state mirror instead
+-- of the trie: accounts from @address_state_ref@, SolidVM storage from
 -- @storage@, code from @code_ref@, block headers from @block_data_ref@.
 -- Writes land in the in-memory overlay that the handlers already use per
--- command (the sandbox), so nothing here can touch the database. Trie-level
--- reads (state trie nodes, hash preimages) are not available from SQL and
--- fail loudly; the spike counts on that to find any handler path that still
--- needs the trie.
+-- command, so nothing here can touch the database. Trie-level reads (state
+-- trie nodes, hash preimages) are not available from SQL and fail loudly
+-- ('TrieAccess'); the spike counts on that to find any handler path that
+-- still needs the trie.
 module Blockchain.VmQuery.SqlContext
   ( SqlQueryEnv (..),
     SqlQueryM,
@@ -50,71 +43,57 @@ module Blockchain.VmQuery.SqlContext
   )
 where
 
-import Blockchain.DB.BlockSummaryDB ()
-import Blockchain.DB.ChainDB (BlockHashRoot (..))
 import Blockchain.DB.CodeDB (DBCode)
-import Blockchain.DB.MemAddressStateDB (AddressStateModification (..), HasMemAddressStateDB (..))
-import Blockchain.DB.RawStorageDB (HasMemRawStorageDB (..), RawStorageKey, RawStorageValue)
+import Blockchain.DB.RawStorageDB (RawStorageKey, RawStorageValue)
 import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState)
 import Blockchain.Data.AddressStateRef (addressStateRefCodePtr)
+import Blockchain.Data.Block (blockBlockData)
 import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.Data.BlockSummary (BlockSummary, blockHeaderToBSum)
 import Blockchain.Data.DataDefs
 import Blockchain.Data.ProposalFacts (noProposalFacts)
-import Blockchain.Data.VmTrace (VmTracer)
-import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Model.JsonBlock (blockDataRefToBlock)
-import Blockchain.Data.Block (blockBlockData)
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Class (blockHeaderHash)
-import Blockchain.Strato.Model.ExtendedWord (Word256)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, unsafeCreateKeccak256FromWord256)
+import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import qualified Blockchain.TxRunResultCache as TRC
-import Blockchain.VMContext (ContextBestBlockInfo (..), ContextState (..), CurrentBlockHash (..), GasCap (..), HasPendingMPNodes (..), MemDBs (..))
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
-import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Base (AccessibleEnv (..))
+import Blockchain.VMContext (Backend (..), Context (..), ContextBestBlockInfo (..), ContextM, ContextState (..), MemContextDBs, StateMirror (..), TrieAccess (..), runContextIO)
 import Control.Concurrent.MVar (MVar, withMVar)
-import Control.Monad.IO.Unlift (MonadUnliftIO, withRunInIO)
-import Control.Monad.Trans.Resource (ResourceT, runResourceT)
-import Control.Monad.Logger
-import Control.Monad.Reader
+import Control.Concurrent.STM (newTQueueIO)
 import Control.Monad (when)
-import Data.Foldable (forM_)
+import Control.Monad.Composable.Base (Eff, provide, runEff, withLogger)
+import Control.Monad.Composable.Streaming (runStreamMUsingEnv, unconnectedStreamEnv)
+import Control.Monad.IO.Unlift (withRunInIO)
+import Control.Monad.Logger (LogLevel (..), defaultOutput)
+import Control.Monad.Trans.Reader (runReaderT)
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Data.Default (def)
+import Data.Foldable (forM_)
 import Data.IORef
-import System.Environment (lookupEnv)
-import GHC.Clock (getMonotonicTimeNSec)
 import qualified Data.Map.Strict as M
 import Data.Maybe (fromMaybe, isJust, isNothing)
-import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Database.Persist ((==.))
 import qualified Database.Persist as P
-import qualified Database.Persist.Sql as SQL
 import Database.Persist.Sql (SqlBackend)
-import Debugger (DebugSettings)
+import qualified Database.Persist.Sql as SQL
+import GHC.Clock (getMonotonicTimeNSec)
 import Prometheus (Counter, Gauge, Histogram, Info (..), counter, gauge, histogram, incCounter, observe, setGauge, unsafeRegister)
 import SolidVM.Model.Storable (BasicValue (..))
-import UnliftIO.Exception (Exception, throwIO)
-
--- | Thrown when a handler reaches for the state trie, which SQL cannot serve.
-data TrieAccess = TrieAccess String
-  deriving (Show)
-
-instance Exception TrieAccess
+import System.Environment (lookupEnv)
+import System.IO (hPutStrLn, stderr)
 
 data SqlQueryEnv = SqlQueryEnv
   { sqeDb :: SQLDB,
     sqeState :: IORef ContextState,
-    sqeBlockHashRoot :: IORef BlockHashRoot,
-    -- | Code added during a command (a sandboxed create) lives here, never in SQL.
-    sqeCodeOverlay :: IORef (M.Map Keccak256 DBCode),
+    -- | Code and block summaries added during a command (a sandboxed create)
+    -- live here, never in SQL.
+    sqeOverlay :: IORef MemContextDBs,
+    -- | Block summaries read from the mirror; keyed by immutable hashes, so
+    -- they are kept across requests.
     sqeSummaries :: IORef (M.Map Keccak256 BlockSummary),
     -- | SQL statements issued through this context, for the spike's counts.
     sqeRoundTrips :: IORef Int,
@@ -196,11 +175,16 @@ prefetchDeclined = unsafeRegister . counter $ Info "vm_query_prefetch_declined_t
 prefetchPromoted :: Counter
 prefetchPromoted = unsafeRegister . counter $ Info "vm_query_prefetch_promoted_total" "Contracts above the threshold prefetched whole after enough slot reads in one epoch"
 
-newtype SqlQueryM a = SqlQueryM {unSqlQueryM :: ReaderT SqlQueryEnv (LoggingT IO) a}
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader SqlQueryEnv, MonadLogger, MonadLoggerIO, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO)
+-- | The handlers' monad. It is the node's own; what makes it a query VM is
+-- the 'Mirror' backend 'runSqlQueryM' runs it over.
+type SqlQueryM = ContextM
 
--- | VMQ_LOG=debug|info shows the handlers' own logging (function
--- resolution, proxy following); the default is warnings only.
+-- | A read against the mirror, on whichever connection serves it.
+type MirrorQuery a = SQL.SqlPersistT (ResourceT (Eff '[SQLDB])) a
+
+-- | Run handlers over the mirror behind @env@. VMQ_LOG=debug|info shows the
+-- handlers' own logging (function resolution, proxy following); the default
+-- is warnings only.
 runSqlQueryM :: SqlQueryEnv -> SqlQueryM a -> IO a
 runSqlQueryM env m = do
   level <- lookupEnv "VMQ_LOG"
@@ -208,28 +192,52 @@ runSqlQueryM env m = do
         Just "debug" -> LevelDebug
         Just "info" -> LevelInfo
         _ -> LevelWarn
-  runStderrLoggingT . filterLogger (\_ lvl -> lvl >= minLevel) $ runReaderT (unSqlQueryM m) env
+      logger loc src lvl msg = when (lvl >= minLevel) $ defaultOutput stderr loc src lvl msg
+  que <- newTQueueIO
+  -- The handlers never touch the stream; the context only needs one in its row.
+  stream <- unconnectedStreamEnv "vm-query"
+  let ctx =
+        Context
+          { _backend = Mirror (sqeOverlay env) (mirrorOf env),
+            _state = sqeState env,
+            _stateDiffQueue = que,
+            _resolveFile = const (pure Nothing),
+            _fetchMissingNodes = False
+          }
+  runEff . withLogger logger . runStreamMUsingEnv stream $ runContextIO ctx m
+
+-- | The mirror as the VM context reads it.
+mirrorOf :: SqlQueryEnv -> StateMirror
+mirrorOf env =
+  StateMirror
+    { mirrorAccount = loadAddressState env,
+      -- A slot the mirror has no row for is an empty slot.
+      mirrorStorage = \key -> Just . fromMaybe BDefault <$> loadStorage env (fst key) key,
+      mirrorCode = loadCode env,
+      mirrorBlockSummary = loadSummary env,
+      mirrorEmptyTrieRead = modifyIORef' (sqeEmptyTrieReads env) (+ 1)
+    }
 
 -- | A context over the given pool, positioned at the mirror's best block.
 newSqlQueryEnv :: SQLDB -> IO SqlQueryEnv
 newSqlQueryEnv db = do
   env <- newSqlQueryEnvWith db Nothing
-  runSqlQueryM env loadBestHeader
+  loadBestHeader env
   pure env
 
 -- | The mirror's best block header, for callers that cache it.
 bestHeaderFromDb :: SQLDB -> IO (Maybe BlockHeader)
 bestHeaderFromDb db = do
   env <- newSqlQueryEnvWith db Nothing
-  runSqlQueryM env (loadBestHeader >> bestHeader)
+  loadBestHeader env
+  bestHeader env
 
 -- | A context positioned at the given header (no query), or unpositioned.
 newSqlQueryEnvWith :: SQLDB -> Maybe BlockHeader -> IO SqlQueryEnv
 newSqlQueryEnvWith db mHeader = do
   cache <- TRC.new 64
   stateRef <- newIORef (def {_txRunResultsCache = cache})
-  bhr <- newIORef (BlockHashRoot MP.emptyTriePtr)
-  code <- newIORef M.empty
+  overlay <- newIORef def
   sums <- newIORef M.empty
   trips <- newIORef 0
   emptyReads <- newIORef 0
@@ -243,122 +251,110 @@ newSqlQueryEnvWith db mHeader = do
   maxRows <- newIORef defaultCacheMaxRows
   prefetchRows <- newIORef defaultPrefetchMaxRows
   afterSlots <- newIORef defaultPrefetchAfterSlots
-  let env = SqlQueryEnv db stateRef bhr code sums trips emptyReads ids pre accts sqlNanos storageCache cacheBlock snapshot maxRows prefetchRows afterSlots
+  let env = SqlQueryEnv db stateRef overlay sums trips emptyReads ids pre accts sqlNanos storageCache cacheBlock snapshot maxRows prefetchRows afterSlots
   forM_ mHeader $ \header ->
     modifyIORef' stateRef (\s -> s {_bestBlockInfo = ContextBestBlockInfo (blockHeaderHash header) header 0})
   pure env
 
 -- | Make a pooled context ready for the next request. Per-command state
--- always goes: the overlay, code added by a sandboxed create, a trace
+-- always goes: the block maps, code added by a sandboxed create, a trace
 -- command's tracer and debug settings, the gas cap, the counters. The
 -- mirror caches (account rows, storage rows, prefetched addresses) go only
 -- when the best block has changed since they were filled; the block summary
 -- and tx-run caches are keyed by immutable hashes and stay.
-resetForRequest :: Maybe BlockHeader -> SqlQueryM ()
-resetForRequest mHeader = do
-  env <- ask
-  liftIO $ do
-    modifyIORef' (sqeState env) $ \s ->
-      (def {_txRunResultsCache = _txRunResultsCache s})
-        { _bestBlockInfo = maybe Unspecified (\h -> ContextBestBlockInfo (blockHeaderHash h) h 0) mHeader }
-    writeIORef (sqeBlockHashRoot env) (BlockHashRoot MP.emptyTriePtr)
-    writeIORef (sqeCodeOverlay env) M.empty
-    writeIORef (sqeRoundTrips env) 0
-    writeIORef (sqeEmptyTrieReads env) 0
-    writeIORef (sqeSqlNanos env) 0
-    writeIORef (sqeSnapshot env) Nothing
-    let block = blockHeaderHash <$> mHeader
-    cachedFor <- readIORef (sqeCacheBlock env)
-    when (block /= cachedFor || block == Nothing) $ do
-      writeIORef (sqeAccountIds env) M.empty
-      writeIORef (sqePrefetched env) M.empty
-      writeIORef (sqeAccounts env) M.empty
-      writeIORef (sqeStorageCache env) M.empty
-      writeIORef (sqeCacheBlock env) block
-
--- | Drop the command's overlay so the next command starts from the mirror.
-withFreshOverlay :: SqlQueryM a -> SqlQueryM a
-withFreshOverlay act = do
-  env <- ask
-  liftIO $ do
-    modifyIORef' (sqeState env) (\s -> s {_memDBs = def})
-    writeIORef (sqeCodeOverlay env) M.empty
+resetForRequest :: SqlQueryEnv -> Maybe BlockHeader -> IO ()
+resetForRequest env mHeader = do
+  modifyIORef' (sqeState env) $ \s ->
+    (def {_txRunResultsCache = _txRunResultsCache s})
+      { _bestBlockInfo = maybe Unspecified (\h -> ContextBestBlockInfo (blockHeaderHash h) h 0) mHeader }
+  writeIORef (sqeOverlay env) def
+  writeIORef (sqeRoundTrips env) 0
+  writeIORef (sqeEmptyTrieReads env) 0
+  writeIORef (sqeSqlNanos env) 0
+  writeIORef (sqeSnapshot env) Nothing
+  let block = blockHeaderHash <$> mHeader
+  cachedFor <- readIORef (sqeCacheBlock env)
+  when (block /= cachedFor || isNothing block) $ do
     writeIORef (sqeAccountIds env) M.empty
     writeIORef (sqePrefetched env) M.empty
     writeIORef (sqeAccounts env) M.empty
     writeIORef (sqeStorageCache env) M.empty
-    writeIORef (sqeCacheBlock env) Nothing
+    writeIORef (sqeCacheBlock env) block
+
+-- | Drop the command's overlay so the next command starts from the mirror.
+withFreshOverlay :: SqlQueryEnv -> IO a -> IO a
+withFreshOverlay env act = do
+  modifyIORef' (sqeState env) (\s -> s {_memDBs = def})
+  writeIORef (sqeOverlay env) def
+  writeIORef (sqeAccountIds env) M.empty
+  writeIORef (sqePrefetched env) M.empty
+  writeIORef (sqeAccounts env) M.empty
+  writeIORef (sqeStorageCache env) M.empty
+  writeIORef (sqeCacheBlock env) Nothing
   act
 
-readRoundTrips :: SqlQueryM Int
-readRoundTrips = asks sqeRoundTrips >>= liftIO . readIORef
+readRoundTrips :: SqlQueryEnv -> IO Int
+readRoundTrips = readIORef . sqeRoundTrips
 
-readEmptyTrieReads :: SqlQueryM Int
-readEmptyTrieReads = asks sqeEmptyTrieReads >>= liftIO . readIORef
+readEmptyTrieReads :: SqlQueryEnv -> IO Int
+readEmptyTrieReads = readIORef . sqeEmptyTrieReads
 
-resetRoundTrips :: SqlQueryM ()
-resetRoundTrips = do
-  asks sqeRoundTrips >>= liftIO . flip writeIORef 0
-  asks sqeSqlNanos >>= liftIO . flip writeIORef 0
+resetRoundTrips :: SqlQueryEnv -> IO ()
+resetRoundTrips env = do
+  writeIORef (sqeRoundTrips env) 0
+  writeIORef (sqeSqlNanos env) 0
 
-readSqlNanos :: SqlQueryM Integer
-readSqlNanos = asks sqeSqlNanos >>= liftIO . readIORef
-
-countTrip :: SqlQueryM ()
-countTrip = asks sqeRoundTrips >>= liftIO . flip modifyIORef' (+ 1)
+readSqlNanos :: SqlQueryEnv -> IO Integer
+readSqlNanos = readIORef . sqeSqlNanos
 
 -- | A mirror read: on the epoch's pinned snapshot connection when there is
 -- one, else on the pool in its own transaction. Counted and timed.
-mirrorQuery :: SQL.SqlPersistT (ResourceT SqlQueryM) a -> SqlQueryM a
-mirrorQuery q = do
-  countTrip
-  t0 <- liftIO getMonotonicTimeNSec
-  snap <- asks sqeSnapshot >>= liftIO . readIORef
-  r <- case snap of
+mirrorQuery :: SqlQueryEnv -> MirrorQuery a -> IO a
+mirrorQuery env q = do
+  modifyIORef' (sqeRoundTrips env) (+ 1)
+  t0 <- getMonotonicTimeNSec
+  snap <- readIORef (sqeSnapshot env)
+  r <- runEff . provide (sqeDb env) $ case snap of
     Just conn -> withRunInIO $ \runIO -> withMVar conn $ \backend -> runIO (runResourceT (runReaderT q backend))
     Nothing -> sqlQuery q
-  t1 <- liftIO getMonotonicTimeNSec
-  asks sqeSqlNanos >>= liftIO . flip modifyIORef' (+ fromIntegral (t1 - t0))
+  t1 <- getMonotonicTimeNSec
+  modifyIORef' (sqeSqlNanos env) (+ fromIntegral (t1 - t0))
   pure r
 
 -- | Pin (or unpin) the epoch's snapshot connection for this context.
-setSnapshot :: Maybe (MVar SqlBackend) -> SqlQueryM ()
-setSnapshot m = asks sqeSnapshot >>= liftIO . flip writeIORef m
+setSnapshot :: SqlQueryEnv -> Maybe (MVar SqlBackend) -> IO ()
+setSnapshot = writeIORef . sqeSnapshot
 
-setCacheMaxRows :: Int -> SqlQueryM ()
-setCacheMaxRows n = asks sqeCacheMaxRows >>= liftIO . flip writeIORef (max 1 n)
+setCacheMaxRows :: SqlQueryEnv -> Int -> IO ()
+setCacheMaxRows env n = writeIORef (sqeCacheMaxRows env) (max 1 n)
 
-setPrefetchMaxRows :: Int -> SqlQueryM ()
-setPrefetchMaxRows n = asks sqePrefetchMaxRows >>= liftIO . flip writeIORef (max 0 n)
+setPrefetchMaxRows :: SqlQueryEnv -> Int -> IO ()
+setPrefetchMaxRows env n = writeIORef (sqePrefetchMaxRows env) (max 0 n)
 
-setPrefetchAfterSlots :: Int -> SqlQueryM ()
-setPrefetchAfterSlots n = asks sqePrefetchAfterSlots >>= liftIO . flip writeIORef (max 0 n)
+setPrefetchAfterSlots :: SqlQueryEnv -> Int -> IO ()
+setPrefetchAfterSlots env n = writeIORef (sqePrefetchAfterSlots env) (max 0 n)
 
 -- | Sizes of the per-block caches: (storage rows, accounts).
-cacheSizes :: SqlQueryM (Int, Int)
-cacheSizes = do
-  env <- ask
-  liftIO $ (,) <$> (M.size <$> readIORef (sqeStorageCache env)) <*> (M.size <$> readIORef (sqeAccounts env))
+cacheSizes :: SqlQueryEnv -> IO (Int, Int)
+cacheSizes env = (,) <$> (M.size <$> readIORef (sqeStorageCache env)) <*> (M.size <$> readIORef (sqeAccounts env))
 
 -- | Drop the caches whole when past the cap. Called before a fill, never
 -- between a fill and the read that needed it, so a read always sees what
 -- it just loaded; a fill may therefore overshoot the cap by one contract's
 -- rows (at most the cap itself, see prefetchStorage), which bounds a
 -- context's memory at twice the cap.
-enforceCacheCap :: SqlQueryM ()
-enforceCacheCap = do
-  env <- ask
-  liftIO $ do
-    cap <- readIORef (sqeCacheMaxRows env)
-    rows <- M.size <$> readIORef (sqeStorageCache env)
-    accounts <- M.size <$> readIORef (sqeAccounts env)
-    when (rows > cap || accounts > max 1 (cap `div` 10)) $ do
-      writeIORef (sqeStorageCache env) M.empty
-      writeIORef (sqePrefetched env) M.empty
-      writeIORef (sqeAccounts env) M.empty
-      writeIORef (sqeAccountIds env) M.empty
-      incCounter cacheEvictions
-    setGauge cacheRowsGauge . fromIntegral =<< (M.size <$> readIORef (sqeStorageCache env))
+enforceCacheCap :: SqlQueryEnv -> IO ()
+enforceCacheCap env = do
+  cap <- readIORef (sqeCacheMaxRows env)
+  rows <- M.size <$> readIORef (sqeStorageCache env)
+  accounts <- M.size <$> readIORef (sqeAccounts env)
+  when (rows > cap || accounts > max 1 (cap `div` 10)) $ do
+    writeIORef (sqeStorageCache env) M.empty
+    writeIORef (sqePrefetched env) M.empty
+    writeIORef (sqeAccounts env) M.empty
+    writeIORef (sqeAccountIds env) M.empty
+    incCounter cacheEvictions
+  setGauge cacheRowsGauge . fromIntegral =<< (M.size <$> readIORef (sqeStorageCache env))
 
 -- --- SQL reads ---
 
@@ -366,32 +362,31 @@ bdrToHeader :: BlockDataRef -> BlockHeader
 bdrToHeader bdr = blockBlockData (blockDataRefToBlock bdr [] [] [] [] [] [])
 
 -- | The highest block the mirror holds becomes the context's best block.
-loadBestHeader :: SqlQueryM ()
-loadBestHeader = do
-  mBdr <- mirrorQuery $ P.selectFirst [] [P.Desc BlockDataRefNumber]
+loadBestHeader :: SqlQueryEnv -> IO ()
+loadBestHeader env = do
+  mBdr <- mirrorQuery env $ P.selectFirst [] [P.Desc BlockDataRefNumber]
   case mBdr of
-    Nothing -> logWarnN "vm-query: block_data_ref is empty, eth_call has no best block"
+    Nothing -> hPutStrLn stderr "vm-query: block_data_ref is empty, eth_call has no best block"
     Just (P.Entity _ bdr) -> do
       let header = bdrToHeader bdr
-      ref <- asks sqeState
-      liftIO $ modifyIORef' ref (\s -> s {_bestBlockInfo = ContextBestBlockInfo (blockHeaderHash header) header 0})
+      modifyIORef' (sqeState env) (\s -> s {_bestBlockInfo = ContextBestBlockInfo (blockHeaderHash header) header 0})
 
-bestHeader :: SqlQueryM (Maybe BlockHeader)
-bestHeader = do
-  s <- asks sqeState >>= liftIO . readIORef
+bestHeader :: SqlQueryEnv -> IO (Maybe BlockHeader)
+bestHeader env = do
+  s <- readIORef (sqeState env)
   pure $ case _bestBlockInfo s of
     ContextBestBlockInfo _ h _ -> Just h
     Unspecified -> Nothing
 
-loadAddressState :: Address -> SqlQueryM (Maybe AddressState)
-loadAddressState addr = do
-  ref <- asks sqeAccounts
-  cached <- liftIO $ readIORef ref
+loadAddressState :: SqlQueryEnv -> Address -> IO (Maybe AddressState)
+loadAddressState env addr = do
+  let ref = sqeAccounts env
+  cached <- readIORef ref
   case M.lookup addr cached of
     Just st -> pure st
     Nothing -> do
-      enforceCacheCap
-      mRow <- mirrorQuery $ P.getBy (UniqueAddress addr)
+      enforceCacheCap env
+      mRow <- mirrorQuery env $ P.getBy (UniqueAddress addr)
       let st = flip fmap mRow $ \(P.Entity _ r) ->
             AddressState
               { addressStateNonce = addressStateRefNonce r,
@@ -401,34 +396,33 @@ loadAddressState addr = do
                 addressStateChainId = Nothing
               }
       -- The same row answers the id lookup for storage.
-      liftIO $ modifyIORef' ref (M.insert addr st)
-      idsRef <- asks sqeAccountIds
-      liftIO $ modifyIORef' idsRef (M.insert addr (P.entityKey <$> mRow))
+      modifyIORef' ref (M.insert addr st)
+      modifyIORef' (sqeAccountIds env) (M.insert addr (P.entityKey <$> mRow))
       pure st
 
 -- | The row id behind an address, once per command.
-accountId :: Address -> SqlQueryM (Maybe AddressStateRefId)
-accountId addr = do
-  ref <- asks sqeAccountIds
-  cached <- liftIO $ readIORef ref
+accountId :: SqlQueryEnv -> Address -> IO (Maybe AddressStateRefId)
+accountId env addr = do
+  let ref = sqeAccountIds env
+  cached <- readIORef ref
   case M.lookup addr cached of
     Just sid -> pure sid
     Nothing -> do
-      sid <- fmap P.entityKey <$> mirrorQuery (P.getBy (UniqueAddress addr))
-      liftIO $ modifyIORef' ref (M.insert addr sid)
+      sid <- fmap P.entityKey <$> mirrorQuery env (P.getBy (UniqueAddress addr))
+      modifyIORef' ref (M.insert addr sid)
       pure sid
 
 -- | Whole-contract prefetch: the first slot read of an address with at most
 -- 'sqePrefetchMaxRows' rows pulls every row into the cache in one query, and
--- every later slot of that address is an overlay hit. Returns the number of
+-- every later slot of that address is a cache hit. Returns the number of
 -- rows loaded, or Nothing when the contract is too large for it.
-prefetchStorage :: Address -> AddressStateRefId -> SqlQueryM (Maybe Int)
-prefetchStorage addr sid = do
-  ref <- asks sqePrefetched
-  done <- liftIO $ readIORef ref
-  cap <- asks sqeCacheMaxRows >>= liftIO . readIORef
-  prefetchMax <- asks sqePrefetchMaxRows >>= liftIO . readIORef
-  after <- asks sqePrefetchAfterSlots >>= liftIO . readIORef
+prefetchStorage :: SqlQueryEnv -> Address -> AddressStateRefId -> IO (Maybe Int)
+prefetchStorage env addr sid = do
+  let ref = sqePrefetched env
+  done <- readIORef ref
+  cap <- readIORef (sqeCacheMaxRows env)
+  prefetchMax <- readIORef (sqePrefetchMaxRows env)
+  after <- readIORef (sqePrefetchAfterSlots env)
   case M.lookup addr done of
     Just n | n >= 0 -> pure (Just n)
     -- Too large for the threshold: slot by slot, unless this context has
@@ -436,205 +430,76 @@ prefetchStorage addr sid = do
     -- path, in which case it is prefetched whole up to the cache cap.
     Just slotReads
       | after > 0 && negate slotReads >= after -> do
-          r <- fetch cap
-          when (isJust r) $ liftIO (incCounter prefetchPromoted)
+          r <- fetch ref cap
+          when (isJust r) $ incCounter prefetchPromoted
           pure r
       | otherwise -> pure Nothing
     Nothing -> do
-      r <- fetch (min prefetchMax cap)
-      when (isNothing r) $ liftIO (incCounter prefetchDeclined)
+      r <- fetch ref (min prefetchMax cap)
+      when (isNothing r) $ incCounter prefetchDeclined
       pure r
   where
-    fetch limit = do
-      ref <- asks sqePrefetched
-      enforceCacheCap
-      rows <- mirrorQuery $ P.selectList [StorageAddressStateRefId ==. sid] [P.LimitTo (limit + 1)]
+    fetch ref limit = do
+      enforceCacheCap env
+      rows <- mirrorQuery env $ P.selectList [StorageAddressStateRefId ==. sid] [P.LimitTo (limit + 1)]
       if length rows > limit
         then do
-          liftIO $ modifyIORef' ref (M.insertWith (\_ old -> min old (-1)) addr (-1))
+          modifyIORef' ref (M.insertWith (\_ old -> min old (-1)) addr (-1))
           pure Nothing
         else do
-          cacheRef <- asks sqeStorageCache
-          liftIO $ modifyIORef' cacheRef $ \cache ->
+          modifyIORef' (sqeStorageCache env) $ \cache ->
             foldr (\(P.Entity _ st) -> M.insert (addr, storageKey st) (Just (storageValue st))) cache rows
-          liftIO $ modifyIORef' ref (M.insert addr (length rows))
-          liftIO $ observe prefetchRowsHistogram (fromIntegral (length rows))
+          modifyIORef' ref (M.insert addr (length rows))
+          observe prefetchRowsHistogram (fromIntegral (length rows))
           pure (Just (length rows))
 
-loadStorage :: Address -> RawStorageKey -> SqlQueryM (Maybe RawStorageValue)
-loadStorage addr key@(_, path) = do
-  cacheRef <- asks sqeStorageCache
-  cache <- liftIO $ readIORef cacheRef
+loadStorage :: SqlQueryEnv -> Address -> RawStorageKey -> IO (Maybe RawStorageValue)
+loadStorage env addr key@(_, path) = do
+  let cacheRef = sqeStorageCache env
+  cache <- readIORef cacheRef
   case M.lookup key cache of
     Just v -> pure v
     Nothing -> do
-      mSid <- accountId addr
+      mSid <- accountId env addr
       case mSid of
         Nothing -> pure Nothing
         Just sid -> do
-          prefetched <- prefetchStorage addr sid
+          prefetched <- prefetchStorage env addr sid
           case prefetched of
             -- Everything the contract has is cached now; absent means empty.
-            Just _ -> M.findWithDefault Nothing key <$> liftIO (readIORef cacheRef)
+            Just _ -> M.findWithDefault Nothing key <$> readIORef cacheRef
             Nothing -> do
-              enforceCacheCap
-              rows <- mirrorQuery $ P.selectList [StorageAddressStateRefId ==. sid, StorageKey ==. path] [P.LimitTo 1]
+              enforceCacheCap env
+              rows <- mirrorQuery env $ P.selectList [StorageAddressStateRefId ==. sid, StorageKey ==. path] [P.LimitTo 1]
               let v = case rows of
                     (P.Entity _ st : _) -> Just (storageValue st)
                     [] -> Nothing
-              liftIO $ modifyIORef' cacheRef (M.insert key v)
-              asks sqePrefetched >>= liftIO . flip modifyIORef' (M.adjust (subtract 1) addr)
+              modifyIORef' cacheRef (M.insert key v)
+              modifyIORef' (sqePrefetched env) (M.adjust (subtract 1) addr)
               pure v
 
-loadCode :: Keccak256 -> SqlQueryM (Maybe DBCode)
-loadCode h = do
-  mRow <- mirrorQuery $ P.getBy (UniqueCodeHash h)
+loadCode :: SqlQueryEnv -> Keccak256 -> IO (Maybe DBCode)
+loadCode env h = do
+  mRow <- mirrorQuery env $ P.getBy (UniqueCodeHash h)
   pure $ encodeUtf8 . codeRefCode . P.entityVal <$> mRow
 
-loadSummary :: Keccak256 -> SqlQueryM (Maybe BlockSummary)
-loadSummary h = do
-  mBdr <- mirrorQuery $ P.selectFirst [BlockDataRefHash ==. h] []
-  pure $ flip fmap mBdr $ \(P.Entity _ bdr) ->
-    blockHeaderToBSum (fromIntegral (Conf.chainId (Conf.networkConfig ethConf))) noProposalFacts (bdrToHeader bdr) 0
+headerSummary :: BlockHeader -> BlockSummary
+headerSummary header = blockHeaderToBSum (fromIntegral (Conf.chainId (Conf.networkConfig ethConf))) noProposalFacts header 0
 
--- --- Context plumbing ---
-
-instance AccessibleEnv SQLDB SqlQueryM where
-  accessEnv = asks sqeDb
-
-stateGets :: (ContextState -> a) -> SqlQueryM a
-stateGets f = asks sqeState >>= liftIO . fmap f . readIORef
-
-stateModify :: (ContextState -> ContextState) -> SqlQueryM ()
-stateModify f = asks sqeState >>= liftIO . flip modifyIORef' f
-
-instance Mod.Modifiable ContextState SqlQueryM where
-  get _ = stateGets id
-  put _ s = stateModify (const s)
-
-instance Mod.Accessible ContextState SqlQueryM where
-  access _ = stateGets id
-
-instance Mod.Modifiable (Maybe DebugSettings) SqlQueryM where
-  get _ = stateGets _debugSettings
-  put _ d = stateModify (\s -> s {_debugSettings = d})
-
-instance Mod.Modifiable (Maybe VmTracer) SqlQueryM where
-  get _ = stateGets _vmTracer
-  put _ t = stateModify (\s -> s {_vmTracer = t})
-
-instance Mod.Modifiable MemDBs SqlQueryM where
-  get _ = stateGets _memDBs
-  put _ m = stateModify (\s -> s {_memDBs = m})
-
-instance Mod.Modifiable GasCap SqlQueryM where
-  get _ = GasCap <$> stateGets _vmGasCap
-  put _ (GasCap g) = stateModify (\s -> s {_vmGasCap = g})
-
-instance Mod.Modifiable BlockHashRoot SqlQueryM where
-  get _ = asks sqeBlockHashRoot >>= liftIO . readIORef
-  put _ r = asks sqeBlockHashRoot >>= liftIO . flip writeIORef r
-
-instance Mod.Modifiable CurrentBlockHash SqlQueryM where
-  get _ = fromMaybe (CurrentBlockHash (unsafeCreateKeccak256FromWord256 0)) . _currentBlock <$> stateGets _memDBs
-  put _ bh = stateModify (\s -> s {_memDBs = (_memDBs s) {_currentBlock = Just bh}})
-
-instance HasPendingMPNodes SqlQueryM where
-  flushPendingMPNodes = pure ()
-  finalizePendingMPNodes = pure ()
-  clearPendingMPNodes = pure ()
-
-instance HasMemAddressStateDB SqlQueryM where
-  getAddressStateTxDBMap = _stateTxMap <$> stateGets _memDBs
-  putAddressStateTxDBMap m = stateModify (\s -> s {_memDBs = (_memDBs s) {_stateTxMap = m}})
-  getAddressStateBlockDBMap = _stateBlockMap <$> stateGets _memDBs
-  putAddressStateBlockDBMap m = stateModify (\s -> s {_memDBs = (_memDBs s) {_stateBlockMap = m}})
-
-instance HasMemRawStorageDB SqlQueryM where
-  getMemRawStorageTxDB = _storageTxMap <$> stateGets _memDBs
-  putMemRawStorageTxMap m = stateModify (\s -> s {_memDBs = (_memDBs s) {_storageTxMap = m}})
-  getMemRawStorageBlockDB = _storageBlockMap <$> stateGets _memDBs
-  putMemRawStorageBlockMap m = stateModify (\s -> s {_memDBs = (_memDBs s) {_storageBlockMap = m}})
-
--- Accounts: the overlay first (a command's own writes), then the mirror.
-instance (Address `A.Alters` AddressState) SqlQueryM where
-  lookup _ addr = do
-    tx <- getAddressStateTxDBMap
-    case M.lookup addr tx of
-      Just (ASModification st) -> pure (Just st)
-      Just ASDeleted -> pure (Just blankAddressState)
-      Nothing -> do
-        blk <- getAddressStateBlockDBMap
-        case M.lookup addr blk of
-          Just (ASModification st) -> pure (Just st)
-          Just ASDeleted -> pure (Just blankAddressState)
-          Nothing -> loadAddressState addr
-  insert _ addr st = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert addr (ASModification st)
-  delete _ addr = getAddressStateTxDBMap >>= putAddressStateTxDBMap . M.insert addr ASDeleted
-
-instance A.Selectable Address AddressState SqlQueryM where
-  select _ = A.lookup (A.Proxy @AddressState)
-
--- Storage: overlay, then the mirror row for (address, path); a read is
--- cached in the overlay so a slot costs one query per command.
-instance (RawStorageKey `A.Alters` RawStorageValue) SqlQueryM where
-  lookup _ key = do
-    tx <- getMemRawStorageTxDB
-    case M.lookup key tx of
-      Just v -> pure (Just v)
-      Nothing -> do
-        blk <- getMemRawStorageBlockDB
-        case M.lookup key blk of
-          Just v -> pure (Just v)
-          Nothing -> Just . fromMaybe BDefault <$> loadStorage (fst key) key
-  insert _ key v = getMemRawStorageTxDB >>= putMemRawStorageTxMap . M.insert key v
-  delete _ key = getMemRawStorageTxDB >>= putMemRawStorageTxMap . M.insert key BDefault
-  lookupWithDefault p key = fromMaybe BDefault <$> A.lookup p key
-
-instance (Keccak256 `A.Alters` DBCode) SqlQueryM where
-  lookup _ h = do
-    overlay <- asks sqeCodeOverlay >>= liftIO . readIORef
-    case M.lookup h overlay of
-      Just c -> pure (Just c)
-      Nothing -> loadCode h
-  insert _ h c = asks sqeCodeOverlay >>= liftIO . flip modifyIORef' (M.insert h c)
-  delete _ h = asks sqeCodeOverlay >>= liftIO . flip modifyIORef' (M.delete h)
-
-instance A.Selectable FilePath (Either String String) SqlQueryM where
-  select _ _ = pure Nothing
-
-instance (Keccak256 `A.Alters` BlockSummary) SqlQueryM where
-  lookup _ h = do
-    cached <- asks sqeSummaries >>= liftIO . readIORef
-    case M.lookup h cached of
-      Just s -> pure (Just s)
-      Nothing -> do
-        ms <- loadSummary h
-        forM_ ms $ \s -> asks sqeSummaries >>= liftIO . flip modifyIORef' (M.insert h s)
-        pure ms
-  insert _ h s = asks sqeSummaries >>= liftIO . flip modifyIORef' (M.insert h s)
-  delete _ h = asks sqeSummaries >>= liftIO . flip modifyIORef' (M.delete h)
-
--- The main chain's state root is the best header's; private chains are not
--- served by the mirror.
-instance (Maybe Word256 `A.Alters` MP.StateRoot) SqlQueryM where
-  lookup _ Nothing = fmap stateRoot <$> bestHeader
-  lookup _ (Just _) = pure Nothing
-  insert _ _ _ = pure ()
-  delete _ _ = pure ()
-
--- Trie nodes and hash preimages: not in SQL. Any handler path that gets
--- here is one the query VM cannot serve; say so.
-instance (MP.StateRoot `A.Alters` MP.NodeData) SqlQueryM where
-  lookup _ sr
-    | sr == MP.emptyTriePtr = do
-        asks sqeEmptyTrieReads >>= liftIO . flip modifyIORef' (+ 1)
-        pure (Just MP.EmptyNodeData)
-    | otherwise = throwIO (TrieAccess ("state trie node " ++ show sr))
-  insert _ _ _ = pure ()
-  delete _ _ = pure ()
-
-instance (N.NibbleString `A.Alters` N.NibbleString) SqlQueryM where
-  lookup _ k = throwIO (TrieAccess ("hash preimage " ++ show (T.pack (show k))))
-  insert _ _ _ = pure ()
-  delete _ _ = pure ()
+-- | A block's summary: the best block's from the header already in hand (the
+-- main chain's state root is asked for on every call), any other from the
+-- mirror, once.
+loadSummary :: SqlQueryEnv -> Keccak256 -> IO (Maybe BlockSummary)
+loadSummary env h = do
+  best <- bestHeader env
+  case best of
+    Just header | blockHeaderHash header == h -> pure (Just (headerSummary header))
+    _ -> do
+      cached <- readIORef (sqeSummaries env)
+      case M.lookup h cached of
+        Just s -> pure (Just s)
+        Nothing -> do
+          mBdr <- mirrorQuery env $ P.selectFirst [BlockDataRefHash ==. h] []
+          let ms = headerSummary . bdrToHeader . P.entityVal <$> mBdr
+          forM_ ms $ \s -> modifyIORef' (sqeSummaries env) (M.insert h s)
+          pure ms

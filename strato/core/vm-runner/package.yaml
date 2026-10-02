@@ -32,6 +32,7 @@ library:
   - bytestring
   - common-log
   - composable-monads-base
+  - nodedb-monad
   - conduit
   - containers
   - cross-monitoring
@@ -72,8 +73,10 @@ executables:
       - async
       - blockapps-init
       - common-log
+      - composable-monads-base
       - hflags
       - process-monitor
+      - strato-conf
       - strato-model
       - strato-tracing
       - vm-runner

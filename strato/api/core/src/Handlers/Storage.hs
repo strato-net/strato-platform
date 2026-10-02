@@ -26,7 +26,7 @@ import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
 import Control.Monad (unless)
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Data.Aeson
 import Data.Foldable (for_)
 import Data.Maybe
@@ -41,7 +41,6 @@ import Servant
 import Servant.Client
 import Settings
 import SolidVM.Model.Storable
-import UnliftIO
 
 type API =
   "storage" :> QueryParam "key" StoragePath
@@ -122,7 +121,7 @@ instance ToSchema StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) addr)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [StorageAddress] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable StorageFilterParams [StorageAddress] (Base.Eff es) where
   select _ StorageFilterParams {..} = do
     addrs <- fmap (map (entityVal *** E.unValue)) . sqlQuery $
       E.select . E.distinct $

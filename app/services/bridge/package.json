@@ -1,13 +1,14 @@
 {
   "name": "strato-bridge-service",
   "version": "1.0.0",
-  "description": "Bridge service for STRATO ↔ Ethereum",
+  "description": "Bridge service for STRATO \u2194 Ethereum",
   "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "test": "npm run build && node --test dist/polling/alchemyPolling.test.js"
+    "test": "npm run build && node --test \"dist/**/*.test.js\"",
+    "recover-deposits": "ts-node src/scripts/recoverDeposits.ts"
   },
   "engines": {
     "node": ">=22.12 <23.0"

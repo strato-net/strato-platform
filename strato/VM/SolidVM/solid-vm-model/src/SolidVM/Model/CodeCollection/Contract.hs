@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -37,6 +38,8 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Aeson as A
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Default
 import Data.Map (Map, empty, fromList)
 import Data.OpenApi
@@ -56,13 +59,15 @@ data ContractType = ContractType | LibraryType | AbstractType | InterfaceType de
 
 instance Binary ContractType
 
+makeStore ''ContractType
+
 -- Changes to this structure should also have changes in the Unparser :)
 data ContractF a = Contract
   { _contractName :: SolidString,
     _parents :: [SolidString],
     _constants :: Map SolidString (ConstantDeclF a),
     _storageDefs :: Map SolidString (VariableDeclF a),
-    _userDefined :: Map String String,
+    _userDefined :: Map SolidString SolidString,
     _enums :: Map SolidString ([SolidString], a),
     _structs :: Map SolidString [(SolidString, SolidVM.FieldType, a)],
     _errors :: Map SolidString [(SolidString, SolidVM.IndexedType, a)],
@@ -152,6 +157,8 @@ type Contract = Positioned ContractF
 
 makeLenses ''ContractF
 
+makeStore ''ContractF
+
 instance Arbitrary Contract where
   arbitrary = do
     a <- arbitrary
@@ -163,7 +170,7 @@ instance Arbitrary Contract where
             { _contractName = "qq",
               _parents = [],
               _constants = empty, -- :: Map SolidString (ConstantDeclF a),
-              _storageDefs = fromList [(varName, varDecl)], -- :: Map SolidString (VariableDeclF a),
+              _storageDefs = fromList [(stringToLabel varName, varDecl)], -- :: Map SolidString (VariableDeclF a),
               _userDefined = empty,
               _enums = empty,
               _structs = empty,

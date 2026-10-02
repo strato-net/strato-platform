@@ -17,6 +17,11 @@ interface BridgeWalletStatusProps {
 const CONNECT_BUTTON_CLASS =
   'w-full bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white px-4 py-2 rounded-xl font-semibold transition-all flex items-center justify-center hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed';
 
+// Matches the in-app custodial (vault-backed) connector, not the STRATO Wallet
+// browser extension. The extension deliberately announces the EIP-6963 name
+// "STRATO" rather than "STRATO Wallet" so that it does NOT match here -- if it
+// ever announced the latter, this test would misclassify it and wedge Connect.
+// That name is a contract with github.com/strato-net/strato-wallet.
 const isStratoConnector = (connector: { id: string; name: string }) =>
   connector.id === 'stratoWallet' || connector.name === 'STRATO Wallet';
 

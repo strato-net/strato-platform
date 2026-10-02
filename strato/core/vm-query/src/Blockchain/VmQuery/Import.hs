@@ -23,8 +23,9 @@ import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.Strato.Model.Class (blockHeaderHash)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256ToHex)
 import Control.Monad (forM_, unless, when)
-import Control.Monad.Logger (LogLevel (..), filterLogger, runStderrLoggingT)
+import Control.Monad.Composable.Base (runEff, withLogger)
 import Control.Monad.Composable.SQL (runSQLMWith)
+import Control.Monad.Logger (LogLevel (..), defaultOutput)
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString.Char8 as BC
@@ -40,6 +41,7 @@ import Network.HTTP.Client (Manager, httpLbs, parseRequest, responseBody, respon
 import Network.HTTP.Client.TLS (newTlsManager)
 import Network.HTTP.Types (statusCode)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath, basicParse, parsePath)
+import System.IO (stderr)
 import Text.Printf (printf)
 
 get :: Manager -> String -> IO BL.ByteString
@@ -80,7 +82,7 @@ importFromNode :: SQLDB -> String -> [Address] -> IO ()
 importFromNode db nodeUrl targets = do
   manager <- newTlsManager
   let api = nodeUrl ++ "/strato-api/eth/v1.2"
-      runDb = runStderrLoggingT . filterLogger (\_ lvl -> lvl >= LevelWarn) . runSQLMWith db
+      runDb = runEff . withLogger (\loc src lvl msg -> when (lvl >= LevelWarn) (defaultOutput stderr loc src lvl msg)) . runSQLMWith db
   -- Best block first: everything below is read after it, so a call on the
   -- imported rows sees state at least as new as this header.
   blocks <- get manager (api ++ "/block/last/1") >>= decodeOrDie "block/last/1" :: IO [Block']

@@ -57,6 +57,7 @@ library
     , strato-conf
     , strato-model
     , strato-tracing
+    , streaming
     , text
     , time
     , transformers
@@ -86,6 +87,7 @@ executable vm-query
     , blockapps-datadefs
     , blockapps-mpdbs
     , bytestring
+    , composable-monads-base
     , containers
     , data-default
     , hflags

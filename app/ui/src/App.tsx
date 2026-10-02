@@ -12,7 +12,7 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
-import { robinhood, robinhoodTestnet } from "@/lib/bridge/constants";
+import { robinhood, robinhoodTestnet, hyperEvm } from "@/lib/bridge/constants";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { OracleProvider } from "@/context/OracleContext";
@@ -95,7 +95,6 @@ const AuthGate = ({ children }: { children: ReactNode }) => {
 const App = () => {
   const [projectId, setProjectId] = useState("PROJECT_ID_UNSET");
   const [networkId, setNetworkId] = useState<string | null>(null);
-  const [creditCardTopUpAddress, setCreditCardTopUpAddress] = useState<string | null>(null);
   const [contactEnabled, setContactEnabled] = useState(false);
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -117,7 +116,6 @@ const App = () => {
         if (!cancelled) {
           setProjectId(configData.projectId ?? "PROJECT_ID_UNSET");
           if (configData.networkId) setNetworkId(String(configData.networkId));
-          if (configData.creditCardTopUpAddress) setCreditCardTopUpAddress(String(configData.creditCardTopUpAddress));
           if (configData.contactEnabled) setContactEnabled(true);
           setConfigError(false);
         }
@@ -167,8 +165,8 @@ const App = () => {
       const networkName = (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME || "";
       const isProduction = networkName === "upquark";
       const baseChains = isProduction
-        ? [mainnet, polygon, base, linea, robinhood]
-        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet];
+        ? [mainnet, polygon, base, linea, robinhood, hyperEvm]
+        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet, hyperEvm];
       const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(
@@ -206,7 +204,6 @@ const App = () => {
   }, [projectId, loading]);
 
   const networkIdStr = networkId ?? undefined;
-  const creditCardTopUpAddressStr = creditCardTopUpAddress ?? undefined;
 
   if (loading) {
     return (
@@ -234,7 +231,7 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <NetworkProvider initialNetworkId={networkIdStr} initialCreditCardTopUpAddress={creditCardTopUpAddressStr} initialContactEnabled={contactEnabled}>
+      <NetworkProvider initialNetworkId={networkIdStr} initialContactEnabled={contactEnabled}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <WagmiProvider config={wagmiConfig}>
             <RainbowKitProvider>

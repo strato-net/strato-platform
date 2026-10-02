@@ -27,7 +27,7 @@ async function callAsync(tokenObj, callArgs) {
   for (const v of VALIDATORS) {
     try {
       await callAsync(tokenObj, { contract: { address: STAKING, name: 'StratoStaking' }, method: 'tryActivate',
-        args: { operator: v }, txParams: { gasPrice: 10, gasLimit: 2000000 } });
+        args: { validator: v }, txParams: { gasPrice: 10, gasLimit: 2000000 } });
       console.log('tryActivate', v.slice(0, 10), 'Success');
     } catch (e) { console.log('tryActivate', v.slice(0, 10), 'FAILED:', e.message.slice(0, 120)); }
   }

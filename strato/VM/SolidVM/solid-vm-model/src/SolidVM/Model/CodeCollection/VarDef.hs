@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -10,6 +12,8 @@ import Control.Lens (mapped, (&), (?~))
 import Data.Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Int (Int32)
 import Data.OpenApi
 import GHC.Generics
@@ -40,6 +44,8 @@ data IndexedType = IndexedType
 
 instance Binary IndexedType
 
+makeStore ''IndexedType
+
 instance FromJSON IndexedType where
   parseJSON =
     withObject "xabi" $ \v -> do
@@ -65,6 +71,8 @@ data FieldType = FieldType {fieldTypeAtBytes :: Int32, fieldTypeType :: Type}
   deriving (Eq, Show, Generic, NFData)
 
 instance Binary FieldType
+
+makeStore ''FieldType
 
 instance FromJSON FieldType where
   parseJSON =

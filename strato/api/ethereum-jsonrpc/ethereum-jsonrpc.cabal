@@ -20,6 +20,7 @@ executable ethereum-jsonrpc
       EthBlock
       EthLog
       LocalApi
+      ResponseDispatcher
       RPC
       Server
       SqlState
@@ -40,6 +41,7 @@ executable ethereum-jsonrpc
     , bytestring
     , case-insensitive
     , codedb-monad
+    , composable-monads-base
     , containers
     , core-api2
     , ethereum-rlp

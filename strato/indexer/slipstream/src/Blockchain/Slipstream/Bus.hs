@@ -25,6 +25,7 @@ import Blockchain.Data.DataDefs (TransactionResult)
 import Blockchain.EthConf.Model (BusConf (..))
 import Blockchain.Slipstream.Data.Action (AggregateEvent)
 import Control.Monad (unless)
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming.Bus
 import qualified Control.Monad.Composable.Streaming.Kafka as Bus
 import Data.Aeson (ToJSON (..), object, (.=))
@@ -57,14 +58,14 @@ newBusPublisher conf = do
   env <- createBusEnv "slipstream" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
   let results = fromString (busResultsTopic conf)
       events = fromString (busEventsTopic conf)
-  Bus.runStreamMUsingEnv env $ do
+  liftIO . runEff . Bus.runStreamMUsingEnv env $ do
     Bus.createTopicAndWait results
     Bus.createTopicAndWait events
   $logInfoS "slipstream/bus" . T.pack $
     "publishing " ++ busResultsTopic conf ++ " and " ++ busEventsTopic conf ++ " to " ++ busHost conf ++ ":" ++ show (busPort conf)
   let publish :: (MonadUnliftIO m', MonadLogger m', ToJSON a) => Bus.TopicName -> [a] -> m' ()
       publish topic items = unless (null items) $ do
-        r <- try . liftIO . Bus.runStreamMUsingEnv env $ Bus.produceItemsAsJSON topic items
+        r <- try . liftIO . runEff . Bus.runStreamMUsingEnv env $ Bus.produceItemsAsJSON topic items
         case r of
           Right _ -> pure ()
           Left (e :: SomeException) -> $logWarnS "slipstream/bus" . T.pack $ "publish to " ++ show topic ++ " failed: " ++ show e

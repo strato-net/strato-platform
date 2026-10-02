@@ -150,18 +150,6 @@ genEthConf role = do
         (pub, _addr) <- getNodeKey
         putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
-  -- On an API-only host both listeners face only the nginx container, so
-  -- the JSON-RPC server binds where strato-api does instead of everywhere,
-  -- and bloc's simulation calls follow it there.
-  let apiConf = apiConfig runtimeConfig
-      roleApiConfig
-        | role == RoleApi = apiConf { rpcListenAddress = getApiListenAddress }
-        | otherwise = apiConf
-      roleVmConfig
-        | role == RoleApi =
-            (vmConfig runtimeConfig) { vmJsonRpcUrl = "http://" ++ getApiListenAddress ++ ":" ++ show (rpcPort apiConf) }
-        | otherwise = vmConfig runtimeConfig
-
   -- An API-only directory reads through the replica endpoint when one is
   -- given; its writes (and consistency-sensitive reads) stay on --pghost.
   let readerHost = if null flags_pgReaderHost || role /= RoleApi then Nothing else Just flags_pgReaderHost
@@ -188,9 +176,8 @@ genEthConf role = do
             }
 
   return runtimeConfig
-    { apiConfig = roleApiConfig
-    , busConfig = busConf
-    , vmConfig = roleVmConfig { vmQueryUrl = if flags_vmQuery then Just "http://127.0.0.1:8546" else Nothing }
+    { busConfig = busConf
+    , vmConfig = (vmConfig runtimeConfig) { vmQueryUrl = if flags_vmQuery then Just "http://127.0.0.1:8546" else Nothing }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
     , peerSqlitePath = case flags_peerStore of

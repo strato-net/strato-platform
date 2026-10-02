@@ -1,5 +1,7 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Control.Monad.Composable.SQL where
 
@@ -7,28 +9,27 @@ import Blockchain.DB.SQLDB
 import Blockchain.EthConf
 import Control.Monad.Composable.Base
 import Control.Monad.IO.Unlift
-import Control.Monad.Logger
-import Control.Monad.Reader
+import Control.Monad.Logger (MonadLoggerIO)
 import qualified Database.Persist.Postgresql as PSQL
 
-type SQLM = ReaderT SQLDB
+type SQLM es = Eff (SQLDB ': es)
 
 type HasSQL m = (MonadIO m, MonadUnliftIO m, AccessibleEnv SQLDB m)
 
-type CirrusM = ReaderT CirrusDB
+type CirrusM es = Eff (CirrusDB ': es)
 
 type HasCirrus m = HasCirrusDB m
 
 -- | Run against a pool that lives only for the duration of the action.
 -- Fine for a long-lived main loop; wrong for a per-request handler, which
 -- should hold a pool created once with 'createSQLDB' and use 'runSQLMWith'.
-runSQLM :: (MonadUnliftIO m, MonadLoggerIO m) => SQLM m a -> m a
+runSQLM :: (Logger :> es) => SQLM es a -> Eff es a
 runSQLM f =
-  PSQL.withPostgresqlPool connStr 20 (\ppool -> runReaderT f $ sqlDB ppool)
+  PSQL.withPostgresqlPool connStr 20 (\ppool -> provide (sqlDB ppool) f)
 
-runCirrusM :: (MonadUnliftIO m, MonadLoggerIO m) => CirrusM m a -> m a
+runCirrusM :: (Logger :> es) => CirrusM es a -> Eff es a
 runCirrusM f =
-  PSQL.withPostgresqlPool cirrusConnStr 20 (\ppool -> runReaderT f $ CirrusDB ppool)
+  PSQL.withPostgresqlPool cirrusConnStr 20 (\ppool -> provide (CirrusDB ppool) f)
 
 -- | Process-wide pools for the eth and cirrus databases, sized by the caller.
 -- Connections are opened lazily, so creating these before Postgres is
@@ -41,8 +42,8 @@ createSQLDB n
 createCirrusDB :: (MonadUnliftIO m, MonadLoggerIO m) => Int -> m CirrusDB
 createCirrusDB n = CirrusDB <$> PSQL.createPostgresqlPool cirrusConnStr n
 
-runSQLMWith :: SQLDB -> SQLM m a -> m a
-runSQLMWith = flip runReaderT
+runSQLMWith :: SQLDB -> SQLM es a -> Eff es a
+runSQLMWith = provide
 
-runCirrusMWith :: CirrusDB -> CirrusM m a -> m a
-runCirrusMWith = flip runReaderT
+runCirrusMWith :: CirrusDB -> CirrusM es a -> Eff es a
+runCirrusMWith = provide

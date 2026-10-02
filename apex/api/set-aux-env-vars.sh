@@ -7,8 +7,7 @@ if [ -n "${ETHCONF_BASE64:-}" ]; then
   echo "$ETHCONF_BASE64" | base64 -d > "$ETHCONF_FILE"
 fi
 # All config derived from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' "$ETHCONF_FILE")
-STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
+STRATO_HOSTNAME=host.docker.internal  # host-side STRATO processes, aliased by docker-compose
 STRATO_PORT_API=$(yq '.apiConfig.apiPort' "$ETHCONF_FILE")
 
 # Resolve hostname to IPv4 via /etc/hosts to avoid IPv6 connection failures in Docker.
@@ -19,9 +18,9 @@ if [ -n "$STRATO_IPV4" ]; then
   STRATO_HOSTNAME="$STRATO_IPV4"
 fi
 
-# Opt-in: where strato-api runs next to apex rather than at the node URL's host
+# Opt-in: where strato-api runs next to apex rather than on the docker host
 # (an API tier task: APEX_STRATO_API_HOST=127.0.0.1). Unset everywhere else, so
-# the node URL stays the source as above.
+# the host alias stays the source as above.
 if [ -n "${APEX_STRATO_API_HOST:-}" ]; then
   STRATO_HOSTNAME="$APEX_STRATO_API_HOST"
   STRATO_PORT_API="${APEX_STRATO_API_PORT:-$STRATO_PORT_API}"

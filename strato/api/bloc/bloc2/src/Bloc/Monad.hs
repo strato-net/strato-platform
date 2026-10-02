@@ -58,7 +58,7 @@ data BlocEnv = BlocEnv
     -- the counters live in the eth database's writer).
     nonceTtlSeconds :: Int,
     -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
-    -- transaction simulation (same container). From ethconf.yaml vmConfig.
+    -- transaction simulation (same host). Derived from apiConfig.apiListenAddress.
     vmJsonRpcUrl :: String,
     -- | Count of in-flight simulations and the ceiling above which new ones are
     -- shed (503), so simulations can't starve block processing on the shared VM.

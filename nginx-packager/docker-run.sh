@@ -76,11 +76,11 @@ if [[ -n "${ETHCONF_BASE64:-}" ]]; then
   echo "$ETHCONF_BASE64" | base64 -d > "$ETHCONF_FILE"
 fi
 
+# Host-side STRATO processes are reached as host.docker.internal (aliased by docker-compose)
+STRATO_HOSTNAME=host.docker.internal
 # Read config from ethconf.yaml (single source of truth)
-NODE_URL=$(yq '.urlConfig.nodeUrl' "$ETHCONF_FILE")
-STRATO_HOSTNAME=$(echo "$NODE_URL" | sed 's|https\?://\([^:/]*\).*|\1|')
 # As a sidecar in the API tier (docker-compose.api.yml) nginx proxies to the
-# strato-api container next to it, not to the host named by nodeUrl.
+# strato-api container next to it, not to the host.
 if [[ -n "${API_UPSTREAM_HOST:-}" ]]; then
   STRATO_HOSTNAME=$API_UPSTREAM_HOST
 fi

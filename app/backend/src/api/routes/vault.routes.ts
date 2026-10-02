@@ -379,6 +379,41 @@ router.get("/withdraw/preview", authHandler.authorizeRequest(), VaultController.
  */
 router.post("/withdraw", walletAuth, VaultController.withdraw);
 
+/**
+ * @openapi
+ * /vault/withdraw-shares:
+ *   post:
+ *     summary: Withdraw from the vault by burning an exact number of shares
+ *     description: Burns the given number of vault shares and pays out their current USD value proportionally from withdrawable assets. Pass the user's full share balance to withdraw everything without leaving dust.
+ *     tags:
+ *       - Vault
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - shares
+ *             properties:
+ *               shares:
+ *                 type: string
+ *                 description: Number of shares to burn (18 decimals)
+ *     responses:
+ *       200:
+ *         description: Withdrawal transaction result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 hash:
+ *                   type: string
+ */
+router.post("/withdraw-shares", walletAuth, VaultController.withdrawShares);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADMIN ENDPOINTS
 // ═══════════════════════════════════════════════════════════════════════════════

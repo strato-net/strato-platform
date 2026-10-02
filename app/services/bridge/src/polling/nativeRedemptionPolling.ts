@@ -1,4 +1,9 @@
-import { config, getNativeRepresentationBridgeAddress, NATIVE_REDEMPTION_EVENT_SIGNATURE } from "../config";
+import { Interface } from "ethers";
+import {
+  config,
+  getNativeRepresentationBridgeAddress,
+  NATIVE_REDEMPTION_EVENT_SIGNATURES,
+} from "../config";
 import { getCurrentBlockNumber, getChainLogs, isChainConfigured } from "../services/rpcService";
 import { getEnabledChains } from "../services/cirrusService";
 import { recordNativeDepositBatch } from "../services/bridgeService";
@@ -6,37 +11,55 @@ import { nativeBlockTrackingService } from "../services/nativeBlockTrackingServi
 import { NativeDepositArgs } from "../types";
 import { logError, logInfo } from "../utils/logger";
 
-const decodeIndexedAddress = (topic: string): string => `0x${topic.slice(26)}`.toLowerCase();
+/// Decoded with an Interface rather than by slicing the data blob: the
+/// fee-bearing variant appends three words, and hand-slicing two of five would
+/// read a fee as an amount.
+export const NATIVE_REDEMPTION_EVENTS_ABI = [
+  "event RedemptionRequested(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId)",
+  "event RedemptionRequestedWithFee(address indexed representationToken, uint256 amount, address indexed sender, address indexed stratoRecipient, uint96 redemptionId, uint256 maxFee, uint256 requestedAt, uint256 feeHalfLife)",
+];
 
-const decodeNativeRedemptionData = (
-  data: string,
-): { amount: string; redemptionId: string } => {
-  if (!data.startsWith("0x") || data.length < 130) {
-    throw new Error(`Invalid log data: ${data}`);
-  }
+const redemptionEvents = new Interface(NATIVE_REDEMPTION_EVENTS_ABI);
 
-  return {
-    amount: BigInt(`0x${data.slice(2, 66)}`).toString(),
-    redemptionId: BigInt(`0x${data.slice(66, 130)}`).toString(),
-  };
-};
+const normalize = (value: string): string => value.toLowerCase();
 
-const parseNativeDepositLog = (chainId: number, log: any): NativeDepositArgs | null => {
+export const parseNativeDepositLog = (
+  chainId: number,
+  log: any,
+): NativeDepositArgs | null => {
   if (!log.transactionHash || log.topics.length < 4) {
     return null;
   }
 
-  const { amount, redemptionId } = decodeNativeRedemptionData(log.data);
+  const parsed = redemptionEvents.parseLog({ topics: log.topics, data: log.data });
+  if (!parsed) {
+    return null;
+  }
+
+  const base: NativeDepositArgs = {
+    externalChainId: chainId,
+    externalBridge: normalize(log.address),
+    externalRedemptionId: parsed.args.redemptionId.toString(),
+    externalSender: normalize(parsed.args.sender),
+    representationToken: normalize(parsed.args.representationToken),
+    externalTxHash: log.transactionHash,
+    stratoRecipient: normalize(parsed.args.stratoRecipient),
+    stratoTokenAmount: parsed.args.amount.toString(),
+  };
+
+  if (parsed.name !== "RedemptionRequestedWithFee") {
+    return base;
+  }
 
   return {
-    externalChainId: chainId,
-    externalBridge: log.address.toLowerCase(),
-    externalRedemptionId: redemptionId,
-    externalSender: decodeIndexedAddress(log.topics[2]),
-    representationToken: decodeIndexedAddress(log.topics[1]),
-    externalTxHash: log.transactionHash,
-    stratoRecipient: decodeIndexedAddress(log.topics[3]),
-    stratoTokenAmount: amount,
+    ...base,
+    feeTerms: {
+      maxFee: parsed.args.maxFee.toString(),
+      // The ORIGIN chain's timestamp, passed through unchanged: STRATO starts
+      // the fee decay there, so relayer lag is refunded to the user.
+      requestedAt: parsed.args.requestedAt.toString(),
+      feeHalfLife: parsed.args.feeHalfLife.toString(),
+    },
   };
 };
 
@@ -61,7 +84,7 @@ const pollChainNativeRedemptions = async (chainId: number) => {
     lastProcessedBlock + 1,
     currentBlock,
     nativeRepresentationBridge,
-    NATIVE_REDEMPTION_EVENT_SIGNATURE,
+    NATIVE_REDEMPTION_EVENT_SIGNATURES,
   );
 
   const deposits = logs

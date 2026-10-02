@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileBottomNav from '../components/dashboard/MobileBottomNav';
@@ -93,6 +94,8 @@ const createEmptyRevenuePeriod = (): RevenuePeriod => ({
 });
 
 const StratoStats = () => {
+  usePageTitle("Analytics");
+
   const { isLoggedIn } = useUser();
   const [tokens, setTokens] = useState<TokenWithStats[]>([]);
   const [totalMarketCap, setTotalMarketCap] = useState<string>('0');

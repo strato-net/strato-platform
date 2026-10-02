@@ -38,8 +38,9 @@ export interface TxResult {
   message?: string;
 }
 
+// execute() only resolves once every posted transaction succeeded; anything else throws
 export interface TxResponse {
-  status: "Success" | "Failure" | "Pending";
+  status: "Success";
   hash: string;
 }
 
@@ -69,6 +70,9 @@ export interface SafeTransactionResult {
 
 // Clear types for Safe transaction data
 export interface SafeTransactionData {
+  withdrawalId: string;
+  // Tags the payout with its withdrawal on the Safe Transaction Service
+  origin: string;
   safeAddress: string;
   safeTransactionData: any;
   safeTxHash: string;
@@ -98,10 +102,38 @@ export interface DepositArgs {
   targetStratoToken: string;
 }
 
+/**
+ * The solver fee schedule a request committed to on its ORIGIN chain.
+ *
+ * `requestedAt` is the origin chain's timestamp, and passing it through
+ * unchanged is the whole point: STRATO measures the fee decay from when the
+ * user actually asked, so relayer lag is refunded to the user rather than
+ * pocketed by a solver. Never substitute a local clock for it.
+ */
+export interface FeeTerms {
+  maxFee: string;
+  requestedAt: string;
+  feeHalfLife: string;
+}
+
+export type FeeDepositArgs = DepositArgs & FeeTerms;
+
 export interface ActionDepositArgs extends DepositArgs {
   action: string;
   actionToken: string;
   minFinalOut: string;
+}
+
+// One DepositRouted / DepositRoutedWithAction / DepositRoutedWithFee event, ready to record on STRATO.
+// A "fee" deposit carries the schedule it committed to on its origin chain; the others carry zeros.
+export interface WindowDeposit extends ActionDepositArgs, FeeTerms {
+  kind: "standard" | "action" | "fee";
+  depositId: string; // router-assigned, sequential per router
+  // STRATO deposit key: the tx hash, or `${txHash}#${depositId}` when the tx emitted several deposits
+  depositKey: string;
+  sharesTransaction: boolean;
+  blockNumber: number;
+  logIndex: number;
 }
 
 export interface ConfirmDepositArgs {
@@ -120,6 +152,28 @@ export interface NativeDepositArgs {
   externalTxHash: string;
   stratoRecipient: string;
   stratoTokenAmount: string;
+  /// Present only for a redemption that offered a solver fee.
+  feeTerms?: FeeTerms;
+}
+
+/**
+ * A solver's claim on a STRATO withdrawal, read off the external chain's
+ * WithdrawalFilled log and mirrored back to STRATO.
+ *
+ * Mirroring does not pay the solver -- the external chain's own settlement does
+ * that. It makes the claim visible on the chain holding the escrow, and it
+ * closes the user's abort hatch: without it a user could take a solver's tokens
+ * on one chain and their own escrow back on the other.
+ */
+export interface WithdrawalClaimArgs {
+  withdrawalId: string;
+  externalChainId: string | number;
+  claimant: string;
+  claimIndex: number;
+  feeCharged: string;
+  netPaid: string;
+  claimedAt: string;
+  externalFillTxHash: string;
 }
 
 export interface ConfirmNativeDepositArgs {
@@ -132,7 +186,7 @@ export interface ConfirmNativeDepositArgs {
 }
 
 export interface DepositInfo {
-  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  bridgeStatus: string; // 0 NONE, 1 INITIATED, 2 PENDING_REVIEW, 3 COMPLETED, 4 ABORTED, 5 SWEPT, 6 QUARANTINED, 7 ANNOUNCED
   externalSender: string;
   externalToken: string;
   requestedAt: string;
@@ -179,6 +233,20 @@ export interface WithdrawalInfo {
 
   withdrawalId: string;
   useHotWallet?: boolean;
+
+  /// Committed at request time; needed to build the static settlement payload
+  /// and to check a solver's claimed fee. Absent on pre-upgrade withdrawals.
+  feeTerms?: FeeTerms;
+
+  /// Set by the relayer before proposing, not read from Cirrus: the STRATO
+  /// network and bridge this withdrawal came from, and the external-chain
+  /// router that will route the payout. All three are needed to build the
+  /// static settlement payload; without them the proposal falls back to a
+  /// direct transfer to the recipient, which is what pre-upgrade withdrawals
+  /// still need.
+  sourceChainId?: string;
+  sourceBridge?: string;
+  settlementRouter?: string;
 }
 
 export interface NativeWithdrawalInfo {
@@ -199,6 +267,11 @@ export interface NativeWithdrawalInfo {
   useInstantPath?: boolean;
 
   withdrawalId: string;
+
+  /// Committed at request time; copied into the V2 mint attestation so the
+  /// destination chain can check a solver's claim against what the user agreed
+  /// to. Absent on pre-upgrade withdrawals.
+  feeTerms?: FeeTerms;
 }
 
 export interface ChainInfo {

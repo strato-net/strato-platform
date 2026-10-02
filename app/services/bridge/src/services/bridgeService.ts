@@ -1,3 +1,4 @@
+import { decideRejectedWithdrawal } from "./externalSettlementService";
 import {
   config,
   getChainRpcUrl,
@@ -6,8 +7,21 @@ import {
 import { JsonRpcProvider } from "ethers";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, DepositArgs, ActionDepositArgs, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData } from "../types";
-import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
+import { NonEmptyArray, WithdrawalInfo, NativeWithdrawalInfo, NativeDepositArgs, ConfirmDepositArgs, ConfirmNativeDepositArgs, SafeTransactionData, WithdrawalClaimArgs } from "../types";
+import {
+  createSafeTransactions,
+  findWithdrawalPayouts,
+  getSafeOnChainNonce,
+  proposeSafeTransactions,
+  WithdrawalPayout,
+} from "./safeService";
+import { groupByChain, routerSupportsSettlement } from "../utils/safeHelper";
+import { withdrawalProposalJournal } from "./withdrawalProposalJournal";
+import {
+  getEnabledChains,
+  getWithdrawalFeeTerms,
+  getNativeWithdrawalFeeTerms,
+} from "./cirrusService";
 import { logInfo, logError } from "../utils/logger";
 import { mintVouchersForDeposits } from "./voucherService";
 import { eth } from "../utils/api";
@@ -17,8 +31,8 @@ import {
   getExistingNativeMintTxHash,
   getNativeMintProposalExecution,
   proposeNativeMint,
+  representationBridgeSupportsV2,
 } from "./nativeMintService";
-import { buildActionDepositBatchArgs } from "./depositEventService";
 
 let cachedStratoNetworkId: bigint | null = null;
 const announcedManualNativeWithdrawals = new Map<string, string | null>();
@@ -139,6 +153,37 @@ const syncManualNativeMintProposal = async (
   }
 
   if (result.status === "rejected") {
+    // "Rejected" only means OUR proposal did not execute. Whether the mint
+    // happened is a separate question with an on-chain answer, and aborting
+    // without asking it returns the escrow for tokens that already exist.
+    const { decision, state } = await decideRejectedWithdrawal(
+      `native withdrawal ${withdrawal.withdrawalId}`,
+      {
+        kind: "native",
+        chainId: Number(withdrawal.externalChainId),
+        contract: withdrawal.externalBridge,
+        sourceChainId: await getStratoNetworkId(),
+        sourceBridge: config.nativeBridge.address!,
+        withdrawalId: withdrawal.withdrawalId,
+      },
+    );
+    if (decision === "hold") return true;
+    if (decision === "finalize") {
+      const done = await execute({
+        contractName: "StratoNativeBridge",
+        contractAddress: config.nativeBridge.address!,
+        method: "finalizeWithdrawal",
+        args: {
+          id: Number(withdrawal.withdrawalId),
+          externalTxHash: (state as { txHash: string }).txHash,
+          nativeMintProposalHash: "",
+        },
+      });
+      if (done.status === "Success") {
+        announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
+      }
+      return true;
+    }
     await execute({
       contractName: "StratoNativeBridge",
       contractAddress: config.nativeBridge.address!,
@@ -155,7 +200,7 @@ const syncManualNativeMintProposal = async (
     return true;
   }
 
-  const finalizeResult = await execute({
+  await execute({
     contractName: "StratoNativeBridge",
     contractAddress: config.nativeBridge.address!,
     method: "finalizeWithdrawal",
@@ -165,9 +210,6 @@ const syncManualNativeMintProposal = async (
       nativeMintProposalHash: proposalReference,
     },
   });
-  if (finalizeResult.status !== "Success") {
-    return true;
-  }
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
   return true;
 };
@@ -187,133 +229,97 @@ const recordNativeWithdrawalProposal = async (
   });
 };
 
-const isDuplicateDepositError = (error: unknown): boolean => {
-  const message = (error as Error).message;
-  return (
-    message.includes("MB: dup key") ||
-    message.includes("MB: duplicate deposit")
-  );
-};
-
-const recordStandardDeposit = async (deposit: DepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "deposit",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-    },
-  });
-};
-
-const recordActionDeposit = async (deposit: ActionDepositArgs) => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "depositWithAction",
-    args: {
-      externalChainId: deposit.externalChainId,
-      externalSender: deposit.externalSender,
-      externalToken: deposit.externalToken,
-      externalTokenAmount: deposit.externalTokenAmount,
-      externalTxHash: deposit.externalTxHash,
-      stratoRecipient: deposit.stratoRecipient,
-      targetStratoToken: deposit.targetStratoToken,
-      action: deposit.action,
-      actionToken: deposit.actionToken,
-      minFinalOut: deposit.minFinalOut,
-    },
-  });
-};
-
-const recoverMixedDuplicateBatch = async <T extends DepositArgs>(
-  deposits: NonEmptyArray<T>,
-  recordOne: (deposit: T) => Promise<void>,
+/**
+ * Mirror a solver's claim on an outbound withdrawal back onto STRATO.
+ *
+ * This does NOT pay the solver -- the external chain's own settlement does
+ * that. It makes the claim visible on the chain holding the escrow, and it
+ * closes the user's 48-hour abort hatch: without it a user could take a
+ * solver's tokens on one chain and their own escrow back on the other.
+ *
+ * STRATO re-checks the arithmetic (that a rung-zero fee sits inside the
+ * committed schedule at `claimedAt`, and that `netPaid` is the remainder), so a
+ * wrong report is refused rather than recorded.
+ */
+export const recordWithdrawalClaim = async (
+  claim: WithdrawalClaimArgs,
+  contractName: "MercataBridge" | "StratoNativeBridge",
 ) => {
-  for (const deposit of deposits) {
-    try {
-      await recordOne(deposit);
-    } catch (error) {
-      if (!isDuplicateDepositError(error)) throw error;
-      logInfo(
-        "BridgeService",
-        `Deposit already recorded: ${deposit.externalTxHash}`,
-      );
-    }
-  }
-};
-
-export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
-  const externalChainIds = depositArgs.map((deposit) => deposit.externalChainId);
-  const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
-  const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
-  const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
-  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
-  const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
-  const targetStratoTokens = depositArgs.map((deposit) => deposit.targetStratoToken);
+  const contractAddress =
+    contractName === "MercataBridge"
+      ? config.bridge.address!
+      : config.nativeBridge.address!;
 
   try {
     await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "depositBatch",
+      contractName,
+      contractAddress,
+      method: "recordWithdrawalClaim",
       args: {
-        externalChainIds,
-        externalTxHashes,
-        externalTokens,
-        externalTokenAmounts,
-        stratoRecipients,
-        externalSenders,
-        targetStratoTokens,
+        id: Number(claim.withdrawalId),
+        claimant: claim.claimant,
+        claimIndex: claim.claimIndex,
+        feeCharged: claim.feeCharged,
+        netPaid: claim.netPaid,
+        claimedAt: claim.claimedAt,
+        externalFillTxHash: claim.externalFillTxHash,
       },
     });
-
     logInfo(
       "BridgeService",
-      `Successfully deposited ${depositArgs.length} deposits`,
+      `Recorded solver claim on withdrawal ${claim.withdrawalId} at rung ${claim.claimIndex}`,
     );
   } catch (error) {
-    if (isDuplicateDepositError(error)) {
+    const message = (error as Error).message;
+    // Another relayer got there first, or the withdrawal has already left the
+    // state where a claim can be recorded. Both are ordinary races.
+    if (
+      message.includes("claim index not advancing") ||
+      message.includes("bad state")
+    ) {
       logInfo(
         "BridgeService",
-        `Standard deposit batch contained an existing deposit; recovering item-by-item`,
+        `Claim on withdrawal ${claim.withdrawalId} already recorded or no longer recordable`,
       );
-      await recoverMixedDuplicateBatch(depositArgs, recordStandardDeposit);
       return;
     }
     throw error;
   }
 };
 
-export const depositBatchWithAction = async (
-  depositArgs: NonEmptyArray<ActionDepositArgs>,
+/**
+ * Reject an announced deposit governance has ruled fake, slashing its bond.
+ *
+ * The ONLY path that takes an announcer's money, and the relayer reaches for it
+ * only when the claimed origin transaction provably does not contain the
+ * deposit -- a receipt that exists and says something else. An announcement
+ * that merely disagrees with the relayer's numbers is superseded when the real
+ * record lands, and its bond stays reclaimable; the honest reasons to differ
+ * are real (a rebase adjustment, a race with a reorg), and a relayer that
+ * cannot reach an RPC must never mistake its own blindness for fraud.
+ */
+export const rejectAnnouncedDeposit = async (
+  externalChainId: string | number,
+  externalTxHash: string,
 ) => {
-  const args = buildActionDepositBatchArgs(depositArgs);
-
   try {
     await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
-      method: "depositBatchWithAction",
-      args,
+      method: "rejectAnnouncement",
+      args: { externalChainId, externalTxHash },
     });
     logInfo(
       "BridgeService",
-      `Successfully recorded ${depositArgs.length} action deposits`,
+      `Rejected fake announcement ${externalTxHash} on chain ${externalChainId}`,
     );
   } catch (error) {
-    if (isDuplicateDepositError(error)) {
+    const message = (error as Error).message;
+    if (message.includes("bond already resolved")) {
       logInfo(
         "BridgeService",
-        `Action deposit batch contained an existing deposit; recovering item-by-item`,
+        `Announcement ${externalTxHash} already resolved by another server`,
       );
-      await recoverMixedDuplicateBatch(depositArgs, recordActionDeposit);
       return;
     }
     throw error;
@@ -328,12 +334,9 @@ export const recordNativeDepositBatch = async (
   }
 
   try {
-    const result = await execute(
-      depositArgs.map((deposit) => ({
-        contractName: "StratoNativeBridge",
-        contractAddress: config.nativeBridge.address!,
-        method: "recordDeposit",
-        args: {
+    await execute(
+      depositArgs.map((deposit) => {
+        const base = {
           externalChainId: deposit.externalChainId,
           externalBridge: deposit.externalBridge,
           externalRedemptionId: deposit.externalRedemptionId,
@@ -342,15 +345,32 @@ export const recordNativeDepositBatch = async (
           representationToken: deposit.representationToken,
           stratoRecipient: deposit.stratoRecipient,
           stratoTokenAmount: deposit.stratoTokenAmount,
-        },
-      }))
-    );
+        };
 
-    if (result.status !== "Success") {
-      throw new Error(
-        `Native deposit record still ${result.status}; will retry`,
-      );
-    }
+        // A redemption that offered a solver fee goes through the fee-bearing
+        // entry point, carrying the ORIGIN chain's timestamp so STRATO starts
+        // the decay from when the user asked rather than from now.
+        if (!deposit.feeTerms) {
+          return {
+            contractName: "StratoNativeBridge",
+            contractAddress: config.nativeBridge.address!,
+            method: "recordDeposit",
+            args: base,
+          };
+        }
+
+        return {
+          contractName: "StratoNativeBridge",
+          contractAddress: config.nativeBridge.address!,
+          method: "recordDepositWithFee",
+          args: {
+            ...base,
+            maxFee: deposit.feeTerms.maxFee,
+            requestedAt: deposit.feeTerms.requestedAt,
+          },
+        };
+      })
+    );
 
     logInfo(
       "BridgeService",
@@ -379,7 +399,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    const result = await execute({
+    await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,
       method: "confirmDepositBatch",
@@ -388,14 +408,6 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
         externalTxHashes,
       },
     });
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} deposits`,
-      );
-      return;
-    }
 
     logInfo(
       "BridgeService",
@@ -431,7 +443,7 @@ export const confirmNativeDepositBatch = async (
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
-    const result = await execute(
+    await execute(
       deposits.map((deposit) => ({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
@@ -443,14 +455,6 @@ export const confirmNativeDepositBatch = async (
         },
       }))
     );
-
-    if (result.status !== "Success") {
-      logInfo(
-        "BridgeService",
-        `Native deposit confirmation still ${result.status}; skipping voucher mint for ${deposits.length} native deposits`,
-      );
-      return;
-    }
 
     logInfo(
       "BridgeService",
@@ -580,43 +584,176 @@ export const confirmWithdrawalBatch = async (
   }
 };
 
-const confirmEligibleWithdrawalBatch = async (
-  withdrawals: NonEmptyArray<WithdrawalInfo>,
-) => {
-  const transactionProposals = await createSafeTransactions(withdrawals);
+/**
+ * Attach the context a withdrawal needs to be settled through the router.
+ *
+ * Without this the proposal falls back to a direct transfer to the recipient,
+ * which is exactly right for a withdrawal requested before the fast-path
+ * upgrade -- it has no committed fee schedule, so no solver can have claimed
+ * it -- and exactly wrong for one that can be claimed. Attaching it here, once,
+ * is what keeps that decision in a single place.
+ */
+const attachSettlementContext = async (
+  withdrawals: WithdrawalInfo[],
+): Promise<void> => {
+  const feeTerms = await getWithdrawalFeeTerms(withdrawals.map((w) => String(w.withdrawalId)));
+  // Nothing here can be claimed, so nothing needs routing: the direct transfer is right for all
+  if (feeTerms.size === 0) return;
 
-  if (transactionProposals && transactionProposals.length > 0) {
-    const withdrawalIds = withdrawals.map((w) => w.withdrawalId);
-    const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
+  const [sourceChainId, chains] = await Promise.all([getStratoNetworkId(), getEnabledChains()]);
 
+  for (const withdrawal of withdrawals) {
+    const terms = feeTerms.get(String(withdrawal.withdrawalId));
+    const chain = chains.get(Number(withdrawal.externalChainId));
+    if (!terms || !chain?.depositRouter) continue;
+
+    // The wallet that will execute this payout is the one whose settler rights
+    // matter: a hot-wallet withdrawal is proposed from the hot Safe.
+    const settler = withdrawal.useHotWallet
+      ? config.safe.hotWalletAddress
+      : config.safe.address;
+    if (!settler) continue;
+
+    // Probed on chain, not assumed. STRATO commits a schedule to every
+    // withdrawal once upgraded, but the external routers upgrade on their own
+    // schedule; routing to one that cannot settle would stall the withdrawal.
+    if (
+      !(await routerSupportsSettlement(
+        Number(withdrawal.externalChainId),
+        chain.depositRouter,
+        settler,
+      ))
+    ) {
+      continue;
+    }
+
+    withdrawal.feeTerms = terms;
+    withdrawal.sourceChainId = sourceChainId.toString();
+    withdrawal.sourceBridge = config.bridge.address!;
+    withdrawal.settlementRouter = chain.depositRouter;
+  }
+};
+
+const payoutSafes = () => [config.safe.address, config.safe.hotWalletAddress];
+
+// Payouts the Safes already hold for these withdrawals, looked up on each withdrawal's own chain
+const findExistingPayouts = async (
+  withdrawals: WithdrawalInfo[],
+): Promise<Map<string, WithdrawalPayout[]>> => {
+  const existing = new Map<string, WithdrawalPayout[]>();
+  for (const [chainId, chainWithdrawals] of groupByChain(withdrawals)) {
+    const payouts = await findWithdrawalPayouts(chainId, payoutSafes());
+    for (const withdrawal of chainWithdrawals) {
+      const found = payouts.get(String(withdrawal.withdrawalId));
+      if (found?.length) existing.set(String(withdrawal.withdrawalId), found);
+    }
+  }
+  return existing;
+};
+
+/**
+ * A withdrawal still INITIATED on STRATO whose payout is already in a Safe is never given a
+ * second payout. With exactly one payout, record that one on STRATO; with more, a human must
+ * reject the extras first.
+ */
+const adoptExistingPayouts = async (existing: Map<string, WithdrawalPayout[]>) => {
+  for (const [withdrawalId, payouts] of existing) {
+    const hashes = payouts.map((payout) => payout.safeTxHash);
+    if (payouts.length > 1) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${withdrawalId} has ${payouts.length} payouts in the Safe (${hashes.join(", ")}); reject all but one before it can proceed`,
+        ),
+      );
+      continue;
+    }
+
+    logInfo(
+      "BridgeService",
+      `Withdrawal ${withdrawalId} already has Safe payout ${hashes[0]}; recording it instead of proposing another`,
+    );
     try {
-      logInfo("BridgeService", "Confirming non-native withdrawals on STRATO", {
-        withdrawalIds,
-        custodyTxHashes,
-      });
       await execute({
         contractName: "MercataBridge",
         contractAddress: config.bridge.address!,
         method: "confirmWithdrawalBatch",
-        args: {
-          ids: withdrawalIds,
-          custodyTxHashes,
-        },
+        args: { ids: [withdrawalId], custodyTxHashes: hashes },
       });
-      await proposeSafeTransactions(transactionProposals as NonEmptyArray<SafeTransactionData>);
-    } catch (executeError) {
-      const errorMessage = (executeError as Error).message;
-      if (errorMessage.includes("MB: bad state")) {
-        logInfo(
-          "BridgeService",
-          `Withdrawals already confirmed by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
-        );
-        return;
-      }
-      throw executeError;
+    } catch (error) {
+      // Usually Cirrus had not caught up with a confirmation that already landed
+      if ((error as Error).message.includes("MB: bad state")) continue;
+      throw error;
     }
+    logError(
+      "BridgeService",
+      new Error(
+        `Withdrawal ${withdrawalId} had Safe payout ${hashes[0]} without a STRATO confirmation; it is now recorded`,
+      ),
+    );
+  }
+};
 
-    const emailPromises = transactionProposals.map(async (proposal) => {
+const confirmEligibleWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<WithdrawalInfo>,
+) => {
+  const existing = await findExistingPayouts(withdrawals);
+  await adoptExistingPayouts(existing);
+  const unpaid = withdrawals.filter((w) => !existing.has(String(w.withdrawalId)));
+  if (unpaid.length === 0) return;
+
+  await attachSettlementContext(unpaid);
+  const transactionProposals = await createSafeTransactions(unpaid as NonEmptyArray<WithdrawalInfo>);
+  if (!transactionProposals || transactionProposals.length === 0) return;
+
+  // Proposals come back grouped by chain, so pair ids and hashes from the proposals themselves
+  const withdrawalIds = transactionProposals.map((tx) => tx.withdrawalId);
+  const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
+
+  // Keep the signed payouts before STRATO can point at them: if the confirmation lands but
+  // proposing fails, the withdrawal-tx poller proposes exactly this transaction later
+  await withdrawalProposalJournal.record(
+    transactionProposals.map((proposal) => ({
+      withdrawalId: proposal.withdrawalId,
+      proposal,
+    })),
+  );
+
+  try {
+    logInfo("BridgeService", "Confirming non-native withdrawals on STRATO", {
+      withdrawalIds,
+      custodyTxHashes,
+    });
+    // Resolves only on success; a pending or failed confirmation throws before any payout is proposed
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "confirmWithdrawalBatch",
+      args: {
+        ids: withdrawalIds,
+        custodyTxHashes,
+      },
+    });
+  } catch (executeError) {
+    const errorMessage = (executeError as Error).message;
+    if (errorMessage.includes("MB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Withdrawals already confirmed: ${withdrawalIds.join(", ")}; only the custody tx recorded on STRATO will be proposed`,
+      );
+      return;
+    }
+    throw executeError;
+  }
+
+  const proposed = new Set(
+    await proposeSafeTransactions(transactionProposals as NonEmptyArray<SafeTransactionData>),
+  );
+  await withdrawalProposalJournal.markProposed([...proposed]);
+
+  const emailPromises = transactionProposals
+    .filter((proposal) => proposed.has(proposal.safeTxHash))
+    .map(async (proposal) => {
       try {
         await sendEmail(proposal.safeTxHash, proposal.externalChainId);
         return "success";
@@ -629,14 +766,79 @@ const confirmEligibleWithdrawalBatch = async (
       }
     });
 
-    const emailResults = await Promise.all(emailPromises);
-    const successCount = emailResults.filter((r) => r === "success").length;
-    const failureCount = emailResults.filter((r) => r === "failed").length;
+  const emailResults = await Promise.all(emailPromises);
+  const successCount = emailResults.filter((r) => r === "success").length;
+  const failureCount = emailResults.filter((r) => r === "failed").length;
+  logInfo(
+    "BridgeService",
+    `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+  );
+};
+
+/**
+ * Propose custody transactions that STRATO recorded but the Safe service never received,
+ * using the relayer's saved copy. Returns the withdrawals whose saved transaction can never
+ * execute because its Safe nonce was used by something else; those must be aborted.
+ */
+export const proposeRecordedCustodyTxs = async (
+  withdrawals: Array<{ id: Number; safeTxHash: string }>,
+  externalChainId: number,
+): Promise<Number[]> => {
+  const unexecutable: Number[] = [];
+  const toPropose: SafeTransactionData[] = [];
+  const onChainNonces = new Map<string, number>();
+  const existingPayouts = await findWithdrawalPayouts(externalChainId, payoutSafes());
+
+  for (const { id, safeTxHash } of withdrawals) {
+    const entry = await withdrawalProposalJournal.get(safeTxHash);
+    if (!entry) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${id} points at Safe transaction ${safeTxHash}, which the Safe service does not have and this relayer has no copy of; resolve it manually`,
+        ),
+      );
+      continue;
+    }
+
+    // Neither propose nor abort while the Safe holds any payout for this withdrawal
+    const existing = existingPayouts.get(String(id)) ?? [];
+    if (existing.length > 0) {
+      logError(
+        "BridgeService",
+        new Error(
+          `Withdrawal ${id} records custody tx ${safeTxHash}, but the Safe holds payout(s) ${existing.map((p) => p.safeTxHash).join(", ")} for it; resolve it manually`,
+        ),
+      );
+      continue;
+    }
+
+    const { safeAddress, nonce } = entry.proposal;
+    if (!onChainNonces.has(safeAddress)) {
+      onChainNonces.set(safeAddress, await getSafeOnChainNonce(externalChainId, safeAddress));
+    }
+    // It was never proposed, so nobody else could have signed or executed it: a used nonce
+    // means another transaction took the slot and this payout can never happen
+    if (nonce < onChainNonces.get(safeAddress)!) {
+      logInfo(
+        "BridgeService",
+        `Withdrawal ${id} custody tx ${safeTxHash} was never proposed and Safe nonce ${nonce} is already used; aborting so the escrow is refunded`,
+      );
+      unexecutable.push(id);
+      continue;
+    }
     logInfo(
       "BridgeService",
-      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+      `Withdrawal ${id} custody tx ${safeTxHash} was recorded on STRATO but never proposed; proposing the saved transaction`,
     );
+    toPropose.push(entry.proposal);
   }
+
+  if (toPropose.length > 0) {
+    const proposed = await proposeSafeTransactions(toPropose as NonEmptyArray<SafeTransactionData>);
+    await withdrawalProposalJournal.markProposed(proposed);
+  }
+  return unexecutable;
 };
 
 export const finaliseWithdrawalBatch = async (
@@ -673,6 +875,41 @@ export const finaliseWithdrawalBatch = async (
   }
 };
 
+/**
+ * Split rejected Mercata withdrawals into those safe to abort and those the
+ * external chain says were already paid (finalize instead). Anything that
+ * cannot be determined is held: it appears in neither list and is looked at
+ * again on the next poll.
+ */
+export const triageRejectedWithdrawals = async (
+  rejected: WithdrawalInfo[],
+): Promise<{ abort: Number[]; finalize: Number[] }> => {
+  const out = { abort: [] as Number[], finalize: [] as Number[] };
+  if (rejected.length === 0) return out;
+  const [sourceChainId, chains] = await Promise.all([
+    getStratoNetworkId(),
+    getEnabledChains(),
+  ]);
+  for (const w of rejected) {
+    const id = Number(w.withdrawalId);
+    const router = chains.get(Number(w.externalChainId))?.depositRouter;
+    // No router means a chain that settles by plain Safe transfer, which has
+    // no on-chain flag to consult: the pre-fast-path behaviour applies.
+    if (!router) { out.abort.push(id); continue; }
+    const { decision } = await decideRejectedWithdrawal(`withdrawal ${id}`, {
+      kind: "mercata",
+      chainId: Number(w.externalChainId),
+      contract: router,
+      sourceChainId,
+      sourceBridge: config.bridge.address!,
+      withdrawalId: id,
+    });
+    if (decision === "abort") out.abort.push(id);
+    else if (decision === "finalize") out.finalize.push(id);
+  }
+  return out;
+};
+
 export const handleRejectedWithdrawalBatch = async (
   ids: NonEmptyArray<Number>,
 ) => {
@@ -705,6 +942,53 @@ export const handleRejectedWithdrawalBatch = async (
     
     // Re-throw other errors
     throw error;
+  }
+};
+
+/**
+ * Attach the committed fee schedule to native withdrawals, so the mint
+ * attestation can carry it.
+ *
+ * A withdrawal WITHOUT a schedule stays on the V1 attestation and behaves
+ * exactly as before. One WITH a schedule must go through V2: the V1 mint
+ * refuses a claimed withdrawal outright rather than paying the recipient a
+ * second time, so skipping this would strand every fast-path withdrawal at the
+ * mint step.
+ */
+const attachNativeFeeTerms = async (
+  withdrawals: NativeWithdrawalInfo[],
+): Promise<void> => {
+  const terms = await getNativeWithdrawalFeeTerms(
+    withdrawals.map((w) => String(w.withdrawalId)),
+  );
+
+  for (const withdrawal of withdrawals) {
+    const feeTerms = terms.get(String(withdrawal.withdrawalId));
+    if (!feeTerms) continue;
+
+    // Only attach the schedule to a bridge that can actually honour it.
+    // Attaching it selects the V2 attestation, and a V1-only bridge has no such
+    // entry point -- so on an un-upgraded chain this would turn every native
+    // withdrawal into a failed mint. Probed rather than assumed, because STRATO
+    // writes a schedule for every withdrawal the moment it is upgraded while
+    // the destination bridges upgrade on their own schedule.
+    const bridgeAddress = getNativeRepresentationBridgeAddress(
+      Number(withdrawal.externalChainId),
+    );
+    if (!bridgeAddress) continue;
+    if (!(await representationBridgeSupportsV2(
+      Number(withdrawal.externalChainId),
+      bridgeAddress,
+    ))) {
+      logInfo(
+        "BridgeService",
+        `Representation bridge on chain ${withdrawal.externalChainId} is V1 only; ` +
+          `native withdrawal ${withdrawal.withdrawalId} keeps the V1 attestation`,
+      );
+      continue;
+    }
+
+    withdrawal.feeTerms = feeTerms;
   }
 };
 
@@ -745,6 +1029,7 @@ export const finalizeNativeWithdrawalBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
+  await attachNativeFeeTerms(withdrawals);
   const sourceChainId = await getStratoNetworkId();
   const failures: Array<{ withdrawalId: string; message: string }> = [];
   let successful = 0;
@@ -792,7 +1077,8 @@ export const finalizeNativeWithdrawalBatch = async (
         externalTxHash,
       );
 
-      const result = await execute({
+      // A pending finalize throws; the mint hash stays cached so the retry reuses it
+      await execute({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
         method: "finalizeWithdrawal",
@@ -802,14 +1088,6 @@ export const finalizeNativeWithdrawalBatch = async (
           nativeMintProposalHash: "",
         },
       });
-
-      if (result.status !== "Success") {
-        logInfo(
-          "BridgeService",
-          `Native withdrawal ${withdrawal.withdrawalId} destination mint succeeded but STRATO finalize is still ${result.status}`,
-        );
-        continue;
-      }
 
       pendingNativeInstantWithdrawalTxHashes.delete(withdrawal.withdrawalId);
       successful += 1;
@@ -863,13 +1141,12 @@ export const queueManualNativeWithdrawalBatch = async (
     throw new Error("Native bridge address not configured");
   }
 
+  await attachNativeFeeTerms(withdrawals);
   const sourceChainId = await getStratoNetworkId();
 
   for (const withdrawal of withdrawals) {
-    if (withdrawal.useInstantPath) {
-      continue;
-    }
-
+    // No `useInstantPath` skip: the hot-key mint lane is gone, so an
+    // instant-flagged withdrawal is proposed to the Safe like any other.
     const recordedProposalReference = normalizeOptionalHash(
       withdrawal.nativeMintProposalHash,
     );

@@ -1,6 +1,6 @@
 # Setup - Contributing to STRATO
 
-This guide covers everything you need to start contributing to the STRATO platform codebase.
+This page covers how to build STRATO from source, run a local node, and work on the app layer.
 
 ---
 
@@ -8,510 +8,373 @@ This guide covers everything you need to start contributing to the STRATO platfo
 
 **You're in the right place if you want to:**
 
-- Contribute to the STRATO blockchain core (Haskell)
-- Develop smart contracts for the DeFi layer (Solidity)
-- Work on the backend API (Node.js/TypeScript)
-- Build the frontend UI (React/TypeScript)
-- Improve infrastructure and services
+- Change the blockchain core (Haskell, `strato/`)
+- Write or test the platform's smart contracts (SolidVM, `app/contracts/`)
+- Work on the app backend (`app/backend/`) or UI (`app/ui/`)
+- Work on off-chain services (`app/services/`) or node tooling
 
 **Not what you're looking for?**
 
-- Building apps that use STRATO? → See [Building Apps on STRATO](../build-apps/overview.md)
-- Running your own node? → See Node Operators (coming soon)
+- Building apps that use STRATO? See [Building Apps on STRATO](../build-apps/overview.md).
+- Running a node without changing code? See [Run a Node](../node/index.md).
 
 ---
 
 ## Prerequisites
 
-### Required Tools
+`install_deps.sh` supports these platforms:
 
-#### 1. Stack (Haskell Build Tool)
+- macOS Sequoia (15.x) and Tahoe (26.x)
+- Ubuntu 24.04 LTS and 26.04 LTS
+- Amazon Linux 2023
+- Oracle Linux 8.10
 
-**What:** Build tool for Haskell code (blockchain core)
+You need:
 
-**Install:** https://docs.haskellstack.org/en/stable/install_and_upgrade/
-
-```bash
-curl -sSL https://get.haskellstack.org/ | sh
-```
-
-**Verify:**
-
-```bash
-stack --version
-```
-
-#### 2. Docker with Compose Plugin
-
-**What:** Runtime environment for running STRATO components
-
-**Install:** https://docs.docker.com/engine/install/
-
-**Verify:**
-
-```bash
-docker --version
-docker compose version
-```
-
-#### 3. Node.js 18+ and npm
-
-**What:** For building frontend and backend components
-
-**Install:** https://nodejs.org/ or use nvm
-
-```bash
-# Using nvm (recommended)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 18
-nvm use 18
-```
-
-**Verify:**
-
-```bash
-node --version  # Should be v18.x or higher
-npm --version
-```
-
-#### 4. System Libraries
-
-You have two options:
-
-**Option A: Install System-wide**
-
-**Ubuntu 24.04:**
-
-```bash
-sudo apt install -y \
-  libleveldb-dev \
-  liblzma-dev \
-  libpq-dev \
-  libsecp256k1-dev \
-  libsodium-dev \
-  postgresql-client
-```
-
-**macOS (requires Homebrew):**
-
-```bash
-brew install --quiet \
-  leveldb \
-  postgresql \
-  libsodium \
-  pkg-config \
-  secp256k1 \
-  xz
-```
-
-**Option B: Use Nix (Recommended for consistency)**
-
-```bash
-# Install Nix
-curl -L https://nixos.org/nix/install | sh
-
-# Nix packages are predefined in the project
-# No manual library installation needed
-```
-
-**Verify:**
-
-```bash
-# Check if libraries are available
-pkg-config --modversion leveldb
-pkg-config --modversion libsodium
-```
-
-#### 5. OAuth Client Credentials
-
-**What:** Required to connect to STRATO network
-
-**How to get:**
-
-1. Go to [support.blockapps.net](https://support.blockapps.net/)
-2. Sign in
-3. Click "Request Client Credentials"
-4. You'll receive:
-   - `OAUTH_DISCOVERY_URL`
-   - `OAUTH_CLIENT_ID`
-   - `OAUTH_CLIENT_SECRET`
-
-**Keep these safe!** You'll need them to run STRATO locally.
+- **git**
+- **Docker** with the Compose plugin. On Linux, run Docker as your own user (member of the `docker` group), not as root.
+- **Haskell Stack**. The compiler version comes from `strato/stack.yaml`.
+- **System libraries**: LevelDB, secp256k1, libsodium, libpq, librdkafka, xz/lzma, GMP, zlib, and `logrotate`.
+- **Node.js 22.12 or later, below 23**, only if you run the app backend or UI outside Docker. Both `app/backend/package.json` and `app/ui/package.json` declare `"node": ">=22.12 <23.0"`.
+- **OAuth client credentials** to run a node against the shared Keycloak. Request them at [support.blockapps.net](https://support.blockapps.net/). You don't need them if you run the node with `--localAuth` (see [Log in](#4-log-in)).
 
 ---
 
-## Clone the Repository
-
-### 1. Clone the STRATO Platform Monorepo
+## 1. Clone the Repository
 
 ```bash
-git clone git@github.com:blockapps/strato-platform.git
+git clone https://github.com/strato-net/strato-platform
 cd strato-platform
 ```
 
-**What's included:**
-
-```
-strato-platform/
-├── strato/              # Blockchain core (Haskell)
-├── app/                 # DeFi application layer
-│   ├── contracts/       # Smart contracts (Solidity)
-│   ├── backend/         # REST API (Node.js/TypeScript)
-│   ├── ui/              # Web UI (React/TypeScript)
-│   └── services/        # Background services
-├── bootstrap-docker/    # Production deployment
-├── nginx-packager/      # Reverse proxy
-└── docs/                # Documentation
-```
-
-### 2. Install Git Hooks (Optional but Recommended)
-
-**Pre-commit hook:** Automatically removes trailing whitespace
-
-```bash
-cp scripts/hooks/pre-commit .git/hooks/pre-commit
-chmod +x .git/hooks/pre-commit
-```
+If you plan to open pull requests, fork the repository first. See [Contributing Guidelines](contributing.md).
 
 ---
 
-## Build
+## 2. Install Dependencies
 
-### Option 1: Build Everything
+=== "Install script (recommended)"
 
-!!! tip "First Time Building?"
-    The first build will take **15-30 minutes** as Stack downloads dependencies and compiles the Haskell codebase. Subsequent builds are much faster (2-5 minutes for incremental changes).
+    ```bash
+    ./install_deps.sh
+    ```
 
-**With system-wide libraries:**
+    The script installs git, Docker, Stack and the system libraries. On Linux it also adds your user to the `docker` group. To use that group in your current shell, run:
+
+    ```bash
+    newgrp docker
+    docker ps
+    ```
+
+    On Amazon Linux 2023 and Oracle Linux 8.10, the script builds LevelDB, secp256k1 and librdkafka from source.
+
+=== "Manual (Ubuntu)"
+
+    Install [Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/) and [Docker Engine with the Compose plugin](https://docs.docker.com/engine/install/ubuntu/). Then add your user to the `docker` group:
+
+    ```bash
+    sudo groupadd docker ; sudo usermod -aG docker $USER && newgrp docker ; docker ps
+    ```
+
+    Install the libraries that `install_deps.sh` installs:
+
+    ```bash
+    sudo apt install -y --no-install-recommends \
+      build-essential curl libgmp-dev zlib1g-dev \
+      libleveldb-dev liblzma-dev libpq-dev librdkafka-dev \
+      libsecp256k1-dev libsodium-dev logrotate postgresql-client
+    ```
+
+=== "Manual (macOS)"
+
+    Install [Homebrew](https://brew.sh/) and Docker Desktop. Then install:
+
+    ```bash
+    brew install --quiet git haskell-stack
+    brew install --quiet \
+      gmp leveldb libpq librdkafka libsodium logrotate pkgconf secp256k1 xz
+    ```
+
+=== "Nix"
+
+    Install [Nix](https://nix.dev/install-nix.html) and Docker. Build with `NIX=true make` (see below). This passes `--nix` to Stack, which uses `strato/nix/stack.nix` to provide the libraries, so you don't install them system-wide.
+
+!!! note "librdkafka"
+    The default node no longer runs Kafka (19.1 uses embedded JLog streaming). The Kafka streaming backends are still in the Stack build, so librdkafka is still a build dependency.
+
+---
+
+## 3. Build
+
+!!! warning "Do not use root or sudo"
+    Run `make`, `strato-login` and `strato-up` as your normal user. Running them as root causes permission problems.
 
 ```bash
 make
 ```
 
-**With Nix:**
+With Nix:
 
 ```bash
 NIX=true make
 ```
 
-**What this does:**
+The default target does the following:
 
-- Compiles the Haskell blockchain core (`strato`, `vm-runner`, `cirrus`)
-- Builds the Solidity smart contracts (`app/contracts`)
-- Builds the Node.js backend API (`app/backend`)
-- Builds the React frontend UI (`app/ui`)
-- Generates Docker Compose files
+1. Writes `BUILD_METADATA`: the version plus a content hash for each image.
+2. Runs `stack install` in `strato/`. This installs every Haskell executable to `~/.local/bin`, including `strato-setup`, `convoke`, the node processes and `solid-vm-cli`.
+3. Installs the `bin/` scripts to `~/.local/bin`: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-patch-app`, `strato-user-add`, `strato-snapshot` and `strato-logrotate`.
+4. Builds these Docker images: apex, nginx, postgrest, prometheus, smd, app-backend, app-ui, bridge, bridge-nginx, tracking, tracking-nginx, tracking-ui and local-auth.
 
-**Build output:**
+Each image is tagged with the version and a hash of its source directory. `make` skips any image whose tag already exists, so later builds only rebuild what changed. Local Haskell packages compile with `-Wall -Werror`, so any warning fails the build.
 
-```
-✓ strato-core
-✓ vm-runner
-✓ cirrus
-✓ app-contracts
-✓ app-backend
-✓ app-ui
-✓ docker-compose files generated
-```
+If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 
-### Option 2: Build Individual Components
+### Useful Make targets
 
-If you're only working on a specific part:
-
-**Backend only:**
-
-```bash
-make app-backend
-```
-
-**Frontend only:**
-
-```bash
-make app-ui
-```
-
-**Contracts only:**
-
-```bash
-cd app/contracts
-npm install
-npm run compile
-```
-
-**Blockchain core only:**
-
-```bash
-make strato-core
-```
-
-### Option 3: Generate Docker Compose Files Only
-
-```bash
-make docker-compose
-```
-
-This overwrites existing `docker-compose.yml` files with the latest configuration.
+| Target | What it does |
+|--------|--------------|
+| `make` | Builds everything listed above (target `local`) |
+| `make app` | Builds only the `app-backend` and `app-ui` images, then prints a `strato-patch-app` command |
+| `make nginx`, `make apex`, `make smd`, `make app-ui`, ... | Builds one image if its tag is missing |
+| `make nginx-force`, `make app-ui-force`, ... | Rebuilds one image unconditionally |
+| `make pretty` | Formats all tracked `.hs` files with ormolu (runs in Docker) |
+| `make hoogle` | Generates and serves local Haddock/Hoogle docs for `strato/` |
+| `make install-completions` | Installs shell completions for `airlock`, `baby-jubjub-cli` and `strato-barometer` |
+| `make uninstall` | Removes the `strato-*` scripts, `strato-setup` and `convoke` from `~/.local/bin` |
 
 ---
 
-## Run Locally
+## 4. Log in
 
-### 1. Build STRATO
-
-```bash
-cd strato-platform
-make
-```
-
-**What this does:**
-
-- Compiles the Haskell blockchain core
-- Builds Solidity smart contracts
-- Builds Node.js backend API
-- Builds React frontend UI
-
-**Time:** First build takes 15-30 minutes, subsequent builds are 2-5 minutes.
-
-### 2. Start STRATO
+Run this once per machine:
 
 ```bash
-./start my_node_name
+strato-login
 ```
 
-**What this does:**
+It asks for three values and saves them to `~/.secrets/strato_credentials.yaml`:
 
-- Starts all STRATO components (blockchain, API, UI, services)
-- Creates a local node directory (`my_node_name/`)
-- Blockchain data stored in `my_node_name/strato-data/`
-- Logs in `my_node_name/logs/`
+- **OAuth discovery URL**. The default is `https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration`.
+- **Client ID**
+- **Client secret**
 
-**First-time setup:**
+Use `strato-login --force` to replace saved credentials. Don't pass OAuth credentials as environment variables.
 
-The first run will:
+If the credentials file is missing, `strato-up` stops with `OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first.`
 
-1. Initialize the blockchain database
-2. Deploy core contracts
-3. Start API servers
-4. Launch the UI
-
-**This takes 2-5 minutes.**
-
-### 3. Verify It's Running
-
-**Check the blockchain API:**
-
-```bash
-curl http://localhost:8080/strato-api/eth/v1.2/account
-```
-
-**Expected response:**
-
-```json
-{
-  "accounts": []
-}
-```
-
-**Check the REST API:**
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-**Expected response:**
-
-```json
-{
-  "status": "healthy"
-}
-```
-
-**Check the UI:**
-
-Open your browser: http://localhost:3001
-
-You should see the STRATO DeFi interface.
-
-### 4. Access Logs
-
-**All logs:**
-
-```bash
-tail -f my_node_name/logs/*.log
-```
-
-**Blockchain core:**
-
-```bash
-tail -f my_node_name/logs/strato-core.log
-```
-
-**Backend API:**
-
-```bash
-tail -f my_node_name/logs/app-backend.log
-```
-
-**UI:**
-
-```bash
-tail -f my_node_name/logs/app-ui.log
-```
-
-### 5. Stop STRATO
-
-```bash
-# Graceful shutdown
-./stop
-
-# Force stop
-pkill -f strato
-```
-
-### 6. Wipe and Start Fresh
-
-```bash
-./forceWipe
-rm -rf my_node_name/
-./start my_node_name
-```
-
-!!! warning "Wipe Deletes All Data"
-    This removes all blockchain data, contracts, and transactions. Use only for testing/development.
+!!! tip "No Keycloak credentials? Use local auth"
+    `strato-up mynode --localAuth` bundles Ory Hydra and Kratos plus a node-local Vault, so you don't need `strato-login`. The first run creates an admin user, named `admin` unless you set `LOCAL_AUTH_ADMIN_USERNAME`. To add users, run `strato-user-add mynode <username>`. See `local-auth/README.md` and [Identity and Vault](../platform/identity-and-vault.md).
 
 ---
 
-## Run in Docker (Production-like)
+## 5. Run a Local Node
 
-For a fully Dockerized setup (similar to production):
-
-### 1. Prepare Docker Compose
+Start a testnet node from the latest published snapshot. Restoring a snapshot is much faster than syncing from genesis:
 
 ```bash
-cp docker-compose.allDocker.yml bootstrap-docker/docker-compose.yml
-cd bootstrap-docker
+strato-up mynode --network=helium --snapshot
 ```
 
-### 2. Configure Environment
+`strato-up` does the following:
 
-Edit `strato-run.sh` with your credentials:
+1. Runs `strato-setup`, which creates `mynode/` containing:
+    - `.ethereumH/ethconf.yaml` (the node configuration)
+    - `secrets/`
+    - `genesis.json`
+    - a generated `docker-compose.yml`
+    - `commands.txt` (the list of native processes)
+    - `logs/`
+2. With `--snapshot`, restores the snapshot into the new node directory. If `mynode/` already exists, it ignores `--snapshot`.
+3. Starts `convoke` in the background. `convoke` runs `docker compose -p strato up -d --wait`, then starts each line of `commands.txt` as a host process. If any process exits, convoke tears the whole node down.
+
+Other notes:
+
+- The network defaults to `upquark` (mainnet). Use `--network=helium` for testnet.
+- nginx serves the node on `--httpPort` (default `8081`). With `--sslDir=/path/to/ssl`, which must contain `server.pem` and `server.key`, it serves on 443.
+- For all flags, see [Node configuration](../node/configuration.md).
+
+Check status and stop:
 
 ```bash
-NODE_HOST='localhost' \
-network='helium' \
-OAUTH_CLIENT_ID='your-client-id-here' \
-OAUTH_CLIENT_SECRET='your-client-secret-here' \
-./strato
+strato-ps      # status of the node
+strato-down    # stop the node
 ```
 
-**Network options:**
+`strato-ps` and `strato-down` default to the last node you set up. That path is stored in `~/.strato/default-node`. You can also pass a node directory, for example `strato-down mynode`.
 
-- `network='helium'` - Testnet
-- `network='upquark'` - Mainnet
+Logs are in `mynode/logs/`:
 
-### 3. Start
+- one file per native process, named after the command (for example `logs/vm-runner` and `logs/strato-p2p`)
+- `logs/convoke.log`
+- the container logs
 
-```bash
-sudo ./strato-run.sh
-```
+### Clean restart
 
-**This will:**
+!!! warning "Always restart from a clean node directory"
+    Don't start a node on top of an existing or partially stopped `mynode`. Reused state gives unreliable results, for example a stray second process. The only reliable sequence is:
 
-- Pull Docker images
-- Start all services in containers
-- Expose ports (8080, 3000, 3001)
+    ```bash
+    strato-down
+    rm -rf mynode        # or: mv mynode mynode.backup
+    strato-up mynode --network=helium --snapshot
+    ```
 
-### 4. Wipe Docker Deployment
-
-```bash
-cd bootstrap-docker
-sudo ./strato --wipe
-```
+    Manage the node only with `strato-down` and `strato-up`. Don't start or kill individual processes or `convoke` by hand.
 
 ---
 
-## Common Issues
+## 6. Development Loops
 
-### Build Failures
+### Core (Haskell)
 
-**Problem:** `stack: command not found`
+1. Edit code under `strato/`.
+2. Rebuild with `make`, or run `cd strato && stack install` if you only changed Haskell code.
+3. Do a [clean restart](#clean-restart).
 
-**Solution:** Install Stack:
-
-```bash
-curl -sSL https://get.haskellstack.org/ | sh
-```
-
-**Problem:** `Could not find module 'Crypto.Secp256k1'`
-
-**Solution:** Install system libraries:
+To build or test a single package:
 
 ```bash
-# Ubuntu
-sudo apt install libsecp256k1-dev
-
-# macOS
-brew install secp256k1
+cd strato
+stack build slipstream
+stack test slipstream
 ```
 
-**Problem:** `cabal: Missing dependency on a foreign library: * Missing (or bad) C library: leveldb`
+### Contracts (SolidVM)
 
-**Solution:** Install leveldb:
+Contract tests are `*.test.sol` files under `app/contracts/tests/`. `solid-vm-cli` runs them, and `make` installs it. Run a test from its own directory:
 
 ```bash
-# Ubuntu
-sudo apt install libleveldb-dev
-
-# macOS
-brew install leveldb
+cd app/contracts/tests/Lending
+solid-vm-cli test <File>.test.sol
 ```
 
-### Runtime Errors
+`app/contracts/tests/test.sh <File>.test.sol` runs the same command and prints pass/fail counts. Deployment scripts are documented in `app/contracts/deploy/README.md`.
 
-**Problem:** Port already in use (8080, 3000, 3001)
-
-**Solution:**
+### App images on a running node
 
 ```bash
-# Find and kill processes
-lsof -ti:8080 | xargs kill -9
-lsof -ti:3000 | xargs kill -9
-lsof -ti:3001 | xargs kill -9
+make app
+strato-patch-app mynode app-backend:<tag> app-ui:<tag>
 ```
 
-**Problem:** Database connection failed
+Use the exact tags that `make app` prints.
 
-**Solution:** Ensure PostgreSQL is running:
+- **Node stopped:** the new images take effect on the next `strato-up`.
+- **Node running:** recreate only the app containers from the node directory. Use the same environment variables you started the node with:
 
 ```bash
-# Check status
-docker ps | grep postgres
-
-# Restart
-docker-compose restart postgres
+cd mynode
+<ENV VARS> docker compose -p strato up -d --no-deps app-backend app-ui
 ```
 
-**Problem:** OAuth authentication failed
+### App backend and UI outside Docker
 
-**Solution:** Verify your credentials in `strato-run.sh` or request new ones at [support.blockapps.net](https://support.blockapps.net/).
+This loop runs the backend and UI with hot reload, behind the standalone app nginx. It follows `app/README.md`.
+
+**Backend** (port 3001):
+
+```bash
+cd app/backend
+npm i
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+  OAUTH_CLIENT_ID=<client-id> \
+  OAUTH_CLIENT_SECRET=<client-secret> \
+  NODE_URL=<node URL> \
+  BASE_URL=http://localhost \
+  postgres_host=<postgres host> \
+  postgres_password=<postgres password> \
+  npm run dev
+```
+
+The backend exits at startup in these cases:
+
+- `OAUTH_DISCOVERY_URL`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` or `NODE_URL` is missing.
+- `postgres_password` is missing. The backend opens a read-only connection to the node's `cirrus` Postgres database. It uses `postgres_host` (default `postgres`), `postgres_port` (default `5432`) and `postgres_user` (default `postgres`).
+
+On a local node, Postgres listens on `127.0.0.1:5432` and the password is in `mynode/secrets/postgres_password`.
+
+**UI** (port 8080; the Vite dev server proxies `/api` to `localhost:3001`):
+
+```bash
+cd app/ui
+npm i
+npm run dev
+```
+
+**nginx** (port 80). Login only works through nginx. The Vite server on 8080 does not handle authentication.
+
+```bash
+cd app/nginx
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+  OAUTH_CLIENT_ID=<client-id> \
+  OAUTH_CLIENT_SECRET=<client-secret> \
+  NODE_URL=<node URL> \
+  docker compose -f docker-compose.nginx-standalone.yml up -d --build
+```
+
+Open [http://localhost](http://localhost).
+
+- `NODE_URL` must match the backend's `NODE_URL`, because nginx proxies `/rpc` to `NODE_URL/rpc`.
+- Port 80 must be free. Check with `lsof -i :80`.
+- `npm i` in either package also builds `app/packages/shared-types` through a `postinstall` hook.
+
+---
+
+## Troubleshooting
+
+**`permission denied while trying to connect to the Docker daemon socket`**
+
+Your user is not in the `docker` group, or the current shell hasn't picked the group up yet:
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker     # or log out and back in
+docker ps
+```
+
+Don't work around this with `sudo make` or `sudo strato-up`.
+
+**`strato-up: command not found`**
+
+`~/.local/bin` is not on your `PATH`. Run `source ~/.profile`, or open a new terminal.
+
+**`OAuth credentials not found at ~/.secrets/strato_credentials.yaml`**
+
+Run `strato-login`, or start the node with `--localAuth`.
+
+**`Error: STRATO is already running in ... Run 'strato-down' first`**
+
+A convoke process from this node directory is still alive. Run `strato-down`, then do a [clean restart](#clean-restart).
+
+**Node behaves oddly after a restart**
+
+Don't reuse the node directory. Follow the [clean restart](#clean-restart) sequence.
+
+**Setup warns that RAM is not enough for from-genesis sync**
+
+On small machines, vm-runner alone needs about 3.5 GB during genesis sync. Start the node with `--snapshot`. For sizing, see [Node requirements](../node/requirements.md).
+
+**macOS: `ar: @....rsp: No such file or directory` while linking**
+
+Newer Xcode command line tools changed `ar`. Run `./install_deps.sh` again. It patches the Stack-installed GHC settings and cleans stale build caches.
+
+**Missing C library (`leveldb`, `secp256k1`, `rdkafka`, `sodium`, `pq`)**
+
+Run `./install_deps.sh` again, or install the libraries listed in [Install Dependencies](#2-install-dependencies).
+
+**`http://localhost` doesn't load with the standalone app nginx**
+
+- Disable any VPN, which can break Docker networking.
+- Try a private browser window, since a cached 301 redirect to https can interfere.
+- On Linux, if `host.docker.internal` doesn't resolve, pass `HOST_IP=172.17.0.1`.
 
 ---
 
 ## Next Steps
 
-Now that you have STRATO running locally:
-
-1. **Understand the architecture** → Read [Architecture](architecture.md)
-2. **Choose your focus area:**
-   - **Blockchain Core** - Haskell codebase (`strato/`)
-   - **Smart Contracts** - Solidity contracts (`app/contracts/`)
-   - **Backend API** - Node.js/TypeScript (`app/backend/`)
-   - **Frontend UI** - React/TypeScript (`app/ui/`)
-   - **Services** - Background services (`app/services/`)
-3. **Make your first contribution** → Read [Contributing Guidelines](contributing.md)
-
-!!! note "Component Guides Coming Soon"
-    Detailed guides for each component area will be added in future updates.
+1. Read the [Architecture](architecture.md) guide.
+2. Read the [Contributing Guidelines](contributing.md) before opening a pull request.
 
 ---
 
@@ -520,4 +383,3 @@ Now that you have STRATO running locally:
 - **Documentation:** [docs.strato.nexus](https://docs.strato.nexus)
 - **Support:** [support.blockapps.net](https://support.blockapps.net)
 - **Telegram:** [t.me/strato_net](https://t.me/strato_net)
-

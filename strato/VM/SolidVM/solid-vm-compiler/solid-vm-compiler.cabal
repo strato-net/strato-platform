@@ -28,6 +28,7 @@ library
     , containers
     , data-default
     , deepseq
+    , ghc-compact
     , lens
     , lrucache
     , monad-alter

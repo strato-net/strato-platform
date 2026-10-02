@@ -45,6 +45,7 @@ library
     , blockapps-datadefs
     , bytestring
     , common-log
+    , composable-monads-base
     , conduit
     , containers
     , deepseq
@@ -87,6 +88,7 @@ executable slipstream
       base
     , blockapps-init
     , common-log
+    , composable-monads-base
     , hflags
     , persistent-postgresql
     , process-monitor
@@ -120,7 +122,9 @@ test-suite slipstream-batching-test
     , evm-solidity
     , hspec
     , slipstream
+    , strato-model
     , text
+    , time
   default-language: Haskell2010
 
 test-suite slipstream-test

@@ -40,12 +40,21 @@ brokerConfig = BrokerConfig
       , ("KAFKA_LOG_RETENTION_HOURS", "168")
       , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
       , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-      -- A single VMEvent is one indivisible record: CodeCollectionAdded carries
-      -- a whole parsed code collection and has been measured at 2.7 MB for a
-      -- pair of large deploys. The size a broker actually accepts is about HALF
-      -- this limit (a v0 produce is up-converted and re-checked), so 8,000,000
-      -- buys roughly 4 MB of headroom. Keep it below milena's defaultMaxBytes
-      -- (16 MiB) or accepted records become unfetchable.
+      -- Largest record the broker will accept. Raised from 2500000 after helium
+      -- block 595971, where two ~655KB contract deploys produced a 2,720,457 B
+      -- CodeCollectionAdded VMEvent; the broker refused it and the uncaught
+      -- rejection took every validator down. That record is a single
+      -- indivisible event on a topic whose producer still throws, so this limit
+      -- -- not any resilience in the producer -- is what keeps such a block
+      -- from halting the chain. Note the effective ceiling appears to be about
+      -- HALF this value, so budget accordingly.
+      --
+      -- Upper bound, do not exceed: milena's 'defaultMaxBytes' fetch ceiling.
+      -- It consumes with Fetch v0, which returns *nothing* for a partition
+      -- whose next record is larger than the request's maxBytes, so a record
+      -- the broker accepts but the client cannot fetch stalls the consumer at
+      -- that offset silently and permanently -- a worse failure than the
+      -- rejection this raise is meant to avoid.
       , ("KAFKA_MAX_REQUEST_SIZE", "8000000")
       , ("KAFKA_MESSAGE_MAX_BYTES", "8000000")
       , ("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1")

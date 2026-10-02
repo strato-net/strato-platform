@@ -51,24 +51,24 @@ data Event = Event
   { evBlockHash :: Keccak256,
     evTxHash :: Keccak256,
     evTxSender :: Address,
-    evContractName :: String,
+    evContractName :: T.Text,
     evContractAddress :: Address,
-    evName :: String,
-    evArgs :: [(String, Value, String, SVMType.Type)],
+    evName :: T.Text,
+    evArgs :: [(T.Text, Value, T.Text, SVMType.Type)],
     evTopics :: [B.ByteString]
   }
   deriving (Eq, Show, Generic)
 
-eventArgName :: (String, Value, String, SVMType.Type) -> String
+eventArgName :: (T.Text, Value, T.Text, SVMType.Type) -> T.Text
 eventArgName (n, _, _, _) = n
 
-eventArgValue :: (String, Value, String, SVMType.Type) -> Value
+eventArgValue :: (T.Text, Value, T.Text, SVMType.Type) -> Value
 eventArgValue (_, v, _, _) = v
 
-eventArgValueString :: (String, Value, String, SVMType.Type) -> String
+eventArgValueString :: (T.Text, Value, T.Text, SVMType.Type) -> T.Text
 eventArgValueString (_, _, s, _) = s
 
-eventArgType :: (String, Value, String, SVMType.Type) -> SVMType.Type
+eventArgType :: (T.Text, Value, T.Text, SVMType.Type) -> SVMType.Type
 eventArgType (_, _, _, t) = t
 
 instance Format Event where
@@ -80,13 +80,13 @@ instance Format Event where
       ++ "evTxSender: "
       ++ format evTxSender
       ++ "evContractName: "
-      ++ evContractName
+      ++ T.unpack evContractName
       ++ "\n"
       ++ "evContractAccount: "
       ++ format evContractAddress
       ++ "\n"
       ++ "evName: "
-      ++ evName
+      ++ T.unpack evName
       ++ "\n"
       ++ "evArgs: "
       ++ show [(n, s) | (n, _, s, _) <- evArgs]

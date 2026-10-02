@@ -25,6 +25,7 @@ import Control.Exception (catch, IOException)
 import Control.Monad (void, when)
 import qualified Database.PostgreSQL.Simple as PG
 import System.Process (readProcess)
+import Control.Monad.Composable.Base (Eff)
 import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Unlift (liftIO, withRunInIO)
 import qualified Data.ByteString as B
@@ -95,8 +96,7 @@ ensureDatabaseExists conf = do
 -- | Run against a fresh stream environment (and so a fresh broker
 -- connection) each time. Right for a long-lived consumer loop that calls it
 -- once; wrong for a request handler, which should use 'runStreamMPooled'.
-runStreamMConfigured :: MonadUnliftIO m =>
-                        ClientId -> StreamM m a -> m a
+runStreamMConfigured :: ClientId -> StreamM es a -> Eff es a
 runStreamMConfigured name =
   let k = streamingConfig ethConf
   in runStreamM name (fromString $ streamingHost k, fromIntegral $ streamingPort k)
@@ -107,7 +107,7 @@ runStreamMConfigured name =
 -- instead of opening (and leaking until finalized) a new one per request,
 -- which is what 'runStreamMConfigured' does from a handler. Environments are
 -- borrowed exclusively: milena's state is not safe to share between threads.
-runStreamMPooled :: MonadUnliftIO m => ClientId -> StreamM m a -> m a
+runStreamMPooled :: ClientId -> StreamM es a -> Eff es a
 runStreamMPooled name f = do
   pool <- liftIO $ streamEnvPool name
   withRunInIO $ \run -> Pool.withResource pool (run . flip runStreamMUsingEnv f)

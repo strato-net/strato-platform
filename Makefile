@@ -65,9 +65,6 @@ HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)
 HASH_BRIDGE_NGINX := $(call dir_hash,app/services/bridge/nginx)
 HASH_HISTORY := $(call dir_hash,app/services/history)
-HASH_TRACKING := $(call dir_hash,app/services/tracking)
-HASH_TRACKING_NGINX := $(call dir_hash,app/services/tracking/nginx)
-HASH_TRACKING_UI := $(call dir_hash,app/services/tracking/ui)
 HASH_LOCAL_AUTH := $(call dir_hash,local-auth)
 
 # Check if image exists in Docker — rebuild if missing (hash in tag handles source changes)
@@ -88,7 +85,6 @@ generate-version-file:
 	@echo "HASH_NGINX=$(HASH_NGINX)" >> BUILD_METADATA
 	@echo "HASH_PROMETHEUS=$(HASH_PROMETHEUS)" >> BUILD_METADATA
 	@echo "HASH_LOCAL_AUTH=$(HASH_LOCAL_AUTH)" >> BUILD_METADATA
-	@echo "HASH_TRACKING=$(HASH_TRACKING)" >> BUILD_METADATA
 	@echo "Generated BUILD_METADATA file"
 
 # Sed substitutions for docker-compose templates
@@ -102,12 +98,9 @@ HASH_SUBS = -e 's|<HASH_STRATO>|$(HASH_STRATO)|g' \
             -e 's|<HASH_PROMETHEUS>|$(HASH_PROMETHEUS)|g' \
             -e 's|<HASH_SMD>|$(HASH_SMD)|g' \
             -e 's|<HASH_BRIDGE>|$(HASH_BRIDGE)|g' \
-            -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g' \
-            -e 's|<HASH_TRACKING>|$(HASH_TRACKING)|g' \
-            -e 's|<HASH_TRACKING_NGINX>|$(HASH_TRACKING_NGINX)|g' \
-            -e 's|<HASH_TRACKING_UI>|$(HASH_TRACKING_UI)|g'
+            -e 's|<HASH_BRIDGE_NGINX>|$(HASH_BRIDGE_NGINX)|g'
 
-.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx tracking tracking-nginx tracking-ui history local-auth
+.PHONY: postgrest nginx apex app-backend app-ui app-nginx prometheus smd bridge bridge-nginx history local-auth
 
 postgrest:
 	@if $(call image_missing,$(REPO_URL)postgrest:$(VERSION)-$(HASH_POSTGREST)); then \
@@ -210,44 +203,17 @@ history:
 		echo "history up to date"; \
 	fi
 
-tracking:
-	@if $(call image_missing,$(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING)); then \
-		echo "Building tracking ($(VERSION)-$(HASH_TRACKING))..."; \
-		docker build -t $(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING) ./app/services/tracking && \
-		docker tag $(REPO_URL)tracking:$(VERSION)-$(HASH_TRACKING) $(REPO_AWS_ECR_URL)tracking:$(VERSION)-$(HASH_TRACKING); \
-	else \
-		echo "tracking up to date"; \
-	fi
-
-tracking-nginx:
-	@if $(call image_missing,$(REPO_URL)tracking-nginx:$(VERSION)-$(HASH_TRACKING_NGINX)); then \
-		echo "Building tracking-nginx ($(VERSION)-$(HASH_TRACKING_NGINX))..."; \
-		docker build -t $(REPO_URL)tracking-nginx:$(VERSION)-$(HASH_TRACKING_NGINX) ./app/services/tracking/nginx && \
-		docker tag $(REPO_URL)tracking-nginx:$(VERSION)-$(HASH_TRACKING_NGINX) $(REPO_AWS_ECR_URL)tracking-nginx:$(VERSION)-$(HASH_TRACKING_NGINX); \
-	else \
-		echo "tracking-nginx up to date"; \
-	fi
-
-tracking-ui:
-	@if $(call image_missing,$(REPO_URL)tracking-ui:$(VERSION)-$(HASH_TRACKING_UI)); then \
-		echo "Building tracking-ui ($(VERSION)-$(HASH_TRACKING_UI))..."; \
-		docker build -t $(REPO_URL)tracking-ui:$(VERSION)-$(HASH_TRACKING_UI) ./app/services/tracking/ui && \
-		docker tag $(REPO_URL)tracking-ui:$(VERSION)-$(HASH_TRACKING_UI) $(REPO_AWS_ECR_URL)tracking-ui:$(VERSION)-$(HASH_TRACKING_UI); \
-	else \
-		echo "tracking-ui up to date"; \
-	fi
-
 all: local
 
-local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx tracking tracking-nginx tracking-ui oracle local-auth
+local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridge bridge-nginx oracle local-auth
 
-docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx tracking tracking-nginx tracking-ui oracle docker-compose
+docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx tracking tracking-nginx tracking-ui oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force tracking-force tracking-nginx-force tracking-ui-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
 app: app-backend app-ui
 	@echo ""
@@ -294,21 +260,6 @@ bridge-nginx-force:
 	@echo Now building bridge-nginx...
 	docker build --add-host=openresty.org:3.125.51.27 -t ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ./app/services/bridge/nginx
 	docker tag ${REPO_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX} ${REPO_AWS_ECR_URL}bridge-nginx:${VERSION}-${HASH_BRIDGE_NGINX}
-
-tracking-force:
-	@echo Now building tracking...
-	docker build -t ${REPO_URL}tracking:${VERSION}-${HASH_TRACKING} ./app/services/tracking
-	docker tag ${REPO_URL}tracking:${VERSION}-${HASH_TRACKING} ${REPO_AWS_ECR_URL}tracking:${VERSION}-${HASH_TRACKING}
-
-tracking-nginx-force:
-	@echo Now building tracking-nginx...
-	docker build -t ${REPO_URL}tracking-nginx:${VERSION}-${HASH_TRACKING_NGINX} ./app/services/tracking/nginx
-	docker tag ${REPO_URL}tracking-nginx:${VERSION}-${HASH_TRACKING_NGINX} ${REPO_AWS_ECR_URL}tracking-nginx:${VERSION}-${HASH_TRACKING_NGINX}
-
-tracking-ui-force:
-	@echo Now building tracking-ui...
-	docker build -t ${REPO_URL}tracking-ui:${VERSION}-${HASH_TRACKING_UI} ./app/services/tracking/ui
-	docker tag ${REPO_URL}tracking-ui:${VERSION}-${HASH_TRACKING_UI} ${REPO_AWS_ECR_URL}tracking-ui:${VERSION}-${HASH_TRACKING_UI}
 
 local-auth:
 	@if $(call image_missing,local-auth:$(VERSION)-$(HASH_LOCAL_AUTH)); then \
@@ -490,15 +441,13 @@ vault-nginx:
 	BASIL_DOCKER_TAG=${REPO_URL}vault-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}vault-nginx:${VERSION} make --directory=vault-nginx/
 
 docker-compose:
-	@echo Generating vault, highway, bridge, tracking, api compose files...
+	@echo Generating vault, highway, bridge, api compose files...
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' docker-compose.highway.tpl.yml > docker-compose.highway.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.bridge.tpl.yml > docker-compose.bridge.push.ecr.yml
-	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tracking.tpl.yml > docker-compose.tracking.push.yml
-	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.tracking.tpl.yml > docker-compose.tracking.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.yml
 	sed -e 's|<REPO_URL>|$(REPO_AWS_ECR_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.api.tpl.yml > docker-compose.api.push.ecr.yml
 	sed -e 's|<REPO_URL>|$(REPO_URL)|g' -e 's|<VERSION>|$(VERSION)|g' $(HASH_SUBS) docker-compose.app.tpl.yml > docker-compose.app.push.yml
@@ -510,8 +459,6 @@ docker-compose:
 	awk '/build: ./{getline} 1' docker-compose.highway.push.ecr.yml > docker-compose.highway.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.yml > docker-compose.bridge.yml
 	awk '/build: ./{getline} 1' docker-compose.bridge.push.ecr.yml > docker-compose.bridge.ecr.yml
-	awk '/build: ./{getline} 1' docker-compose.tracking.push.yml > docker-compose.tracking.yml
-	awk '/build: ./{getline} 1' docker-compose.tracking.push.ecr.yml > docker-compose.tracking.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.api.push.yml > docker-compose.api.yml
 	awk '/build: ./{getline} 1' docker-compose.api.push.ecr.yml > docker-compose.api.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.app.push.yml > docker-compose.app.yml

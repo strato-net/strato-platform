@@ -91,7 +91,9 @@ contract record MercataGovernance is Ownable {
         emit ValidatorAdded(validator);
     }
 
+    // Never drops the last validator: an empty set halts consensus permanently
     function removeValidator(address validator) internal {
+        require(validators.length > 1, "Cannot remove the last validator");
         uint j = validatorMap[validator];
         uint last = validators.length;
         if (j != last) {
@@ -129,6 +131,7 @@ contract record MercataGovernance is Ownable {
 
         uint v = validatorMap[proposedValidator];
         require(v > 0, "Votes to remove can only be counted for current validators");
+        require(validators.length > 1, "Cannot remove the last validator");
 
         voteForValidator(msg.sender, proposedValidator);
     }
@@ -173,6 +176,9 @@ contract record MercataGovernance is Ownable {
 
         uint v = adminMap[proposedAdmin];
         require(v > 0, "Votes to remove can only be counted for current admins");
+        // An empty admin list strands the contract: every voteTo* entry point
+        // then fails its admin check and nothing can re-seed one.
+        require(admins.length > 1, "Cannot remove the last admin");
 
         voteForAdmin(msg.sender, proposedAdmin);
     }
@@ -198,6 +204,7 @@ contract record MercataGovernance is Ownable {
                 adminMap[proposedAdmin] = admins.length;
                 emit AdminAdded(proposedAdmin);
             } else {
+                require(admins.length > 1, "Cannot remove the last admin");
                 uint j = adminMap[proposedAdmin];
                 address swap = admins[admins.length - 1];
                 admins[j - 1] = swap;

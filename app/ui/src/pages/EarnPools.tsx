@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { usePageTitle } from "@/hooks/usePageTitle";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CircleArrowDown, CircleArrowUp, ArrowLeft, Landmark, Wallet, Gauge } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
@@ -104,8 +105,9 @@ const EarnPools = () => {
   const [isPoolWithdrawModalOpen, setIsPoolWithdrawModalOpen] = useState(false);
   const operationInProgressRef = useRef(false);
 
+  usePageTitle("Swap Pools");
+
   useEffect(() => {
-    document.title = "STRATO Swap Pools | STRATO";
     if (isLoggedIn) fetchUsdstBalance();
   }, [fetchUsdstBalance, isLoggedIn]);
 

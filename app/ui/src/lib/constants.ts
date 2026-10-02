@@ -5,13 +5,33 @@ export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
-export const stratoTokenAddresses = [
-  "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04", // Helium testnet
-  "2ca3e170e6714282da77815f7864b17f612f5f83", // Upquark mainnet
-]
+const STRATO_TOKEN_BY_NETWORK: Record<string, string> = {
+  helium: "8ee9a3391e38176feebf5d43cb2c1d6c4f728b04",
+  upquark: "2ca3e170e6714282da77815f7864b17f612f5f83",
+};
+
+export const getStratoTokenAddress = (): string | undefined => {
+  const network = (typeof window !== "undefined"
+    ? (window as { ENV?: { NETWORK_NAME?: string } }).ENV?.NETWORK_NAME
+    : undefined)?.toLowerCase();
+  return network ? STRATO_TOKEN_BY_NETWORK[network] : undefined;
+};
 export const rewardsAddress = "0000000000000000000000000000000000001020" // TODO: Update with actual deployed address
 export const DECIMAL = 18
 export const WAD = 10n ** 18n;
+
+// ============================================
+// Diversified Vault sunset
+// ============================================
+
+/**
+ * Last moment users can withdraw from the Diversified Vault before it is
+ * deprecated: end of day September 30, 2026, US Eastern (EDT, UTC-4).
+ * Drives the countdown in VaultSunsetBanner; dates are rendered in
+ * VAULT_WITHDRAWAL_TIME_ZONE so every user sees the same calendar day.
+ */
+export const VAULT_WITHDRAWAL_DEADLINE = "2026-09-30T23:59:59-04:00";
+export const VAULT_WITHDRAWAL_TIME_ZONE = "America/New_York";
 
 // ============================================
 // Feature Flags

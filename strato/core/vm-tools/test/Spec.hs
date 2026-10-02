@@ -43,6 +43,7 @@ import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Control.Monad
 import qualified Data.Map.Strict as M
+import Data.String (fromString)
 import Executable.EVMFlags ()
 import HFlags
 import qualified CrossLangFixtureSpec
@@ -94,8 +95,8 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
       v2 = Validator 0x2
       stakingAddr = Address 0xd6726e06
       stakeEvent addr name args = Event zeroHash zeroHash (Address 0) "StratoStaking" addr name args []
-      addrArg v = ("validator", SNULL, show v, SVMType.Address False)
-      weightArg st = ("weight", SNULL, show st, SVMType.Int (Just False) Nothing)
+      addrArg v = ("validator", SNULL, fromString (show v), SVMType.Address False)
+      weightArg st = ("weight", SNULL, fromString (show st), SVMType.Int (Just False) Nothing)
       regArg b = ("registered", SNULL, if b then "True" else "False", SVMType.Bool)
       synced v st = stakeEvent stakingAddr "ValidatorSynced" [addrArg v, regArg True, weightArg st]
 
@@ -140,7 +141,7 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
 
   it "reads ValidatorStakeUpdated once the source is governance" $ do
     let govAddr = Address 0x100
-        stakeArg st = ("stake", SNULL, show st, SVMType.Int (Just False) Nothing)
+        stakeArg st = ("stake", SNULL, fromString (show st), SVMType.Int (Just False) Nothing)
         published v st = stakeEvent govAddr "ValidatorStakeUpdated" [addrArg v, stakeArg st]
         evs = [ published (Address 0x1) (11 :: Integer)
               , synced (Address 0x2) (4 :: Integer)          -- staking is no longer watched

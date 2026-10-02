@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -5,7 +6,6 @@
 {-# LANGUAGE OverloadedStrings     #-}
 
 import           Control.Monad.IO.Class
-import           Control.Concurrent.Async.Lifted.Safe
 import           Control.Exception (SomeException, try)
 import           Blockchain.VMOptions       ()
 
@@ -23,11 +23,13 @@ import           Blockchain.SeqEventNotify
 import           Blockchain.Strato.Discovery.Data.Peer (resetPeers)
 import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Threads
+import           Control.Monad.Composable.Base (Eff, Logger, runEff)
 import           Control.Monad.Composable.Vault (runVaultM)
 import           Executable.StratoP2P
 import           BlockApps.Init
 import           BlockApps.Logging as BL
 import           Data.IORef
+import           Data.String (fromString)
 import           Data.Set.Ordered (empty)
 import           Instrumentation
 import           Blockchain.Sequencer.Kafka (seqP2pEventsTopicName, unseqEventsTopicName)
@@ -35,9 +37,9 @@ import           Control.Monad.Composable.Streaming (createStreamEnv, createTopi
 import           Control.Concurrent.MVar (newMVar)
 
 main :: IO ()
-main = runLoggingT initP2P
+main = runEff $ runLogging initP2P
 
-initP2P :: LoggingT IO ()
+initP2P :: Eff '[Logger] ()
 initP2P = labelTheThread "initP2P" $ do
   liftIO $ blockappsInit "strato_p2p"
   liftIO $ runInstrumentation "strato-p2p"
@@ -47,15 +49,16 @@ initP2P = labelTheThread "initP2P" $ do
   -- a freshly created table will already have all peers in the inactive state.
   _ <- liftIO $ (try resetPeers :: IO (Either SomeException ()))
   _ <- liftIO $ $initHFlags "Strato P2P"
-  liftIO $ runStreamMConfigured "strato-p2p" $ do
+  runStreamMConfigured "strato-p2p" $ do
     createTopicAndWait seqP2pEventsTopicName
     createTopicAndWait unseqEventsTopicName
   setParticipationMode flags_participationMode
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
+  bcast <- newSeqEventBroadcast
   let vaultUrl' = vaultUrl . urlConfig $ ethConf
       streamAddr = let k = streamingConfig ethConf in (streamingHost k, streamingPort k)
-      runner f = runLoggingT $ runVaultM vaultUrl' $ do
+      runner f = runEff . runLogging $ runVaultM vaultUrl' $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         -- Every peer connection gets its own producer. A single process-wide
@@ -68,8 +71,18 @@ initP2P = labelTheThread "initP2P" $ do
         env <- createStreamEnv "strato-p2p" streamAddr
         envVar <- liftIO $ newMVar env
         let cfg' = cfg { configContext = ctx, configStreamEnv = envVar }
-        runContextM cfg' . f $ seqEventNotificationSource
+        -- Sequencer events are consumed once per process by
+        -- runSeqEventBroadcaster below and fanned out in memory. Each
+        -- connection subscribes here, at its start, and sees the events
+        -- published from then on, like the Kafka-era latest-offset source.
+        -- Running one topic consumer per connection is not an option on the
+        -- JLog backend, where all consumers with the same client id share a
+        -- single checkpoint and would each get only a slice of the events.
+        seqSrc <- subscribeSeqEvents bcast
+        runContextM cfg' . f $ seqSrc
   liftIO $
-    race_
-      (run 10248 $ prometheus def p2pApp)
-      (stratoP2P runner)
+    raceAll
+      [ runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 10248 defaultSettings) $ prometheus def p2pApp
+      , runSeqEventBroadcaster bcast
+      , stratoP2P runner
+      ]

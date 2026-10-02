@@ -137,8 +137,8 @@ basicPatterns =
     (makeRegex ("false" :: String), \[] -> Just $ BBool False),
     (makeRegex ("true" :: String), \[] -> Just $ BBool True),
     (makeRegex ("address\\(([a-zA-Z0-9\\:]+)\\)" :: String), \[accountString] -> Just $ BAddress $ read accountString),
-    (makeRegex ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)" :: String), \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
-    (makeRegex ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)" :: String), \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
+    (makeRegex ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)" :: String), \[enumName, enumValName, enumValNum] -> BEnumVal (stringToLabel enumName) (stringToLabel enumValName) <$> readMaybe enumValNum),
+    (makeRegex ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)" :: String), \[contractName, accountString] -> Just $ BContract (stringToLabel contractName) $ read accountString),
     (makeRegex ("([0-9]+)" :: String), \[numString] -> Just $ BInteger $ read numString),
     (makeRegex ("(\"([^\"\\\\]|\\.)*\")" :: String), \[theString, _] -> Just $ BString $ encodeUtf8 . T.pack $ fromMaybe (error $ "can't read " ++ show theString) $ readMaybe theString)
   ]

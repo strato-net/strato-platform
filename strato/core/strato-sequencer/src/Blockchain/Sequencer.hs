@@ -44,6 +44,7 @@ import Control.Monad (forever, forM, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
@@ -65,9 +66,9 @@ import Text.ShortDescription
 -- round trip instead of two (see 'writeSeqEvents').
 data SeqOutEvent
   = SeqOutEvent [P2pEvent] [VmTask]
-  | -- | End of a sequencer loop iteration: write whatever has accumulated.
-    -- Bounds how long output can sit unwritten on a quiet node, without
-    -- needing a timer.
+  | -- | End of a sequencer loop iteration: write whatever has accumulated
+    -- and commit the state staged behind it. Bounds how long output can sit
+    -- unwritten on a quiet node, without needing a timer.
     SeqFlush
 
 -- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
@@ -81,9 +82,6 @@ yieldToVm ts = yield $ SeqOutEvent [] ts
 -- | Emit both topics as a single unit, so they cost one Kafka round trip.
 yieldToBoth :: Monad m => [P2pEvent] -> [VmTask] -> ConduitT i SeqOutEvent m ()
 yieldToBoth es ts = yield $ SeqOutEvent es ts
-
-instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
-  doIO = lift . doIO
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -100,7 +98,7 @@ tryResolveSelfAddr = do
     Just addr -> return (Just addr)
     Nothing -> do
       let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runLoggingT $ runVaultM vaultUrl' $ do
+      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runVaultM vaultUrl' $ do
         pubKey <- getPub
         return $ fromPublicKey pubKey
       case result of
@@ -137,7 +135,7 @@ type MonadSequencer m =
 --
 -- Note: 'initSequencer' runs before the main loop to yield initial events (e.g., 'VmSelfAddress').
 sequencer :: SequencerM ()
-sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka
+sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka commitSequencerState
 
 initSequencer :: (
   MonadFail m,
@@ -155,12 +153,22 @@ initSequencer = do
   bootstrapBlockstanbul
   yield SeqFlush
 
+-- | Write sequencer output, then run the commit action.
+--
+-- The commit is where the sequencer makes durable what it records about its
+-- output ('commitSequencerState': the emitted marks and the best sequenced
+-- block). It runs after every write and never without one, so those records
+-- can never claim a block the log does not have: 'blockstanbulSend'' marks a
+-- block emitted before yielding it, but the mark only lands once the block
+-- has. Losing both to a crash is harmless, the block is emitted again when
+-- p2p re-delivers it; losing only the block was the permanent vm_tasks gap.
 writeToKafka :: (
   MonadSequencer m,
   HasStreaming m
   ) =>
+  m () ->
   ConduitT SeqOutEvent Void m ()
-writeToKafka = go noPendingWrites
+writeToKafka commit = go noPendingWrites
   where
     go pending =
       await >>= \case
@@ -186,11 +194,12 @@ writeToKafka = go noPendingWrites
     -- to that whole set, not to the individual events. Bounding only the
     -- accumulator is not enough: a single oversized add would still build a
     -- set the broker rejects with MessageSizeTooLarge, which is fatal here.
-    flush pending =
+    flush pending = do
       mapM_ (\(p2pRaw, vmRaw) -> void . lift $ writeSeqEncoded p2pRaw vmRaw) $
         zipChunks
           (chunkByBytes maxProduceBytes . reverse $ pendingP2p pending)
           (chunkByBytes maxProduceBytes . reverse $ pendingVm pending)
+      lift commit
 
     -- Pair the two topics' chunks so each request still carries both, and keep
     -- whichever list is longer going once the other runs out.
@@ -240,6 +249,9 @@ maxProduceBytes = 768 * 1024
 -- batch held across a produce kept ~2GiB live). Four megabytes still coalesces
 -- hundreds of ordinary blocks into one round trip. Kept below
 -- 'maxProduceBytes' so the common path is a single message set per topic.
+--
+-- It also bounds what a crash can discard: the state describing pending
+-- output is staged with it and committed by the same flush.
 maxPendingBytes :: Int
 maxPendingBytes = 512 * 1024
 
@@ -419,6 +431,7 @@ blockstanbulSend' msg = do
         GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps)
         LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps)
         RunPreprepare b -> (VmRunPreprepare b : vms, p2ps)
+        ProposerStatus p -> (VmProposerStatus p : vms, p2ps)
         _ -> (vms, p2ps)
     vmEvenP2pCheckptFilterHelper [] = ([], [])
 
