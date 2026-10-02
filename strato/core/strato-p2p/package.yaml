@@ -91,6 +91,17 @@ library:
     - vault-monad
     - warp
 
+tests:
+  peer-claims-test:
+    source-dirs: test-claims
+    main: Main.hs
+    ghc-options: -dynamic
+    dependencies:
+      - blockDB
+      - hspec
+      - strato-model
+      - strato-p2p
+
 #removing p2p tests for now, it is more work to keep updating this than the reward it is giving
 #tests:
 #  strato-p2p-client-test:
