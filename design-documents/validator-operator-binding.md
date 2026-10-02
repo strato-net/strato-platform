@@ -271,6 +271,13 @@ A real run on a helium validator host (mock-free), then §9.7's end-to-end throu
    digest vector (`0xb40f…9bd3`), `splitSignature` accept/reject rules and 400 status, and the
    revert mapper incl. passthrough.
 
+- **One validator per operator (added 2026-10-01).** `assertOperatesNoOtherValidator` runs in
+  `registerStratoOperator` and `setStratoOperator` (the latter excepting the target validator):
+  reads staking state fresh, and if the caller already operates an active validator throws
+  `StratoError` 409 "This account already operates validator <name (0x…)>. An operator can run one
+  validator; use a different account." Pure helper `findOperatedValidator` in
+  `stakingAuthorization.ts`, unit-tested. Admin votes are not checked (contract rule pending, §8).
+
 ## 6. Component C: UI
 
 Implemented 2026-09-29, redesigned 2026-10-01 after the first real helium run (`app/ui/src`).
@@ -352,10 +359,16 @@ Verified with `npm run build`, `tsc -b` clean on touched files, eslint clean exc
 - **Listed ≠ active.** Registry `active` means listed; consensus membership lives in staking. The
   script therefore states consequences generically ("may leave the consensus set") and the app,
   which has staking state, shows the precise status after the transaction (§6.4).
+- **One validator per operator is an app rule, not yet a contract rule.** Hasan's rule (2026-10-01):
+  an operator operates at most one validator. `ValidatorRegistry` has no operator-uniqueness check
+  (helium operator `7b1f…` runs four genesis validators), so the backend refuses `register` /
+  `setOperator` for an account that already operates an active validator (409) and the UI offers
+  no second-validator path. Admin votes and direct contract calls can still create 1:N bindings
+  until §8's contract change lands.
 - **Digest lacks chainId.** Registry address scoping suffices today (helium and upquark registries
   differ). Note for a future logic swap; not changed here.
 
-## 8. Optional contract change: invalidate authorizations on every binding change
+## 8. Contract changes for the next registry logic swap: nonce bump on every binding write, one validator per operator
 
 Recommended to ride along with the prod registry logic swap (runbook step 1) and, on helium, one
 more `setLogicContract` vote on the registry proxy. The digest format is unchanged, so the script,
@@ -372,8 +385,17 @@ retires all outstanding signatures for that validator. The scenario in §7 becom
 admins set C, the B signature is over a stale nonce and reverts. Signed paths still consume exactly
 one nonce per binding, so nothing changes for the happy path.
 
-Tests to add in `tests/Staking/ValidatorRegistry.test.sol` (§9 items 3–5) and a one-line update to
-`staking-consensus.md`'s description of the nonce.
+Second change for the same swap, **one validator per operator** (rule set 2026-10-01): keep a
+`mapping(address => address) validatorOf` (operator → validator) written in `_list` and
+`_changeOperator`; require `validatorOf[operator] == address(0) || validatorOf[operator] ==
+validator` on every binding write, admin paths included. Grandfather existing 1:N data (helium's
+`7b1f…` with four validators) by only enforcing on writes, never on reads; an admin
+`adminSetOperator` away from a shared operator clears its slot.
+
+Tests to add in `tests/Staking/ValidatorRegistry.test.sol` (§9 items 3–5, plus: second `register`
+by the same operator reverts; `setOperator` to an operator that already has a validator reverts;
+admin re-assignment frees the slot) and a one-line update to `staking-consensus.md`'s description
+of the nonce and operator binding.
 
 ## 9. Testing
 

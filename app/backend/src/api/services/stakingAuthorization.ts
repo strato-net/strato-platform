@@ -50,6 +50,19 @@ export const splitSignature = (signature: unknown): SplitSignature | null => {
   };
 };
 
+// One operator runs one validator. The registry does not enforce this (helium's genesis
+// validators share one operator), so the app refuses before posting. Returns the first
+// ACTIVE record the account operates, or null. Addresses compare case-insensitively with or
+// without 0x.
+export const findOperatedValidator = <T extends { operator: string; active: boolean }>(
+  records: T[],
+  operator: string
+): T | null => {
+  const wanted = hex40(String(operator || ""));
+  if (!wanted) return null;
+  return records.find((record) => record.active && hex40(String(record.operator || "")) === wanted) ?? null;
+};
+
 // ValidatorRegistry reverts that a user can act on, in the order they are matched.
 const REGISTRY_REVERTS: { needle: string; status: number; message: string }[] = [
   {

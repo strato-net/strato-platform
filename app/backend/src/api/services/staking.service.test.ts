@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { StratoError } from "../../errors/StratoError";
-import { authorizationDigest, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
+import { authorizationDigest, findOperatedValidator, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
 
 // Pinned by tests/Staking/ValidatorRegistry.test.sol (it_matches_off_chain_digests_and_recovers_real_signatures).
 const VECTOR = {
@@ -79,4 +79,20 @@ test("mapRegistryRevert passes every other error through unchanged", () => {
   assert.equal(mapRegistryRevert(plain), plain);
   assert.equal(mapRegistryRevert("VR: staking missing"), "VR: staking missing");
   assert.equal(mapRegistryRevert(undefined), undefined);
+});
+
+test("findOperatedValidator returns the active record the account operates, case- and prefix-insensitive", () => {
+  const records = [
+    { validator: "aaaa000000000000000000000000000000000001", operator: "7b1f8cd02cd09ab9510e30fc8e15ff898a639771", active: true },
+    { validator: "aaaa000000000000000000000000000000000002", operator: "3b23c91aedc1c0f4ad442c7248f6e49cc1547c1d", active: false },
+    { validator: "aaaa000000000000000000000000000000000003", operator: "3b23c91aedc1c0f4ad442c7248f6e49cc1547c1d", active: true },
+  ];
+  assert.equal(findOperatedValidator(records, "0x3B23C91AEDC1C0F4AD442C7248F6E49CC1547C1D")?.validator, "aaaa000000000000000000000000000000000003");
+  assert.equal(findOperatedValidator(records, "7b1f8cd02cd09ab9510e30fc8e15ff898a639771")?.validator, "aaaa000000000000000000000000000000000001");
+  // Inactive (delisted) records do not count.
+  assert.equal(findOperatedValidator(records.filter((r) => !r.active), "3b23c91aedc1c0f4ad442c7248f6e49cc1547c1d"), null);
+  // Nobody / empty input.
+  assert.equal(findOperatedValidator(records, "0x2222222222222222222222222222222222222222"), null);
+  assert.equal(findOperatedValidator([], "0x3b23c91aedc1c0f4ad442c7248f6e49cc1547c1d"), null);
+  assert.equal(findOperatedValidator(records, ""), null);
 });

@@ -1,7 +1,8 @@
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { authorizationDigest, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
+import { authorizationDigest, findOperatedValidator, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
+import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
@@ -1796,6 +1797,27 @@ export const getStratoAuthorizationDigest = async (
   };
 };
 
+// One operator runs one validator (validator -> operator is 1:1). The registry does not
+// enforce it, so refuse here, reading state fresh, before anything is posted. The validator
+// the caller already operates is named by its registry profile when that read succeeds.
+const assertOperatesNoOtherValidator = async (accessToken: string, userAddress: string, exceptValidator?: string): Promise<void> => {
+  const operated = findOperatedValidator(v2ValidatorRecords(await getStakingBlocState(accessToken, true)), userAddress);
+  if (!operated || (exceptValidator && operated.validator === exceptValidator)) return;
+
+  let label = `0x${operated.validator}`;
+  try {
+    const registryState = await getBlocState(accessToken, extractContractName(ValidatorRegistry), requireValidatorRegistryAddress(), false);
+    const name = String(addressKeyed(registryState.operators).get(operated.validator)?.name || "").trim();
+    if (name) label = `${name} (0x${operated.validator})`;
+  } catch {
+    // The address alone is a fine label.
+  }
+  throw new StratoError(
+    `This account already operates validator ${label}. An operator can run one validator; use a different account.`,
+    409
+  );
+};
+
 // List a validator with msg.sender as its operator; joining the consensus set is a
 // separate tryActivate. Needs the validator key's consent unless the key itself sends it.
 export const registerStratoOperator = async (
@@ -1806,6 +1828,7 @@ export const registerStratoOperator = async (
   const validator = requireValidatorArg(input.validator);
   if (input.commissionBps === undefined || input.commissionBps === "") throw badRequest("commissionBps is required");
   await requireV2(accessToken);
+  await assertOperatesNoOtherValidator(accessToken, userAddress);
 
   const signature = splitSignature(input.signature);
   if (!signature && validator !== normalizeAddress(userAddress)) {
@@ -1857,6 +1880,8 @@ export const setStratoOperator = async (
   const validator = requireValidatorArg(input.validator);
   const newOperator = normalizeAddress(userAddress);
   await requireV2(accessToken);
+  // Taking over the validator you already operate is the registry's "same operator" case.
+  await assertOperatesNoOtherValidator(accessToken, userAddress, validator);
 
   const signature = splitSignature(input.signature);
   if (!signature && validator !== newOperator) {

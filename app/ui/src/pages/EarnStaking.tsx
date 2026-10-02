@@ -1362,7 +1362,7 @@ const EarnStaking = () => {
           <BecomeValidatorCard
             isV2={isV2}
             connectedAddress={userAddress}
-            hasValidators={operatedValidators.length > 0}
+            operatedValidator={operatedValidators[0] ?? null}
             minStake={formatToken(info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
             symbol={symbol}

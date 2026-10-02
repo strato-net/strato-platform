@@ -66,7 +66,9 @@ type Props = {
   isV2: boolean;
   connectedAddress?: string | null;
   // V2: the caller already operates at least one validator.
-  hasValidators?: boolean;
+  // The validator this account already operates, if any. Validator -> operator is 1:1, so when
+  // set the card only reports status and never offers to bind another node.
+  operatedValidator?: ListedValidatorInfo | null;
   // Formatted minimum self-bond, for copy.
   minStake: string;
   maxCommissionBps: string;
@@ -100,7 +102,7 @@ type Mode = "register" | "change" | "same";
 const BecomeValidatorCard = ({
   isV2,
   connectedAddress,
-  hasValidators,
+  operatedValidator,
   minStake,
   maxCommissionBps,
   symbol,
@@ -228,7 +230,33 @@ const BecomeValidatorCard = ({
     }
   };
 
-  const title = isV2 && hasValidators ? "Register another validator" : "Become a validator";
+  const title = "Become a validator";
+
+  // ---- already an operator: one validator per operator, so only report where it stands ----
+  if (isV2 && operatedValidator) {
+    const operatedLabel = operatedValidator.name || truncateAddress(operatedValidator.address, 8, 6);
+    const operatedNext = describeValidatorNextStep(operatedValidator, minStakeRaw, minStake, symbol, joinsPaused);
+    const linkedOther = linked && normalizeAddress(initialValidator) !== normalizeAddress(operatedValidator.address);
+    const linkedSame = linked && !linkedOther;
+    return (
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium">You operate {operatedLabel}.</span>
+            <ValidatorStatusBadge validator={operatedValidator} />
+            {operatedNext && <span className="text-muted-foreground">{operatedNext}</span>}
+          </div>
+          {linkedOther && (
+            <p className="mt-3 text-sm text-destructive">
+              This account already operates {operatedLabel}. An operator can run one validator; log in with a different account to
+              bind {truncateAddress(withHexPrefix(initialValidator || ""), 8, 6)}.
+            </p>
+          )}
+          {linkedSame && <p className="mt-3 text-sm text-muted-foreground">You already operate this validator.</p>}
+        </CardContent>
+      </Card>
+    );
+  }
 
   // ---- operator-keyed contract (V1): the plain form, unchanged behaviour ----
   if (!isV2) {
@@ -266,15 +294,12 @@ const BecomeValidatorCard = ({
     const label = doneRecord ? doneRecord.name || truncateAddress(doneRecord.address, 8, 6) : truncateAddress(doneValidator, 8, 6);
     return (
       <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <CardContent className="p-5">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium">{doneMode === "change" ? `You now operate ${label}.` : `Registered ${label}.`}</span>
             {doneRecord && <ValidatorStatusBadge validator={doneRecord} />}
             {nextStep && <span className="text-muted-foreground">{nextStep}</span>}
           </div>
-          <Button size="sm" variant="outline" onClick={() => { setDoneValidator(""); setPhase("guide"); }}>
-            Add another validator
-          </Button>
         </CardContent>
       </Card>
     );
@@ -293,7 +318,7 @@ const BecomeValidatorCard = ({
             </p>
           </div>
           <Button size="sm" onClick={() => setPhase("guide")}>
-            {hasValidators ? "Add a validator" : "Become a validator"}
+            Become a validator
           </Button>
         </CardContent>
       </Card>
