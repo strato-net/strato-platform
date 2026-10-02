@@ -30,6 +30,7 @@ export const ORACLE_CONFIG = {
     MIN_VALID_SOURCES: 3,
     MAX_SOURCE_DIVERGENCE_PERCENT: 5,    // Alert if sources differ by >5%
     MAX_PRICE_CHANGE_PERCENT: 20,        // Alert if price changed >20% from last
+    DEXSCREENER_MIN_TXNS_24H: 10,        // DexScreener pools with fewer trades in 24h are skipped as stale
 };
 
 // Retry delay configurations
