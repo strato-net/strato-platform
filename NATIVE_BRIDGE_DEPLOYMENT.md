@@ -275,9 +275,16 @@ This batch does:
 - on `StratoNativeRepresentationBridge`, optionally split operational roles with `grantRole` / `revokeRole`
 - on `StratoNativeRepresentationBridge`, `setAttestationSigner(<NATIVE_VERIFIER_KMS_SIGNER>, true)` for each independent native verifier
 - on `StratoNativeRepresentationBridge`, `setAttestationThreshold(<native mint attestation threshold>)`
+- when replacing an existing signer set, identify all currently enabled signers and include `setAttestationSigner(<RETIRED_SIGNER>, false)` for every signer outside the intended set. Adding the new verifiers does not remove the old signer. Add replacements before removals and order threshold changes so each intermediate signer count satisfies the threshold; execute the replacement as one atomic Safe batch. Signer/threshold changes invalidate outstanding attestations, which must be regenerated.
 - on `StratoNativeRepresentationBridge`, grant `MINT_EXECUTOR_ROLE` to the dedicated instant executor; do not grant it admin permissions
 - on `StratoNativeRepresentationBridge`, optionally `setMaxAttestationValiditySeconds(<seconds>)` if the default 7 day maximum validity should change
 - on `StratoNativeRepresentationBridge`, `registerTokenMapping(<STRATO_TOKEN>, <SEPOLIA_REPRESENTATION_TOKEN_PROXY>, false)`
+
+Generate the signer portion with `npm run native:signers -- --config /path/to/native-signers.json --output /path/to/native-signers-safe.json` from `app/ethereum`. The local JSON configuration must contain `chainId` (number), `bridgeAddress`, `safeAddress`, `attestationSigners` (the complete intended address list), `disabledAttestationSigners` (an explicit list of retired addresses, or `[]` for a fresh bridge), and `attestationThreshold` (number). RPC selection uses the existing network environment variables, such as `SEPOLIA_RPC_URL`.
+
+The generator reads signer state at one block, requires the Safe's attestation-admin role, and refuses to generate a batch if the configured lists do not account for the on-chain enabled signer count. Identify any missing legacy signer rather than ignoring this error. Calls add replacements, set the threshold, then remove retired signers. Execute as one atomic Safe batch; regenerate if signer state changes before execution. This command only writes JSON and never submits transactions.
+
+After execution, run `npm run native:signers -- --config /path/to/native-signers.json --verify`. Verification fails unless the signer count, intended signers, retired signers, and threshold all match.
 
 V1 minting is removed. Every V2 verifier signature binds `useInstantPath`. Manual V2 mints require the custody Safe's `DEFAULT_ADMIN_ROLE`; instant V2 mints require `MINT_EXECUTOR_ROLE` on the dedicated executor. Verifier EOAs must hold neither role.
 
@@ -305,6 +312,7 @@ Fastest checks:
 - on the bridge proxy, operational role holders match the deployment role plan
 - on the bridge proxy, `attestationSigners(<STRATO_VAULT_BACKED_SIGNER>)` returns `true`
 - on the bridge proxy, `attestationThreshold()` returns the configured native mint attestation threshold
+- `attestationSignerCount()` equals the intended signer count (for example, exactly `3` for a 2-of-3 setup), every intended signer returns `true`, and every retired signer returns `false` from `attestationSigners(address)`
 - on the bridge proxy, `maxAttestationValiditySeconds()` returns the configured maximum attestation validity
 - on the bridge proxy, `stratoToRepresentation(<STRATO_TOKEN>)` returns `<SEPOLIA_REPRESENTATION_TOKEN_PROXY>`
 
@@ -847,3 +855,21 @@ pre-solver layout; it does not authorize replacing a deployed solver layout.
   Do not restart the new runtime until KMS configuration and role checks pass.
   Run native plain/routed deposit and fallback, instant/manual withdrawal,
   cancellation-vs-mint, and refund acceptance tests before production activation.
+
+### Native settlement digest RPC compatibility
+
+The four STRATO native settlement/cancellation/refund getters use
+`keccak256(abi.encode(...))`, matching the EAB pattern. This returns actual
+32-byte data for `eth_call`; the previous variadic hash returned a SolidVM hex
+string that the RPC encoder emitted as empty `0x` despite the `bytes32` return
+type. Deposit IDs and storage layout are unchanged.
+
+Upgrade the STRATO `StratoNativeBridge` implementation. No Sepolia or platform
+upgrade is required for this correction. Verifiers must already contain the
+native digest ABI fix; they read the digest from the contract. Existing
+attestations use the old digest and do not satisfy the new quorum. Allow
+verifiers to re-attest pending operations; do not resubmit deposits or copy old
+attestation counts. Confirm the pending deposit's `getDepositSettlementDigest`
+RPC result is exactly `0x` plus 64 hex characters, then verify fresh attestations
+and the final routed/fallback event. A live post-upgrade check is still required;
+local contract tests do not exercise the deployed RPC server.

@@ -13,6 +13,7 @@ import {
   NATIVE_ATTESTATION_ABI,
   NATIVE_MINT_V2_TYPES,
   NATIVE_REFUND_TYPES,
+  NATIVE_BRIDGE_DIGEST_ABI,
 } from "../config/bridgeAbi";
 import { validateDepositRefundSource, validateDepositRefundEvidence, validateDepositRefundCompletion } from "./depositRefundValidation";
 import { ConsensusProvider } from "./consensusProvider";
@@ -316,9 +317,10 @@ const readSourceDigest = async (
   args: unknown[],
   contractAddress = sourceBridge,
   nodeUrl = stratoNodeUrl,
+  digestAbi?: readonly string[],
 ): Promise<string> => {
   const request = async () => axios.post(`${nodeUrl}/rpc`,
-    buildBridgeDigestRequest(contractAddress, method, args),
+    buildBridgeDigestRequest(contractAddress, method, args, digestAbi),
     { headers: authHeaders(await getStratoToken()), timeout: 30_000 });
   try { return parseBridgeDigest((await request()).data); }
   catch (error: any) {
@@ -1012,6 +1014,7 @@ app.post("/v1/attest-native-withdrawal", async (req, res) => {
       [withdrawalId, externalTxHash, nativeMintProposalHash],
       nativeVerifier.sourceBridge,
       nativeStratoNodeUrl,
+      NATIVE_BRIDGE_DIGEST_ABI,
     );
     const transactionHash = await submitStratoAttestation(
       "attestWithdrawalSettlement",
@@ -1059,6 +1062,7 @@ app.post("/v1/attest-native-deposit", async (req, res) => {
       [depositId],
       nativeVerifier.sourceBridge,
       nativeStratoNodeUrl,
+      NATIVE_BRIDGE_DIGEST_ABI,
     );
     const transactionHash = await submitStratoAttestation(
       "attestDepositSettlement",
@@ -1118,6 +1122,7 @@ app.post("/v1/attest-native-cancellation", async (req, res) => {
       [withdrawalId, cancellationTxHash],
       nativeVerifier.sourceBridge,
       nativeStratoNodeUrl,
+      NATIVE_BRIDGE_DIGEST_ABI,
     );
     const transactionHash = await submitStratoAttestation(
       "attestWithdrawalCancellation",
@@ -1163,6 +1168,7 @@ app.post("/v1/attest-native-refund", async (req, res) => {
       [depositId, refundTxHash],
       nativeVerifier.sourceBridge,
       nativeStratoNodeUrl,
+      NATIVE_BRIDGE_DIGEST_ABI,
     );
     const transactionHash = await submitStratoAttestation(
       "attestDepositRefund",

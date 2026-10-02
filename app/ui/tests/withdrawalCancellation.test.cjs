@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function harness({ eligible = true, requestOnly = false, fail = false, fetching = false } = {}) {
+function harness({ eligible = true, requestOnly = false, fail = false, fetching = false, readError = false, fetched = true } = {}) {
   const state = [], calls = [], cache = new Map(); let cursor = 0;
   const key = value => JSON.stringify(value);
   const client = { getQueryData: k => cache.get(key(k)), setQueryData: (k, value) => cache.set(key(k), typeof value === "function" ? value(cache.get(key(k))) : value), invalidateQueries: async () => {} };
@@ -17,7 +17,7 @@ function harness({ eligible = true, requestOnly = false, fail = false, fetching 
     exports, require: id => {
       if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx };
       if (id === 'react') return { useRef: initial => { const index = cursor++; if (!(index in state)) state[index] = { current: initial }; return state[index]; }, useState: initial => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = value; }]; } };
-      if (id === '@tanstack/react-query') return { useQueryClient: () => client, useQuery: options => options.queryKey.at(-1) === 'submitted' ? { data: client.getQueryData(options.queryKey) } : ({ isFetching: fetching, data: { eligible, requestOnly, availableAt: '1', message: 'Cancellation status' } }) };
+      if (id === '@tanstack/react-query') return { useQueryClient: () => client, useQuery: options => options.queryKey.at(-1) === 'submitted' ? { data: client.getQueryData(options.queryKey) } : ({ isFetchedAfterMount: fetched, isError: readError, isFetching: fetching, data: { eligible, requestOnly, availableAt: '1', message: 'Cancellation status' } }) };
       if (id === '@/context/UserContext') return { useUser: () => ({ userAddress: 'account' }) };
       if (id === '@/context/TokenContext') return { useTokenContext: () => ({ fetchUsdstBalance: async () => calls.push('fees') }) };
       if (id === '@/context/UserTokensContext') return { useUserTokens: () => ({ fetchTokens: async () => calls.push('balances') }) };
@@ -30,13 +30,15 @@ function harness({ eligible = true, requestOnly = false, fail = false, fetching 
   const render = () => { cursor = 0; return exports.default({ source: 'native', withdrawalId: '17', onCanceled: () => calls.push('refresh') }); };
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const button = label => nodes(render()).find(n => n.type === 'Button' && n.props.children === label);
-  const open = () => (button('Cancel withdrawal') || button('Cancellation submitted')).props.onClick();
-  const submit = () => button(requestOnly ? 'Request cancellation' : 'Confirm cancellation');
-  return { calls, render, nodes, open, submit, remount: () => { state.length = 0; }, setFetching: value => { fetching = value; } };
+  const action = () => nodes(render()).find(n => n.type === 'Button');
+  const open = () => action().props.onClick();
+  const submit = () => nodes(render()).filter(n => n.type === 'Button' && n.props.children === (requestOnly ? 'Request cancellation' : 'Confirm cancellation')).at(-1);
+  return { calls, render, nodes, open, submit, button, remount: () => { state.length = 0; }, setFetching: value => { fetching = value; } };
 }
 
 test('user cancellation cannot submit during the waiting period', async () => {
-  const h = harness({ eligible: false }); h.open();
+  const h = harness({ eligible: false });
+  assert.equal(h.button('Cancel withdrawal'), undefined);
   assert.equal(h.submit().props.disabled, true);
   await h.submit().props.onClick();
   assert.deepEqual(h.calls, []);
@@ -70,10 +72,18 @@ test('cached eligibility cannot resubmit after success, including after remount'
 });
 
 test('refetching eligibility blocks cancellation even with cached eligible status', async () => {
-  const h = harness({ fetching: true }); h.open();
+  const h = harness(); h.open(); h.setFetching(true);
+  assert.equal(h.button('Cancel withdrawal'), undefined);
   assert.equal(h.submit().props.disabled, true);
   await h.submit().props.onClick();
   assert.deepEqual(h.calls, []);
   h.setFetching(false);
   assert.equal(h.submit().props.disabled, false);
+});
+
+test('failed or stale initial eligibility never offers cancellation', () => {
+  for (const options of [{ readError: true }, { fetched: false }, { fetching: true }]) {
+    const h = harness(options);
+    assert.equal(h.button('Cancel withdrawal'), undefined);
+  }
 });

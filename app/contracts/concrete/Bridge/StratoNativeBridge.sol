@@ -645,7 +645,7 @@ contract record StratoNativeBridge is Ownable {
         bytes32 proposalHashDigest = bytes(nativeMintProposalHash).length == 0
             ? keccak256(bytes(""))
             : keccak256(bytes(nativeMintProposalHash.normalizeHex()));
-        return keccak256(
+        return keccak256(abi.encode(
             keccak256("SNB_WITHDRAWAL_SETTLEMENT_V1"),
             block.chainid,
             address(this),
@@ -661,7 +661,7 @@ contract record StratoNativeBridge is Ownable {
             w.stratoTokenAmount,
             externalTxHashDigest,
             proposalHashDigest
-        );
+        ));
     }
 
     function attestWithdrawalSettlement(
@@ -766,7 +766,7 @@ contract record StratoNativeBridge is Ownable {
         string cancellationTxHash
     ) public returns (bytes32) {
         NativeWithdrawalInfo w = withdrawals[id];
-        return keccak256(
+        return keccak256(abi.encode(
             keccak256("SNB_WITHDRAWAL_CANCELLATION_V1"),
             block.chainid,
             address(this),
@@ -781,7 +781,7 @@ contract record StratoNativeBridge is Ownable {
             w.stratoToken,
             w.stratoTokenAmount,
             keccak256(bytes(cancellationTxHash.normalizeHex()))
-        );
+        ));
     }
 
     function attestWithdrawalCancellation(
@@ -967,7 +967,7 @@ contract record StratoNativeBridge is Ownable {
         string depositId
     ) public returns (bytes32) {
         NativeDepositInfo d = deposits[depositId];
-        return keccak256(
+        return keccak256(abi.encode(
             keccak256("SNB_DEPOSIT_SETTLEMENT_V1"),
             block.chainid,
             address(this),
@@ -985,7 +985,7 @@ contract record StratoNativeBridge is Ownable {
             d.stratoTokenAmount,
             d.actionToken,
             d.minFinalOut
-        );
+        ));
     }
 
     function attestDepositSettlement(string depositId) external {
@@ -1119,7 +1119,7 @@ contract record StratoNativeBridge is Ownable {
         string refundTxHash
     ) public returns (bytes32) {
         NativeDepositInfo d = deposits[depositId];
-        return keccak256(
+        return keccak256(abi.encode(
             keccak256("SNB_DEPOSIT_REFUND_V1"),
             block.chainid,
             address(this),
@@ -1133,7 +1133,7 @@ contract record StratoNativeBridge is Ownable {
             d.stratoToken,
             d.stratoTokenAmount,
             refundTxHash.normalizeHex()
-        );
+        ));
     }
 
     function attestDepositRefund(string depositId, string refundTxHash) external {

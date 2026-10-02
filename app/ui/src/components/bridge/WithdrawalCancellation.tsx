@@ -26,7 +26,7 @@ export default function WithdrawalCancellation({ source, withdrawalId, onCancele
   const status = useQuery({
     queryKey,
     queryFn: async () => (await api.get<WithdrawalCancellationStatus>('/bridge/withdrawalCancellation', { params: request })).data,
-    enabled: open, staleTime: 0, refetchInterval: open ? 10_000 : false,
+    enabled: !!userAddress && submitted.data !== true, staleTime: 0, refetchInterval: 10_000,
   });
   const submit = async () => {
     if (submissionPending.current || queryClient.getQueryData(submittedKey) || status.isFetching || !status.data?.eligible || status.isError) return;
@@ -41,8 +41,10 @@ export default function WithdrawalCancellation({ source, withdrawalId, onCancele
     } catch (e) { setError(extractApiErrorMessage(e) || 'Cancellation failed. Refresh the withdrawal status before trying again.'); }
     finally { submissionPending.current = false; setSubmitting(false); void fetchUsdstBalance(); void fetchTokens(); }
   };
+  const cancellationAvailable = status.isFetchedAfterMount && !status.isFetching && !status.isError && status.data?.eligible;
   return <>
-    <Button variant="outline" size="sm" disabled={submitting || submitted.data === true} onClick={() => { setError(''); setOpen(true); }}>{submitted.data ? 'Cancellation submitted' : 'Cancel withdrawal'}</Button>
+    {(submitted.data === true || cancellationAvailable) &&
+      <Button variant="outline" size="sm" disabled={submitting || submitted.data === true} onClick={() => { setError(''); setOpen(true); }}>{submitted.data ? 'Cancellation submitted' : status.data?.requestOnly ? 'Request cancellation' : 'Cancel withdrawal'}</Button>}
     <Dialog open={open} onOpenChange={value => { if (!submitting) setOpen(value); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Cancel withdrawal #{withdrawalId}</DialogTitle><DialogDescription>

@@ -97,6 +97,37 @@ contract Describe_NativeDepositRouting is Authorizable {
         require(token.allowance(address(bridge), bridge.tokenRouter()) == 0, "stale approval");
     }
 
+    function it_digest_getters_return_32_bytes_for_rpc_encoding() {
+        recordRouted(99);
+        string depositId = bridge.getDepositId(1, externalBridge, 1);
+        require(bytes(bridge.getDepositSettlementDigest(depositId)).length == 32, "deposit digest is not bytes32");
+        require(bytes(bridge.getWithdrawalSettlementDigest(1, "abcdef", "1234")).length == 32, "withdrawal digest is not bytes32");
+        require(bytes(bridge.getWithdrawalCancellationDigest(1, "abcdef")).length == 32, "cancellation digest is not bytes32");
+        require(bytes(bridge.getDepositRefundDigest(depositId, "abcdef")).length == 32, "refund digest is not bytes32");
+    }
+
+    function it_pending_deposit_recovers_with_fresh_quorum_after_digest_change() {
+        recordRouted(99);
+        string depositId = bridge.getDepositId(1, externalBridge, 1);
+        bytes32 oldDigest = bridge.getDepositSettlementDigest(depositId);
+        attest(1);
+        bridge.setSettlementVerifier(address(new NativeRouteCaller()), true);
+        bytes32 newDigest = bridge.getDepositSettlementDigest(depositId);
+        require(oldDigest != newDigest, "digest did not change");
+        require(bridge.settlementAttestationCounts(newDigest) == 0, "old quorum carried over");
+        bool rejected = false;
+        try bridge.confirmDepositWithRoute(1, externalBridge, 1, steps()) {} catch { rejected = true; }
+        require(rejected, "old quorum settled new digest");
+        verifier1.do(address(bridge), "attestDepositSettlement", depositId);
+        rejected = false;
+        try bridge.confirmDepositWithRoute(1, externalBridge, 1, steps()) {} catch { rejected = true; }
+        require(rejected, "one fresh attestation settled");
+        verifier2.do(address(bridge), "attestDepositSettlement", depositId);
+        bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
+        assertSettled();
+        require(savings.balanceOf(address(user)) == 100, "pending route lost");
+    }
+
     function it_routes_unlocked_tokens_to_the_pinned_recipient() {
         recordRouted(99);
         attest(1);

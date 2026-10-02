@@ -31,6 +31,8 @@
     "external:rollout:test": "node --test test/ExternalBridgeRolloutPlan.test.js test/ExternalBridgeOrchestration.test.js",
     "external:vault:ops": "node scripts/externalBridgeVaultOps.js",
     "external:vault:ops:test": "node --test test/ExternalBridgeVaultOps.test.js",
+    "native:signers": "node scripts/nativeBridgeSignerOps.js",
+    "native:signers:test": "node --test test/NativeBridgeSignerOps.test.js",
     "verify:sepolia": "hardhat verify --network sepolia",
     "verify:baseSepolia": "hardhat verify --network baseSepolia",
     "verify:lineaSepolia": "hardhat verify --network lineaSepolia",

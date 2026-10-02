@@ -15,6 +15,13 @@ export const BRIDGE_DIGEST_ABI = [
   "function getDepositRefundDigest(uint256,address,uint256,string) view returns (bytes32)",
 ];
 
+export const NATIVE_BRIDGE_DIGEST_ABI = [
+  "function getDepositSettlementDigest(string) view returns (bytes32)",
+  "function getWithdrawalSettlementDigest(uint256,string,string) view returns (bytes32)",
+  "function getWithdrawalCancellationDigest(uint256,string) view returns (bytes32)",
+  "function getDepositRefundDigest(string,string) view returns (bytes32)",
+];
+
 export const DEPOSIT_REFUND_TYPES = {
   DepositRefundAuthorization: [
     { name: "sourceChainId", type: "uint256" }, { name: "sourceBridge", type: "address" },

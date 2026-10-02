@@ -25,10 +25,10 @@ export const matchesSourceWithdrawalAuthorization = (
 };
 
 // Read digests from SolidVM instead of reproducing its runtime ABI encoding in ethers.
-export const buildBridgeDigestRequest = (sourceBridge: string, method: string, args: unknown[]) => ({
+export const buildBridgeDigestRequest = (sourceBridge: string, method: string, args: unknown[], abi: readonly string[] = BRIDGE_DIGEST_ABI) => ({
   jsonrpc: "2.0", id: 1, method: "eth_call",
   params: [{ to: `0x${sourceBridge.replace(/^0x/i, "")}`,
-    data: new Interface(BRIDGE_DIGEST_ABI).encodeFunctionData(method, args) }, "latest"],
+    data: new Interface(abi).encodeFunctionData(method, args) }, "latest"],
 });
 
 export const depositDigestArgs = (deposit: DepositSettlementAttestation): unknown[] => {

@@ -10,7 +10,9 @@ import { AbiCoder, Interface, keccak256 } from "ethers";
 import * as evidence from "./nativeSettlementValidation";
 import { parseNativeSourceRecord, validateNativeRedemptionRefund } from "./nativeAttestationValidation";
 import { verifierFailureDetails } from "../utils/processingIssues";
-import { NATIVE_MINT_EVENT_ABI, NATIVE_CANCELLATION_ABI, NATIVE_REFUND_ABI } from "../config/bridgeAbi";
+import { NATIVE_MINT_EVENT_ABI, NATIVE_CANCELLATION_ABI, NATIVE_REFUND_ABI, NATIVE_BRIDGE_DIGEST_ABI } from "../config/bridgeAbi";
+
+import { buildBridgeDigestRequest } from "./authorizationValidation";
 
 const address = (digit: string) => `0x${digit.repeat(40)}`;
 const normalize = (value: string) => value.toLowerCase().replace(/^0x/, "");
@@ -53,7 +55,7 @@ function harness(kind: "withdrawal" | "cancellation" | "deposit" | "refund" | "r
   const handlers = new Map<string, Function>();
   runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, {
     ...evidence, parseNativeSourceRecord, validateNativeRedemptionRefund, verifierFailureDetails, normalize,
-    nativeStratoNodeUrl: "https://native.example", auditDecision: () => {}, NATIVE_REFUND_TYPES: {},
+    NATIVE_BRIDGE_DIGEST_ABI, nativeStratoNodeUrl: "https://native.example", auditDecision: () => {}, NATIVE_REFUND_TYPES: {},
     destinationChainId: 11155111n, verifierConfirmations: 12,
     nativeVerifier: { sourceBridge, destinationBridge: externalBridge, digest: "policy",
       bridge: { maxAttestationValiditySeconds: async () => 300n, signerSetVersion: async () => 1n, refundedRedemptions: async () => false },
@@ -75,7 +77,15 @@ function harness(kind: "withdrawal" | "cancellation" | "deposit" | "refund" | "r
       assert.ok(["key,value", "value"].includes(params.select));
       return { data: [{ key: params.key.slice(3), value: state.row }] };
     },
-    readSourceDigest: async () => hash,
+    readSourceDigest: async (method: string, args: unknown[], bridge: string, nodeUrl: string, abi?: readonly string[]) => {
+      assert.equal(bridge, sourceBridge);
+      assert.equal(nodeUrl, "https://native.example");
+      const request = buildBridgeDigestRequest(bridge, method, args, abi);
+      const call = request.params[0] as { data: string };
+      const decoded = new Interface(NATIVE_BRIDGE_DIGEST_ABI).decodeFunctionData(method, call.data);
+      assert.deepEqual(Array.from(decoded, String), Array.from(args, String));
+      return hash;
+    },
     submitStratoAttestation: async (...args: any[]) => { assert.equal(args[4], "https://native.example"); state.submissions.push(args); return hash; },
     app: { post: (path: string, handler: Function) => handlers.set(path, handler) },
   });
