@@ -169,6 +169,14 @@ spec = describe "consensus message signatures" $ do
     [b | RunPreprepare b <- out] `shouldBe` [block]
     [() | OMsg _ RoundChange {} <- out] `shouldBe` []
 
+  it "rejects a committed block whose body is not the header's, and still takes the real one" $ do
+    let sealedBlk = addCommitmentSeals (map seal [k1, k2, k3]) block
+        altered = sealedBlk {blockBlockUncles = [blockBlockData block]}
+    blockHash altered `shouldBe` blockHash sealedBlk
+    out <- run ctx $ sendMessages [PreviousBlock altered, PreviousBlock sealedBlk]
+    [b | FailedHistoric b <- out] `shouldBe` [altered]
+    [b | ToCommit b <- out] `shouldBe` [sealedBlk]
+
   it "rejects a signature made for another network" $
     accepted ctx (signed 2 k2 (Prepare here di)) `shouldReturn` False
 

@@ -371,7 +371,13 @@ eventLoop ctx = execStateC ctx $
           chainId' <- use chainId
           lastRound' <- use lastRound
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift $ lift $ runExceptT $
+          doAuthn <- use productionAuth
+          eNextSeqNo <- lift $ lift $ runExceptT $ do
+            -- The seals cover the header alone. A copy with another body must fail
+            -- here, where the real block can still follow, not in the VM after this
+            -- height has been committed with the wrong transactions.
+            when (doAuthn && not (bodyMatchesHeader blk)) $
+              throwE "transactions or uncles do not match the block header"
             replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
