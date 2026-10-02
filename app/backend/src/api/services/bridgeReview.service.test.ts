@@ -225,7 +225,7 @@ test("policy overview reads only Cirrus, paginates all routes, and uses the cust
   state.tables["/BlockApps-ExternalAssetBridge-chains"] = [{ key: "11155111", value: { enabled: true } }];
   state.tables["/BlockApps-ExternalAssetBridge-mintPolicies"] = [{ key: token, value: { capacity: depositId, consumed: "1", refillRate: "100", lastRefillAt: "1000" } }];
   state.tables["/BlockApps-ExternalAssetBridge-nativeAutoRouteEnabled"] = [{ key: "11155111", key2: token, value: true }];
-  state.tables["/BlockApps-StratoNativeBridge"] = [{ depositsPaused: false, withdrawalsPaused: false, custodyVault: `0x${custody}`, INSTANT_WITHDRAWAL_DELAY_SECONDS: "900" }];
+  state.tables["/BlockApps-StratoNativeBridge"] = [{ depositsPaused: false, withdrawalsPaused: false, custodyVault: `0x${custody}` }];
   state.tables["/BlockApps-StratoNativeBridge-assets"] = [{ key: token, key2: 11155111, value: { enabled: true, representationToken: address, externalSymbol: "USDST", maxPerWithdrawal: "0", instantWithdrawalThreshold: "50" } }];
   state.tables["/BlockApps-StratoNativeBridge-tokenBridgeConfigs"] = [{ key: token, value: { depositsDisabled: false, withdrawalsDisabled: true, maxOutstandingWithdrawal: "100" } }];
   state.tables["/BlockApps-StratoNativeCustodyVault"] = [{ paused: false }];

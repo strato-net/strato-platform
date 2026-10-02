@@ -365,3 +365,70 @@ test("refund quorum requires matching digests from distinct eligible attestors",
   mode = "valid";
   await attestWithdrawalRefund({ destinationChainId: "1" } as any, digest);
 });
+
+test("native settlement uses the native source quorum and native verifier route", async (t) => {
+  const cirrusService = await import("./cirrusService");
+  const {
+    attestNativeCancellation,
+    attestNativeDeposit,
+    attestNativeWithdrawal,
+  } = await import("./settlementAttestationService");
+  t.mock.method(cirrusService, "getNativeSettlementVerifierConfig", async () => ({
+    threshold: 2,
+    count: 2,
+    verifiers: ["one", "two"],
+  }));
+  t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => {
+    throw new Error("EAB quorum must not authorize native settlement");
+  });
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two";
+  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two";
+  const requests: Array<{ url: string; payload: any }> = [];
+  t.mock.method(axios, "post", async (url: string, payload: any) => {
+    requests.push({ url, payload });
+    return {
+      data: {
+        transactionHash: `tx-${url}`,
+        settlementAttestor: url.split("/")[2],
+      },
+    };
+  });
+
+  await attestNativeWithdrawal(
+    { withdrawalId: "7", externalChainId: "1" } as any,
+    `0x${"a".repeat(64)}`,
+    `0x${"b".repeat(64)}`,
+  );
+
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "https://one/v1/attest-native-withdrawal",
+      "https://two/v1/attest-native-withdrawal",
+    ],
+  );
+  assert.equal(requests[0].payload.withdrawalId, "7");
+  requests.length = 0;
+  await attestNativeDeposit({ depositId: "native-7", externalChainId: "1" } as any);
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "https://one/v1/attest-native-deposit",
+      "https://two/v1/attest-native-deposit",
+    ],
+  );
+  assert.equal(requests[0].payload.depositId, "native-7");
+  requests.length = 0;
+  await attestNativeCancellation(
+    { withdrawalId: "7", externalChainId: "1" } as any,
+    `0x${"c".repeat(64)}`,
+  );
+  assert.deepEqual(
+    requests.map(({ url }) => url),
+    [
+      "https://one/v1/attest-native-cancellation",
+      "https://two/v1/attest-native-cancellation",
+    ],
+  );
+  assert.equal(requests[0].payload.withdrawalId, "7");
+});

@@ -8,7 +8,12 @@ import { normalizeHex as normalize } from "../utils/utils";
 import express from "express";
 import { WithdrawalReleasePendingError } from "../types";
 import type { DepositRefundAuthorization } from "../types";
-import { DEPOSIT_REFUND_TYPES } from "../config/bridgeAbi";
+import {
+  DEPOSIT_REFUND_TYPES,
+  NATIVE_ATTESTATION_ABI,
+  NATIVE_MINT_V2_TYPES,
+  NATIVE_REFUND_TYPES,
+} from "../config/bridgeAbi";
 import { validateDepositRefundSource, validateDepositRefundEvidence, validateDepositRefundCompletion } from "./depositRefundValidation";
 import { ConsensusProvider } from "./consensusProvider";
 import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
@@ -30,6 +35,20 @@ import {
   evaluateWithdrawalPolicy,
   loadVerifierPolicy,
 } from "./verifierPolicy";
+import { loadNativeVerifierPolicy } from "./nativeVerifierPolicy";
+import {
+  verifyNativeMint,
+  verifyNativeMintCancellation,
+  verifyNativeRedemptionsBatch,
+  verifyNativeRedemptionRefund,
+} from "../services/nativeVerificationService";
+import type { NativeDepositInfo, NativeWithdrawalInfo } from "../types";
+import {
+  NativeMintAttestation,
+  NativeRedemptionRefund,
+  validateNativeMintAttestation,
+  validateNativeRedemptionRefund,
+} from "./nativeAttestationValidation";
 
 interface WithdrawalAuthorization {
   sourceChainId: string;
@@ -123,6 +142,49 @@ const verifierConfirmations = Number(
   required("VERIFIER_CONFIRMATIONS"),
 );
 const port = Number(process.env.PORT || 3004);
+
+const nativePolicyPath = process.env.NATIVE_VERIFIER_POLICY_PATH?.trim();
+const nativeVerifier = nativePolicyPath
+  ? (() => {
+      const { policy, digest } = loadNativeVerifierPolicy(nativePolicyPath);
+      const signerAddress = getAddress(required("NATIVE_ATTESTATION_SIGNER_ADDRESS"));
+      const sourceBridgeAddress = required("STRATO_NATIVE_BRIDGE_ADDRESS")
+        .replace(/^0x/, "")
+        .toLowerCase();
+      const destinationBridge = getAddress(
+        required("NATIVE_REPRESENTATION_BRIDGE_ADDRESS"),
+      );
+      if (
+        policy.sourceChainId !== sourceChainId.toString() ||
+        policy.sourceBridge !== sourceBridgeAddress ||
+        policy.destinationChainId !== destinationChainId.toString() ||
+        policy.destinationBridge !== destinationBridge
+      ) {
+        throw new Error("Native verifier policy bridge or chain binding does not match");
+      }
+      const kms = {
+        address: signerAddress,
+        keyId: required("NATIVE_KMS_KEY_ID"),
+        region: required("NATIVE_KMS_REGION"),
+      };
+      if (
+        signerAddress === authorizationSignerAddress ||
+        kms.keyId === kmsConfig.keyId
+      ) {
+        throw new Error("Native verification requires a separate KMS key and signer");
+      }
+      return {
+        policy,
+        digest,
+        signerAddress,
+        sourceBridge: sourceBridgeAddress,
+        destinationBridge,
+        kms,
+        signer: new DigestKmsSigner(kms, provider),
+        bridge: new Contract(destinationBridge, NATIVE_ATTESTATION_ABI, provider),
+      };
+    })()
+  : undefined;
 if (
   !Number.isSafeInteger(verifierConfirmations) ||
   verifierConfirmations <= 0
@@ -211,9 +273,13 @@ const stratoGet = async (path: string, params: Record<string, string>) => {
   }
 };
 
-const readSourceDigest = async (method: string, args: unknown[]): Promise<string> => {
+const readSourceDigest = async (
+  method: string,
+  args: unknown[],
+  contractAddress = sourceBridge,
+): Promise<string> => {
   const request = async () => axios.post(`${stratoNodeUrl}/rpc`,
-    buildBridgeDigestRequest(sourceBridge, method, args),
+    buildBridgeDigestRequest(contractAddress, method, args),
     { headers: authHeaders(await getStratoToken()), timeout: 30_000 });
   try { return parseBridgeDigest((await request()).data); }
   catch (error: any) {
@@ -226,6 +292,8 @@ const readSourceDigest = async (method: string, args: unknown[]): Promise<string
 const submitStratoAttestation = async (
   method: string,
   args: Record<string, unknown>,
+  contractName = "ExternalAssetBridge",
+  contractAddress = sourceBridge,
 ): Promise<string> => {
   const request = async () =>
     axios.post(
@@ -235,8 +303,8 @@ const submitStratoAttestation = async (
           {
             type: "FUNCTION",
             payload: {
-              contractName: "ExternalAssetBridge",
-              contractAddress: sourceBridge,
+              contractName,
+              contractAddress,
               method,
               args,
             },
@@ -327,6 +395,37 @@ const validateSettlementVerifier = async (): Promise<string> => {
   );
   if (!verifierResponse.data?.length) {
     throw new Error(`STRATO account ${address} is not a settlement verifier`);
+  }
+  if (nativeVerifier) {
+    const [nativeVerifierResponse, nativeBridgeResponse] = await Promise.all([
+      stratoGet(
+        "/cirrus/search/BlockApps-StratoNativeBridge-settlementVerifiers",
+        {
+          address: `eq.${nativeVerifier.sourceBridge}`,
+          key: `eq.${address}`,
+          value: "eq.true",
+          select: "key",
+        },
+      ),
+      stratoGet("/cirrus/search/BlockApps-StratoNativeBridge", {
+        address: `eq.${nativeVerifier.sourceBridge}`,
+        select: "settlementVerifierThreshold,settlementVerifierCount",
+        limit: "1",
+      }),
+    ]);
+    if (!nativeVerifierResponse.data?.length) {
+      throw new Error(
+        `STRATO account ${address} is not a native settlement verifier`,
+      );
+    }
+    const nativeBridge = nativeBridgeResponse.data?.[0];
+    if (
+      Number(nativeBridge?.settlementVerifierThreshold || 0) < 2 ||
+      Number(nativeBridge?.settlementVerifierThreshold || 0) >
+        Number(nativeBridge?.settlementVerifierCount || 0)
+    ) {
+      throw new Error("Native settlement verifier quorum is not configured");
+    }
   }
   return address;
 };
@@ -659,11 +758,374 @@ app.get("/health", (_, res) => {
     policyDigest: verifierPolicyDigest,
     baselinePolicyHash: verifierPolicy.baselinePolicyHash,
     verifierIndex: verifierPolicy.verifierIndex,
+    native: nativeVerifier
+      ? {
+          attestationSigner: nativeVerifier.signerAddress,
+          sourceBridge: nativeVerifier.sourceBridge,
+          destinationBridge: nativeVerifier.destinationBridge,
+          policyVersion: nativeVerifier.policy.version,
+          policyDigest: nativeVerifier.digest,
+          baselinePolicyHash: nativeVerifier.policy.baselinePolicyHash,
+        }
+      : undefined,
   });
 });
 
 app.use(verifierAccessControl(verifierApiToken));
 app.use(express.json({ limit: "32kb" }));
+
+app.post("/v1/sign-native-mint", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const attestation = req.body?.attestation as NativeMintAttestation;
+    if (!attestation) throw new Error("Native mint attestation is required");
+    const latest = await provider.getBlock("latest");
+    if (!latest) throw new Error("Native destination head is unavailable");
+    await validateNativeMintAttestation(
+      attestation,
+      nativeVerifier.policy,
+      stratoGet,
+      nativeVerifier.bridge,
+      BigInt(latest.timestamp),
+    );
+    const signature = await nativeVerifier.signer.signTypedData(
+      {
+        name: "StratoNativeRepresentationBridge",
+        version: "1",
+        chainId: destinationChainId,
+        verifyingContract: nativeVerifier.destinationBridge,
+      },
+      NATIVE_MINT_V2_TYPES,
+      attestation,
+    );
+    auditDecision(
+      "sign_native_mint",
+      attestation.sourceWithdrawalId,
+      "approve",
+      attestation.useInstantPath
+        ? "verified instant withdrawal"
+        : "verified Safe withdrawal",
+    );
+    res.json({
+      attestationSigner: nativeVerifier.signerAddress,
+      signature,
+    });
+  } catch (error) {
+    auditDecision(
+      "sign_native_mint",
+      String(req.body?.attestation?.sourceWithdrawalId || ""),
+      "reject",
+      (error as Error).message,
+    );
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        nativeVerifier?.signerAddress,
+      ),
+    });
+  }
+});
+
+app.post("/v1/sign-native-refund", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const depositId = String(req.body?.depositId || "");
+    const refund = req.body?.refund as NativeRedemptionRefund;
+    if (!/^(0x)?[0-9a-f]{64}$/i.test(depositId)) {
+      throw new Error("Invalid native deposit identity");
+    }
+    const latest = await provider.getBlock("latest");
+    if (!latest) throw new Error("Native destination head is unavailable");
+    await validateNativeRedemptionRefund(
+      depositId.replace(/^0x/i, ""),
+      refund,
+      nativeVerifier.policy,
+      stratoGet,
+      nativeVerifier.bridge,
+      BigInt(latest.timestamp),
+    );
+    const signature = await nativeVerifier.signer.signTypedData(
+      {
+        name: "StratoNativeRepresentationBridge",
+        version: "1",
+        chainId: destinationChainId,
+        verifyingContract: nativeVerifier.destinationBridge,
+      },
+      NATIVE_REFUND_TYPES,
+      refund,
+    );
+    auditDecision(
+      "sign_native_refund",
+      refund.redemptionId,
+      "approve",
+      "verified STRATO refund decision",
+    );
+    res.json({
+      attestationSigner: nativeVerifier.signerAddress,
+      signature,
+    });
+  } catch (error) {
+    auditDecision(
+      "sign_native_refund",
+      String(req.body?.refund?.redemptionId || ""),
+      "reject",
+      (error as Error).message,
+    );
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        nativeVerifier?.signerAddress,
+      ),
+    });
+  }
+});
+
+const getNativeSourceRecord = async <T>(
+  mapping: "withdrawals" | "deposits",
+  key: string,
+): Promise<T> => {
+  if (!nativeVerifier) throw new Error("Native verification is not configured");
+  const response = await stratoGet(
+    `/cirrus/search/BlockApps-StratoNativeBridge-${mapping}`,
+    {
+      address: `eq.${nativeVerifier.sourceBridge}`,
+      key: `eq.${key}`,
+      select: "value",
+      limit: "1",
+    },
+  );
+  const rows = response.data;
+  if (!Array.isArray(rows) || rows.length !== 1 || !rows[0]?.value) {
+    throw new Error(`Native ${mapping === "withdrawals" ? "withdrawal" : "deposit"} is unavailable`);
+  }
+  return rows[0].value as T;
+};
+
+const validateNativeSettlementRoute = (
+  record: Pick<
+    NativeDepositInfo | NativeWithdrawalInfo,
+    "externalChainId" | "externalBridge" | "representationToken" | "stratoToken"
+  >,
+): void => {
+  if (!nativeVerifier) throw new Error("Native verification is not configured");
+  const routeAllowed = nativeVerifier.policy.routes.some(
+    (route) =>
+      normalize(route.stratoToken) === normalize(record.stratoToken) &&
+      normalize(route.representationToken) ===
+        normalize(record.representationToken),
+  );
+  if (
+    String(record.externalChainId) !==
+      nativeVerifier.policy.destinationChainId ||
+    normalize(record.externalBridge) !==
+      normalize(nativeVerifier.policy.destinationBridge) ||
+    !routeAllowed
+  ) {
+    throw new Error("Native settlement route is rejected by verifier policy");
+  }
+};
+
+app.post("/v1/attest-native-withdrawal", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const withdrawalId = String(req.body?.withdrawalId || "");
+    const externalTxHash = String(req.body?.externalTxHash || "");
+    const nativeMintProposalHash = String(req.body?.nativeMintProposalHash || "");
+    if (!/^\d+$/.test(withdrawalId) || !/^0x[0-9a-f]{64}$/i.test(externalTxHash)) {
+      throw new Error("Invalid native withdrawal settlement identity");
+    }
+    const withdrawal = await getNativeSourceRecord<NativeWithdrawalInfo>(
+      "withdrawals",
+      withdrawalId,
+    );
+    if (
+      !["2", "10"].includes(String(withdrawal.bridgeStatus)) ||
+      String(withdrawal.withdrawalId) !== withdrawalId
+    ) {
+      throw new Error("Native withdrawal is not pending settlement");
+    }
+    validateNativeSettlementRoute(withdrawal);
+    await verifyNativeMint(
+      withdrawal,
+      BigInt(nativeVerifier.policy.sourceChainId),
+      nativeVerifier.sourceBridge,
+      externalTxHash,
+    );
+    const digest = await readSourceDigest(
+      "getWithdrawalSettlementDigest",
+      [withdrawalId, externalTxHash, nativeMintProposalHash],
+      nativeVerifier.sourceBridge,
+    );
+    const transactionHash = await submitStratoAttestation(
+      "attestWithdrawalSettlement",
+      { id: withdrawalId, externalTxHash, nativeMintProposalHash },
+      "StratoNativeBridge",
+      nativeVerifier.sourceBridge,
+    );
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
+  } catch (error) {
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        settlementAttestorAddress,
+      ),
+    });
+  }
+});
+
+app.post("/v1/attest-native-deposit", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const depositId = String(req.body?.depositId || "");
+    if (!depositId) throw new Error("Invalid native deposit identity");
+    const deposit = await getNativeSourceRecord<NativeDepositInfo>("deposits", depositId);
+    if (
+      !["1", "2"].includes(String(deposit.bridgeStatus)) ||
+      String(deposit.depositId) !== depositId
+    ) {
+      throw new Error("Native deposit is not pending settlement");
+    }
+    validateNativeSettlementRoute(deposit);
+    const verified = await verifyNativeRedemptionsBatch([deposit]);
+    if (verified.get(depositId) !== true) {
+      throw new Error("Native redemption evidence is not confirmed");
+    }
+    const digest = await readSourceDigest(
+      "getDepositSettlementDigest",
+      [depositId],
+      nativeVerifier.sourceBridge,
+    );
+    const transactionHash = await submitStratoAttestation(
+      "attestDepositSettlement",
+      { depositId },
+      "StratoNativeBridge",
+      nativeVerifier.sourceBridge,
+    );
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
+  } catch (error) {
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        settlementAttestorAddress,
+      ),
+    });
+  }
+});
+
+app.post("/v1/attest-native-cancellation", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const withdrawalId = String(req.body?.withdrawalId || "");
+    const cancellationTxHash = String(req.body?.cancellationTxHash || "");
+    if (
+      !/^\d+$/.test(withdrawalId) ||
+      !/^0x[0-9a-f]{64}$/i.test(cancellationTxHash)
+    ) {
+      throw new Error("Invalid native cancellation identity");
+    }
+    const withdrawal = await getNativeSourceRecord<NativeWithdrawalInfo>(
+      "withdrawals",
+      withdrawalId,
+    );
+    if (
+      String(withdrawal.bridgeStatus) !== "10" ||
+      String(withdrawal.withdrawalId) !== withdrawalId ||
+      normalize(withdrawal.cancellationTxHash || "") !==
+        normalize(cancellationTxHash)
+    ) {
+      throw new Error("Native cancellation evidence is not recorded");
+    }
+    validateNativeSettlementRoute(withdrawal);
+    await verifyNativeMintCancellation(
+      withdrawal,
+      BigInt(nativeVerifier.policy.sourceChainId),
+      nativeVerifier.sourceBridge,
+      cancellationTxHash,
+    );
+    const digest = await readSourceDigest(
+      "getWithdrawalCancellationDigest",
+      [withdrawalId, cancellationTxHash],
+      nativeVerifier.sourceBridge,
+    );
+    const transactionHash = await submitStratoAttestation(
+      "attestWithdrawalCancellation",
+      { id: withdrawalId, cancellationTxHash },
+      "StratoNativeBridge",
+      nativeVerifier.sourceBridge,
+    );
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
+  } catch (error) {
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        settlementAttestorAddress,
+      ),
+    });
+  }
+});
+
+app.post("/v1/attest-native-refund", async (req, res) => {
+  try {
+    if (!nativeVerifier) throw new Error("Native verification is not configured");
+    const depositId = String(req.body?.depositId || "");
+    const refundTxHash = String(req.body?.refundTxHash || "");
+    if (!depositId || !/^0x[0-9a-f]{64}$/i.test(refundTxHash)) {
+      throw new Error("Invalid native refund settlement identity");
+    }
+    const deposit = await getNativeSourceRecord<NativeDepositInfo>("deposits", depositId);
+    if (
+      String(deposit.bridgeStatus) !== "7" ||
+      String(deposit.depositId) !== depositId
+    ) {
+      throw new Error("Native deposit is not pending refund");
+    }
+    validateNativeSettlementRoute(deposit);
+    await verifyNativeRedemptionRefund(deposit, refundTxHash);
+    const digest = await readSourceDigest(
+      "getDepositRefundDigest",
+      [depositId, refundTxHash],
+      nativeVerifier.sourceBridge,
+    );
+    const transactionHash = await submitStratoAttestation(
+      "attestDepositRefund",
+      { depositId, refundTxHash },
+      "StratoNativeBridge",
+      nativeVerifier.sourceBridge,
+    );
+    res.json({ settlementAttestor: settlementAttestorAddress, transactionHash, digest });
+  } catch (error) {
+    res.status(422).json({
+      decision: "reject",
+      error: (error as Error).message,
+      ...verifierFailureDetails(
+        error,
+        nativeVerifier?.policy.version || verifierPolicy.version,
+        nativeVerifier?.digest || verifierPolicyDigest,
+        settlementAttestorAddress,
+      ),
+    });
+  }
+});
 
 for (const action of ["sign", "attest"] as const) {
   app.post(`/v1/${action}-deposit-refund`, async (req, res) => {
@@ -941,6 +1403,21 @@ app.post("/v1/attest-refund", async (req, res) => {
   }
 });
 
+const validateNativeVerifierConfig = async (): Promise<void> => {
+  if (!nativeVerifier) return;
+  await validateAwsKmsAddress(nativeVerifier.kms);
+  const [enabled, threshold] = await Promise.all([
+    nativeVerifier.bridge.attestationSigners(nativeVerifier.signerAddress),
+    nativeVerifier.bridge.attestationThreshold(),
+  ]);
+  if (!enabled) {
+    throw new Error("Native KMS signer is not enabled on the representation bridge");
+  }
+  if (Number(threshold) < 2) {
+    throw new Error("Native representation bridge attestation threshold must be at least two");
+  }
+};
+
 const start = async () => {
   try {
     await validateRpcIdentity();
@@ -948,6 +1425,7 @@ const start = async () => {
       validateSettlementVerifier(),
       validateAwsKmsAddress(kmsConfig),
       validatePolicyAgainstContracts(),
+      validateNativeVerifierConfig(),
     ]);
     if (
       normalize(verifierPolicy.settlementAttestor) !==

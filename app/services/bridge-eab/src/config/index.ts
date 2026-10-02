@@ -6,6 +6,9 @@ export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 export const STRATO_DECIMALS = 18;
 export const WAD = 10n ** 18n;
 export const VERIFIER_REQUEST_TIMEOUT_MS = 60_000;
+export const NATIVE_VERIFIER_REQUEST_TIMEOUT_MS = Number(
+  process.env.NATIVE_VERIFIER_REQUEST_TIMEOUT_MS || VERIFIER_REQUEST_TIMEOUT_MS,
+);
 export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
 // HyperEVM caps JSON-RPC batches at 20 calls per HTTP request
 export const RPC_BATCH_LIMIT = 20;
@@ -218,47 +221,6 @@ export const getNativeRepresentationBridgeAddress = (
   return process.env[`CHAIN_${chainIdStr}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`];
 };
 
-export const getNativeBridgePrivateKey = (
-  chainId: number | bigint,
-): string | undefined => {
-  const chainIdStr = chainId.toString();
-  return process.env[`CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`];
-};
-
-export interface NativeBridgePrivateKeyConfig {
-  envVar: string;
-  privateKey: string;
-}
-
-export const getNativeBridgePrivateKeys = (
-  chainId: number | bigint,
-): NativeBridgePrivateKeyConfig[] => {
-  const chainIdStr = chainId.toString();
-  const baseEnv = `CHAIN_${chainIdStr}_NATIVE_BRIDGE_PRIVATE_KEY`;
-  const keys: NativeBridgePrivateKeyConfig[] = [];
-  const seen = new Set<string>();
-
-  const addKey = (envVar: string) => {
-    const privateKey = process.env[envVar]?.trim();
-    if (!privateKey || seen.has(privateKey)) {
-      return;
-    }
-    seen.add(privateKey);
-    keys.push({ envVar, privateKey });
-  };
-
-  addKey(baseEnv);
-  for (let index = 1; ; index += 1) {
-    const envVar = `${baseEnv}_${index}`;
-    if (!process.env[envVar]) {
-      break;
-    }
-    addKey(envVar);
-  }
-
-  return keys;
-};
-
 export const getExternalBridgeVerifierUrls = (
   chainId: number | bigint,
 ): string[] =>
@@ -274,6 +236,27 @@ export const getExternalBridgeVerifierApiTokens = (
     .split(",")
     .map((token) => token.trim())
     .filter(Boolean);
+
+export const getNativeVerifierUrls = (
+  chainId: number | bigint,
+): string[] =>
+  (process.env[`CHAIN_${chainId}_NATIVE_VERIFIER_URLS`] || "")
+    .split(",")
+    .map((url) => url.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+
+export const getNativeVerifierApiTokens = (
+  chainId: number | bigint,
+): string[] =>
+  (process.env[`CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS`] || "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+export const getNativeMintExecutorPrivateKey = (
+  chainId: number | bigint,
+): string | undefined =>
+  process.env[`CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`]?.trim();
 
 export const getExternalBridgeExecutorPrivateKey = (
   chainId: number | bigint,

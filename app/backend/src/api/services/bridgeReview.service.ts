@@ -247,7 +247,7 @@ export const getAdminBridgePolicies = async (accessToken: string): Promise<Bridg
   };
   const [eab, native] = await Promise.all([
     root(ExternalAssetBridge, externalAssetBridge, "depositsPaused,withdrawalsPaused"),
-    root(StratoNativeBridge, stratoNativeBridge, "depositsPaused,withdrawalsPaused,custodyVault,INSTANT_WITHDRAWAL_DELAY_SECONDS"),
+    root(StratoNativeBridge, stratoNativeBridge, "depositsPaused,withdrawalsPaused,custodyVault"),
   ]);
   const custodyAddress = typeof native?.custodyVault === "string" && /^(0x)?[0-9a-f]{40}$/i.test(native.custodyVault) &&
     !/^(0x)?0+$/i.test(native.custodyVault) ? native.custodyVault.replace(/^0x/i, "").toLowerCase() : "";

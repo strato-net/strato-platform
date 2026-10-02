@@ -5,10 +5,20 @@ import {
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
-import { ProcessingIssue, ActionDepositArgs, DepositArgs, WithdrawalReleasePendingError } from "../types";
+import {
+  ProcessingIssue,
+  ActionDepositArgs,
+  DepositArgs,
+  NativeDepositInfo,
+  NativeWithdrawalInfo,
+  WithdrawalReleasePendingError,
+} from "../types";
 import { logInfo } from "../utils/logger";
 import { WithdrawalAuthorization } from "./externalWithdrawalService";
-import { getSettlementVerifierConfig } from "./cirrusService";
+import {
+  getNativeSettlementVerifierConfig,
+  getSettlementVerifierConfig,
+} from "./cirrusService";
 
 const signerHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,
@@ -24,7 +34,9 @@ export const requestVerifierQuorum = async (
 ): Promise<boolean> => {
   const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
   const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
-  const { threshold, verifiers } = await getSettlementVerifierConfig();
+  const { threshold, verifiers } = path.startsWith("/v1/attest-native-")
+    ? await getNativeSettlementVerifierConfig()
+    : await getSettlementVerifierConfig();
   if (urls.length === 0) {
     throw new Error(
       `No external bridge settlement verifiers configured for chain ${chainId}`,
@@ -163,4 +175,55 @@ export const attestWithdrawalRelease = async (
 
 export const attestWithdrawalRefund = async (authorization: WithdrawalAuthorization, expectedDigest: string): Promise<void> => {
   await requestVerifierQuorum(authorization.destinationChainId, "/v1/attest-refund", { authorization }, expectedDigest);
+};
+
+export const attestNativeWithdrawal = async (
+  withdrawal: NativeWithdrawalInfo,
+  externalTxHash: string,
+  nativeMintProposalHash: string,
+): Promise<void> => {
+  await requestVerifierQuorum(
+    withdrawal.externalChainId,
+    "/v1/attest-native-withdrawal",
+    {
+      withdrawalId: withdrawal.withdrawalId,
+      externalTxHash,
+      nativeMintProposalHash,
+    },
+  );
+};
+
+export const attestNativeRefund = async (
+  deposit: NativeDepositInfo,
+  refundTxHash: string,
+): Promise<void> => {
+  await requestVerifierQuorum(
+    deposit.externalChainId,
+    "/v1/attest-native-refund",
+    { depositId: deposit.depositId, refundTxHash },
+  );
+};
+
+export const attestNativeDeposit = async (
+  deposit: Pick<NativeDepositInfo, "depositId" | "externalChainId">,
+): Promise<void> => {
+  await requestVerifierQuorum(
+    deposit.externalChainId,
+    "/v1/attest-native-deposit",
+    { depositId: deposit.depositId },
+  );
+};
+
+export const attestNativeCancellation = async (
+  withdrawal: NativeWithdrawalInfo,
+  cancellationTxHash: string,
+): Promise<void> => {
+  await requestVerifierQuorum(
+    withdrawal.externalChainId,
+    "/v1/attest-native-cancellation",
+    {
+      withdrawalId: withdrawal.withdrawalId,
+      cancellationTxHash,
+    },
+  );
 };

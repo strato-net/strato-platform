@@ -77,7 +77,6 @@ EXTERNAL_NAME=STRATO
 EXTERNAL_SYMBOL=STRATO
 MAX_PER_WITHDRAWAL=<wei amount>
 INSTANT_WITHDRAWAL_THRESHOLD=<wei amount>
-INSTANT_WITHDRAWAL_DELAY_SECONDS=<seconds>
 
 AUCTION_DEPLOYER_SAFE=<Safe that deploys/funds auction>
 LIQUIDITY_LAUNCHER=<LiquidityLauncher address>
@@ -157,15 +156,6 @@ npm run initialize:native-bridge -- \
   --token-factory <TOKEN_FACTORY> \
   --bridge-operator <BRIDGE_OPERATOR> \
   --guardian <GUARDIAN>
-```
-
-Set instant withdrawal delay if required:
-
-```text
-target: <STRATO_NATIVE_BRIDGE_PROXY>
-method: setInstantWithdrawalDelaySeconds(uint256)
-args:
-  newDelaySeconds: <INSTANT_WITHDRAWAL_DELAY_SECONDS>
 ```
 
 If the STRATO token is paused, whitelist the custody vault for bridge lock/unlock movement:
@@ -358,7 +348,9 @@ Import into Ethereum mainnet Safe Transaction Builder after replacing placeholde
 }
 ```
 
-If `ATTESTATION_THRESHOLD` is greater than `1`, add one `setAttestationSigner(<signer>, true)` transaction for each additional signer before `setAttestationThreshold`.
+Add at least two distinct `setAttestationSigner(<signer>, true)` transactions
+before `setAttestationThreshold`. `ATTESTATION_THRESHOLD` must be at least `2`
+and cannot exceed the enabled signer count.
 
 ## 6. Rename CATA To STRATO
 
@@ -410,8 +402,16 @@ npm run configure:native-route -- \
   --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
   --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> \
   --strato-token <STRATO_NATIVE_TOKEN> \
+  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
+  --settlement-verifier-threshold 2 \
   --enabled true
 ```
+
+Review the dry-run output first. Every required STRATO administrator must then
+run the same command with `--execute`. The settlement verifier addresses are the
+STRATO accounts used by the verifier processes, not their external-chain KMS
+signer addresses. Do not enable the route until both source and destination
+thresholds are at least two.
 
 Verify Cirrus:
 
@@ -427,15 +427,17 @@ Bridge service env:
 STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
 CHAIN_1_RPC_URL=<ETHEREUM_RPC_URL>
 CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY=<native-mint-signer-and-gas-key>
+CHAIN_1_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>
+CHAIN_1_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
+CHAIN_1_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 ```
 
-If multiple signers are required:
-
-```bash
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-native-mint-signer-key>
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-native-mint-signer-key>
-```
+Run each native verifier with a separate KMS key, AWS identity, native policy file,
+RPC provider, API token, and `SETTLEMENT_ATTESTOR_*` STRATO credentials. Enable
+each verifier's KMS address through `setAttestationSigner` on the representation
+bridge and its STRATO settlement-attestor account through
+`setSettlementVerifier` on `StratoNativeBridge`; never enable the executor
+address as either signer.
 
 STRATO App mainnet addresses should be added to `app/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
 
@@ -713,7 +715,7 @@ If a native withdrawal is stuck in `INITIATED`:
 ```text
 1. Confirm bridge service is running with STRATO_NATIVE_BRIDGE_ADDRESS.
 2. Confirm BRIDGE_OPERATOR matches the bridge service STRATO account.
-3. Confirm CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS and CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY are configured.
+3. Confirm the representation bridge, executor, source settlement-attestor accounts, verifier URLs, and verifier tokens are configured.
 4. Check bridge service logs for queueManualNativeWithdrawalBatch or finalizeNativeWithdrawalBatch.
 ```
 

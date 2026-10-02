@@ -4,21 +4,84 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
-import { config, getNativeBridgePrivateKeys, getDepositConfirmationPolicy, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
+import { config, getNativeMintExecutorPrivateKey, getNativeVerifierUrls, getNativeVerifierApiTokens, getDepositConfirmationPolicy, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES, NATIVE_REFUND_ABI, NATIVE_REFUND_TYPES } from "../config/bridgeAbi";
 import { DepositRefundAuthorization, NativeDepositInfo, NativeRefundProposal } from "../types";
 import { getChainProvider, getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
 import { getRecordedDepositReviews, getBridgeReviewRecords, getDepositRefundVault, getNativeDepositRefundProposal, getNativeDepositRefundEvidence } from "./cirrusService";
 import { recoverDepositObservation } from "./depositEventService";
 import { getStratoNetworkId } from "./bridgeService";
-import { execute } from "../utils/stratoHelper";
+import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import { safeChecksum, ensureHexPrefix } from "../utils/utils";
 import { DigestKmsSigner } from "../utils/kmsSigner";
 import { getEventTransactionHash } from "./externalWithdrawalService";
-import { requestVerifierQuorum } from "./settlementAttestationService";
+import {
+  attestNativeRefund,
+  requestVerifierQuorum,
+} from "./settlementAttestationService";
 import { processingIssueService } from "./processingIssueService";
 import { verifierIssues, processingIssue } from "../utils/processingIssues";
 import { verifyNativeRedemptionsBatch } from "./nativeVerificationService";
+
+const collectNativeRefundSignatures = async (
+  chainId: number,
+  depositId: string,
+  bridge: Contract,
+  domain: Record<string, unknown>,
+  refund: Record<string, unknown>,
+): Promise<string[]> => {
+  const urls = getNativeVerifierUrls(chainId);
+  const tokens = getNativeVerifierApiTokens(chainId);
+  const threshold = Number(await bridge.attestationThreshold());
+  if (
+    urls.length !== tokens.length ||
+    !Number.isSafeInteger(threshold) ||
+    threshold < 2 ||
+    urls.length < threshold
+  ) {
+    throw new Error("Native refund verifier configuration does not satisfy quorum");
+  }
+  const responses = await Promise.allSettled(
+    urls.map((url, index) =>
+      axios.post(
+        `${url}/v1/sign-native-refund`,
+        { depositId, refund },
+        {
+          headers: { Authorization: `Bearer ${tokens[index]}` },
+          timeout: NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
+          maxRedirects: 0,
+        },
+      ),
+    ),
+  );
+  const signatures: Array<{ signer: string; signature: string }> = [];
+  const seen = new Set<string>();
+  for (const response of responses) {
+    if (response.status !== "fulfilled") continue;
+    try {
+      const signature = String(response.value.data?.signature || "");
+      const claimed = safeChecksum(response.value.data?.attestationSigner);
+      const recovered = safeChecksum(
+        verifyTypedData(domain, NATIVE_REFUND_TYPES, refund, signature),
+      );
+      if (claimed !== recovered || seen.has(recovered.toLowerCase())) continue;
+      if (!(await bridge.attestationSigners(recovered))) continue;
+      seen.add(recovered.toLowerCase());
+      signatures.push({ signer: recovered.toLowerCase(), signature });
+    } catch {
+      continue;
+    }
+  }
+  if (signatures.length < threshold) {
+    throw new Error(
+      `Native refund verifier quorum unavailable: received ${signatures.length}, require ${threshold}`,
+    );
+  }
+  return signatures
+    .sort((a, b) => a.signer.localeCompare(b.signer))
+    .slice(0, threshold)
+    .map(({ signature }) => signature);
+};
 
 export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<void> => {
   if (Number(d.bridgeStatus) !== 7) throw new Error("Native refund decision is unavailable");
@@ -36,20 +99,37 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
   } else {
     const block = await provider.getBlock("latest");
     if (!block) throw new Error("Native refund RPC unavailable");
-    const validity = BigInt(await bridge.maxAttestationValiditySeconds());
+    const [validityValue, signerSetVersion] = await Promise.all([
+      bridge.maxAttestationValiditySeconds(),
+      bridge.signerSetVersion(),
+    ]);
+    const validity = BigInt(validityValue);
     const deadline = String(BigInt(block.timestamp) + validity);
     const a = { sourceChainId: String(await getStratoNetworkId()), sourceBridge: safeChecksum(config.nativeBridge.address!),
       destinationChainId: String(chainId), destinationBridge: destination, redemptionId: d.externalRedemptionId,
       representationToken: safeChecksum(d.representationToken), recipient: safeChecksum(d.externalSender),
-      amount: d.stratoTokenAmount, deadline };
+      amount: d.stratoTokenAmount, deadline, signerSetVersion: String(signerSetVersion) };
     const domain = { name: "StratoNativeRepresentationBridge", version: "1", chainId, verifyingContract: destination };
-    const keys = getNativeBridgePrivateKeys(BigInt(chainId));
-    if (!keys.length) throw new Error("Native refund signers are not configured");
-    const wallets = keys.map(key => new Wallet(ensureHexPrefix(key.privateKey), provider)).sort((x, y) => x.address.toLowerCase().localeCompare(y.address.toLowerCase()));
-    const signatures = await Promise.all(wallets.map(wallet => wallet.signTypedData(domain, NATIVE_REFUND_TYPES, a)));
+    const signatures = await collectNativeRefundSignatures(
+      chainId,
+      d.depositId,
+      bridge,
+      domain,
+      a,
+    );
     const data = iface.encodeFunctionData("refundRedemption", [a, signatures]);
-    if (await bridge.hasRole(id("MINT_EXECUTOR_ROLE"), wallets[0].address)) {
-      const tx = await wallets[0].sendTransaction({ to: destination, data });
+    const executorKey = getNativeMintExecutorPrivateKey(chainId);
+    const executor = executorKey
+      ? new Wallet(ensureHexPrefix(executorKey), provider)
+      : undefined;
+    if (
+      executor &&
+      await bridge.hasRole(id("MINT_EXECUTOR_ROLE"), executor.address)
+    ) {
+      const tx = await (bridge.connect(executor) as Contract).refundRedemption(
+        a,
+        signatures,
+      );
       const receipt = await tx.wait();
       if (!receipt || receipt.status !== 1) throw new Error("Native deposit refund failed");
       hash = receipt.hash;
@@ -133,6 +213,13 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
     await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
       method: "recordDepositRefundEvidence", args: { depositId: d.depositId, refundTxHash: hash } });
   }
+  await attestNativeRefund(d, hash);
+  await executeAsRelayer({
+    contractName: "StratoNativeBridge",
+    contractAddress: config.nativeBridge.address!,
+    method: "finalizeDepositRefund",
+    args: { depositId: d.depositId, refundTxHash: hash },
+  });
 };
 
 export const recoverExternalDepositRefund = async (chainId: number, router: string, id: string): Promise<void> => {

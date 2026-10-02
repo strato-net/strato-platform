@@ -19,7 +19,7 @@ The native bridge is split across:
 
 Native refund completion requires a separate governance vote on `finalizeDepositRefund(depositId, refundTxHash)` after the operator records confirmed external evidence. Verify the bridge is owned by AdminRegistry (not the hot operator), its finalization voting threshold is correct, the operator has no whitelist bypass for `finalizeDepositRefund`, and `depositRefundEvidence` is indexed. Deploy backend/UI with the Confirm refund action; keep the item pending until that vote executes.
 
-Before enabling **Complete delivery** or **Return funds** in Admin, upgrade StratoNativeBridge and StratoNativeRepresentationBridge and follow the [deposit recovery upgrade gate](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds). Native refunds restore representations to the original external sender and retain STRATO backing. They use the existing native attestors and mint executor/Safe; no EAB verifier service is required for native refunds. Preserve `data/native-refunds/` across service replacements and test Safe expiry/retry if execution requires Safe approval.
+Before enabling **Complete delivery** or **Return funds** in Admin, upgrade StratoNativeBridge and StratoNativeRepresentationBridge and follow the [deposit recovery upgrade gate](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds). Native refunds restore representations to the original external sender and retain STRATO backing. They use the native KMS identities configured in the shared EAB verifier fleet and execute through the authorized refund executor or Safe. Preserve `data/native-refunds/` across service replacements and test Safe expiry/retry if execution requires Safe approval.
 
 ## Naming
 
@@ -128,7 +128,7 @@ This calls:
 
 Important:
 - `setAsset(...)`, `setTokenFactory(...)`, `setCustodyVault(...)`, and vault `setBridge(...)` are owner-governed on STRATO
-- if `owner = ADMIN_REGISTRY`, the STRATO helper scripts are expected to work through owner/governance semantics
+- if `owner = ADMIN_REGISTRY`, `configure:native-route` submits these owner-only calls through `AdminRegistry.castVoteOnIssue`; each required administrator must run the same `--execute` command
 
 ### Step 6: Configure the STRATO native route
 
@@ -146,6 +146,8 @@ npm run configure:native-route -- \
   --external-symbol wSTRATO \
   --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
   --strato-token <STRATO_NATIVE_TOKEN> \
+  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
+  --settlement-verifier-threshold 2 \
   --enabled true
 ```
 
@@ -153,6 +155,7 @@ Notes:
 - `external-chain-id` is Sepolia for now: `11155111`
 - `external-bridge` must be the Sepolia `StratoNativeRepresentationBridge` proxy
 - `representation-token` must be the Sepolia `StratoNativeRepresentationToken` proxy
+- review the dry-run plan, then append `--execute`; every required STRATO administrator must submit the same votes
 
 ### Step 7: Whitelist the custody vault for paused STRATO token moves
 
@@ -262,20 +265,21 @@ Record:
 
 Use the Sepolia Safe to execute the post-deploy admin transactions.
 
-Saved batch file:
-- `app/ethereum/deployments/sepolia-native-bridge-safe-batch.json`
+Create the environment-specific Safe Transaction Builder batch locally from the
+call template in this runbook. Do not commit signer addresses or a stale batch.
 
 This batch does:
 - on `StratoNativeRepresentationToken`, `grantRole(BRIDGE_ROLE, <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>)`
 - on `StratoNativeRepresentationToken`, keep `transfersEnabled = false` until the sale/release condition is met
 - on `StratoNativeRepresentationToken`, `setTransferEndpoint(<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>, true)` so redemptions can occur while peer-to-peer transfers are blocked
 - on `StratoNativeRepresentationBridge`, optionally split operational roles with `grantRole` / `revokeRole`
-- on `StratoNativeRepresentationBridge`, `setAttestationSigner(<STRATO_VAULT_BACKED_SIGNER>, true)` for each native mint attestation signer
+- on `StratoNativeRepresentationBridge`, `setAttestationSigner(<NATIVE_VERIFIER_KMS_SIGNER>, true)` for each independent native verifier
 - on `StratoNativeRepresentationBridge`, `setAttestationThreshold(<native mint attestation threshold>)`
+- on `StratoNativeRepresentationBridge`, grant `MINT_EXECUTOR_ROLE` to the dedicated instant executor; do not grant it admin permissions
 - on `StratoNativeRepresentationBridge`, optionally `setMaxAttestationValiditySeconds(<seconds>)` if the default 7 day maximum validity should change
 - on `StratoNativeRepresentationBridge`, `registerTokenMapping(<STRATO_TOKEN>, <SEPOLIA_REPRESENTATION_TOKEN_PROXY>, false)`
 
-`mintRepresentationWithAttestation` requires both valid `NativeMintAttestation` signatures and `MINT_EXECUTOR_ROLE` on the caller. Grant `MINT_EXECUTOR_ROLE` only to the custody Safe, so no single attestation signer or relayer key can mint on its own. `initialize` grants it to the admin Safe on fresh deployments.
+V1 minting is removed. Every V2 verifier signature binds `useInstantPath`. Manual V2 mints require the custody Safe's `DEFAULT_ADMIN_ROLE`; instant V2 mints require `MINT_EXECUTOR_ROLE` on the dedicated executor. Verifier EOAs must hold neither role.
 
 `StratoNativeRepresentationBridge.initialize(<SEPOLIA_ADMIN_SAFE>)` bootstraps all bridge roles to the Safe. For production, the Safe should explicitly grant operational roles to the intended addresses and optionally revoke those roles from itself while keeping `DEFAULT_ADMIN_ROLE`.
 
@@ -310,27 +314,41 @@ Before running the native flow end to end, update the bridge service environment
 - `STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>`
 - `CHAIN_11155111_RPC_URL=<sepolia-rpc-url>` if it is not already configured
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<destination-native-bridge-key>` for paying gas and signing native mint attestations
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1=<additional-signer-key>` and higher numbered keys if the destination bridge attestation threshold is greater than `1`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>`; this key must not be an attestation signer
+- `CHAIN_11155111_NATIVE_VERIFIER_URLS=<comma-separated-independent-verifiers>`
+- `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<matching-comma-separated-tokens>`
 
 Confirm that `StratoNativeBridge` has the bridge service STRATO address configured as its bridge operator before starting native withdrawals. The operator must be the STRATO address for the same `BA_USERNAME` account running the service.
 
-The instant withdrawal review window is configured on `StratoNativeBridge` with `setInstantWithdrawalDelaySeconds`. The attestation maximum validity window is configured on `StratoNativeRepresentationBridge` with `setMaxAttestationValiditySeconds`.
+Native withdrawal authorization is immediately valid when the withdrawal becomes pending, matching EAB. The attestation maximum validity window is configured on `StratoNativeRepresentationBridge` with `setMaxAttestationValiditySeconds`.
 
-If the bridge service is deployed through `docker-compose.bridge.tpl.yml`, these values must be present in the runtime env file used by Compose as well. The template now forwards:
+The native runtime is `bridge-eab`; the legacy `/bridge` service remains unchanged. If `bridge-eab` is deployed through `docker-compose.bridge-eab.tpl.yml`, these values must be present in its runtime env file. The template forwards:
 - `STRATO_NATIVE_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`
-- `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1` through `_5`
+- `CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`
+- `CHAIN_11155111_NATIVE_VERIFIER_URLS`
+- `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS`
 
 The bridge service now has a native mint path:
-- instant withdrawals move to `PENDING_REVIEW`, wait until the STRATO contract-provided `nativeMintNotBefore`, sign the EIP-712 `NativeMintAttestation`, submit `mintRepresentationWithAttestation(attestation, signatures)` with the chain-specific native bridge key, wait for a successful destination receipt, then call `finalizeWithdrawal` on STRATO with the destination tx hash
-- approval-lane withdrawals sign the same attestation, propose `mintRepresentationWithAttestation(attestation, signatures)` to the configured Safe, persist the Safe tx hash on STRATO, and later call `finalizeWithdrawal` after Safe execution
+- instant withdrawals move to `PENDING_REVIEW`, wait until `nativeMintNotBefore`, collect lane-bound V2 signatures from independent verifiers, execute directly through the authorized instant executor, verify destination confirmations and event fields, then finalize on STRATO
+- approval-lane withdrawals collect only native mint signatures, propose the mint directly to the Safe, persist the Safe tx hash on STRATO, verify execution, and then finalize
 
 Native redemption recovery policy:
 - external-to-STRATO redemptions burn representation tokens on Sepolia before STRATO unlock
 - `abortDeposit` on STRATO is an operator rejection/escalation marker and does not automatically re-mint representation tokens on Sepolia
 - if a valid external burn cannot be completed on STRATO, Safe/admin operators must intervene manually by fixing and confirming the STRATO deposit or by performing a controlled compensating action on the external chain
+
+Native verifier rollout order:
+1. Keep native routes disabled while configuration is incomplete.
+2. Add at least two independent representation-bridge attestation signers, then set `attestationThreshold` to at least `2`. The contract rejects `0` and `1`.
+3. Through STRATO governance, enable each verifier's settlement-attestor STRATO account with `setSettlementVerifier(account, true)`, then set `settlementVerifierThreshold` to at least `2`.
+4. Grant `MINT_EXECUTOR_ROLE` only to the dedicated instant executor; retain `DEFAULT_ADMIN_ROLE` on the custody Safe.
+5. Configure independent native verifier KMS signers, the native policy baseline, verifier URLs, API tokens, and each verifier's `SETTLEMENT_ATTESTOR_*` credentials.
+6. Deploy the verifier and bridge services and confirm their health checks.
+7. Exercise one manual Safe withdrawal, then one capped instant withdrawal.
+8. Enable the native route only after both verifier quorums and service health checks pass.
+
+The native verifier policy must bind the source/destination chain IDs, source native bridge, destination representation bridge, enabled token routes, instant-lane cap, and policy baseline hash. Use separate KMS keys and IAM policy from EAB signing. Keep the Safe's admin permissions for manual settlement and recovery.
 
 The existing bridge service still also requires its normal Safe envs:
 - `SAFE_ADDRESS`
@@ -363,11 +381,13 @@ For a new deployment, run these in order. Each item is covered by the detailed s
 12. Verify the Sepolia bridge proxy EIP-712 domain returns `StratoNativeRepresentationBridge` and version `1`.
 13. Execute the Sepolia Safe admin batch: token bridge role, transfer endpoint setup, attestation signer, threshold, optional attestation validity, and token mapping.
 14. Confirm the Sepolia Safe batch worked.
-15. Configure the STRATO native route to point at the Sepolia representation bridge and token proxies.
-16. Whitelist the STRATO custody vault for paused-token `transferFrom` and `transfer`.
-17. Update bridge service config/env.
-18. Restart or redeploy the bridge service.
-19. Run the native bridge smoke check.
+15. Configure at least two destination attestation signers and a threshold of at least two.
+16. Through STRATO governance, configure the corresponding settlement-attestor accounts and a threshold of at least two.
+17. Configure the STRATO native route to point at the Sepolia representation bridge and token proxies.
+18. Whitelist the STRATO custody vault for paused-token `transferFrom` and `transfer`.
+19. Update verifier and bridge service config/env.
+20. Restart or redeploy the verifiers and bridge service.
+21. Run the native bridge smoke check.
 
 ## Command Runbook
 
@@ -427,10 +447,19 @@ npm run configure:native-route -- \
   --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
   --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> \
   --strato-token <STRATO_NATIVE_TOKEN> \
+  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
+  --settlement-verifier-threshold 2 \
   --enabled true
 ```
 
-Use `--enabled false` to disable the STRATO-side route without changing the rest of the route metadata.
+The command is a dry run unless `--execute` is supplied. Review the generated
+AdminRegistry calls, then have every required STRATO administrator run the same
+command with `--execute`. The verifier accounts are the STRATO addresses derived
+from each verifier's `SETTLEMENT_ATTESTOR_BA_USERNAME`; they are not the external
+chain KMS signer addresses.
+
+Use `--enabled false` to disable the STRATO-side route without changing the rest
+of the route metadata.
 
 ### STRATO: Whitelist Custody Vault for Paused Tokens
 
@@ -464,7 +493,6 @@ Meaning:
 These are owner-governed STRATO calls. If you need to change them after deployment, execute the corresponding transaction through the STRATO owner/governance path:
 
 ```text
-StratoNativeBridge.setInstantWithdrawalDelaySeconds(<seconds>)
 StratoNativeBridge.setBridgeOperator(<new-bridge-operator>)
 StratoNativeBridge.setGuardian(<new-guardian>)
 StratoNativeBridge.setPause(<depositsPaused>, <withdrawalsPaused>)
@@ -476,14 +504,6 @@ StratoNativeCustodyVault.setPause(<paused>)
 ```
 
 Use `setBridgeOperator(<bridge-service-strato-address>)` when rotating or correcting the service runtime account. This is a security-sensitive role and should remain owner/governance controlled for production; do not make it an instant admin action by default.
-
-A typical instant review delay update would target:
-
-```text
-to: <STRATO_NATIVE_BRIDGE_PROXY>
-method: setInstantWithdrawalDelaySeconds(uint256)
-args: <INSTANT_WITHDRAWAL_DELAY_SECONDS>
-```
 
 ### Sepolia: Deploy New Representation Contracts
 
@@ -538,18 +558,17 @@ args:
   data: 0x
 ```
 
-Upgrading a representation bridge proxy from `version()` `1.0.0` to `1.1.0` adds `MINT_EXECUTOR_ROLE`, which `mintRepresentationWithAttestation` requires. Grant it to the custody Safe inside the upgrade transaction so mints never run unguarded or stall between two Safe transactions:
+The V2 lane-bound implementation removes the V1 mint entry point. Grant `MINT_EXECUTOR_ROLE` to the dedicated instant executor in the same Safe upgrade batch; the Safe uses `DEFAULT_ADMIN_ROLE` for manual V2 mints:
 
 ```text
 target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
 method: upgradeToAndCall(address newImplementation, bytes data)
 args:
   newImplementation: <NEW_IMPLEMENTATION_ADDRESS>
-  data: grantRole(MINT_EXECUTOR_ROLE, <SEPOLIA_ADMIN_SAFE>)
-        = 0x2f2ff15d0e2c8d3d0c799879e89202bcf76344a42c099a15051a57a3db48ed0284ab6517<SEPOLIA_ADMIN_SAFE padded to 32 bytes>
+  data: grantRole(MINT_EXECUTOR_ROLE, <NATIVE_MINT_EXECUTOR>)
 ```
 
-After the upgrade, the bridge service's instant lane (a direct `mintRepresentationWithAttestation` call from the native bridge signer key) reverts with `AccessControlUnauthorizedAccount`; mints must be executed through the Safe. The role only helps if no single relayer-held key can execute Safe transactions alone: a Safe owner key held by the relayer on a threshold-1 Safe is still a single-key mint path.
+After the upgrade, a manual V2 attestation submitted by the executor reverts with `AccessControlUnauthorizedAccount`, and changing `useInstantPath` invalidates the verifier signatures. The Safe may retain `MINT_EXECUTOR_ROLE` for recovery, but normal Safe proposals use the manual lane.
 
 After deploying or upgrading `StratoNativeRepresentationBridge`, verify the EIP-712 domain on the proxy before testing native withdrawals:
 
@@ -655,11 +674,11 @@ Representation bridge signer and threshold config:
 target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
 method: setAttestationSigner(address signer, bool enabled)
 args:
-  signer: <native-bridge-signer-address>
+  signer: <native-verifier-kms-signer-address>
   enabled: true
 ```
 
-`signer` must be the address recovered from the bridge service's `CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY`. If multiple numbered signer keys are configured (`CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1`, etc.), each signer needed to satisfy the threshold must be enabled. If the service signs with a key that is not enabled here, native withdrawal minting fails on Sepolia with `BadAttestationSignatures()`.
+Each signer must be the address of a separately operated native verifier's KMS key. The bridge service holds no attestation private keys. The gas-paying executor must not be enabled as a signer.
 
 ```text
 target: <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
@@ -715,17 +734,22 @@ Set:
 STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
 CHAIN_11155111_RPC_URL=<sepolia-rpc-url>
 CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
-CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY=<key-for-signer-and-gas>
+CHAIN_11155111_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>
+CHAIN_11155111_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
+CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 ```
 
-If `attestationThreshold()` is greater than `1`, add enough enabled signer keys:
+Each verifier process additionally needs:
 
 ```bash
-CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-signer-key>
-CHAIN_11155111_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-signer-key>
+NATIVE_VERIFIER_POLICY_PATH=/run/secrets/native-verifier-policy.json
+NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+NATIVE_ATTESTATION_SIGNER_ADDRESS=<this-verifier-kms-address>
+NATIVE_KMS_KEY_ID=<this-verifier-kms-key-id>
+NATIVE_KMS_REGION=<aws-region>
 ```
 
-Each configured private key must recover to a signer enabled through `setAttestationSigner`. The bridge service validates at startup that all configured keys are enabled on the destination bridge and that enough enabled keys exist to satisfy `attestationThreshold()`.
+The bridge service validates that enough verifier endpoints are configured for `attestationThreshold()` and that its executor is not an enabled signer. Each verifier validates that its own KMS signer is enabled before serving requests.
 
 ### Validation Commands
 

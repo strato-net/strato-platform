@@ -101,12 +101,13 @@ MercataBridge withdrawals are handled only by the legacy service. `BRIDGE_ADDRES
 
 - `STRATO_NATIVE_BRIDGE_ADDRESS` - STRATO native bridge proxy address
 - `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS` - External representation bridge address for each native route chain
-- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY` - Destination-chain key used to pay gas and sign native mint attestations
-- `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY_1`, `_2`, ... - Optional additional destination-chain signer keys when the destination bridge attestation threshold is raised
+- `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY` - Gas-paying executor key; it must not be an attestation signer
+- `CHAIN_${chainId}_NATIVE_VERIFIER_URLS` - Comma-separated independent native verifier endpoints
+- `CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS` - Matching comma-separated verifier bearer tokens
 
-Native withdrawal review delay and attestation validity are enforced by the native bridge contracts, not bridge-service environment variables.
+Each verifier uses a separate `NATIVE_KMS_KEY_ID`, `NATIVE_KMS_REGION`, `NATIVE_ATTESTATION_SIGNER_ADDRESS`, and `NATIVE_VERIFIER_POLICY_PATH`. The native policy binds both bridge identities, token routes, and instant caps. Configure the same verifier services' STRATO accounts with `setSettlementVerifier` on `StratoNativeBridge`, then set `setSettlementVerifierThreshold` to at least 2. Configure at least two destination attestation signers and a destination threshold of at least 2. The signed V2 attestation binds `useInstantPath` and the current destination signer-set version: manual withdrawals execute through the Safe and instant withdrawals through the dedicated executor.
 
-Before finalizing a native withdrawal on STRATO, the service verifies the successful external receipt and the complete `RepresentationMinted` event against the committed withdrawal using all configured verification RPCs. This applies to direct execution, recovered transactions, and Safe executions. It waits for `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS` (or `DEPOSIT_CONFIRMATIONS`) using the slowest RPC head. The withdrawal's stored external bridge address remains authoritative after configuration changes. A Safe API execution result alone cannot finalize the withdrawal.
+Before finalizing a native deposit, withdrawal, cancellation refund, or redemption refund on STRATO, each verifier independently verifies the successful external receipt, confirmation depth, and complete destination event, then submits its own STRATO settlement attestation. The source contract requires the configured quorum before custody can be unlocked or settlement finalized. This applies to direct execution, recovered transactions, and Safe executions. The stored external bridge address remains authoritative after configuration changes. A Safe API execution result or one service's RPC check alone cannot move custody.
 
 #### External Vault Releases
 - `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS` - Unprivileged destination-chain gas executor address
@@ -525,7 +526,7 @@ User cancellation is available from Bridge Out history. Before execution starts,
 
 A native cancellation request changes the withdrawal to `CANCELLATION_PENDING` (10) and retains escrow. The service proposes `cancelMint(sourceChainId, sourceBridge, sourceWithdrawalId)` through the shared durable Safe queue. If an older mint proposal blocks the Safe nonce, Safe signers must reject/replace it before executing cancellation. Safe rejection alone is not proof that minting is impossible. The external contract permanently blocks that mint identity, including subsequently signed authorizations, and refuses cancellation after minting succeeds.
 
-After independent RPC receipt checks and the configured confirmation depth, the service records the external cancellation hash. STRATO admins must independently verify the successful `NativeMintCanceled` event against the destination bridge, source STRATO chain, source bridge and withdrawal ID before voting `refundCanceledWithdrawal(id, cancellationTxHash)`. This vote actually unlocks escrow to its original owner. The hash must match the recorded evidence; duplicate refunds revert. This intentionally trusts STRATO governance verification, not an operator report or a new native verifier quorum.
+After the operator records the confirmed external cancellation hash, each configured verifier independently verifies the successful `NativeMintCanceled` event against the destination bridge, source STRATO chain, source bridge and withdrawal ID. `refundCanceledWithdrawal(id, cancellationTxHash)` becomes executable only after the STRATO verifier threshold attests that exact hash. The refund unlocks escrow to its original owner or the recorded solver claimant; duplicate refunds revert.
 
 If minting won the race, the service verifies that mint and finalizes instead; escrow remains locked as backing. Paused withdrawals may delay that finalization until unpaused. Bridge pause does not block safe cancellation/refund, but a separate custody-vault pause still blocks unlocks until governance unpauses that vault.
 

@@ -864,7 +864,6 @@ export const buildBridgePolicyRows = (records: BridgePolicyRecords): BridgePolic
         flag("Token withdrawals disabled", config.withdrawalsDisabled), flag("Auto-route configured", nativeRoutes.get(key(token, chainId)) ?? false),
         amount("Maximum per withdrawal", v.maxPerWithdrawal, precision, symbol, "No route cap"),
         amount("Instant withdrawal threshold", v.instantWithdrawalThreshold, precision, symbol, "Instant withdrawals disabled"),
-        { label: "Instant withdrawal delay (seconds)", value: uint(records.native?.INSTANT_WITHDRAWAL_DELAY_SECONDS) },
         amount("Outstanding limit (shared across networks)", cap, precision, symbol, "No aggregate cap"),
         amount("Locked balance (all networks)", used, precision, symbol),
         amount("Remaining aggregate allowance", cap === "0" ? "0" : remaining, precision, symbol, cap === "0" ? "No aggregate cap" : undefined),

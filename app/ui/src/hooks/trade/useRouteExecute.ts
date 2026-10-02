@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import type { AxiosRequestConfig } from "axios";
 import {
   RouteExecuteParams,
   TransactionResponse,
@@ -16,6 +17,20 @@ export function useRouteExecute() {
 export function useWithdrawalExecute() {
   return useStratoExecution<WithdrawalRequestParams>("withdrawal", params =>
     params.routeType === "native" ? "/trade/bridge/requestNativeWithdrawal" : "/trade/bridge/requestWithdrawal");
+}
+
+type TransactionResponseEnvelope = {
+  success: boolean;
+  data: TransactionResponse;
+};
+
+export function normalizeTransactionResponse(
+  response: TransactionResponse | TransactionResponseEnvelope
+): TransactionResponse {
+  if (typeof (response as TransactionResponse).status === "string") {
+    return response as TransactionResponse;
+  }
+  return (response as TransactionResponseEnvelope).data;
 }
 
 function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (params: T) => string) {
@@ -36,11 +51,12 @@ function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (par
           ? "Confirm the transaction in your wallet." : "Waiting for STRATO to confirm your transactions…", transactions });
       };
       try {
-        const { data } = await api.post<TransactionResponse>(
+        const { data: response } = await api.post<TransactionResponse | TransactionResponseEnvelope>(
           endpoint(params),
           params,
-          { walletTxProgress } as any
+          { walletTxProgress } as AxiosRequestConfig & { walletTxProgress: typeof walletTxProgress }
         );
+        const data = normalizeTransactionResponse(response);
         if (data.status === "Failure") {
           executionFailed = true;
           throw new Error("execution reverted");
@@ -55,7 +71,8 @@ function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (par
         return data;
       } catch (error) {
         const normalized = normalizeError(error);
-        const responseUnknown = !!(error as any)?.request && !(error as any)?.response;
+        const requestError = error as { request?: unknown; response?: unknown };
+        const responseUnknown = !!requestError.request && !requestError.response;
         const unconfirmed = !executionFailed && (transactions.some(tx => tx.submittedHash) || responseUnknown) &&
           !transactions.some(tx => tx.status === "failed");
         setProgress({

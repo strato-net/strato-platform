@@ -11,7 +11,7 @@ Key contracts:
 - `ExternalBridgeVault`: Pooled custody per external token and threshold-authorized releases on each external chain.
 - `ExternalAssetDepositRouter`: Emits uniquely numbered external deposits and transfers assets to the route vault.
 - `TokenRouter`: Executes validated, bounded STRATO routes after bridge settlement.
-- `StratoNativeBridge`: Unchanged native-asset bridge.
+- `StratoNativeBridge`: Native-asset coordinator with threshold-attested destination settlement.
 - `MercataBridge`: Independent legacy history and operations, outside this fresh deployment.
 
 Non-native bridge-in:
@@ -36,6 +36,8 @@ Non-native bridge-out:
 3. The unprivileged executor reserves and releases route-local vault liquidity.
 4. Independent verifier services confirm the exact vault `WithdrawalReleased` event. Multiple withdrawals may share an external transaction; replay protection is per withdrawal/reservation. Any relayer may finalize after two STRATO attestations, and only then is escrow burned.
 5. Large withdrawals additionally require Safe review. Expired reservations can be cancelled. Governance refunds additionally require the configured STRATO verifier threshold to attest confirmed external non-payment: no reservation after authorization expiry, or a matching cancelled reservation. A recorded operator cancellation alone cannot authorize a refund or change the withdrawal out of READY. Release finalization remains possible after cancellation metadata is recorded. Refund attestations bind the verifier’s expected source-state digest, and stale submissions revert. The destination vault is captured in each authorization so later chain configuration changes cannot redirect recovery.
+
+Native bridge flows use the same independent verifier services with separate native policy and destination-signing configuration. Destination mint/refund attestations require at least two signers and bind the signer-set version. Verifiers independently attest confirmed external burns before native bridge-in unlocks, `RepresentationMinted` before outbound completion, `NativeMintCanceled` before cancellation refunds, and `RedemptionRefunded` before deposit refunds. Every custody-moving source finalization requires the configured `StratoNativeBridge` verifier threshold.
 
 Operational controls:
 - Deposit and withdrawal pause controls are independent.

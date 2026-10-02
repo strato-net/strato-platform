@@ -13,11 +13,25 @@ const externalNetworks = Object.fromEntries(NETWORKS.map(({ name, rpcEnv, defaul
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.26",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [{
+      version: "0.8.26",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+      },
+    }],
+    overrides: {
+      "contracts/bridge/StratoNativeRepresentationBridge.sol": {
+        version: "0.8.26",
+        settings: {
+          viaIR: true,
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+        },
       },
     },
   },

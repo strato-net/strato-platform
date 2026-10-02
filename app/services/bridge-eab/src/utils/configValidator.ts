@@ -2,7 +2,7 @@ import { readOAuthDiscovery } from "../auth/discovery";
 import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
 import { validateVerificationRpcEndpoints } from "../services/rpcService";
 import { logInfo, logError } from "./logger";
-import { Contract, JsonRpcProvider, Wallet } from "ethers";
+import { Contract, id, JsonRpcProvider, Wallet } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
@@ -15,7 +15,10 @@ import {
   getExternalBridgeExecutorPrivateKey,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
-  getNativeBridgePrivateKeys,
+  getNativeMintExecutorPrivateKey,
+  getNativeVerifierApiTokens,
+  getNativeVerifierUrls,
+  NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
 } from "../config";
 import { ensureHexPrefix } from "./utils";
 
@@ -26,6 +29,7 @@ const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
+  "function hasRole(bytes32,address) view returns (bool)",
 ];
 
 const EXTERNAL_VAULT_ABI = [
@@ -67,6 +71,12 @@ export const validateExternalBridgeExecutorConfig = (
 ): ExternalBridgeExecutorValidationResult => {
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (
+    !Number.isSafeInteger(NATIVE_VERIFIER_REQUEST_TIMEOUT_MS) ||
+    NATIVE_VERIFIER_REQUEST_TIMEOUT_MS <= 0
+  ) {
+    errors.push("NATIVE_VERIFIER_REQUEST_TIMEOUT_MS must be a positive integer");
+  }
   const prefix = `CHAIN_${chainId}_EXTERNAL_BRIDGE_EXECUTOR`;
   let executorAddress: string | undefined;
 
@@ -635,11 +645,14 @@ export async function validateBridgeConfig(): Promise<boolean> {
         for (const chainId of nativeChainIds) {
           const representationBridgeEnv =
             `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`;
-          const bridgeKeyEnv =
-            `CHAIN_${chainId}_NATIVE_BRIDGE_PRIVATE_KEY`;
+          const executorEnv = `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR_PRIVATE_KEY`;
+          const verifierUrlsEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_URLS`;
+          const verifierTokensEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS`;
           const rpcEnv = `CHAIN_${chainId}_RPC_URL`;
           const representationBridgeAddress = process.env[representationBridgeEnv];
-          const bridgePrivateKeys = getNativeBridgePrivateKeys(chainId);
+          const executorKey = getNativeMintExecutorPrivateKey(chainId);
+          const verifierUrls = getNativeVerifierUrls(chainId);
+          const verifierTokens = getNativeVerifierApiTokens(chainId);
 
           if (!representationBridgeAddress) {
             missingNativeBridgeEnvVars.push(representationBridgeEnv);
@@ -647,32 +660,24 @@ export async function validateBridgeConfig(): Promise<boolean> {
             errors.push(`Invalid native representation bridge address format: ${representationBridgeEnv}`);
           }
 
-          if (bridgePrivateKeys.length === 0) {
-            missingNativeBridgeEnvVars.push(bridgeKeyEnv);
+          if (!executorKey) {
+            missingNativeBridgeEnvVars.push(executorEnv);
+          } else if (!isPrivateKey(executorKey)) {
+            errors.push(`Invalid native mint executor private key format: ${executorEnv}`);
           }
-
-          const signerAddresses = new Map<string, string>();
-          for (const { envVar, privateKey } of bridgePrivateKeys) {
-            if (!isPrivateKey(privateKey)) {
-              errors.push(`Invalid native bridge private key format: ${envVar}`);
-              continue;
-            }
-
-            const signerAddress = new Wallet(normalizePrivateKey(privateKey)).address;
-            const existingEnv = signerAddresses.get(signerAddress.toLowerCase());
-            if (existingEnv) {
-              errors.push(`${envVar} resolves to same signer as ${existingEnv}: ${signerAddress}`);
-            } else {
-              signerAddresses.set(signerAddress.toLowerCase(), envVar);
-            }
+          if (verifierUrls.length === 0) {
+            missingNativeBridgeEnvVars.push(verifierUrlsEnv);
+          }
+          if (verifierTokens.length !== verifierUrls.length) {
+            errors.push(`${verifierTokensEnv} must contain one token per native verifier URL`);
           }
 
           if (
             process.env[rpcEnv] &&
             representationBridgeAddress &&
             isAddress(representationBridgeAddress) &&
-            bridgePrivateKeys.length > 0 &&
-            bridgePrivateKeys.every(({ privateKey }) => isPrivateKey(privateKey))
+            executorKey &&
+            isPrivateKey(executorKey)
           ) {
             try {
               const provider = new JsonRpcProvider(process.env[rpcEnv]);
@@ -684,37 +689,34 @@ export async function validateBridgeConfig(): Promise<boolean> {
               const [
                 threshold,
                 maxAttestationValiditySeconds,
-                signerStatuses,
+                executorIsSigner,
+                executorIsAuthorized,
               ] = await Promise.all([
                 nativeBridge.attestationThreshold(),
                 nativeBridge.maxAttestationValiditySeconds(),
-                Promise.all(
-                  bridgePrivateKeys.map(({ privateKey }) =>
-                    nativeBridge.attestationSigners(
-                      new Wallet(normalizePrivateKey(privateKey)).address,
-                    ),
-                  ),
+                nativeBridge.attestationSigners(
+                  new Wallet(normalizePrivateKey(executorKey)).address,
+                ),
+                nativeBridge.hasRole(
+                  id("MINT_EXECUTOR_ROLE"),
+                  new Wallet(normalizePrivateKey(executorKey)).address,
                 ),
               ]);
 
-              const enabledConfiguredSignerCount = signerStatuses.filter(Boolean).length;
-              signerStatuses.forEach((enabled, index) => {
-                if (!enabled) {
-                  const keyConfig = bridgePrivateKeys[index];
-                  const signerAddress = new Wallet(normalizePrivateKey(keyConfig.privateKey)).address;
-                  errors.push(
-                    `${keyConfig.envVar} resolves to ${signerAddress}, which is not enabled on ${representationBridgeEnv}`,
-                  );
-                }
-              });
-              if (Number(threshold) <= 0) {
+              if (Number(threshold) < 2) {
                 errors.push(
-                  `${representationBridgeEnv} attestationThreshold must be greater than zero`,
+                  `${representationBridgeEnv} attestationThreshold must be at least two`,
                 );
-              } else if (Number(threshold) > enabledConfiguredSignerCount) {
+              } else if (Number(threshold) > verifierUrls.length) {
                 errors.push(
-                  `${representationBridgeEnv} attestationThreshold is ${String(threshold)}; bridge service has ${enabledConfiguredSignerCount} enabled configured native bridge signer(s)`,
+                  `${representationBridgeEnv} attestationThreshold is ${String(threshold)}; bridge service has ${verifierUrls.length} configured native verifier(s)`,
                 );
+              }
+              if (executorIsSigner) {
+                errors.push(`${executorEnv} must not resolve to a native attestation signer`);
+              }
+              if (!executorIsAuthorized) {
+                errors.push(`${executorEnv} does not hold MINT_EXECUTOR_ROLE`);
               }
               if (BigInt(maxAttestationValiditySeconds.toString()) <= 0n) {
                 errors.push(

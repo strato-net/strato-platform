@@ -2,7 +2,11 @@ import { getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcSe
 import { getDepositConfirmationPolicy, ZERO_ADDRESS } from "../config";
 import { NativeDepositInfo, NativeWithdrawalInfo } from "../types";
 import { AbiCoder, Interface, keccak256 } from "ethers";
-import { NATIVE_MINT_EVENT_ABI } from "../config/bridgeAbi";
+import {
+  NATIVE_CANCELLATION_ABI,
+  NATIVE_MINT_EVENT_ABI,
+  NATIVE_REFUND_ABI,
+} from "../config/bridgeAbi";
 import { processingIssue } from "../utils/processingIssues";
 import { parseNativeDepositLog } from "../utils/nativeRedemption";
 import { logError } from "../utils/logger";
@@ -11,6 +15,8 @@ const normalizeAddress = (value: string) =>
   value.toLowerCase().replace(/^0x/, "");
 
 const mintInterface = new Interface(NATIVE_MINT_EVENT_ABI);
+const refundInterface = new Interface(NATIVE_REFUND_ABI);
+const cancellationInterface = new Interface(NATIVE_CANCELLATION_ABI);
 
 export const verifyNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
@@ -56,6 +62,126 @@ export const verifyNativeMint = async (
   if (!matches) throw Object.assign(new Error("Native mint evidence does not match the withdrawal"), {
     issues: [processingIssue("CONFIGURATION", { transactionHash, operation: "verifyNativeMint" })],
   });
+};
+
+export const verifyNativeRedemptionRefund = async (
+  deposit: NativeDepositInfo,
+  transactionHash: string,
+): Promise<void> => {
+  const chainId = Number(deposit.externalChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error("Invalid native refund chain configuration");
+  }
+  const confirmations = getDepositConfirmationPolicy(chainId);
+  const [receipts, latestBlock] = await Promise.all([
+    getTransactionReceiptsBatch(chainId, [transactionHash]),
+    getVerificationBlockNumber(chainId),
+  ]);
+  const receipt = receipts.get(transactionHash);
+  const blockNumber = receipt?.blockNumber;
+  if (
+    !receipt ||
+    receipt.__rpcDisagreement ||
+    typeof blockNumber !== "string" ||
+    !/^0x[0-9a-f]+$/i.test(blockNumber) ||
+    BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)
+  ) {
+    throw new Error("Native refund awaiting confirmations");
+  }
+  const matches =
+    String(receipt.transactionHash || "").toLowerCase() ===
+      transactionHash.toLowerCase() &&
+    /^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") &&
+    receipt.status === "0x1" &&
+    receipt.logs?.some((log: any) => {
+      if (
+        normalizeAddress(log.address || "") !==
+          normalizeAddress(deposit.externalBridge) ||
+        log.removed
+      ) {
+        return false;
+      }
+      try {
+        const args = refundInterface.parseLog(log)?.args;
+        return (
+          args &&
+          BigInt(args.redemptionId) === BigInt(deposit.externalRedemptionId) &&
+          normalizeAddress(args.representationToken) ===
+            normalizeAddress(deposit.representationToken) &&
+          normalizeAddress(args.recipient) ===
+            normalizeAddress(deposit.externalSender) &&
+          BigInt(args.amount) === BigInt(deposit.stratoTokenAmount)
+        );
+      } catch {
+        return false;
+      }
+    });
+  if (!matches) {
+    throw new Error("Native refund evidence does not match the deposit");
+  }
+};
+
+export const verifyNativeMintCancellation = async (
+  withdrawal: NativeWithdrawalInfo,
+  sourceChainId: bigint,
+  sourceBridge: string,
+  transactionHash: string,
+): Promise<void> => {
+  const chainId = Number(withdrawal.externalChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error("Invalid native cancellation chain configuration");
+  }
+  const confirmations = getDepositConfirmationPolicy(chainId);
+  const [receipts, latestBlock] = await Promise.all([
+    getTransactionReceiptsBatch(chainId, [transactionHash]),
+    getVerificationBlockNumber(chainId),
+  ]);
+  const receipt = receipts.get(transactionHash);
+  const blockNumber = receipt?.blockNumber;
+  if (
+    !receipt ||
+    receipt.__rpcDisagreement ||
+    typeof blockNumber !== "string" ||
+    !/^0x[0-9a-f]+$/i.test(blockNumber) ||
+    BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)
+  ) {
+    throw new Error("Native cancellation awaiting confirmations");
+  }
+  const mintId = keccak256(
+    AbiCoder.defaultAbiCoder().encode(
+      ["uint256", "address", "uint256"],
+      [sourceChainId, `0x${normalizeAddress(sourceBridge)}`, withdrawal.withdrawalId],
+    ),
+  );
+  const matches =
+    String(receipt.transactionHash || "").toLowerCase() ===
+      transactionHash.toLowerCase() &&
+    /^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") &&
+    receipt.status === "0x1" &&
+    receipt.logs?.some((log: any) => {
+      if (
+        normalizeAddress(log.address || "") !==
+          normalizeAddress(withdrawal.externalBridge) ||
+        log.removed
+      ) {
+        return false;
+      }
+      try {
+        const args = cancellationInterface.parseLog(log)?.args;
+        return (
+          args &&
+          args.mintId === mintId &&
+          BigInt(args.sourceChainId) === sourceChainId &&
+          normalizeAddress(args.sourceBridge) === normalizeAddress(sourceBridge) &&
+          BigInt(args.sourceWithdrawalId) === BigInt(withdrawal.withdrawalId)
+        );
+      } catch {
+        return false;
+      }
+    });
+  if (!matches) {
+    throw new Error("Native mint cancellation evidence mismatch");
+  }
 };
 
 export const verifyNativeRedemptionsBatch = async (

@@ -157,6 +157,7 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   const strato = await import("../utils/stratoHelper");
   const mint = await import("./nativeMintService");
   const verification = await import("./nativeVerificationService");
+  const attestations = await import("./settlementAttestationService");
   const bridge = await import("./bridgeService");
   const { JsonRpcProvider } = await import("ethers");
   const source = config.nativeBridge.address;
@@ -174,6 +175,13 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   };
   const cirrus = await import("./cirrusService");
   t.mock.method(cirrus, "getNativeWithdrawalById", async () => record);
+  t.mock.method(cirrus, "getNativeWithdrawalFeeTerms", async (ids: string[]) =>
+    new Map(ids.map((id) => [id, {
+      maxFee: "0",
+      requestedAt: "1",
+      feeHalfLife: "21600",
+    }])),
+  );
   t.mock.method(mint, "buildNativeMintRequest", async (withdrawal, _chain, _source, destination) => {
     assert.equal(destination, record.externalBridge, "use the committed bridge, not mutable environment routing");
     return { idempotencyKey: withdrawal.withdrawalId } as any;
@@ -188,8 +196,9 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
     verified.push(hash);
     if (!confirmed) throw new Error("Native mint awaiting confirmations");
   });
+  t.mock.method(attestations, "attestNativeWithdrawal", async () => undefined);
   const calls: any[] = [];
-  t.mock.method(strato, "execute", async (call: any) => { calls.push(call); return {} as any; });
+  t.mock.method(strato, "executeAsRelayer", async (call: any) => { calls.push(call); return {} as any; });
   await assert.rejects(bridge.finalizeNativeWithdrawalBatch([record]), /awaiting confirmations/);
   assert.equal(calls.length, 0);
   confirmed = true;
@@ -211,7 +220,7 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   const processing = await import("./processingIssueService");
   let current: any = { bridgeStatus: "3", externalTxHash: "0xMINT-HASH" };
   t.mock.method(cirrus, "getNativeWithdrawalById", async () => current);
-  t.mock.method(strato, "execute", async () => { throw new Error("SNB: bad state"); });
+  t.mock.method(strato, "executeAsRelayer", async () => { throw new Error("SNB: bad state"); });
   t.mock.method(mint, "getExistingNativeMintTxHash", async () => "mint-hash");
   assert.equal(await bridge.finalizeNativeWithdrawalBatch([record]), true, "matching completed mint is success");
   for (const state of [undefined, { bridgeStatus: "4", externalTxHash: "mint-hash" }, { bridgeStatus: "3", externalTxHash: "other-hash" }, { bridgeStatus: "2", externalTxHash: "mint-hash" }]) {
@@ -219,7 +228,7 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
     await assert.rejects(bridge.finalizeNativeWithdrawalBatch([record]), /SNB: bad state/);
   }
   current = { bridgeStatus: "3", externalTxHash: "0xMINT-HASH" };
-  t.mock.method(strato, "execute", async () => { throw new Error("SNB: tx hash already set"); });
+  t.mock.method(strato, "executeAsRelayer", async () => { throw new Error("SNB: tx hash already set"); });
   assert.equal(await bridge.finalizeNativeWithdrawalBatch([record]), true);
   const failures: unknown[] = [];
   t.mock.method(processing.processingIssueService, "record", async (_context, error) => { failures.push(error); return {} as any; });
@@ -265,10 +274,15 @@ test("native settlement uses verified intent for fresh steps, retries transport 
   const strato = await import("../utils/stratoHelper");
   const quotes = await import("./routeQuoteService");
   const vouchers = await import("./voucherService");
+  const attestations = await import("./settlementAttestationService");
   const service = await import("./bridgeService");
   const calls: any[] = [], recipients: string[][] = [];
   t.mock.method(strato, "execute", async (input: any) => { calls.push(...input); return { status: "Success", hash: "settled" } as any; });
   t.mock.method(vouchers, "mintVouchersForDeposits", async (users: string[]) => { recipients.push(users); });
+  let attestationError = "";
+  t.mock.method(attestations, "attestNativeDeposit", async () => {
+    if (attestationError) throw new Error(attestationError);
+  });
   let failure = "";
   const steps = [{ action: "SAVE", target: address("4"), tokenIn: address("7"), tokenOut: address("4"), minAmountOut: "95", parameter1: "0", parameter2: "0", direction: false, factoryPoolIndex: "0" }];
   t.mock.method(quotes, "fetchRouteSteps", async (input: any) => {
@@ -282,6 +296,13 @@ test("native settlement uses verified intent for fresh steps, retries transport 
   assert.equal(calls[0].args.actionToken, address("4"));
   assert.equal(calls[0].args.minFinalOut, "95");
   const deposit = { ...parsed, depositId: "native1", stratoToken: address("7"), verified: true };
+  attestationError = "native verifier quorum unavailable";
+  await assert.rejects(
+    service.confirmNativeDepositBatch([deposit]),
+    /native verifier quorum unavailable/,
+  );
+  assert.equal(calls.length, 1, "custody cannot move before verifier quorum");
+  attestationError = "";
   await service.confirmNativeDepositBatch([deposit]);
   assert.equal(calls[1].method, "confirmDepositWithRoute");
   assert.deepEqual(calls[1].args.steps, steps);
@@ -525,8 +546,10 @@ test("native cancellation recovers Safe proposals and records only confirmed, ma
   const safeQueue = await import("./safeProposalService");
   const external = await import("./externalWithdrawalService");
   const strato = await import("../utils/stratoHelper");
+  const attestations = await import("./settlementAttestationService");
   const { config } = await import("../config");
   const { NATIVE_CANCELLATION_ABI } = await import("../config/bridgeAbi");
+  const { verifyNativeMintCancellation } = await import("./nativeVerificationService");
   const { processNativeMintCancellation } = await import("./nativeMintService");
   process.env.CHAIN_11155111_DEPOSIT_CONFIRMATIONS = "12";
   const cancellation = new Interface(NATIVE_CANCELLATION_ABI);
@@ -547,12 +570,24 @@ test("native cancellation recovers Safe proposals and records only confirmed, ma
   t.mock.method(rpcService, "getVerificationBlockNumber", async () => head);
   t.mock.method(external, "getEventTransactionHash", async () => hash);
   t.mock.method(strato, "execute", async (call: any) => { calls.push(call); });
+  t.mock.method(strato, "executeAsRelayer", async (call: any) => { calls.push(call); });
+  let cancellationAttestationError = "";
+  const attestCancellation = t.mock.method(
+    attestations,
+    "attestNativeCancellation",
+    async () => {
+      if (cancellationAttestationError) {
+        throw new Error(cancellationAttestationError);
+      }
+    },
+  );
   t.mock.method(safeQueue, "withSafeProposalQueue", async (_chain: number, _key: string, work: any) => work({
     apiKit: { getNextNonce: async () => "4", getTransaction: async () => { throw { status: 404 }; },
       proposeTransaction: async (p: any) => { saved = p; published++; } },
     protocolKit: { getNonce: async () => 4, createTransaction: async ({ transactions, options }: any) => ({ data: { ...transactions[0], nonce: options.nonce } }),
       getTransactionHash: async () => hash, signHash: async () => ({ data: "signature" }) },
   }, saved));
+  await verifyNativeMintCancellation(w, 2001n, source, hash);
   await assert.rejects(processNativeMintCancellation({ ...w, bridgeStatus: "2" }, "2001"), /not requested/);
   role = false;
   await assert.rejects(processNativeMintCancellation(w, "2001"), /configured Safe/);
@@ -577,13 +612,23 @@ test("native cancellation recovers Safe proposals and records only confirmed, ma
   receipt.logs[0].address = w.externalBridge;
   await processNativeMintCancellation(w, "2001");
   assert.equal(calls.pop().method, "recordWithdrawalCancellationEvidence");
+  cancellationAttestationError = "native cancellation quorum unavailable";
+  await assert.rejects(
+    processNativeMintCancellation({ ...w, cancellationTxHash: hash }, "2001"),
+    /native cancellation quorum unavailable/,
+  );
+  assert.equal(calls.length, 0, "escrow cannot unlock before verifier quorum");
+  cancellationAttestationError = "";
   await processNativeMintCancellation({ ...w, cancellationTxHash: hash }, "2001");
+  assert.equal(calls.pop().method, "refundCanceledWithdrawal");
+  assert.equal(attestCancellation.mock.callCount(), 2);
   assert.equal(calls.length, 0, "indexed evidence is not recorded twice");
 });
 
 test("native cancellation recovery finalizes a verified winning mint instead of proposing a refund", async t => {
   const mint = await import("./nativeMintService");
   const verification = await import("./nativeVerificationService");
+  const attestations = await import("./settlementAttestationService");
   const strato = await import("../utils/stratoHelper");
   const api = await import("../utils/api");
   const { recoverNativeWithdrawalCancellation } = await import("./bridgeService");
@@ -593,8 +638,9 @@ test("native cancellation recovery finalizes a verified winning mint instead of 
   t.mock.method(mint, "getExistingNativeMintTxHash", async () => hash);
   let verified = false;
   t.mock.method(verification, "verifyNativeMint", async () => { if (!verified) throw new Error("awaiting confirmations"); });
+  t.mock.method(attestations, "attestNativeWithdrawal", async () => undefined);
   const calls: any[] = [];
-  t.mock.method(strato, "execute", async call => { calls.push(call); });
+  t.mock.method(strato, "executeAsRelayer", async call => { calls.push(call); });
   const cancel = t.mock.method(mint, "processNativeMintCancellation", async () => {});
   const w: any = { withdrawalId: "917", bridgeStatus: "10", externalBridge: address("5") };
   await assert.rejects(recoverNativeWithdrawalCancellation(w), /awaiting confirmations/);

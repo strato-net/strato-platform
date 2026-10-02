@@ -244,6 +244,11 @@ export interface NativeWithdrawalInfo {
   cancellationTxHash?: string;
   nativeMintNotBefore?: string;
   useInstantPath?: boolean;
+  feeTerms?: {
+    maxFee: string;
+    requestedAt: string;
+    feeHalfLife: string;
+  };
 
   withdrawalId: string;
 }

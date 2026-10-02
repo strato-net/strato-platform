@@ -57,13 +57,48 @@ test("EAB restart recovers the external refund and waits for verifier proof befo
 test("native Safe refunds survive restart, deduplicate proposals, replace stale nonces and verify completion", async t => {
   const rpc = await import("./rpcService"), cirrus = await import("./cirrusService"), bridgeService = await import("./bridgeService");
   const native = await import("./nativeVerificationService"), configModule = await import("../config");
+  const attestations = await import("./settlementAttestationService");
   const helper = await import("../utils/safeHelper"), strato = await import("../utils/stratoHelper");
+  const axios = await import("axios");
   const { NATIVE_REFUND_ABI } = await import("../config/bridgeAbi");
   const { recoverNativeDepositRefund } = await import("./depositRefundService");
   const directory = await mkdtemp(path.join(tmpdir(), "native-refund-test-")), cwd = process.cwd();
   process.chdir(directory); t.after(async () => { process.chdir(cwd); await rm(directory, { recursive: true, force: true }); });
-  const wallet = Wallet.createRandom();
-  t.mock.method(configModule, "getNativeBridgePrivateKeys", () => [{ privateKey: wallet.privateKey, address: wallet.address }] as any);
+  const wallets = [Wallet.createRandom(), Wallet.createRandom()];
+  t.mock.method(configModule, "getNativeVerifierUrls", () => ["https://native-verifier-1.test", "https://native-verifier-2.test"]);
+  t.mock.method(configModule, "getNativeVerifierApiTokens", () => ["token-1", "token-2"]);
+  t.mock.method(configModule, "getNativeMintExecutorPrivateKey", () => undefined);
+  t.mock.method(axios.default, "post", async (url: string, body: any) => {
+    const wallet = wallets[url.includes("-1.") ? 0 : 1];
+    return ({
+    data: {
+      attestationSigner: wallet.address,
+      signature: await wallet.signTypedData(
+        {
+          name: "StratoNativeRepresentationBridge",
+          version: "1",
+          chainId: 1,
+          verifyingContract: addr("2"),
+        },
+        {
+          RedemptionRefund: [
+            { name: "sourceChainId", type: "uint256" },
+            { name: "sourceBridge", type: "address" },
+            { name: "destinationChainId", type: "uint256" },
+            { name: "destinationBridge", type: "address" },
+            { name: "redemptionId", type: "uint256" },
+            { name: "representationToken", type: "address" },
+            { name: "recipient", type: "address" },
+            { name: "amount", type: "uint256" },
+            { name: "deadline", type: "uint256" },
+            { name: "signerSetVersion", type: "uint256" },
+          ],
+        },
+        body.refund,
+      ),
+    },
+  }) as any;
+  });
   t.mock.method(bridgeService, "getStratoNetworkId", async () => 90071992547409939999n);
   let originalVerified = true;
   const d: any = { depositId: "d".repeat(64), bridgeStatus: "7", externalChainId: "1", externalBridge: addr("2"),
@@ -75,7 +110,10 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
     call: async ({ data }: any) => {
       const parsed = iface.parseTransaction({ data })!;
       const value = parsed.name === "hasRole" ? parsed.args[1].toLowerCase() === addr("1")
-        : parsed.name === "refundedRedemptions" ? refunded : 1800;
+        : parsed.name === "refundedRedemptions" ? refunded
+          : parsed.name === "attestationSigners" ? wallets.some((wallet) => parsed.args[0] === wallet.address)
+            : parsed.name === "attestationThreshold" ? 2
+              : parsed.name === "signerSetVersion" ? 3 : 1800;
       return iface.encodeFunctionResult(parsed.name, [value]);
     } };
   t.mock.method(rpc, "getChainProvider", () => provider as any);
@@ -92,9 +130,16 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   t.mock.method(cirrus, "getNativeDepositRefundProposal", async () => recorded);
   let evidenceRecords = 0, records = 0, evidence: string | undefined;
   t.mock.method(cirrus, "getNativeDepositRefundEvidence", async () => evidence);
+  let finalized = 0;
+  t.mock.method(attestations, "attestNativeRefund", async () => undefined);
   t.mock.method(strato, "execute", async ({ method, args }: any) => {
     if (method === "recordDepositRefundProposal") { records++; recorded = args.proposalHash; }
-    else { assert.equal(method, "recordDepositRefundEvidence"); assert.equal(args.refundTxHash, hash); evidence = args.refundTxHash; evidenceRecords++; }
+    else if (method === "recordDepositRefundEvidence") { assert.equal(args.refundTxHash, hash); evidence = args.refundTxHash; evidenceRecords++; }
+    return "done";
+  });
+  t.mock.method(strato, "executeAsRelayer", async ({ method }: any) => {
+    assert.equal(method, "finalizeDepositRefund");
+    finalized++;
     return "done";
   });
   const refundEvent = { address: d.externalBridge, ...iface.encodeEventLog(iface.getEvent("RedemptionRefunded")!, [7, d.representationToken, d.externalSender, 100]) };
@@ -128,5 +173,6 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   await recoverNativeDepositRefund(d);
   assert.equal(evidenceRecords, 1); assert.equal(proposals, 3);
   await recoverNativeDepositRefund(d);
-  assert.equal(evidenceRecords, 1, "retries do not re-record evidence or finalize without governance");
+  assert.equal(evidenceRecords, 1, "retries do not re-record evidence");
+  assert.equal(finalized, 2);
 });

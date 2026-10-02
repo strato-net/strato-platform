@@ -317,6 +317,33 @@ export const getNativeWithdrawalsByStatus = async (
   }));
 };
 
+export const getNativeWithdrawalFeeTerms = async (
+  ids: string[],
+): Promise<Map<string, NonNullable<NativeWithdrawalInfo["feeTerms"]>>> => {
+  const result = new Map<string, NonNullable<NativeWithdrawalInfo["feeTerms"]>>();
+  const unique = [...new Set(ids)];
+  if (!nativeBridgeAddress || unique.length === 0) return result;
+  const rows = await getPaginatedRows(
+    `/${NATIVE_BRIDGE_URL}-withdrawalFeeTerms`,
+    {
+      params: {
+        address: `eq.${nativeBridgeAddress}`,
+        key: `in.(${unique.join(",")})`,
+        select: "key,value",
+      },
+    },
+  );
+  for (const row of rows) {
+    if (!row?.value?.set) continue;
+    result.set(String(row.key), {
+      maxFee: String(row.value.maxFee ?? "0"),
+      requestedAt: String(row.value.requestedAt ?? "0"),
+      feeHalfLife: String(row.value.feeHalfLife ?? "0"),
+    });
+  }
+  return result;
+};
+
 // Get deposits by status (reusable function)
 export const getDepositsByStatus = async (
   status: string
@@ -610,6 +637,36 @@ export const getSettlementVerifierConfig = async (): Promise<{
     cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-settlementVerifiers`, {
       params: {
         address: `eq.${externalAssetBridgeAddress}`,
+        value: "eq.true",
+        select: "key",
+      },
+    }),
+  ]);
+  return {
+    threshold: Number(rows?.[0]?.settlementVerifierThreshold || 0),
+    count: Number(rows?.[0]?.settlementVerifierCount || 0),
+    verifiers: (verifierRows || []).map((row: any) =>
+      String(row.key).toLowerCase().replace(/^0x/, ""),
+    ),
+  };
+};
+
+export const getNativeSettlementVerifierConfig = async (): Promise<{
+  threshold: number;
+  count: number;
+  verifiers: string[];
+}> => {
+  const [rows, verifierRows] = await Promise.all([
+    cirrus.get(`/${NATIVE_BRIDGE_URL}`, {
+      params: {
+        address: `eq.${nativeBridgeAddress}`,
+        select: "settlementVerifierThreshold,settlementVerifierCount",
+        limit: 1,
+      },
+    }),
+    cirrus.get(`/${NATIVE_BRIDGE_URL}-settlementVerifiers`, {
+      params: {
+        address: `eq.${nativeBridgeAddress}`,
         value: "eq.true",
         select: "key",
       },

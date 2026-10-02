@@ -18,7 +18,7 @@ contract NativeFailingRouter {
 }
 
 contract Describe_NativeDepositRouting is Authorizable {
-    using BridgeTypes for *;
+    using NativeBridgeTypes for *;
     using RouterTypes for *;
     StratoNativeBridge bridge;
     StratoNativeCustodyVault vault;
@@ -26,6 +26,8 @@ contract Describe_NativeDepositRouting is Authorizable {
     SaveUSDSTVault savings;
     TokenRouter router;
     NativeRouteCaller user;
+    NativeRouteCaller verifier1;
+    NativeRouteCaller verifier2;
     address externalBridge = address(0x3333);
     address representation = address(0x4444);
 
@@ -66,6 +68,11 @@ contract Describe_NativeDepositRouting is Authorizable {
         bridge.setTokenRouter(address(router));
         bridge.setAutoRouteEnabled(address(token), 1, true);
         user = new NativeRouteCaller();
+        verifier1 = new NativeRouteCaller();
+        verifier2 = new NativeRouteCaller();
+        bridge.setSettlementVerifier(address(verifier1), true);
+        bridge.setSettlementVerifier(address(verifier2), true);
+        bridge.setSettlementVerifierThreshold(2);
     }
 
     function steps() internal returns (RouteStep[]) {
@@ -76,9 +83,15 @@ contract Describe_NativeDepositRouting is Authorizable {
         bridge.recordDepositWithRoute(1, externalBridge, 1, address(user), "abcdef", representation, address(user), 100, address(savings), minimum);
     }
 
+    function attest(uint256 chainId) internal {
+        string depositId = bridge.getDepositId(chainId, externalBridge, 1);
+        verifier1.do(address(bridge), "attestDepositSettlement", depositId);
+        verifier2.do(address(bridge), "attestDepositSettlement", depositId);
+    }
+
     function assertSettled() internal {
-        (BridgeStatus status,,,,,,,,,,) = bridge.getDepositInfo(bridge.getDepositId(1, externalBridge, 1));
-        require(status == BridgeStatus.COMPLETED, "not completed");
+        (NativeBridgeStatus status,,,,,,,,,,) = bridge.getDepositInfo(bridge.getDepositId(1, externalBridge, 1));
+        require(status == NativeBridgeStatus.COMPLETED, "not completed");
         require(vault.lockedBalance(address(token)) == 900, "liability not released exactly once");
         require(token.balanceOf(address(bridge)) == 0, "stranded source tokens");
         require(token.allowance(address(bridge), bridge.tokenRouter()) == 0, "stale approval");
@@ -86,6 +99,7 @@ contract Describe_NativeDepositRouting is Authorizable {
 
     function it_routes_unlocked_tokens_to_the_pinned_recipient() {
         recordRouted(99);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(savings.balanceOf(address(user)) == 100, "missing route output");
         require(token.balanceOf(address(user)) == 0, "unexpected fallback");
@@ -102,6 +116,7 @@ contract Describe_NativeDepositRouting is Authorizable {
 
     function it_falls_back_on_unavailable_route() {
         recordRouted(99);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, []);
         require(token.balanceOf(address(user)) == 100, "missing fallback");
         assertSettled();
@@ -109,6 +124,7 @@ contract Describe_NativeDepositRouting is Authorizable {
 
     function it_falls_back_when_final_output_is_below_user_minimum() {
         recordRouted(101);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(token.balanceOf(address(user)) == 100, "missing fallback");
         require(savings.balanceOf(address(user)) == 0, "partial output persisted");
@@ -119,6 +135,7 @@ contract Describe_NativeDepositRouting is Authorizable {
         NativeFailingRouter failing = new NativeFailingRouter(false);
         bridge.setTokenRouter(address(failing));
         recordRouted(99);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(token.balanceOf(address(failing)) == 0, "router transfer persisted");
         require(token.balanceOf(address(user)) == 100, "missing fallback");
@@ -129,6 +146,7 @@ contract Describe_NativeDepositRouting is Authorizable {
         NativeFailingRouter failing = new NativeFailingRouter(true);
         bridge.setTokenRouter(address(failing));
         recordRouted(99);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(token.balanceOf(address(failing)) == 0, "router transfer persisted");
         require(token.balanceOf(address(user)) == 100, "missing fallback");
@@ -137,17 +155,19 @@ contract Describe_NativeDepositRouting is Authorizable {
 
     function it_does_not_swallow_custody_failures() {
         recordRouted(99);
+        attest(1);
         vault.setPause(true);
         bool failed = false;
         try bridge.confirmDepositWithRoute(1, externalBridge, 1, steps()) {} catch { failed = true; }
         require(failed, "custody failure swallowed");
-        (BridgeStatus status,,,,,,,,,,) = bridge.getDepositInfo(bridge.getDepositId(1, externalBridge, 1));
-        require(status == BridgeStatus.INITIATED, "settlement persisted");
+        (NativeBridgeStatus status,,,,,,,,,,) = bridge.getDepositInfo(bridge.getDepositId(1, externalBridge, 1));
+        require(status == NativeBridgeStatus.INITIATED, "settlement persisted");
         require(vault.lockedBalance(address(token)) == 1000, "liability changed");
     }
 
     function it_rejects_replay_and_nonoperator_confirmation() {
         recordRouted(99);
+        attest(1);
         bool failed = false;
         try user.do(address(bridge), "confirmDepositWithRoute", 1, externalBridge, 1, steps()) {} catch { failed = true; }
         require(failed, "nonoperator accepted");
@@ -161,6 +181,7 @@ contract Describe_NativeDepositRouting is Authorizable {
     function it_preserves_plain_native_redemptions() {
         bridge.setAutoRouteEnabled(address(token), 1, false);
         bridge.recordDeposit(1, externalBridge, 1, address(user), "abcdef", representation, address(user), 100);
+        attest(1);
         bridge.confirmDeposit(1, externalBridge, 1);
         require(token.balanceOf(address(user)) == 100, "missing plain deposit");
         assertSettled();
@@ -171,6 +192,7 @@ contract Describe_NativeDepositRouting is Authorizable {
         require(!bridge.autoRouteEnabled(address(token), 2), "new route enabled by default");
         require(!bridge.autoRouteEnabled(address(savings), 1), "permission leaked to another token");
         bridge.recordDepositWithRoute(2, externalBridge, 1, address(user), "abcdef", representation, address(user), 100, address(savings), 99);
+        attest(2);
         bridge.confirmDepositWithRoute(2, externalBridge, 1, steps());
         require(token.balanceOf(address(user)) == 100, "disabled route did not fall back");
         require(savings.balanceOf(address(user)) == 0, "disabled route executed");
@@ -181,6 +203,7 @@ contract Describe_NativeDepositRouting is Authorizable {
     function it_falls_back_if_permission_is_revoked_after_recording() {
         recordRouted(99);
         bridge.setAutoRouteEnabled(address(token), 1, false);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(token.balanceOf(address(user)) == 100, "missing fallback");
         require(savings.balanceOf(address(user)) == 0, "revoked route executed");
@@ -216,6 +239,7 @@ contract Describe_NativeDepositRouting is Authorizable {
         try bridge.recordDepositWithRoute(1, externalBridge, 1, address(user), "abcdef", representation, address(user), 100, address(token), 1) {} catch { failed = true; }
         require(failed, "duplicate intent accepted");
         bridge.reviewDeposit(1, externalBridge, 1);
+        attest(1);
         bridge.confirmDepositWithRoute(1, externalBridge, 1, steps());
         require(savings.balanceOf(address(user)) == 100, "review changed intent");
         assertSettled();
@@ -229,6 +253,7 @@ contract Describe_NativeDepositRouting is Authorizable {
         require(failed, "deposit pause bypassed");
         require(vault.lockedBalance(address(token)) == 1000, "paused settlement changed custody");
         bridge.setPause(false, false);
+        attest(1);
         RouteStep[] wrong = [RouteStep(RouteAction.SAVE, address(savings), address(token), address(token), 99, 0, 0, false, 0)];
         bridge.confirmDepositWithRoute(1, externalBridge, 1, wrong);
         require(token.balanceOf(address(user)) == 100, "wrong-output route did not fall back");
