@@ -222,6 +222,53 @@ The phrase is not saved anywhere, so record it. Usernames may contain letters, n
 
 `strato-up` runs the same script for the first admin with `--with-nodekey`, which also makes that key the node's operator identity.
 
+## Bind an operator to your validator
+
+A validator record on the staking contracts is keyed by your node's address, the key the node
+keeps in the vault. The *operator* is the everyday account that self-bonds, sets the commission
+and collects the operator share of rewards. Only the node key can say who operates it, and it
+does so by signing a one-time authorization. `strato-authorize-operator` produces that signature
+on the node; the operator then submits it from the staking page, paying the transaction fee from
+their own account. The node key never leaves the vault and never needs USDST.
+
+```bash
+strato-authorize-operator 0xYOUR_OPERATOR_ADDRESS
+```
+
+Run it on the validator host as the user that owns the node directory. It reads
+`secrets/oauth_credentials.yaml` and `.ethereumH/ethconf.yaml` from the node directory named in
+`~/.strato/default-node` (or `--node-dir`), mints the same client-credentials token the node uses,
+asks the vault which key it holds, reads the registry on the network's app host, prints what will
+happen and asks for confirmation, then asks the vault for one signature. Nothing is written to disk
+and the token is never printed.
+
+It prints the signature on stdout and, on stderr, a link into the staking page with the
+validator, operator and signature prefilled. Open the link, log in as the operator account, and
+click **Register** (first time; you choose name and commission there) or **Change operator**.
+Then self-bond at least the minimum stake and activate.
+
+Two things to know before signing an **operator change**:
+
+- Sign when the new operator is ready to take over; the change applies as soon as they submit it.
+- The change releases the current operator's self-bond for unbonding, so the validator may leave
+  the consensus set until the new operator self-bonds and activates. Bind first, self-bond second.
+
+For a first registration the signature is only usable by the operator named in it.
+
+Options: `--node-dir DIR`, `--registry ADDR` and `--api-url URL` for dev networks, `--yes` to skip
+the prompt, `--digest-only` to print the digest without signing (for keys held outside a vault).
+
+| Exit | Meaning |
+|---|---|
+| 0 | signed, or the operator is already bound (nothing to do) |
+| 3 | node directory, credentials or `ethconf.yaml` missing; run `strato-login` / `strato-setup` |
+| 4 | Keycloak rejected the client id or secret |
+| 5 | the vault has no key for this client, or is sealed |
+| 6 | the app host is unreachable; pass `--api-url` / `--registry` |
+| 7 | the registry on this network is not ready for signed authorizations yet (not upgraded, or its logic computes a different digest); ask the admins |
+| 8 | unknown network; pass `--api-url` and `--registry` |
+| 10 | you declined, or there is no terminal to confirm on (pass `--yes`) |
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |

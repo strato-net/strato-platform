@@ -26,6 +26,7 @@ import {
   setStratoSelfBondGrace,
   setStratoSetParams,
   setStratoStakingParams,
+  setStratoOperator,
   setStratoOperatorCommission,
   setStratoValidatorAddress,
   setStratoValidatorOperator,
@@ -93,7 +94,9 @@ const pick = (...values: unknown[]): any =>
 class StakingController {
   static async getInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const info = await getStratoStakingInfo(req.accessToken, req.address as string | undefined);
+      // ?fresh=1 bypasses the short bloc-state cache; the page sends it right after a transaction.
+      const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+      const info = await getStratoStakingInfo(req.accessToken, req.address as string | undefined, fresh);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
       next(error);
@@ -478,6 +481,27 @@ class StakingController {
         name: body.name,
         description: body.description,
         metadataURI: body.metadataURI,
+        signature: body.signature,
+      });
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Take over a listed validator as its operator, with the validator key's signed consent
+  // to the connected account (or the key sending it itself).
+  static async setOperator(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const body = req.body || {};
+      const validator = pick(body.validator, body.validatorAddress);
+      if (!isAddressLike(validator) || !isOptionalSignature(body.signature)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid operator change request" });
+        return;
+      }
+
+      const result = await setStratoOperator(req.accessToken, req.address as string, {
+        validator,
         signature: body.signature,
       });
       res.status(RestStatus.OK).json(result);
