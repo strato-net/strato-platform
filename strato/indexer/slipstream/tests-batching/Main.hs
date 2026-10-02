@@ -105,9 +105,13 @@ main = hspec $ do
         (insertIndexTable contract >> insertCollectionTable [row]) .| sinkList
       map slipstreamQueryPostgres queries `shouldSatisfy` \case
         [storageUpsert, mappingUpsert] ->
-          " WHERE excluded.block_number::numeric > \"storage\".block_number::numeric;" `T.isSuffixOf` storageUpsert
-            && " WHERE excluded.block_number::numeric > \"mapping\".block_number::numeric;" `T.isSuffixOf` mappingUpsert
+          " WHERE excluded.block_number::bigint > \"storage\".block_number::bigint;" `T.isSuffixOf` storageUpsert
+            && " WHERE excluded.block_number::bigint > \"mapping\".block_number::bigint;" `T.isSuffixOf` mappingUpsert
         _ -> False
+
+    it "creates the history tables without a primary key" $
+      [pk | CreateTable {tableName = HistoryTableName {}, primaryKeyColumns = pk} <- initialSlipstreamQueries]
+        `shouldBe` [[], []]
 
 insertRowCount :: SlipstreamQuery -> Int
 insertRowCount InsertTable {values = rows} = length rows

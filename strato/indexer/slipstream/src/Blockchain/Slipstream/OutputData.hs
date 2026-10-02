@@ -837,10 +837,11 @@ keyColumnNames = zipWith (\i t -> ("key" <> (if i == 1 then "" else T.pack $ sho
 
 -- A replayed batch re-sends rows Cirrus already holds. Only a newer block may
 -- overwrite a row, so a replay updates nothing and the history triggers add no
--- duplicate rows.
+-- duplicate rows. PBFT finality gives one block per height, so the number alone
+-- identifies the block.
 newerBlockClause :: Text -> Text
 newerBlockClause tblText =
-  "excluded.block_number::numeric > " <> tblText <> ".block_number::numeric"
+  "excluded.block_number::bigint > " <> tblText <> ".block_number::bigint"
 
 jsonbUpdateClause :: Text -> Text -> Text
 jsonbUpdateClause tblText colText = T.concat
@@ -1340,8 +1341,9 @@ initialSlipstreamQueries =
 -- only cost writes. The check keeps later startups from locking the table.
 dropHistoryPrimaryKeySQL :: Text -> Text
 dropHistoryPrimaryKeySQL tbl = T.concat
-  [ "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = '", tbl, "_pkey') THEN "
-  , "ALTER TABLE \"", tbl, "\" DROP CONSTRAINT \"", tbl, "_pkey\"; END IF; END $$;"
+  [ "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = '\"", tbl, "\"'::regclass"
+  , " AND conname = '", tbl, "_pkey') THEN "
+  , "ALTER TABLE \"", tbl, "\" DROP CONSTRAINT IF EXISTS \"", tbl, "_pkey\"; END IF; END $$;"
   ]
 
 genericBaseTableIndexesSQL :: Text
