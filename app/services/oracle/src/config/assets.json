@@ -388,7 +388,7 @@
           }
         },
         "Pure": {
-          "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
+          "url": "https://sandbox.api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
           "parse": "pure",
           "apiKeyEnvVar": "PURE_API_KEY",
@@ -1034,7 +1034,7 @@
           }
         },
         "Pure": {
-          "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
+          "url": "https://sandbox.api.collectpure.com/marketplace/get-spot-price/v1",
           "headers": "x-api-key",
           "parse": "pure",
           "apiKeyEnvVar": "PURE_API_KEY",
