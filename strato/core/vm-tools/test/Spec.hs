@@ -24,7 +24,8 @@
 --import Blockchain.Strato.Model.Secp256k1
 --import Blockchain.VMContext
 
-import Blockchain.Bagger.Transactions (TxRunResult (..), getStakeDeltasFromResults)
+import Blockchain.Bagger (attachBlockRewards)
+import Blockchain.Bagger.Transactions (TxRunResult (..), getDeltasFromResults, getStakeDeltasFromResults)
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.ExecResults
@@ -34,7 +35,7 @@ import Blockchain.Data.VmTrace
 import Blockchain.Forks (isBlockRewardReceiptForkActive)
 import Blockchain.Model.SyncState (BestSequencedBlock (..))
 import Blockchain.Strato.Model.Address (Address (..))
-import SolidVM.Model.Delta (getStakeDeltasFromEvents)
+import SolidVM.Model.Delta (fromDelta, getStakeDeltasFromEvents)
 import SolidVM.Model.Event
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value (Value (..))
@@ -157,6 +158,31 @@ stakingSpec = describe "staking (header v3, stake deltas, proposal facts)" $ do
         trr st = TxRunResult undefined (Right $ er st) 0 M.empty M.empty []
         results = [trr (M.fromList [(v1, 1), (v2, 2)]), trr (M.fromList [(v1, 3)])]
     getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 3), (v2, 2)]
+
+  it "carries the fee payment's validator and stake changes into its transaction's" $ do
+    let er new removed st = (solidvmErrorResults undefined)
+          { erException = Nothing, erNewValidators = new, erRemovedValidators = removed, erStakeUpdates = st }
+        v3 = Validator 0x3
+        fee = er [v1] [v2] (M.fromList [(v1, 5), (v2, 0)])
+        tx = er [v3] [] (M.fromList [(v1, 9)])
+        results = [TxRunResult undefined (Right $ prependConsensusDeltas fee tx) 0 M.empty M.empty []]
+    fromDelta (getDeltasFromResults results) `shouldBe` ([v1, v3], [v2])
+    getStakeDeltasFromResults results `shouldBe` M.fromList [(v1, 9), (v2, 0)]
+
+  -- Heights on either side of every fork height the default test config can have.
+  it "carries the block-reward call's validator and stake changes into the first transaction's" $
+    forAll genBlockHeaderV3 $ \h -> do
+      let er new removed st = (solidvmErrorResults undefined)
+            { erException = Nothing, erNewValidators = new, erRemovedValidators = removed, erStakeUpdates = st }
+          reward = er [v1] [] (M.fromList [(v1, 5), (v2, 7)])
+          tx = er [] [v2] (M.fromList [(v2, 0)])
+          trr = TxRunResult undefined (Right tx) 0 M.empty M.empty []
+          after' = attachBlockRewards h {number = 2000000} (Just reward) [trr, trr]
+          before = attachBlockRewards h {number = 1} (Just reward) [trr, trr]
+      fromDelta (getDeltasFromResults after') `shouldBe` ([v1], [v2, v2])
+      getStakeDeltasFromResults after' `shouldBe` M.fromList [(v1, 5), (v2, 0)]
+      fromDelta (getDeltasFromResults before) `shouldBe` ([], [v2, v2])
+      getStakeDeltasFromResults before `shouldBe` M.fromList [(v2, 0)]
 
   it "derives no proposal facts from pre-v3 headers" $
     forAll arbitrary $ \h -> proposalFactsFromHeader 1 0 (h :: BlockHeader) `shouldBe` noProposalFacts

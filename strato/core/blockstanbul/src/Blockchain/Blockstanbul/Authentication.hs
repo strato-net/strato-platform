@@ -12,6 +12,7 @@ module Blockchain.Blockstanbul.Authentication (
     commitmentSeal,
     addCommitmentSeals,
     authenticate,
+    bodyMatchesHeader,
     verifyProposerSeal,
     getProposerSeal,
     verifyCommitmentSeal,
@@ -36,6 +37,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Verification (ommersVerificationValue, transactionsVerificationValue)
 import Control.Lens as L
 import Control.Monad (unless, when)
 import Control.Monad.Composable.Vault
@@ -61,7 +63,7 @@ commitmentSeal sha =
 
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do
-  let mesg = getHash tm
+  mesg <- uses chainId (`getHash` tm)
   addr <- use selfAddr
   sig <- sign mesg
   return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
@@ -69,13 +71,21 @@ signMessage tm = do
 blockstanbulError :: (MonadError String m) => String -> m a
 blockstanbulError = if flags_strictBlockstanbul then error else throwError
 
-authenticate :: (Monad m) => InEvent -> m Bool
-authenticate (IMsg (MsgAuth cm sig) tm) = do
-  let msgHash = getHash tm
+authenticate :: (Monad m) => Integer -> InEvent -> m Bool
+authenticate chainId' (IMsg (MsgAuth cm sig) tm) = do
+  let msgHash = getHash chainId' tm
       mKey = recoverPub sig msgHash --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
   return (mAddress == Just cm)
-authenticate _ = return True
+authenticate _ _ = return True
+
+-- | Do the block's transactions and uncles belong to its header? Signatures and
+-- seals cover the header alone, so without this a relay could change the body
+-- under a proposer's signature.
+bodyMatchesHeader :: Block -> Bool
+bodyMatchesHeader (Block hdr txs uncles) =
+  transactionsRoot hdr == transactionsVerificationValue txs
+    && getBlockOmmersHash hdr == ommersVerificationValue uncles
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
                        Set Validator -> M.Map Validator Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)
