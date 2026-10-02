@@ -378,6 +378,12 @@ const getBlocState = (
 const getStakingBlocState = (accessToken: string, fresh = false): Promise<Record<string, any>> =>
   getBlocState(accessToken, extractContractName(StratoStaking), requireStakingAddress(), fresh);
 
+// A committed write makes every cached snapshot stale; drop them so the next /info read
+// (from this user or anyone else) sees the new state instead of waiting out the TTL.
+const invalidateBlocStateCache = (): void => {
+  blocStateCache.clear();
+};
+
 const isFunctionEntry = (value: unknown): boolean =>
   typeof value === "string" && value.startsWith("function");
 
@@ -449,12 +455,12 @@ type StakingContractState = {
 // views keep serving v1 reads because both layouts still declare those collections.
 // The version falls back to v1 when none was ever detected, which is what every
 // network showed before v2 existed; a null here means bloc is unreachable.
-const getContractState = async (accessToken: string): Promise<StakingContractState | null> => {
+const getContractState = async (accessToken: string, fresh = false): Promise<StakingContractState | null> => {
   if (!stakingAddress()) return null;
 
   const version = (await detectContractVersion(accessToken)) ?? "v1";
   try {
-    return { version, state: await getStakingBlocState(accessToken) };
+    return { version, state: await getStakingBlocState(accessToken, fresh) };
   } catch {
     return null;
   }
@@ -1100,9 +1106,10 @@ export const getStratoStakingNetworkApy = async (accessToken: string): Promise<s
 
 export const getStratoStakingInfo = async (
   accessToken: string,
-  userAddress?: string
+  userAddress?: string,
+  fresh = false
 ): Promise<StratoStakingInfo> => {
-  const contractState = await getContractState(accessToken);
+  const contractState = await getContractState(accessToken, fresh);
   if (!contractState) return emptyInfo();
 
   return contractState.version === "v2"
@@ -1541,9 +1548,11 @@ const buildAndPost = async (
   txs: FunctionInput | FunctionInput[]
 ): Promise<{ status: string; hash: string }> => {
   const builtTx = await buildFunctionTx(txs, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
+  if (result.status !== "unsigned") invalidateBlocStateCache();
+  return result;
 };
 
 const stakingCall = (method: string, args: Record<string, unknown> = {}): FunctionInput => ({

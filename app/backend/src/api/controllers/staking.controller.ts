@@ -94,7 +94,9 @@ const pick = (...values: unknown[]): any =>
 class StakingController {
   static async getInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const info = await getStratoStakingInfo(req.accessToken, req.address as string | undefined);
+      // ?fresh=1 bypasses the short bloc-state cache; the page sends it right after a transaction.
+      const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+      const info = await getStratoStakingInfo(req.accessToken, req.address as string | undefined, fresh);
       res.status(RestStatus.OK).json(info);
     } catch (error) {
       next(error);

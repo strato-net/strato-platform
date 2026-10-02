@@ -640,16 +640,25 @@ const EarnStaking = () => {
   const useExternalWalletSigning = isConnected && !isAppAuthenticated;
   const stakingTxConfig = useExternalWalletSigning ? ({ walletAuth: true } as any) : undefined;
 
-  const refreshInfo = useCallback(async () => {
+  // `fresh` makes the backend bypass its short bloc-state cache; used right after a transaction.
+  const refreshInfo = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
       const endpoint = isLoggedIn ? "/staking/info" : "/staking/info/public";
-      const { data } = await api.get<StakingInfo>(endpoint);
+      const { data } = await api.get<StakingInfo>(endpoint, fresh === true ? { params: { fresh: 1 } } : undefined);
       setInfo(data);
     } finally {
       setLoading(false);
     }
   }, [isLoggedIn]);
+
+  // After a transaction: contract state is read fresh at once; the wallet balance comes from the
+  // indexer, which lags the chain by a few seconds, so read again shortly after.
+  const refreshAfterAction = useCallback(async () => {
+    await refreshInfo(true);
+    if (isLoggedIn) fetchUsdstBalance();
+    window.setTimeout(() => { refreshInfo(true); }, 4000);
+  }, [refreshInfo, isLoggedIn, fetchUsdstBalance]);
 
   usePageTitle("Stake");
 
@@ -876,7 +885,7 @@ const EarnStaking = () => {
       setProcessingTarget(target ?? null);
       await action();
       toast({ title: successTitle, variant: "success" });
-      await refreshInfo();
+      await refreshAfterAction();
       return true;
     } catch (error: unknown) {
       const message = stakingActionErrorMessage(error);
@@ -1382,7 +1391,7 @@ const EarnStaking = () => {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={refreshInfo} disabled={loading || submitting}>
+                <Button variant="outline" size="sm" onClick={() => refreshInfo(true)} disabled={loading || submitting}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Refresh
                 </Button>
