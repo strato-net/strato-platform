@@ -238,7 +238,7 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
 // deadline ("0" = not yet scheduled), after which only self-bond does.
 const selfBondRequirementText = (info: StakingInfo, minStakeLabel: string): string => {
   if (info.selfBondRuleActive) {
-    return `Validators need ${minStakeLabel} of self-bond; delegated stake no longer counts toward it.`;
+    return `Validators need ${minStakeLabel} of self-bond.`;
   }
   const grace = Number(info.selfBondGraceUntil || "0");
   if (Number.isFinite(grace) && grace > 0) {
