@@ -1,22 +1,23 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 import BlockApps.Logging (runNoLoggingT)
+import qualified Blockchain.Slipstream.Events as E
 import qualified BlockApps.SolidVMStorageDecoder as Decoder
 import Blockchain.Slipstream.Data.Action (AggregateAction(..))
 import Blockchain.Slipstream.Processor (processedContractToProcessedCollectionRows)
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.Strato.Model.Keccak256 (zeroHash)
 import SolidVM.Model.Storable
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import qualified SolidVM.Model.Type as SVMType
 import Data.Default (def)
-import Data.Time (UTCTime(..), fromGregorian)
 import Data.List (nub)
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Slipstream.MessageConsumer (sinkSlipstreamOutputChunks, slipstreamOutputChunkSize)
 import Blockchain.Slipstream.SQL
 import Blockchain.Slipstream.SolidityValue
+import Blockchain.Strato.Model.Keccak256 (unsafeCreateKeccak256FromWord256, zeroHash)
 import qualified BlockApps.Solidity.Value as V
 import Conduit
 import qualified Data.ByteString.Base16 as B16
@@ -24,6 +25,7 @@ import qualified Data.ByteString as B
 import Data.IORef
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
+import Data.Time (UTCTime (..), fromGregorian)
 import Test.Hspec
 
 main :: IO ()
@@ -50,6 +52,14 @@ main = hspec $ do
       T.isInfixOf (T.replicate 32 "41") sql `shouldBe` True
       T.any (== '\0') sql `shouldBe` False
       T.isInfixOf "Cannot decode byte" sql `shouldBe` False
+    it "hex-encodes NUL-containing bytes values such as bytes32(0)" $ do
+      let zeroRows = processedContractToProcessedCollectionRows $ AggregateAction
+            zeroHash (UTCTime (fromGregorian 2026 10 1) 0) 1 0x1 0x2
+            (Action.SolidVMDiff $ Map.fromList [(keyPath "41", BBytes $ B.replicate 32 0)])
+      queries <- runNoLoggingT $ runConduit $ insertCollectionTable zeroRows .| sinkList
+      let sql = T.concat $ slipstreamQueryPostgres <$> queries
+      T.any (== '\0') sql `shouldBe` False
+      T.isInfixOf (T.replicate 64 "0") sql `shouldBe` True
     it "uses declared bytes types for nested view keys, preserving numeric and address keys" $ do
       queries <- runNoLoggingT $ runConduit $
         (createCollectionTable ("Test", "Keys") def emptyCodeCollection []
@@ -137,6 +147,24 @@ main = hspec $ do
           T.isInfixOf "OLD.block_hash = NEW.block_hash" (slipstreamQueryPostgres storageHistoryQuery)
             `shouldBe` False
         [] -> expectationFailure "initialSlipstreamQueries is empty"
+
+    it "lets only a newer block overwrite storage and mapping rows" $ do
+      let ts = UTCTime (fromGregorian 2026 10 1) 0
+          bh = unsafeCreateKeccak256FromWord256 1
+          contract = E.ProcessedContract 0xabc bh ts 7 Map.empty
+          row = ProcessedCollectionRow 0xabc Nothing "_balances" "Mapping" bh bh ts 7
+            [V.SimpleValue $ V.ValueString "u"] "_balances[u]" (V.SimpleValue $ V.ValueString "5")
+      queries <- runNoLoggingT . runConduit $
+        (insertIndexTable contract >> insertCollectionTable [row]) .| sinkList
+      map slipstreamQueryPostgres queries `shouldSatisfy` \case
+        [storageUpsert, mappingUpsert] ->
+          " WHERE excluded.block_number::bigint > \"storage\".block_number::bigint;" `T.isSuffixOf` storageUpsert
+            && " WHERE excluded.block_number::bigint > \"mapping\".block_number::bigint;" `T.isSuffixOf` mappingUpsert
+        _ -> False
+
+    it "creates the history tables without a primary key" $
+      [pk | CreateTable {tableName = HistoryTableName {}, primaryKeyColumns = pk} <- initialSlipstreamQueries]
+        `shouldBe` [[], []]
 
 insertRowCount :: SlipstreamQuery -> Int
 insertRowCount InsertTable {values = rows} = length rows

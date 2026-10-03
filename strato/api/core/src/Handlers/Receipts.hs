@@ -378,6 +378,9 @@ instance (SQLDB Base.:> es) => GetReceipts (Base.Eff es) where
     -- the header reconstituted from BlockDataRef + the four side tables so
     -- the proof handler can serialize the canonical V2 header bytes (with
     -- signatures cleared) and surface the commit signatures separately.
+    -- The side-table rows are read in id (insertion) order, which is the
+    -- header's own order: unordered, a parallel scan can interleave them and
+    -- the rebuilt header no longer hashes to the block hash.
     bdrs <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
       E.select $
         E.from $ \bdRef -> do
@@ -391,26 +394,31 @@ instance (SQLDB Base.:> es) => GetReceipts (Base.Eff es) where
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. BlockValidatorRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. BlockValidatorRefId)]
               return v
         vd <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. ValidatorDeltaRefId)]
               return v
         ps <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. ProposalSignatureRefId)]
               return v
         ss <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. CommitmentSignatureRefId)]
               return v
         stakes <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. BlockStakeRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. BlockStakeRefId)]
               return v
         -- The proof handler doesn't use blockReceiptTransactions; pass [].
         let block :: Block

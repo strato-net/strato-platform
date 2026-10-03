@@ -22,7 +22,6 @@ import Bloc.API.Utils (TxParams (..))
 import Bloc.Database.Queries (getContractWithCodeCollectionByAddress, withCodeCollectionCache)
 import Bloc.Monad (HasBlocEnv, getBlocEnv)
 import qualified Bloc.Monad
-import Bloc.Server.JsonRpc (jsonRpcCall)
 import Bloc.Server.TransactionResult (getReturnTypes)
 import Bloc.Server.Transaction
   ( checkIsSynced,
@@ -67,6 +66,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Read as TR
 import Handlers.AccountInfo (AccountsFilterParams)
 import Handlers.Storage (StorageAddress, StorageFilterParams)
+import JsonRpcClient (jsonRpcCall)
 import Numeric (showHex)
 import SQLM (ApiError (..))
 import qualified SolidVM.Model.CodeCollection as CC

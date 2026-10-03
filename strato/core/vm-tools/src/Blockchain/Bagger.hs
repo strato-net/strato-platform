@@ -19,8 +19,6 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Blockstanbul.Authentication
 --import           Blockchain.Data.Block
 
-import Blockchain.DB.MemAddressStateDB
-import Blockchain.DB.StorageDB
 import qualified Blockchain.Data.AddressStateDB as DD
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.DataDefs as DD
@@ -140,13 +138,11 @@ attachBlockRewards' _ mRewards [] = ([], mRewards)
 -- already been applied to the state).
 runFromStateRoot :: MonadBagger m => MineTransactions m -> Integer -> BlockHeader -> [OutputTx] -> Address -> Bool -> m (Maybe ExecResults, Either RunAttemptError (StateRoot, [TxRunResult], Integer))
 runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress payBlockRewards' = do
-  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot theBlockHeader)
+  startFromStateRoot (stateRoot theBlockHeader)
   (TxMiningResult res ranTxs unranTxs newGas unattachedRewards) <-
     timeit "mineTransactions bagger" (Just vmBlockInsertionMined) $
       mineTransactions theBlockHeader remainingGas txs mSelfAddress payBlockRewards'
-  timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
-  resetAddressStateTxDBMap
-  timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
+  timeit "flushMemDBs bagger" (Just vmBlockInsertionMined) flushMemDBs
   newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
   return . (,) unattachedRewards $ case res of -- currently only get GasLimit errors out of mineTransactions'
@@ -739,5 +735,5 @@ buildRewardedBlockHeader bd = do
 withBagger :: MonadBagger m => m a -> m a
 withBagger f = withCurrentBlockHash baggerBlockHash $ do
   best <- B.bestBlockHeader . B.miningCache <$> getBaggerState
-  A.insert (A.Proxy @StateRoot) (Nothing :: Maybe Word256) (stateRoot best)
+  startFromStateRoot (stateRoot best)
   f

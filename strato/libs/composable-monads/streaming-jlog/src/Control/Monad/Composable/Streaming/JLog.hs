@@ -163,11 +163,16 @@ produceItems topicName events = do
 produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
 produceItemsBestEffort topicName events = [] <$ produceItems topicName events
 
--- | Append an already-serialized payload to an open writer.
+-- | Append an already-serialized payload to an open writer. A failed append
+-- throws rather than returning: callers commit state that describes the
+-- write once this returns, and must never do so for a write that failed.
 writeRawMessage :: Ptr JLogCtx -> BS.ByteString -> IO ()
 writeRawMessage ctx bs =
-  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-    void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
+    rc <- jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+    when (rc /= 0) $ do
+      errStr <- jlog_ctx_err_string ctx >>= peekCString
+      error $ "jlog_ctx_write failed (rc=" ++ show rc ++ "): " ++ errStr
 
 -- | Append already-encoded payloads to several topics in one call.
 --
@@ -218,13 +223,8 @@ produceItemsAsJSON topicName events = do
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
     ctx <- getOrCreateWriter env topicName topicPath
-    mapM_ (writeMessage ctx) events
+    mapM_ (writeRawMessage ctx . LBS.toStrict . JSON.encode) events
   return [ProduceResponse]
-  where
-    writeMessage ctx e = do
-      let bs = LBS.toStrict $ JSON.encode e
-      BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-        void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
 
 ----------------------
 --Consuming/Fetching--

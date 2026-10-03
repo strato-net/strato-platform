@@ -37,6 +37,9 @@ module.exports = {
   },
   networks: {
     ...externalNetworks,
+    hardhat: process.env.FORK_RPC_URL
+      ? { forking: { url: process.env.FORK_RPC_URL, blockNumber: process.env.FORK_BLOCK ? Number(process.env.FORK_BLOCK) : undefined } }
+      : {},
     robinhoodTestnet: {
       url:
         process.env.ROBINHOOD_TESTNET_RPC_URL ||
