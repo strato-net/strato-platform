@@ -60,8 +60,6 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.SyncDB (updateVmBestBlockNumber)
 import SolidVM.Model.Delta
 import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
@@ -155,7 +153,7 @@ addBlocks unfiltered = do
               failures <- addBlock block
               if null failures
                 then do
-                  RBDB.withRedisBlockDB $ updateVmBestBlockNumber blockNo
+                  P.setGauge vmBestBlock (fromIntegral blockNo)
                   (didReplaceThisTime, replacedBits@(hsh, num)) <- replaceBestIfBetter block
                   if didReplaceThisTime
                     then do
