@@ -595,6 +595,7 @@ export const confirmNativeDepositBatch = async (
     const calls: FunctionInput[] = [];
     for (const deposit of deposits) {
       const routed = !!deposit.actionToken && BigInt(`0x${deposit.actionToken.replace(/^0x/i, "")}`) !== 0n;
+      let fallback = false;
       let steps: Awaited<ReturnType<typeof fetchRouteSteps>> = [];
       if (routed) {
         if (!deposit.stratoToken || !deposit.stratoTokenAmount || !deposit.minFinalOut) {
@@ -605,6 +606,7 @@ export const confirmNativeDepositBatch = async (
             amountIn: deposit.stratoTokenAmount, minFinalOut: deposit.minFinalOut });
         } catch (error) {
           if (isTransportRouteError(error)) throw error;
+          fallback = true;
           logInfo("BridgeService", `Native deposit ${deposit.depositId} will use source-token fallback: ${(error as Error).message}`);
         }
       }
@@ -612,12 +614,12 @@ export const confirmNativeDepositBatch = async (
       calls.push({
         contractName: "StratoNativeBridge",
         contractAddress: config.nativeBridge.address!,
-        method: routed ? "confirmDepositWithRoute" : "confirmDeposit",
+        method: fallback ? "confirmDepositFallback" : routed ? "confirmDepositWithRoute" : "confirmDeposit",
         args: {
           externalChainId: deposit.externalChainId,
           externalBridge: deposit.externalBridge,
           externalRedemptionId: deposit.externalRedemptionId,
-          ...(routed ? { steps } : {}),
+          ...(routed && !fallback ? { steps } : {}),
         },
       });
     }

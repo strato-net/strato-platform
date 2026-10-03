@@ -148,9 +148,32 @@ contract Describe_NativeDepositRouting is Authorizable {
     function it_falls_back_on_unavailable_route() {
         recordRouted(99);
         attest(1);
-        bridge.confirmDepositWithRoute(1, externalBridge, 1, []);
+        bridge.confirmDepositFallback(1, externalBridge, 1);
         require(token.balanceOf(address(user)) == 100, "missing fallback");
         assertSettled();
+    }
+
+    function it_requires_route_intent_and_quorum_for_explicit_fallback() {
+        recordRouted(99);
+        bool failed = false;
+        try bridge.confirmDepositFallback(1, externalBridge, 1) {} catch { failed = true; }
+        require(failed, "fallback bypassed verifier quorum");
+        attest(1);
+        bridge.confirmDepositFallback(1, externalBridge, 1);
+        failed = false;
+        try bridge.confirmDepositFallback(1, externalBridge, 1) {} catch { failed = true; }
+        require(failed, "fallback replay succeeded");
+        require(token.balanceOf(address(user)) == 100, "fallback amount changed");
+        assertSettled();
+    }
+
+    function it_does_not_use_explicit_fallback_for_plain_deposits() {
+        bridge.recordDeposit(1, externalBridge, 1, address(user), "abcdef", representation, address(user), 100);
+        attest(1);
+        bool failed = false;
+        try bridge.confirmDepositFallback(1, externalBridge, 1) {} catch { failed = true; }
+        require(failed, "plain deposit used routed fallback");
+        require(vault.lockedBalance(address(token)) == 1000, "custody changed");
     }
 
     function it_falls_back_when_final_output_is_below_user_minimum() {

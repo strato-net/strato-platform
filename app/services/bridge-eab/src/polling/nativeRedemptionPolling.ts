@@ -46,8 +46,10 @@ export const pollChainNativeRedemptions = async (chainId: number) => {
       const existing = known.find(d => String(d.externalRedemptionId) === String(deposit.externalRedemptionId));
       if (existing) {
         // A reused identity with different evidence needs investigation, never another payout.
-        const fields = ["externalTxHash", "externalSender", "representationToken", "stratoRecipient", "stratoTokenAmount", "actionToken", "minFinalOut"] as const;
-        if (fields.some(key => String(existing[key] ?? (key === "actionToken" ? "0".repeat(40) : key === "minFinalOut" ? "0" : "")).toLowerCase().replace(/^0x/, "") !== String(deposit[key]).toLowerCase().replace(/^0x/, ""))) {
+        const textFields = ["externalTxHash", "externalSender", "representationToken", "stratoRecipient", "actionToken"] as const;
+        const uintFields = ["stratoTokenAmount", "minFinalOut"] as const;
+        if (textFields.some(key => String(existing[key] ?? (key === "actionToken" ? "0".repeat(40) : "")).toLowerCase().replace(/^0x/, "") !== String(deposit[key]).toLowerCase().replace(/^0x/, "")) ||
+          uintFields.some(key => BigInt(String(existing[key] || "0")) !== BigInt(String(deposit[key] || "0")))) {
           throw new Error("Native redemption identity has conflicting recorded evidence");
         }
         await processingIssueService.resolve(context);

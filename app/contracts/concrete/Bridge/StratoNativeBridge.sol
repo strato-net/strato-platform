@@ -1041,6 +1041,34 @@ contract record StratoNativeBridge is Ownable {
         _completeDeposit(d, sourceAmount);
     }
 
+    function confirmDepositFallback(
+        uint256 externalChainId,
+        address externalBridge,
+        uint256 externalRedemptionId
+    ) external onlyBridgeOperator whenDepositsOpen nonReentrantDeposit {
+        string depositId = getDepositId(externalChainId, externalBridge, externalRedemptionId);
+        NativeDepositInfo d = deposits[depositId];
+        _requireConfirmable(d);
+        _requireSettlementAttestations(getDepositSettlementDigest(depositId));
+        require(d.actionToken != address(0) && d.minFinalOut > 0, "SNB: no route intent");
+        uint256 actualUnlockedAmount = StratoNativeCustodyVault(custodyVault).unlock(
+            d.stratoToken, d.stratoRecipient, d.stratoTokenAmount
+        );
+        emit DepositActionFailed(
+            d.depositId,
+            d.externalTxHash,
+            d.actionToken,
+            "SNB: route unavailable"
+        );
+        emit DepositActionFallback(
+            d.depositId,
+            d.externalTxHash,
+            d.stratoToken,
+            actualUnlockedAmount
+        );
+        _completeDeposit(d, actualUnlockedAmount);
+    }
+
     function _executeDepositRoute(NativeDepositInfo d, uint256 sourceAmount, RouteStep[] steps) internal returns (uint256) {
         require(autoRouteEnabled[d.stratoToken][d.externalChainId], "SNB: auto route disabled");
         require(tokenRouter != address(0), "SNB: router not set");

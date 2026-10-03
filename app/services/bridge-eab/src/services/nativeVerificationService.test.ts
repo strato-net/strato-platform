@@ -305,8 +305,8 @@ test("native settlement uses verified intent for fresh steps, retries transport 
   assert.equal(recipients.length, 1);
   failure = "No executable route";
   await service.confirmNativeDepositBatch([deposit]);
-  assert.equal(calls[2].method, "confirmDepositWithRoute");
-  assert.deepEqual(calls[2].args.steps, []);
+  assert.equal(calls[2].method, "confirmDepositFallback");
+  assert.equal(calls[2].args.steps, undefined);
   await service.confirmNativeDepositBatch([{ ...deposit, actionToken: address("0"), minFinalOut: "0" }]);
   assert.equal(calls[3].method, "confirmDeposit");
   assert.equal(calls[3].args.steps, undefined);
@@ -508,7 +508,7 @@ test("native sweep recovers old omissions, avoids recorded payouts and detects r
   let hash = state.hash, changing = false, hashReads = 0;
   t.mock.method(rpc, "getVerifiedBlockHash", async () => { hashReads++; return changing && hashReads > 2 ? "0x" + "c".repeat(64) : hash; });
   const ranges: number[][] = [];
-  const entry = { ...log(true), blockNumber: "0x64", blockHash: hash };
+  const entry = { ...log(false), blockNumber: "0x64", blockHash: hash };
   t.mock.method(rpc, "getVerifiedNativeLogs", async (_chain, from, to) => {
     ranges.push([from, to]);
     return from <= 100 && to >= 100 ? [{ ...entry, blockHash: hash }] : [];
@@ -521,8 +521,9 @@ test("native sweep recovers old omissions, avoids recorded payouts and detects r
   assert.equal(record.mock.callCount(), 1);
   assert.equal(state.reconciliationBlock, 2000);
   state.reconciliationBlock = 0;
+  known = [{ ...known[0], minFinalOut: "0".repeat(40) }];
   await pollChainNativeRedemptions(1);
-  assert.equal(record.mock.callCount(), 1, "already indexed redemption spends no additional transaction fees");
+  assert.equal(record.mock.callCount(), 1, "equivalent zero formatting spends no additional transaction fees");
   hash = "0x" + "b".repeat(64);
   ranges.length = 0;
   await pollChainNativeRedemptions(1);
