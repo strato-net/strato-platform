@@ -783,3 +783,43 @@ export const formatArgValue = (value: unknown): string => {
     return "[unserializable]";
   }
 };
+
+/** WAD-scaled oracle USD price per metal unit → formatted $ */
+export const fmtSpotDollarWei = (weiStr: string): string | null => {
+  try {
+    const v = BigInt(weiStr);
+    if (v <= 0n) return null;
+    const s = formatUnits(v, 18);
+    const n = parseFloat(s);
+    if (!Number.isFinite(n)) return null;
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return null;
+  }
+};
+
+/** Effective USD per metal unit after mint fee spread: spot * 10000 / (10000 - feeBps) */
+export const effectiveDollarWei = (spotWeiStr: string, feeBps: string): string | null => {
+  try {
+    const spot = BigInt(spotWeiStr);
+    const bps = BigInt(feeBps || "0");
+    if (spot <= 0n || bps >= 10000n) return null;
+    const eff = (spot * 10000n) / (10000n - bps);
+    return fmtSpotDollarWei(eff.toString());
+  } catch {
+    return null;
+  }
+};
+
+/** Raw token amount and WAD price → formatted USD, respecting token decimals. */
+export const formatTokenUsd = (amount: string, decimals: number, price?: string): string | null => {
+  try {
+    return price && BigInt(amount) > 0n
+      ? fmtSpotDollarWei((BigInt(amount) * BigInt(price) / 10n ** BigInt(decimals)).toString()) : null;
+  } catch { return null; }
+};

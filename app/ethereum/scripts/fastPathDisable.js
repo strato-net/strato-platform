@@ -42,7 +42,6 @@ const TARGETS = {
     chainId: 11155111,
     contracts: [
       { name: "DepositRouter", address: "0x1f0457d1d8c3f0da3e579be3843dd6e093163b84" },
-      { name: "StratoNativeRepresentationBridge", address: "0x80f6497e8f8700c89b3a0b030c3e71aa874f6cf7" },
     ],
   },
   baseSepolia: {

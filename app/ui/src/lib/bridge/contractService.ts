@@ -6,6 +6,8 @@ import {
   ERC20_ABI, 
   NATIVE_TOKEN_ADDRESS, 
   PERMIT2_ADDRESS,
+  EIP7702_DELEGATION_CODE_PATTERN,
+  STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
 } from './constants';
 import { safeParseUnits, formatBalance } from '../../utils/numberUtils';
 import { 
@@ -15,7 +17,9 @@ import {
   Permit2ApprovalResult,
   Permit2Params,
   Permit2Domain,
-  Permit2Types
+  Permit2Types,
+  TokenApprovalParams,
+  NativeRedemptionParams
 } from './types';
 
 const PROXIED_CHAIN_IDS = new Set([
@@ -44,6 +48,20 @@ async function getClient(chainId: string) {
 function formatAddress(address: string): `0x${string}` {
     return (address.startsWith('0x') ? address : `0x${address}`) as `0x${string}`;
   }
+
+export async function assertExternalWalletRecipient(address: string, chainId: string): Promise<void> {
+  let code: `0x${string}` | undefined;
+  try {
+    const client = await getClient(chainId);
+    code = await client.getCode({ address: formatAddress(address) });
+  } catch {
+    throw new Error("Recipient wallet check unavailable");
+  }
+  // EIP-7702 delegation preserves the EOA's key-controlled address.
+  if (code && code !== '0x' && !EIP7702_DELEGATION_CODE_PATTERN.test(code)) {
+    throw new Error("Contract wallet cannot receive on STRATO");
+  }
+}
 
 export function getPermit2Nonce(): bigint {
     return BigInt(Date.now());
@@ -96,12 +114,17 @@ export function createPermit2Message({
     };
   }
 
-export async function checkPermit2Approval({
+export async function checkPermit2Approval(params: Permit2Params): Promise<Permit2ApprovalResult> {
+  return checkTokenApproval({ ...params, spender: PERMIT2_ADDRESS });
+}
+
+export async function checkTokenApproval({
     token,
     owner,
     amount,
-    chainId
-  }: Permit2Params): Promise<Permit2ApprovalResult> {
+    chainId,
+    spender
+  }: TokenApprovalParams): Promise<Permit2ApprovalResult> {
   const client = await getClient(chainId);
     
     const allowance = await client.readContract({
@@ -110,7 +133,7 @@ export async function checkPermit2Approval({
       functionName: "allowance",
       args: [
       formatAddress(owner),
-        PERMIT2_ADDRESS as `0x${string}`
+        formatAddress(spender)
       ]
     });
     
@@ -119,6 +142,22 @@ export async function checkPermit2Approval({
       currentAllowance: allowance
     };
   }
+
+export async function simulateNativeRedemption({ bridge, token, amount, recipient, account, chainId, actionIntent }: NativeRedemptionParams): Promise<void> {
+  const client = await getClient(chainId);
+  await client.simulateContract({
+    address: formatAddress(bridge),
+    abi: STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI,
+    ...(actionIntent ? {
+      functionName: "requestRedemptionWithRoute" as const,
+      args: [formatAddress(token), amount, formatAddress(recipient), formatAddress(actionIntent.actionToken), actionIntent.minFinalOut] as const,
+    } : {
+      functionName: "requestRedemption" as const,
+      args: [formatAddress(token), amount, formatAddress(recipient)] as const,
+    }),
+    account: formatAddress(account),
+  });
+}
 
 export async function getTokenConfig({ 
     tokenAddress, 
@@ -266,14 +305,34 @@ export async function simulateDeposit({
   const accountAddress = formatAddress(account);
 
   if (isNative) {
-    await client.simulateContract({
+    const request = {
       address: routerAddress,
       abi: DEPOSIT_ROUTER_ABI,
-      functionName: "depositETH",
-      args: [formatAddress(userAddress), formatAddress(targetStratoToken)],
+      functionName: actionIntent?.action
+        ? "depositETHWithAction"
+        : "depositETH",
+      args: actionIntent?.action
+        ? [
+            formatAddress(userAddress),
+            formatAddress(targetStratoToken),
+            actionIntent.action,
+            formatAddress(actionIntent.actionToken),
+            actionIntent.minFinalOut,
+          ] as const
+        : [formatAddress(userAddress), formatAddress(targetStratoToken)] as const,
       value: amount,
       account: accountAddress,
-    });
+    } as const;
+    const [gas, fees, balance] = await Promise.all([
+      client.estimateContractGas(request),
+      client.estimateFeesPerGas(),
+      client.getBalance({ address: accountAddress }),
+    ]);
+    const gasPrice = fees.maxFeePerGas ?? fees.gasPrice;
+    if (balance < amount + (gas * gasPrice * 120n) / 100n) {
+      throw new Error("Insufficient funds for deposit and gas fees; reduce the deposit amount");
+    }
+    await client.simulateContract(request);
   } else {
     if (!permitData || !tokenAddress) {
       throw new Error("Permit data and token address are required for ERC20 deposits");

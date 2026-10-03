@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getTokens,
+  getTokenSymbols,
   getBalance,
   createToken,
   transferToken,
@@ -26,6 +27,20 @@ import {
 } from "../validators/tokens.validator";
 
 class TokensController {
+  static async getSymbols(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const addresses = typeof req.query.addresses === "string" ? req.query.addresses.split(",") : [];
+      if (!addresses.length || addresses.length > 100 || addresses.some((address) => !/^(0x)?[0-9a-fA-F]{40}$/.test(address))) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Provide 1–100 token addresses" });
+        return;
+      }
+      const normalized = [...new Set(addresses.map((address) => address.toLowerCase().replace(/^0x/, "")))];
+      res.status(RestStatus.OK).json(await getTokenSymbols(req.accessToken, normalized));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async get(
     req: Request,
     res: Response,

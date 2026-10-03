@@ -2,7 +2,7 @@
 export class StratoError extends Error {
   public status: number;
   
-  constructor(message: string, status: number = 400) {
+  constructor(message: string, status: number = 400, public readonly details?: Record<string, unknown>) {
     super(message);
     this.name = 'StratoError';
     this.status = status;

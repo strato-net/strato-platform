@@ -30,3 +30,5 @@ export * from './trade-types';
 
 // Export all NFT (ERC-721) types
 export * from './nft-types';
+
+export * from "./bridge-review";

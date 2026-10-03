@@ -12,21 +12,34 @@
  *     --max-per-withdrawal <amount> \
  *     [--instant-withdrawal-threshold <amount>] \
  *     --strato-token <addr> \
+ *     [--token-router <addr>] \
+ *     [--auto-route-enabled <true|false>] \
  *     [--enabled <true|false>] \
+ *     [--settlement-verifiers <addr,addr,...> \
+ *      --settlement-verifier-threshold <count>] \
+ *     [--admin-registry <addr>] \
  *     [--deposits-disabled <true|false> \
  *      --withdrawals-disabled <true|false> \
- *      --max-outstanding-withdrawal <amount>]
+ *      --max-outstanding-withdrawal <amount>] \
+ *     [--execute]
+ *
+ * Dry-run is the default. Owner-only calls are submitted through AdminRegistry
+ * when --execute is supplied.
  */
 require('dotenv').config();
-const config = require('./config');
 const auth = require('./auth');
-const { rest, util } = require('blockapps-rest');
+const { submit } = require('./configure-external-bridge');
 
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const parsed = {};
+const DEFAULT_ADMIN_REGISTRY = '000000000000000000000000000000000000100c';
+
+function parseArgs(args = process.argv.slice(2)) {
+  const parsed = { execute: false };
 
   for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--execute') {
+      parsed.execute = true;
+      continue;
+    }
     if (!args[i].startsWith('--')) continue;
 
     const key = args[i].slice(2);
@@ -40,10 +53,6 @@ function parseArgs() {
   }
 
   return parsed;
-}
-
-function buildTxParams() {
-  return { gasPrice: config.gasPrice, gasLimit: config.gasLimit };
 }
 
 function parseBoolean(value, fallback) {
@@ -65,54 +74,25 @@ function ensurePositiveIntegerString(value, label) {
   return normalized;
 }
 
-async function callContract(tokenObj, address, name, method, args) {
-  const callArgs = {
-    contract: { address, name },
-    method,
-    args,
-    txParams: buildTxParams(),
+function normalizeAddress(value, label) {
+  const normalized = String(value || '').replace(/^0x/i, '').toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(normalized) || /^0{40}$/.test(normalized)) {
+    throw new Error(`${label} must be a nonzero 20-byte hex address`);
+  }
+  return normalized;
+}
+
+const parameter = (type, value) => ({ type, value });
+
+function governanceCall(adminRegistry, target, func, args) {
+  return {
+    contract: adminRegistry,
+    method: 'castVoteOnIssue',
+    args: { _target: target, _func: func, _args: args },
   };
-  const response = await rest.call(
-    tokenObj,
-    callArgs,
-    { config, cacheNonce: true, isAsync: true }
-  );
-  const responseArray = Array.isArray(response) ? response : [response];
-  const hashes = responseArray.map((item) => item && item.hash).filter(Boolean);
-
-  if (hashes.length === 0) {
-    throw new Error(
-      `rest.call returned no tx hash for ${name}.${method}: ${JSON.stringify(response)}`
-    );
-  }
-
-  const finalResults = await util.until(
-    (results) =>
-      Array.isArray(results) &&
-      results.length > 0 &&
-      results.every((result) => result && result.status && result.status !== 'Pending'),
-    (options) => rest.getBlocResults(tokenObj, hashes, options),
-    { config, isAsync: true },
-    60000
-  );
-
-  const final = Array.isArray(finalResults) ? finalResults[0] : finalResults;
-  if (!final || final.status !== 'Success') {
-    throw new Error(
-      `Contract call failed for ${name}.${method}: ${JSON.stringify(final || finalResults)}`
-    );
-  }
-
-  return final;
 }
 
-function logCallResult(label, result) {
-  const suffix = result && result.hash ? ` (tx: ${result.hash})` : '';
-  console.log(`${label}: submitted successfully${suffix}`);
-}
-
-async function main() {
-  const args = parseArgs();
+function buildPlan(args) {
   const required = [
     'bridge-address',
     'external-chain-id',
@@ -123,35 +103,24 @@ async function main() {
     'max-per-withdrawal',
     'strato-token',
   ];
+  const tokenRouter = args['token-router'];
+  const autoRouteEnabled = parseBoolean(args['auto-route-enabled'], undefined);
   const missing = required.filter((key) => !args[key]);
 
   if (missing.length > 0) {
-    console.error(`Missing required arguments: ${missing.map((key) => `--${key}`).join(', ')}`);
-    console.error('\nUsage:');
-    console.error(
-      '  node configure-native-route.js --bridge-address <addr> --external-chain-id <id> --external-bridge <addr> --representation-token <addr> --external-name <name> --external-symbol <symbol> --max-per-withdrawal <amount> --strato-token <addr> [--enabled <true|false>] [--deposits-disabled <true|false> --withdrawals-disabled <true|false> --max-outstanding-withdrawal <amount>]'
-    );
-    process.exit(1);
+    throw new Error(`Missing required arguments: ${missing.map((key) => `--${key}`).join(', ')}`);
   }
 
-  const username = process.env.GLOBAL_ADMIN_NAME;
-  const password = process.env.GLOBAL_ADMIN_PASSWORD;
-  if (!username || !password) {
-    console.error('Missing GLOBAL_ADMIN_NAME / GLOBAL_ADMIN_PASSWORD in .env');
-    process.exit(1);
-  }
-
-  console.log(`Authenticating as ${username}...`);
-  const token = await auth.getUserToken(username, password);
-  const tokenObj = { token };
-  console.log('Authenticated.\n');
-
-  const bridgeAddress = args['bridge-address'];
+  const bridgeAddress = normalizeAddress(args['bridge-address'], 'bridge-address');
+  const adminRegistry = normalizeAddress(
+    args['admin-registry'] || DEFAULT_ADMIN_REGISTRY,
+    'admin-registry'
+  );
   const callArgs = {
     enabled: parseBoolean(args.enabled, true),
     externalChainId: ensurePositiveIntegerString(args['external-chain-id'], 'external-chain-id'),
-    externalBridge: args['external-bridge'],
-    representationToken: args['representation-token'],
+    externalBridge: normalizeAddress(args['external-bridge'], 'external-bridge'),
+    representationToken: normalizeAddress(args['representation-token'], 'representation-token'),
     externalName: args['external-name'],
     externalSymbol: args['external-symbol'],
     maxPerWithdrawal: String(args['max-per-withdrawal']).trim(),
@@ -160,8 +129,41 @@ async function main() {
         ? '0'
         : args['instant-withdrawal-threshold']
     ).trim(),
-    stratoToken: args['strato-token'],
+    stratoToken: normalizeAddress(args['strato-token'], 'strato-token'),
   };
+  const settlementVerifierInput = args['settlement-verifiers'];
+  const settlementThresholdInput = args['settlement-verifier-threshold'];
+  if ((settlementVerifierInput == null) !== (settlementThresholdInput == null)) {
+    throw new Error(
+      '--settlement-verifiers and --settlement-verifier-threshold must be provided together'
+    );
+  }
+  const settlementVerifiers = settlementVerifierInput == null
+    ? []
+    : settlementVerifierInput.split(',').map((value, index) =>
+        normalizeAddress(value.trim(), `settlement-verifiers[${index}]`)
+      );
+  const settlementVerifierThreshold = settlementThresholdInput == null
+    ? null
+    : Number(ensurePositiveIntegerString(
+        settlementThresholdInput,
+        'settlement-verifier-threshold'
+      ));
+  if (
+    settlementVerifiers.length > 0 &&
+    (
+      new Set(settlementVerifiers).size !== settlementVerifiers.length ||
+      settlementVerifierThreshold < 2 ||
+      settlementVerifierThreshold > settlementVerifiers.length
+    )
+  ) {
+    throw new Error(
+      'Settlement verifiers must be distinct and the threshold must be between 2 and the verifier count'
+    );
+  }
+  const normalizedTokenRouter = tokenRouter
+    ? normalizeAddress(tokenRouter, 'token-router')
+    : null;
   const tokenConfigKeys = [
     'deposits-disabled',
     'withdrawals-disabled',
@@ -190,39 +192,82 @@ async function main() {
     throw new Error('max-outstanding-withdrawal must be an unsigned integer string');
   }
 
-  console.log('Native route configuration plan:');
-  console.log(JSON.stringify({ bridgeAddress, callArgs, tokenConfigArgs }, null, 2));
-  console.log('');
-
-  console.log(`Calling StratoNativeBridge(${bridgeAddress}).setAsset(...)`);
-  const result = await callContract(
-    tokenObj,
-    bridgeAddress,
-    'StratoNativeBridge',
-    'setAsset',
-    callArgs
+  const calls = [];
+  const add = (func, methodArgs) =>
+    calls.push(governanceCall(adminRegistry, bridgeAddress, func, methodArgs));
+  settlementVerifiers.forEach((verifier) =>
+    add('setSettlementVerifier', [
+      parameter('address', verifier),
+      parameter('bool', true),
+    ])
   );
-  logCallResult('Route configuration', result);
-
-  if (tokenConfigArgs) {
-    console.log(`Calling StratoNativeBridge(${bridgeAddress}).setTokenBridgeConfig(...)`);
-    const tokenConfigResult = await callContract(
-      tokenObj,
-      bridgeAddress,
-      'StratoNativeBridge',
-      'setTokenBridgeConfig',
-      tokenConfigArgs
-    );
-    logCallResult('Token bridge configuration', tokenConfigResult);
+  if (settlementVerifierThreshold != null) {
+    add('setSettlementVerifierThreshold', [
+      parameter('uint8', String(settlementVerifierThreshold)),
+    ]);
   }
-
-  console.log('\nNative route configuration complete.');
-  console.log(`Bridge proxy: ${bridgeAddress}`);
-  console.log(`STRATO token: ${callArgs.stratoToken}`);
-  console.log(`External chain id: ${callArgs.externalChainId}`);
+  add('setAsset', [
+    parameter('bool', callArgs.enabled),
+    parameter('uint256', callArgs.externalChainId),
+    parameter('address', callArgs.externalBridge),
+    parameter('address', callArgs.representationToken),
+    parameter('string', callArgs.externalName),
+    parameter('string', callArgs.externalSymbol),
+    parameter('uint256', callArgs.maxPerWithdrawal),
+    parameter('uint256', callArgs.instantWithdrawalThreshold),
+    parameter('address', callArgs.stratoToken),
+  ]);
+  if (tokenConfigArgs) {
+    add('setTokenBridgeConfig', [
+      parameter('address', tokenConfigArgs.stratoToken),
+      parameter('bool', tokenConfigArgs.depositsDisabled),
+      parameter('bool', tokenConfigArgs.withdrawalsDisabled),
+      parameter('uint256', tokenConfigArgs.maxOutstandingWithdrawal),
+    ]);
+  }
+  if (normalizedTokenRouter) {
+    add('setTokenRouter', [parameter('address', normalizedTokenRouter)]);
+  }
+  if (autoRouteEnabled !== undefined) {
+    add('setAutoRouteEnabled', [
+      parameter('address', callArgs.stratoToken),
+      parameter('uint256', callArgs.externalChainId),
+      parameter('bool', autoRouteEnabled),
+    ]);
+  }
+  return { adminRegistry, bridgeAddress, calls };
 }
 
-main().catch((error) => {
-  console.error('Failed:', error.message);
-  process.exit(1);
-});
+async function main() {
+  const args = parseArgs();
+  const plan = buildPlan(args);
+  console.log(JSON.stringify(plan, null, 2));
+  if (!args.execute) {
+    console.log('Dry run only. Re-run with --execute to submit governance votes.');
+    return;
+  }
+  const username = process.env.GLOBAL_ADMIN_NAME;
+  const password = process.env.GLOBAL_ADMIN_PASSWORD;
+  if (!username || !password) {
+    throw new Error('Missing GLOBAL_ADMIN_NAME / GLOBAL_ADMIN_PASSWORD in .env');
+  }
+  const token = await auth.getUserToken(username, password);
+  for (let index = 0; index < plan.calls.length; index += 1) {
+    const call = plan.calls[index];
+    const result = await submit({ token }, call);
+    console.log(JSON.stringify({
+      call: index + 1,
+      function: call.args._func,
+      ...result,
+    }));
+  }
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('configure-native-route failed:', error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { parseArgs, buildPlan };

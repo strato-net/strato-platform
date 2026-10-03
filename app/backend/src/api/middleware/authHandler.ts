@@ -37,6 +37,7 @@ interface CustomJwtPayload extends JWTPayload {
 type AuthOptions = {
   allowAnonAccess?: boolean;
   allowWalletAuth?: boolean;
+  requireAuthenticatedIdentity?: boolean;
 };
 
 // ————————————————————————————————————————————————————————————————
@@ -56,10 +57,11 @@ class AuthHandler {
         const allowAnonAccess = typeof options === "boolean" ? options : options?.allowAnonAccess;
         const allowWalletAuth = typeof options === "object" ? options.allowWalletAuth === true : false;
         let token = getTokenFromHeader(req);
-        const walletAddress = req.headers["x-wallet-address"] as string | undefined;
+        const requireAuthenticatedIdentity = typeof options === "object" && options.requireAuthenticatedIdentity === true;
+        const walletAddress = requireAuthenticatedIdentity ? undefined : req.headers["x-wallet-address"] as string | undefined;
 
         const isSafeMethod = ["GET", "HEAD", "OPTIONS"].includes(req.method);
-        const effectiveAllowAnon = allowAnonAccess ?? isSafeMethod;
+        const effectiveAllowAnon = requireAuthenticatedIdentity ? false : allowAnonAccess ?? isSafeMethod;
         const walletAuthenticated = !!walletAddress && (isSafeMethod || allowWalletAuth);
         const isServiceUser = !token && (effectiveAllowAnon || walletAuthenticated);
 

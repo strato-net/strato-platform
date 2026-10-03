@@ -34,13 +34,13 @@ import { usdstAddress } from "@/lib/constants";
  * @param tokenAddress - Optional token address to determine decimals
  * @returns Formatted value string
  */
-const formatValue = (val: string | number, tokenAddress?: string): string => {
+const formatValue = (val: string | number, tokenAddress?: string, tokenDecimals?: Map<string, number>): string => {
   try {
     const valStr = String(val);
     if (!valStr || valStr === "0" || valStr === "null" || valStr === "undefined") {
       return "0";
     }
-    const formatted = formatUnits(BigInt(valStr), 18);
+    const formatted = formatUnits(BigInt(valStr), tokenDecimals?.get(normalizeAddress(tokenAddress)) ?? 18);
     const numValue = parseFloat(formatted);
 
     // Determine decimal places: 2 for USDST, 4 for others
@@ -58,17 +58,15 @@ const formatValue = (val: string | number, tokenAddress?: string): string => {
 /**
  * Get the full formatted amount for tooltip display
  */
-const getFullAmount = (val: string | number): string => {
+const getFullAmount = (val: string | number, tokenAddress?: string, tokenDecimals?: Map<string, number>): string => {
   try {
     const valStr = String(val);
     if (!valStr || valStr === "0" || valStr === "null" || valStr === "undefined") {
       return "0";
     }
-    const formatted = formatUnits(BigInt(valStr), 18);
-    return parseFloat(formatted).toLocaleString(undefined, {
-      maximumFractionDigits: 18,
-      minimumFractionDigits: 0
-    });
+    const formatted = formatUnits(BigInt(valStr), tokenDecimals?.get(normalizeAddress(tokenAddress)) ?? 18);
+    const [whole, fraction] = formatted.split(".");
+    return BigInt(whole).toLocaleString() + (fraction ? `.${fraction}` : "");
   } catch {
     return String(val);
   }
@@ -214,7 +212,8 @@ export type ActivityHandler = (
   event: Event,
   tokenSymbols: Map<string, string>,
   userAddress?: string | null,
-  tokenImages?: Map<string, string>
+  tokenImages?: Map<string, string>,
+  tokenDecimals?: Map<string, number>
 ) => ActivityCardData | null;
 
 /**
@@ -266,7 +265,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "Send / Receive",
     iconConfig: { icon: Send, color: "bg-blue-500" },
     getTokenAddress: (event: Event) => [event.address].filter(Boolean),
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const tokenSymbol = tokenSymbols.get(event.address);
       const tokenAddress = event.address;
       const from = event.attributes.from || event.attributes.From || "";
@@ -278,12 +277,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount",
-          value: formatValue(value, tokenAddress),
+          value: formatValue(value, tokenAddress, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || tokenAddress,
-          rawAmount: getFullAmount(value),
+          rawAmount: getFullAmount(value, tokenAddress, tokenDecimals),
         },
         {
           label: "From",
@@ -428,7 +427,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "SaveUSDST Deposit",
     iconConfig: { icon: Download, color: "bg-cyan-500" },
     getTokenAddress: () => [usdstAddress],
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
       const assets = event.attributes.assets || event.attributes.Assets || "0";
       const shares = event.attributes.shares || event.attributes.Shares || "0";
@@ -437,12 +436,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Deposited",
-          value: formatValue(assets, usdstAddress),
+          value: formatValue(assets, usdstAddress, tokenDecimals),
           type: "amount",
           badge: usdstSymbol,
           image: tokenImages?.get(usdstAddress),
           imageFallback: usdstSymbol,
-          rawAmount: getFullAmount(assets),
+          rawAmount: getFullAmount(assets, usdstAddress, tokenDecimals),
         },
         {
           label: "Shares Minted",
@@ -482,7 +481,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     displayName: "SaveUSDST Withdraw",
     iconConfig: { icon: Upload, color: "bg-cyan-600" },
     getTokenAddress: () => [usdstAddress],
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
       const receiver = event.attributes.receiver || event.attributes.Receiver || "";
       const assets = event.attributes.assets || event.attributes.Assets || "0";
@@ -491,12 +490,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Withdrawn",
-          value: formatValue(assets, usdstAddress),
+          value: formatValue(assets, usdstAddress, tokenDecimals),
           type: "amount",
           badge: usdstSymbol,
           image: tokenImages?.get(usdstAddress),
           imageFallback: usdstSymbol,
-          rawAmount: getFullAmount(assets),
+          rawAmount: getFullAmount(assets, usdstAddress, tokenDecimals),
         },
         {
           label: "Owner",
@@ -540,7 +539,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const againstToken = event.attributes.againstToken || event.attributes.against_token;
       return [usdstAddress, againstToken].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
       const againstToken = getEventAttribute(event, "againstToken", "against_token");
       // depositAmount is the gross collateral pulled in; mintAmount is net of the PSM fee
@@ -553,21 +552,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Deposited",
-          value: formatValue(depositAmount, againstToken),
+          value: formatValue(depositAmount, againstToken, tokenDecimals),
           type: "amount",
           badge: collateralSymbol,
           image: tokenImages?.get(againstToken),
           imageFallback: collateralSymbol || againstToken,
-          rawAmount: getFullAmount(depositAmount),
+          rawAmount: getFullAmount(depositAmount, againstToken, tokenDecimals),
         },
         {
           label: "Minted",
-          value: formatValue(mintAmount, usdstAddress),
+          value: formatValue(mintAmount, usdstAddress, tokenDecimals),
           type: "amount",
           badge: usdstSymbol,
           image: tokenImages?.get(usdstAddress),
           imageFallback: usdstSymbol,
-          rawAmount: getFullAmount(mintAmount),
+          rawAmount: getFullAmount(mintAmount, usdstAddress, tokenDecimals),
         },
         addressField("By", user, userAddress),
       ];
@@ -600,7 +599,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const redeemToken = event.attributes.redeemToken || event.attributes.redeem_token;
       return [usdstAddress, redeemToken].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = getEventAttribute(event, "user", "User");
       const redeemToken = getEventAttribute(event, "redeemToken", "redeem_token");
       // burnAmount is the gross USDST burned; payoutAmount is net of the PSM fee
@@ -613,21 +612,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Burned",
-          value: formatValue(burnAmount, usdstAddress),
+          value: formatValue(burnAmount, usdstAddress, tokenDecimals),
           type: "amount",
           badge: usdstSymbol,
           image: tokenImages?.get(usdstAddress),
           imageFallback: usdstSymbol,
-          rawAmount: getFullAmount(burnAmount),
+          rawAmount: getFullAmount(burnAmount, usdstAddress, tokenDecimals),
         },
         {
           label: "Received",
-          value: formatValue(payoutAmount, redeemToken),
+          value: formatValue(payoutAmount, redeemToken, tokenDecimals),
           type: "amount",
           badge: redeemSymbol,
           image: tokenImages?.get(redeemToken),
           imageFallback: redeemSymbol || redeemToken,
-          rawAmount: getFullAmount(payoutAmount),
+          rawAmount: getFullAmount(payoutAmount, redeemToken, tokenDecimals),
         },
         addressField("By", user, userAddress),
       ];
@@ -654,35 +653,40 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
   "Deposit": {
     contract_name: "MercataBridge",
     event_name: "DepositCompleted",
-    displayName: "Non-native Deposit",
+    displayName: "Bridge In",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
-      return token ? [token] : [];
+      return [token, event.finalToken].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const stratoToken = event.attributes.stratoToken || event.attributes.strato_token;
-      const tokenSymbol = stratoToken ? tokenSymbols.get(stratoToken) : undefined;
+      const isRouted = event.depositOutcome === "route" && !!event.finalToken;
+      const isFallback = event.depositOutcome === "fallback" && !!event.finalToken;
+      const displayedToken = isRouted || isFallback ? event.finalToken : stratoToken;
+      const displayedAmount = isRouted || isFallback
+        ? event.finalAmount || "0"
+        : event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
+      const tokenSymbol = displayedToken ? tokenSymbols.get(displayedToken) : undefined;
       const stratoRecipient = event.attributes.stratoRecipient || event.attributes.strato_recipient || "";
       const externalSender = event.attributes.externalSender || event.attributes.external_sender || "";
-      const stratoTokenAmount = event.attributes.stratoTokenAmount || event.attributes.strato_token_amount || "0";
       const externalChainId = event.attributes.externalChainId || event.attributes.external_chain_id || "";
       const externalTxHash = event.attributes.externalTxHash || event.attributes.external_tx_hash || "";
 
       const chainName = externalChainId ? getChainName(parseInt(externalChainId)) : "Unknown Chain";
 
-      const stratoTokenImage = stratoToken ? tokenImages?.get(stratoToken) : undefined;
+      const stratoTokenImage = displayedToken ? tokenImages?.get(displayedToken) : undefined;
 
       const fields: ActivityField[] = [
         // Amount first (for line 1)
-        stratoToken ? {
+        displayedToken ? {
           label: "Amount",
-          value: formatValue(stratoTokenAmount, stratoToken),
+          value: formatValue(displayedAmount, displayedToken, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: stratoTokenImage,
-          imageFallback: tokenSymbol || stratoToken,
-          rawAmount: getFullAmount(stratoTokenAmount),
+          imageFallback: tokenSymbol || displayedToken,
+          rawAmount: getFullAmount(displayedAmount, displayedToken, tokenDecimals),
         } : null,
         // From, To, Tx for line 2
         {
@@ -712,7 +716,11 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       ].filter(Boolean) as ActivityField[];
 
       return {
-        title: "Non-native Deposit",
+        title: isRouted
+          ? "Bridge & Trade"
+          : isFallback
+            ? "Bridge In (Fallback)"
+            : "Bridge In",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -730,24 +738,98 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "ExternalDeposit": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "DepositCompleted",
+    displayName: "Bridge In",
+    iconConfig: { icon: Download, color: "bg-green-500" },
+    getTokenAddress: (event: Event) =>
+      activityTypes.Deposit.getTokenAddress(event),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>) =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages, tokenDecimals),
+  },
+  "RoutedTrade": {
+    contract_name: "TokenRouter",
+    event_name: "RouteExecuted",
+    displayName: "Trade",
+    iconConfig: { icon: ArrowLeftRight, color: "bg-orange-500" },
+    getTokenAddress: (event: Event) =>
+      [event.attributes.tokenIn, event.attributes.tokenOut].filter(
+        Boolean
+      ) as string[],
+    handler: (
+      event: Event,
+      tokenSymbols: Map<string, string>,
+      userAddress?: string | null,
+      tokenImages?: Map<string, string>,
+      tokenDecimals?: Map<string, number>
+    ): ActivityCardData => {
+      const tokenIn = event.attributes.tokenIn || "";
+      const tokenOut = event.attributes.tokenOut || "";
+      const caller = event.attributes.caller || "";
+      const recipient = event.attributes.recipient || "";
+      return {
+        title: "Trade",
+        fields: [
+          addImageToField(
+            {
+              label: "From Amount",
+              value: formatValue(event.attributes.amountIn || "0", tokenIn, tokenDecimals),
+              rawAmount: getFullAmount(event.attributes.amountIn || "0", tokenIn, tokenDecimals),
+              type: "amount",
+              badge: tokenSymbols.get(tokenIn),
+            },
+            tokenIn,
+            tokenImages,
+            tokenSymbols
+          ),
+          addImageToField(
+            {
+              label: "To Amount",
+              value: formatValue(event.attributes.amountOut || "0", tokenOut, tokenDecimals),
+              rawAmount: getFullAmount(event.attributes.amountOut || "0", tokenOut, tokenDecimals),
+              type: "amount",
+              badge: tokenSymbols.get(tokenOut),
+            },
+            tokenOut,
+            tokenImages,
+            tokenSymbols
+          ),
+          addressField("From", caller, userAddress),
+          addressField("To", recipient, userAddress),
+        ],
+        timestamp: event.block_timestamp || "",
+        eventId: event.id?.toString(),
+        layout: {
+          type: "two-line",
+          line1: {
+            fieldLabels: ["From Amount", "To Amount"],
+            renderer: "amounts-with-arrow",
+          },
+          line2: {
+            fieldLabels: ["From", "To"],
+            renderer: "addresses-with-arrow",
+          },
+        },
+      };
+    },
+  },
   "NativeDeposit": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeDepositCompleted",
-    displayName: "Native Deposit",
+    displayName: "Bridge In",
     iconConfig: { icon: Download, color: "bg-green-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       return token ? [token] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => ({
-      ...activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages),
-      title: "Native Deposit",
-    }),
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData =>
+      activityTypes.Deposit.handler(event, tokenSymbols, userAddress, tokenImages, tokenDecimals),
   },
   "Withdraw": {
     contract_name: "MercataBridge",
     event_name: "WithdrawalRequested",
-    displayName: "Non-native Bridge Out",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.token || event.attributes.Token;
@@ -757,7 +839,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       if (externalToken) tokens.push(externalToken);
       return tokens;
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const token = event.attributes.token || event.attributes.Token || "";
       const externalToken = event.attributes.externalToken || event.attributes.external_token;
       const tokenSymbol = token ? tokenSymbols.get(token) : undefined;
@@ -777,12 +859,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         // Amount first (for line 1)
         token ? {
           label: "Amount",
-          value: formatValue(stratoTokenAmount, token),
+          value: formatValue(stratoTokenAmount, token, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || token,
-          rawAmount: getFullAmount(stratoTokenAmount),
+          rawAmount: getFullAmount(stratoTokenAmount, token, tokenDecimals),
         } : null,
         // From, To, External Token for line 2
         {
@@ -818,7 +900,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       return {
-        title: "Non-native Bridge Out",
+        title: "Bridge Out",
         fields,
         timestamp: event.block_timestamp || "",
         eventId: event.id?.toString(),
@@ -836,17 +918,45 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       };
     },
   },
+  "ExternalWithdraw": {
+    contract_name: "ExternalAssetBridge",
+    event_name: "WithdrawalRequested",
+    displayName: "Bridge Out",
+    iconConfig: { icon: Upload, color: "bg-red-500" },
+    getTokenAddress: (event: Event) => {
+      const token = event.attributes.stratoToken || event.attributes.strato_token;
+      const externalToken = event.attributes.externalToken || event.attributes.external_token;
+      return [token, externalToken].filter(Boolean) as string[];
+    },
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData =>
+      activityTypes.Withdraw.handler(
+        {
+          ...event,
+          attributes: {
+            ...event.attributes,
+            token: event.attributes.stratoToken || event.attributes.strato_token,
+            user: event.attributes.stratoSender || event.attributes.strato_sender,
+            dest: event.attributes.externalRecipient || event.attributes.external_recipient,
+            destChainId: event.attributes.externalChainId || event.attributes.external_chain_id,
+          },
+        },
+        tokenSymbols,
+        userAddress,
+        tokenImages,
+        tokenDecimals,
+      ),
+  },
   "NativeWithdraw": {
     contract_name: "StratoNativeBridge",
     event_name: "NativeWithdrawalRequested",
-    displayName: "Native Bridge Out",
+    displayName: "Bridge Out",
     iconConfig: { icon: Upload, color: "bg-red-500" },
     getTokenAddress: (event: Event) => {
       const token = event.attributes.stratoToken || event.attributes.strato_token;
       const externalToken = event.attributes.representationToken || event.attributes.representation_token;
       return [token, externalToken].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const attributes = event.attributes;
       const normalizedEvent = {
         ...event,
@@ -862,8 +972,8 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       } as Event;
 
       return {
-        ...activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages),
-        title: "Native Bridge Out",
+        ...activityTypes.Withdraw.handler(normalizedEvent, tokenSymbols, userAddress, tokenImages, tokenDecimals),
+        title: "Bridge Out",
       };
     },
   },
@@ -877,7 +987,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       // Include USDST since the minted amount is always USDST
       return asset ? [asset, usdstAddress] : [usdstAddress];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const owner = event.attributes.owner || event.attributes.Owner || "";
       const asset = (event.attributes.asset || event.attributes.Asset || "").toLowerCase();
       const amountUSD = event.attributes.amountUSD || event.attributes.amount_usd || "0";
@@ -891,12 +1001,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount Minted",
-          value: formatValue(amountUSD, usdstAddress),
+          value: formatValue(amountUSD, usdstAddress, tokenDecimals),
           type: "amount",
           badge: usdstSymbol,
           image: usdstImage,
           imageFallback: usdstSymbol,
-          rawAmount: getFullAmount(amountUSD),
+          rawAmount: getFullAmount(amountUSD, usdstAddress, tokenDecimals),
         },
         {
           label: "Borrower",
@@ -943,7 +1053,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out;
       return [tokenIn, tokenOut].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const sender = event.attributes.sender || event.attributes.Sender || "";
       const tokenIn = event.attributes.tokenIn || event.attributes.token_in || "";
       const tokenOut = event.attributes.tokenOut || event.attributes.token_out || "";
@@ -959,22 +1069,22 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         // Amount In (for line 1)
         {
           label: "Amount In",
-          value: formatValue(amountIn, tokenIn),
+          value: formatValue(amountIn, tokenIn, tokenDecimals),
           type: "amount",
           badge: tokenInSymbol,
           image: tokenInImage,
           imageFallback: tokenInSymbol || tokenIn,
-          rawAmount: getFullAmount(amountIn),
+          rawAmount: getFullAmount(amountIn, tokenIn, tokenDecimals),
         },
         // Amount Out (for line 1)
         {
           label: "Amount Out",
-          value: formatValue(amountOut, tokenOut),
+          value: formatValue(amountOut, tokenOut, tokenDecimals),
           type: "amount",
           badge: tokenOutSymbol,
           image: tokenOutImage,
           imageFallback: tokenOutSymbol || tokenOut,
-          rawAmount: getFullAmount(amountOut),
+          rawAmount: getFullAmount(amountOut, tokenOut, tokenDecimals),
         },
         // By (for line 2)
         {
@@ -1014,7 +1124,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       // Return empty array - pool tokens will be fetched separately in ActivityFeedCards
       return [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const provider = event.attributes.provider || event.attributes.Provider || "";
       let tokenAAmount = event.attributes.tokenAAmount || event.attributes.token_a_amount || event.attributes.tokenA || "0";
       let tokenBAmount = event.attributes.tokenBAmount || event.attributes.token_b_amount || event.attributes.tokenB || "0";
@@ -1050,22 +1160,22 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         // Token A Amount (for line 1)
         {
           label: "Token A Amount",
-          value: formatValue(tokenAAmount, tokenA),
+          value: formatValue(tokenAAmount, tokenA, tokenDecimals),
           type: "amount",
           badge: tokenASymbol,
           image: tokenAImage,
           imageFallback: tokenASymbol || tokenA || "Token A",
-          rawAmount: getFullAmount(tokenAAmount),
+          rawAmount: getFullAmount(tokenAAmount, tokenA, tokenDecimals),
         },
         // Token B Amount (for line 1)
         {
           label: "Token B Amount",
-          value: formatValue(tokenBAmount, tokenB),
+          value: formatValue(tokenBAmount, tokenB, tokenDecimals),
           type: "amount",
           badge: tokenBSymbol,
           image: tokenBImage,
           imageFallback: tokenBSymbol || tokenB || "Token B",
-          rawAmount: getFullAmount(tokenBAmount),
+          rawAmount: getFullAmount(tokenBAmount, tokenB, tokenDecimals),
         },
         // Provider (for line 2)
         {
@@ -1106,7 +1216,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const e = event as Event & { token0?: string; token1?: string };
       return [e.token0, e.token1].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const e = event as Event & { token0?: string; token1?: string };
       const sender = getEventAttribute(event, "sender", "recipient");
       const toBigInt = (v: string): bigint => {
@@ -1125,21 +1235,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount In",
-          value: formatValue(amountIn, tokenIn),
+          value: formatValue(amountIn, tokenIn, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(tokenIn),
           image: tokenImages?.get(tokenIn),
           imageFallback: tokenSymbols.get(tokenIn) || tokenIn,
-          rawAmount: getFullAmount(amountIn),
+          rawAmount: getFullAmount(amountIn, tokenIn, tokenDecimals),
         },
         {
           label: "Amount Out",
-          value: formatValue(amountOut, tokenOut),
+          value: formatValue(amountOut, tokenOut, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(tokenOut),
           image: tokenImages?.get(tokenOut),
           imageFallback: tokenSymbols.get(tokenOut) || tokenOut,
-          rawAmount: getFullAmount(amountOut),
+          rawAmount: getFullAmount(amountOut, tokenOut, tokenDecimals),
         },
         {
           label: "By",
@@ -1177,7 +1287,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const e = event as Event & { token0?: string; token1?: string };
       return [e.token0, e.token1].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const e = event as Event & { token0?: string; token1?: string };
       const provider = getEventAttribute(event, "owner", "sender");
       const amount0 = getEventAttribute(event, "amount0") || "0";
@@ -1188,21 +1298,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Token A Amount",
-          value: formatValue(amount0, token0),
+          value: formatValue(amount0, token0, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token0),
           image: tokenImages?.get(token0),
           imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
-          rawAmount: getFullAmount(amount0),
+          rawAmount: getFullAmount(amount0, token0, tokenDecimals),
         },
         {
           label: "Token B Amount",
-          value: formatValue(amount1, token1),
+          value: formatValue(amount1, token1, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token1),
           image: tokenImages?.get(token1),
           imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
-          rawAmount: getFullAmount(amount1),
+          rawAmount: getFullAmount(amount1, token1, tokenDecimals),
         },
         {
           label: "Provider",
@@ -1240,7 +1350,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const e = event as Event & { token0?: string; token1?: string };
       return [e.token0, e.token1].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData | null => {
       const e = event as Event & { token0?: string; token1?: string };
       // owner on pool-level Burn events; sender on PositionManagerV3 DecreaseLiquidity
       const owner = getEventAttribute(event, "owner", "sender");
@@ -1255,21 +1365,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Token A Amount",
-          value: formatValue(amount0, token0),
+          value: formatValue(amount0, token0, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token0),
           image: tokenImages?.get(token0),
           imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
-          rawAmount: getFullAmount(amount0),
+          rawAmount: getFullAmount(amount0, token0, tokenDecimals),
         },
         {
           label: "Token B Amount",
-          value: formatValue(amount1, token1),
+          value: formatValue(amount1, token1, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token1),
           image: tokenImages?.get(token1),
           imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
-          rawAmount: getFullAmount(amount1),
+          rawAmount: getFullAmount(amount1, token1, tokenDecimals),
         },
         {
           label: "Provider",
@@ -1307,7 +1417,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const e = event as Event & { token0?: string; token1?: string };
       return [e.token0, e.token1].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData | null => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData | null => {
       const e = event as Event & { token0?: string; token1?: string };
       const recipient = getEventAttribute(event, "recipient", "owner");
       const amount0 = getEventAttribute(event, "amount0") || "0";
@@ -1320,21 +1430,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Token A Amount",
-          value: formatValue(amount0, token0),
+          value: formatValue(amount0, token0, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token0),
           image: tokenImages?.get(token0),
           imageFallback: tokenSymbols.get(token0) || token0 || "Token 0",
-          rawAmount: getFullAmount(amount0),
+          rawAmount: getFullAmount(amount0, token0, tokenDecimals),
         },
         {
           label: "Token B Amount",
-          value: formatValue(amount1, token1),
+          value: formatValue(amount1, token1, tokenDecimals),
           type: "amount",
           badge: tokenSymbols.get(token1),
           image: tokenImages?.get(token1),
           imageFallback: tokenSymbols.get(token1) || token1 || "Token 1",
-          rawAmount: getFullAmount(amount1),
+          rawAmount: getFullAmount(amount1, token1, tokenDecimals),
         },
         {
           label: "To",
@@ -1733,7 +1843,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const asset = event.attributes.asset || event.attributes.Asset || "";
       const amount = event.attributes.amount || event.attributes.Amount || "0";
@@ -1744,12 +1854,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount",
-          value: formatValue(amount, asset),
+          value: formatValue(amount, asset, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || asset,
-          rawAmount: getFullAmount(amount),
+          rawAmount: getFullAmount(amount, asset, tokenDecimals),
         },
         {
           label: "Borrower",
@@ -1787,7 +1897,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const asset = event.attributes.asset || event.attributes.Asset || "";
       const amount = event.attributes.amount || event.attributes.Amount || "0";
@@ -1798,12 +1908,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount",
-          value: formatValue(amount, asset),
+          value: formatValue(amount, asset, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || asset,
-          rawAmount: getFullAmount(amount),
+          rawAmount: getFullAmount(amount, asset, tokenDecimals),
         },
         {
           label: "Depositor",
@@ -1865,7 +1975,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const tokenArray = normalizeToArray(tokens);
       return tokenArray.filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const sender = event.attributes.sender || event.attributes.Sender || "";
       const recipient = event.attributes.recipient || event.attributes.Recipient || "";
       const tokens = event.attributes.tokens || event.attributes.Tokens || [];
@@ -1919,15 +2029,15 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       }
 
       const tokenSymbol = firstToken ? tokenSymbols.get(String(firstToken)) : undefined;
-      const displayAmount = firstAmount ? formatValue(firstAmount, String(firstToken)) : "0";
+      const displayAmount = firstAmount ? formatValue(firstAmount, String(firstToken), tokenDecimals) : "0";
       const hasMultipleTokens = tokenArray.length > 1;
 
       // Build list of all token amounts for tooltip
       const allTokenAmounts = tokenArray.map((token, index) => {
         const amount = amountArray[index];
         const symbol = token ? tokenSymbols.get(String(token)) : undefined;
-        const formattedAmount = amount ? formatValue(amount, String(token)) : "0";
-        const fullAmount = amount ? getFullAmount(amount) : "0";
+        const formattedAmount = amount ? formatValue(amount, String(token), tokenDecimals) : "0";
+        const fullAmount = amount ? getFullAmount(amount, String(token), tokenDecimals) : "0";
         return {
           token,
           amount: formattedAmount,
@@ -1978,7 +2088,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
           badge: tokenSymbol,
           image: tokenImages?.get(String(firstToken)),
           imageFallback: tokenSymbol || String(firstToken),
-          rawAmount: firstAmount ? getFullAmount(firstAmount) : undefined,
+          rawAmount: firstAmount ? getFullAmount(firstAmount, String(firstToken), tokenDecimals) : undefined,
           additionalContent,
         } : null,
         // Referred By and Referred User for line 2
@@ -2026,7 +2136,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const asset = event.attributes.asset || event.attributes.Asset || "";
       const amountIn = event.attributes.amountIn || event.attributes.amount_in || "0";
@@ -2037,12 +2147,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount",
-          value: formatValue(amountIn, asset),
+          value: formatValue(amountIn, asset, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || asset,
-          rawAmount: getFullAmount(amountIn),
+          rawAmount: getFullAmount(amountIn, asset, tokenDecimals),
         },
         {
           label: "Depositor",
@@ -2052,7 +2162,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
         },
         {
           label: "USD Value",
-          value: `$${formatValue(depositValueUSD, usdstAddress)}`,
+          value: `$${formatValue(depositValueUSD, usdstAddress, tokenDecimals)}`,
           type: "text",
         },
       ];
@@ -2080,7 +2190,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
     event_name: "Withdrawn",
     displayName: "Diversified Vault Withdrawal",
     iconConfig: { icon: Upload, color: "bg-amber-500" },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const sharesBurned = event.attributes.sharesBurned || event.attributes.shares_burned || "0";
       const withdrawValueUSD = event.attributes.withdrawValueUSD || event.attributes.withdraw_value_usd || "0";
@@ -2088,7 +2198,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "USD Value",
-          value: `$${formatValue(withdrawValueUSD, usdstAddress)}`,
+          value: `$${formatValue(withdrawValueUSD, usdstAddress, tokenDecimals)}`,
           type: "amount",
           badge: "USD",
           rawAmount: `$${getFullAmount(withdrawValueUSD)}`,
@@ -2134,7 +2244,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const asset = event.attributes.asset || event.attributes.Asset;
       return asset ? [asset] : [];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const user = event.attributes.user || event.attributes.User || "";
       const asset = event.attributes.asset || event.attributes.Asset || "";
       const amount = event.attributes.amount || event.attributes.Amount || "0";
@@ -2144,12 +2254,12 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Amount",
-          value: formatValue(amount, asset),
+          value: formatValue(amount, asset, tokenDecimals),
           type: "amount",
           badge: tokenSymbol,
           image: tokenImage,
           imageFallback: tokenSymbol || asset,
-          rawAmount: getFullAmount(amount),
+          rawAmount: getFullAmount(amount, asset, tokenDecimals),
         },
         {
           label: "Recipient",
@@ -2188,7 +2298,7 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const payToken = event.attributes.payToken || event.attributes.pay_token;
       return [metalToken, payToken].filter(Boolean) as string[];
     },
-    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>): ActivityCardData => {
+    handler: (event: Event, tokenSymbols: Map<string, string>, userAddress?: string | null, tokenImages?: Map<string, string>, tokenDecimals?: Map<string, number>): ActivityCardData => {
       const buyer = event.attributes.buyer || event.attributes.Buyer || "";
       const metalToken = event.attributes.metalToken || event.attributes.metal_token || "";
       const payToken = event.attributes.payToken || event.attributes.pay_token || "";
@@ -2203,21 +2313,21 @@ export const activityTypes: Record<string, ActivityTypeConfig> = {
       const fields: ActivityField[] = [
         {
           label: "Paid",
-          value: formatValue(payAmount, payToken),
+          value: formatValue(payAmount, payToken, tokenDecimals),
           type: "amount",
           badge: paySymbol,
           image: payImage,
           imageFallback: paySymbol || payToken,
-          rawAmount: getFullAmount(payAmount),
+          rawAmount: getFullAmount(payAmount, payToken, tokenDecimals),
         },
         {
           label: "Received",
-          value: formatValue(metalAmount, metalToken),
+          value: formatValue(metalAmount, metalToken, tokenDecimals),
           type: "amount",
           badge: metalSymbol,
           image: metalImage,
           imageFallback: metalSymbol || metalToken,
-          rawAmount: getFullAmount(metalAmount),
+          rawAmount: getFullAmount(metalAmount, metalToken, tokenDecimals),
         },
         {
           label: "Buyer",

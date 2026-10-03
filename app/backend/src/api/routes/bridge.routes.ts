@@ -3,7 +3,15 @@ import authHandler from "../middleware/authHandler";
 import BridgeController from "../controllers/bridge.controller";
 
 const router = Router();
+const adminAuth = authHandler.authorizeRequest({ requireAuthenticatedIdentity: true });
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
+
+router.get("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
+router.post("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
+
+router.get("/admin/policies", adminAuth, BridgeController.policies);
+router.get("/admin/reviews", adminAuth, BridgeController.reviews);
+router.post("/admin/reviews/prepare", adminAuth, BridgeController.reviews);
 
 /**
  * @openapi
@@ -164,8 +172,6 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                 properties:
  *                   id:
  *                     type: string
- *                   isDefaultRoute:
- *                     type: boolean
  *                   enabled:
  *                     type: boolean
  *                   stratoToken:
@@ -183,7 +189,7 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                   externalChainId:
  *                     type: string
  */
-router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), BridgeController.getBridgeableTokens);
 
 /**
  * @openapi
@@ -207,7 +213,7 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
  *                     type: object
  *                     additionalProperties: true
  */
-router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
+router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeController.getNetworkConfigs);
 
 /**
  * @openapi
@@ -269,7 +275,7 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  *                 totalCount:
  *                   type: integer
  */
-router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
+router.get("/transactions/:type", walletAuth, BridgeController.getTransactions);
 
 /**
  * @openapi

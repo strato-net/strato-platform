@@ -5,6 +5,22 @@ const { SaveUSDSTVault, Token } = constants;
 
 export const toUTCTime = (d: Date) => d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
 
+export const buildSwapHistoryUserFilter = (
+  senderAddress?: string,
+  includeRecipient = false,
+): Record<string, string> => {
+  if (!senderAddress) return {};
+  const sender = senderAddress.toLowerCase().replace(/^0x/, "");
+  const router = constants.tokenRouter?.toLowerCase().replace(/^0x/, "");
+  const filters = [`sender.eq.${sender}`];
+  if (includeRecipient) filters.push(`recipient.eq.${sender}`);
+  // Direct router trades are signed by the user; bridge settlements are signed by the operator.
+  if (router && router !== constants.ZERO_ADDRESS) {
+    filters.push(`and(sender.eq.${router},transaction_sender.eq.${sender})`);
+  }
+  return { and: `(or(${filters.join(",")}))` };
+};
+
 // The /mapping table key column is a JSON object of the form
 // {key, key2, key3, ...}; return the parts as an ordered list.
 export const getMappingKeyParts = (key: any): string[] => {
@@ -106,7 +122,7 @@ export const getTokenMetadata = async (accessToken: string, tokenAddresses: stri
   const saveUsdstVault = constants.saveUsdstVault?.toLowerCase().replace(/^0x/, "");
   const [tokenResponse, saveUsdstResponse] = await Promise.all([
     cirrus.get(accessToken, `/${Token}`, {
-      params: { select: `address,_name,_symbol,status,images:${Token}-images(value)`, address: `in.(${normalizedAddresses.join(",")})` }
+      params: { select: `address,_name,_symbol,status,customDecimals,images:${Token}-images(value)`, address: `in.(${normalizedAddresses.join(",")})` }
     }),
     saveUsdstVault && normalizedAddresses.includes(saveUsdstVault)
       ? cirrus.get(accessToken, `/${SaveUSDSTVault}`, {
@@ -122,7 +138,7 @@ export const getTokenMetadata = async (accessToken: string, tokenAddresses: stri
   const metadata = new Map(
     (tokenResponse.data || []).map((token: any) => [
       token.address.toLowerCase().replace(/^0x/, ""),
-      { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value }
+      { name: token._name, symbol: token._symbol, status: token.status, image: token.images?.[0]?.value, decimals: token.customDecimals ?? 18 }
     ])
   );
 
