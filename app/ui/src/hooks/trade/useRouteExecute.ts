@@ -64,7 +64,7 @@ function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (par
         const confirmed = data.status === "Success";
         setProgress({
           status: confirmed ? "success" : "unconfirmed",
-          message: confirmed ? (operation === "trade" ? "Your trade is confirmed." : "Your withdrawal request is confirmed on STRATO. Track the external transfer in Recent Transactions.") : `Your ${operation} request is still pending. Do not resubmit; check your activity for confirmation.`,
+          message: confirmed ? (operation === "trade" ? "Your trade is confirmed." : "Your withdrawal was requested. Track its progress in Recent Transactions.") : operation === "withdrawal" ? "Your withdrawal may still be processing. Do not submit again. Check Recent Transactions for updates." : `Your ${operation} request is still pending. Do not resubmit; check your activity for confirmation.`,
           transactions,
           hash: transactions.find(tx => tx.functionName === (operation === "trade" ? "executeRoute" : "requestWithdrawal"))?.hash || data.hash,
         });
@@ -77,7 +77,7 @@ function useStratoExecution<T>(operation: "trade" | "withdrawal", endpoint: (par
           !transactions.some(tx => tx.status === "failed");
         setProgress({
           status: unconfirmed ? "unconfirmed" : "error",
-          message: unconfirmed ? "Confirmation is unavailable. Do not resubmit; check your activity for the transaction status."
+          message: unconfirmed ? operation === "withdrawal" ? "Your withdrawal may still be processing. Do not submit again. Check Recent Transactions for updates." : "Confirmation is unavailable. Do not resubmit; check your activity for the transaction status."
             : normalized.code === "UNKNOWN_ERROR" ? getFriendlyMessage(normalized.message) : normalized.userMessage,
           transactions,
         });

@@ -55,8 +55,8 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
       { key: "waiting_tx", label: "Waiting for Transaction", description: "Transaction is being processed on-chain" },
       {
         key: "submitted",
-        label: "Awaiting STRATO Settlement",
-        description: "Your external transaction is confirmed. Verification and STRATO settlement are still pending. Any trade or fallback occurs during settlement. You can close this modal and track your deposit in recent activity."
+        label: "Processing on STRATO",
+        description: "Your transaction on the source network is confirmed. Your deposit is still being processed on STRATO, including any requested trade or fallback. You can close this window and track your deposit in recent activity."
       }
     );
     return steps;
@@ -145,10 +145,10 @@ const DepositProgressModal: React.FC<DepositProgressModalProps> = ({
           </div>
           <span className="text-lg font-semibold text-foreground">
             {currentStep === "error" 
-              ? (isRedemption ? "Redemption Failed" : "Deposit Failed")
+              ? "Deposit Failed"
               : awaitingSettlement
-              ? (isRedemption ? "Redemption Submitted" : "Deposit Submitted")
-              : (isRedemption ? "Processing Redemption" : "Processing Deposit")}
+              ? "Deposit Submitted"
+              : "Processing Deposit"}
           </span>
         </div>
       }

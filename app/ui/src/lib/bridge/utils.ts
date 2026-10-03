@@ -326,7 +326,7 @@ export const LEGACY_DEPOSIT_STATUS_OPTIONS = [
 ];
 
 export const WITHDRAWAL_STATUS_LABELS: Record<number, string> = {
-  [ExternalBridgeStatus.CANCELLATION_PENDING]: "Cancellation pending",
+  [ExternalBridgeStatus.CANCELLATION_PENDING]: "Cancelation pending",
   [ExternalBridgeStatus.INITIATED]: "Requested",
   [ExternalBridgeStatus.PENDING_REVIEW]: "Pending Review",
   [ExternalBridgeStatus.READY]: "Processing",
@@ -340,7 +340,7 @@ export const WITHDRAWAL_STATUS_LABELS: Record<number, string> = {
 export const WITHDRAWAL_STATUS_OPTIONS = BRIDGE_STATUS_OPTIONS
   .filter(({ value }) => value !== ExternalBridgeStatus.CANCELLED)
   .map(({ value, label }) => ({ value, label: WITHDRAWAL_STATUS_LABELS[value] ?? label }))
-  .concat([{ value: ExternalBridgeStatus.CANCELLATION_PENDING, label: "Cancellation pending" }]);
+  .concat([{ value: ExternalBridgeStatus.CANCELLATION_PENDING, label: "Cancelation pending" }]);
 
 /**
  * Chain options for filter dropdowns

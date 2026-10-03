@@ -34,14 +34,14 @@ export const EXTERNAL_BRIDGE_STATUS_LABELS: Record<number, { text: string; color
   5: { text: "Canceled", color: "bg-red-500/15 text-red-500" },
   6: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
   7: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
-  [ExternalBridgeStatus.CANCELLATION_PENDING]: { text: "Cancellation pending", color: "bg-amber-500/15 text-amber-600" },
+  [ExternalBridgeStatus.CANCELLATION_PENDING]: { text: "Cancelation pending", color: "bg-amber-500/15 text-amber-600" },
 };
 export const UNKNOWN_BRIDGE_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 export const EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS: Record<number, { text: string; color: string; description: string }> = {
   9: {
     text: "Rejected — no funds received",
     color: "bg-red-500/15 text-red-500",
-    description: "Governance determined that no funds were received for this deposit. No STRATO assets were credited and no refund was issued.",
+    description: "No funds were received for this deposit. No STRATO assets were credited and no refund was issued.",
   },
   6: {
     text: "Refunded",
@@ -54,14 +54,14 @@ export const EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS: Record<number, { text: strin
     description: "Your original asset is being returned to the sending wallet. No action is needed from you.",
   },
   0: {
-    text: "Reopened",
+    text: "Processing",
     color: "bg-amber-500/15 text-amber-500",
-    description: "Reopened by governance. Processing will retry automatically; no action is needed from you.",
+    description: "Your deposit is being processed. No action is needed from you.",
   },
   7: {
     text: "Rejected",
     color: "bg-red-500/15 text-red-500",
-    description: "The deposit was rejected and is awaiting recovery by the bridge administrators. Funds have not yet been returned; no action is needed from you.",
+    description: "Your deposit was rejected. We are working on next steps. No action is needed from you.",
   },
 };
 

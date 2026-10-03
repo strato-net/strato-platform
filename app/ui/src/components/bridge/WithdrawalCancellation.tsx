@@ -38,25 +38,25 @@ export default function WithdrawalCancellation({ source, withdrawalId, onCancele
       queryClient.setQueryData<WithdrawalCancellationStatus>(queryKey, current => current ? { ...current, eligible: false } : current);
       void queryClient.invalidateQueries({ queryKey, exact: true });
       setOpen(false); onCanceled();
-    } catch (e) { setError(extractApiErrorMessage(e) || 'Cancellation failed. Refresh the withdrawal status before trying again.'); }
+    } catch (e) { setError(extractApiErrorMessage(e) || 'Cancelation failed. Refresh the withdrawal status before trying again.'); }
     finally { submissionPending.current = false; setSubmitting(false); void fetchUsdstBalance(); void fetchTokens(); }
   };
   const cancellationAvailable = status.isFetchedAfterMount && !status.isFetching && !status.isError && status.data?.eligible;
   return <>
     {(submitted.data === true || cancellationAvailable) &&
-      <Button variant="outline" size="sm" disabled={submitting || submitted.data === true} onClick={() => { setError(''); setOpen(true); }}>{submitted.data ? 'Cancellation submitted' : status.data?.requestOnly ? 'Request cancellation' : 'Cancel withdrawal'}</Button>}
+      <Button variant="outline" size="sm" disabled={submitting || submitted.data === true} onClick={() => { setError(''); setOpen(true); }}>{submitted.data ? 'Cancelation submitted' : status.data?.requestOnly ? 'Request cancelation' : 'Cancel withdrawal'}</Button>}
     <Dialog open={open} onOpenChange={value => { if (!submitting) setOpen(value); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Cancel withdrawal #{withdrawalId}</DialogTitle><DialogDescription>
-          Cancellation returns escrow to the original STRATO account. An external payment that has already started cannot be canceled here.
+          Review your withdrawal before canceling.
         </DialogDescription></DialogHeader>
-        <p className="text-sm">{submitted.data ? 'Cancellation submitted. Waiting for the withdrawal status to update.' : status.isFetching ? 'Checking cancellation availability…' : status.data?.message}</p>
+        <p className="text-sm">{submitted.data ? 'Cancelation requested. Track its progress in Recent Transactions.' : status.isFetching ? 'Checking cancelation availability…' : status.data?.message}</p>
         {status.data && !status.data.eligible && Number(status.data.availableAt) * 1000 > Date.now() &&
           <p className="text-sm">Available after {new Date(Number(status.data.availableAt) * 1000).toLocaleString()}</p>}
-        {(error || status.isError) && <p role="alert" className="text-sm text-destructive">{error || 'Cancellation status is unavailable. Please try again.'}</p>}
+        {(error || status.isError) && <p role="alert" className="text-sm text-destructive">{error || 'Cancelation status is unavailable. Please try again.'}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={submitting} onClick={() => setOpen(false)}>Close</Button>
-          <Button disabled={submitting || submitted.data === true || status.isFetching || status.isError || !status.data?.eligible} onClick={submit}>{submitting ? 'Canceling…' : status.data?.requestOnly ? 'Request cancellation' : 'Confirm cancellation'}</Button>
+          <Button disabled={submitting || submitted.data === true || status.isFetching || status.isError || !status.data?.eligible} onClick={submit}>{submitting ? 'Canceling…' : status.data?.requestOnly ? 'Request cancelation' : 'Confirm cancelation'}</Button>
         </div>
       </DialogContent>
     </Dialog>

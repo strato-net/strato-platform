@@ -352,13 +352,11 @@ export const getBridgeTransactions = async (
   const isDeposit = type === "deposit";
   const offset = Math.max(Number(rawParams.offset || 0), 0);
   const limit = rawParams.limit == null ? undefined : Math.max(Number(rawParams.limit), 0);
-  const sourceLimit = isDeposit && limit != null ? String(offset + limit) : undefined;
-  const sourcePageParams = isDeposit
-    ? {
-        order: rawParams.order || "block_timestamp.desc",
-        ...(sourceLimit ? { limit: sourceLimit } : {}),
-      }
-    : {};
+  const sourceLimit = limit != null ? String(offset + limit) : undefined;
+  const sourcePageParams = {
+    order: rawParams.order || "block_timestamp.desc",
+    ...(sourceLimit ? { limit: sourceLimit } : {}),
+  };
   const queryParams = buildQueryParams(stripPagingParams(rawParams), userAddress, [], type);
 
   const dataParams = {
@@ -402,8 +400,8 @@ export const getBridgeTransactions = async (
           }
         })
       : Promise.resolve({ data: [] }),
-    isDeposit && constants.stratoNativeBridge
-      ? cirrus.get(accessToken, `/${StratoNativeBridge}-deposits`, {
+    constants.stratoNativeBridge
+      ? cirrus.get(accessToken, `/${StratoNativeBridge}-${type === "withdrawal" ? "withdrawals" : "deposits"}`, {
           params: {
             select: "count()",
             ...nativeParams,
@@ -424,11 +422,9 @@ export const getBridgeTransactions = async (
   const mergedResults = [...standardRows, ...legacyRows, ...nativeRows];
   const allResults = isDeposit ? applyPagination(mergedResults, rawParams) : mergedResults;
   const nativeCount = Number(nativeCountResponse.data?.[0]?.count || 0);
-  const totalCount = isDeposit
-    ? Number(standardResponse.totalCount || 0) +
+  const totalCount = Number(standardResponse.totalCount || 0) +
       Number(legacyResponse.totalCount || 0) +
-      nativeCount
-    : allResults.length;
+      nativeCount;
 
   if (!allResults.length) {
     return { data: [], totalCount };
@@ -1142,11 +1138,11 @@ export const getWithdrawalCancellation = async (accessToken: string, source: str
   }
   const eligible = cancelable && BigInt(Math.floor(Date.now() / 1000)) >= availableAt;
   return { eligible, requestOnly, availableAt: availableAt.toString(), message: requestOnly
-    ? "Request cancellation of the external mint. Funds remain locked until Safe signers cancel the mint and STRATO governance verifies it. If the mint already executed, the withdrawal will complete instead. A STRATO transaction fee applies."
+    ? "We’ll cancel your withdrawal if it hasn’t completed and return your tokens to STRATO. A transaction fee applies."
     : eligible
-    ? "Cancel this withdrawal and return the escrowed tokens to your STRATO wallet. A STRATO transaction fee applies."
-    : cancelable ? "Cancellation becomes available after the waiting period and any active review expire."
-    : "This withdrawal has entered processing or is already closed. Any required cancellation must complete the bridge review process." };
+    ? "Your tokens will return to your STRATO wallet. A transaction fee applies."
+    : cancelable ? "Cancelation becomes available after the waiting period and any active review expire."
+    : "This withdrawal has entered processing or is already closed. Any required cancelation must complete the bridge review process." };
 };
 
 export const cancelUserWithdrawal = async (accessToken: string, source: string, withdrawalId: string, userAddress: string): Promise<TransactionResponse> => {

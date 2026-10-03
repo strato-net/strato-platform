@@ -1108,9 +1108,9 @@ test('deposit modal renders only required wallet steps and never claims STRATO s
     const submitted = h.stages.at(-1);
     assert.equal(submitted.step, 'submitted');
     const html = render(submitted);
-    assert.ok(html.includes(options.redemption ? 'Redemption Submitted' : 'Deposit Submitted'));
-    assert.ok(html.includes('Awaiting STRATO Settlement'));
-    assert.ok(html.includes('Verification and STRATO settlement are still pending'));
+    assert.ok(html.includes('Deposit Submitted'));
+    assert.ok(html.includes('Processing on STRATO'));
+    assert.ok(html.includes('Your deposit is still being processed on STRATO'));
     assert.ok(!html.includes('Deposit Complete') && !html.includes('Redemption Complete'));
     assert.equal(modalProps.closable, true);
     const error = render({ ...submitted, step: 'error', error: 'Deposit reverted' });
@@ -1118,7 +1118,7 @@ test('deposit modal renders only required wallet steps and never claims STRATO s
     assert.equal(modalProps.closable, true);
   }
   const legacy = render({ step: 'complete', isNative: false, isRedemption: true });
-  assert.ok(legacy.includes('Redemption Submitted'));
+  assert.ok(legacy.includes('Deposit Submitted'));
   assert.ok(!legacy.includes('Sign Permit'));
 });
 

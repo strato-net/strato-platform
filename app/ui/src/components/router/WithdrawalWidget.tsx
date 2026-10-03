@@ -222,7 +222,7 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
     />
     {preview?.manualReview && (
       <p className="text-xs md:text-sm text-yellow-600">
-        This amount requires manual approval. Processing time depends on that approval.
+        This withdrawal requires review and may take longer.
       </p>
     )}
     <Button
@@ -236,9 +236,9 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
       open={!!confirmation}
       onOk={() => void confirm()}
       onCancel={() => setConfirmation(null)}
-      title="Confirm Bridge Transaction"
-      okText="Yes, Bridge Assets"
-      cancelText="Cancel"
+      title="Confirm withdrawal"
+      okText="Confirm withdrawal"
+      cancelText="Back"
       fromNetwork="STRATO"
       toNetwork={confirmation?.networkName || "Not selected"}
       selectedToken={confirmation?.route ?? null}

@@ -5,7 +5,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import MobileBottomNav from "../components/dashboard/MobileBottomNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import WithdrawalWidget from "@/components/router/WithdrawalWidget";
-import WithdrawTransactionDetails from "@/components/dashboard/WithdrawTransactionDetails";
+import RecentTransactions from "@/components/bridge/RecentTransactions";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { Loader2 } from "lucide-react";
 import { formatBalance } from "@/utils/numberUtils";
@@ -16,7 +16,7 @@ import { useFeeBalancesReady, useTradeBridgeCatalog } from "@/hooks/trade/useTra
 const WithdrawalsPage = () => {
   usePageTitle("Bridge Out");
 
-  const { isLoggedIn, loading, isAppAuthenticated, externalWalletAddress } = useUser();
+  const { isLoggedIn, userAddress, loading, isAppAuthenticated, externalWalletAddress } = useUser();
   const { withdrawalSummary, loadingWithdrawalSummary, fetchWithdrawalSummary } =
     useBridgeContext();
   const bridgeCatalog = useTradeBridgeCatalog();
@@ -98,31 +98,14 @@ const WithdrawalsPage = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-sm flex flex-col">
-                <CardHeader>
-                  <CardTitle>Important Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2 text-sm text-muted-foreground list-disc pl-5">
-                    <li>Withdrawals are not instant—funds arrive after bridge verification and confirmation on the destination network, typically within 1–3 business days.</li>
-                    <li>Large amounts may require manual approval, which extends processing time.</li>
-                    <li>Double-check the receiving address—completed withdrawals cannot be reversed.</li>
-                  </ul>
-                </CardContent>
-              </Card>
+
             </div>
           </div>
 
           {/* Withdrawal History */}
           {isLoggedIn && (
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Bridge Out History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <WithdrawTransactionDetails context="withdrawals" />
-              </CardContent>
-            </Card>
+            <RecentTransactions key={userAddress} withdrawalsOnly
+              networkOptions={bridgeCatalog.availableNetworks} routeTokens={bridgeCatalog.bridgeableTokens} />
           )}
         </main>
       </div>

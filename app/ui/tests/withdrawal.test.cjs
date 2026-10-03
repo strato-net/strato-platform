@@ -100,7 +100,7 @@ for (const routeType of ['standard', 'native']) {
       assert.equal(posted.params, params);
       assert.equal(invalidations, 1);
       assert.equal(states.at(-1).status, outcome === 'Success' ? 'success' : outcome === 'Failure' ? 'error' : 'unconfirmed');
-      assert.match(states.at(-1).message, outcome === 'Success' ? /request is confirmed on STRATO.*Track the external transfer/ : outcome === 'Failure' ? /failed|revert/i : /Do not resubmit/);
+      assert.match(states.at(-1).message, outcome === 'Success' ? /withdrawal was requested.*Track its progress in Recent Transactions/ : outcome === 'Failure' ? /failed|revert/i : /Do not submit again/);
     }
   });
 }
@@ -190,7 +190,7 @@ test('withdrawal summary and confirmation render exact preview amounts and the p
     assert.ok(confirm.includes(`${received} ${route.externalSymbol}`), confirm);
     assert.ok(confirm.includes(`${escrowed} ${route.stratoTokenSymbol}`), confirm);
     assert.ok(confirm.includes(h.user.externalEvmWalletAddress));
-    assert.equal(confirm.includes('requires manual approval'), !!confirmationProps.preview.manualReview);
+    assert.equal(confirm.includes('requires review'), !!confirmationProps.preview.manualReview);
     h.user.externalEvmWalletAddress = `0x${address('6')}`;
     h.change('withdrawal-amount', '2');
     assert.equal(renderToStaticMarkup(React.createElement(Confirmation, h.find(p => p.onOk).props)), confirm,

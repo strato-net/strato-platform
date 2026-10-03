@@ -9,6 +9,7 @@ import * as rpcConfig from "../../config/rpc.config";
 import {
   buildDepositActionCatalog,
   getBridgeableTokens,
+  getBridgeTransactions,
   getBridgeTransferContractName,
   getDepositRouterMajor,
   getNetworkConfigs,
@@ -737,4 +738,23 @@ test("user cancellation reads stored ownership and policy, and fails closed on m
   assert.equal(pending.requestOnly, true);
   state = "10";
   assert.equal((await getWithdrawalCancellation("token", "native", "17", user)).eligible, false);
+});
+
+ test("recent withdrawals bound and order each source query before merging", async (t) => {
+  const previous = Object.getOwnPropertyDescriptor(constants, "stratoNativeBridge")!;
+  Object.defineProperty(constants, "stratoNativeBridge", { configurable: true, get: () => "1".repeat(40) });
+  t.after(() => Object.defineProperty(constants, "stratoNativeBridge", previous));
+  let dataQueries = 0;
+  t.mock.method(cirrus, "get", async (_token: string, _table: string, options: any) => {
+    const params = options.params;
+    if (params.select.includes("count()")) return { data: [{ count: 0 }] };
+    dataQueries++;
+    assert.equal(params.limit, "5");
+    assert.equal(params.order, "block_timestamp.desc");
+    assert.equal(params["value->>stratoSender"], `eq.${"2".repeat(40)}`);
+    return { data: [] };
+  });
+  const result = await getBridgeTransactions("test", "withdrawal", "2".repeat(40), { limit: "5", offset: "0", order: "block_timestamp.desc" });
+  assert.ok(dataQueries >= 2);
+  assert.deepEqual(result, { data: [], totalCount: 0 });
 });

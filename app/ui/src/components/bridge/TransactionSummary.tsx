@@ -5,8 +5,6 @@ import { BridgeToken } from "@strato/shared-types";
 import type { WithdrawalPreview } from "@/lib/bridge/types";
 import { AlertTriangle } from "lucide-react";
 
-const FEE_VOUCHER = parseFloat(BRIDGE_OUT_FEE) * 100;
-
 interface TransactionSummaryProps {
   selectedToken: BridgeToken | null;
   amount: string;
@@ -52,9 +50,9 @@ const TransactionSummary: React.FC<TransactionSummaryProps> = ({
         </span>
       </div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:gap-2">
-        <span>Transaction Fee</span>
+        <span>Fee</span>
         <span className="font-medium text-foreground">
-          {BRIDGE_OUT_FEE} USDST ({FEE_VOUCHER} voucher)
+          {BRIDGE_OUT_FEE} USDST · vouchers used first
         </span>
       </div>
       {selectedToken?.maxPerWithdrawal &&

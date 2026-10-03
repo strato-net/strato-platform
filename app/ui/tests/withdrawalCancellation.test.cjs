@@ -32,7 +32,7 @@ function harness({ eligible = true, requestOnly = false, fail = false, fetching 
   const button = label => nodes(render()).find(n => n.type === 'Button' && n.props.children === label);
   const action = () => nodes(render()).find(n => n.type === 'Button');
   const open = () => action().props.onClick();
-  const submit = () => nodes(render()).filter(n => n.type === 'Button' && n.props.children === (requestOnly ? 'Request cancellation' : 'Confirm cancellation')).at(-1);
+  const submit = () => nodes(render()).filter(n => n.type === 'Button' && n.props.children === (requestOnly ? 'Request cancelation' : 'Confirm cancelation')).at(-1);
   return { calls, render, nodes, open, submit, button, remount: () => { state.length = 0; }, setFetching: value => { fetching = value; } };
 }
 

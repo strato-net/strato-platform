@@ -1,3 +1,4 @@
+import WithdrawalCancellation from "./WithdrawalCancellation";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -15,6 +16,9 @@ import type { BridgeToken, BridgeTransaction } from '@strato/shared-types';
 import type { NetworkSummary } from '@/lib/bridge/types';
 
 type RecentTx = {
+  withdrawalId?: string;
+  sender?: string;
+  externalTxHash?: string;
   refundTxHash?: string;
   _type: 'deposit' | 'withdrawal' | 'metal' | 'route';
   block_timestamp?: string;
@@ -56,11 +60,11 @@ const formatTimeAgo = (time?: string) => {
   return `${days} day${days > 1 ? "s" : ""} ago`;
 };
 
-const TxRow = ({ icon, iconBg, label, status, timeLabel, fromAmount, fromSymbol, toAmount, toSymbol, refundUrl }: {
+const TxRow = ({ icon, iconBg, label, status, timeLabel, fromAmount, fromSymbol, toAmount, toSymbol, refundUrl, transactionUrl, action }: {
   icon: React.ReactNode; iconBg: string; label: string;
   status: { text: string; color: string; description?: string };
   timeLabel: string; fromAmount: string; fromSymbol: string;
-  toAmount: string; toSymbol: string; refundUrl?: string;
+  toAmount: string; toSymbol: string; refundUrl?: string; transactionUrl?: string; action?: React.ReactNode;
 }) => (
   <div className="flex items-center gap-3 px-4 py-4">
     <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${iconBg}`}>{icon}</div>
@@ -70,6 +74,8 @@ const TxRow = ({ icon, iconBg, label, status, timeLabel, fromAmount, fromSymbol,
         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${status.color}`}>{status.text}</span>
       </div>
       <p className="text-xs text-muted-foreground mt-0.5">{timeLabel}</p>
+      {transactionUrl && <a className="text-xs text-primary" href={transactionUrl} target="_blank" rel="noopener noreferrer">View transaction ↗</a>}
+      {action}
       {refundUrl && <a className="text-xs text-primary" href={refundUrl} target="_blank" rel="noopener noreferrer">View refund ↗</a>}
       {status.description && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{status.description}</p>}
     </div>
@@ -101,6 +107,9 @@ const mapDeposit = (tx: Record<string, unknown>, type: 'api' | 'pending'): Recen
 const mapWithdrawal = (tx: Record<string, unknown>): RecentTx => {
   const info = tx.WithdrawalInfo as Record<string, unknown> | undefined;
   return {
+    withdrawalId: String(tx.withdrawalId ?? ''),
+    sender: info?.stratoSender as string,
+    externalTxHash: info?.externalTxHash as string,
     _type: 'withdrawal', bridgeSource: tx.bridgeSource as RecentTx['bridgeSource'], block_timestamp: tx.block_timestamp as string,
     externalChainId: (info?.externalChainId ?? tx.externalChainId) as string,
     externalSymbol: tx.externalSymbol as string, stratoTokenSymbol: tx.stratoTokenSymbol as string,
@@ -135,6 +144,7 @@ function useMetalTransactions(limit: number, isLoggedIn: boolean) {
 interface RecentTransactionsProps {
   fundingMode?: "bridge" | "metals";
   metalRefreshKey?: number;
+  withdrawalsOnly?: boolean;
   includeRoutes?: boolean;
   routeRefreshKey?: number;
   networkOptions?: NetworkSummary[];
@@ -145,6 +155,7 @@ const RecentTransactions = ({
   fundingMode = "bridge",
   metalRefreshKey = 0,
   includeRoutes = false,
+  withdrawalsOnly = false,
   routeRefreshKey = 0,
   networkOptions,
   routeTokens,
@@ -154,7 +165,7 @@ const RecentTransactions = ({
     fetchDepositTransactions, fetchWithdrawTransactions,
     availableNetworks: bridgeNetworks, depositRefreshKey, withdrawalRefreshKey,
     bridgeableTokens: sharedBridgeTokens,
-    pendingDepositsKey,
+    pendingDepositsKey, triggerWithdrawalRefresh,
   } = useBridgeContext();
   const availableNetworks = networkOptions ?? bridgeNetworks;
   const bridgeableTokens = routeTokens ?? sharedBridgeTokens;
@@ -171,7 +182,7 @@ const RecentTransactions = ({
 
   const chainNameMap = new Map(availableNetworks.map(n => [String(n.chainId), n.chainName]));
   const isMobile = useIsMobile();
-  const recentLimit = isMobile ? 6 : 8;
+  const recentLimit = withdrawalsOnly ? 5 : isMobile ? 6 : 8;
 
   const [bridgeError, setBridgeError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -184,7 +195,7 @@ const RecentTransactions = ({
 
   useEffect(() => {
     if (fundingMode !== "bridge") return;
-    if (!isLoggedIn || (includeRoutes && !userAddress)) { setBridgeTxs([]); bridgeLoadedRef.current = true; return; }
+    if (!isLoggedIn || ((includeRoutes || withdrawalsOnly) && !userAddress)) { setBridgeTxs([]); bridgeLoadedRef.current = true; return; }
     if (!bridgeLoadedRef.current) setBridgeLoading(true);
     let disposed = false, fetching = false;
     const load = () => {
@@ -192,7 +203,7 @@ const RecentTransactions = ({
       fetching = true;
       const params = { limit: String(recentLimit), offset: "0", order: "block_timestamp.desc" };
       Promise.all([
-        fetchDepositTransactions(params, "deposits"),
+        withdrawalsOnly ? Promise.resolve({ data: [] }) : fetchDepositTransactions(params, "deposits"),
         includeRoutes
           ? Promise.resolve({ data: [] })
           : fetchWithdrawTransactions(params, "deposits"),
@@ -206,7 +217,7 @@ const RecentTransactions = ({
         if (disposed) return;
         const apiDeposits = (depositResult.data || []) as unknown as Record<string, unknown>[];
         let remaining = [];
-        try { ({ remaining } = mergePendingDeposits(apiDeposits, pendingDepositsKey)); }
+        try { if (!withdrawalsOnly) ({ remaining } = mergePendingDeposits(apiDeposits, pendingDepositsKey)); }
         catch { /* Indexed history remains available when local storage is unavailable. */ }
         if (includeRoutes) remaining = remaining.filter(p => normalizeAddress(p.DepositInfo?.stratoRecipient) === normalizeAddress(userAddress));
         const routeEvents = routeResult.events || [];
@@ -247,20 +258,20 @@ const RecentTransactions = ({
     };
     load();
     const refresh = () => { if (document.visibilityState === "visible") load(); };
-    const timer = includeRoutes ? window.setInterval(refresh, RECENT_TRANSACTIONS_REFRESH_MS) : undefined;
-    if (includeRoutes) {
+    const timer = (includeRoutes || withdrawalsOnly) ? window.setInterval(refresh, RECENT_TRANSACTIONS_REFRESH_MS) : undefined;
+    if (includeRoutes || withdrawalsOnly) {
       window.addEventListener("focus", refresh);
       document.addEventListener("visibilitychange", refresh);
     }
     return () => {
       disposed = true;
       if (timer !== undefined) window.clearInterval(timer);
-      if (includeRoutes) {
+      if (includeRoutes || withdrawalsOnly) {
         window.removeEventListener("focus", refresh);
         document.removeEventListener("visibilitychange", refresh);
       }
     };
-  }, [retryKey, isLoggedIn, userAddress, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, routeRefreshKey, pendingDepositsKey]);
+  }, [retryKey, isLoggedIn, userAddress, fundingMode, fetchDepositTransactions, fetchWithdrawTransactions, depositRefreshKey, withdrawalRefreshKey, recentLimit, includeRoutes, withdrawalsOnly, routeRefreshKey, pendingDepositsKey]);
 
   if (fundingMode === "metals" && isLoggedIn && lastMetalRefreshKey !== metalRefreshKey) {
     setLastMetalRefreshKey(metalRefreshKey);
@@ -302,6 +313,8 @@ const RecentTransactions = ({
         const status: ReturnType<typeof getDepositStatusLabel> = {
           ...(isW ? getBridgeStatusLabel(tx.status, tx.bridgeSource) : getDepositStatusLabel(tx.status, tx.bridgeSource)),
           ...(isW && tx.bridgeSource !== "legacy" && { text: WITHDRAWAL_STATUS_LABELS[Number(tx.status)] || "Unknown" }),
+          ...(withdrawalsOnly && tx.status === String(ExternalBridgeStatus.CANCELLATION_PENDING) && { description: "We’re checking whether your withdrawal can be canceled. No action is needed." }),
+          ...(withdrawalsOnly && tx.bridgeSource === "external" && tx.status === String(ExternalBridgeStatus.REFUNDED) && { description: "Your tokens were returned to your STRATO wallet." }),
         };
         const hasOutcome = !isW && tx.depositOutcome && tx.depositOutcome !== "bridge" && tx.finalTokenSymbol;
         const rebasedExt = computeRebasedAmount(tx.amount || "0", tx.stratoTokenSymbol);
@@ -309,15 +322,19 @@ const RecentTransactions = ({
           ? formatBalance(tx.externalAmount, undefined, tx.externalDecimals, 2, 4) : rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
 
         return <TxRow key={key}
+          transactionUrl={withdrawalsOnly && tx.externalTxHash ? getExplorerUrl(String(tx.externalChainId), tx.externalTxHash) : undefined}
+          action={withdrawalsOnly && ['external', 'native'].includes(tx.bridgeSource || '') && tx.withdrawalId &&
+            normalizeAddress(tx.sender) === normalizeAddress(userAddress) && ['1', '2'].includes(tx.status || '')
+            ? <WithdrawalCancellation source={tx.bridgeSource as 'external' | 'native'} withdrawalId={tx.withdrawalId} onCanceled={triggerWithdrawalRefresh} /> : undefined}
           refundUrl={tx.refundTxHash ? getExplorerUrl(String(tx.externalChainId), tx.refundTxHash) : undefined}
           icon={isW ? <ArrowUp className="w-4 h-4 text-amber-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
           iconBg={isW ? "bg-amber-500/15" : "bg-emerald-500/15"}
-          label={includeRoutes
+          label={includeRoutes || withdrawalsOnly
             ? isW ? "Bridge Out" : isFallback ? "Bridge In (Fallback)" : isRouted ? "Bridge & Trade" : "Bridge In"
             : isW ? "Withdrawal" : isFallback ? "Deposit (Fallback)" : isRouted ? "Deposit & Trade" : "Deposit"} status={status}
           timeLabel={`${formatTimeAgo(tx.block_timestamp)} · ${chainNameMap.get(String(tx.externalChainId)) || "Unknown Chain"}`}
           fromAmount={isW ? amt : externalAmt} fromSymbol={(isW ? tx.stratoTokenSymbol : tx.externalSymbol) || "-"}
-          toAmount={status.description ? "0" : hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, tx.finalDecimals ?? 18, 2, 4) : (isW ? externalAmt : amt)}
+          toAmount={!isW && status.description ? "0" : hasOutcome && tx.finalAmount ? formatBalance(tx.finalAmount, undefined, tx.finalDecimals ?? 18, 2, 4) : (isW ? externalAmt : amt)}
           toSymbol={(hasOutcome ? tx.finalTokenSymbol : (isW ? tx.externalSymbol : tx.stratoTokenSymbol)) || "-"} />;
       })}
     </div>
@@ -358,9 +375,9 @@ const RecentTransactions = ({
           <CardTitle className="text-base">
             {includeRoutes ? "Your activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
           </CardTitle>
-          <Link to={viewAllLink} className={linkClass}>
+          {!withdrawalsOnly && <Link to={viewAllLink} className={linkClass}>
             View All {"\u2192"}
-          </Link>
+          </Link>}
         </div>
 
         {!isLoggedIn
