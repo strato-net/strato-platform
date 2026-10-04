@@ -235,3 +235,14 @@ for (const change of ['account', 'recipient', 'session', 'fee balance', 'fee bal
     assert.equal(h.toasts[0].title, 'Review withdrawal again');
   });
 }
+
+test('withdrawal explorer links reject pending placeholders and malformed hashes', () => {
+  for (const hash of [undefined, '', '0x', '0'.repeat(64), '0x' + '0'.repeat(64), 'pending', '0x1234', 'g'.repeat(64)]) {
+    assert.equal(utils.getWithdrawalExplorerUrl('11155111', hash), undefined);
+  }
+  const hash = 'ab'.repeat(32);
+  for (const value of [hash, '0x' + hash, '0X' + hash]) {
+    assert.equal(utils.getWithdrawalExplorerUrl('11155111', value), `https://sepolia.etherscan.io/tx/0x${hash}`);
+  }
+  assert.equal(utils.getWithdrawalExplorerUrl('1', hash), `https://etherscan.io/tx/0x${hash}`);
+});

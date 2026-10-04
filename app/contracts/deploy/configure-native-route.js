@@ -239,7 +239,16 @@ function buildPlan(args) {
 }
 
 async function main() {
-  const args = parseArgs();
+  let args = parseArgs();
+  if (args.config) {
+    const routes = JSON.parse(require('fs').readFileSync(args.config, 'utf8'));
+    const index = Number(args.route);
+    if (!Array.isArray(routes) || args.route == null || !Number.isSafeInteger(index) || index < 0 || !routes[index]) {
+      throw new Error('--config requires --route <zero-based index> from native-routes.json');
+    }
+    args = { ...routes[index], ...args };
+    if (JSON.stringify(args).includes('REVIEW_REQUIRED')) throw new Error('Resolve the native route inputs before generating votes');
+  }
   const plan = buildPlan(args);
   console.log(JSON.stringify(plan, null, 2));
   if (!args.execute) {

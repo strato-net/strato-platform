@@ -23,12 +23,16 @@ export const buildBridgeReviewQueue = (
       ...(recovery ? { recoveryStatus: status === 8 ? "refund_pending" as const : status === 0 ? "reopened" as const : "rejected" as const } : {}),
       chainId: String(row.key), reference: String(row.key3), token: v.stratoToken,
       amount: String(v.stratoTokenAmount), account: v.stratoRecipient,
+      externalBridge: String(row.key2), externalTxHash: nonzeroHash(v.externalTxHash),
+      externalAccount: v.externalSender, externalToken: v.externalToken, externalAmount: String(v.externalTokenAmount),
       refundRecipient: v.externalSender, refundToken: v.externalToken, refundAmount: String(v.externalTokenAmount),
-      reason: status === 8 ? "Return of funds authorized. The bridge verifies the original custody evidence and retries the refund automatically; settlement is permanently disabled."
+      scenario: status === 8 ? "Deposit refund in progress" : status === 0 ? "Deposit delivery retry"
+        : recovery ? "Deposit recovery decision" : "Deposit evidence review",
+      reason: status === 8 ? "The bridge is returning the original external asset."
         : recovery ? status === 0
-        ? "Governance reopened this deposit. The bridge retries verification and processing automatically. Funds have not yet been delivered or returned."
-        : "Rejected deposit awaiting recovery. External funds have not been returned. Keep this item open until delivery or a verified refund completes."
-        : "Review the external deposit evidence. Approve received funds, reject and refund received funds, or reject without refund only after verifying no funds were received.",
+        ? "Delivery was reopened and is being retried."
+        : "Choose verified delivery, an external refund, or rejection when no funds were received."
+        : "Verify whether the external deposit was received and choose its disposition.",
       actions: recovery ? status === 7 ? ["approve", "refund", "reject"] : [] : ["approve", "refund", "reject"],
     });
   }
@@ -47,8 +51,10 @@ export const buildBridgeReviewQueue = (
     items.push({ id: `eab:withdrawal:${row.key}`, source: "eab", kind: pending ? "withdrawal_review" : "withdrawal_refund",
       chainId: String(v.externalChainId), reference: String(row.key), token: v.stratoToken,
       amount: String(v.stratoTokenAmount), account: v.stratoSender,
-      reason: pending ? "Safe approval is required before this withdrawal can proceed."
-        : "Authorization expired. Refund requires verifier confirmation that no external payment occurred; expiry alone is not proof of non-payment.",
+      externalAccount: v.externalRecipient, externalToken: v.externalToken, externalAmount: String(v.externalTokenAmount),
+      scenario: pending ? "Withdrawal Safe approval" : "Expired withdrawal refund",
+      reason: pending ? "The external payment requires Safe approval."
+        : "Authorization expired; verifier proof of no external payment is still required.",
       ...(proposal ? { safeProposalHash: proposal } : {}),
       actions: pending ? [] : ["refund"],
     });
@@ -66,11 +72,15 @@ export const buildBridgeReviewQueue = (
         ...(recovery ? { recoveryStatus: refunding ? "refund_pending" as const : "rejected" as const } : {}),
         chainId: String(v.externalChainId || row.key), reference: String(row.key2 || row.key),
         token: v.stratoToken, amount: String(v.stratoTokenAmount), account: v.stratoRecipient,
+        externalBridge: v.externalBridge, externalTxHash: nonzeroHash(v.externalTxHash),
+        externalAccount: v.externalSender, externalToken: v.representationToken, externalAmount: String(v.stratoTokenAmount),
         ...(source === "native" ? { refundRecipient: v.externalSender, refundToken: v.representationToken, refundAmount: String(v.stratoTokenAmount), refundBridge: v.externalBridge, refundRedemptionId: String(v.externalRedemptionId) } : {}),
-        reason: evidence ? "The operator reports a confirmed external refund. Independently verify the transaction, original asset, sender and amount before voting to mark this deposit Refunded. STRATO custody remains locked."
-          : refunding ? "Return of funds authorized. The bridge will restore the original external representations after verifying the burn; STRATO custody remains locked."
-          : recovery ? "Rejected redemption awaiting recovery. Choose delivery on STRATO or restoration of the original external representations."
-          : "Operator evidence review is required. Do not override failed custody verification or treat cancellation as an external refund.",
+        scenario: source === "legacy" ? "Legacy deposit review" : evidence ? "Redemption refund confirmation"
+          : refunding ? "Redemption refund in progress" : recovery ? "Redemption recovery decision" : "Redemption evidence review",
+        reason: evidence ? "Verify the confirmed external representation refund."
+          : refunding ? "The bridge is restoring the external representation."
+          : recovery ? "Choose verified STRATO delivery, an external representation refund, or rejection when no burn occurred."
+          : "Verify whether the external representation was burned and choose its disposition.",
         actions: source === "native" ? refunding ? evidence ? ["confirm_refund"] : [] : recovery ? ["approve", "refund", "reject"] : ["refund", "reject"] : [],
         ...(evidence ? { refundEvidenceHash: evidence } : {}),
         ...(!evidence && refunding && nonzeroHash(v.refundProposalHash) ? { safeProposalHash: nonzeroHash(v.refundProposalHash) } : {}),
@@ -78,14 +88,16 @@ export const buildBridgeReviewQueue = (
     }
     for (const row of withdrawals) {
       const v = row.value;
-      if (source === "native" && String(v.bridgeStatus) === "2" && (v.useInstantPath === true || String(v.useInstantPath) === "true")) continue;
       if (source === "native" && String(v.bridgeStatus) === String(ExternalBridgeStatus.CANCELLATION_PENDING)) {
         const evidence = /^(0x)?[a-f0-9]{64}$/i.test(v.cancellationTxHash || "") ? nonzeroHash(v.cancellationTxHash) : undefined;
         items.push({ id: `native:withdrawal:${row.key}`, source, kind: "withdrawal_cancellation",
           chainId: String(v.externalChainId), reference: String(row.key), token: v.stratoToken,
           amount: String(v.stratoTokenAmount), account: v.stratoSender, refundBridge: v.externalBridge,
-          reason: evidence ? "Verify the confirmed external mint cancellation before returning STRATO escrow."
-            : "Cancellation requested. Escrow remains locked until the external mint identity is permanently canceled.",
+          externalBridge: v.externalBridge,
+          externalAccount: v.externalRecipient, externalToken: v.representationToken, externalAmount: String(v.externalTokenAmount),
+          scenario: evidence ? "Withdrawal cancellation refund" : "Withdrawal mint cancellation",
+          reason: evidence ? "The external mint cancellation is ready for independent verification."
+            : "The external mint identity must be canceled before STRATO escrow can be returned.",
           ...(evidence ? { refundEvidenceHash: evidence } : {}),
           ...(nonzeroHash(v.cancellationProposalHash) ? { safeProposalHash: nonzeroHash(v.cancellationProposalHash) } : {}),
           actions: evidence ? ["confirm_cancellation"] : [],
@@ -93,10 +105,16 @@ export const buildBridgeReviewQueue = (
         continue;
       }
       const proposal = nonzeroHash(source === "native" ? v.nativeMintProposalHash : v.custodyTxHash);
+      const instant = source === "native" && (v.useInstantPath === true || String(v.useInstantPath) === "true");
       items.push({ id: `${source}:withdrawal:${row.key}`, source, kind: "withdrawal_review",
         chainId: String(v.externalChainId), reference: String(row.key), token: v.stratoToken,
         amount: String(v.stratoTokenAmount), account: v.stratoSender,
-        reason: proposal ? "Review and execute the Safe proposal to proceed." : "The bridge operator is preparing the Safe proposal.",
+        externalBridge: v.externalBridge, externalTxHash: nonzeroHash(v.externalTxHash),
+        externalAccount: v.externalRecipient, externalToken: v.representationToken, externalAmount: String(v.externalTokenAmount),
+        scenario: source === "legacy" ? "Legacy withdrawal review" : instant ? "Blocked instant withdrawal" : "Manual withdrawal Safe approval",
+        reason: instant ? "Instant verifier approval is unavailable; governance cancellation is available."
+          : proposal ? "The external mint proposal is ready in Safe." : "The bridge service is preparing the external mint proposal.",
+        ...(source === "native" ? { useInstantPath: instant } : {}),
         ...(proposal ? { safeProposalHash: proposal } : {}), actions: source === "native" ? ["cancel_withdrawal"] : [],
       });
     }

@@ -130,7 +130,6 @@ export default function WithdrawalWidget({ catalog, active, feeBalancesReady, on
   return <div className="space-y-6">
     <RouteProgressDialog progress={execute.progress} onClose={execute.closeProgress} operation="Withdrawal" />
     <div className="space-y-2 text-center">
-      <h3 className="text-lg font-semibold text-foreground">{modeLabels.title}</h3>
       <p className="text-sm text-muted-foreground">{modeLabels.description}</p>
     </div>
     <div className="w-full">

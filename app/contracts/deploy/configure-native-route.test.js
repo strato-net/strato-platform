@@ -62,3 +62,22 @@ test("parses execute without consuming the next option", () => {
     { execute: true, "bridge-address": "1".repeat(40) },
   );
 });
+
+test("prepared route file remains dry-run and does not rewrite shared token settings", () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { spawnSync } = require('node:child_process');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'native-route-test-'));
+  try {
+    const file = path.join(dir, 'routes.json');
+    fs.writeFileSync(file, JSON.stringify([{ ...baseArgs, enabled:true, 'auto-route-enabled':true,
+      sharedTokenSettings:{ depositsDisabled:false, withdrawalsDisabled:false, maxOutstandingWithdrawal:'99' } }]));
+    const result = spawnSync(process.execPath, [path.join(__dirname, 'configure-native-route.js'), '--config', file, '--route', '0', '--enabled', 'false', '--auto-route-enabled', 'false'], { encoding:'utf8' });
+    assert.equal(result.status,0,result.stderr);
+    assert.match(result.stdout,/Dry run only/);
+    assert.doesNotMatch(result.stdout,/setTokenBridgeConfig/);
+    const invalid = spawnSync(process.execPath, [path.join(__dirname, 'configure-native-route.js'), '--config', file, '--route', '9'], { encoding:'utf8' });
+    assert.notEqual(invalid.status,0);
+  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+});

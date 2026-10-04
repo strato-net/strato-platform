@@ -17,6 +17,15 @@ const reviewActionLabel = (item: BridgeReviewItem, action: BridgeReviewGovernanc
   action === 'refund' && item.kind !== 'withdrawal_refund' ? 'Reject and refund / vote'
     : action === 'approve' && item.kind === 'deposit_recovery' ? 'Complete delivery / vote' : actionLabels[action];
 
+const DetailRow = ({ label, value, shorten = false, copy = false }: { label: string; value: string; shorten?: boolean; copy?: boolean }) =>
+  <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
+    <span className="shrink-0 text-muted-foreground">{label}</span>
+    <span className="flex min-w-0 items-center gap-2 text-right">
+      <span className="break-all">{shorten ? truncateAddress(value) : value}</span>
+      {copy && <CopyButton address={value} />}
+    </span>
+  </div>;
+
 const BridgeReviewQueue = () => {
   const { castVoteOnIssue, userAddress } = useUser();
   const [submittedVotes, setSubmittedVotes] = useState<Record<string, number>>({});
@@ -81,29 +90,39 @@ const BridgeReviewQueue = () => {
       {reviews.isError && <p role="alert" className="text-sm text-destructive">The review queue is unavailable. Check the STRATO connection; this does not mean there are no pending reviews.</p>}
       {reviews.isLoading ? <div role="status" className="flex min-h-24 items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Loading review items…</div> : !reviews.isError && !reviews.data?.length ? <p className="text-sm text-muted-foreground">No transactions currently require review.</p> : null}
       {reviews.data?.map(item => {
+        const deposit = item.kind === 'deposit_review' || item.kind === 'deposit_recovery';
         const unavailable = reviews.isError || item.approvalStatus === 'unavailable' ||
           (item.kind === 'withdrawal_refund' && !['pending', 'ready'].includes(item.refundStatus || '')) ||
           (item.actions.length > 0 && (item.governanceStatus !== 'available' || item.actions.some(action => !item.governance?.[action])));
         return <div key={item.id} className="border rounded-lg p-4 space-y-3">
         <div className="flex flex-wrap justify-between gap-2">
-          <h3 className="font-medium">{item.kind === 'withdrawal_cancellation' ? 'Withdrawal cancellation' : item.kind === 'withdrawal_refund' ? 'Withdrawal refund review' : item.kind === 'deposit_recovery' ? 'Deposit recovery pending' : item.kind === 'deposit_review' ? 'Deposit review' : 'Withdrawal pending review'} #{item.reference}</h3>
+          <h3 className="font-medium">{item.scenario || (item.kind.startsWith('deposit') ? 'Deposit review' : 'Withdrawal review')} #{item.reference}</h3>
           <span className="text-sm text-muted-foreground">{item.source === 'eab' ? 'EAB' : item.source === 'native' ? 'Native bridge' : 'Legacy bridge'} · {getChainName(Number(item.chainId))} ({item.chainId})</span>
         </div>
         {item.approvalStatus === 'approved' && <p role="status" className="text-sm font-medium text-green-700 dark:text-green-400">Approved · awaiting settlement</p>}
         {item.recoveryStatus === 'refund_pending' && <p role="status" className="text-sm font-medium">{item.refundEvidenceHash ? 'Refund confirmation requires governance approval' : `Refund processing${item.safeProposalHash ? ' · Safe approval required' : ''}`}</p>}
         {item.approvalStatus === 'unavailable' && <p role="alert" className="text-sm text-destructive">Deposit approval status is unavailable.</p>}
         {item.actions.some(action => Object.prototype.hasOwnProperty.call(actionLabels, action)) && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
-        <p className="text-sm">{item.kind === 'withdrawal_refund' ? 'Withdrawal authorization expired. The refund is not complete.' : item.reason}</p>
         <p role={unavailable ? 'alert' : 'status'} className={`text-sm font-medium${unavailable ? ' text-destructive' : ''}`}>Next step: {reviews.isError ? 'Admin — refresh the queue. Displayed transaction and voting status may be stale.' : getBridgeReviewNextStep(item, item.actions.some(action => isVotePending(item, action)))}</p>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-2">Account: {truncateAddress(item.account)}<CopyButton address={item.account} /></span>
-          <span className="inline-flex items-center gap-2">Token: {truncateAddress(item.token)}<CopyButton address={item.token} /></span>
-          <span>Amount (raw units): {item.amount}</span>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{deposit ? 'External evidence' : 'External destination'}</p>
+            {item.externalTxHash && <DetailRow label="Source transaction" value={item.externalTxHash} shorten copy />}
+            {item.refundEvidenceHash && <DetailRow label={item.kind === 'withdrawal_cancellation' ? 'Cancellation transaction' : 'Refund transaction'} value={item.refundEvidenceHash} shorten copy />}
+            {item.safeProposalHash && <DetailRow label="Safe proposal" value={item.safeProposalHash} shorten copy />}
+            {item.externalBridge && <DetailRow label="Bridge" value={item.externalBridge} shorten copy />}
+            {item.externalAccount && <DetailRow label={deposit ? 'Sender' : 'Recipient'} value={item.externalAccount} shorten copy />}
+            {item.externalToken && <DetailRow label="Token" value={item.externalToken} shorten copy />}
+            {item.externalAmount && <DetailRow label="Amount (raw)" value={item.externalAmount} />}
+          </div>
+          <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{deposit ? 'STRATO delivery' : 'STRATO escrow'}</p>
+            <DetailRow label={deposit ? 'Recipient' : 'Sender'} value={item.account} shorten copy />
+            <DetailRow label="Token" value={item.token} shorten copy />
+            <DetailRow label="Amount (raw)" value={item.amount} />
+          </div>
         </div>
-        {item.refundEvidenceHash && <p className="flex flex-wrap items-center gap-2 text-sm">External transaction to verify: <span className="break-all">{item.refundEvidenceHash}</span><CopyButton address={item.refundEvidenceHash} /></p>}
         <div className="flex flex-wrap gap-2">
-          {item.kind === 'withdrawal_review' && <span className="text-sm text-muted-foreground">Approval handled in Safe</span>}
-          {item.safeProposalHash && <span className="inline-flex items-center gap-2 text-sm">Proposal: {truncateAddress(item.safeProposalHash)}<CopyButton address={item.safeProposalHash} /></span>}
           {item.actions.filter((action): action is BridgeReviewGovernanceAction => Object.prototype.hasOwnProperty.call(actionLabels, action) && (action !== 'approve' || item.approvalStatus !== 'approved')).map(action => {
             const progress = item.governance?.[action];
             const quorum = progress && progress.votesCast >= progress.votesRequired;
@@ -116,7 +135,7 @@ const BridgeReviewQueue = () => {
               : quorum ? 'Quorum reached; STRATO admin must execute'
               : progress.hasVoted ? 'Awaiting votes from other STRATO admins' : 'STRATO admins: remaining votes required';
             return <div key={action} className="space-y-1">
-              <Button variant={action === 'reject' ? 'destructive' : 'outline'} size="sm" disabled={!!disabled} onClick={() => { setError(''); setNoFundsConfirmed(false); setSelected({ item, action }); }}>
+              <Button variant="outline" size="sm" disabled={!!disabled} onClick={() => { setError(''); setNoFundsConfirmed(false); setSelected({ item, action }); }}>
                 {pending ? quorum ? 'Execution submitted' : 'Vote submitted' : quorum ? `Execute ${action === 'cancel_withdrawal' ? 'cancellation request' : action === 'confirm_cancellation' ? 'verified cancellation refund' : action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : action === 'confirm_refund' ? 'refund confirmation' : item.kind === 'withdrawal_refund' ? 'refund' : 'return decision'}` : progress?.hasVoted ? 'You voted' : reviewActionLabel(item, action)}
               </Button>
               {progress && <p className="text-xs text-muted-foreground">{action === 'cancel_withdrawal' ? 'Cancellation' : action === 'confirm_cancellation' ? 'Cancellation refund' : action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : action === 'confirm_refund' ? 'Refund confirmation' : 'Refund'}: {progress.votesCast} of {progress.votesRequired} votes{progress.hasVoted ? ' · You voted' : ''} · {nextVoteStep}</p>}

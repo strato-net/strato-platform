@@ -828,7 +828,7 @@ export const getBridgeReviewRecords = async () => {
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     read(EXTERNAL_ASSET_BRIDGE_URL, externalAssetBridgeAddress, "withdrawals", { "value->>status": "in.(2,3)" }),
     read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
-    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { or: `(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
+    read(NATIVE_BRIDGE_URL, nativeBridgeAddress, "withdrawals", { "value->>bridgeStatus": `in.(2,${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
   ]);
   const [reviews, authorizations, refundProposals, refundEvidence] = await Promise.all([getRowsByIds(`/${EXTERNAL_ASSET_BRIDGE_URL}-withdrawalManualReviews`,
     withdrawals.filter(row => String(row.value.status) === "2").map(row => String(row.key)),

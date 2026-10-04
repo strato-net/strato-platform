@@ -22,14 +22,12 @@ const readReviewRows = async <T = BridgeReviewRow>(accessToken: string, contract
 };
 
 export const getAdminBridgeReviews = async (accessToken: string, userAddress?: string): Promise<BridgeReviewItem[]> => {
-  const { ExternalAssetBridge, externalAssetBridge, StratoNativeBridge, stratoNativeBridge, MercataBridge, mercataBridge } = constants;
-  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals] = await Promise.all([
+  const { ExternalAssetBridge, externalAssetBridge, StratoNativeBridge, stratoNativeBridge } = constants;
+  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals] = await Promise.all([
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawals", { "value->>status": "in.(2,3)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
-    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { or: `(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
-    readReviewRows(accessToken, MercataBridge, mercataBridge, "deposits", { select: "key,key2,value", order: "key.asc,key2.asc", "value->>bridgeStatus": "eq.2" }),
-    readReviewRows(accessToken, MercataBridge, mercataBridge, "withdrawals", { "value->>bridgeStatus": "eq.2" }),
+    readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { "value->>bridgeStatus": `in.(2,${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
   ]);
   const ids = withdrawals.filter(row => String(row.value.status) === "2").map(row => row.key);
   const reviews: BridgeReviewRow[] = [];
@@ -49,7 +47,7 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
     const hashes = new Map(proposals.map(row => [String(row.key), row.value]));
     for (const row of nativeDeposits) if (hashes.has(String(row.key))) row.value.refundProposalHash = hashes.get(String(row.key));
   }
-  const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits, legacyWithdrawals });
+  const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits: [], legacyWithdrawals: [] });
   const chains = new Map((await readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "chains", {})).map(row => [String(row.key), row.value]));
   for (const item of items.filter(item => item.source === "eab" && item.actions.includes("refund") && item.kind !== "withdrawal_refund")) {
     const vault = chains.get(item.chainId)?.vault;

@@ -51,9 +51,7 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
         rows = rows.filter((row) => String(row[column]) === filter.slice(3));
       }
     }
-    if (params.or === "(and(value->>bridgeStatus.eq.2,value->>useInstantPath.eq.false),value->>bridgeStatus.eq.10)") {
-      rows = rows.filter(row => String(row.value.bridgeStatus) === "10" || (String(row.value.bridgeStatus) === "2" && String(row.value.useInstantPath) === "false"));
-    } else if (params.or) {
+    if (params.or) {
       const identities = [...params.or.matchAll(/and\(key2.eq.([^,]+),key3.eq.([^)]+)\)/g)] as RegExpMatchArray[];
       assert.ok(identities.length > 0 && identities.length <= 20);
       rows = rows.filter((row) => identities.some((match) => row.key2 === match[1] && String(row.key3) === match[2]));
@@ -103,7 +101,7 @@ test("email token metadata batches and paginates, retaining precision without gu
   assert.ok(calls > 3, "all batches must read beyond the server row cap");
 });
 
-test("admin review queries paginate both bridges and exclude automatic native delays", async t => {
+test("admin review queries paginate both bridges and retain instant native withdrawals", async t => {
   const withdrawals = Array.from({ length: 45 }, (_, i) => ({ ...withdrawal(i), value: { ...withdrawal(i).value, status: i % 2 ? "3" : "2" } }));
   const deposits = Array.from({ length: 7 }, (_, i) => ({ ...deposit(i), value: { ...deposit(i).value, status: "2" } }));
   const calls = await mockCirrus(t, {
@@ -119,7 +117,7 @@ test("admin review queries paginate both bridges and exclude automatic native de
   assert.equal(records.withdrawals.length, 45);
   assert.equal(records.reviews.length, 23);
   assert.equal(records.authorizations.length, 22);
-  assert.deepEqual(records.nativeWithdrawals.map(row => row.key), ["0"]);
+  assert.deepEqual(records.nativeWithdrawals.map(row => row.key), ["0", "1"]);
   assert.ok(calls.every(call => call.params.address === `eq.${"1".repeat(40)}`));
 });
 

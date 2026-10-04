@@ -21,42 +21,45 @@ export const getDepositStatusLabel = (status?: string | number, source?: BridgeT
 };
 
 export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = false): string => {
-  if (item.kind === "withdrawal_cancellation" && !item.refundEvidenceHash) return item.safeProposalHash ? "Safe signers — execute the mint cancellation. If an older mint proposal blocks its nonce, reject that proposal in Safe first. Escrow remains locked."
-    : "Bridge service — prepare permanent external mint cancellation. No refund vote is available yet.";
+  if (item.kind === "withdrawal_cancellation" && !item.refundEvidenceHash) return item.safeProposalHash
+    ? "Safe signers — execute the mint-cancellation proposal."
+    : "Bridge service — prepare the mint-cancellation proposal.";
   if (item.kind === "withdrawal_refund") {
-    if (item.refundStatus === "pending") return "Verifiers — confirm that no external payment occurred. The bridge requests these checks automatically; no admin vote is needed yet.";
-    if (item.refundStatus !== "ready") return "Admin — refresh the queue. Verifier confirmation is unavailable; do not vote until refund readiness is confirmed.";
+    if (item.refundStatus === "pending") return "Verifiers — confirm that no external payment occurred.";
+    if (item.refundStatus !== "ready") return "Admin — refresh after verifier availability is restored.";
   }
-  if (item.approvalStatus === "unavailable") return "Admin — refresh the queue to confirm whether the deposit is already approved before taking another action.";
+  if (item.approvalStatus === "unavailable") return "Admin — refresh to confirm the current approval state.";
   if (item.approvalStatus === "approved" || item.recoveryStatus === "reopened") {
-    return "Bridge service — retry verification and delivery on STRATO automatically. No further admin vote is needed for delivery; the transfer is not complete yet.";
+    return "Bridge service — retry verification and STRATO delivery.";
+  }
+  if (item.kind === "withdrawal_review" && item.useInstantPath && !item.governance?.cancel_withdrawal?.votesCast && !votePending) {
+    return "STRATO admins — vote to cancel this blocked instant withdrawal.";
   }
   if (item.kind === "withdrawal_review" && !item.governance?.cancel_withdrawal?.votesCast && !votePending) return item.safeProposalHash
-    ? "Safe signers — review and execute the proposal in Safe. The bridge then continues withdrawal processing; no STRATO admin vote is needed here."
-    : "Bridge service — prepare the Safe proposal. Safe signers can act once the proposal is available.";
+    ? "Safe signers — review and execute the mint proposal."
+    : "Bridge service — prepare the Safe mint proposal.";
   if (item.recoveryStatus === "refund_pending" && !item.refundEvidenceHash) return item.safeProposalHash
-    ? "Safe signers — review and execute the refund proposal in Safe. The bridge will verify the external transaction before requesting STRATO admin confirmation."
-    : "Bridge service — verify the original deposit and process its external refund. No admin vote is needed yet; funds have not been confirmed returned.";
-  if (!item.actions.length) return "Bridge operator — investigate the deposit evidence and complete the required review. No STRATO admin vote is available here.";
-  if (votePending) return "STRATO indexing — wait for the submitted vote or execution to appear. Do not submit it again while the queue refreshes.";
+    ? "Safe signers — execute the external refund proposal."
+    : "Bridge service — prepare and verify the external refund.";
+  if (!item.actions.length) return "Bridge service — continue automated processing.";
+  if (votePending) return "STRATO indexing — wait for the submitted governance transaction.";
   if (item.governanceStatus !== "available" || item.actions.some(action => !item.governance?.[action])) {
-    return "Admin — refresh the queue. Voting status is unavailable; do not submit another vote until it is confirmed.";
+    return "Admin — refresh after voting status is available.";
   }
   const progress = item.actions.map(action => item.governance![action]!);
-  const verified = item.kind === "withdrawal_refund" ? "Verifier checks complete. " : "";
   if (progress.some(vote => vote.votesCast >= vote.votesRequired)) {
-    return `${verified}STRATO admin — select Execute for the decision that has reached quorum. The decision is not complete until execution succeeds.`;
+    return "STRATO admin — execute the decision that reached quorum.";
   }
   if (progress.every(vote => vote.hasVoted)) {
-    return `${verified}Other STRATO admins — review and cast the remaining votes. Your vote is recorded; no further vote is needed from you.`;
+    return "Other STRATO admins — cast the remaining votes.";
   }
-  if (item.kind === "withdrawal_refund") return "Verifier checks complete. STRATO admins — select Refund / vote to approve returning the escrowed tokens to the user's STRATO wallet. Funds return when the approved refund executes.";
-  if (item.kind === "withdrawal_cancellation") return "STRATO admins — independently verify the confirmed external mint cancellation, then vote to refund the STRATO escrow.";
-  if (item.kind === "withdrawal_review") return "STRATO admins — complete the cancellation vote to stop mint processing and request permanent external cancellation. Escrow remains locked.";
-  if (item.refundEvidenceHash) return "STRATO admins — independently verify the external refund transaction, then select Confirm refund / vote. Execution marks the refund complete; it does not send funds.";
+  if (item.kind === "withdrawal_refund") return "STRATO admins — vote to return the escrowed tokens.";
+  if (item.kind === "withdrawal_cancellation") return "STRATO admins — verify the mint cancellation and vote to refund STRATO escrow.";
+  if (item.kind === "withdrawal_review") return "STRATO admins — vote to request permanent mint cancellation.";
+  if (item.refundEvidenceHash) return "STRATO admins — verify the external refund and vote to confirm it.";
   return item.actions.includes("approve")
-    ? "STRATO admins — verify whether funds were received, then choose approval, refund, or rejection without refund. Submitting a vote does not complete delivery or refund."
-    : "STRATO admins — verify the redemption evidence. Return funds if a valid burn occurred, or reject without refund if no valid burn occurred. The bridge service handles delivery verification.";
+    ? "STRATO admins — choose verified delivery, refund, or rejection without refund."
+    : "STRATO admins — choose refund for a valid burn or rejection when no burn occurred.";
 };
 
 /**
@@ -251,6 +254,11 @@ export function formatDate(dateString: string): string {
   } catch (error) {
     return dateString;
   }
+}
+
+export function getWithdrawalExplorerUrl(chainId: string, txHash?: string): string | undefined {
+  if (!txHash || !/^(0x)?[0-9a-f]{64}$/i.test(txHash) || /^(0x)?0{64}$/i.test(txHash)) return undefined;
+  return getExplorerUrl(chainId, `0x${txHash.replace(/^0x/i, "")}`);
 }
 
 /**

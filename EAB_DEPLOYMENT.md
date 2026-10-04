@@ -1,5 +1,9 @@
 # External Asset Bridge Deployment
 
+For a same-network rollout covering both EAB and native, start with
+[the streamlined workflow](BRIDGE_ROLLOUT.md). This document remains the detailed
+EAB execution reference.
+
 One EAB between one STRATO network and one supported external EVM chain. Same
 reviewed commit on every machine. No liquidity migration. Do not upgrade an old
 vault.

@@ -7,7 +7,7 @@ import { ArrowDown, ArrowUp, Gem, Frown } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useBridgeContext } from '@/context/BridgeContext';
 import { formatBalance } from '@/utils/numberUtils';
-import { ExternalBridgeStatus, WITHDRAWAL_STATUS_LABELS, getBridgeStatusLabel, getDepositStatusLabel, getExplorerUrl, mergePendingDeposits } from '@/lib/bridge/utils';
+import { ExternalBridgeStatus, WITHDRAWAL_STATUS_LABELS, getBridgeStatusLabel, getDepositStatusLabel, getExplorerUrl, getWithdrawalExplorerUrl, mergePendingDeposits } from '@/lib/bridge/utils';
 import { RECENT_TRANSACTIONS_REFRESH_MS } from '@/lib/bridge/constants';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { activityFeedApi } from '@/lib/activityFeed';
@@ -322,7 +322,7 @@ const RecentTransactions = ({
           ? formatBalance(tx.externalAmount, undefined, tx.externalDecimals, 2, 4) : rebasedExt ? `≈ ${formatBalance(rebasedExt, undefined, 18, 2, 4)}` : amt;
 
         return <TxRow key={key}
-          transactionUrl={withdrawalsOnly && tx.externalTxHash ? getExplorerUrl(String(tx.externalChainId), tx.externalTxHash) : undefined}
+          transactionUrl={withdrawalsOnly ? getWithdrawalExplorerUrl(String(tx.externalChainId), tx.externalTxHash) : undefined}
           action={withdrawalsOnly && ['external', 'native'].includes(tx.bridgeSource || '') && tx.withdrawalId &&
             normalizeAddress(tx.sender) === normalizeAddress(userAddress) && ['1', '2'].includes(tx.status || '')
             ? <WithdrawalCancellation source={tx.bridgeSource as 'external' | 'native'} withdrawalId={tx.withdrawalId} onCanceled={triggerWithdrawalRefresh} /> : undefined}
@@ -342,7 +342,9 @@ const RecentTransactions = ({
 
   const activeTxs = isBridge ? bridgeTxs : metal.transactions;
   const activeLoading = isBridge ? bridgeLoading : metal.loading;
-  const viewAllLink = includeRoutes
+  const viewAllLink = withdrawalsOnly
+    ? "/dashboard/activity?type=Withdraw"
+    : includeRoutes
     ? "/dashboard/activity"
     : isBridge
       ? "/bridge-transactions?from=deposits"
@@ -373,11 +375,11 @@ const RecentTransactions = ({
       <CardContent className="p-0">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/70">
           <CardTitle className="text-base">
-            {includeRoutes ? "Your activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
+            {withdrawalsOnly ? "Your Activity" : includeRoutes ? "Your activity" : isBridge ? "Recent Transactions" : "Recent Metal Purchases"}
           </CardTitle>
-          {!withdrawalsOnly && <Link to={viewAllLink} className={linkClass}>
+          <Link to={viewAllLink} className={linkClass}>
             View All {"\u2192"}
-          </Link>}
+          </Link>
         </div>
 
         {!isLoggedIn

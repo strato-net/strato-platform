@@ -67,7 +67,12 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   state.tables["/BlockApps-StratoNativeBridge-withdrawals"] = [false, true].map((useInstantPath, i) => ({ key: String(i), value: { ...withdrawal("0").value, bridgeStatus: "2", useInstantPath, nativeMintProposalHash: hash } }));
   const items = await getAdminBridgeReviews("token");
   assert.equal(items.filter(item => item.kind === "deposit_review").length, 5, "server row caps must not truncate reviews");
-  assert.equal(items.filter(item => item.source === "native").length, 1);
+  assert.equal(items.filter(item => item.source === "native").length, 2);
+  const instant = items.find(item => item.id === "native:withdrawal:1")!;
+  assert.deepEqual(instant.actions, ["cancel_withdrawal"], "instant withdrawals remain available for governance cancellation");
+  assert.equal(instant.scenario, "Blocked instant withdrawal");
+  assert.equal(instant.useInstantPath, true);
+  assert.ok(state.reads.every(read => !read.table.includes("MercataBridge")), "legacy bridge records do not belong in the action queue");
   const review = items.find(item => item.id === "eab:withdrawal:1")!;
   assert.equal(review.kind, "withdrawal_review");
   assert.equal(review.safeProposalHash, hash);

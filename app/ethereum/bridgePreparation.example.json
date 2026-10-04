@@ -1,0 +1,26 @@
+{
+  "source": {
+    "nodeUrl": "https://workspace-maya-2fj39fc.blockapps.net",
+    "stratoChainId": "114784819836269",
+    "eab": "394d276e3b6109d6c58444653c26996bf3ae3eda",
+    "native": "49f69252b00235030a4dcd4c7ef17a64ef346258"
+  },
+  "target": {
+    "stratoChainId": "114784819836269",
+    "chainId": 84532,
+    "depositRouterDeploymentBlock": "REVIEW_REQUIRED",
+    "nativeRepresentationBridge": "REVIEW_REQUIRED"
+  },
+  "eabRoutes": [{
+    "sourceChainId": 11155111,
+    "sourceExternalToken": "0x0000000000000000000000000000000000000000",
+    "externalToken": "0x0000000000000000000000000000000000000000",
+    "stratoToken": "93fb7295859b2d70199e0a4883b7c320cf874e6c",
+    "externalDecimals": "18", "externalName": "Ether", "externalSymbol": "ETH"
+  }],
+  "nativeRoutes": [{
+    "sourceChainId": 11155111,
+    "stratoToken": "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    "representationToken": "REVIEW_REQUIRED"
+  }]
+}

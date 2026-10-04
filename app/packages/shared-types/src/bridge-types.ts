@@ -229,7 +229,14 @@ export interface BridgeReviewItem {
   token: string;
   amount: string;
   account: string;
+  externalBridge?: string;
+  externalTxHash?: string;
+  externalAccount?: string;
+  externalToken?: string;
+  externalAmount?: string;
+  scenario?: string;
   reason: string;
+  useInstantPath?: boolean;
   safeProposalHash?: string;
   reviewDigest?: string;
   approvalStatus?: "pending" | "approved" | "unavailable";

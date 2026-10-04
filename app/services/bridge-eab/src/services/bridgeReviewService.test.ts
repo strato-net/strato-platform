@@ -57,7 +57,7 @@ test("review queue preserves large values and excludes unexpired and already-pai
   assert.deepEqual(queue.map(item => item.kind), ["deposit_review", "withdrawal_review", "withdrawal_refund", "withdrawal_review"]);
   assert.equal(queue[0].amount, amount);
   assert.equal(queue[1].safeProposalHash, hash);
-  assert.match(queue[2].reason, /expiry alone is not proof/);
+  assert.match(queue[2].reason, /verifier proof/);
   assert.deepEqual(queue[2].actions, ["refund"]);
 });
 
@@ -292,7 +292,7 @@ test("review emails use existing recipients and contain no URL links", async t =
   t.mock.method(sgMail, "send", async (message: any) => { sent.push(message); return [] as any; });
   const item = { id: "eab:withdrawal:2", source: "eab" as const, kind: "withdrawal_review" as const,
     chainId: "11155111", reference: "2", token: address, amount, account: address,
-    reason: "Review required", actions: [], safeProposalHash: hash };
+    scenario: "EAB withdrawal Safe approval", reason: "Review required", actions: [], safeProposalHash: hash };
   try {
     await sendBridgeReviewEmail(item);
     assert.equal(sent.length, 1);

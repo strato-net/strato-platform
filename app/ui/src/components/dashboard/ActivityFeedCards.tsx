@@ -25,6 +25,7 @@ import { ActivityCard, type ActivityCardData } from "./ActivityCard";
 
 interface ActivityFeedCardsProps {
   isMyActivity: boolean;
+  initialActivityType?: string;
 }
 
 type YieldVaultDef = {
@@ -43,14 +44,14 @@ type YieldVaultInfo = {
 
 const normalizeAddress = (address?: string) => (address || "").toLowerCase().replace(/^0x/, "");
 
-const ActivityFeedCards = ({ isMyActivity }: ActivityFeedCardsProps) => {
+const ActivityFeedCards = ({ isMyActivity, initialActivityType = "all" }: ActivityFeedCardsProps) => {
   const { userAddress } = useUser();
   const [cardData, setCardData] = useState<ActivityCardData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selectedActivityType, setSelectedActivityType] = useState<string>("all");
+  const [selectedActivityType, setSelectedActivityType] = useState<string>(() => Object.prototype.hasOwnProperty.call(activityTypes, initialActivityType) ? initialActivityType : "all");
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const itemsPerPage = 10;
