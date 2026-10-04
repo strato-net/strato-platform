@@ -96,7 +96,7 @@ indexAPI idxEvents = do
 
   when (not $ null stateDiffs) $ do
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length stateDiffs) ++ " state diffs"
-    mapM_ commitSqlDiffs stateDiffs
+    commitSqlDiffs stateDiffs
 
   when (not $ null asmUpdates) $ do
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length asmUpdates) ++ " address state updates"

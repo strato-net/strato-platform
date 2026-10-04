@@ -27,6 +27,9 @@ import Blockchain.Strato.Model.Address (addressToByteString)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Internal as BI
+import Data.Word (byteSwap64)
+import Foreign.Storable (pokeByteOff)
 import Data.Char (isDigit)
 import Data.List (isPrefixOf)
 import qualified Data.Vector as V
@@ -48,7 +51,12 @@ padRight32 bs
   | otherwise = bs <> B.replicate (32 - B.length bs `mod` 32) 0
 
 encodeUint256 :: Integer -> B.ByteString
-encodeUint256 n = padLeft32 $ integerToBytesBE (n `mod` (2 ^ (256 :: Integer)))
+encodeUint256 n = BI.unsafeCreate 32 $ \p -> go p (3 :: Int) (n `mod` (2 ^ (256 :: Integer)))
+  where
+    -- 32 bytes big-endian, written as four Word64s from the low end
+    go p i m = do
+      pokeByteOff p (i * 8) (byteSwap64 (fromIntegral m))
+      if i == 0 then pure () else go p (i - 1) (m `shiftR` 64)
 
 encodeInt256 :: Integer -> B.ByteString
 encodeInt256 n
