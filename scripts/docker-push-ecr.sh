@@ -14,8 +14,9 @@
 #   2. Skips any image whose tag already exists in the registry
 #      (checked with `docker manifest inspect`, which reuses the `docker login`).
 #   3. Pushes the rest one by one. If a push still fails with the immutable-tag
-#      error (e.g. a race with a parallel build), it is logged and tolerated.
-#      Any other push failure fails the script.
+#      error, or with any error after which the tag exists in the registry
+#      (a race with a parallel build of the same commit), it is logged and
+#      tolerated. Any other push failure fails the script.
 #
 # Usage:
 #   scripts/docker-push-ecr.sh [-f compose.yml]... [--dry-run] [--registry-glob GLOB] [IMAGE]...
@@ -127,6 +128,9 @@ for img in "${TARGETS[@]}"; do
     pushed=$((pushed + 1))
   elif grep -q "$IMMUTABLE_TAG_MSG" "$push_log"; then
     log "SKIP  $img (tag already exists in immutable repository - tolerated)"
+    skipped=$((skipped + 1))
+  elif docker manifest inspect "$img" >/dev/null 2>&1; then
+    log "SKIP  $img (push failed, but the tag now exists - pushed concurrently by another build - tolerated)"
     skipped=$((skipped + 1))
   else
     log "FAIL  $img (docker push exited $rc)"
