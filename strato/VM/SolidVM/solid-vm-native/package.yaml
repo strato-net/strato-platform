@@ -1,0 +1,53 @@
+name: solid-vm-native
+license: Apache-2.0
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src/
+  exposed-modules:
+    - Core
+    - Compile
+  ghc-options: -O1
+  dependencies:
+    - base16-bytestring
+    - bytestring
+    - containers
+    - lens
+    - mtl
+    - solid-vm-model
+    - source-tools
+    - strato-model
+    - text
+
+executables:
+  svmc:
+    source-dirs: exec_src/
+    main: Main.hs
+    ghc-options: -O1 -threaded -rtsopts
+    dependencies:
+      - aeson
+      - bytestring
+      - containers
+      - directory
+      - filepath
+      - mtl
+      - solid-vm-compiler
+      - solid-vm-model
+      - solid-vm-native
+      - strato-model
+      - text
+
+  svmc-probe:
+    source-dirs: tools/
+    main: Probe.hs
+    ghc-options: -O1
+    dependencies:
+      - aeson
+      - bytestring
+      - containers
+      - lens
+      - solid-vm-compiler
+      - solid-vm-model
+      - text

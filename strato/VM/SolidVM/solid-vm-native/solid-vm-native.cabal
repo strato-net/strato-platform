@@ -1,0 +1,72 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           solid-vm-native
+version:        0.0.0
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      Core
+      Compile
+  other-modules:
+      Paths_solid_vm_native
+  hs-source-dirs:
+      src/
+  ghc-options: -O1
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , containers
+    , lens
+    , mtl
+    , solid-vm-model
+    , source-tools
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable svmc
+  main-is: Main.hs
+  other-modules:
+      Paths_solid_vm_native
+  hs-source-dirs:
+      exec_src/
+  ghc-options: -O1 -threaded -rtsopts
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , directory
+    , filepath
+    , mtl
+    , solid-vm-compiler
+    , solid-vm-model
+    , solid-vm-native
+    , strato-model
+    , text
+  default-language: Haskell2010
+
+executable svmc-probe
+  main-is: Probe.hs
+  other-modules:
+      Paths_solid_vm_native
+  hs-source-dirs:
+      tools/
+  ghc-options: -O1
+  build-depends:
+      aeson
+    , base
+    , bytestring
+    , containers
+    , lens
+    , solid-vm-compiler
+    , solid-vm-model
+    , text
+  default-language: Haskell2010
