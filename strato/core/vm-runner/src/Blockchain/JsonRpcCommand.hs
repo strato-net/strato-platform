@@ -76,7 +76,7 @@ import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Variable(..), forceLoadVar)
+import SolidVM.Model.Value (Variable(..), forceLoadVar, renderValue)
 import Numeric (showHex)
 import Text.Format (format)
 
@@ -211,7 +211,7 @@ simulateOne header spec = do
         [ TraceLog
             (evContractAddress ev)
             (evName ev)
-            [(n, v) | (n, _, v, _) <- evArgs ev]
+            [(n, renderValue v) | (n, v) <- evArgs ev]
           | ev <- maybe [] erEvents mEr
         ]
       hex n = "0x" ++ showHex n ""

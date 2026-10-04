@@ -15,6 +15,11 @@ import Prometheus
 vmBlocksProcessed :: Counter
 vmBlocksProcessed = unsafeRegister $ counter (Info "vm_blocks_processed" "evm counter for blocks processed")
 
+-- | Number of the last block executed; what strato-ps shows as the VM's position.
+{-# NOINLINE vmBestBlock #-}
+vmBestBlock :: Gauge
+vmBestBlock = unsafeRegister $ gauge (Info "vm_best_block" "number of the last block the vm-runner executed")
+
 {-# NOINLINE vmBlocksMined #-}
 vmBlocksMined :: Counter
 vmBlocksMined = unsafeRegister $ counter (Info "vm_blocks_mined" "evm counter for blocks mined")
