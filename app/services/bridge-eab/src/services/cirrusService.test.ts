@@ -211,6 +211,27 @@ for (const [method, table, rows, identity] of [
   });
 }
 
+test("native withdrawal IDs are normalized when Cirrus returns numeric keys", async t => {
+  await mockCirrus(t, {
+    [`${native}-withdrawals`]: [{ ...withdrawal(114), key: 114 }],
+  });
+  const { getNativeWithdrawalsByStatus } = await import("./cirrusService");
+  const [result] = await getNativeWithdrawalsByStatus("1");
+  assert.equal(result.withdrawalId, "114");
+});
+
+test("EAB IDs are normalized when Cirrus returns numeric keys", async t => {
+  await mockCirrus(t, {
+    [`${external}-withdrawals`]: [{ ...withdrawal(31), key: 31 }],
+    [`${external}-deposits`]: [{ ...deposit(13), key: 1, key3: 13 }],
+  });
+  const { getDepositsByStatus, getExternalWithdrawalsByStatus } = await import("./cirrusService");
+  const [withdrawalResult] = await getExternalWithdrawalsByStatus("1");
+  const [depositResult] = await getDepositsByStatus("1");
+  assert.equal(withdrawalResult.withdrawalId, "31");
+  assert.equal(depositResult.depositId, "13");
+});
+
 test("withdrawal enrichment batches long IDs and reads capped authorization/review pages", async (t) => {
   const rows = Array.from({ length: 45 }, (_, i) => withdrawal(i));
   await mockCirrus(t, {

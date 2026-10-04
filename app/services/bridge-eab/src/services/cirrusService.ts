@@ -276,7 +276,7 @@ export const getExternalWithdrawalsByStatus = async (
     return {
       ...item.value,
       bridgeStatus: item.value.status,
-      withdrawalId: item.key,
+      withdrawalId: String(item.key),
       vault,
       recoveryOnly: status === "3" && (item.bridge?.withdrawalsPaused !== false || !enabledChains.has(externalChainId)),
       reservationId: normalizeOptionalHash(item.value.reservationId) ?? undefined,
@@ -320,7 +320,7 @@ export const getNativeWithdrawalsByStatus = async (
 
   return data.map((item) => ({
     ...item.value,
-    withdrawalId: item.key,
+    withdrawalId: String(item.key),
   }));
 };
 
@@ -382,7 +382,7 @@ export const getDepositsByStatus = async (
         bridgeStatus: v.status,
         externalChainId,
         externalTxHash: v.externalTxHash,
-        depositId,
+        depositId: String(depositId),
         externalDecimals: asset.externalDecimals,
         depositRouter,
         custodyAddress,
