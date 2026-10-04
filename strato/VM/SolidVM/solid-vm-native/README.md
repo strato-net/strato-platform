@@ -221,7 +221,8 @@ not selected by inspecting the stored tag.
 Storage remains compatible with the existing layout:
 
 - Scalars use the existing `BasicValue` encoding.
-- Zero/default values use `BDefault`.
+- Scalar writes preserve their `BasicValue` tags in action diffs; the storage
+  backend normalizes zero/default values to `BDefault` on disk.
 - Arrays use a `length` field and indexed elements.
 - Struct fields use `Field`.
 - Mapping keys use the same encoding as the interpreter's `expToPath`.
@@ -245,7 +246,8 @@ Implemented in the prototype:
 - Mappings, arrays, structs, and pointers in storage
 - Declarations, assignment, arithmetic, comparisons, branches, and loops
 - Destructuring
-- Modifiers and `_`
+- Modifiers and `_`, including ownership modifiers forwarding a `variadic` result
+- Explicit base-constructor calls
 - Internal, external, low-level, delegate, library, and `super` calls
 - `using L for T`
 - Public storage getters
@@ -253,13 +255,15 @@ Implemented in the prototype:
 - SolidVM catch-all `try`/`catch`
 - `require`, `assert`, `revert`, and custom-error text
 - Variadic-tail parameters
-- Common explicit conversions
+- Common explicit conversions, including address-to-string
+- Implicit contract-to-address conversion (both use the same Haskell representation)
 - `keccak256(bytes)`
 - `delete` and array `push`
 
 Not implemented or incomplete:
 
-- Constructor execution and base-constructor calls
+- Complete constructor initialization and native deployment; the live adapter
+  still runs constructors through the interpreter
 - Contract creation (`new`, `create`, and `create2`)
 - `decimal`
 - Solidity-style typed `try`/`catch`
@@ -273,8 +277,8 @@ See `notes/RESULTS.md` for the detailed list.
 
 ## Strict-type census
 
-The prototype was run over every distinct deployed code hash found during the
-experiment:
+The original prototype was run over every distinct deployed code hash found
+during the experiment:
 
 | Network | Compiled function instances | Failed function instances |
 |---|---:|---:|
@@ -293,6 +297,14 @@ Do not silently add compatibility coercions. The intended process is:
 1. Report the divergence.
 2. Determine the desired SolidVM Native semantics.
 3. Add an explicit compatibility rule only if it is deliberately approved.
+
+The PriceOracle integration adds the contract-to-address and address-to-string
+rules identified above. Its inherited ownership modifier can forward a
+`variadic` voting result even from a function declared to return nothing.
+The external boundary preserves that result; typed internal calls decode it
+against the declared signature, with a runtime error if it does not fit.
+This is an explicit compatibility exception to the original strict-return
+criterion. Ordinary mismatches such as `uint x = "string"` still fail compilation.
 
 ## Known semantic questions and divergences
 

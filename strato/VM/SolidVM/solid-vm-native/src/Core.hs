@@ -33,6 +33,8 @@ data Ty t where
   TStruct   :: T.Text -> Fields ts -> Ty (HL ts)
   TTuple    :: Fields ts -> Ty (HL ts)
   TVariadic :: Ty [Dyn]                   -- the only dynamic type: tx args / `variadic` / `.call` results
+  TWireArray :: Ty [Dyn]                 -- boundary only: preserves arrays inside variadic arguments
+  TWireEnum :: T.Text -> T.Text -> Ty Integer -- boundary only: preserves enum labels without their declaration
   TMaybe    :: Ty t -> Ty (Maybe t)       -- internal: modifier return slot
   TRef      :: SType -> Ty StoragePath    -- `storage` pointer (local, parameter or return value) with its layout
 
@@ -69,6 +71,8 @@ tyEq (TArr a) (TArr b) = (\Refl -> Refl) <$> tyEq a b
 tyEq (TStruct n fs) (TStruct m gs) | n == m = (\Refl -> Refl) <$> fieldsEq fs gs
 tyEq (TTuple fs) (TTuple gs) = (\Refl -> Refl) <$> fieldsEq fs gs
 tyEq TVariadic TVariadic = Just Refl
+tyEq TWireArray TWireArray = Just Refl
+tyEq (TWireEnum a x) (TWireEnum b y) | a == b && x == y = Just Refl
 tyEq (TMaybe a) (TMaybe b) = (\Refl -> Refl) <$> tyEq a b
 tyEq (TRef a) (TRef b) | showST a == showST b = Just Refl
 tyEq _ _ = Nothing
@@ -84,6 +88,8 @@ showTy = \case
   TEnum n _ -> "enum " <> n; TContract n -> "contract " <> n; TUnit -> "()"
   TArr t -> showTy t <> "[]"; TStruct n _ -> "struct " <> n; TTuple fs -> "(" <> T.intercalate "," (fieldTys fs) <> ")"
   TVariadic -> "variadic"; TMaybe t -> "Maybe " <> showTy t; TRef st -> showST st <> " storage"
+  TWireArray -> "wire array"
+  TWireEnum n _ -> "enum " <> n
   where
     fieldTys :: Fields ts -> [T.Text]
     fieldTys FNil = []
@@ -101,6 +107,8 @@ showDyn (Dyn t v) = case t of
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
   TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (show v)
+  TWireArray -> "[" <> T.intercalate "," (map showDyn v) <> "]"
+  TWireEnum n label -> n <> "." <> label
   where
     showFields :: Fields ts -> HL ts -> [T.Text]
     showFields FNil HNil = []
@@ -112,6 +120,8 @@ defaultOf = \case
   TEnum _ _ -> 0; TContract _ -> Address 0; TUnit -> (); TArr _ -> Seq.empty
   TStruct _ fs -> defaults fs; TTuple fs -> defaults fs
   TVariadic -> []; TMaybe _ -> Nothing; TRef _ -> StoragePath []
+  TWireArray -> []
+  TWireEnum _ _ -> 0
   where
     defaults :: Fields ts -> HL ts
     defaults FNil = HNil
@@ -144,15 +154,16 @@ fromBasic t v = case (t, v) of
   _ -> Left ("storage value " <> T.pack (show v) <> " does not fit declared type " <> showTy t)
 
 -- Keep the existing storage format (tags, BDefault for zero values).
+-- Preserve scalar tags for action diffs; the storage backend normalizes defaults.
 toBasic :: Ty t -> t -> BasicValue
 toBasic t v = case t of
-  TInt -> if v == 0 then BDefault else BInteger v
-  TEnum n ns -> if v == 0 then BDefault else BEnumVal n (if fromIntegral v < length ns then ns !! fromIntegral v else "") (fromIntegral v)
-  TBool -> if v then BBool True else BDefault
-  TAddr -> if v == Address 0 then BDefault else BAddress v
-  TContract n -> if v == Address 0 then BDefault else BContract n v
-  TStr -> if T.null v then BDefault else BString (TE.encodeUtf8 v)
-  TBytes -> if B.null v then BDefault else BBytes v
+  TInt -> BInteger v
+  TEnum n ns -> BEnumVal n (if v >= 0 && fromIntegral v < length ns then ns !! fromIntegral v else "") (fromIntegral v)
+  TBool -> BBool v
+  TAddr -> BAddress v
+  TContract n -> BContract n v
+  TStr -> BString (TE.encodeUtf8 v)
+  TBytes -> BBytes v
   _ -> BDefault
 
 -- Mapping-key encoding, identical to SolidVM's expToPath so existing state stays readable.
@@ -184,7 +195,7 @@ ref (IS i) (_ :& env) = ref i env
 
 -- ---------------------------------------------------------------- runtime
 
-data CallKind = Call | DelegateCall deriving (Eq, Show)
+data CallKind = Call | RawCall | DelegateCall deriving (Eq, Show)
 
 data Frame = Frame
   { fThis :: Address      -- storage/identity context
@@ -266,10 +277,8 @@ readValWith getSlot t p = case t of
 writeVal :: Ty t -> StoragePath -> t -> M ()
 writeVal t p v = case t of
   TArr et -> do
-    old <- readSlot TInt (snocP p (Field "length"))
     writeSlot TInt (snocP p (Field "length")) (fromIntegral (Seq.length v))
     F.forM_ (zip [0 :: Integer ..] (F.toList v)) $ \(i, x) -> writeVal et (snocP p (Index (BC.pack (show i)))) x
-    F.forM_ [fromIntegral (Seq.length v) .. old - 1] $ \i -> writeVal et (snocP p (Index (BC.pack (show i)))) (defaultOf et)
   TStruct _ fs -> writeFields fs v
   TTuple fs -> writeFields fs v
   _ -> writeSlot t p v
@@ -319,9 +328,35 @@ mkFn (SigCons _ rest) body = \a -> mkFn rest (\env -> do r <- liftIO (newIORef a
 
 -- The dynamic boundary (tx args, .call results): check each arg once, then run the typed action.
 callDyn :: Sig args r -> Fn args r -> [Dyn] -> M [Dyn]
-callDyn (SigNil r) f [] = do v <- f; pure (retDyn r v)
+callDyn (SigNil r) f [] = do
+  st <- ask
+  liftIO $ runReaderT (retDyn r <$> f) st
+    `catch` (\(ForwardReturn ds) -> pure $ case ds of
+      [Dyn TUnit ()] -> []
+      _ -> [Dyn TVariadic ds])
 callDyn (SigCons t rest) f (d : ds) = do v <- fromDyn t d; callDyn rest (f v) ds
 callDyn s _ ds = diverge ("arity mismatch at call boundary: expected " <> T.pack (show (sigArity s)) <> " more, got " <> T.pack (show (length ds)))
+
+-- Modifier voting can forward a dynamic return despite the declared signature.
+-- Preserve it at the external boundary; typed internal calls decode it once.
+data ForwardReturn = ForwardReturn [Dyn]
+instance Show ForwardReturn where
+  show (ForwardReturn ds) = "forwarded return: " ++ show (map showDyn ds)
+instance Exception ForwardReturn
+
+typedReturns :: Sig args r -> Fn args r -> Fn args r
+typedReturns (SigCons _ rest) f = \a -> typedReturns rest (f a)
+typedReturns (SigNil r) f = do
+  st <- ask
+  liftIO $ runReaderT f st `catch` (\(ForwardReturn ds) -> runReaderT (decode ds) st)
+  where
+    decode ds = case r of
+      TUnit -> pure ()
+      TVariadic -> pure ds
+      TTuple fs -> fromDyns fs ds
+      _ -> case ds of
+        [d] -> fromDyn r d
+        _ -> diverge "forwarded return does not match declared signature"
 
 -- address <-> contract and int <-> enum share a wire value; the typed side decides.
 fromDyn :: Ty t -> Dyn -> M t
@@ -333,10 +368,13 @@ fromDyn t (Dyn t' v) = case tyEq t t' of
     (TContract _, TContract _) -> pure v
     (TInt, TEnum _ _) -> pure v
     (TEnum _ _, TInt) -> pure v
+    (TEnum n _, TWireEnum m _) | n == m -> pure v
+    (TInt, TWireEnum _ _) -> pure v
     (TBytes, TStr) -> pure (TE.encodeUtf8 v)
     (TStr, TBytes) -> pure (TE.decodeUtf8 v)
     (TArr et, TArr et') -> mapM (fromDyn et . Dyn et') v
     (TArr et, TVariadic) -> Seq.fromList <$> mapM (fromDyn et) v
+    (TArr et, TWireArray) -> Seq.fromList <$> mapM (fromDyn et) v
     (TTuple fs, TVariadic) -> fromDyns fs v
     (TStruct _ fs, TVariadic) -> fromDyns fs v
     (TVariadic, _) -> pure [Dyn t' v]
@@ -379,4 +417,4 @@ dynFromText t s = case t of
 
 -- ---------------------------------------------------------------- control flow
 
-data Flow r = Next | Brk | Cnt | Ret r
+data Flow r = Next | Brk | Cnt | Ret r | RetDynamic [Dyn]

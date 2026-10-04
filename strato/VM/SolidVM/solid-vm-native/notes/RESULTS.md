@@ -247,3 +247,107 @@ Artifacts: `/tmp/solid-vm-native-integration/profile-{off,on}/`,
 `profile-analysis.json`, `profile-{off,on}.csv`, `analyze-profile.py`,
 `profile-sync.py`, and `profile-hot-census.txt` with the fetched deployed sources
 in `profile-hot-code/`.
+
+## PriceOracle support — 2026-10-04
+
+PriceOracle now compiles as a whole contract, including both profiled deployed
+versions (`824ec4ab…` and `b0f9648b…`). The implementation adds generic support
+for contract-to-address conversion, address-to-string conversion, explicit
+base-constructor calls, and ownership modifiers forwarding a dynamic voting
+result. Live deployment and constructor initialization still use the interpreter;
+this does not implement `new` or native contract creation.
+
+Modifier forwarding is an explicit exception to the original strict-return
+criterion: the external boundary can preserve a `variadic` result even for a
+void function. Typed internal calls decode that result against their declared
+signature. A mismatching forwarded result can therefore fail at runtime.
+Ordinary mismatches such as `uint x = "string"` still fail compilation, and
+whole-contract rejection remains in place.
+
+The integration check now compares **65 returns/events/action-diff snapshots**
+per deployed oracle version between separate native-off and native-on processes.
+Both versions match exactly. Checks cover ring-buffer wraparound, shrinking and
+growing the queue, batch prices, weighted TWAP across distinct timestamps,
+freshness boundaries, named timestamp returns, signed division/remainder,
+array assignment when shrinking, named struct/enum forwarding through proxies,
+voting returns, nested modifier postludes, and typed internal returns.
+The genesis source also exercises the real
+AdminRegistry/Proxy ownership path and a self-owned proxy upgrade. Profiling
+counters confirm that the oracle functions execute natively.
+
+Live replay initially exposed generic call-boundary and arithmetic bugs:
+
+- Block 1: arrays inside proxy arguments were decoded as `variadic` lists,
+  causing SolidVM's argument matcher to reject the batch-price call. A boundary
+  array representation now preserves the original array shape.
+- Block 12949: a typed governance call to its own proxy was treated as a raw
+  external call, changing `msg.sender`. Typed calls now use SolidVM's default
+  call semantics; low-level `.call` retains raw-call semantics. The standalone
+  mock runtime uses the same distinction.
+- Block 118981: PoolV3 uses signed division in its tick calculations. Native
+  division previously truncated toward zero; SolidVM uses floor division.
+  Native now uses the same `div` operator, with negative-operand regression
+  checks. Remainder retains SolidVM's `rem` semantics.
+- Block 119483: assigning a shorter array in a token metadata update cleared
+  old trailing storage slots. SolidVM retains those slots behind the new length;
+  native whole-array assignment now does the same. PriceOracle's explicit
+  clearing of observations during queue resizing is unchanged.
+- Block 145550: a proxy tried to resolve `ActionableEvent` against its own code
+  collection, which did not declare that implementation type. Dynamic argument
+  conversion now preserves struct names, field values, and enum labels without
+  requiring their declarations in the forwarding contract. Typed callee decoding
+  still uses its own declarations.
+
+Explicit zero writes also retain their scalar tags in action diffs; normalization
+to `BDefault` remains in the existing storage backend. The mock storage now
+normalizes all default scalar values too. These changes add no contract-specific
+Haskell code. Blockchain dispatch, the runtime adapter, profiling, and the check
+executable remain the separate uncommitted integration prototype described above.
+
+
+### Fresh Upquark replay and timing
+
+Both runs started with an empty `mynode`, used the same binary
+(`5e53224a007c3557167b32655c00a2aa4d060fec97a004e5af382530ec4ec1e1`),
+and enabled `SOLIDVM_PROFILE=1`. The target was block **528301**, hash
+`e61dbd03712dbdabac3b6f161ce20fb515c7822e6fba4e95aa0ec7bc00004753`.
+Both inserted that expected block with **zero state-root mismatches**.
+Every restart used `strato-down`, full removal of `mynode`, and `strato-up`.
+Both runs finished with all node services down and `mynode` removed.
+
+| Measurement | Native off | Native on |
+|---|---:|---:|
+| Block 1 through 528301 elapsed time | 1753.648 s | 1625.630 s |
+| VM CPU time at final metrics scrape | 1750.878 s | 1624.380 s |
+| PriceOracle contract self time | 80.340 s | 33.853 s |
+| PriceOracle interpreted calls | 4,780,332 | 0 |
+| PriceOracle native entry calls | 0 | 336,663 |
+
+PriceOracle contract self time improved **2.37×**. Whole replay elapsed time
+fell **7.30%**, and the VM CPU snapshot fell **7.22%**. Native PriceOracle
+execution covered all six code hashes encountered in this replay, including
+older genesis versions. Native internal calls are folded into their entry
+function's timer; compare contract self-time sums, not function call counts
+or sums of inclusive time.
+
+This is one profiled pair. Profiling overhead can differ between execution
+modes, and the generic compatibility changes also enable contracts beyond
+PriceOracle, including proxies and tokens. The whole-sync improvement cannot
+be attributed to PriceOracle alone and is not an unprofiled benchmark.
+These runs used the native branch's older develop base (`87720e8da4`), missing
+the optimizations merged into develop in `d29bcbc316`. The measured gain is
+relative to that older baseline; repeat the comparison after merging develop.
+The harness stops after observing the target; final metrics include a small
+overshoot (off: block 528364, on: block 528643), while elapsed times use the
+exact target block. OrderBook remains interpreted and is still the largest
+contract cost (149.863 s self time in the native-enabled run).
+
+The root `make build_common` and all four correctness processes completed
+successfully. Native remains opt-in with `SOLIDVM_NATIVE=1`; statement-level
+gas parity and the previously documented semantic limitations remain unfinished.
+No commit was made for this step.
+
+Artifacts: `/tmp/solid-vm-native-integration/priceoracle-{off,on}/`,
+`priceoracle-analysis.json`, `analyze-priceoracle.py`, `priceoracle-sync.py`,
+and `priceoracle-{old-,}check-{off,on}.log`. The failed replay artifacts preserve
+the transactions that motivated the generic fixes above.

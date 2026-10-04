@@ -3,9 +3,10 @@
 -- SolidVM source -> typed Haskell actions.  Typecheck and compile in one pass over the
 -- existing parser's CodeCollection.  Strict: no implicit coercions; anything the typed
 -- model cannot express is reported as an Err, never approximated.
+-- Contract-to-address is a selected compatibility exception (see README.md).
 module Compile where
 
-import Control.Exception (try)
+import Control.Exception (try, throwIO)
 import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.Reader
@@ -25,19 +26,11 @@ import Blockchain.Strato.Model.Address (Address (..))
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
-import SolidVM.Model.CodeCollection hiding (DelegateCall, Internal)
+import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
 import Core
-import System.Environment (lookupEnv)
-import System.IO.Unsafe (unsafePerformIO)
-
--- Measurement toggle only: SVMC_LENIENT=1 allows implicit contract->address conversion so the
--- census can report how many failures are due to that single SolidVM leniency.
-lenientContractAddress :: Bool
-lenientContractAddress = unsafePerformIO ((== Just "1") <$> lookupEnv "SVMC_LENIENT")
-{-# NOINLINE lenientContractAddress #-}
 
 -- ---------------------------------------------------------------- errors
 
@@ -199,7 +192,7 @@ compileAs sc t e = atLine (S.extractExpression e) $ case (t, e) of
   _ -> do
     CE t' f <- compileE sc e
     case (t, t') of
-      (TAddr, TContract _) | lenientContractAddress -> pure f
+      (TAddr, TContract _) -> pure f
       _ -> do Refl <- sameTy t t'; pure f
 
 compileFields :: Scope ls r -> Fields ts -> [Expression] -> C (Env ls -> M (HL ts))
@@ -424,7 +417,7 @@ intOp = \case
   "+" -> pure (\a b -> pure (a + b))
   "-" -> pure (\a b -> pure (a - b))
   "*" -> pure (\a b -> pure (a * b))
-  "/" -> pure (\a b -> if b == 0 then revert "division by zero" else pure (a `quot` b))
+  "/" -> pure (\a b -> if b == 0 then revert "division by zero" else pure (a `div` b))
   "%" -> pure (\a b -> if b == 0 then revert "modulo by zero" else pure (a `rem` b))
   "**" -> pure (\a b -> if b < 0 then revert "negative exponent" else pure (a ^ b))
   "|" -> pure (\a b -> pure (a .|. b))
@@ -599,7 +592,7 @@ compileCall sc callee args = case callee of
     | Nothing <- lookupVar sc lib, Nothing <- M.lookup lib (cStorage c), Just libC <- M.lookup lib (cCC c ^. contracts) ->
         -- library / contract-qualified internal call, compiled in the library's own context
         maybe (unknown ("function " <> lib <> "." <> key n)) linkCall (findFun (cFuns (mkCtx (cCC c) libC)) n (length args))
-  S.MemberAccess _ target "call" -> lowLevel Call target
+  S.MemberAccess _ target "call" -> lowLevel RawCall target
   S.MemberAccess _ target "delegatecall" -> lowLevel DelegateCall target
   S.MemberAccess _ target "push" -> case compileStorage sc target of
     Right (SArray el, pp) -> do
@@ -700,6 +693,7 @@ compileCall sc callee args = case callee of
           ("bytes", TBytes) -> pure (CE TBytes f)
           ("string", TBytes) -> pure (CE TStr (fmap TE.decodeUtf8 . f))
           ("string", TStr) -> pure (CE TStr f)
+          ("string", TAddr) -> pure (CE TStr (fmap (T.pack . show) . f))
           ("bool", TBool) -> pure (CE TBool f)
           -- explicit conversion out of the dynamic world: checked once at runtime
           (_, TVariadic) -> do
@@ -808,7 +802,7 @@ applyCall _ _ _ _ = typeErr "argument count mismatch"
 -- so the mismatch branch is unreachable.  A callee that failed to compile throws when called.
 link :: Sig args r -> C Fun -> Fn args r
 link sig = \case
-  Right (Fun _ sig' f) | Just Refl <- sigEq sig sig' -> f
+  Right (Fun _ sig' f) | Just Refl <- sigEq sig sig' -> typedReturns sig f
   Right (Fun n _ _) -> throwFn sig ("internal: linked signature mismatch for " <> n)
   Left e -> throwFn sig ("callee failed to compile: " <> showErr e)
 
@@ -886,6 +880,7 @@ compileFunction c name f = inFun (cName c <> "." <> name) $ do
     _ -> withModifiers sc0 (f ^. funcModifiers) body
   pure $ Fun name sig $ mkFn sig $ \env -> inner env >>= \case
     Ret v -> pure v
+    RetDynamic ds -> liftIO $ throwIO $ ForwardReturn ds
     _ -> pure (defaultOf r)
 
 -- Push each named return value as a local; `return;` reads them back as a tuple.
@@ -921,7 +916,20 @@ withModifiers :: Scope ls r -> [(T.Text, [Expression])] -> [Statement] -> C (Env
 withModifiers sc [] body = compileBlock sc body
 withModifiers sc ((mn, margs) : rest) body = do
   inner <- withModifiers sc rest body
-  when (M.member mn (cCC (sC sc) ^. contracts)) $ unsupported ("base constructor call " <> mn <> "(...)")
+  case M.lookup mn (cCC (sC sc) ^. contracts) of
+    Just parent -> case parent ^. constructor of
+      Nothing | null margs -> pure inner
+      Nothing -> typeErr ("base constructor " <> mn <> " argument count mismatch")
+      Just ctor -> do
+        let parentCtx = mkCtx (cCC (sC sc)) parent
+        SomeSig sig <- funSig parentCtx ctor
+        fun <- compileFunction parentCtx "constructor" ctor
+        CE _ call <- applyCall sc sig (\_ -> pure $ link sig (Right fun)) margs
+        pure $ \env -> call env >> inner env
+    Nothing -> withModifier sc mn margs inner
+
+withModifier :: Scope ls r -> T.Text -> [Expression] -> (Env ls -> M (Flow r)) -> C (Env ls -> M (Flow r))
+withModifier sc mn margs inner = do
   modi <- maybe (unknown ("modifier " <> mn)) pure (M.lookup mn (cContract (sC sc) ^. modifiers))
   mbody <- maybe (unsupported "modifier without a body") pure (modi ^. modifierContents)
   when (length margs /= length (modi ^. modifierArgs)) $ typeErr ("modifier " <> mn <> " argument count mismatch")
@@ -930,7 +938,8 @@ withModifiers sc ((mn, margs) : rest) body = do
     pure (pn, SomeTy t, e)
   let r = sRet sc
       -- hidden slot: a `return` inside the body is stashed here by `_` and the modifier continues
-      sc1 = (pushVar "$ret" (TMaybe r) sc) { sInner = Just (\e -> case e of (_ :& env) -> inner env) }
+      sc1 = (pushVar "$rawRet" (TMaybe TVariadic) (pushVar "$ret" (TMaybe r) sc))
+        { sInner = Just (\e -> case e of (_ :& _ :& env) -> inner env) }
   k <- withParams sc1 params $ \sc2 -> do
     bodyK <- compileBlock sc2 mbody
     retSlot <- maybe (err Internal "lost $ret") pure (lookupVar sc2 "$ret")
@@ -939,11 +948,19 @@ withModifiers sc ((mn, margs) : rest) body = do
         Refl <- sameTy r rt'
         pure $ \env -> bodyK env >>= \case
           Ret v -> pure (Ret v)
-          _ -> liftIO (readIORef (ref ix env)) >>= \case
-            Just v -> pure (Ret v)
-            Nothing -> pure Next
+          RetDynamic ds -> pure (RetDynamic ds)
+          _ -> case lookupVar sc2 "$rawRet" of
+            Just (Var _ (TMaybe TVariadic) rawIx) -> liftIO (readIORef (ref rawIx env)) >>= \case
+              Just ds -> pure (RetDynamic ds)
+              Nothing -> liftIO (readIORef (ref ix env)) >>= \case
+                Just v -> pure (Ret v)
+                Nothing -> pure Next
+            _ -> diverge "lost modifier dynamic return slot"
       _ -> err Internal "$ret has the wrong type"
-  pure $ \env -> do slot <- liftIO (newIORef Nothing); k (slot :& env)
+  pure $ \env -> do
+    slot <- liftIO (newIORef Nothing)
+    rawSlot <- liftIO (newIORef Nothing)
+    k (rawSlot :& slot :& env)
 
 -- Push a list of typed parameters (evaluated in the enclosing scope) and continue.
 withParams :: Scope ls r -> [(T.Text, SomeTy, Expression)] -> (forall ls'. Scope ls' r -> C (Env ls' -> M a)) -> C (Env ls -> M a)
@@ -1023,6 +1040,7 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
     pure $ \env -> bf env >>= \case
       Brk -> pure Next
       Ret v -> pure (Ret v)
+      RetDynamic ds -> pure (RetDynamic ds)
       _ -> loop cf bf (\_ -> pure ()) env
   S.ForStatement mInit mCond mStep body a -> case mInit of
     Just (S.VariableDefinition [S.VarDefEntry (Just ty) _ n _] mInitE) -> atLine a $ do
@@ -1056,8 +1074,12 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
       pure $ \env -> Ret <$> g env
     (r, _) -> typeErr ("return without a value in a function returning " <> showTy r)
   S.Return (Just e) _ -> do
-    f <- compileAs sc (sRet sc) e
-    pure $ \env -> Ret <$> f env
+    case compileE sc e of
+      Right (CE TVariadic f) | isJust (sInner sc), isNothing (tyEq (sRet sc) TVariadic) ->
+        pure $ \env -> RetDynamic <$> f env
+      _ -> do
+        f <- compileAs sc (sRet sc) e
+        pure $ \env -> Ret <$> f env
   S.Throw _ _ -> pure (\_ -> revert "throw")
   S.EmitStatement en args _ -> do
     ev <- maybe (unknown ("event " <> en)) pure (M.lookup en (cContract (sC sc) ^. events))
@@ -1102,6 +1124,9 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
         -- stash in the innermost $ret slot and keep running the modifier
         setRet sc env v
         pure Next
+      RetDynamic ds -> do
+        setRawRet sc env (Just ds)
+        pure Next
       fl -> pure fl
     Nothing -> typeErr "`_` outside a modifier"
   where
@@ -1111,6 +1136,7 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
         go = cf env >>= \b -> if not b then pure Next else bf env >>= \case
           Brk -> pure Next
           Ret v -> pure (Ret v)
+          RetDynamic ds -> pure (RetDynamic ds)
           _ -> stepF env >> go
 
 fieldsLen :: Fields ts -> Int
@@ -1120,8 +1146,15 @@ fieldsLen (FCons _ _ rest) = 1 + fieldsLen rest
 -- Write the function's return value into the modifier's hidden `$ret` slot.
 setRet :: Scope ls r -> Env ls -> r -> M ()
 setRet sc env v = case lookupVar sc "$ret" of
-  Just (Var _ (TMaybe t) i) | Just Refl <- tyEq t (sRet sc) -> liftIO (writeIORef (ref i env) (Just v))
+  Just (Var _ (TMaybe t) i) | Just Refl <- tyEq t (sRet sc) -> do
+    liftIO (writeIORef (ref i env) (Just v))
+    setRawRet sc env Nothing
   _ -> diverge "internal: $ret slot missing"
+
+setRawRet :: Scope ls r -> Env ls -> Maybe [Dyn] -> M ()
+setRawRet sc env ds = case lookupVar sc "$rawRet" of
+  Just (Var _ (TMaybe TVariadic) i) -> liftIO $ writeIORef (ref i env) ds
+  _ -> diverge "lost modifier dynamic return slot"
 
 -- ---------------------------------------------------------------- contracts
 

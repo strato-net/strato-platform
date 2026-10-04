@@ -15,7 +15,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as T
 import SolidVM.Model.CodeCollection (CodeCollection)
-import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
+import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..), isDefault)
 import System.Directory (listDirectory)
 import System.Environment
 import System.FilePath ((</>))
@@ -77,7 +77,7 @@ data World = World
 mkRT :: World -> RT
 mkRT w = RT
   { rtGet = \a p -> M.findWithDefault BDefault (a, p) <$> readIORef (wStorage w)
-  , rtPut = \a p v -> modifyIORef' (wStorage w) (if v == BDefault then M.delete (a, p) else M.insert (a, p) v)
+  , rtPut = \a p v -> modifyIORef' (wStorage w) (if isDefault v then M.delete (a, p) else M.insert (a, p) v)
   , rtEmit = \fr cn en args -> modifyIORef' (wEvents w) (++ [T.pack (show (fThis fr)) <> " " <> cn <> "." <> en <> "(" <> T.intercalate ", " [n <> "=" <> showDyn d | (n, d) <- args] <> ")"])
   , rtCall = \kind caller addr name args _ -> dispatch w kind caller addr name args
   , rtBlockNumber = 1
@@ -86,13 +86,15 @@ mkRT w = RT
 
 -- Call boundary: EVM semantics -- a reverting callee rolls back its own writes.
 dispatch :: World -> CallKind -> Frame -> Address -> T.Text -> [Dyn] -> IO [Dyn]
-dispatch w kind caller codeAddr fn args = do
+dispatch w kind caller target fn args = do
+  let codeAddr = if kind == Call && target == fThis caller then fCode caller else target
   modifyIORef' wCalls' (+ 1)
   (cn, col) <- maybe (throwIO (Revert ("no code at " <> T.pack (show codeAddr)))) pure (M.lookup codeAddr (wCode w))
   cc <- maybe (throwIO (Divergence ("contract " <> cn <> " missing in collection"))) pure (M.lookup cn (colContracts col))
   let fr = case kind of
-        Call -> Frame { fThis = codeAddr, fCode = codeAddr, fSender = fThis caller, fOrigin = fOrigin caller, fSig = fn, fArgs = args, fValue = 0 }
+        Call | target == fThis caller -> caller { fSig = fn, fArgs = args }
         DelegateCall -> caller { fCode = codeAddr, fSig = fn, fArgs = args }
+        _ -> Frame { fThis = codeAddr, fCode = codeAddr, fSender = fThis caller, fOrigin = fOrigin caller, fSig = fn, fArgs = args, fValue = 0 }
       key = fn <> "/" <> T.pack (show (length args))
   (sigFun, args') <- case M.lookup key (ccFuns cc) of
     Just ef -> pure (ef, args)
