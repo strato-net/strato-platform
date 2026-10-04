@@ -9,12 +9,13 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 
-data SqlType = SqlBool | SqlDecimal | SqlText | SqlJsonb | SqlJsonbArray | SqlTimestamp | SqlSerial deriving (Eq, Ord, Show)
+data SqlType = SqlBool | SqlDecimal | SqlText | SqlBytesKey | SqlJsonb | SqlJsonbArray | SqlTimestamp | SqlSerial deriving (Eq, Ord, Show)
 
 sqlTypePostgres :: SqlType -> Text
 sqlTypePostgres SqlBool      = "bool"
 sqlTypePostgres SqlDecimal   = "decimal"
 sqlTypePostgres SqlText      = "text"
+sqlTypePostgres SqlBytesKey  = "text"
 sqlTypePostgres SqlJsonb      = "jsonb"
 sqlTypePostgres SqlJsonbArray = "jsonb"
 sqlTypePostgres SqlTimestamp = "timestamp"

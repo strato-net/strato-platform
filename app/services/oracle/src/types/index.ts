@@ -22,6 +22,7 @@ export interface ExchangeRateConfig {
 export interface Asset {
     targetAssetAddress: string;
     constantPrice?: number;
+    minSources?: number; // Overrides ORACLE_CONFIG.MIN_VALID_SOURCES for this asset
     weekendProxy?: string; // Proxy symbol for weekend/market-closed pricing (e.g., "PAXG" for XAU)
     equivalentAssets?: string[]; // Assets with equivalent prices (e.g., ["XAUT"] for XAU)
     submit?: boolean; // Whether to submit this asset to blockchain (default: true)

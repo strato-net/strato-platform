@@ -224,25 +224,21 @@ instance Format StoragePath where
       addConditionalDot w = w
 
 instance JSON.FromJSON StoragePath where
-  parseJSON (JSON.String v) = return $ either (error . (("malformed StoragePath: " ++ show v ++ "\n") ++)) id $ parsePath $ encodeUtf8 v
+  parseJSON (JSON.String v) = either fail pure $ storageKeyToPath v
   parseJSON v = error $ "wrong format in call to parseJSON for StoragePath: " ++ show v
 
 instance JSON.ToJSONKey StoragePath where
 
 instance JSON.ToJSON StoragePath where
-  toJSON v = JSON.String $ decodeUtf8 $ unparsePath v
+  toJSON = JSON.String . pathToStorageKey
 
 instance Binary StoragePath where
 
 instance PersistField StoragePath where
-  toPersistValue = toPersistValue . C8.unpack . unparsePath
-  fromPersistValue v =
-    case fromPersistValue v of
-      Left e -> Left e
-      Right theString ->
-        case parsePath theString of
-          Left e -> Left $ T.pack $ "malformed value string in call to fromPersistValue: " ++ show theString ++ "\n" ++ e
-          Right theStoragePath -> Right theStoragePath
+  toPersistValue = PersistText . pathToStorageKey
+  fromPersistValue v = do
+    text <- fromPersistValue v
+    either (Left . T.pack) Right $ storageKeyToPath text
 
 instance PersistFieldSql StoragePath where
   sqlType _ = SqlString
@@ -250,11 +246,11 @@ instance PersistFieldSql StoragePath where
 instance E.SqlString StoragePath where
 
 instance ToHttpApiData StoragePath where
-  toUrlPiece = decodeUtf8 . unparsePath
+  toUrlPiece = pathToStorageKey
 
 instance FromHttpApiData StoragePath where
   parseUrlPiece v =
-    case parsePath $ encodeUtf8 v of
+    case storageKeyToPath v of
       Left e -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v ++ "\n" ++ e
       Right theStoragePath -> Right theStoragePath
 
@@ -448,14 +444,27 @@ instance RLPSerializable BasicValue where
   rlpDecode (RLPString "") = BDefault
   rlpDecode x = error $ "invalid shape for BasicValue: " ++ show x
 
+-- SQL text cannot contain NUL, and mapping indexes need not be UTF-8.
+-- Keep field names visible for storage searches; tag binary indexes reversibly.
+-- Raw trie/Binary encoding is unchanged.
 pathToStorageKey :: StoragePath -> Text
-pathToStorageKey = decodeUtf8 . unparsePath
+pathToStorageKey (StoragePath pieces) = decodeUtf8 . unparsePath . StoragePath $ map encodeIndex pieces
+  where
+    encodeIndex (Index raw)
+      | not (B.all (\w -> w >= 0x20 && w < 0x7f) raw) || "~hex:" `B.isPrefixOf` raw =
+          Index $ "~hex:" <> B16.encode raw
+    encodeIndex piece = piece
 
 basicToStorageValue :: BasicValue -> Text
 basicToStorageValue = T.pack . format
 
 storageKeyToPath :: Text -> Either String StoragePath
-storageKeyToPath = parsePath . encodeUtf8
+storageKeyToPath text = do
+  StoragePath pieces <- parsePath $ encodeUtf8 text
+  StoragePath <$> traverse decodeIndex pieces
+  where
+    decodeIndex (Index raw) | Just hex <- B.stripPrefix "~hex:" raw = Index <$> B16.decode hex
+    decodeIndex piece = Right piece
 
 storageValueByteStringToBasic :: B.ByteString -> Either String BasicValue
 storageValueByteStringToBasic bs =

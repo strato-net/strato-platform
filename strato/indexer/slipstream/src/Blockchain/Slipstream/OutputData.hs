@@ -49,6 +49,7 @@ import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import           Data.Bool                       (bool)
 import qualified Data.Set as Set
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Map                        (Map)
@@ -101,6 +102,7 @@ data OnConflict = DoNothing
   { conflictCols       :: [Text]
   , conflictUpdateCols :: [Text]
   , extraSQL           :: Maybe Text
+  , conflictWhere      :: Maybe Text
   } deriving (Eq, Ord, Show)
 
 data SlipstreamQuery = CreateTable
@@ -291,7 +293,7 @@ slipstreamQueryText _ CreateView{..} =
               , tableNameToDoubleQuoteText sourceTableName
               , " e WHERE e.address = s.address AND e.collection_name = s.collection_name"
               ]
-           ++ [ T.concat [" AND e.\"key\"->>'", k, "' = s.\"key\"->>'", k, "'"]
+           ++ [ T.concat [" AND e.\"key\"->>'", k, "_hex' = s.\"key\"->>'", k, "_hex'"]
               | k <- mappingKeyName <$> [1 .. mappingKeyCount]
               ]
            ++ [ " AND e.\"key\"->>'"
@@ -337,6 +339,8 @@ slipstreamQueryText _ CreateView{..} =
                   ]
                 _ -> ""
             , case t of
+                SqlBytesKey -> T.concat
+                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
                 SqlJsonbArray -> T.concat
                   [ "THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
@@ -410,6 +414,7 @@ slipstreamQueryText _ CreateView{..} =
                       SqlBool      -> "false::boolean"
                       SqlDecimal   -> "'0'::text"
                       SqlText      -> "''::text"
+                      SqlBytesKey  -> "NULL::text"
                       SqlJsonb     -> "to_jsonb(''::text)"
                       SqlTimestamp -> "'infinity'::timestamp)"
                       SqlSerial    -> "0::numeric"
@@ -471,12 +476,13 @@ slipstreamQueryText _ InsertTable{..} = T.concat $
   ] ++ (case onConflict of
     Nothing -> []
     Just DoNothing -> ["\n ON CONFLICT DO NOTHING;"]
-    Just (OnConflict conflictCols conflictUpdateCols mExtraSQL) ->
+    Just (OnConflict conflictCols conflictUpdateCols mExtraSQL mWhere) ->
       [ "\n ON CONFLICT ",
         wrapAndEscapeDouble conflictCols,
         " DO UPDATE SET ",
         tableUpsert conflictUpdateCols,
         maybe "" (", " <>) mExtraSQL,
+        maybe "" (" WHERE " <>) mWhere,
         ";"
       ])
 slipstreamQueryText _ InsertDelegatecall{} = ""
@@ -673,7 +679,9 @@ createCollectionTable ::
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
 createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
-      keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
+      keySqlTypes = (\case
+        SVMType.Bytes{} -> SqlBytesKey
+        keyType -> fromMaybe SqlText $ solidityTypeToSQLType False (Just c) cc keyType) <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       keyCount = length keyNames
       lastKeyName = if keyCount <= 1 then "key" else "key" <> tshow keyCount
@@ -778,7 +786,7 @@ insertIndexTable cs =
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
-          in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
+          in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL) (Just $ newerBlockClause tblText)
              ]
    in yieldMany $ processContract cs'
 
@@ -833,6 +841,14 @@ eventBaseColumnsQuery =
 keyColumnNames :: [a] -> [(Text, a)]
 keyColumnNames = zipWith (\i t -> ("key" <> (if i == 1 then "" else T.pack $ show i), t)) [(1 :: Int)..]
 
+-- A replayed batch re-sends rows Cirrus already holds. Only a newer block may
+-- overwrite a row, so a replay updates nothing and the history triggers add no
+-- duplicate rows. PBFT finality gives one block per height, so the number alone
+-- identifies the block.
+newerBlockClause :: Text -> Text
+newerBlockClause tblText =
+  "excluded.block_number::bigint > " <> tblText <> ".block_number::bigint"
+
 jsonbUpdateClause :: Text -> Text -> Text
 jsonbUpdateClause tblText colText = T.concat
   [ colText
@@ -886,12 +902,24 @@ insertCollectionTableQuery rows =
           keyValuePairs =
             [ ValueMapping
               . Map.fromList
-              $ (\(t,k) -> (ValueString t, k))
-              <$> keyColumnNames (collectionDataKeys m)
+              $ concatMap keyValues $ keyColumnNames (collectionDataKeys m)
             , SimpleValue . ValueString $ collectionDataPath m
             , val
             ]
        in (m, isObject,) $ Just <$> keyValuePairs
+
+    -- Store readable keys plus their lossless bytes. Collection views use the
+    -- bytes for Solidity bytes/bytesN keys, even when those bytes are valid UTF-8.
+    -- Existing rows/views require a clean reindex to populate/use the hex keys.
+    keyValues (name, SimpleValue (ValueBytes _ raw)) =
+      let hex = decodeUtf8 $ Base16.encode raw
+          readable = case decodeUtf8' raw of
+            Right text | not (BS.elem 0 raw) -> text
+            _ -> "~hex:" <> hex
+       in [ (ValueString name, SimpleValue $ ValueString readable)
+          , (ValueString $ name <> "_hex", SimpleValue $ ValueString hex)
+          ]
+    keyValues (name, value) = [(ValueString name, value)]
 
     preparedRows = map prepareRow rows
 
@@ -939,7 +967,7 @@ insertCollectionTableQuery rows =
                 "collection_name",
                 "collection_type"
               ]
-       in [InsertTable tblName columns valueTuples . Just $ OnConflict onConflictCols updateSet (Just valueUpdateSQL)]
+       in [InsertTable tblName columns valueTuples . Just $ OnConflict onConflictCols updateSet (Just valueUpdateSQL) (Just $ newerBlockClause tblText)]
 
 insertEventArrayTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 insertEventArrayTableQuery [] = []
@@ -1142,10 +1170,7 @@ valueToSQLText' _ (SimpleValue (ValueString s)) = Just $ escapeQuestionMarks s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks $
-  case decodeUtf8' bytes of
-    Left _ -> decodeUtf8 $ Base16.encode bytes
-    Right x -> x
+valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks $ decodeValueBytes bytes
 valueToSQLText' _ (ValueEnum _ _ index) = Just . T.pack $ show index
 valueToSQLText' _ (ValueContract addr) =
   if addr == 0
@@ -1232,9 +1257,10 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      ["address", "block_hash"]
+      []
       Nothing
       [("storage_history_idx", ["address","valid_to"])]
+  , RawSQL $ dropHistoryPrimaryKeySQL "history@storage"
 {-  , CreateTable
       contractTableName
       [ ("address", SqlText)
@@ -1257,7 +1283,7 @@ initialSlipstreamQueries =
       ]
       ["address", "path"]
       Nothing -- (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
-      [("mapping_idx", ["address","path"])]
+      []
   , CreateTable
       mappingHistoryTableName
       [ ("address", SqlText)
@@ -1272,9 +1298,10 @@ initialSlipstreamQueries =
       , ("valid_from", SqlTimestamp)
       , ("valid_to", SqlTimestamp)
       ]
-      ["address", "block_hash", "path"]
+      []
       Nothing
       [("mapping_history_idx", ["address","path","valid_to"])]
+  , RawSQL $ dropHistoryPrimaryKeySQL "history@mapping"
   , CreateTable
       globalEventTableName
       [ ("id", SqlSerial)
@@ -1312,6 +1339,7 @@ initialSlipstreamQueries =
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
   , RawSQL genericBaseTableIndexesSQL
+  , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
@@ -1320,6 +1348,15 @@ initialSlipstreamQueries =
   , CreateFkeyFunction $ ForeignKeyInfo "mapping" (indexTableName "" "storage") (indexTableName "" "mapping") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "contract") (indexTableName "" "storage") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "contract" (indexTableName "" "storage") (indexTableName "" "contract") True "address" SqlText
+  ]
+
+-- History rows are deduplicated by newerBlockClause, so the old primary keys
+-- only cost writes. The check keeps later startups from locking the table.
+dropHistoryPrimaryKeySQL :: Text -> Text
+dropHistoryPrimaryKeySQL tbl = T.concat
+  [ "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = '\"", tbl, "\"'::regclass"
+  , " AND conname = '", tbl, "_pkey') THEN "
+  , "ALTER TABLE \"", tbl, "\" DROP CONSTRAINT IF EXISTS \"", tbl, "_pkey\"; END IF; END $$;"
   ]
 
 genericBaseTableIndexesSQL :: Text
@@ -1346,10 +1383,6 @@ genericBaseTableIndexesSQL = T.unlines
   , "    AND (value)::text <> ALL (ARRAY['\"\"', '0', 'false'])"
   , "    AND jsonb_typeof(value) IS NOT NULL;"
   , ""
-  , "CREATE INDEX IF NOT EXISTS storage_status_address_idx"
-  , "  ON storage (((data->>'status')), address)"
-  , "  WHERE jsonb_exists(data, 'status');"
-  , ""
   , "CREATE INDEX IF NOT EXISTS event_name_sender_timestamp_idx"
   , "  ON event (event_name, transaction_sender, block_timestamp DESC);"
   , ""
@@ -1358,6 +1391,9 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_name_timestamp_idx"
   , "  ON event (event_name, block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_timestamp_idx"
+  , "  ON event (block_timestamp DESC);"
   ]
 
 jsonbMergeDeepSQL :: Text
