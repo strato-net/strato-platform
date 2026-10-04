@@ -19,7 +19,8 @@ the AST and inspecting `Value` constructors at runtime. Source contracts and
 Haskell programs written with the SolidVM DSL remain SolidVM programs; this
 package is a new execution engine for them.
 
-This is a first working prototype. It is not connected to `vm-runner` yet.
+This is a standalone experimental prototype. An uncommitted integration connects
+it to `vm-runner` behind `SOLIDVM_NATIVE=1`.
 
 ## Repository location and dependencies
 
@@ -79,14 +80,50 @@ The compiler and strict typechecker:
   inheritance, `super`, library calls, and `using L for T`.
 - Produces compile errors classified as `TypeError`, `Unsupported`, `Unknown`,
   or `Internal`.
-- Keeps each function as `Either Err Fun`, permitting eventual per-function
-  fallback to the interpreter.
+- Keeps each function as `Either Err Fun` for diagnostics. The blockchain
+  integration uses `compileContractChecked`, rejecting the entire contract if
+  any storage declaration, function, or constructor fails compilation.
 
 `compileCollection` is the main compiler entry point:
 
 ```haskell
 compileCollection :: CodeCollection -> CompiledCollection
 ```
+
+The integration, counters, profiling, and `solid-vm-native-check` described below
+depend on uncommitted changes outside this package. They are not provided by
+`solid-vm-native` alone.
+
+The experimental blockchain integration is enabled with `SOLIDVM_NATIVE=1`
+in the environment of `strato-up`. It defaults to the interpreter. Native
+callbacks run in the existing `SM` state through `withRunInIO`, preserving the
+storage database, call frames, action diffs, and event encoder. Compiled and
+rejected contracts share a bounded 128-entry cache keyed by code hash, parser
+fork mode, and contract name. Debugger/tracer calls, memory-reference calls,
+and unsupported contract compilation use the interpreter. Runtime failures
+are reported; execution is never retried through the interpreter after writes.
+
+`solidvm_native_events` exposes execution hits, fallbacks, compiled contracts,
+and rejected contracts on the VM's Prometheus endpoint. Run
+`SOLIDVM_NATIVE=0 solid-vm-native-check --network=upquark` and then the same
+command with `SOLIDVM_NATIVE=1` in separate processes to compare returns,
+events, action diffs, nested calls, delegate calls, rollback, and a timed loop.
+This is an integration experiment: native statement-level gas charging and
+full exception/trace parity remain unfinished.
+
+Set `SOLIDVM_PROFILE=1` in the environment of `strato-up` to collect
+`solidvm_profile_calls`, `solidvm_profile_total_seconds`, and
+`solidvm_profile_self_seconds` on the same metrics endpoint. Labels identify
+execution mode, contract name and code hash, and function. Total time includes
+nested calls; self time subtracts nested dispatches and their profiling overhead.
+Both use elapsed time and include reverted calls. Profiling is disabled by
+default. Native internal closure calls remain inside their entry function's
+time, so compare contracts when comparing native and interpreted self times.
+Storage operations and call preparation are included in the enclosing function;
+block processing outside function dispatch is not measured by these counters.
+
+See `notes/RESULTS.md` for the 2026-10-04 integration checks and live Upquark
+comparison, including the limits of the measured speedup.
 
 ### `exec_src/Main.hs`
 
@@ -196,9 +233,8 @@ The current execution monad is:
 type M = ReaderT (RT, Frame) IO
 ```
 
-That choice made the standalone mock easy to implement. It is not the desired
-production shape because STRATO's storage, gas, event, and call operations
-live in the existing SolidVM `SM`/`ContextM` stack.
+The uncommitted adapter uses `SM`'s existing `withRunInIO` bridge for these
+callbacks, so storage, events, and nested calls use the existing VM state.
 
 ## Current language coverage
 
@@ -231,7 +267,7 @@ Not implemented or incomplete:
 - Several cryptographic/system builtins
 - SolidVM's RLP-based multi-value `keccak256`
 - Gas accounting
-- Production action/event data
+- Full exception, trace, and inherited-event parity
 
 See `notes/RESULTS.md` for the detailed list.
 
@@ -278,6 +314,11 @@ data, return values, and failure behavior also matter.
 
 ## Integration plan
 
+The uncommitted integration provides generic dispatch, an `SM` runtime
+adapter, and a bounded compiled-contract cache. The steps below preserve the
+original production plan; strict whole-contract rejection currently leaves
+parts of the fee chain on the interpreter.
+
 ### 1. Adapt the execution monad
 
 Replace or parameterize `M = ReaderT (RT, Frame) IO` so compiled actions can
@@ -318,11 +359,11 @@ At a SolidVM call:
 3. Convert transaction text arguments once using the declared signature.
 4. Run `callDyn` at the dynamic boundary.
 5. Convert return values to the existing VM result format.
-6. Fall back to the interpreter when that function did not compile.
+6. Fall back to the interpreter when the entire contract did not compile.
 
 Track compiled hits, fallbacks, compilation failures, and runtime divergences.
-The initial live engine must support per-function fallback because roughly
-30% of deployed function instances currently fail strict compilation.
+The experimental live engine uses whole-contract fallback. The historical
+function census therefore overstates the fraction eligible for native execution.
 
 ### 4. Integrate the fee path first
 

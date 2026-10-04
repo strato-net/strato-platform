@@ -69,7 +69,7 @@ Criteria 1–5, 8, 12 and 21 are the user's; direction on strictness, gas and st
     through a small typed API (`readUInt`, `writeAddr`, `call`, `emit`, `require`, ...). The storage layer and trie
     are unchanged.
 
-17. (proposed) Per-function fallback to the interpreter for unsupported constructs during development, with a
+17. Whole-contract fallback to the interpreter for unsupported constructs during development, with a
     hit/miss counter, so coverage can grow incrementally and every stage is measurable.
 
 18. (proposed) No contract-specific Haskell anywhere: the compiler is generic over SolidVM source. The hand-written

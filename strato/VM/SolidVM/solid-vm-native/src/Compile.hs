@@ -730,7 +730,7 @@ compileCall sc callee args = case callee of
       pure $ CE TVariadic $ \env -> do
         a <- addrOf env; n <- nf env; ds <- argsF env
         (r, f) <- ask
-        liftIO (rtCall r kind f a n ds)
+        liftIO (rtCall r kind f a n ds Nothing)
 
     externalCall :: T.Text -> (Env ls -> M Address) -> T.Text -> C (CE ls)
     externalCall cn addrOf m = do
@@ -742,7 +742,7 @@ compileCall sc callee args = case callee of
       pure $ CE r $ \env -> do
         a <- addrOf env; ds <- argsF env
         (rt', f) <- ask
-        out <- liftIO (rtCall rt' Call f a m ds)
+        out <- liftIO (rtCall rt' Call f a m ds (Just (SomeTy r)))
         case r of
           TUnit -> pure ()
           TVariadic -> pure out
@@ -876,7 +876,11 @@ compileFunction c name f = inFun (cName c <> "." <> name) $ do
     -- a single named return value is a local initialised to its default
     (_, [rn]) | [_] <- f ^. funcVals -> do
       k <- withModifiers (pushVar rn r sc0) { sNamedRet = [rn] } (f ^. funcModifiers) body
-      pure $ \env -> do rr <- liftIO (newIORef (defaultOf r)); k (rr :& env)
+      pure $ \env -> do
+        rr <- liftIO (newIORef (defaultOf r))
+        k (rr :& env) >>= \case
+          Next -> Ret <$> liftIO (readIORef rr)
+          flow -> pure flow
     -- several named return values: locals, gathered by a bare `return`
     (TTuple fs, _ : _ : _) | length names == fieldsLen fs -> namedReturns sc0 fs names (f ^. funcModifiers) body
     _ -> withModifiers sc0 (f ^. funcModifiers) body
@@ -889,7 +893,12 @@ namedReturns :: forall ls ts. Scope ls (HL ts) -> Fields ts -> [T.Text] -> [(T.T
 namedReturns sc0 fs0 names mods body = go sc0 fs0 names
   where
     go :: forall ls' us. Scope ls' (HL ts) -> Fields us -> [T.Text] -> C (Env ls' -> M (Flow (HL ts)))
-    go sc FNil [] = withModifiers sc { sNamedRet = names } mods body
+    go sc FNil [] = do
+      k <- withModifiers sc { sNamedRet = names } mods body
+      gather <- gatherNamed sc fs0 names
+      pure $ \env -> k env >>= \case
+        Next -> Ret <$> gather env
+        flow -> pure flow
     go sc (FCons _ t rest) (n : ns) = do
       k <- go (pushVar n t sc) rest ns
       pure $ \env -> do rr <- liftIO (newIORef (defaultOf t)); k (rr :& env)
@@ -1173,6 +1182,13 @@ compileContract cc c = CompiledContract (c ^. contractName) storageE funsE ctorE
 
 compileCollection :: CodeCollection -> CompiledCollection
 compileCollection cc = CompiledCollection (M.map (compileContract cc) (cc ^. contracts))
+
+compileContractChecked :: CodeCollection -> Contract -> Either [(T.Text, Err)] CompiledContract
+compileContractChecked cc c =
+  let compiled = compileContract cc c
+   in case collectionErrors (CompiledCollection (M.singleton (ccName compiled) compiled)) of
+        [] -> Right compiled
+        failures -> Left failures
 
 -- All compile errors of a collection, for the census.
 collectionErrors :: CompiledCollection -> [(T.Text, Err)]

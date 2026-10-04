@@ -90,3 +90,160 @@ multi-value `keccak256` 157, `keccak256(string)` 16. One collection fails to par
   SolidVM's catch does not roll back writes made before the throw inside the try block — not yet compared).
 - `bytes[i]` is an `Integer` 0..255; `push` on a local array is a typed snoc.
 - Gas: not modelled yet.
+
+## 2026-10-04: STRATO integration and live Upquark comparison
+
+The integration and profiling results below used uncommitted changes in
+`solid-vm/`, `solid-vm-compiler/`, and node shutdown tooling. Those changes are
+kept separately from the native compiler/runtime checkpoint; this package alone
+does not provide the blockchain dispatch, metrics, or integration-check command.
+
+The compiler is connected to STRATO's normal SolidVM call dispatch behind
+`SOLIDVM_NATIVE=1`; the default remains the interpreter. The adapter uses the
+existing `SM` state for storage, action diffs, events, nested calls, delegate
+calls, and rollback. No contract-specific Haskell was added. Compilation is
+all-or-nothing per contract, including storage and constructors. Unsupported
+contracts use the interpreter, and runtime failures are never retried after
+native execution starts. Compiled and rejected contracts use a bounded
+128-entry cache keyed by code hash, parser fork mode, and contract name.
+
+Four fresh Upquark syncs reached the same pinned target, block **528301**,
+with **zero state-root mismatches**. The target's insertion and successful
+completion were checked against block hash
+`e61dbd03712dbdabac3b6f161ce20fb515c7822e6fba4e95aa0ec7bc00004753`;
+its header state root is
+`c098241edb08b77bfe4cdddc6f6c3b81d4972912b857e23fb622597b59b87df0`.
+
+| Dispatcher | Mode | Block 1 → 528301, seconds | VM CPU snapshot, seconds |
+|---|---|---:|---:|
+| Initial | Interpreter | 1509.6 | 1643.7 |
+| Initial | Native | 1692.8 | 1715.1 |
+| Final | Interpreter | 1683.5 | 1669.2 |
+| Final | Native | 1538.2 | 1661.8 |
+
+The initial dispatcher repeated overload scans and function comparisons even
+for rejected contracts. Contract overload checks now run on cache misses; function
+matching runs only for compiled contracts. The initial pair ran native first,
+then interpreted; the final pair reversed that order. Both modes within each
+pair used the same binary. Final binary SHA-256:
+`fc8b2904e95a111e733adc0ffff3d33f266055b024d9bcd74db2311729a9ba33`.
+
+The final pair shows **8.6% lower wall time**, but VM CPU time is only **0.4%
+lower**, and the two interpreter wall times varied by **11.5%**. This establishes
+working integration, not a reliable end-to-end speedup yet. CPU values are the
+last Prometheus RTS snapshots near the target; they include startup and a small
+block overshoot, unlike the pinned block timestamp metric.
+
+The final native snapshot recorded **4,239,927 native calls** and **16,271,511
+fallbacks**: approximately **20.7% of tracked dispatches** ran natively. It also
+recorded 44 successful and 225 rejected compilation attempts; these counters
+are not a census of distinct contracts. Whole-contract rejection substantially
+reduces eligibility compared with the historical per-function census above.
+
+`solid-vm-native-check --network=upquark` exercises the real transaction and
+storage runtime with fresh in-memory state. All **13 checks** produced identical
+returns, events/topics, and action diffs in both modes, covering nested calls,
+proxy/delegate calls, child-call rollback, default storage fields, named
+returns, struct literals through proxies, and whole-contract fallback. Three
+separate runs per mode timed 100 calls to a 10,000-iteration arithmetic loop:
+median **0.5172 s interpreted**, **0.1259 s native**, or **4.1× faster**.
+Native statement-level gas charging is unfinished, so this is an experimental
+performance measurement rather than a production gas-equivalent benchmark.
+
+Live sync exposed three issues that were fixed and covered by regression checks:
+
+- Block 117160: external getter results containing unset storage references
+  needed decoding with the declared return type and physical storage address.
+- Block 199593: functions falling through their body returned defaults instead
+  of their assigned named return values, including internal calls.
+- Block 339458: proxy variadic arguments needed to preserve anonymous struct
+  literals without looking up an empty type name.
+
+Methodology follows the prior Cursor full-sync notes: use `strato-up` and
+`strato-down`, confirm all services are down, fully clear `mynode` between runs,
+and measure VM log timestamps for the same block range. VM RTS flags were
+`+RTS -T -N4 -A64m -I2 -F1.2 -RTS`. `SVMC_LENIENT`, `SVM_NATIVE_FEES`, and
+`SOLIDVM_AST_INTRINSICS` were unset. Builds used root `make`. Shutdown was also
+repaired so supervisor interruption during a restart cannot leave recorded
+process groups or Docker services behind. The final node is stopped and
+`mynode` is cleared.
+
+Logs, metrics, lifecycle records, the sync harness, binary hashes, and exact
+results are under `/tmp/solid-vm-native-integration/`; `summary.json` contains
+the verified comparison. `initial-{on,off}` preserves the first valid pair,
+`native-{on,off}` the final pair, and `native-failed-*` the discarded failing
+runs. Gas, complete exception/trace parity, inherited-event behavior, and
+compiler coverage remain unfinished; this replay does not certify contracts
+or execution paths absent from the tested workload.
+
+## Runtime profile — 2026-10-04
+
+Added opt-in `SOLIDVM_PROFILE=1` counters at function dispatch, labelled by
+execution mode, contract name/code hash, and function. Monotonic elapsed
+timers record calls, inclusive time, and self time. A per-thread stack subtracts
+nested dispatches and their profiling overhead; reverted calls unwind through
+the same accounting. The default path does not register timing counters.
+
+Two fresh Upquark syncs used the same binary
+`d5aed15b465d8514031ef12435eb0ceecbb1f882909a124cf8b8b49208d96130`
+and the previous pinned target, block **528301**. Both inserted the expected
+`e61dbd03…` block hash with **zero state-root mismatches**. All 13 correctness
+checks matched with profiling enabled in both modes, and again with profiling
+disabled. The node was shut down with `strato-down` and `mynode` removed after
+each run.
+
+| Profile | Calls | Function self time |
+|---|---:|---:|
+| Interpreter baseline | 20,630,623 | 452.1 s |
+| Native-enabled: interpreter fallback | 16,229,387 | 412.5 s |
+| Native-enabled: native execution | 4,227,016 | 43.6 s |
+
+Native accounted for **20.7% of dispatches but 9.6% of measured function self
+time**. **80.6% of native calls** were `Decider.decide`,
+`DeciderState.payFees`, `DeciderState.getImplContract`, and `ERC20._msgSender`.
+Their baseline self times averaged approximately **19.5, 18.4, 5.7, and 1.7 µs
+per call**, respectively. These are already inexpensive bodies; nested token
+calls are accounted for separately.
+
+Contract versions observed executing natively represented **33.1% of baseline
+dispatches but 20.3% of baseline self time** (excluding their constructors).
+Matching only function names and code hashes observed executing natively gives
+**12.3%** of baseline self time. These are coverage estimates: a supported
+contract can still fall back for a particular invocation, and native internal
+closure calls are folded into their entry function rather than timed separately.
+The contract comparison avoids interpreting that folding as a function speedup.
+
+The expensive baseline work is concentrated elsewhere:
+
+| Contract | Baseline self time | Share | Native status |
+|---|---:|---:|---|
+| OrderBook | 143.1 s | 31.6% | Interpreter |
+| PriceOracle | 80.0 s | 17.7% | Interpreter |
+| ERC20 | 33.1 s | 7.3% | Mixed invocations |
+| AdminRegistry | 22.9 s | 5.1% | Mostly interpreter |
+| Voucher | 22.7 s | 5.0% | Interpreter |
+
+`OrderBook.createOffer` alone contributed **131.5 s / 29.1%** of baseline self
+time. Sources fetched by the measured code hashes and compiled through `svmc
+census` identify `new Offer`, `new Bid`, and base-constructor calls as compiler
+gaps for OrderBook. PriceOracle is rejected on inherited ownership code
+(`expected address, got contract PriceOracle`, address-to-string conversion)
+and its base-constructor call. Together these two contracts account for
+**49.3%** of baseline function time and remain on the interpreter.
+
+This supports the hypothesis that current native coverage is concentrated in
+cheap work. The next useful coverage targets are PriceOracle's inherited
+ownership/construction support and OrderBook's contract creation. Their timers
+also include shared storage, deployment, and call preparation, so enabling them
+does not imply all of that time can be eliminated by native execution.
+
+These are elapsed-time workload profiles, not CPU profiles or an uninstrumented
+speed benchmark. Profiled pinned sync times were 1738.7 s off and 1760.1 s on;
+instrumentation adds overhead. Metrics include a small polling overshoot beyond
+the target (final logs reached 528391 off and 528875 on). Timing outside function
+dispatch is not measured, and storage/call preparation are not separate buckets.
+
+Artifacts: `/tmp/solid-vm-native-integration/profile-{off,on}/`,
+`profile-analysis.json`, `profile-{off,on}.csv`, `analyze-profile.py`,
+`profile-sync.py`, and `profile-hot-census.txt` with the fetched deployed sources
+in `profile-hot-code/`.

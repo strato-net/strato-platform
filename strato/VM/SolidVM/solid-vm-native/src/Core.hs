@@ -209,7 +209,7 @@ data RT = RT
   { rtGet  :: Address -> StoragePath -> IO BasicValue
   , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()
   , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
-  , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> IO [Dyn]
+  , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
   , rtBlockNumber :: Integer
   , rtTimestamp :: Integer
   }
@@ -244,17 +244,24 @@ snocP (StoragePath ps) p = StoragePath (ps ++ [p])
 
 -- Whole values in storage: scalars are one slot; arrays are `length` + indexed slots; structs are fields.
 readVal :: Ty t -> StoragePath -> M t
-readVal t p = case t of
+readVal t p = do
+  (r, f) <- ask
+  readValWith (liftIO . rtGet r (fThis f)) t p
+
+readValWith :: forall m t. MonadIO m => (StoragePath -> m BasicValue) -> Ty t -> StoragePath -> m t
+readValWith getSlot t p = case t of
   TArr et -> do
-    n <- readSlot TInt (snocP p (Field "length"))
-    Seq.fromList <$> mapM (\i -> readVal et (snocP p (Index (BC.pack (show i))))) [0 .. n - 1]
+    n <- readSlotWith TInt (snocP p (Field "length"))
+    Seq.fromList <$> mapM (\i -> readValWith getSlot et (snocP p (Index (BC.pack (show i))))) [0 .. n - 1]
   TStruct _ fs -> readFields fs
   TTuple fs -> readFields fs
-  _ -> readSlot t p
+  _ -> readSlotWith t p
   where
-    readFields :: Fields ts -> M (HL ts)
+    readSlotWith :: Ty a -> StoragePath -> m a
+    readSlotWith ty path = getSlot path >>= either (liftIO . throwIO . Divergence) pure . fromBasic ty
+    readFields :: Fields ts -> m (HL ts)
     readFields FNil = pure HNil
-    readFields (FCons n ft rest) = (:*) <$> readVal ft (snocP p (Field (TE.encodeUtf8 n))) <*> readFields rest
+    readFields (FCons n ft rest) = (:*) <$> readValWith getSlot ft (snocP p (Field (TE.encodeUtf8 n))) <*> readFields rest
 
 writeVal :: Ty t -> StoragePath -> t -> M ()
 writeVal t p v = case t of

@@ -79,7 +79,7 @@ mkRT w = RT
   { rtGet = \a p -> M.findWithDefault BDefault (a, p) <$> readIORef (wStorage w)
   , rtPut = \a p v -> modifyIORef' (wStorage w) (if v == BDefault then M.delete (a, p) else M.insert (a, p) v)
   , rtEmit = \fr cn en args -> modifyIORef' (wEvents w) (++ [T.pack (show (fThis fr)) <> " " <> cn <> "." <> en <> "(" <> T.intercalate ", " [n <> "=" <> showDyn d | (n, d) <- args] <> ")"])
-  , rtCall = dispatch w
+  , rtCall = \kind caller addr name args _ -> dispatch w kind caller addr name args
   , rtBlockNumber = 1
   , rtTimestamp = 0
   }
