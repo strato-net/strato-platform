@@ -23,4 +23,8 @@ else
     echo "No pidfile found"
 fi
 
+if [[ -f docker-compose.yml ]]; then
+    docker compose -p strato down
+fi
+
 echo "STRATO stopped"

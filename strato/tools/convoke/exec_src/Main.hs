@@ -11,7 +11,7 @@ import System.Directory
 import System.Environment (getArgs, setEnv)
 import System.Posix.Types (ProcessID)
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
-import System.Posix.Signals (signalProcess, sigTERM, sigKILL, Signal)
+import System.Posix.Signals (signalProcess, sigTERM, sigINT, sigKILL, Signal, installHandler, Handler(Ignore))
 import System.Posix.Process (getProcessStatus, ProcessStatus)
 import System.Posix.Resource (Resource(ResourceOpenFiles), ResourceLimit(..), ResourceLimits(..), getResourceLimit, setResourceLimit)
 import Control.Concurrent (threadDelay)
@@ -230,6 +230,9 @@ main = do
   result <- awaitAnyOrInterrupt asyncs `catch` \e -> case e of
     UserInterrupt -> return Nothing
     _ -> throwIO e
+  -- Finish cleanup even if strato-down signals after a child has failed.
+  _ <- installHandler sigTERM Ignore Nothing
+  _ <- installHandler sigINT Ignore Nothing
   case result of
     Just (_, (exitCode, pid, cmd)) -> do
       say $ "ERROR: Process " ++ cmd ++ " (PID " ++ show pid ++ ") exited with: " ++ show exitCode
