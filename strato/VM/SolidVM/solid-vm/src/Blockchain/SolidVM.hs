@@ -40,6 +40,7 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Forks (isEmitArgForkActive)
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
@@ -1007,7 +1008,13 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM (forceValue <=< getVar) exps
+  -- Consensus-visible through the receipts root: see 'isEmitArgForkActive'.
+  -- Before it, args keep their storage references and unwritten values.
+  emitArgFork <- isEmitArgForkActive . BlockHeader.number . Env.blockHeader <$> getEnv
+  expVals <-
+    if emitArgFork
+      then mapM (forceValue <=< getVar) exps
+      else mapM (forceLoadVar . Constant <=< getVar) exps
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
@@ -1033,8 +1040,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           evArgs <- forM (zip (CC._eventLogs ev) expVals) $
             \(CC.EventLog name _ (CC.IndexedType _ idxType _), value) ->
               (name,) <$> case value of
-                SReference _ -> forceValue =<< createDefaultValue cc curCnct idxType
-                SNULL -> forceValue =<< createDefaultValue cc curCnct idxType
+                SReference _ | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
+                SNULL | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
                 _ -> pure value
 
           tHash <- Env.txHash <$> getEnv
