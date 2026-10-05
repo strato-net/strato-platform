@@ -205,9 +205,10 @@ instance (MP.StateRoot `A.Alters` MP.NodeData) ContextM where
 -- so when no peer replies there is nothing left to do but say so and stop.
 fetchMPNode :: MP.StateRoot -> ContextM (Maybe MP.NodeData)
 fetchMPNode k = do
-  void $ writeUnseqEvents [IEGetMPNodes [k]]
+  -- Read from the topic's end, not the VM's own group: block tasks queued
+  -- behind the failed one must stay unconsumed for the restart.
   mnd <- timeout 10000000 $
-    runConsume "ethereum-vm" seqVmTasksTopicName $ \evs -> do
+    consumeFromLatest seqVmTasksTopicName (void $ writeUnseqEvents [IEGetMPNodes [k]]) $ \evs -> do
       let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
           findND _ = Nothing
           mND = foldr (<|>) Nothing (findND <$> evs)
