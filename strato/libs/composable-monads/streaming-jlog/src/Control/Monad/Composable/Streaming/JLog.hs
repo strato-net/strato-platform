@@ -77,7 +77,7 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 
 import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
-                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
+                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber, jlog_ctx_remove_subscriber,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
@@ -271,10 +271,13 @@ runConsume consumerGroup topicName f = do
       (msgs, lastId) <- liftIO $ waitForBatch topicPath subscriber
       -- Process batch, then checkpoint once at the end
       mResult <- processBatch msgs
-      liftIO $ checkpointTo topicPath subscriber lastId
+      -- A batch that stops the loop is left unconsumed, as if f had thrown,
+      -- so a consumer that stops on a failure reads it again on restart.
       case mResult of
         Just r -> return r
-        Nothing -> consumeLoop topicPath subscriber
+        Nothing -> do
+          liftIO $ checkpointTo topicPath subscriber lastId
+          consumeLoop topicPath subscriber
 
     -- Keep the fast idle poll loop in concrete IO. Putting this
     -- Nothing -> delay -> recurse path back in the polymorphic consumer
@@ -393,7 +396,9 @@ consumeFromLatest topicName initAction f = do
     withCString topicPath $ \cpath -> do
       ctx <- jlog_new cpath
       _ <- jlog_ctx_init ctx
-      withCString subscriber $ \csub ->
+      -- Adding an existing subscriber keeps its old position, so drop it first.
+      withCString subscriber $ \csub -> do
+        void $ jlog_ctx_remove_subscriber ctx csub
         void $ jlog_ctx_add_subscriber ctx csub 1  -- JLOG_END
       jlog_ctx_close ctx
   

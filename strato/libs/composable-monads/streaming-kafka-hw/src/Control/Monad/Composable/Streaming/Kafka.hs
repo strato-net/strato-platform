@@ -288,12 +288,14 @@ runConsume consumerGroup topicName f = do
     consumeLoop kc = do
       (items, newOffset) <- pollItems kc
       mReturnVal <- f items
-      liftIO $ commitOffset kc topicName newOffset
+      -- A batch that stops the loop is left uncommitted, as if f had thrown.
       case mReturnVal of
         Just returnVal -> do
           liftIO $ void $ KC.closeConsumer kc
           pure returnVal
-        Nothing -> consumeLoop kc
+        Nothing -> do
+          liftIO $ commitOffset kc topicName newOffset
+          consumeLoop kc
 
     pollItems kc = do
       msgs <- liftIO $ KC.pollMessageBatch kc (KC.Timeout 50000) (KC.BatchSize 500)
