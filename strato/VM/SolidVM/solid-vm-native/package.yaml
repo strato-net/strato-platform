@@ -9,6 +9,10 @@ library:
   exposed-modules:
     - SolidVM.Core
     - SolidVM.Compile
+    - SolidVM.Gas
+    - SolidVM.Values
+    - SolidVM.Events
+    - SolidVM.Storage
   ghc-options: -O1
   dependencies:
     - Decimal
@@ -21,3 +25,17 @@ library:
     - source-tools
     - strato-model
     - text
+    - blockapps-data
+    - blockapps-mpdbs
+    - evm-solidity
+    - solid-vm
+    - solid-vm-static-analysis
+    - unliftio
+    - vector
+    - solid-vm-parser
+    - monad-alter
+    - vm-tools
+    - common-log
+    - ethereum-rlp
+    - strato-conf
+    - utf8-string

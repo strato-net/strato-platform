@@ -13,6 +13,10 @@ library
   exposed-modules:
       SolidVM.Core
       SolidVM.Compile
+      SolidVM.Gas
+      SolidVM.Values
+      SolidVM.Events
+      SolidVM.Storage
   other-modules:
       Paths_solid_vm_native
   hs-source-dirs:
@@ -22,12 +26,26 @@ library
       Decimal
     , base
     , base16-bytestring
+    , blockapps-data
+    , blockapps-mpdbs
     , bytestring
+    , common-log
     , containers
+    , ethereum-rlp
+    , evm-solidity
     , lens
+    , monad-alter
     , mtl
+    , solid-vm
     , solid-vm-model
+    , solid-vm-parser
+    , solid-vm-static-analysis
     , source-tools
+    , strato-conf
     , strato-model
     , text
+    , unliftio
+    , utf8-string
+    , vector
+    , vm-tools
   default-language: Haskell2010
