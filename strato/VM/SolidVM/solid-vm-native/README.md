@@ -130,30 +130,9 @@ out-of-gas errors. Full exception/trace parity remains unfinished.
 See `notes/RESULTS.md` for the 2026-10-04 integration checks and live Upquark
 comparison, including the limits of the measured speedup.
 
-### `exec_src/Main.hs`
-
-The prototype CLI and mock runtime:
-
-- Loads raw source, a JSON source string, or a JSON list of source files.
-- Calls the existing
-  `compileSourceWithAnnotationsWithoutImports` frontend.
-- Implements the contract census command.
-- Implements an in-memory runtime with storage, events, nested calls,
-  delegate calls, and rollback on `Revert`.
-- Runs the end-to-end fee-chain demonstration.
-
-The mock runtime is test scaffolding. It is not intended to become STRATO's
-production runtime.
-
-### `tools/Probe.hs`
-
-A parser/AST inspection utility used while developing compiler support. It
-prints the selected contract's storage declarations and the selected
-function's arguments, return values, modifiers, overloads, and statement AST.
-
 ### `fixtures/`
 
-Sources used by the fee-chain demonstration:
+Source collections retained for compiler coverage checks:
 
 - `Decide.sol`
 - `DeciderState.sol`
@@ -180,36 +159,7 @@ make
 Do not use the old `/tmp/vmqa/svmc/build.sh`; it was only prototype
 scaffolding.
 
-Stack sees this package as `solid-vm-native` and builds:
-
-- Library: `solid-vm-native`
-- Executable: `svmc`
-- Executable: `svmc-probe`
-
-## Running the prototype tools
-
-From `strato/`:
-
-```bash
-stack exec svmc -- census <source-directory>
-stack exec svmc -- feechain VM/SolidVM/solid-vm-native/fixtures
-stack exec svmc-probe -- <source-file> <contract-name> <function-name>
-```
-
-`census` compiles every source collection in a directory and reports function
-successes and failures by reason. `WHOLE` rows report eligibility for the live
-adapter, including its rejection of overloads with duplicate arities.
-
-`feechain` compiles the fixture contracts and executes five fee decisions
-against the mock runtime. The expected high-level trace is:
-
-1. Decisions 1-3 burn one voucher each.
-2. The sender's voucher balance moves from `3e18` to zero.
-3. Voucher total supply moves from `10e18` to `7e18`.
-4. Decisions 4-5 transfer `1e16` USDST each to the fee collector.
-5. The sender's USDST balance moves from `5e16` to `3e16`.
-6. The collector's USDST balance moves from zero to `2e16`.
-7. All five calls return `True`.
+Stack sees this package as the `solid-vm-native` library.
 
 ## Current type and execution model
 
@@ -278,7 +228,6 @@ Implemented in the prototype:
 
 Not implemented or incomplete:
 
-- Contract creation in the standalone mock runtime
 - Typed catch clauses
 - Several cryptographic/system builtins
 - The removed `getUserCert` lookup and byte payloads for low-level calls compile
@@ -334,10 +283,8 @@ The following decisions remain provisional:
 - Parser-produced `InlineBoundsCheck` nodes are enforced.
 - `super` executes in the selected parent context, matching STRATO dispatch.
 - Catch handles `Revert` and STRATO `SolidException`, including exhaustion;
-  engine failures remain uncaught. Mock external calls restore storage and
-  events on revert.
-- STRATO supplies the canonical gas meter through `RT.rtChargeGas`. The
-  standalone mock host supplies an unlimited no-op callback.
+  engine failures remain uncaught.
+- STRATO supplies the canonical gas meter through `RT.rtChargeGas`.
 - Events use the contract context containing the executing body, including
   inherited `super` calls (`ERC20` versus `Token` in the fee path).
 
@@ -409,9 +356,9 @@ Decider.decide
   -> USDST transfer
 ```
 
-All functions reached by this path compile and already execute end to end in
-the mock runtime. Hooking this narrow path into `payFees` provides a controlled
-performance and consensus test before general dispatch is enabled.
+The historical mock fee-chain runner has been removed. This path now executes
+through the live native integration; see `notes/RESULTS.md` for sync validation
+and performance measurements.
 
 Baseline full-upquark measurements from the earlier experiment:
 
