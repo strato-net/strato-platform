@@ -17,6 +17,7 @@ library
       SolidVM.Values
       SolidVM.Events
       SolidVM.Storage
+      SolidVM.Builtins
   other-modules:
       Paths_solid_vm_native
   hs-source-dirs:

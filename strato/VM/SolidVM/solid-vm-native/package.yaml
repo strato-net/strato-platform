@@ -13,6 +13,7 @@ library:
     - SolidVM.Values
     - SolidVM.Events
     - SolidVM.Storage
+    - SolidVM.Builtins
   ghc-options: -O1
   dependencies:
     - Decimal

@@ -259,7 +259,13 @@ data RT = RT
   , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
   , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
   , rtSender :: Frame -> IO Address
-  , rtBuiltin :: T.Text -> [Dyn] -> IO Dyn
+  , rtAbiEncode :: Bool -> [Dyn] -> IO B.ByteString
+  , rtCreateCode :: Maybe Dyn -> T.Text -> T.Text -> [Dyn] -> IO Address
+  , rtSelfdestruct :: Address -> IO Bool
+  , rtPreviousBlock :: IO (Address, Address, Integer)
+  , rtProposer :: IO Address
+  , rtCopyStorage :: StoragePath -> StoragePath -> IO ()
+  , rtDerive :: Address -> T.Text -> T.Text -> [Dyn] -> IO Address
   , rtCreate :: Frame -> T.Text -> Maybe (IO Dyn) -> IO [Dyn] -> IO Address
   , rtBlockNumber :: Integer
   , rtTimestamp :: Integer

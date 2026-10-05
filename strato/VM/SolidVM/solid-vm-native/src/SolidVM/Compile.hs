@@ -32,6 +32,7 @@ import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
 import SolidVM.Core
+import qualified SolidVM.Builtins as Builtins
 
 -- ---------------------------------------------------------------- errors
 
@@ -296,10 +297,13 @@ compileExpression sc chargeDestination e = case e of
     "timestamp" -> pure $ CE TInt (\_ -> rtTimestamp <$> rt)
     _ | m `elem` ["prevProposer", "prevIntendedProposer", "coinbase", "proposer"] -> pure $ CE TAddr $ \_ -> do
           runtime <- rt
-          liftIO (rtBuiltin runtime ("__solidvm_block_" <> m) []) >>= fromDyn TAddr
+          liftIO $ case m of
+            "prevProposer" -> (\(a, _, _) -> a) <$> rtPreviousBlock runtime
+            "prevIntendedProposer" -> (\(_, a, _) -> a) <$> rtPreviousBlock runtime
+            _ -> rtProposer runtime
       | m == "prevRound" -> pure $ CE TInt $ \_ -> do
           runtime <- rt
-          liftIO (rtBuiltin runtime "__solidvm_block_prevRound" []) >>= fromDyn TInt
+          liftIO $ (\(_, _, n) -> n) <$> rtPreviousBlock runtime
       | otherwise -> unsupported ("block." <> m)
   S.MemberAccess _ (S.Variable _ en) member
     | Nothing <- lookupVar sc en, Nothing <- M.lookup en (cStorage c), Just names <- lookupEnum c en ->
@@ -323,9 +327,8 @@ compileExpression sc chargeDestination e = case e of
         argsF <- compileDynArgs sc args
         _ <- compileAs sc TStr ix
         pure $ CE TStr $ \env -> do
-          ds <- argsF env
-          runtime <- rt
-          liftIO (rtBuiltin runtime "__solidvm_missing_getUserCert" ds) >>= fromDyn TStr
+          _ <- argsF env
+          Builtins.missingUserCert
   S.IndexAccess _ _ _ -> do LV t g _ <- compileLV sc e; pure (CE t g)
   S.FunctionCall _ callee args -> compileCall sc callee args
   S.Unitary _ op x -> case op of
@@ -883,7 +886,7 @@ compileAssignment sc destinationFirst metered l r = do
       pure (void . parentF)
     _ -> pure (\_ -> pure ())
   case compileStorage sc r of
-    Right (sourceType@(SScalar (SomeTy sourceTy)), sourceF) -> do
+    Right (SScalar (SomeTy sourceTy), sourceF) -> do
       _ <- compileAs sc t r
       pure $ CE t $ \env -> do
         let source = do
@@ -899,7 +902,7 @@ compileAssignment sc destinationFirst metered l r = do
           (Just destination, _, _) -> do
             (runtime, caller) <- ask
             liftIO $ case basic of
-              BDefault -> void $ rtBuiltin runtime "__solidvm_assign_unset_storage" [Dyn (TRef sourceType) destination, Dyn (TRef sourceType) path]
+              BDefault -> rtCopyStorage runtime destination path
               _ -> rtPut runtime (fThis caller) destination basic
           (_, _, set) -> set value
         pure value
@@ -1125,17 +1128,16 @@ compileCall sc callee args = case callee of
       pure $ CE TAddr $ \env -> do
         ds <- argsF env
         address <- addressF env
-        runtime <- rt
-        liftIO (rtBuiltin runtime "__solidvm_derive" (Dyn TAddr address : ds)) >>= fromDyn TAddr
+        Builtins.derive address ds
 
     builtinCall :: Ty t -> T.Text -> C (CE ls)
     builtinCall t name = do
+      action <- maybe (unknown ("builtin " <> name)) pure (Builtins.lookupAction name)
       f <- dynArgs args
       pure $ CE t $ \env -> do
         ds <- f env
         case callee of S.MemberAccess _ (S.Variable _ "abi") _ -> chargeGas 1 >> chargeGas 1; _ -> pure ()
-        runtime <- rt
-        liftIO (rtBuiltin runtime name ds) >>= fromDyn t
+        action ds >>= fromDyn t
 
     lowLevel :: CallKind -> Expression -> C (CE ls)
     lowLevel kind target = do
@@ -1156,8 +1158,7 @@ compileCall sc callee args = case callee of
           liftIO (rtCall r kind f a n ds (Just (SomeTy TRaw)))
         _ -> pure $ CE TRaw $ \env -> do
           n <- nameF env; ds <- argsF env; _ <- addrOf env
-          r <- rt
-          liftIO (rtBuiltin r "__solidvm_invalid_low_level" (Dyn nameTy n : ds)) >>= fromDyn TRaw
+          Builtins.invalidLowLevel (Dyn nameTy n : ds)
 
     externalCall :: T.Text -> (Env ls -> M Address) -> T.Text -> C (CE ls)
     externalCall cn addrOf m = do
