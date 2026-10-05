@@ -614,6 +614,21 @@ test("confirmation policy fails closed after runtime environment changes", async
   assert.equal(getDepositConfirmationPolicy(999999), 8);
 });
 
+test("deposit reconciliation depth rejects values that can skip or disable scanning", async (t) => {
+  const { getDepositReconciliationDepth } = await import("../config");
+  const prior = process.env.DEPOSIT_RECONCILIATION_BLOCKS;
+  t.after(() => {
+    if (prior === undefined) delete process.env.DEPOSIT_RECONCILIATION_BLOCKS;
+    else process.env.DEPOSIT_RECONCILIATION_BLOCKS = prior;
+  });
+  for (const value of ["0", "-1", "1.5", "bad", "2000"]) {
+    process.env.DEPOSIT_RECONCILIATION_BLOCKS = value;
+    assert.throws(() => getDepositReconciliationDepth(), /must be an integer between 1 and 1999/);
+  }
+  process.env.DEPOSIT_RECONCILIATION_BLOCKS = "64";
+  assert.equal(getDepositReconciliationDepth(), 64);
+});
+
 test("WebSocket reconnect backs off and periodic polls cannot bypass the delay", async () => {
   const fs = await import("node:fs");
   const vm = await import("node:vm");

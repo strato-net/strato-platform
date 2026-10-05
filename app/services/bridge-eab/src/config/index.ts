@@ -191,8 +191,15 @@ export const getDepositConfirmationPolicy = (
 export const DEPOSIT_WS_RECONNECT_BASE_MS = 1_000;
 export const DEPOSIT_WS_RECONNECT_MAX_MS = 60_000;
 
-export const getDepositReconciliationDepth = (): number =>
-  Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);
+export const getDepositReconciliationDepth = (): number => {
+  const depth = Number(process.env.DEPOSIT_RECONCILIATION_BLOCKS || 64);
+  if (!Number.isSafeInteger(depth) || depth < 1 || depth >= NATIVE_SCAN_WINDOW_BLOCKS) {
+    throw new Error(
+      `DEPOSIT_RECONCILIATION_BLOCKS must be an integer between 1 and ${NATIVE_SCAN_WINDOW_BLOCKS - 1}`,
+    );
+  }
+  return depth;
+};
 
 export const getMissingReceiptGraceMs = (): number =>
   Number(process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000);

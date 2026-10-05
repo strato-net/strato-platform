@@ -216,6 +216,18 @@ describe("ExternalBridgeVault", function () {
     ).to.be.revertedWithCustomError(vault, "InvalidAttestationThreshold");
   });
 
+  it("keeps authorizations valid when the threshold is set to its current value", async function () {
+    const authorization = await buildAuthorization();
+    const signatures = await thresholdSignatures(authorization);
+    const version = await vault.signerSetVersion();
+
+    await vault.connect(attestationAdmin).setAttestationThreshold(2);
+
+    expect(await vault.signerSetVersion()).to.equal(version);
+    await expect(vault.connect(executor).reserve(authorization, signatures))
+      .to.emit(vault, "WithdrawalReserved");
+  });
+
   it("rejects an authorization signed by an unknown signer", async function () {
     const authorization = await buildAuthorization();
     const signatures = await Promise.all(

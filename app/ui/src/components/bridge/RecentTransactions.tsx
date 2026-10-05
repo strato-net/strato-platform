@@ -44,6 +44,8 @@ type RecentTx = {
 };
 
 const METAL_STATUS = getBridgeStatusLabel(ExternalBridgeStatus.COMPLETED);
+const INCOMPLETE_WITHDRAWAL_STATUS_FILTER = "in.(1,2,3,10)";
+const TERMINAL_WITHDRAWAL_STATUS_FILTER = "in.(4,5,6,7)";
 const normalizeAddress = (address?: string) =>
   (address || "").toLowerCase().replace(/^0x/, "");
 
@@ -202,11 +204,23 @@ const RecentTransactions = ({
       if (disposed || fetching) return;
       fetching = true;
       const params = { limit: String(recentLimit), offset: "0", order: "block_timestamp.desc" };
+      const withdrawalRequest = includeRoutes
+        ? Promise.resolve({ data: [] })
+        : withdrawalsOnly
+          ? Promise.all([
+              fetchWithdrawTransactions({
+                ...params,
+                "value->>bridgeStatus": TERMINAL_WITHDRAWAL_STATUS_FILTER,
+              }, "deposits"),
+              fetchWithdrawTransactions({
+                order: "block_timestamp.desc",
+                "value->>bridgeStatus": INCOMPLETE_WITHDRAWAL_STATUS_FILTER,
+              }, "deposits"),
+            ]).then(results => ({ data: results.flatMap(result => result.data || []) }))
+          : fetchWithdrawTransactions(params, "deposits");
       Promise.all([
         withdrawalsOnly ? Promise.resolve({ data: [] }) : fetchDepositTransactions(params, "deposits"),
-        includeRoutes
-          ? Promise.resolve({ data: [] })
-          : fetchWithdrawTransactions(params, "deposits"),
+        withdrawalRequest,
         includeRoutes
           ? activityFeedApi.getActivities(
               [{ contract_name: "TokenRouter", event_name: "RouteExecuted" }],
@@ -221,10 +235,19 @@ const RecentTransactions = ({
         catch { /* Indexed history remains available when local storage is unavailable. */ }
         if (includeRoutes) remaining = remaining.filter(p => normalizeAddress(p.DepositInfo?.stratoRecipient) === normalizeAddress(userAddress));
         const routeEvents = routeResult.events || [];
-        const all = [
+        const seenWithdrawals = new Set<string>();
+        const withdrawals = ((withdrawalResult.data || []) as unknown as Record<string, unknown>[])
+          .filter(tx => {
+            const key = `${tx.bridgeSource || "unknown"}:${tx.withdrawalId || ""}`;
+            if (seenWithdrawals.has(key)) return false;
+            seenWithdrawals.add(key);
+            return true;
+          })
+          .map(mapWithdrawal);
+        const sorted = [
           ...remaining.map((p: Record<string, unknown>) => mapDeposit(p, 'pending')),
           ...apiDeposits.map((tx) => mapDeposit(tx, 'api')),
-          ...((withdrawalResult.data || []) as unknown as Record<string, unknown>[]).map(mapWithdrawal),
+          ...withdrawals,
           ...routeEvents.map((event): RecentTx => ({
             _type: "route",
             block_timestamp: event.block_timestamp,
@@ -234,8 +257,8 @@ const RecentTransactions = ({
             finalToken: event.attributes.tokenOut,
             status: String(ExternalBridgeStatus.COMPLETED),
           })),
-        ].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime())
-         .slice(0, recentLimit);
+        ].sort((a, b) => new Date(b.block_timestamp || 0).getTime() - new Date(a.block_timestamp || 0).getTime());
+        const all = withdrawalsOnly ? sorted : sorted.slice(0, recentLimit);
         const metadata = await resolveTokenMetadata(all.flatMap((tx) => [tx.stratoToken, tx.finalToken].filter(Boolean)));
         if (disposed) return;
         for (const tx of all) {

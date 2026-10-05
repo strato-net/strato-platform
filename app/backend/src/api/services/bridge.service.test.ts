@@ -678,6 +678,29 @@ test("legacy On Hold filtering does not change EAB or native status semantics", 
   assert(queried.has(`/${constants.StratoNativeBridge}-deposits`));
 });
 
+test("withdrawal status groups map to each bridge's stored statuses", async (t) => {
+  t.mock.getter(constants, "stratoNativeBridge", () => "9".repeat(40));
+  const filters = new Map<string, Set<string>>();
+  t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
+    if (table.endsWith("-withdrawals")) {
+      const status = params["value->>status"] || params["value->>bridgeStatus"];
+      if (!filters.has(table)) filters.set(table, new Set());
+      filters.get(table)!.add(status);
+      if (params.select === "count()") return { data: [{ count: 0 }] };
+    }
+    return { data: [] };
+  });
+
+  for (const status of ["in.(1,2,3,10)", "in.(4,5,6,7)"]) {
+    await getBridgeTransactions("token", "withdrawal", "user", { "value->>bridgeStatus": status }, "all");
+  }
+
+  assert.deepEqual(filters.get(`/${constants.ExternalAssetBridge}-withdrawals`), new Set(["in.(1,2,3,10)", "in.(4,5,6,7)"]));
+  for (const table of [`/${constants.MercataBridge}-withdrawals`, `/${constants.StratoNativeBridge}-withdrawals`]) {
+    assert.deepEqual(filters.get(table), new Set(["in.(1,2)", "in.(3,4)"]));
+  }
+});
+
 test("native deposit refunds normalize pending/completed states and expose the confirmed return hash", async t => {
   const service = await import("./bridge.service");
   const helpers = await import("../helpers/bridge.helper");

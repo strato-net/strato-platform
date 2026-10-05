@@ -77,11 +77,15 @@ const applyPagination = (
 };
 
 const toLegacyStatusFilter = (statusFilter?: string): string | undefined =>
-  statusFilter === "eq.4"
-    ? "eq.3"
-    : statusFilter === "eq.7"
-      ? "eq.4"
-      : statusFilter === "eq.3" ||
+  statusFilter === "in.(1,2,3,10)"
+    ? "in.(1,2)"
+    : statusFilter === "in.(4,5,6,7)"
+      ? "in.(3,4)"
+      : statusFilter === "eq.4"
+        ? "eq.3"
+        : statusFilter === "eq.7"
+          ? "eq.4"
+          : statusFilter === "eq.3" ||
           statusFilter === "eq.5" ||
           statusFilter === "eq.8" ||
           statusFilter === "eq.6" ||

@@ -409,7 +409,9 @@ export const getDepositStatusByIdentity = async (
       },
     },
   );
-  return data?.[0]?.status == null ? undefined : String(data[0].status);
+  if (data?.[0]?.status == null) return undefined;
+  const status = String(data[0].status);
+  return /^(?:0x)?0+$/.test(status) ? "0" : status;
 };
 
 export const getDepositReviewApproval = async (

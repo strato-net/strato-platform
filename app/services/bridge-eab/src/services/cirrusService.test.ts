@@ -152,6 +152,20 @@ test("review outcomes require a terminal funds state, never just a rejected or a
   assert.equal(await getBridgeReviewOutcome({ ...item, id: "eab:withdrawal:2", kind: "withdrawal_refund" }), "refunded");
 });
 
+test("deposit status reads normalize Cirrus zero enum representations", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getDepositStatusByIdentity } = await import("./cirrusService");
+  let status: string | undefined;
+  t.mock.method(cirrus, "get", async () => status === undefined ? [] : [{ status }]);
+  for (status of ["0", "0".repeat(40), `0x${"0".repeat(40)}`]) {
+    assert.equal(await getDepositStatusByIdentity(1, router, "2"), "0");
+  }
+  status = "2";
+  assert.equal(await getDepositStatusByIdentity(1, router, "2"), "2");
+  status = undefined;
+  assert.equal(await getDepositStatusByIdentity(1, router, "2"), undefined);
+});
+
 test("malformed indexed attestation counts cannot enable refund preparation", async t => {
   const { cirrus } = await import("../utils/api");
   const { getSettlementAttestationCount } = await import("./cirrusService");

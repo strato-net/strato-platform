@@ -467,6 +467,7 @@ contract ExternalBridgeVault is
         if (threshold < 2 || threshold > attestationSignerCount) {
             revert InvalidAttestationThreshold();
         }
+        if (attestationThreshold == threshold) return;
 
         attestationThreshold = threshold;
         ++signerSetVersion;

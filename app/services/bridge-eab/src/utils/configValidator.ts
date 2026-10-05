@@ -18,6 +18,7 @@ import {
   getExternalBridgeExecutorPrivateKey,
   getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
+  getDepositReconciliationDepth,
   getNativeMintExecutorKmsConfig,
   getNativeVerifierApiTokens,
   getNativeVerifierUrls,
@@ -383,6 +384,11 @@ export async function validateBridgeConfig(): Promise<boolean> {
     warnings.push(
       "Withdrawal polling interval is very short (< 5s) - may cause rate limiting",
     );
+  }
+  try {
+    getDepositReconciliationDepth();
+  } catch (error) {
+    errors.push((error as Error).message);
   }
   const missingReceiptGraceMs = Number(
     process.env.DEPOSIT_MISSING_RECEIPT_GRACE_MS || 5 * 60 * 1000,
