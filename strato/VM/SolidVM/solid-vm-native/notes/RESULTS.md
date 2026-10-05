@@ -1,5 +1,9 @@
 # svmc — first working version of the strict SolidVM → Haskell-action compiler
 
+These sections record successive experiments. Current gas implementation and
+measurements are in [Canonical gas charging](#canonical-gas-charging-2026-10-05);
+earlier statements that gas is unimplemented describe the earlier binaries.
+
 Location: `/tmp/vmqa/svmc` (standalone, outside the repo; built with `./build.sh Main.hs svmc`
 against the installed stack packages — reuses the existing parser via
 `compileSourceWithAnnotationsWithoutImports`, nothing in the repo touched).
@@ -595,3 +599,83 @@ Artifacts under `/tmp/solid-vm-native-integration/`:
 `features-native-strict-fixed/{metadata.json,caught-up-block.json,metrics.txt,
 verified-block-log.txt,comparison.json,vm-runner.log}`, `native-strict-census.log`,
 `native-strict-check-{off,on}.log`, and `native-strict-negative.log`.
+
+
+## Canonical gas charging (2026-10-05)
+
+The compiler now emits the interpreter's charges for statements, expressions,
+loop iterations, internal function entry, contract casts, and arithmetic.
+Arithmetic uses the same 256-bit limb widths and operand-dependent policies.
+Existing STRATO builtin callbacks retain their own charges. Constructor
+initializers charge their actual expressions, without synthetic assignment or
+function-entry charges.
+
+`RT.rtChargeGas` calls STRATO's existing `decrementGas` using the same gas state
+as the surrounding transaction. There is no separate native meter and no
+automatic charge on monadic bind. Nested calls and builtins preserve
+`SolidException`, including `TooMuchGas`; contract catches handle it without
+catching native engine failures. The standalone mock host remains unlimited.
+
+Matching exhaustion points also required matching evaluation order: argument
+evaluation precedes callee lookup; division/modulo preserve the interpreter's
+repeated right-operand evaluation; assignment destinations and indices are
+resolved before writing; storage/aggregate aliases preserve parent lookups;
+for-loop steps also execute after break/return, as in the current interpreter.
+This retains the canonical gas policy rather than implementing the alternative
+policy proposed in criterion 10.
+
+Validation through root `make build_common` and the real SM runtime:
+
+- **60,555 varying-budget comparisons match**, covering 55 cases at budgets
+  0–1100, including constructors, inherited/library/internal/external calls,
+  storage and memory indexing, aggregate aliases, increments, tuple assignments,
+  modifiers, arithmetic, loops, and caught exhaustion. Comparisons include exact
+  `TooMuchGas` values and messages, as well as success boundaries and returns.
+- **127 existing comparisons match** returns, events, and action/storage diffs.
+- All **150** cached Upquark source collections parse; all **56,951** function
+  instances and all **2,681** whole-contract contexts still compile.
+
+Receipt remaining-gas fields are currently zero in the interpreter too, so
+receipt equality cannot establish metering equality; the varying-budget checks
+provide that evidence. Full non-gas exception/trace parity remains separate.
+An additional memory-struct literal field-write probe exposed a pre-existing
+semantic difference: the interpreter rejects writes to its constant fields,
+while the native representation allows them. It is outside the passing gas
+suite and has not been changed to reproduce that behavior.
+
+Clean Upquark runs, with no builds or tests running alongside the measured runs:
+
+| Mode | Block at 300 s from block 1 | Block at 300 s including startup | Seconds from block 1 to 140000 |
+|---|---:|---:|---:|
+| Saved native binary without gas | 171782 | 161972 | 250.644 |
+| Final native with canonical gas | 166253 | 155812 | 259.820 |
+| Interpreted | 142568 | 130654 | 296.454 |
+
+Gas adds **3.66% time** over unmetered native for the same prefix. Native with
+gas uses **12.36% less time** than interpreted execution. The startup-inclusive
+155812 is close to the user's 156000 observation, whose exact timing definition
+is unknown. These are single-run comparisons; startup/P2P delay varies.
+
+Both native runs require strict native execution and have **zero function
+fallbacks, zero constructor fallbacks, zero rejected contracts, and zero
+state-root mismatches**. The interpreted run also has zero state-root
+mismatches. The saved baseline process executable and SHA256 were independently
+checked through `/proc`, not just through PATH resolution. An earlier baseline
+that overlapped builds is excluded; an earlier gas-enabled native run before
+final alias/increment corrections is also excluded from the table.
+
+The final native measured binary SHA256 is
+`9199290624015774dd9472d67d01ae148a6823296d30d782e87f7e3cfe4d1a3c`.
+The interpreted comparator predates the last native-only alias/increment
+corrections; interpreted execution was unchanged by those corrections.
+
+Each run used `strato-up`/`strato-down` and a fully cleared QA `mynode`.
+All test services are down, QA state is removed, and original node state is
+preserved. Changes remain uncommitted.
+
+Artifacts under `/tmp/solid-vm-native-integration/`:
+`real-gas/{validation-final.json,comparison.json,alias-off.log,alias-on.log,
+census-final.log,build-aliases.log}`, and
+`features-real-gas-{baseline-clean,native-final,interpreted}/` with metadata,
+metrics, progress, lifecycle and VM logs. The baseline directory also contains
+`process-binary.json` proving which executable ran.

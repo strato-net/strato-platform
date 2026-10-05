@@ -84,7 +84,8 @@ data World = World
 
 mkRT :: World -> RT
 mkRT w = RT
-  { rtGet = \a p -> M.findWithDefault BDefault (a, p) <$> readIORef (wStorage w)
+  { rtChargeGas = \_ -> pure ()
+  , rtGet = \a p -> M.findWithDefault BDefault (a, p) <$> readIORef (wStorage w)
   , rtPut = \a p v -> modifyIORef' (wStorage w) (if isDefault v then M.delete (a, p) else M.insert (a, p) v)
   , rtEmit = \fr cn en args -> modifyIORef' (wEvents w) (++ [T.pack (show (fThis fr)) <> " " <> cn <> "." <> en <> "(" <> T.intercalate ", " [n <> "=" <> showDyn d | (n, d) <- args] <> ")"])
   , rtCall = \kind caller addr name args _ -> dispatch w kind caller addr name args

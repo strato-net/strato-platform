@@ -17,6 +17,8 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
+import Blockchain.SolidVM.Exception (SolidException)
+import Data.Bits (shiftR)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 
@@ -251,7 +253,8 @@ newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
 instance Exception NativeUnavailable
 
 data RT = RT
-  { rtGet  :: Address -> StoragePath -> IO BasicValue
+  { rtChargeGas :: Integer -> IO ()
+  , rtGet  :: Address -> StoragePath -> IO BasicValue
   , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()
   , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
   , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
@@ -263,6 +266,36 @@ data RT = RT
   }
 
 type M = ReaderT (RT, Frame) IO
+
+chargeGas :: Integer -> M ()
+chargeGas amount = rt >>= \runtime -> liftIO (rtChargeGas runtime amount)
+
+charged :: Integer -> M a -> M a
+charged amount action = chargeGas amount >> action
+
+chargeAfter :: Integer -> M a -> M a
+chargeAfter amount action = do
+  value <- action
+  chargeGas amount
+  pure value
+
+chargeOp :: Integer -> M ()
+chargeOp bytes = chargeGas (1 + (bytes `shiftR` 5))
+
+-- SolidVM charges by 256-bit limbs, including a full limb for small integers.
+byteWidth :: Integer -> Integer
+byteWidth = go 0 . abs
+  where
+    go width 0 = width
+    go width n = go (width + 32) (n `shiftR` 256)
+
+catchContractFailure :: M a -> M a -> M a
+catchContractFailure action handler = do
+  state <- ask
+  liftIO $ runReaderT action state `catches`
+    [ Handler (\(_ :: Revert) -> runReaderT handler state)
+    , Handler (\(_ :: SolidException) -> runReaderT handler state)
+    ]
 
 rt :: M RT
 rt = asks fst

@@ -117,8 +117,13 @@ compiled contracts, and rejected contracts on the VM's Prometheus endpoint. Run
 `SOLIDVM_NATIVE=0 solid-vm-native-check --network=upquark` and then the same
 command with `SOLIDVM_NATIVE=1` in separate processes to compare returns,
 events, action diffs, nested calls, delegate calls, rollback, and a timed loop.
-This is an integration experiment: native statement-level gas charging and
-full exception/trace parity remain unfinished.
+Native expressions, statements, loops, internal calls, and arithmetic charge
+through the existing STRATO gas meter. The compiler emits charges at the
+interpreter's evaluation points; monadic bind itself has no gas charge.
+The same `decrementGas` callback enforces exhaustion, and nested calls retain
+`TooMuchGas` rather than converting it to a generic revert. Set
+`SOLIDVM_NATIVE_GAS_CHECK=1` for varying-budget comparisons, including exact
+out-of-gas errors. Full exception/trace parity remains unfinished.
 
 Set `SOLIDVM_PROFILE=1` in the environment of `strato-up` to collect
 `solidvm_profile_calls`, `solidvm_profile_total_seconds`, and
@@ -289,7 +294,6 @@ Not implemented or incomplete:
   their existing runtime failure paths; they do not gain certificate lookup or
   EVM ABI dispatch
 - `msg.data` snapshots parameters at call entry; subsequent parameter reassignment is not tracked
-- Gas accounting
 - Full exception and trace parity
 
 See `notes/RESULTS.md` for the detailed list.
@@ -338,9 +342,11 @@ The following decisions remain provisional:
 - All integer widths currently use unbounded `Integer`.
 - Parser-produced `InlineBoundsCheck` nodes are enforced.
 - `super` executes in the selected parent context, matching STRATO dispatch.
-- Catch currently catches `Revert`; mock external calls restore storage and
+- Catch handles `Revert` and STRATO `SolidException`, including exhaustion;
+  engine failures remain uncaught. Mock external calls restore storage and
   events on revert.
-- Gas is not modelled.
+- STRATO supplies the canonical gas meter through `RT.rtChargeGas`. The
+  standalone mock host supplies an unlimited no-op callback.
 - Events use the contract context containing the executing body, including
   inherited `super` calls (`ERC20` versus `Token` in the fee path).
 
