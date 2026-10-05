@@ -7,8 +7,8 @@ dependencies:
 library:
   source-dirs: src/
   exposed-modules:
-    - Core
-    - Compile
+    - SolidVM.Core
+    - SolidVM.Compile
   ghc-options: -O1
   dependencies:
     - Decimal

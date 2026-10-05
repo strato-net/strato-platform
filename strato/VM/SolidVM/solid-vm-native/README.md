@@ -46,7 +46,7 @@ standalone.
 
 ## Package layout
 
-### `src/Core.hs`
+### `src/SolidVM/Core.hs`
 
 The typed runtime foundation:
 
@@ -68,7 +68,7 @@ The typed runtime foundation:
 
 Compiled function bodies do not use SolidVM's `Value` sum type.
 
-### `src/Compile.hs`
+### `src/SolidVM/Compile.hs`
 
 The compiler and strict typechecker:
 

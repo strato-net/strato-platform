@@ -2,7 +2,7 @@
              ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification #-}
 -- Typed core for the SolidVM -> Haskell-action compiler.
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
-module Core where
+module SolidVM.Core where
 
 import Control.Exception
 import Control.Monad.Reader

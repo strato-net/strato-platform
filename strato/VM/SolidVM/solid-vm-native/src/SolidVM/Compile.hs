@@ -4,7 +4,7 @@
 -- existing parser's CodeCollection.  Strict: no implicit coercions; anything the typed
 -- model cannot express is reported as an Err, never approximated.
 -- Contract-to-address is a selected compatibility exception (see README.md).
-module Compile where
+module SolidVM.Compile where
 
 import Control.Exception (throwIO)
 import Control.Lens ((^.), (&), (.~))
@@ -31,7 +31,7 @@ import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
-import Core
+import SolidVM.Core
 
 -- ---------------------------------------------------------------- errors
 

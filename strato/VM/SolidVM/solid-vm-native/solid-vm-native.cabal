@@ -11,8 +11,8 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Core
-      Compile
+      SolidVM.Core
+      SolidVM.Compile
   other-modules:
       Paths_solid_vm_native
   hs-source-dirs:
