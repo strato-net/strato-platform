@@ -245,6 +245,9 @@ const parseTxArg = (text: string): any => {
   }
 };
 
+const parseVariadicArg = (text: string): any =>
+  text.startsWith('"') ? text : parseTxArg(text);
+
 const formatArg = (type: AbiType, value: any): any => {
   const typeName = solidityTypeName(type);
   if (value === undefined) {
@@ -577,10 +580,11 @@ export const castVoteOnIssueById = async (
     }
 
     // Fixed args are decoded once from the original transaction source. Variadic
-    // tails stay verbatim because their element types cannot be recovered from ABI.
+    // tails have no ABI types to recover, so each element goes back in the shape the
+    // node's inference will type exactly as it did at creation (see parseVariadicArg)
     const { contractName, funcArgs } = await fetchFuncArgs(accessToken, tx.to, tx.funcName);
     const namedArgs = Object.fromEntries(funcArgs.map(([name, type], i) =>
-      [name, type.tag === "Variadic" ? tx.args.slice(i) : hintedArg(type, parseTxArg(tx.args[i]))]));
+      [name, type.tag === "Variadic" ? tx.args.slice(i).map(parseVariadicArg) : hintedArg(type, parseTxArg(tx.args[i]))]));
 
     replaySubmitted = true;
     return callTargetFunction(accessToken, userAddress, contractName, tx.to, tx.funcName, namedArgs);
