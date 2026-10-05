@@ -114,9 +114,11 @@ changes carry across constructor stages.
 
 `solidvm_native_events` exposes execution hits, constructor stages, fallbacks,
 compiled contracts, and rejected contracts on the VM's Prometheus endpoint. Run
-`SOLIDVM_NATIVE=0 solid-vm-native-check --network=upquark` and then the same
-command with `SOLIDVM_NATIVE=1` in separate processes to compare returns,
-events, action diffs, nested calls, delegate calls, rollback, and a timed loop.
+the `solid-vm-native-check` test suite in `solid-vm/tests/native/` with
+`SOLIDVM_NATIVE=0` and `SOLIDVM_NATIVE=1` in separate processes to compare
+returns, events, action diffs, nested calls, delegate calls, and rollback.
+Build test suites from the repository root with `make build_common_with_tests`;
+the test binary accepts `--network=upquark`.
 Native expressions, statements, loops, internal calls, and arithmetic charge
 through the existing STRATO gas meter. The compiler emits charges at the
 interpreter's evaluation points; monadic bind itself has no gas charge.
@@ -124,17 +126,6 @@ The same `decrementGas` callback enforces exhaustion, and nested calls retain
 `TooMuchGas` rather than converting it to a generic revert. Set
 `SOLIDVM_NATIVE_GAS_CHECK=1` for varying-budget comparisons, including exact
 out-of-gas errors. Full exception/trace parity remains unfinished.
-
-Set `SOLIDVM_PROFILE=1` in the environment of `strato-up` to collect
-`solidvm_profile_calls`, `solidvm_profile_total_seconds`, and
-`solidvm_profile_self_seconds` on the same metrics endpoint. Labels identify
-execution mode, contract name and code hash, and function. Total time includes
-nested calls; self time subtracts nested dispatches and their profiling overhead.
-Both use elapsed time and include reverted calls. Profiling is disabled by
-default. Native internal closure calls remain inside their entry function's
-time, so compare contracts when comparing native and interpreted self times.
-Storage operations and call preparation are included in the enclosing function;
-block processing outside function dispatch is not measured by these counters.
 
 See `notes/RESULTS.md` for the 2026-10-04 integration checks and live Upquark
 comparison, including the limits of the measured speedup.
