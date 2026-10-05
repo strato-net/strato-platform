@@ -517,6 +517,28 @@ test("keeps JSON-RPC batches within the 20-call submission limit", async () => {
   );
 });
 
+test("receipt batches expose RPC failures but preserve explicit null results", async () => {
+  const txHash = `0x${"ab".repeat(32)}`;
+  await stubPost(
+    () => [{ id: 1, result: null }],
+    async () => assert.equal((await getTransactionReceiptsBatch(CHAIN_ID, [txHash])).size, 0),
+  );
+  await stubPost(
+    () => [{ id: 1, error: { code: -32005, message: "provider unavailable" } }],
+    async () => assert.rejects(
+      getTransactionReceiptsBatch(CHAIN_ID, [txHash]),
+      new RegExp(`Receipt RPC failed on chain ${CHAIN_ID}.*-32005`),
+    ),
+  );
+  await stubPost(
+    () => ({ error: { code: -32600, message: "invalid request" } }),
+    async () => assert.rejects(
+      getTransactionReceiptsBatch(CHAIN_ID, [txHash]),
+      new RegExp(`Receipt RPC failed on chain ${CHAIN_ID}.*-32600`),
+    ),
+  );
+});
+
 test("records an expired trace failure for review and settles the next deposit in the same pass", async (t) => {
   const rpc = await import("../services/rpcService");
   const cirrus = await import("../services/cirrusService");

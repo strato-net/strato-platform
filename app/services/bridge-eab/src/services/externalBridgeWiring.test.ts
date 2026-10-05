@@ -43,6 +43,44 @@ const assertSettlementArguments = (input: any) => {
   assert.deepEqual(Object.keys(input.args).sort(), names.sort());
 };
 
+test("STRATO writes submit once while ordinary API requests retain retries", async (t) => {
+  const api = await import("../utils/api");
+  const axios = (await import("axios")).default;
+  let writeAttempts = 0, readAttempts = 0;
+  t.mock.method(axios, "request", async (request: any) => {
+    assert.equal("maxAttempts" in request, false);
+    if (request.url === "https://example.test/write") {
+      writeAttempts += 1;
+      throw new Error("write failed");
+    }
+    readAttempts += 1;
+    if (readAttempts === 1) throw new Error("read failed");
+    return { data: "ok" };
+  });
+
+  await assert.rejects(
+    api.fetch.post("https://example.test/write", {}, { maxAttempts: 1 }),
+    /write failed/,
+  );
+  assert.equal(writeAttempts, 1);
+  assert.equal(await api.fetch.get("https://example.test/read"), "ok");
+  assert.equal(readAttempts, 2);
+
+  const strato = await import("../utils/stratoHelper");
+  let submissionConfig: any;
+  t.mock.method(api.strato, "post", async (_url: string, _data: any, requestConfig: any) => {
+    submissionConfig = requestConfig;
+    return [{ status: "Success", hash: "0xabc" }];
+  });
+  await strato.execute({
+    contractName: "ExternalAssetBridge",
+    contractAddress: externalBridgeAddress,
+    method: "setLastProcessedBlock",
+    args: { externalChainId: 1, blockNumber: 2 },
+  });
+  assert.deepEqual(submissionConfig, { maxAttempts: 1 });
+});
+
 test("normalizes Cirrus asset and deposit identity filters for ETH and mixed-case ERC-20 addresses", async (t) => {
   const { cirrus } = await import("../utils/api");
   const service = await import("./cirrusService");

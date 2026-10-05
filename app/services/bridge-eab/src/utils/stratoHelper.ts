@@ -200,7 +200,7 @@ const executeWithClients = async (
     let result: Awaited<ReturnType<typeof postAndWaitForTx>>;
     try {
       result = await postAndWaitForTx(
-        () => transactionClient.post("/transaction/parallel?resolve=true", buildFunctionTx(inputs)),
+        () => transactionClient.post("/transaction/parallel?resolve=true", buildFunctionTx(inputs), { maxAttempts: 1 }),
         timeout,
         resultsClient,
       );

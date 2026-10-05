@@ -4,11 +4,10 @@ require("dotenv").config();
 const { NETWORKS } = require("./scripts/lib/externalBridgeNetworks");
 
 const accounts = process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [];
-const externalNetworks = Object.fromEntries(NETWORKS.map(({ name, rpcEnv, defaultRpcUrl }) => [name, {
-  url: process.env[rpcEnv] || (name === "mainnet" ? undefined : defaultRpcUrl),
-  accounts,
-  gasPrice: "auto",
-}]));
+const externalNetworks = Object.fromEntries(NETWORKS.flatMap(({ name, rpcEnv, defaultRpcUrl }) => {
+  const url = process.env[rpcEnv] || defaultRpcUrl;
+  return url ? [[name, { url, accounts, gasPrice: "auto" }]] : [];
+}));
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {

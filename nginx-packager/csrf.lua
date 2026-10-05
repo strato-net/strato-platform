@@ -254,6 +254,7 @@ function _M.initialize_token()
 end
 
 local wallet_auth_routes = {
+    ["/api/bridge/withdrawalCancellation"] = true,
     ["/api/bridge/requestNativeWithdrawal"] = true,
     ["/api/bridge/requestWithdrawal"] = true,
     ["/api/metal-forge/buy"] = true,

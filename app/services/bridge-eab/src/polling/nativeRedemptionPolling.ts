@@ -20,7 +20,10 @@ export const pollChainNativeRedemptions = async (chainId: number) => {
   if (!Number.isSafeInteger(depth) || depth < 1 || depth >= NATIVE_SCAN_WINDOW_BLOCKS) throw new Error("Invalid native scan overlap");
   const head = Math.max(0, await getVerificationBlockNumber(chainId) - getDepositConfirmationPolicy(chainId));
   const saved = await nativeBlockTrackingService.getCheckpoint(chainId);
-  const reset = (saved.bridge && saved.bridge !== bridge) || saved.block > head ||
+  if (saved.block > head) {
+    throw new Error(`Native checkpoint ${saved.block} is ahead of confirmed head ${head} for chain ${chainId}`);
+  }
+  const reset = (saved.bridge && saved.bridge !== bridge) ||
     (saved.hash && await getVerifiedBlockHash(chainId, saved.block) !== saved.hash);
   // A checkpoint mismatch can be deeper than the overlap: replay from genesis.
   const state = reset ? { block: 0, reconciliationBlock: 0 } : saved;

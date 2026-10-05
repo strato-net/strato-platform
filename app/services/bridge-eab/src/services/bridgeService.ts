@@ -196,16 +196,10 @@ const syncManualNativeMintProposal = async (
   }
 
   if (result.status === "rejected") {
-    await execute({
-      contractName: "StratoNativeBridge",
-      contractAddress: config.nativeBridge.address!,
-      method: "abortWithdrawal",
-      args: {
-        id: Number(withdrawal.withdrawalId),
-      },
-    });
-    announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
-    return true;
+    throw Object.assign(
+      new Error(`Native withdrawal ${withdrawal.withdrawalId} mint proposal was rejected; governance cancellation review is required`),
+      { issues: [processingIssue("MANUAL_REVIEW", { operation: "requestWithdrawalCancellation" })] },
+    );
   }
 
   if (!result.txHash) {

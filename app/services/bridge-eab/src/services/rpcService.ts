@@ -124,7 +124,15 @@ export const getTransactionReceiptsBatch = async (
           method: "eth_getTransactionReceipt",
           params: [ensureHexPrefix(txHash)],
         }));
-        const response: any[] = await fetch.post(rpcUrl, batchRequest);
+        const response: any = await fetch.post(rpcUrl, batchRequest);
+        const rpcError = Array.isArray(response)
+          ? response.find((item) => item?.error)?.error
+          : response?.error;
+        if (rpcError) {
+          throw new Error(
+            `Receipt RPC failed on chain ${chainId}: code=${Number(rpcError.code)} message=${sanitizeRpcError(rpcError.message, rpcUrl)}`,
+          );
+        }
         if (!Array.isArray(response)) continue;
         response.forEach((item) => {
           const index = Number(item.id) - 1;

@@ -455,9 +455,9 @@ const validateSettlementVerifier = async (): Promise<string> => {
           select: "key",
         },
       ),
-      nativeStratoGet("/cirrus/search/BlockApps-StratoNativeBridge", {
+      nativeStratoGet("/cirrus/search/storage", {
         address: `eq.${nativeVerifier.sourceBridge}`,
-        select: "settlementVerifierThreshold,settlementVerifierCount",
+        select: "data",
         limit: "1",
       }),
     ]);
@@ -466,7 +466,7 @@ const validateSettlementVerifier = async (): Promise<string> => {
         `STRATO account ${address} is not a native settlement verifier`,
       );
     }
-    const nativeBridge = nativeBridgeResponse.data?.[0];
+    const nativeBridge = nativeBridgeResponse.data?.[0]?.data;
     if (
       Number(nativeBridge?.settlementVerifierThreshold || 0) < 2 ||
       Number(nativeBridge?.settlementVerifierThreshold || 0) >

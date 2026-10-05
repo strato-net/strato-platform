@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import attributeMapping from "../../infra/config/attributeMapping.json";
 import { resolveRoutedActivityUser, indexRouteExecutions, getRoutedActivityCaller } from "./routeAttribution";
 
 const route = {
@@ -8,6 +9,14 @@ const route = {
   externalAssetBridge: "2222222222222222222222222222222222222222",
   nativeBridge: "4".repeat(40),
 };
+
+test("all swap rewards use the emitted sender for route attribution", () => {
+  const mappings = Object.values(
+    attributeMapping as Record<string, Record<string, { amount: string; user?: string }>>,
+  ).flatMap((events) => events.Swap ? [events.Swap] : []);
+  assert.ok(mappings.length > 0);
+  assert.ok(mappings.every((mapping) => mapping.user === "sender"));
+});
 
 test("attributes underlying route activity to a direct caller", () => {
   assert.equal(

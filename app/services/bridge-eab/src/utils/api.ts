@@ -1,8 +1,8 @@
 import { classifyProcessingError } from "./processingIssues";
-import axios, { AxiosRequestConfig } from "axios";
+import axios from "axios";
 import { getBAUserToken, getRelayerToken } from "../auth";
 import { config } from "../config";
-import { RetryConfig, ClientOptions, ApiClient } from "../types";
+import { RetryConfig, ClientOptions, ApiClient, ApiRequestConfig } from "../types";
 
 export const extractErrorMessage = (error: any): string => {
   // Check for Cloudflare challenge
@@ -81,13 +81,14 @@ const createClient = (
     method: "get" | "post",
     url: string,
     data?: any,
-    config?: AxiosRequestConfig,
+    requestConfig?: ApiRequestConfig,
   ): Promise<T> => {
+    const { maxAttempts, ...axiosConfig } = requestConfig || {};
     const headers = {
       Accept: "application/json",
       "Content-Type": "application/json",
       "X-Requested-With": "XMLHttpRequest",
-      ...config?.headers,
+      ...axiosConfig.headers,
     };
 
     if (authenticated) {
@@ -107,19 +108,19 @@ const createClient = (
           data,
           headers,
           timeout,
-          ...config,
+          ...axiosConfig,
         }),
-      { logPrefix },
+      { logPrefix, maxAttempts },
     );
 
     return responseData;
   };
 
   return {
-    get: <T>(url: string, config?: AxiosRequestConfig) =>
+    get: <T>(url: string, config?: ApiRequestConfig) =>
       request<T>("get", url, undefined, config),
 
-    post: <T>(url: string, data?: any, config?: AxiosRequestConfig) =>
+    post: <T>(url: string, data?: any, config?: ApiRequestConfig) =>
       request<T>("post", url, data, config),
   };
 };

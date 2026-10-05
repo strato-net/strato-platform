@@ -9,6 +9,13 @@ const canonical = (value: any): string => JSON.stringify(value, (_key, item) => 
   return item;
 });
 
+const blockFingerprint = (block: any): string => canonical({
+  hash: block.hash,
+  number: block.number,
+  parentHash: block.parentHash,
+  timestamp: block.timestamp,
+});
+
 export const validateVerifierRpcUrls = (urls: string[]): void => {
   const parsed = urls.map((url) => new URL(url));
   if (parsed.some((url) => url.protocol !== "https:" || url.username || url.password)) {
@@ -50,7 +57,8 @@ export class ConsensusProvider extends JsonRpcProvider {
     }
     const fingerprint = (result: any) => result == null ? "null" :
       method === "eth_getTransactionReceipt" ? receiptFingerprint(result) :
-      method === "trace_transaction" ? traceFingerprint(result) : canonical(result);
+      method === "trace_transaction" ? traceFingerprint(result) :
+      method === "eth_getBlockByNumber" ? blockFingerprint(result) : canonical(result);
     if (results.some((result) => fingerprint(result) !== fingerprint(results[0]))) {
       throw new Error(`Verifier RPC disagreement: ${method}`);
     }

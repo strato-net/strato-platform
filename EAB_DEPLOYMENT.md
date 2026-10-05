@@ -646,6 +646,12 @@ and replay from before the first missed event; do not simply advance the cursor.
 | Native external chain | Preserve `CHAIN_<ID>_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`, existing native signing keys/threshold and gas funding used by withdrawals. These are not new routed-deposit keys. |
 | Rewards poller | Nonzero `TOKEN_ROUTER`, `EXTERNAL_ASSET_BRIDGE_ADDRESS`, and `STRATO_NATIVE_BRIDGE`. Missing bridge identities suppress router attribution; missing router configuration blocks startup. |
 
+Deploy a rewards-poller image whose pool `Swap` mappings attribute `user` from
+the emitted `sender` before enabling EAB or native auto-routing. Before rollout,
+audit already-processed routed swaps for rewards credited to the submitting
+operator. Advancing poller cursors does not correct historical rewards; reconcile
+any incorrect operator rewards before controlled reprocessing.
+
 Pass settings into the actual containers, not only Compose `.env`. Keep secrets
 with Infra. Native deposit verification runs in the bridge service; the three
 standalone EAB verifier health checks do not certify native receipt verification.

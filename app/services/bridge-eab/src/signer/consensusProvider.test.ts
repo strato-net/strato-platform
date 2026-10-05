@@ -62,3 +62,31 @@ test("pins latest reads to the slowest provider head", async (t) => {
     assert.deepEqual(pinned, [[{ to: "0x123" }, "0x1f"], [{ to: "0x123" }, "0x1f"], ["0x1f", false], ["0x1f", false]]);
   } finally { provider.destroy(); }
 });
+
+test("compares only security-relevant block fields", async (t) => {
+  let changedField: "hash" | "number" | "parentHash" | "timestamp" | undefined;
+  t.mock.method(JsonRpcProvider.prototype, "send", async function (this: JsonRpcProvider) {
+    const block = {
+      hash: "0xabc",
+      number: "0x10",
+      parentHash: "0xdef",
+      timestamp: "0x20",
+      optionalMetadata: this._getConnection().url,
+    };
+    if (changedField && this._getConnection().url.includes("two")) {
+      block[changedField] = "0xff";
+    }
+    return block;
+  });
+  const provider = new ConsensusProvider(urls);
+  try {
+    assert.ok(await provider.send("eth_getBlockByNumber", ["0x10", false]));
+    for (const field of ["hash", "number", "parentHash", "timestamp"] as const) {
+      changedField = field;
+      await assert.rejects(
+        provider.send("eth_getBlockByNumber", ["0x10", false]),
+        /disagreement/,
+      );
+    }
+  } finally { provider.destroy(); }
+});

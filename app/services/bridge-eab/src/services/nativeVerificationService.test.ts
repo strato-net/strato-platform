@@ -201,7 +201,8 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   assert.equal(calls[0].method, "finalizeWithdrawal");
   assert.equal(calls[0].args.externalTxHash, "mint-hash");
   calls.length = 0;
-  t.mock.method(mint, "getNativeMintProposalExecution", async () => ({ status: "executed", txHash: "safe-hash" }));
+  let proposalExecution: any = { status: "executed", txHash: "safe-hash" };
+  t.mock.method(mint, "getNativeMintProposalExecution", async () => proposalExecution);
   const manual = { ...record, withdrawalId: "502", useInstantPath: false, nativeMintProposalHash: "a".repeat(64) };
   confirmed = false;
   await bridge.queueManualNativeWithdrawalBatch([manual]);
@@ -232,6 +233,14 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   current = { bridgeStatus: "4", externalTxHash: "safe-hash" };
   await bridge.queueManualNativeWithdrawalBatch([manual]);
   assert.equal(failures.length, 1, "Safe abort must not be treated as completion");
+  const operatorCalls: any[] = [];
+  t.mock.method(strato, "execute", async call => { operatorCalls.push(call); return {} as any; });
+  proposalExecution = { status: "rejected" };
+  await bridge.queueManualNativeWithdrawalBatch([manual]);
+  assert.equal(failures.length, 2);
+  assert.equal((failures[1] as any).issues[0].code, "MANUAL_REVIEW");
+  assert.equal((failures[1] as any).issues[0].details.operation, "requestWithdrawalCancellation");
+  assert.equal(operatorCalls.length, 0, "rejected Safe mints must not directly unlock STRATO escrow");
 
 });
 
@@ -393,6 +402,22 @@ test("native discovery scans and advances only through the confirmed head", asyn
   await new Promise<void>(resolve => setImmediate(resolve));
   assert.equal(logs.mock.callCount(), 2);
   assert.equal(updates.mock.callCount(), 1);
+});
+
+test("native discovery preserves a checkpoint ahead of the confirmed head", async t => {
+  const rpc = await import("./rpcService");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { pollChainNativeRedemptions } = await import("../polling/nativeRedemptionPolling");
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(cursor, "getCheckpoint", async () => ({ block: 101, reconciliationBlock: 0 }));
+  const logs = t.mock.method(rpc, "getVerifiedNativeLogs", async () => []);
+  const updates = t.mock.method(cursor, "saveCheckpoint", async () => undefined);
+  await assert.rejects(pollChainNativeRedemptions(1), /checkpoint 101 is ahead of confirmed head 100/);
+  assert.equal(logs.mock.callCount(), 0);
+  assert.equal(updates.mock.callCount(), 0);
 });
 
 test("native recording isolates blocked deposits without advancing the cursor past them", async t => {

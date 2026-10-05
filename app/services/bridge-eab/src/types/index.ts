@@ -1,6 +1,7 @@
 import type { ProcessingRecord } from "@strato/shared-types";
 import type { ProposeTransactionProps } from "@safe-global/api-kit";
 import type { RouteStep } from "@strato/shared-types";
+import type { AxiosRequestConfig } from "axios";
 
 export type TransactionTraceResult = any[] | Error;
 
@@ -67,9 +68,13 @@ export interface ClientOptions {
   tokenProvider?: () => Promise<string>;
 }
 
+export interface ApiRequestConfig extends AxiosRequestConfig {
+  maxAttempts?: number;
+}
+
 export interface ApiClient {
-  get<T = any>(url: string, config?: any): Promise<T>;
-  post<T = any>(url: string, data?: any, config?: any): Promise<T>;
+  get<T = any>(url: string, config?: ApiRequestConfig): Promise<T>;
+  post<T = any>(url: string, data?: any, config?: ApiRequestConfig): Promise<T>;
 }
 
 export interface DepositArgs {

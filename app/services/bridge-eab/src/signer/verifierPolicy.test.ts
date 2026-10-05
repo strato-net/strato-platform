@@ -249,6 +249,45 @@ test("pins actual RPC identities without truncating STRATO network IDs", async (
   await assert.rejects(validateRpcIdentity(), /STRATO RPC network ID mismatch/);
 });
 
+test("native verifier startup reads upgrade-added quorum fields from generic storage", async () => {
+  let threshold = "2";
+  const nativePaths: string[] = [];
+  const { validateSettlementVerifier } = loadSignerChecks(["validateSettlementVerifier"], {
+    sourceBridge: policy.sourceBridge,
+    normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
+    nativeVerifier: {
+      sourceBridge: policy.sourceBridge,
+      policy: { sourceChainId: policy.sourceChainId },
+    },
+    stratoGet: async (path: string) => {
+      if (path === "/strato/v2.3/key") {
+        return { data: { address: policy.settlementAttestor } };
+      }
+      assert.equal(path, "/cirrus/search/BlockApps-ExternalAssetBridge-settlementVerifiers");
+      return { data: [{ key: policy.settlementAttestor }] };
+    },
+    nativeStratoGet: async (path: string, params: Record<string, string>) => {
+      nativePaths.push(path);
+      if (path === "/strato/v2.3/key") {
+        return { data: { address: policy.settlementAttestor } };
+      }
+      if (path === "/strato-api/eth/v1.2/metadata") {
+        return { data: { networkID: policy.sourceChainId } };
+      }
+      if (path.endsWith("-settlementVerifiers")) {
+        return { data: [{ key: policy.settlementAttestor }] };
+      }
+      assert.equal(path, "/cirrus/search/storage");
+      assert.equal(params.select, "data");
+      return { data: [{ data: { settlementVerifierThreshold: threshold, settlementVerifierCount: "3" } }] };
+    },
+  });
+  assert.equal(await validateSettlementVerifier(), policy.settlementAttestor);
+  assert.ok(nativePaths.includes("/cirrus/search/storage"));
+  threshold = "1";
+  await assert.rejects(validateSettlementVerifier(), /quorum is not configured/);
+});
+
 test("refund attestations reject paid, reserved, unconfirmed, or mismatched vault state", async () => {
   const authorization = {
     sourceChainId: "9001", sourceBridge: `0x${policy.sourceBridge}`, sourceWithdrawalId: "7",
