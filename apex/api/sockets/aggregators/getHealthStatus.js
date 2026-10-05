@@ -40,6 +40,12 @@ let healthBody = {
       latestCheckTimestamp: null,
       lastFailureTimestamp: null,
     },
+    jsonRpc: {
+      enabled: null,
+      health: null,
+      latestCheckTimestamp: null,
+      lastFailureTimestamp: null,
+    },
   },
 };
 
@@ -59,14 +65,15 @@ const counter = new Prometheus.Counter({
 async function getHealthStatus() {
   counter.inc();
 
-  const [healthInfo, stallInfo, systemInfo, syncInfo, networkHealthInfo] = await utils.getLatestHealth()
+  const [healthInfo, stallInfo, systemInfo, syncInfo, networkHealthInfo, jsonRpcInfo] = await utils.getLatestHealth()
 
   if (healthInfo && stallInfo && systemInfo && syncInfo) {
     healthBody = utils.consolidateHealthData(
       healthInfo,
       stallInfo,
       systemInfo,
-      syncInfo
+      syncInfo,
+      jsonRpcInfo
     );
 
     emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_HEALTH, {
