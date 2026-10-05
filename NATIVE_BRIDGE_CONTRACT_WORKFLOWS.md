@@ -51,7 +51,7 @@ Responsibilities:
 - Stores STRATO token to representation token mappings.
 - Allows users to request redemption back to STRATO by transferring representation tokens to the bridge and burning them.
 - Emits `RedemptionRequested` events for the STRATO relayer.
-- Mints representation tokens through `mintRepresentationWithAttestation`.
+- Mints representation tokens through lane-bound `mintRepresentationWithAttestationV2`.
 - Validates EIP-712 native mint attestations before minting.
 - Enforces replay protection through `processedMints`.
 - Supports route disable/enable/freeze/migration controls.
@@ -64,7 +64,8 @@ Main privileged roles:
 - `MAPPING_ADMIN_ROLE`: route registration, disable, enable, freeze, and migration.
 - `PAUSER_ROLE` / `UNPAUSER_ROLE`: emergency controls.
 - `ATTESTATION_ADMIN_ROLE`: signer set and threshold configuration.
-- `MINT_EXECUTOR_ROLE`: required to call `mintRepresentationWithAttestation`. Grant only to the custody Safe, so a mint needs both valid attestation signatures and Safe execution.
+- `MINT_EXECUTOR_ROLE`: required for V2 attestations with `useInstantPath == true`; grant it to the dedicated instant executor.
+- `DEFAULT_ADMIN_ROLE`: required for V2 attestations with `useInstantPath == false`; retain it on the custody Safe.
 
 Initialization note:
 
@@ -259,7 +260,7 @@ STRATO contract behavior:
 
 - Requires status `INITIATED`.
 - Sets status to `PENDING_REVIEW`.
-- Sets `nativeMintNotBefore = block.timestamp + INSTANT_WITHDRAWAL_DELAY_SECONDS`.
+- Sets `nativeMintNotBefore = block.timestamp`, matching EAB authorization timing.
 - Emits `NativeWithdrawalPending`.
 
 State transition:
@@ -299,7 +300,7 @@ Manual lane meaning:
 
 The external mint is performed on `StratoNativeRepresentationBridge`.
 
-The current external contract uses `mintRepresentationWithAttestation(attestation, signatures)`.
+The external contract uses `mintRepresentationWithAttestationV2(attestation, signatures)`. V1 minting is removed.
 
 External contract behavior:
 
@@ -314,8 +315,11 @@ External contract behavior:
   - `notBefore <= block.timestamp`.
   - `deadline >= block.timestamp`.
   - `deadline <= notBefore + maxAttestationValiditySeconds`.
+  - signed `useInstantPath` matches the lane committed on STRATO.
   - `stratoToken` is mapped to the supplied `representationToken`.
   - route is active.
+- Requires `MINT_EXECUTOR_ROLE` when `useInstantPath == true`.
+- Requires `DEFAULT_ADMIN_ROLE`/Safe when `useInstantPath == false`.
 - Verifies sorted valid signatures from configured `attestationSigners`.
 - Requires signature count to satisfy `attestationThreshold`.
 - Computes replay key:

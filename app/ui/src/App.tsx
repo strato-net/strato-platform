@@ -19,6 +19,7 @@ import { OracleProvider } from "@/context/OracleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SwapAsset from "./pages/SwapAsset";
+import UnifiedTrade from "./pages/UnifiedTrade";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
@@ -283,6 +284,16 @@ const App = () => {
                                                   }
                                                 />
                                                 <Route
+                                                  path="/dashboard/unified-trade"
+                                                  element={
+                                                    <GuestAccessibleRoute>
+                                                      <BridgeProvider scope="trade">
+                                                        <UnifiedTrade />
+                                                      </BridgeProvider>
+                                                    </GuestAccessibleRoute>
+                                                  }
+                                                />
+                                                <Route
                                                   path="/dashboard/deposits"
                                                   element={
                                                     <GuestAccessibleRoute>
@@ -473,7 +484,9 @@ const App = () => {
                                                   path="/dashboard/withdrawals"
                                                   element={
                                                     <GuestAccessibleRoute>
-                                                      <WithdrawalsPage />
+                                                      <BridgeProvider scope="trade">
+                                                        <WithdrawalsPage />
+                                                      </BridgeProvider>
                                                     </GuestAccessibleRoute>
                                                   }
                                                 />

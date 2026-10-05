@@ -2,12 +2,83 @@ import type { Chain } from 'viem';
 import { defineChain } from 'viem/utils';
 import { ChainHints } from './types';
 
+export const ExternalBridgeStatus = {
+  NONE: 0,
+  INITIATED: 1,
+  PENDING_REVIEW: 2,
+  READY: 3,
+  COMPLETED: 4,
+  CANCELLED: 5,
+  REFUNDED: 6,
+  ABORTED: 7,
+  REFUND_PENDING: 8,
+  REJECTED_NO_FUNDS: 9,
+  CANCELLATION_PENDING: 10,
+} as const;
+
 // Core Constants
+export const BRIDGE_SCOPES = {
+  fund: { apiBase: "/bridge", pendingDepositsKey: "pendingDeposits" },
+  trade: { apiBase: "/trade/bridge", pendingDepositsKey: "tradePendingDeposits" },
+} as const;
+
 export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const;
+export const EIP7702_DELEGATION_CODE_PATTERN = /^0xef0100[0-9a-f]{40}$/i;
+
+export const EXTERNAL_BRIDGE_STATUS_LABELS: Record<number, { text: string; color: string }> = {
+  1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  2: { text: "Pending Review", color: "bg-amber-500/15 text-amber-500" },
+  3: { text: "Ready", color: "bg-blue-500/15 text-blue-500" },
+  4: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
+  5: { text: "Canceled", color: "bg-red-500/15 text-red-500" },
+  6: { text: "Refunded", color: "bg-emerald-500/15 text-emerald-500" },
+  7: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
+  [ExternalBridgeStatus.CANCELLATION_PENDING]: { text: "Cancelation pending", color: "bg-amber-500/15 text-amber-600" },
+};
+export const UNKNOWN_BRIDGE_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
+export const EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS: Record<number, { text: string; color: string; description: string }> = {
+  9: {
+    text: "Rejected — no funds received",
+    color: "bg-red-500/15 text-red-500",
+    description: "No funds were received for this deposit. No STRATO assets were credited and no refund was issued.",
+  },
+  6: {
+    text: "Refunded",
+    color: "bg-emerald-500/15 text-emerald-500",
+    description: "The original asset was returned to the sending wallet on the source network.",
+  },
+  8: {
+    text: "Refund processing",
+    color: "bg-blue-500/15 text-blue-500",
+    description: "Your original asset is being returned to the sending wallet. No action is needed from you.",
+  },
+  0: {
+    text: "Processing",
+    color: "bg-amber-500/15 text-amber-500",
+    description: "Your deposit is being processed. No action is needed from you.",
+  },
+  7: {
+    text: "Rejected",
+    color: "bg-red-500/15 text-red-500",
+    description: "Your deposit was rejected. We are working on next steps. No action is needed from you.",
+  },
+};
+
+// Legacy/native Completed and Aborted are normalized to 4 and 7 by the history API.
+export const LEGACY_BRIDGE_STATUS_LABELS: Record<number, { text: string; color: string }> = {
+  1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  2: { text: "Pending", color: "bg-amber-500/15 text-amber-500" },
+  4: { text: "Complete", color: "bg-emerald-500/15 text-emerald-500" },
+  5: { text: "Swept", color: "bg-red-500/15 text-red-500" },
+  6: { text: "On Hold", color: "bg-orange-500/15 text-orange-500" },
+  7: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
+};
+export const LEGACY_DEPOSIT_ON_HOLD = 6;
 
 // UI Constants
 export const ITEMS_PER_PAGE = 10;
+export const RECENT_TRANSACTIONS_REFRESH_MS = 15_000;
 
 export const BRIDGE_MODE_LABELS = {
   convert: {
@@ -68,6 +139,19 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'targetStratoToken', type: 'address' }
     ],
     name: 'depositETH',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function'
+  },
+  {
+    inputs: [
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'targetStratoToken', type: 'address' },
+      { name: 'action', type: 'uint8' },
+      { name: 'actionToken', type: 'address' },
+      { name: 'minFinalOut', type: 'uint256' }
+    ],
+    name: 'depositETHWithAction',
     outputs: [],
     stateMutability: 'payable',
     type: 'function'
@@ -185,6 +269,19 @@ export const DEPOSIT_ROUTER_ABI = [
 ] as const;
 
 export const STRATO_NATIVE_REPRESENTATION_BRIDGE_ABI = [
+  {
+    inputs: [
+      { name: 'representationToken', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoRecipient', type: 'address' },
+      { name: 'actionToken', type: 'address' },
+      { name: 'minFinalOut', type: 'uint256' }
+    ],
+    name: 'requestRedemptionWithRoute',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
+  },
   {
     inputs: [
       { name: 'representationToken', type: 'address' },

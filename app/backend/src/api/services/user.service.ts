@@ -29,6 +29,7 @@ export const isUserAdmin = async (
   try {
     const response = await cirrus.get(accessToken, "/" + AdminRegistry + "-adminMap", {
       params: {
+        address: "eq." + adminRegistry,
         key: "eq." + userAddress,
         select: "key,value",
         limit: "1"

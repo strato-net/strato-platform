@@ -4,7 +4,7 @@ import { cirrus } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
 import * as config from "../../config/config";
 import * as oracleHelper from "../helpers/oracle.helper";
-import { getBalance } from "./tokens.service";
+import { getBalance, getTokenSymbols } from "./tokens.service";
 
 test("returns saveUSDST balances for exact address filters", async (t) => {
   const saveUsdstVault = "1111111111111111111111111111111111111111";
@@ -135,4 +135,21 @@ test("logs saveUSDST balance query failures before falling back", async (t) => {
     vaultAddress: saveUsdstVault,
     error: "Cirrus unavailable",
   });
+});
+
+test("fetches indexed symbols and decimals for requested tokens and vault shares", async (t) => {
+  const addresses = ["1".repeat(40), "2".repeat(40)];
+  const paths: string[] = [];
+  t.mock.method(cirrus, "get", async (_token: string, path: string, request?: any) => {
+    paths.push(path);
+    const decimalsField = path === `/${constants.Token}` ? "customDecimals" : "customDecimals:_underlyingDecimals";
+    assert.deepEqual(request.params, { address: `in.(${addresses.join(",")})`, select: `address,_symbol,${decimalsField}` });
+    return { status: 200, data: [{ address: addresses[0], _symbol: path, customDecimals: 6 }] };
+  });
+  const rows = await getTokenSymbols("access-token", addresses);
+  assert.deepEqual(paths.sort(), [constants.Token, constants.SaveUSDSTVault, constants.YieldVault].map((table) => `/${table}`).sort());
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((row) => row.customDecimals === 6));
+  assert.deepEqual(await getTokenSymbols("access-token", []), []);
+  assert.equal(paths.length, 3);
 });

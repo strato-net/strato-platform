@@ -30,6 +30,7 @@ interface RewardsWidgetProps {
   /** render nothing while both the current and projected rates are 0
    *  (used by the Trade page to avoid an "Earning Now 0 pts/day" banner) */
   hideWhenZero?: boolean;
+  compact?: boolean;
 }
 
 // ============================================================================
@@ -222,6 +223,7 @@ export const RewardsWidget = ({
   actionLabel = isWithdrawal ? "Withdraw" : "Deposit",
   swapTokenInAddress,
   hideWhenZero = false,
+  compact = false,
 }: RewardsWidgetProps) => {
   const { getPrice } = useOracleContext();
 
@@ -429,6 +431,19 @@ export const RewardsWidget = ({
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
+  if (compact) return (
+    <details className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs dark:border-amber-800 dark:bg-amber-950">
+      <summary className="cursor-pointer font-medium text-amber-800 dark:text-amber-200">
+        Trade rewards · <RateValue formatted={newRateFormatted.formatted} raw={newRateFormatted.raw} /> pts/day estimated after trade
+      </summary>
+      <div className="mt-2 space-y-1 text-muted-foreground">
+        <p>{activityName}</p>
+        <p>Current: <RateValue formatted={currentRateFormatted.formatted} raw={currentRateFormatted.raw} /> pts/day</p>
+        <p>Projected total for this activity, separate from asset APY. Rates vary with reward emissions and participation.</p>
+      </div>
+    </details>
+  );
+
   return (
     <div className="mt-3 p-3 bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950 dark:via-yellow-950 dark:to-orange-950 border border-amber-200 dark:border-amber-800 rounded-lg shadow-sm w-full">
       {/* Current Rate - Always visible */}

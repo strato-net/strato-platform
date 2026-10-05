@@ -1,0 +1,31 @@
+import { RouteQuoteResponse } from "@strato/shared-types";
+import type { StratoRouteStep } from "../types";
+import { config } from "../config";
+import { app } from "../utils/api";
+import { getExecutableRouteSteps } from "../utils/routeQuoteUtils";
+
+export const fetchRouteSteps = async ({
+  tokenIn,
+  tokenOut,
+  amountIn,
+  minFinalOut,
+}: {
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  minFinalOut: string;
+}): Promise<StratoRouteStep[]> => {
+  if (!config.api.appUrl) {
+    throw new Error("STRATO_APP_API_URL is not configured");
+  }
+
+  const quote = await app.get<RouteQuoteResponse>("/api/trade/route/quote", {
+    params: {
+      tokenIn,
+      tokenOut,
+      amount: amountIn,
+      slippageBps: 1,
+    },
+  });
+  return getExecutableRouteSteps(quote, tokenIn, tokenOut, minFinalOut);
+};

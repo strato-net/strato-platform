@@ -6,7 +6,8 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "dev": "nodemon src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test": "npm run build && node --test dist/features/events-read/routeAttribution.test.js"
   },
   "engines": {
     "node": ">=22.12 <23.0"

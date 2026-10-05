@@ -26,6 +26,15 @@ const config = {
   rewards: {
     address: getEnv("REWARDS_CONTRACT_ADDRESS"),
   },
+  externalAssetBridge: {
+    address: getEnv("EXTERNAL_ASSET_BRIDGE_ADDRESS"),
+  },
+  nativeBridge: {
+    address: getEnv("STRATO_NATIVE_BRIDGE"),
+  },
+  tokenRouter: {
+    address: getEnv("TOKEN_ROUTER"),
+  },
   priceOracle: {
     address: getEnv("PRICE_ORACLE_ADDRESS"),
   },

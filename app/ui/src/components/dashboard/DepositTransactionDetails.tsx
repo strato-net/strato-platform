@@ -1,9 +1,10 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo } from "react";
 import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { Table, Select, Space, Card } from "antd";
 import { FrownOutlined, CopyOutlined } from "@ant-design/icons";
 import { useBridgeContext } from "@/context/BridgeContext";
-import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
+import { formatDate, getChainName, DEPOSIT_STATUS_OPTIONS, LEGACY_DEPOSIT_STATUS_OPTIONS, getDepositStatusLabel, ExternalBridgeStatus, handleCopyToClipboard, getExplorerUrl, mergePendingDeposits } from "@/lib/bridge/utils";
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
@@ -14,19 +15,17 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const DepositTransactionDetails = ({ context }: { context?: string }) => {
   const isMobile = useIsMobile();
+  const [historyError, setHistoryError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number>(0);
   const [selectedChainId, setSelectedChainId] = useState<number>(0);
   const [selectedType, setSelectedType] = useState<'bridge' | 'save' | 'forge' | ''>('');
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
-  const DEPOSIT_STATUS_OPTIONS = [
-    ...BRIDGE_STATUS_OPTIONS.filter((o) => o.value !== 4),
-    { value: 6, label: "On Hold" },
-    { value: 7, label: "Announced" },
-  ];
 
   const {
+    scope,
     loading: isLoading,
     fetchDepositTransactions,
     availableNetworks,
@@ -46,6 +45,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
 
   useEffect(() => {
     const loadTransactions = async () => {
+      setHistoryError(false);
       try {
         const params: Record<string, string> = {
           limit: ITEMS_PER_PAGE.toString(),
@@ -86,14 +86,14 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         setTransactions(merged as DepositTransaction[]);
         setTotalCount(result.totalCount + filteredPending.length);
       } catch (error) {
-        console.error("Error loading transactions:", error);
+        setHistoryError(true);
         setTransactions([]);
         setTotalCount(0);
       }
     };
 
     loadTransactions();
-  }, [currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
+  }, [retryKey, currentPage, depositStatus, selectedChainId, fetchDepositTransactions, context, selectedType, depositRefreshKey]);
 
   
 
@@ -163,6 +163,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       title: "Received",
       key: "received",
       render: (_: any, record: any) => {
+        if (getDepositStatusLabel(record?.DepositInfo?.bridgeStatus, record.bridgeSource).description) return <span className="text-sm text-muted-foreground">Not received</span>;
         const outcome = record.depositOutcome;
         const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "fallback") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
@@ -183,51 +184,20 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       title: "Status",
       key: "depositStatus",
       render: (_: any, record: any) => {
-        const statusStr = record?.DepositInfo?.bridgeStatus || "0";
+        const statusStr = record?.DepositInfo?.bridgeStatus;
         const statusNum = parseInt(statusStr);
-        if (statusNum === 1) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              <Clock className="h-3 w-3 mr-1" />
-              Initiated
-            </span>
-          );
-        } else if (statusNum === 2) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Pending Review
-            </span>
-          );
-        } else if (statusNum === 3) {
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Completed
-            </span>
-          );
-        } else if (statusNum === 6) {
-          // Quarantined on the bridge: received, but the requested route cannot be minted
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              On Hold
-            </span>
-          );
-        } else if (statusNum === 7) {
-          // Announced by a solver against a bond; not yet observed by the relayer
-          return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              Announced
-            </span>
-          );
-        }
+        const status = getDepositStatusLabel(statusStr, record.bridgeSource);
+        const StatusIcon = statusNum === ExternalBridgeStatus.COMPLETED ? CheckCircle2
+          : (statusNum === ExternalBridgeStatus.INITIATED || statusNum === ExternalBridgeStatus.PENDING_REVIEW) ? Clock : AlertCircle;
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-foreground">
-            <AlertCircle className="h-3 w-3 mr-1" />
-            Unknown
-          </span>
+          <div>
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {status.text === "Complete" ? "Completed" : status.text}
+            </span>
+            {status.description && <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">{status.description}</p>}
+            {record.refundTxHash && <a className="text-xs text-primary" href={getExplorerUrl(String(record.externalChainId), record.refundTxHash)} target="_blank" rel="noopener noreferrer">View refund ↗</a>}
+          </div>
         );
       },
       width: 80,
@@ -280,7 +250,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
                 setCurrentPage(1);
               }}
               style={{ width: isMobile ? '100%' : 150 }}
-              options={DEPOSIT_STATUS_OPTIONS}
+              options={scope === "fund" ? LEGACY_DEPOSIT_STATUS_OPTIONS : DEPOSIT_STATUS_OPTIONS}
             />
           </div>
           <div className={isMobile ? "w-full" : ""}>
@@ -303,7 +273,10 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
         </Space>
       </Card>
       
-      <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      {historyError ? <div role="alert" className="rounded-lg border border-destructive/40 p-4 text-destructive">
+        <p>Unable to load transaction history. Please try again.</p>
+        <Button variant="outline" className="mt-2" onClick={() => setRetryKey(value => value + 1)}>Retry</Button>
+      </div> : <div className="bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
         <Table
           columns={columns}
           dataSource={transactions}
@@ -333,7 +306,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
           }}
           rowKey={(_, index) => index}
         />
-      </div>
+      </div>}
     </div>
   );
 };

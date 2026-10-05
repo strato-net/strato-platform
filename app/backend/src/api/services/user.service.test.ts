@@ -3,7 +3,20 @@ import test from "node:test";
 import JSONBig from "json-bigint";
 import { bloc, cirrus, eth, strato } from "../../utils/appApiHelper";
 import { constants } from "../../config/constants";
-import { castVoteOnIssueById, createIssue } from "./user.service";
+import { castVoteOnIssueById, createIssue, isUserAdmin } from "./user.service";
+
+test("admin authorization reads only the configured registry and fails closed on read failure", async t => {
+  let fail = false;
+  t.mock.method(cirrus, "get", (async (_token: string, _path: string, options: any) => {
+    assert.equal(options.params.address, `eq.${constants.adminRegistry}`);
+    assert.equal(options.params.key, `eq.${"1".repeat(40)}`);
+    if (fail) throw new Error("offline");
+    return { status: 200, data: [{ value: 1 }] };
+  }) as typeof cirrus.get);
+  assert.equal(await isUserAdmin("token", "1".repeat(40)), true);
+  fail = true;
+  assert.equal(await isUserAdmin("token", "1".repeat(40)), false);
+});
 
 const JSONBigString = JSONBig({ storeAsString: true });
 

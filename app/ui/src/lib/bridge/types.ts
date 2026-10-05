@@ -1,8 +1,14 @@
 import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, TransactionResponse, WithdrawalSummaryResponse, DepositAction } from "@strato/shared-types";
 import type { WalletTxProgressHandler } from "@/lib/axios";
+import type { DepositStep } from "@/components/bridge/DepositProgressModal";
 
 export interface BalanceResponse {
   balance: string;
+}
+
+export interface TokenDisplayMetadata {
+  _symbol: string;
+  customDecimals: number;
 }
 
 export interface BridgeResponse {
@@ -22,7 +28,31 @@ export type NetworkSummary = {
   depositRouter: string;
 };
 
+export type TradeBridgeCatalog = {
+  availableNetworks: NetworkSummary[];
+  bridgeableTokens: BridgeToken[];
+  selectedNetwork: string | null;
+  setSelectedNetwork: (networkName: string) => void;
+  loading: boolean;
+};
+
+export interface WithdrawalWidgetProps {
+  catalog: TradeBridgeCatalog;
+  active: boolean;
+  feeBalancesReady: boolean;
+  onPendingChange: (pending: boolean) => void;
+  onSubmitted?: () => void;
+}
+
+export type AutoRouteDepositResult = {
+  txHash: `0x${string}`;
+  status: "pending" | "confirmed";
+  type: "approval" | "deposit";
+};
+
 export type BridgeContextType = {
+  scope: "fund" | "trade";
+  pendingDepositsKey: string;
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
@@ -132,6 +162,20 @@ export interface Permit2Params {
   chainId: string;
 }
 
+export interface TokenApprovalParams extends Permit2Params {
+  spender: string;
+}
+
+export interface NativeRedemptionParams {
+  actionIntent?: { actionToken: string; minFinalOut: bigint };
+  bridge: string;
+  token: string;
+  amount: bigint;
+  recipient: string;
+  account: string;
+  chainId: string;
+}
+
 export interface Permit2Domain {
   name: string;
   chainId: number;
@@ -187,4 +231,40 @@ export interface BridgeContext {
   depositRouter: string;
   depositAmount: bigint;
   isNative: boolean;
+}
+
+export interface AutoRouteQuoteBinding {
+  routeType?: "standard" | "native";
+  externalBridge?: string;
+  externalChainId: string;
+  externalToken: string;
+  targetStratoToken: string;
+  externalAmount: bigint;
+  externalDecimals: number;
+  tokenOut: string;
+  slippageBps: number;
+}
+
+export interface AutoRouteDepositProgress {
+  step: DepositStep;
+  txHash?: string;
+  error?: string;
+  approvalRequired: boolean;
+  permitRequired: boolean;
+  isRedemption: boolean;
+  chainId: number;
+}
+
+export interface WithdrawalPreview {
+  externalAmount: string;
+  escrowAmount: string;
+  manualReview: boolean;
+}
+
+export interface WithdrawalConfirmation {
+  selectionKey: string;
+  route: BridgeToken;
+  networkName: string;
+  recipient: string;
+  preview: WithdrawalPreview;
 }

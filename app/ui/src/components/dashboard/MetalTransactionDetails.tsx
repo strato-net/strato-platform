@@ -6,7 +6,7 @@ import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatDate } from "@/lib/bridge/utils";
 import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { activityFeedApi } from "@/lib/activityFeed";
-import { METAL_ACTIVITY_PAIR, MetalTx, resolveTokenSymbols, collectMetalTokenAddrs, mapEventsToMetalTxs } from "@/lib/metalActivity";
+import { METAL_ACTIVITY_PAIR, MetalTx, resolveTokenMetadata, collectMetalTokenAddrs, mapEventsToMetalTxs } from "@/lib/metalActivity";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 async function fetchMetalPage(page: number): Promise<{ txs: MetalTx[]; total: number }> {
@@ -15,21 +15,21 @@ async function fetchMetalPage(page: number): Promise<{ txs: MetalTx[]; total: nu
     { limit: ITEMS_PER_PAGE, offset: (page - 1) * ITEMS_PER_PAGE, myActivity: true }
   );
   const events = result.events || [];
-  const symbolMap = await resolveTokenSymbols([...collectMetalTokenAddrs(events)]);
-  return { total: result.total || 0, txs: mapEventsToMetalTxs(events, symbolMap) };
+  const metadata = await resolveTokenMetadata([...collectMetalTokenAddrs(events)]);
+  return { total: result.total || 0, txs: mapEventsToMetalTxs(events, metadata) };
 }
 
 const columns = [
   {
     title: "Paid", key: "paid", width: 180,
     render: (_: unknown, r: MetalTx) => (
-      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.payAmount, 18)} {r.paySymbol}</span>
+      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.payAmount, r.payDecimals)} {r.paySymbol}</span>
     ),
   },
   {
     title: "Received", key: "received", width: 180,
     render: (_: unknown, r: MetalTx) => (
-      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.metalAmount, 18)} {r.metalSymbol}</span>
+      <span className="text-sm text-foreground">{formatWeiToDecimalHP(r.metalAmount, r.metalDecimals)} {r.metalSymbol}</span>
     ),
   },
   {

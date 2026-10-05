@@ -10,7 +10,8 @@ import {TransactionResponse} from "./common-types";
 export interface NetworkConfig {
   externalChainId: number;
   chainInfo: {
-    custody: string;
+    custody?: string;
+    vault?: string;
     enabled: boolean;
     chainName: string;
     depositRouter: string;
@@ -28,9 +29,11 @@ export interface NetworkConfig {
 export interface BridgeToken {
   id: string;
   routeType: BridgeRouteType;
+  isDefaultRoute?: boolean;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
+  stratoTokenDecimals?: number;
   externalChainId: string;       // Matches AssetInfo.externalChainId
   externalBridge?: string;       // Native-only representation bridge address
   externalName: string;          // Matches AssetInfo.externalName
@@ -38,6 +41,9 @@ export interface BridgeToken {
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
+  manualReviewThreshold?: string;
+  depositsEnabled?: boolean;
+  withdrawalsEnabled?: boolean;
   instantWithdrawalThreshold?: string; // Native-only; amount eligible for automatic instant bridge-out
   enabled: boolean;              // effective route enabled state
   depositsPaused?: boolean;      // Native-only; hides native redemption/deposit routes when true
@@ -47,12 +53,50 @@ export interface BridgeToken {
   maxOutstandingWithdrawal?: string; // Native-only; aggregate custody cap, 0 means unlimited
   outstandingWithdrawal?: string; // Native-only; amount currently locked in custody
   remainingOutstandingWithdrawal?: string; // Native-only; available aggregate capacity
-  isDefaultRoute: boolean;       // true when route token matches asset default token
   stratoTokenImage?: string;     // First image URL from TokenFactory images
+  rebaseRequired?: boolean;
   rebaseFactor?: string;         // External-only; for example, getCurrentMultiplier() for TSLAx
+  autoRouteEnabled?: boolean;    // On-chain auto-route flag for this deposit route (undefined for legacy)
 }
 
 export type BridgeRouteType = "standard" | "native";
+
+export enum ExternalBridgeStatus {
+  NONE = 0,
+  INITIATED = 1,
+  PENDING_REVIEW = 2,
+  READY = 3,
+  COMPLETED = 4,
+  CANCELLED = 5,
+  REFUNDED = 6,
+  ABORTED = 7,
+  REFUND_PENDING = 8,
+  REJECTED_NO_FUNDS = 9,
+  CANCELLATION_PENDING = 10,
+}
+
+export interface ExternalWithdrawalInfo {
+  status?: string;
+  bridgeStatus: string;
+  externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  stratoSender: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  requestedAt: string;
+  timestamp: string;
+  authorizationDeadline?: string;
+  requiresManualReview?: boolean;
+  reservationId?: string;
+  reservationTxHash?: string;
+  externalTxHash?: string;
+  cancellationTxHash?: string;
+  reviewApprovalDeadline?: string;
+  reviewDigest?: string;
+  reviewProposalHash?: string;
+}
 
 /**
  * A post-deposit action (earn yield or forge metal) returned by /bridge/depositActions
@@ -102,11 +146,31 @@ export interface BridgeTransaction {
   externalName?: string;
   externalSymbol?: string;
   externalToken?: string;
-  // Deposit action outcome (only for deposits with AUTO_SAVE or AUTO_FORGE)
-  depositOutcome?: "bridge" | "save" | "forge" | "fallback";
+  externalDecimals?: number;
+  // Deposit action outcome
+  depositOutcome?: "bridge" | "save" | "forge" | "route" | "fallback";
   finalToken?: string;
   finalTokenSymbol?: string;
   finalAmount?: string;
+  routeType?: BridgeRouteType;
+  bridgeSource?: "external" | "legacy" | "native";
+  depositRouter?: string;
+  depositId?: string;
+  refundTxHash?: string;
+  WithdrawalInfo?: ExternalWithdrawalInfo;
+  DepositInfo?: {
+    status?: string;
+    bridgeStatus: string;
+    externalSender: string;
+    externalToken: string;
+    externalTokenAmount: string;
+    externalTxHash: string;
+    stratoRecipient: string;
+    stratoToken: string;
+    stratoTokenAmount: string;
+    requestedAt: string;
+    timestamp: string;
+  };
 }
 
 /**
@@ -145,4 +209,163 @@ export interface WithdrawalSummaryResponse {
   totalWithdrawn30d: string;      // Total withdrawn in last 30 days in wei (string format)
   pendingWithdrawals: string;      // Pending withdrawals in wei (string format)
   availableToWithdraw: string;     // Available balance to withdraw in wei (string format)
+}
+
+export interface BridgeReviewItem {
+  id: string;
+  source: "eab" | "native" | "legacy";
+  kind: "deposit_review" | "deposit_recovery" | "withdrawal_review" | "withdrawal_refund" | "withdrawal_cancellation";
+  outcome?: "delivered" | "refunded" | "rejected_no_funds";
+  recoveryStatus?: "rejected" | "reopened" | "refund_pending";
+  refundVault?: string;
+  refundEvidenceHash?: string;
+  refundBridge?: string;
+  refundRedemptionId?: string;
+  refundRecipient?: string;
+  refundToken?: string;
+  refundAmount?: string;
+  chainId: string;
+  reference: string;
+  token: string;
+  amount: string;
+  account: string;
+  externalBridge?: string;
+  externalTxHash?: string;
+  externalAccount?: string;
+  externalToken?: string;
+  externalAmount?: string;
+  scenario?: string;
+  reason: string;
+  useInstantPath?: boolean;
+  safeProposalHash?: string;
+  reviewDigest?: string;
+  approvalStatus?: "pending" | "approved" | "unavailable";
+  refundStatus?: "pending" | "ready" | "unavailable";
+  governanceStatus?: "available" | "unavailable";
+  governance?: Partial<Record<BridgeReviewGovernanceAction, BridgeReviewGovernance>>;
+  actions: BridgeReviewGovernanceAction[];
+}
+
+export interface BridgeReviewVote {
+  target: string;
+  func: string;
+  args: string[];
+}
+
+export interface BridgeReviewRow<T = Record<string, any>> {
+  key: string;
+  key2?: string;
+  key3?: string;
+  value: T;
+}
+
+export interface BridgeReviewRecords {
+  deposits: BridgeReviewRow[];
+  withdrawals: BridgeReviewRow[];
+  reviews: BridgeReviewRow[];
+  nativeDeposits: BridgeReviewRow[];
+  nativeWithdrawals: BridgeReviewRow[];
+  legacyDeposits: BridgeReviewRow[];
+  legacyWithdrawals: BridgeReviewRow[];
+}
+
+export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "confirm_refund" | "cancel_withdrawal" | "confirm_cancellation";
+
+export interface BridgeReviewGovernance {
+  issueId?: string;
+  votesCast: number;
+  votesRequired: number;
+  hasVoted: boolean;
+}
+
+export type ProcessingIssueCode = "MINT_CAPACITY" | "WITHDRAWAL_CAPACITY" | "FUNDING_REQUIRED" |
+  "MANUAL_REVIEW" | "POLICY_RESTRICTED" | "DEPENDENCY_UNAVAILABLE" | "CONFIRMATIONS_PENDING" | "INDEXING_PENDING" |
+  "PAUSED" | "CONFIGURATION" | "UNKNOWN";
+
+export interface ProcessingIssue {
+  code: ProcessingIssueCode;
+  retryable: boolean;
+  message: string;
+  details: Record<string, string>;
+}
+
+export interface ProcessingContext {
+  source: "eab" | "native";
+  chainId: string;
+  bridge: string;
+  reference: string;
+  stage: string;
+  token?: string;
+  account?: string;
+}
+
+export interface ProcessingRecord {
+  context: ProcessingContext;
+  issues: ProcessingIssue[];
+  firstSeenAt: number;
+  lastProgressAt?: number;
+  progress?: Record<string, string>;
+  lastSeenAt: number;
+  attempts: number;
+  nextRetryAt: number;
+  resolvedAt?: number;
+  outcome?: "processing_resumed" | "completed";
+}
+
+export interface BridgeProcessingIssuesPage {
+  items: Array<ProcessingRecord & { id: string }>;
+  total: number;
+  offset: number;
+  limit: number;
+  state: "active" | "cleared";
+  fetchedAt: number;
+}
+
+export interface BridgePolicyField {
+  label: string;
+  value: string | null;
+  kind?: "amount" | "timestamp";
+  decimals?: number;
+  unit?: string;
+}
+
+export interface BridgePolicyRow {
+  id: string;
+  source: "eab" | "native";
+  kind: "Mint policy" | "Route";
+  token: string;
+  symbol?: string;
+  chainId?: string;
+  externalToken?: string;
+  externalSymbol?: string;
+  fields: BridgePolicyField[];
+}
+
+export interface BridgePolicyOverview {
+  items: BridgePolicyRow[];
+  unconfigured: Array<"eab" | "native">;
+  fetchedAt: number;
+}
+
+export interface BridgePolicyRecords {
+  eab?: Record<string, unknown>;
+  native?: Record<string, unknown>;
+  custody?: Record<string, unknown>;
+  routes: BridgeReviewRow[];
+  chains: BridgeReviewRow[];
+  mintPolicies: BridgeReviewRow[];
+  actions: BridgeReviewRow[];
+  ethAutoRoute: BridgeReviewRow<unknown>[];
+  nativeAssets: BridgeReviewRow[];
+  nativeConfigs: BridgeReviewRow[];
+  nativeAutoRoute: BridgeReviewRow<unknown>[];
+  locked: BridgeReviewRow<unknown>[];
+  tokens: Array<{ address: string; _symbol?: string; customDecimals?: unknown }>;
+}
+
+export interface WithdrawalCancellationStatus {
+  eligible: boolean;
+  requestOnly: boolean;
+  availableAt: string;
+  message: string;
 }

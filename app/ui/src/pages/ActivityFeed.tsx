@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
@@ -15,6 +16,8 @@ import { Button } from "@/components/ui/button";
 
 const ActivityFeed = () => {
   const { isLoggedIn } = useUser();
+  const [searchParams] = useSearchParams();
+  const activityType = searchParams.get("type") || "all";
   const [activeTab, setActiveTab] = useState(() => isLoggedIn ? "my-activity" : "all-activity");
 
   usePageTitle("Activity Feed");
@@ -75,7 +78,7 @@ const ActivityFeed = () => {
             </TabsList>
 
             <TabsContent value="my-activity" className="mt-0">
-              {isLoggedIn ? <ActivityFeedCards isMyActivity={true} /> : <GuestLoginPrompt />}
+              {isLoggedIn ? <ActivityFeedCards key={activityType} isMyActivity={true} initialActivityType={activityType} /> : <GuestLoginPrompt />}
             </TabsContent>
 
             <TabsContent value="all-activity" className="mt-0">

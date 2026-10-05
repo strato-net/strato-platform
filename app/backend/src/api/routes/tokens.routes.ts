@@ -3,6 +3,7 @@ import authHandler from "../middleware/authHandler";
 import TokensController from "../controllers/tokens.controller";
 
 const router = Router();
+router.get("/symbols", authHandler.authorizeRequest(true), TokensController.getSymbols);
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
 
 /**

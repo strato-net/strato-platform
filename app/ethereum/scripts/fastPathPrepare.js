@@ -59,13 +59,6 @@ const TARGETS = {
         proxy: "0x1f0457d1d8c3f0da3e579be3843dd6e093163b84",
         reinitVersion: 2,
       },
-      {
-        name: "StratoNativeRepresentationBridge",
-        legacy: "StratoNativeRepresentationBridgeLegacyV1",
-        proxy: "0x80f6497e8f8700c89b3a0b030c3e71aa874f6cf7",
-        // 3, because the v1.1.0 MINT_EXECUTOR_ROLE upgrade already burned 2.
-        reinitVersion: 3,
-      },
     ],
   },
   baseSepolia: {
@@ -147,19 +140,6 @@ function activationCalls(name, proxy, impl, cfg) {
       data: iface.encodeFunctionData("initializeFastPath", [
         FEE_HALF_LIFE, MAX_FEE_BPS, cfg.bondToken, cfg.bondAmount,
         CUSTODY_SAFE, BOND_TTL, [CUSTODY_SAFE, HOT_WALLET],
-      ]),
-    });
-  } else {
-    const iface = new ethers.Interface([
-      "function initializeFastPath(uint64 halfLifeSeconds,uint16 feeBpsCeiling,address bondToken,uint256 bondAmount,address slashRecipient,uint64 ttlSeconds)",
-    ]);
-    calls.push({
-      label: `${name}.initializeFastPath(...)`,
-      to: proxy,
-      value: "0",
-      data: iface.encodeFunctionData("initializeFastPath", [
-        FEE_HALF_LIFE, MAX_FEE_BPS, cfg.bondToken, cfg.bondAmount,
-        CUSTODY_SAFE, BOND_TTL,
       ]),
     });
   }

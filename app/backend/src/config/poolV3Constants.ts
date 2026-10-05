@@ -115,6 +115,7 @@ export const POOL_V3_SWAP_HISTORY_SELECT_FIELDS = [
   "address",
   "id",
   "block_timestamp",
+  "transaction_hash",
   "sender",
   "recipient",
   "amount0::text",
