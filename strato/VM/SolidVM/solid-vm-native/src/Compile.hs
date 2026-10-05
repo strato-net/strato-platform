@@ -11,6 +11,7 @@ import Control.Lens ((^.))
 import Control.Monad
 import Control.Monad.Reader
 import Data.Bifunctor (first)
+import Data.Decimal
 import Data.Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
@@ -28,7 +29,7 @@ import qualified Data.Source.Annotation as SA
 import qualified Data.Source.Position as SP
 import SolidVM.Model.CodeCollection hiding (DelegateCall, RawCall, Internal)
 import qualified SolidVM.Model.CodeCollection.Statement as S
-import SolidVM.Model.Storable (StoragePath (..), StoragePathPiece (..))
+import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
 import Core
 
@@ -128,7 +129,7 @@ resolveTy c = \case
   Ty.Address{} -> pure (SomeTy TAddr)
   Ty.String{} -> pure (SomeTy TStr)
   Ty.Bytes{} -> pure (SomeTy TBytes)
-  Ty.Variadic -> pure (SomeTy TVariadic)
+  Ty.Variadic -> pure (SomeTy TRaw)
   Ty.Enum{Ty.typedef = n} -> enumTy c n
   Ty.Contract{Ty.typedef = n} -> pure (SomeTy (TContract n))
   Ty.UserDefined _ actual -> resolveTy c actual
@@ -136,7 +137,7 @@ resolveTy c = \case
   Ty.Struct{Ty.typedef = n} -> stypeTy =<< storageTy c (Ty.UnknownLabel n)
   Ty.Array{Ty.entry = e} -> do SomeTy t <- resolveTy c e; pure (SomeTy (TArr t))
   Ty.Mapping{} -> typeErr "mapping used as a value type"
-  Ty.Decimal -> unsupported "decimal"
+  Ty.Decimal -> pure (SomeTy TDecimal)
   Ty.Error{} -> unsupported "error type as value"
 
 resolveName :: CCtx -> T.Text -> C SomeTy
@@ -193,6 +194,13 @@ compileAs sc t e = atLine (S.extractExpression e) $ case (t, e) of
     CE t' f <- compileE sc e
     case (t, t') of
       (TAddr, TContract _) -> pure f
+      (TContract _, TAddr) -> pure f
+      (TDecimal, TInt) -> pure (fmap fromInteger . f)
+      (_, TRaw) -> pure (\env -> f env >>= fromDyn t . Dyn TRaw)
+      (TRaw, _) -> pure (fmap (retDyn t') . f)
+      (TVariadic, TVariadic) -> pure f
+      (TVariadic, _) -> pure (fmap (\v -> [Dyn t' v]) . f)
+      (_, TVariadic) -> pure (\env -> f env >>= \ds -> fromDyn t (Dyn TVariadic ds))
       _ -> do Refl <- sameTy t t'; pure f
 
 compileFields :: Scope ls r -> Fields ts -> [Expression] -> C (Env ls -> M (HL ts))
@@ -215,7 +223,7 @@ compileE' sc e = case e of
   S.HexaLiteral _ h -> case B16.decode (TE.encodeUtf8 h) of
     Right bs -> lit TBytes bs
     Left _ -> typeErr ("bad hex literal " <> h)
-  S.DecimalLiteral{} -> unsupported "decimal literal"
+  S.DecimalLiteral _ d -> lit TDecimal (S.unwrapDecimal d)
   S.TupleExpression _ [Just x] -> compileE sc x
   S.TupleExpression _ xs | all isJust xs -> do
     ces <- mapM (compileE sc) (catMaybes xs)
@@ -256,6 +264,7 @@ compileE' sc e = case e of
   S.Variable _ "this" -> pure $ CE (TContract (cName c)) (\_ -> fThis <$> frame)
   S.Variable _ "now" -> pure $ CE TInt (\_ -> rtTimestamp <$> rt)
   S.Variable _ n -> case lookupVar sc n of
+    Just (Var _ (TAlias _ _) _) -> do LV t g _ <- compileLV sc e; pure (CE t g)
     Just (Var _ (TRef _) _) -> do LV t g _ <- compileLV sc e; pure (CE t g)
     Just (Var _ t i) -> pure $ CE t (\env -> liftIO (readIORef (ref i env)))
     Just (RefVar{}) -> do LV t g _ <- compileLV sc e; pure (CE t g)
@@ -271,7 +280,7 @@ compileE' sc e = case e of
           pure (CE t f)
       | otherwise -> unknown ("variable " <> n)
   S.MemberAccess _ (S.Variable _ "msg") m -> case m of
-    "sender" -> pure $ CE TAddr (\_ -> fSender <$> frame)
+    "sender" -> pure $ CE TAddr (\_ -> do (runtime, caller) <- ask; liftIO $ rtSender runtime caller)
     "sig" -> pure $ CE TStr (\_ -> fSig <$> frame)
     "value" -> pure $ CE TInt (\_ -> fValue <$> frame)
     "data" -> pure $ CE TVariadic (\_ -> fArgs <$> frame)
@@ -280,11 +289,17 @@ compileE' sc e = case e of
   S.MemberAccess _ (S.Variable _ "block") m -> case m of
     "number" -> pure $ CE TInt (\_ -> rtBlockNumber <$> rt)
     "timestamp" -> pure $ CE TInt (\_ -> rtTimestamp <$> rt)
-    _ -> unsupported ("block." <> m)
+    _ | m `elem` ["prevProposer", "prevIntendedProposer", "coinbase", "proposer"] -> pure $ CE TAddr $ \_ -> do
+          runtime <- rt
+          liftIO (rtBuiltin runtime ("__solidvm_block_" <> m) []) >>= fromDyn TAddr
+      | m == "prevRound" -> pure $ CE TInt $ \_ -> do
+          runtime <- rt
+          liftIO (rtBuiltin runtime "__solidvm_block_prevRound" []) >>= fromDyn TInt
+      | otherwise -> unsupported ("block." <> m)
   S.MemberAccess _ (S.Variable _ en) member
     | Nothing <- lookupVar sc en, Nothing <- M.lookup en (cStorage c), Just names <- lookupEnum c en ->
         case lookup member (zip names [0 ..]) of
-          Just i -> lit (TEnum en names) i
+          Just i -> lit (TEnum en names) (enumValue i)
           Nothing -> unknown ("enum member " <> en <> "." <> member)
   S.MemberAccess _ (S.Variable _ lib) cn
     | Nothing <- lookupVar sc lib, Nothing <- M.lookup lib (cStorage c), Just libC <- M.lookup lib (cCC c ^. contracts)
@@ -302,14 +317,23 @@ compileE' sc e = case e of
   S.FunctionCall _ callee args -> compileCall sc callee args
   S.Unitary _ op x -> case op of
     "!" -> do f <- compileAs sc TBool x; pure $ CE TBool (fmap not . f)
-    "-" -> do f <- compileAs sc TInt x; pure $ CE TInt (fmap negate . f)
+    "-" -> do
+      CE t f <- compileE sc x
+      case t of
+        TDecimal -> pure $ CE TDecimal (fmap negate . f)
+        _ -> do Refl <- sameTy TInt t; pure $ CE TInt (fmap negate . f)
+    "++" -> incr True x 1
+    "--" -> incr True x (-1)
     "~" -> do f <- compileAs sc TInt x; pure $ CE TInt (fmap complement . f)
     "delete" -> do
-      LV t _ set <- compileLV sc x
-      pure $ CE TUnit (\env -> set env (defaultOf t))
+      (_, pathF) <- compileStorage sc x
+      pure $ CE TUnit $ \env -> do
+        path <- pathF env
+        (runtime, caller) <- ask
+        liftIO $ rtPut runtime (fThis caller) path BDefault
     _ -> unsupported ("unary " <> T.pack op)
-  S.PlusPlus _ x -> incr x 1
-  S.MinusMinus _ x -> incr x (-1)
+  S.PlusPlus _ x -> incr False x 1
+  S.MinusMinus _ x -> incr False x (-1)
   S.Ternary _ cnd a b -> do
     cf <- compileAs sc TBool cnd
     CE t af <- compileE sc a
@@ -319,10 +343,52 @@ compileE' sc e = case e of
     -- (a, b) = rhs : assign through each l-value (holes skip)
     CE rt' rf <- compileE sc r
     case rt' of
+      TStruct _ fs -> do
+        setters <- tupleSetters sc fs lhss
+        pure $ CE TUnit (\env -> rf env >>= setters env)
       TTuple fs -> do
         setters <- tupleSetters sc fs lhss
         pure $ CE TUnit (\env -> rf env >>= setters env)
       _ -> typeErr ("destructuring a non-tuple " <> showTy rt')
+  S.Binary _ "=" (S.Variable _ n) r
+    | Just (Var _ (TAlias t _) i) <- lookupVar sc n -> do
+        valueF <- compileAs sc t r
+        pure $ CE t $ \env -> do
+          value <- valueF env
+          liftIO $ writeIORef (ref i env) (Right value)
+          pure value
+  S.Binary _ "=" (S.Variable _ n) r
+    | Just (Var _ (TRef st) i) <- lookupVar sc n -> do
+        (other, pathF) <- compileStorage sc r
+        when (showST st /= showST other) $ typeErr "storage alias type mismatch"
+        pure $ CE TUnit $ \env -> pathF env >>= liftIO . writeIORef (ref i env)
+  S.Binary _ "=" l r
+    | Right (SScalar (SomeTy targetTy), destinationF) <- compileStorage sc l
+    , Right (sourceType@(SScalar (SomeTy sourceTy)), sourceF) <- compileStorage sc r -> do
+        _ <- compileAs sc targetTy r
+        pure $ CE targetTy $ \env -> do
+          source <- sourceF env
+          (runtime, caller) <- ask
+          basic <- liftIO $ rtGet runtime (fThis caller) source
+          sourceValue <- either diverge pure (fromBasic sourceTy basic)
+          value <- fromDyn targetTy (Dyn sourceTy sourceValue)
+          case (targetTy, l) of
+            (TInt, S.InlineBoundsCheck _ lo hi _) -> do
+              when (maybe False (value <) lo) $ revert ("underflow: " <> T.pack (show value))
+              when (maybe False (value >) hi) $ revert ("overflow: " <> T.pack (show value))
+            _ -> pure ()
+          destination <- destinationF env
+          liftIO $ case basic of
+            BDefault -> void $ rtBuiltin runtime "__solidvm_assign_unset_storage" [Dyn (TRef sourceType) destination, Dyn (TRef sourceType) source]
+            _ -> rtPut runtime (fThis caller) destination basic
+          pure value
+  S.Binary _ "=" l r
+    | Right (SScalar (SomeTy t@(TContract _)), pathF) <- compileStorage sc l
+    , Right (CE TAddr valueF) <- compileE sc r -> pure $ CE t $ \env -> do
+        value <- valueF env
+        path <- pathF env
+        writeSlot TAddr path value
+        pure value
   S.Binary _ "=" l r -> do
     LV t _ set <- compileLV sc l
     rf <- compileAs sc t r
@@ -330,6 +396,10 @@ compileE' sc e = case e of
   S.Binary _ op l r | Just bop <- T.stripSuffix "=" (T.pack op), bop `elem` ["+", "-", "*", "/", "%", "|", "&", "^", "<<", ">>"] -> do
     LV t get set <- compileLV sc l
     case (t, bop) of
+      (TDecimal, _) -> do
+        rf <- compileAs sc TDecimal r
+        f <- decimalOp bop
+        pure $ CE TDecimal (\env -> do a <- get env; b <- rf env; v <- f a b; set env v; pure v)
       (TStr, "+") -> do
         rf <- compileAs sc TStr r
         pure $ CE TStr (\env -> do a <- get env; b <- rf env; set env (a <> b); pure (a <> b))
@@ -351,17 +421,29 @@ compileE' sc e = case e of
     isSeqLike :: Ty t -> Bool
     isSeqLike = \case TArr _ -> True; TStr -> True; TBytes -> True; _ -> False
 
-    incr :: Expression -> Integer -> C (CE ls)
-    incr x d = do
+    incr :: Bool -> Expression -> Integer -> C (CE ls)
+    incr prefix x d = do
       LV t get set <- compileLV sc x
       Refl <- sameTy TInt t
-      pure $ CE TInt (\env -> do v <- (+ d) <$> get env; set env v; pure v)
+      pure $ CE TInt $ \env -> do
+        v <- get env
+        let next = v + d
+        set env next
+        pure (if prefix then next else v)
 
     binop :: T.Text -> Expression -> Expression -> C (CE ls)
     binop op l r
       | op `elem` ["+", "-", "*", "/", "%", "**", "|", "&", "^", "<<", ">>"] = do
           CE lt lf <- compileE sc l
           case (lt, op) of
+            (TDecimal, _) -> do
+              rf <- compileAs sc TDecimal r
+              f <- decimalOp op
+              pure $ CE TDecimal (\env -> do a <- lf env; b <- rf env; f a b)
+            (TInt, _) | Right (CE TDecimal _) <- compileE sc r -> do
+              rf <- compileAs sc TDecimal r
+              f <- decimalOp op
+              pure $ CE TDecimal (\env -> do a <- lf env; b <- rf env; f (fromInteger a) b)
             (TStr, "+") -> do rf <- compileAs sc TStr r; pure $ CE TStr (\env -> (<>) <$> lf env <*> rf env)
             (TBytes, "+") -> do rf <- compileAs sc TBytes r; pure $ CE TBytes (\env -> (<>) <$> lf env <*> rf env)
             _ -> do
@@ -376,10 +458,16 @@ compileE' sc e = case e of
           let k = if op == "==" then id else not
           pure $ CE TBool (\env -> do a <- lf env; b <- rf env; pure (k (eq a b)))
       | op `elem` ["<", ">", "<=", ">="] = do
-          lf <- compileAs sc TInt l
-          rf <- compileAs sc TInt r
-          let cmp = case op of "<" -> (<); ">" -> (>); "<=" -> (<=); _ -> (>=)
-          pure $ CE TBool (\env -> cmp <$> lf env <*> rf env)
+          let cmp :: Ord a => a -> a -> Bool
+              cmp a b = case op of "<" -> a < b; ">" -> a > b; "<=" -> a <= b; _ -> a >= b
+          if isDecimal l || isDecimal r then do
+            lf <- compileAs sc TDecimal l
+            rf <- compileAs sc TDecimal r
+            pure $ CE TBool (\env -> cmp <$> lf env <*> rf env)
+          else do
+            lf <- compileAs sc TInt l
+            rf <- compileAs sc TInt r
+            pure $ CE TBool (\env -> cmp <$> lf env <*> rf env)
       | op == "&&" = do
           lf <- compileAs sc TBool l; rf <- compileAs sc TBool r
           pure $ CE TBool (\env -> lf env >>= \a -> if a then rf env else pure False)
@@ -388,11 +476,23 @@ compileE' sc e = case e of
           pure $ CE TBool (\env -> lf env >>= \a -> if a then pure True else rf env)
       | otherwise = unsupported ("operator " <> op)
 
+    isDecimal x = case compileE sc x of Right (CE TDecimal _) -> True; _ -> False
+
     eqOn :: Ty t -> C (t -> t -> Bool)
     eqOn = \case
-      TInt -> pure (==); TBool -> pure (==); TAddr -> pure (==); TStr -> pure (==); TBytes -> pure (==)
+      TDecimal -> pure (==); TInt -> pure (==); TBool -> pure (==); TAddr -> pure (==); TStr -> pure (==); TBytes -> pure (==)
       TEnum _ _ -> pure (==); TContract _ -> pure (==)
       t -> typeErr ("no equality on " <> showTy t)
+
+decimalOp :: T.Text -> C (Decimal -> Decimal -> M Decimal)
+decimalOp op = case op of
+  "+" -> pure (rounded (+))
+  "-" -> pure (rounded (-))
+  "*" -> pure (rounded (*))
+  "/" -> pure $ \a b -> if b == 0 then revert "division by zero" else rounded (/) a b
+  _ -> unsupported ("decimal operator " <> op)
+  where
+    rounded f a b = pure $ roundTo (max (decimalPlaces a) (decimalPlaces b)) (f a b)
 
 data SomeTuple ls = forall ts. SomeTuple (Fields ts) (Env ls -> M (HL ts))
 
@@ -433,7 +533,51 @@ unitMul = \case
 
 -- ---------------------------------------------------------------- l-values
 
+data ALV ls = forall t. ALV (Ty t) (Env ls -> M (Maybe StoragePath)) (Env ls -> M t) (Env ls -> t -> M ())
+
+compileAliasLV :: Scope ls r -> Expression -> C (ALV ls)
+compileAliasLV sc expression = case expression of
+  S.Variable _ name | Just (Var _ (TAlias t _) i) <- lookupVar sc name ->
+    pure $ ALV t
+      (\env -> either Just (const Nothing) <$> liftIO (readIORef (ref i env)))
+      (\env -> liftIO (readIORef (ref i env)) >>= either (readVal t) pure)
+      (\env value -> liftIO $ writeIORef (ref i env) (Right value))
+  S.MemberAccess _ parent field -> do
+    ALV t pathOf get set <- compileAliasLV sc parent
+    case t of
+      TStruct _ fields -> do
+        SomeIx ft i <- fieldIx fields field
+        pure $ ALV ft
+          (\env -> fmap (`snocP` Field (TE.encodeUtf8 field)) <$> pathOf env)
+          (\env -> hget i <$> get env)
+          (\env value -> get env >>= set env . hset i value)
+      _ -> typeErr "alias member of a non-struct"
+  S.IndexAccess _ parent (Just index) -> do
+    ALV t pathOf get set <- compileAliasLV sc parent
+    indexF <- compileAs sc TInt index
+    case t of
+      TArr et -> pure $ ALV et
+        (\env -> pathOf env >>= \case
+          Nothing -> pure Nothing
+          Just path -> do
+            i <- indexF env
+            pure $ Just $ snocP path (Index (BC.pack (show i))))
+        (\env -> do
+          values <- get env
+          i <- indexF env
+          maybe (revert "alias array index out of bounds") pure (Seq.lookup (fromIntegral i) values))
+        (\env value -> do
+          values <- get env
+          i <- indexF env
+          when (i < 0 || i >= fromIntegral (Seq.length values)) $ revert "alias array index out of bounds"
+          set env (Seq.update (fromIntegral i) value values))
+      _ -> typeErr "alias index into a non-array"
+  _ -> typeErr "not an aggregate alias"
+
 compileLV :: forall ls r. Scope ls r -> Expression -> C (LV ls)
+compileLV sc e | Right (ALV t pathOf get set) <- compileAliasLV sc e = pure $ LV t
+  (\env -> pathOf env >>= maybe (get env) (readVal t))
+  (\env value -> pathOf env >>= maybe (set env value) (\path -> writeVal t path value))
 compileLV sc e = atLine (S.extractExpression e) $ case e of
   S.InlineBoundsCheck _ lo hi x -> do
     LV t get set <- compileLV sc x
@@ -508,7 +652,9 @@ fieldIx (FCons n t rest) f
 
 compileStorage :: Scope ls r -> Expression -> C (SType, Env ls -> M StoragePath)
 compileStorage sc = \case
+  S.InlineBoundsCheck _ _ _ expression -> compileStorage sc expression
   S.Variable _ n -> case lookupVar sc n of
+    Just (Var _ (TAlias _ st) i) -> pure (st, \env -> liftIO (readIORef (ref i env)) >>= either pure (const (diverge "memory value used as storage pointer")))
     Just (RefVar _ st i) -> pure (st, \env -> liftIO (readIORef (ref i env)))
     Just (Var _ (TRef st) i) -> pure (st, \env -> liftIO (readIORef (ref i env)))
     Just (Var{}) -> typeErr ("local value " <> n <> " used where a storage location is required")
@@ -531,8 +677,6 @@ compileStorage sc = \case
         kf <- compileAs sc TInt ix
         pure (el, \env -> do
           ps <- pp env; i <- kf env
-          n <- readSlot TInt (snocP ps (Field "length"))
-          when (i < 0 || i >= n) $ revert ("index out of bounds: " <> T.pack (show i))
           pure (snocP ps (Index (BC.pack (show i)))))
       _ -> typeErr "index into a non-mapping"
   S.IndexAccess _ _ Nothing -> typeErr "empty index"
@@ -556,20 +700,22 @@ compileCall sc callee args = case callee of
     [m] -> do mf <- compileAs sc TStr m; pure $ CE TUnit (\env -> mf env >>= revert)
     _ -> typeErr "revert takes at most one argument"
   S.Variable _ "keccak256" -> case args of
-    [x] -> do
-      CE t f <- compileE sc x
-      case t of
-        TBytes -> pure $ CE TBytes (fmap (keccak256ToByteString . hash) . f)
-        _ -> unsupported ("keccak256 over " <> showTy t <> " (SolidVM hashes the RLP of the value)")
-    _ -> unsupported "keccak256 over several values (SolidVM hashes the RLP of the values)"
-  S.Variable _ n | n `elem` ["create", "create2", "ecrecover", "sha256", "ripemd160", "addmod", "mulmod", "blockhash", "selfdestruct", "verifyCert", "getUserCert"] ->
-    unsupported ("builtin " <> n)
+    [x] | Right (CE TBytes f) <- compileE sc x -> pure $ CE TBytes (fmap (keccak256ToByteString . hash) . f)
+    _ -> builtinCall TStr "keccak256"
+  S.Variable _ n | n `elem` ["create", "create2", "ecrecover"] -> builtinCall TAddr n
+  S.Variable _ n | n `elem` ["addmod", "mulmod"] -> builtinCall TInt n
+  S.Variable _ "selfdestruct" -> builtinCall TBool "selfdestruct"
+  S.Variable _ "getUserCert" -> unsupported "obsolete getUserCert builtin (absent from STRATO)"
+  S.MemberAccess _ (S.Variable _ "abi") "encodePacked" -> builtinCall TBytes "abiEncodePacked"
+  S.MemberAccess _ (S.Variable _ "abi") "encode" -> builtinCall TBytes "abiEncode"
+  S.MemberAccess _ target "derive" -> deriveCall target
+  S.Variable _ "derive" -> deriveCall (S.Variable (S.extractExpression callee) "this")
   S.Variable _ n | Just k <- castTarget n -> cast k
   S.Variable _ n | Just names <- lookupEnum c n -> case args of
     [x] -> do f <- compileAs sc TInt x
               pure $ CE (TEnum n names) $ \env -> do v <- f env
                                                      when (v < 0 || v >= fromIntegral (length names)) $ revert ("enum out of range: " <> T.pack (show v))
-                                                     pure v
+                                                     pure (enumValue v)
     _ -> typeErr "enum conversion takes one argument"
   S.Variable _ n | Just _ <- lookupStruct c n -> do
     SomeTy t <- resolveName c n
@@ -624,6 +770,9 @@ compileCall sc callee args = case callee of
     case tt of
       TContract cn | Nothing <- usingLib tt m -> externalCall cn tf m
       TAddr | m == "balance" -> unsupported "address.balance"
+      TDecimal | m == "truncate", [places] <- args -> do
+        placesF <- compileAs sc TInt places
+        pure $ CE TDecimal (\env -> do value <- tf env; n <- placesF env; pure $ roundTo' truncate (fromInteger n) value)
       _ -> case usingLib tt m of
         Just (lib, fe) -> do
           -- `using L for T`: x.f(args) == L.f(x, args)
@@ -636,10 +785,17 @@ compileCall sc callee args = case callee of
               pure (CE rt' k)
             SigNil _ -> typeErr ("library function " <> lib <> "." <> m <> " takes no arguments")
         Nothing -> unsupported ("method " <> m <> " on " <> showTy tt)
-  S.NewExpression _ ty _ -> do
+  S.NewExpression _ ty mSalt -> do
+    saltF <- traverse (\salt -> do CE st sf <- compileE sc salt; pure (\env -> Dyn st <$> sf env)) mSalt
     SomeTy t <- resolveTy c ty
     case t of
-      TContract n -> unsupported ("contract creation: new " <> n)
+      TContract n -> do
+        target <- maybe (unknown ("contract " <> n)) pure (M.lookup n (cCC c ^. contracts))
+        SomeSig sig <- maybe (pure (SomeSig (SigNil TUnit))) (funSig (mkCtx (cCC c) target)) (target ^. constructor)
+        argsF <- typedArgs sig args
+        pure $ CE t $ \env -> do
+          state@(runtime, caller) <- ask
+          liftIO $ rtCreate runtime caller n ((\sf -> runReaderT (sf env) state) <$> saltF) (runReaderT (argsF env) state)
       _ -> typeErr ("call of new " <> showTy t)
   _ -> unsupported "call of a computed function"
   where
@@ -665,35 +821,50 @@ compileCall sc callee args = case callee of
     requireLike nm = case args of
       [x] -> do f <- compileAs sc TBool x; pure $ CE TUnit (\env -> f env >>= \b -> unless b (revert nm))
       [x, m] -> do f <- compileAs sc TBool x; mf <- compileAs sc TStr m
-                   pure $ CE TUnit (\env -> f env >>= \b -> unless b (mf env >>= revert))
+                   pure $ CE TUnit (\env -> do b <- f env; message <- mf env; unless b (revert message))
       _ -> typeErr (nm <> " takes one or two arguments")
 
     castTarget :: T.Text -> Maybe T.Text
     castTarget n
       | n `elem` ["address", "payable"] = Just "address"
-      | n == "bool" || n == "string" || n == "bytes" = Just n
+      | n `elem` ["bool", "string", "bytes", "decimal", "variadic"] = Just n
       | "uint" `T.isPrefixOf` n || "int" `T.isPrefixOf` n = Just "int"
       | "bytes" `T.isPrefixOf` n = Just "bytes"
       | otherwise = Nothing
 
     cast :: T.Text -> C (CE ls)
+    cast "variadic" = do
+      f <- dynArgs args
+      pure $ CE TVariadic f
+    cast "string" | [x] <- args = do
+      CE t f <- compileE sc x
+      case t of
+        TStr -> pure $ CE TStr f
+        TAddr -> pure $ CE TStr (fmap (T.pack . show) . f)
+        TInt -> pure $ CE TStr (fmap (T.pack . show) . f)
+        TBool -> pure $ CE TStr (fmap (\v -> if v then "true" else "false") . f)
+        _ -> builtinCall TStr "string"
+    cast k | k `elem` ["string", "decimal"] = do
+      SomeTy t <- castTy k
+      builtinCall t k
     cast k = case args of
       [x] -> do
         CE t f <- compileE sc x
         case (k, t) of
           ("address", TAddr) -> pure (CE TAddr f)
           ("address", TContract _) -> pure (CE TAddr f)
+          ("address", TStr) -> builtinCall TAddr "address"
+          ("address", TBytes) -> builtinCall TAddr "address"
+          ("int", TDecimal) -> builtinCall TInt "int"
+          ("int", TStr) -> builtinCall TInt "int"
           ("address", TInt) -> pure (CE TAddr (fmap (Address . fromIntegral) . f))
           ("int", TInt) -> pure (CE TInt f)
-          ("int", TEnum _ _) -> pure (CE TInt f)
+          ("int", TEnum _ _) -> pure (CE TInt (fmap enumNumber . f))
           ("int", TAddr) -> pure (CE TInt (fmap (\(Address a) -> fromIntegral a) . f))
           ("int", TBytes) -> pure (CE TInt (fmap (B.foldl' (\acc w -> acc * 256 + fromIntegral w) 0) . f))
           ("bytes", TInt) -> pure (CE TBytes (fmap intToBytes32 . f))
           ("bytes", TStr) -> pure (CE TBytes (fmap TE.encodeUtf8 . f))
           ("bytes", TBytes) -> pure (CE TBytes f)
-          ("string", TBytes) -> pure (CE TStr (fmap TE.decodeUtf8 . f))
-          ("string", TStr) -> pure (CE TStr f)
-          ("string", TAddr) -> pure (CE TStr (fmap (T.pack . show) . f))
           ("bool", TBool) -> pure (CE TBool f)
           -- explicit conversion out of the dynamic world: checked once at runtime
           (_, TVariadic) -> do
@@ -701,13 +872,33 @@ compileCall sc callee args = case callee of
             pure $ CE target $ \env -> f env >>= \case
               [d] -> fromDyn target d
               ds -> diverge ("converting " <> T.pack (show (length ds)) <> " dynamic values to " <> showTy target)
+          (_, TRaw) -> do
+            SomeTy target <- castTy k
+            pure $ CE target (\env -> f env >>= fromDyn target . Dyn TRaw)
           _ -> typeErr ("cannot convert " <> showTy t <> " to " <> k)
       _ -> typeErr "conversion takes one argument"
 
     castTy :: T.Text -> C SomeTy
     castTy = \case
       "address" -> pure (SomeTy TAddr); "int" -> pure (SomeTy TInt); "bool" -> pure (SomeTy TBool)
-      "string" -> pure (SomeTy TStr); "bytes" -> pure (SomeTy TBytes); k -> unknown ("type " <> k)
+      "decimal" -> pure (SomeTy TDecimal); "string" -> pure (SomeTy TStr); "bytes" -> pure (SomeTy TBytes); k -> unknown ("type " <> k)
+
+    deriveCall target = do
+      addressF <- compileAs sc TAddr target
+      argsF <- dynArgs args
+      pure $ CE TAddr $ \env -> do
+        address <- addressF env
+        ds <- argsF env
+        runtime <- rt
+        liftIO (rtBuiltin runtime "__solidvm_derive" (Dyn TAddr address : ds)) >>= fromDyn TAddr
+
+    builtinCall :: Ty t -> T.Text -> C (CE ls)
+    builtinCall t name = do
+      f <- dynArgs args
+      pure $ CE t $ \env -> do
+        ds <- f env
+        runtime <- rt
+        liftIO (rtBuiltin runtime name ds) >>= fromDyn t
 
     lowLevel :: CallKind -> Expression -> C (CE ls)
     lowLevel kind target = do
@@ -721,10 +912,10 @@ compileCall sc callee args = case callee of
         [] -> typeErr ".call needs a function name"
       nf <- compileAs sc TStr nameE
       argsF <- dynArgs rest
-      pure $ CE TVariadic $ \env -> do
+      pure $ CE TRaw $ \env -> do
         a <- addrOf env; n <- nf env; ds <- argsF env
         (r, f) <- ask
-        liftIO (rtCall r kind f a n ds Nothing)
+        liftIO (rtCall r kind f a n ds (Just (SomeTy TRaw)))
 
     externalCall :: T.Text -> (Env ls -> M Address) -> T.Text -> C (CE ls)
     externalCall cn addrOf m = do
@@ -739,6 +930,7 @@ compileCall sc callee args = case callee of
         out <- liftIO (rtCall rt' Call f a m ds (Just (SomeTy r)))
         case r of
           TUnit -> pure ()
+          TRaw -> pure out
           TVariadic -> pure out
           _ -> case out of
             [d] -> fromDyn r d
@@ -762,10 +954,16 @@ compileCall sc callee args = case callee of
       CE t f <- compileE sc x
       pure $ case t of
         TVariadic -> f
+        TRaw -> \env -> f env >>= \values -> pure $ case values of
+          [Dyn TVariadic remaining] -> remaining
+          _ -> [Dyn TRaw values]
         _ -> \env -> (: []) . Dyn t <$> f env
     dynArgs xs = do
       fs <- forM xs $ \x -> do CE t f <- compileE sc x; pure (\env -> Dyn t <$> f env)
-      pure (\env -> mapM ($ env) fs)
+      pure $ \env -> mapM ($ env) fs >>= \values -> pure $ case reverse values of
+        Dyn TVariadic remaining : rest -> reverse rest ++ remaining
+        Dyn TRaw [Dyn TVariadic remaining] : rest -> reverse rest ++ remaining
+        _ -> values
 
 -- exact "name/arity" first, else a declaration whose last parameter is `variadic`
 findSig :: M.Map T.Text (C SomeSig) -> T.Text -> Int -> Maybe (C SomeSig)
@@ -802,7 +1000,7 @@ applyCall _ _ _ _ = typeErr "argument count mismatch"
 -- so the mismatch branch is unreachable.  A callee that failed to compile throws when called.
 link :: Sig args r -> C Fun -> Fn args r
 link sig = \case
-  Right (Fun _ sig' f) | Just Refl <- sigEq sig sig' -> typedReturns sig f
+  Right (Fun n sig' f) | Just Refl <- sigEq sig sig' -> typedReturns sig (internalFrame n sig f)
   Right (Fun n _ _) -> throwFn sig ("internal: linked signature mismatch for " <> n)
   Left e -> throwFn sig ("callee failed to compile: " <> showErr e)
 
@@ -815,9 +1013,11 @@ throwFn (SigCons _ rest) msg = \_ -> throwFn rest msg
 superEntry :: CCtx -> T.Text -> Int -> C FunEntry
 superEntry c n arity = do
   let ps = mapMaybe (\p -> M.lookup p (cCC c ^. contracts)) (cContract c ^. parents)
-      cands = [f' | p <- ps, Just f <- [M.lookup n (p ^. functions)], f' <- f : (f ^. funcOverload), length (f' ^. funcArgs) == arity, isJust (f' ^. funcContents)]
+      cands = [(p, f') | p <- ps, Just f <- [M.lookup n (p ^. functions)], f' <- f : (f ^. funcOverload), length (f' ^. funcArgs) == arity, isJust (f' ^. funcContents)]
   case cands of
-    (f : _) -> pure (FunEntry (funSig c f) (compileFunction c ("super." <> n) f))
+    ((parent, f) : _) ->
+      let parentCtx = mkCtx (cCC c) parent
+       in pure (FunEntry (funSig parentCtx f) (compileFunction parentCtx ("super." <> n) f))
     [] -> unknown ("super." <> n)
 
 -- ---------------------------------------------------------------- functions
@@ -842,7 +1042,9 @@ funSig c f = do
     go :: Ty r -> [(Maybe T.Text, IndexedType)] -> C SomeSig
     go r [] = pure (SomeSig (SigNil r))
     go r ((_, it) : rest) = do
-      SomeTy t <- paramTy c it
+      SomeTy t <- case indexedTypeType it of
+        Ty.Variadic -> pure (SomeTy TVariadic)
+        _ -> paramTy c it
       SomeSig s <- go r rest
       pure (SomeSig (SigCons t s))
     fieldsOf :: [(Maybe T.Text, IndexedType)] -> C SomeFields
@@ -976,14 +1178,20 @@ compileBlock :: Scope ls r -> [Statement] -> C (Env ls -> M (Flow r))
 compileBlock _ [] = pure (\_ -> pure Next)
 compileBlock sc (s : rest) = case s of
   S.SimpleStatement (S.VariableDefinition [S.VarDefEntry (Just ty) loc n _] mInit) a -> atLine a $
-    if loc == Just S.Storage
+    if loc == Just S.Storage || implicitStorageAlias sc mInit
       then do
         st <- storageTy (sC sc) ty
         initE <- maybe (typeErr "storage pointer needs an initialiser") pure mInit
         (st', pathOf) <- compileStorage sc initE
         when (showST st /= showST st') $ typeErr ("storage pointer type mismatch: " <> showST st <> " vs " <> showST st')
-        k <- compileBlock (pushVar n (TRef st) sc) rest
-        pure $ \env -> do p <- pathOf env; rr <- liftIO (newIORef p); k (rr :& env)
+        case st of
+          SStruct{} | loc /= Just S.Storage -> do
+            SomeTy t <- stypeTy st
+            k <- compileBlock (pushVar n (TAlias t st) sc) rest
+            pure $ \env -> do p <- pathOf env; rr <- liftIO (newIORef (Left p)); k (rr :& env)
+          _ -> do
+            k <- compileBlock (pushVar n (TRef st) sc) rest
+            pure $ \env -> do p <- pathOf env; rr <- liftIO (newIORef p); k (rr :& env)
       else do
         SomeTy t <- resolveTy (sC sc) ty
         initF <- maybe (pure (\_ -> pure (defaultOf t))) (compileAs sc t) mInit
@@ -994,6 +1202,9 @@ compileBlock sc (s : rest) = case s of
     -- (T1 a, T2 b) = rhs
     CE rt' rf <- compileE sc initE
     case rt' of
+      TStruct _ fs -> do
+        k <- destructure sc fs entries rest
+        pure $ \env -> rf env >>= k env
       TTuple fs -> do
         k <- destructure sc fs entries rest
         pure $ \env -> rf env >>= k env
@@ -1005,6 +1216,14 @@ compileBlock sc (s : rest) = case s of
     pure $ \env -> sf env >>= \case
       Next -> k env
       fl -> pure fl
+
+implicitStorageAlias :: Scope ls r -> Maybe Expression -> Bool
+implicitStorageAlias sc (Just expression) = case compileStorage sc expression of
+  Right (SStruct{}, _) -> True
+  Right (SArray{}, _) -> True
+  Right (SMap{}, _) -> True
+  _ -> False
+implicitStorageAlias _ Nothing = False
 
 -- Declare each tuple component as a typed local (blank entries are skipped), then continue.
 destructure :: Scope ls r -> Fields ts -> [VarDefEntry] -> [Statement] -> C (Env ls -> HL ts -> M (Flow r))
@@ -1075,8 +1294,12 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
     (r, _) -> typeErr ("return without a value in a function returning " <> showTy r)
   S.Return (Just e) _ -> do
     case compileE sc e of
-      Right (CE TVariadic f) | isJust (sInner sc), isNothing (tyEq (sRet sc) TVariadic) ->
+      Right (CE TRaw f) | isJust (tyEq (sRet sc) TRaw) || isJust (sInner sc) ->
         pure $ \env -> RetDynamic <$> f env
+      Right (CE TVariadic f) | isJust (sInner sc), isNothing (tyEq (sRet sc) TVariadic) ->
+        pure $ \env -> f env >>= \case
+          ds@[Dyn TUnit ()] -> pure $ RetDynamic ds
+          ds -> pure $ RetDynamic [Dyn TVariadic ds]
       _ -> do
         f <- compileAs sc (sRet sc) e
         pure $ \env -> Ret <$> f env
@@ -1105,7 +1328,27 @@ compileStmt sc s = atLine (S.extractStatement s) $ case s of
       pure $ \env -> do vs <- mapM ($ env) fs; revert (n <> "(" <> T.intercalate "," (map showDyn vs) <> ")")
     _ -> typeErr "revert takes at most one argument"
   S.UncheckedStatement body _ -> compileBlock sc body
-  S.SolidityTryCatchStatement{} -> unsupported "solidity-style try/catch"
+  S.SolidityTryCatchStatement expression returnsDecl success handlers _ -> do
+    CE t f <- compileE sc expression
+    sf <- case returnsDecl of
+      Nothing -> do k <- compileBlock sc success; pure (\env _ -> k env)
+      Just [(name, ty)] -> do
+        SomeTy dt <- resolveTy (sC sc) ty
+        Refl <- sameTy dt t
+        k <- compileBlock (pushVar name t sc) success
+        pure (\env value -> do rr <- liftIO (newIORef value); k (rr :& env))
+      Just declarations -> case t of
+        TTuple fs -> destructure sc fs [S.VarDefEntry (Just ty) Nothing name (S.extractStatement s) | (name, ty) <- declarations] success
+        _ -> typeErr "try return declaration mismatch"
+    hf <- case M.lookup "Nill" handlers of
+      Just (Nothing, body) | M.size handlers == 1 -> compileBlock sc body
+      _ -> unsupported "typed catch clauses"
+    pure $ \env -> do
+      state <- ask
+      result <- liftIO (try (runReaderT (f env) state))
+      case result of
+        Left (Revert _) -> hf env
+        Right value -> sf env value
   S.TryCatchStatement body handlers _ -> do
     bf <- compileBlock sc body
     hf <- case M.toList handlers of
@@ -1201,9 +1444,19 @@ getterEntry c n st = FunEntry (fst <$> g) (snd <$> g)
     build (SArray v) = do
       Getter sig body <- build v
       pure $ Getter (SigCons TInt sig) (\p env -> case env of (r :& env') -> do i <- liftIO (readIORef r); body (snocP p (Index (BC.pack (show i)))) env')
+    build (SStruct name fields) = do
+      SomeTy ty <- stypeTy (SStruct name [(field, fieldTy) | (field, fieldTy) <- fields, scalarField fieldTy])
+      case ty of
+        TStruct _ fs -> do
+          let t = TTuple fs
+          pure $ Getter (SigNil t) (\p env -> case env of ENil -> readVal t p)
+        _ -> err Internal "struct getter type"
     build leaf = do
       SomeTy t <- stypeTy leaf
       pure $ Getter (SigNil t) (\p env -> case env of ENil -> readVal t p)
+    scalarField SArray{} = False
+    scalarField SMap{} = False
+    scalarField _ = True
 
 compileContract :: CodeCollection -> Contract -> CompiledContract
 compileContract cc c = CompiledContract (c ^. contractName) storageE funsE ctorE

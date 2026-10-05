@@ -9,6 +9,8 @@ import Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.Foldable as F
+import Data.Decimal
+import Text.Read (readMaybe)
 import Data.IORef
 import Data.Kind (Type)
 import qualified Data.Sequence as Seq
@@ -22,19 +24,22 @@ import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPie
 
 data Ty t where
   TInt      :: Ty Integer                 -- every int/uint width (unbounded, see notes)
+  TDecimal  :: Ty Decimal
   TBool     :: Ty Bool
   TAddr     :: Ty Address
   TStr      :: Ty T.Text
   TBytes    :: Ty B.ByteString
-  TEnum     :: T.Text -> [T.Text] -> Ty Integer   -- distinct from TInt in tyEq
+  TEnum     :: T.Text -> [T.Text] -> Ty EnumValue -- distinct from TInt in tyEq
   TContract :: T.Text -> Ty Address               -- distinct from TAddr in tyEq
   TUnit     :: Ty ()
   TArr      :: Ty t -> Ty (Seq.Seq t)
   TStruct   :: T.Text -> Fields ts -> Ty (HL ts)
   TTuple    :: Fields ts -> Ty (HL ts)
   TVariadic :: Ty [Dyn]                   -- the only dynamic type: tx args / `variadic` / `.call` results
+  TRaw      :: Ty [Dyn]
   TWireArray :: Ty [Dyn]                 -- boundary only: preserves arrays inside variadic arguments
   TWireEnum :: T.Text -> T.Text -> Ty Integer -- boundary only: preserves enum labels without their declaration
+  TAlias    :: Ty t -> SType -> Ty (Either StoragePath t)
   TMaybe    :: Ty t -> Ty (Maybe t)       -- internal: modifier return slot
   TRef      :: SType -> Ty StoragePath    -- `storage` pointer (local, parameter or return value) with its layout
 
@@ -60,6 +65,7 @@ infixr 5 :*
 
 tyEq :: Ty a -> Ty b -> Maybe (a :~: b)
 tyEq TInt TInt = Just Refl
+tyEq TDecimal TDecimal = Just Refl
 tyEq TBool TBool = Just Refl
 tyEq TAddr TAddr = Just Refl
 tyEq TStr TStr = Just Refl
@@ -71,8 +77,10 @@ tyEq (TArr a) (TArr b) = (\Refl -> Refl) <$> tyEq a b
 tyEq (TStruct n fs) (TStruct m gs) | n == m = (\Refl -> Refl) <$> fieldsEq fs gs
 tyEq (TTuple fs) (TTuple gs) = (\Refl -> Refl) <$> fieldsEq fs gs
 tyEq TVariadic TVariadic = Just Refl
+tyEq TRaw TRaw = Just Refl
 tyEq TWireArray TWireArray = Just Refl
 tyEq (TWireEnum a x) (TWireEnum b y) | a == b && x == y = Just Refl
+tyEq (TAlias a x) (TAlias b y) | showST x == showST y = (\Refl -> Refl) <$> tyEq a b
 tyEq (TMaybe a) (TMaybe b) = (\Refl -> Refl) <$> tyEq a b
 tyEq (TRef a) (TRef b) | showST a == showST b = Just Refl
 tyEq _ _ = Nothing
@@ -84,10 +92,12 @@ fieldsEq _ _ = Nothing
 
 showTy :: Ty t -> T.Text
 showTy = \case
-  TInt -> "int"; TBool -> "bool"; TAddr -> "address"; TStr -> "string"; TBytes -> "bytes"
+  TDecimal -> "decimal"; TInt -> "int"; TBool -> "bool"; TAddr -> "address"; TStr -> "string"; TBytes -> "bytes"
   TEnum n _ -> "enum " <> n; TContract n -> "contract " <> n; TUnit -> "()"
   TArr t -> showTy t <> "[]"; TStruct n _ -> "struct " <> n; TTuple fs -> "(" <> T.intercalate "," (fieldTys fs) <> ")"
   TVariadic -> "variadic"; TMaybe t -> "Maybe " <> showTy t; TRef st -> showST st <> " storage"
+  TAlias t _ -> "alias " <> showTy t
+  TRaw -> "raw result"
   TWireArray -> "wire array"
   TWireEnum n _ -> "enum " <> n
   where
@@ -96,17 +106,29 @@ showTy = \case
     fieldTys (FCons _ t rest) = showTy t : fieldTys rest
 
 data SomeTy = forall t. SomeTy (Ty t)
+-- Numeric enum fields in transaction aggregates keep their wire encoding.
+data EnumValue = EnumValue {enumNumber :: Integer, enumIsNumber :: Bool}
+
+instance Eq EnumValue where
+  a == b = enumNumber a == enumNumber b
+
+enumValue :: Integer -> EnumValue
+enumValue n = EnumValue n False
+
 data Dyn = forall t. Dyn (Ty t) t
 
 showDyn :: Dyn -> T.Text
 showDyn (Dyn t v) = case t of
+  TDecimal -> T.pack (show v)
   TInt -> T.pack (show v); TBool -> T.pack (show v); TAddr -> T.pack (show v); TStr -> T.pack (show v)
-  TBytes -> T.pack (show v); TEnum n ns -> n <> "." <> (if fromIntegral v < length ns then ns !! fromIntegral v else T.pack (show v))
+  TBytes -> T.pack (show v); TEnum n ns -> let i = enumNumber v in n <> "." <> (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else T.pack (show i))
   TContract n -> n <> "(" <> T.pack (show v) <> ")"; TUnit -> "()"
   TArr et -> "[" <> T.intercalate "," (map (showDyn . Dyn et) (F.toList v)) <> "]"
   TStruct n fs -> n <> "{" <> T.intercalate "," (showFields fs v) <> "}"
   TTuple fs -> "(" <> T.intercalate "," (showFields fs v) <> ")"
   TVariadic -> "[" <> T.intercalate "," (map showDyn v) <> "]"; TMaybe _ -> "<maybe>"; TRef _ -> T.pack (show v)
+  TAlias _ _ -> "<alias>"
+  TRaw -> "[" <> T.intercalate "," (map showDyn v) <> "]"
   TWireArray -> "[" <> T.intercalate "," (map showDyn v) <> "]"
   TWireEnum n label -> n <> "." <> label
   where
@@ -116,10 +138,13 @@ showDyn (Dyn t v) = case t of
 
 defaultOf :: Ty t -> t
 defaultOf = \case
+  TDecimal -> 0
   TInt -> 0; TBool -> False; TAddr -> Address 0; TStr -> ""; TBytes -> ""
-  TEnum _ _ -> 0; TContract _ -> Address 0; TUnit -> (); TArr _ -> Seq.empty
+  TEnum _ _ -> enumValue 0; TContract _ -> Address 0; TUnit -> (); TArr _ -> Seq.empty
   TStruct _ fs -> defaults fs; TTuple fs -> defaults fs
   TVariadic -> []; TMaybe _ -> Nothing; TRef _ -> StoragePath []
+  TAlias t _ -> Right (defaultOf t)
+  TRaw -> [Dyn TVariadic []]
   TWireArray -> []
   TWireEnum _ _ -> 0
   where
@@ -141,8 +166,10 @@ fromBasic :: Ty t -> BasicValue -> Either T.Text t
 fromBasic t v = case (t, v) of
   (_, BDefault) -> Right (defaultOf t)
   (TInt, BInteger n) -> Right n
-  (TEnum _ _, BEnumVal _ _ w) -> Right (fromIntegral w)
-  (TEnum _ _, BInteger n) -> Right n
+  (TDecimal, BDecimal b) -> maybe (Left "invalid decimal storage") Right (readMaybe (BC.unpack b))
+  (TDecimal, BInteger n) -> Right (fromInteger n)
+  (TEnum _ _, BEnumVal _ _ w) -> Right (enumValue (fromIntegral w))
+  (TEnum _ _, BInteger n) -> Right (EnumValue n True)
   (TBool, BBool b) -> Right b
   (TAddr, BAddress a) -> Right a
   (TAddr, BContract _ a) -> Right a
@@ -157,8 +184,10 @@ fromBasic t v = case (t, v) of
 -- Preserve scalar tags for action diffs; the storage backend normalizes defaults.
 toBasic :: Ty t -> t -> BasicValue
 toBasic t v = case t of
+  TDecimal -> BDecimal (BC.pack (show v))
   TInt -> BInteger v
-  TEnum n ns -> BEnumVal n (if v >= 0 && fromIntegral v < length ns then ns !! fromIntegral v else "") (fromIntegral v)
+  TEnum n ns -> let i = enumNumber v in if enumIsNumber v then BInteger i
+    else BEnumVal n (if i >= 0 && fromIntegral i < length ns then ns !! fromIntegral i else "") (fromIntegral i)
   TBool -> BBool v
   TAddr -> BAddress v
   TContract n -> BContract n v
@@ -171,8 +200,9 @@ encodeKey :: Ty t -> t -> StoragePathPiece
 encodeKey t v = Index $ case t of
   TAddr -> BC.pack (show v)
   TContract _ -> BC.pack (show v)
+  TDecimal -> BC.pack (show v)
   TInt -> BC.pack (show v)
-  TEnum _ _ -> BC.pack (show v)
+  TEnum _ _ -> BC.pack (show (enumNumber v))
   TBool -> if v then "true" else "false"
   TStr -> TE.encodeUtf8 v
   TBytes -> v
@@ -221,6 +251,9 @@ data RT = RT
   , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()
   , rtEmit :: Frame -> T.Text -> T.Text -> [(T.Text, Dyn)] -> IO ()   -- contract name, event name, args
   , rtCall :: CallKind -> Frame -> Address -> T.Text -> [Dyn] -> Maybe SomeTy -> IO [Dyn]
+  , rtSender :: Frame -> IO Address
+  , rtBuiltin :: T.Text -> [Dyn] -> IO Dyn
+  , rtCreate :: Frame -> T.Text -> Maybe (IO Dyn) -> IO [Dyn] -> IO Address
   , rtBlockNumber :: Integer
   , rtTimestamp :: Integer
   }
@@ -333,7 +366,7 @@ callDyn (SigNil r) f [] = do
   liftIO $ runReaderT (retDyn r <$> f) st
     `catch` (\(ForwardReturn ds) -> pure $ case ds of
       [Dyn TUnit ()] -> []
-      _ -> [Dyn TVariadic ds])
+      _ -> ds)
 callDyn (SigCons t rest) f (d : ds) = do v <- fromDyn t d; callDyn rest (f v) ds
 callDyn s _ ds = diverge ("arity mismatch at call boundary: expected " <> T.pack (show (sigArity s)) <> " more, got " <> T.pack (show (length ds)))
 
@@ -350,25 +383,42 @@ typedReturns (SigNil r) f = do
   st <- ask
   liftIO $ runReaderT f st `catch` (\(ForwardReturn ds) -> runReaderT (decode ds) st)
   where
-    decode ds = case r of
+    decode returned = case r of
       TUnit -> pure ()
+      TRaw -> pure returned
       TVariadic -> pure ds
       TTuple fs -> fromDyns fs ds
       _ -> case ds of
         [d] -> fromDyn r d
         _ -> diverge "forwarded return does not match declared signature"
+      where
+        ds = case returned of [Dyn TVariadic values] -> values; _ -> returned
+
+internalFrame :: T.Text -> Sig args r -> Fn args r -> Fn args r
+internalFrame name sig f = go sig f []
+  where
+    callName = maybe name id (T.stripPrefix "super." name)
+    go :: Sig as result -> Fn as result -> [Dyn] -> Fn as result
+    go (SigCons t rest) action args = \a -> go rest (action a) (Dyn t a : args)
+    go (SigNil _) action args = local (\(runtime, caller) ->
+      (runtime, caller {fSig = callName, fArgs = reverse args})) action
 
 -- address <-> contract and int <-> enum share a wire value; the typed side decides.
 fromDyn :: Ty t -> Dyn -> M t
 fromDyn t (Dyn t' v) = case tyEq t t' of
   Just Refl -> pure v
   Nothing -> case (t, t') of
+    (_, TRaw) -> case v of
+      [d] -> fromDyn t d
+      ds -> fromDyn t (Dyn TVariadic ds)
+    (TRaw, _) -> pure $ retDyn t' v
     (TAddr, TContract _) -> pure v
     (TContract _, TAddr) -> pure v
     (TContract _, TContract _) -> pure v
-    (TInt, TEnum _ _) -> pure v
-    (TEnum _ _, TInt) -> pure v
-    (TEnum n _, TWireEnum m _) | n == m -> pure v
+    (TDecimal, TInt) -> pure (fromInteger v)
+    (TInt, TEnum _ _) -> pure (enumNumber v)
+    (TEnum _ _, TInt) -> pure (EnumValue v True)
+    (TEnum n _, TWireEnum m _) | n == m -> pure (enumValue v)
     (TInt, TWireEnum _ _) -> pure v
     (TBytes, TStr) -> pure (TE.encodeUtf8 v)
     (TStr, TBytes) -> pure (TE.decodeUtf8 v)
@@ -378,6 +428,7 @@ fromDyn t (Dyn t' v) = case tyEq t t' of
     (TTuple fs, TVariadic) -> fromDyns fs v
     (TStruct _ fs, TVariadic) -> fromDyns fs v
     (TVariadic, _) -> pure [Dyn t' v]
+    (_, TVariadic) | [d] <- v -> fromDyn t d
     _ -> diverge ("value of type " <> showTy t' <> " where " <> showTy t <> " was declared")
 
 fromDyns :: Fields ts -> [Dyn] -> M (HL ts)
@@ -387,7 +438,8 @@ fromDyns _ _ = diverge "tuple arity mismatch at call boundary"
 
 retDyn :: Ty r -> r -> [Dyn]
 retDyn TUnit () = []
-retDyn TVariadic ds = ds
+retDyn TVariadic ds = [Dyn TVariadic ds]
+retDyn TRaw ds = ds
 retDyn (TTuple fs) hl = toDyns fs hl
 retDyn r v = [Dyn r v]
 
@@ -399,7 +451,7 @@ toDyns (FCons _ t rest) (x :* xs) = Dyn t x : toDyns rest xs
 dynFromText :: Ty t -> T.Text -> Either T.Text Dyn
 dynFromText t s = case t of
   TInt -> Dyn TInt <$> readInt
-  TEnum _ _ -> Dyn t <$> readInt
+  TEnum _ _ -> Dyn t . enumValue <$> readInt
   TBool -> Dyn TBool <$> (case s of "true" -> Right True; "false" -> Right False; _ -> Left ("not a bool: " <> s))
   TAddr -> Dyn TAddr <$> readAddr
   TContract _ -> Dyn t <$> readAddr

@@ -19,7 +19,8 @@ library
       src/
   ghc-options: -O1
   build-depends:
-      base
+      Decimal
+    , base
     , base16-bytestring
     , bytestring
     , containers

@@ -15,6 +15,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as T
 import SolidVM.Model.CodeCollection (CodeCollection)
+import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..), isDefault)
 import System.Directory (listDirectory)
 import System.Environment
@@ -54,6 +55,13 @@ census dir = do
             nFuns = sum [M.size (ccFuns c) + maybe 0 (const 1) (ccConstructor c) | c <- M.elems (colContracts col)]
             nBad = length [() | (_, e) <- errs, eKind e /= Internal] -- storage errors counted too
         printf "%s: %d contracts, %d functions, %d errors\n" f (M.size (colContracts col)) nFuns (length errs)
+        forM_ (M.toList (CC._contracts cc)) $ \(name, contract) -> do
+          let duplicateArities f' =
+                let arities = map (length . CC._funcArgs) (f' : CC._funcOverload f')
+                 in length arities /= M.size (M.fromList [(arity, ()) | arity <- arities])
+              supported = not (any duplicateArities (M.elems (CC._functions contract)))
+                && either (const False) (const True) (compileContractChecked cc contract)
+          printf "    WHOLE %s %s\n" (T.unpack name) (if supported then "supported" else "rejected" :: String)
         forM_ errs $ \(w, e) -> T.putStrLn ("    " <> w <> " -> " <> showErr e)
         forM_ errs $ \(_, e) -> modifyIORef' summary (M.insertWith (+) (T.pack (show (eKind e)) <> ": " <> headline (eMsg e)) 1)
         modifyIORef' totals (\(a, b, c, d) -> (a + 1, b, c + nFuns - nBad, d + nBad))
@@ -80,6 +88,9 @@ mkRT w = RT
   , rtPut = \a p v -> modifyIORef' (wStorage w) (if isDefault v then M.delete (a, p) else M.insert (a, p) v)
   , rtEmit = \fr cn en args -> modifyIORef' (wEvents w) (++ [T.pack (show (fThis fr)) <> " " <> cn <> "." <> en <> "(" <> T.intercalate ", " [n <> "=" <> showDyn d | (n, d) <- args] <> ")"])
   , rtCall = \kind caller addr name args _ -> dispatch w kind caller addr name args
+  , rtBuiltin = \name _ -> throwIO (Divergence ("builtin requires the STRATO runtime: " <> name))
+  , rtSender = pure . fSender
+  , rtCreate = \_ _ _ _ -> throwIO (Divergence "contract creation requires the STRATO runtime")
   , rtBlockNumber = 1
   , rtTimestamp = 0
   }

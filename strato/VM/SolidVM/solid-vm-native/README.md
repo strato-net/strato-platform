@@ -192,7 +192,8 @@ stack exec svmc-probe -- <source-file> <contract-name> <function-name>
 ```
 
 `census` compiles every source collection in a directory and reports function
-successes and failures by reason.
+successes and failures by reason. `WHOLE` rows report eligibility for the live
+adapter, including its rejection of overloads with duplicate arities.
 
 `feechain` compiles the fixture contracts and executes five fee decisions
 against the mock runtime. The expected high-level trace is:
@@ -216,13 +217,20 @@ transfer(address,uint256) returns (bool)
 
 Local variables are typed `IORef`s. Function arguments and return values have
 exact Haskell types. Storage reads are decoded according to the declared type,
-not selected by inspecting the stored tag.
+with scalar assignment retaining the original storage tag for compatibility.
+Copying an unset scalar delegates to STRATO's assignment path: its legacy
+behavior can leave the destination value intact and write a `length` field.
+This is an explicit exception to the storage-tag criterion in the draft specs.
 
 Storage remains compatible with the existing layout:
 
 - Scalars use the existing `BasicValue` encoding.
 - Scalar writes preserve their `BasicValue` tags in action diffs; the storage
   backend normalizes zero/default values to `BDefault` on disk.
+- Typed enum values retain whether a transaction supplied a numeric field or a
+  named enum member, preserving storage and forwarded argument encoding.
+- `msg.data` retains validated transaction representations, including nested
+  numeric enum fields and variadic-tail argument packing.
 - Arrays use a `length` field and indexed elements.
 - Struct fields use `Field`.
 - Mapping keys use the same encoding as the interpreter's `expToPath`.
@@ -241,37 +249,37 @@ callbacks, so storage, events, and nested calls use the existing VM state.
 
 Implemented in the prototype:
 
-- Integer, boolean, address, string, bytes, enum, and contract types
+- Integer, decimal, boolean, address, string, bytes, enum, and contract types
 - Typed arrays, structs, tuples, and multiple/named returns
 - Mappings, arrays, structs, and pointers in storage
 - Declarations, assignment, arithmetic, comparisons, branches, and loops
 - Destructuring
 - Modifiers and `_`, including ownership modifiers forwarding a `variadic` result
 - Explicit base-constructor calls
+- Ordinary and salted `new Contract(...)`, plus `create`/`create2`, through the live adapter
 - Internal, external, low-level, delegate, library, and `super` calls
 - `using L for T`
 - Public storage getters
 - Events
-- SolidVM catch-all `try`/`catch`
+- SolidVM catch-all `try`/`catch` and Solidity-style `try f() returns (...) catch`
 - `require`, `assert`, `revert`, and custom-error text
-- Variadic-tail parameters
-- Common explicit conversions, including address-to-string
-- Implicit contract-to-address conversion (both use the same Haskell representation)
-- `keccak256(bytes)`
-- `delete` and array `push`
+- Variadic-tail parameters and raw call results preserving scalar, tuple, and
+  variadic return shapes
+- Common explicit conversions, including address-to-string and radix/padded string formatting
+- Implicit conversions between addresses and contracts (both use `Address`)
+- `keccak256(bytes)`, SolidVM RLP hashing, `ecrecover`, ABI encoding, and address derivation
+- `delete`, array `push`, and distinct prefix/postfix increment and decrement
 
 Not implemented or incomplete:
 
 - Complete constructor initialization and native deployment; the live adapter
   still runs constructors through the interpreter
-- Contract creation (`new`, `create`, and `create2`)
-- `decimal`
-- Solidity-style typed `try`/`catch`
+- Contract creation in the standalone mock runtime
 - Typed catch clauses
 - Several cryptographic/system builtins
-- SolidVM's RLP-based multi-value `keccak256`
+- `msg.data` snapshots parameters at call entry; subsequent parameter reassignment is not tracked
 - Gas accounting
-- Full exception, trace, and inherited-event parity
+- Full exception and trace parity
 
 See `notes/RESULTS.md` for the detailed list.
 
@@ -312,13 +320,12 @@ The following decisions remain provisional:
 
 - All integer widths currently use unbounded `Integer`.
 - Parser-produced `InlineBoundsCheck` nodes are enforced.
-- `super` uses virtual dispatch through the derived contract context.
+- `super` executes in the selected parent context, matching STRATO dispatch.
 - Catch currently catches `Revert`; mock external calls restore storage and
   events on revert.
 - Gas is not modelled.
-- Events are currently attributed to the most-derived contract. The existing
-  interpreter can attribute an inherited event to the contract containing the
-  executing body (`ERC20` versus `Token` in the observed fee path).
+- Events use the contract context containing the executing body, including
+  inherited `super` calls (`ERC20` versus `Token` in the fee path).
 
 Consensus behavior must be checked before this engine executes production
 blocks. State roots alone are not sufficient: receipts, gas, event/action

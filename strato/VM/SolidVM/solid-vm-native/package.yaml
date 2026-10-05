@@ -11,6 +11,7 @@ library:
     - Compile
   ghc-options: -O1
   dependencies:
+    - Decimal
     - base16-bytestring
     - bytestring
     - containers

@@ -351,3 +351,177 @@ Artifacts: `/tmp/solid-vm-native-integration/priceoracle-{off,on}/`,
 `priceoracle-analysis.json`, `analyze-priceoracle.py`, `priceoracle-sync.py`,
 and `priceoracle-{old-,}check-{off,on}.log`. The failed replay artifacts preserve
 the transactions that motivated the generic fixes above.
+
+
+## 2026-10-04: Ordinary contract creation
+
+The compiler now accepts `new Contract(...)`, checks its constructor argument
+signature, and delegates deployment to STRATO's existing creation path. The
+adapter reuses address/nonce allocation, storage initialization, interpreted
+constructors, parent initialization, events, and action recording. Argument
+execution is deferred until after address allocation, matching SolidVM's order
+when an argument itself creates another contract. Salted `new`, `create`, and
+`create2` remain unsupported; the standalone mock runtime does not deploy.
+
+The sender builtin now reads the live runtime environment. SolidVM retains the
+constructor's sender environment when a failed constructor is caught; using the
+native entry frame's original sender produced a different subsequent constructor
+argument. The adapter preserves the interpreted behavior, including its existing
+partial writes on caught failures.
+
+Whole-contract census coverage for the 408 contract/code-hash versions observed
+in the saved Upquark interpreted replay increased from **292 (71.6%)** to
+**315 (77.2%)**. These are compilation-eligible versions, including base/library
+contexts, rather than counts of deployed addresses or runtime certification.
+The census now prints `WHOLE` eligibility, accounting for unsupported overloads
+with duplicate arities. One observed version's source still fails to parse.
+
+The 23 newly eligible versions include both OrderBooks, Market, MarketFactory,
+PredictDapp, NFTFactory, nine PoolFactory versions, three PoolV3Factory versions,
+four TokenFactory versions, and VaultFactory. OrderBook was the largest remaining
+interpreted contract in the older profile (149.863 seconds of self time).
+
+Root `make build_common` passed. All four correctness processes passed, with
+**71 identical return/event/action snapshots per native-off/native-on pair**,
+using both saved PriceOracle versions and the genesis governance collection.
+New checks cover constructor inheritance, arguments, storage and events, nested
+creation, caught constructor failures, and deployment through delegatecall.
+Metrics confirm the creation probes execute natively.
+
+Census and correctness artifacts are under
+`/tmp/solid-vm-native-integration/more-contracts-*`.
+
+A fresh native-enabled replay was stopped at the user's request at block
+44061, with zero state-root mismatches to that point. This is not a full-chain
+validation or a performance comparison. The user's original node directory
+was preserved and restored; all node services are stopped.
+
+
+## 2026-10-04: Expanded Upquark contract support
+
+This supersedes the coverage and unsupported-feature list in the ordinary
+creation checkpoint above. Generic support now includes decimal arithmetic and
+conversions, salted creation and address derivation, `create`/`create2`, RLP
+hashing and ABI encoding, radix/padded string formatting, Solidity-style
+catch-all `try` with return bindings, implicit storage aliases, struct
+destructuring/getters, raw scalar/tuple/variadic results, and distinct prefix
+and postfix increments. The live adapter reuses STRATO's creation, builtin,
+storage, and event paths; constructors still execute through the interpreter.
+
+### Compilation and execution checks
+
+The final census covers **150 source collections**, with no parse failures:
+**56,948 function instances compile**, three fail, and **2,679 of 2,681
+contract/code-hash contexts** pass whole-contract checks. In the saved
+interpreted Upquark profile, **407 of 408 observed contexts (99.75%)** now
+compile, compared with 292 (71.6%) before this work. These counts include
+base/library contexts and are not counts of deployed addresses.
+
+The two rejected contexts are:
+
+- `CN4@27b3164d…`: two functions use `getUserCert`, which no longer exists in
+  STRATO. Its other functions remain interpreted through whole-contract fallback.
+- `Exploit2@61c24687…`: a function supplies an EVM byte selector to
+  `delegatecall`; SolidVM's interface requires a function name. This context
+  was not encountered in the saved runtime profile.
+
+Root `make build_common` passed. The real-runtime comparison executable checks
+**123 return/event/action snapshots per native-off/native-on pair**; all match
+using both saved PriceOracle versions. Checks include the actual Rewards,
+YieldVault, StablePool, and genesis governance/proxy sources. The five-decision
+fee-chain fixture also passes. An isolated 100 × 10,000-iteration arithmetic
+loop took 0.535 seconds interpreted and 0.140 seconds native; this is not a
+whole-sync speedup measurement.
+
+The final unprofiled native replay reached block **528301**, hash
+`e61dbd03712dbdabac3b6f161ce20fb515c7822e6fba4e95aa0ec7bc00004753`,
+with **zero state-root mismatches**, in **1214.015 seconds** from block 1.
+The binary SHA-256 is
+`6f3048fac15edccfc06ece506ffa881ded9dfd4815d0dfd0a2acd715f5cdd721`.
+A separate profiled replay also passed the target, recording 8,321,530 native
+entries and 679 interpreted entries. Those interpreted entries were CN4 calls
+and helper calls from interpreted constructors; constructor bodies are not
+included in these entry counters. Native internal calls are folded into their
+entry function's timer.
+
+### Replay divergences fixed
+
+The development replays exposed these generic differences; the final replay
+passes every listed block:
+
+| Block | Difference corrected |
+|---:|---|
+| 17 | An implicit struct alias must write through to storage until rebound. |
+| 23176 | STRATO permits sparse storage-array writes without increasing length. |
+| 23249 | Address values assigned to contract storage retain their original tag. |
+| 48896 | Public struct getters omit array/mapping members and return a tuple. |
+| 51185 | Copying an unset storage scalar uses STRATO's legacy assignment behavior. |
+| 66105 | `selfdestruct` returns a boolean, even when its result is discarded. |
+| 79399 | Governance forwarding retains raw return shapes and variadic packing. |
+| 84210 | Postfix increment returns the old value, including queue request IDs. |
+| 145550 | Numeric enums inside transaction structs retain numeric wire/storage encoding. |
+
+Inherited events and `super` use the selected parent's execution context. Internal
+and `super` calls also update `msg.sig` and entry arguments for `msg.data`.
+
+### Compatibility and remaining limits
+
+Unset scalar assignment is the notable compatibility exception: STRATO can
+leave the destination's old scalar intact while writing a `.length` field.
+Native explicitly delegates that case to the existing assignment path. This
+uses the stored tag to select behavior and therefore deviates from criterion 5.
+Numeric enum provenance preserves wire/storage encoding while enum operations
+remain typed. Caught constructor failures retain STRATO's sender environment
+and partial-write behavior. None of these fixes names a deployed contract.
+
+Constructors remain interpreted, gas/exception/trace parity is unfinished,
+and `msg.data` does not yet track parameters reassigned after entry. Typed catch
+clauses and unused system/cryptographic builtins remain unsupported; the two
+rejected contexts above are the only exclusions found in this source census.
+Legacy modifier forwarding can still return a dynamic result inconsistent
+with a declared return type; that is an existing strict-typing exception.
+The census, state roots, and sampled action comparisons do not establish
+complete language or receipt parity. The integration remains opt-in through
+`SOLIDVM_NATIVE=1`, and these changes are uncommitted.
+
+Artifacts are under `/tmp/solid-vm-native-integration/`: `features-census-final.log`,
+`features-coverage-final.json`, `features-final-{old-,}check-{0,1}.log`,
+`features-feechain-final.log`, `features-on-wire-fixed/`, and `features-on-final/`.
+Failed `features-*` replay directories retain the divergence evidence.
+
+### Clean performance comparison
+
+All runs used fresh Upquark state, `SOLIDVM_PROFILE=0`, and no handwritten fee
+or AST-intrinsic shortcuts. The current native-on and native-off runs used the
+same binary; the previous-native runs used the saved pre-feature binary
+(`1d9cf8ec8324388826111ed773889d38ee3349b9974fda89d8d72bd7f60208b5`).
+Every run completed with zero state-root mismatches over its tested prefix.
+
+| Run | Block at 300 s from block 1 | Block at 300 s including startup | Block 1 → 528301 |
+|---|---:|---:|---:|
+| Interpreted, current binary | 146254 | 125586 | Not measured unprofiled |
+| Previous native, 300 s run | 158920 | 147057 | Not measured in this run |
+| Previous native, full replay | 161256 | 144370 | 1251.058 s |
+| Expanded native, full replay | 170420 | 161455 | 1214.015 s |
+
+The expanded native run inserted **7.24% more blocks** in the controlled
+300-second window than the previous-native short run, and **16.52% more** than
+the interpreter. The repeated previous-native prefix illustrates run variance.
+Including startup, the expanded run reached **161455**, **3.50% above the
+user's 156000 observation**. Startup/peer delays vary, so the block-1 clock is
+the controlled comparison; the user's original stopwatch definition is unknown.
+
+The paired full replay was **37.043 seconds shorter (2.96%)** with expanded
+native support. Final VM CPU snapshots were 1325.339 seconds previously and
+1301.243 seconds now (1.82% lower); these include startup and small target
+overshoots, unlike the exact log-derived elapsed time. The full-sync gain is
+modest despite the much larger compilation coverage. This is one full pair,
+not a statistical benchmark or proof of complete execution parity.
+
+The earlier diagnostic/profiling replays are correctness evidence, not timing
+baselines. Their diagnostic writes, profiling, and concurrent builds would
+confound a speed comparison. The benchmark node is fully stopped and its
+`mynode` removed; the user's original node state remains preserved.
+
+Timing artifacts: `features-{on-final,off-final,on-baseline,on-baseline-full}/`
+and `features-performance-final.json` under the artifact directory above.
