@@ -19,8 +19,10 @@ the AST and inspecting `Value` constructors at runtime. Source contracts and
 Haskell programs written with the SolidVM DSL remain SolidVM programs; this
 package is a new execution engine for them.
 
-This is a standalone experimental prototype. An uncommitted integration connects
-it to `vm-runner` behind `SOLIDVM_NATIVE=1`.
+The package provides an independent transaction execution engine. Callers can
+select it by substituting the `solid-vm-native` dependency for `solid-vm`;
+the compatibility module preserves the `Blockchain.SolidVM` API. The caller
+substitution is intentionally not part of this refactor.
 
 ## Repository location and dependencies
 
@@ -91,44 +93,41 @@ The compiler and strict typechecker:
 compileCollection :: CodeCollection -> CompiledCollection
 ```
 
-The integration, counters, profiling, and `solid-vm-native-check` described below
-depend on uncommitted changes outside this package. They are not provided by
-`solid-vm-native` alone.
+### Execution modules
 
-The experimental blockchain integration is enabled with `SOLIDVM_NATIVE=1`
-in the environment of `strato-up`. It defaults to the interpreter. Native
-callbacks run in the existing `SM` state through `withRunInIO`, preserving the
-storage database, call frames, action diffs, and event encoder. Compiled and
-rejected contracts share a bounded 128-entry cache keyed by code hash, parser
-fork mode, and contract name. Debugger/tracer calls, memory-reference calls,
-and unsupported contract compilation use the interpreter. Runtime failures
-are reported; execution is never retried through the interpreter after writes.
+- `SolidVM.Builtins`: handwritten actions selected by the compiler. Pure
+  arithmetic, conversions, hashing, and signature recovery run directly;
+  database operations use explicit runtime callbacks.
+- `SolidVM.Blockchain`: transaction entry points, deployment, function
+  dispatch, nested calls, and result assembly.
+- `SolidVM.Runtime`: a bounded 128-entry compilation cache and the bridge from
+  typed actions to transaction state. A contract is admitted only when all
+  functions and constructor stages compile. Cache keys include code hash,
+  parser fork mode, and contract name; failed compilations retain diagnostics.
+- `SolidVM.Gas`: gas decrement and exhaustion checking. The compiler emits
+  charges at evaluation points; monadic bind has no gas charge.
+- `SolidVM.Storage`, `SolidVM.Values`, and `SolidVM.Events`: storage operations,
+  boundary value conversion, and the existing event/action encoding.
 
-Set `SOLIDVM_NATIVE_STRICT=1` together with `SOLIDVM_NATIVE=1` to prohibit
-interpreter fallback. Missing native functions or constructor stages stop
-execution with an engine error, rather than turning an unsupported operation
-into a failed transaction. Native deployment compiles storage initializers,
-parent arguments, and constructor bodies; the existing runtime retains parent
-ordering, default-value action diffs, and deployment bookkeeping. Parameter
-changes carry across constructor stages.
+`Blockchain.SolidVM` and `Blockchain.SolidVM.Simple` preserve the existing
+public interfaces for package substitution. The shared transaction-state and
+frontend modules remain dependencies of this package; the interpreter evaluator
+is neither called nor modified. There is no environment variable, runtime flag,
+or interpreter fallback. Compilation and unexpected host failures stop block
+execution; ordinary contract failures become failed transaction results.
 
-`solidvm_native_events` exposes execution hits, constructor stages, fallbacks,
-compiled contracts, and rejected contracts on the VM's Prometheus endpoint. Run
-the `solid-vm-native-check` test suite in `solid-vm/tests/native/` with
-`SOLIDVM_NATIVE=0` and `SOLIDVM_NATIVE=1` in separate processes to compare
-returns, events, action diffs, nested calls, delegate calls, and rollback.
-Build test suites from the repository root with `make build_common_with_tests`;
-the test binary accepts `--network=upquark`.
-Native expressions, statements, loops, internal calls, and arithmetic charge
-through the existing STRATO gas meter. The compiler emits charges at the
-interpreter's evaluation points; monadic bind itself has no gas charge.
-The same `decrementGas` callback enforces exhaustion, and nested calls retain
-`TooMuchGas` rather than converting it to a generic revert. Set
-`SOLIDVM_NATIVE_GAS_CHECK=1` for varying-budget comparisons, including exact
-out-of-gas errors. Full exception/trace parity remains unfinished.
+The `solid-vm-native-check` suite in `solid-vm/tests/native/` exercises real
+transaction state with return values, events, action diffs, nested calls,
+delegate calls, rollback, and varying gas budgets. It can be built against
+either engine for differential comparison:
 
-See `notes/RESULTS.md` for the 2026-10-04 integration checks and live Upquark
-comparison, including the limits of the measured speedup.
+```sh
+make build_common_with_tests NIX_FLAG='solid-vm:test:solid-vm-native-check solid-vm-native:test:solid-vm-native-check'
+```
+
+The two suites share the same source and fixtures. Gas exhaustion is intentionally
+uncatchable in the replacement; other return, event, action, and gas comparisons
+retain the interpreter behavior.
 
 ### `fixtures/`
 
@@ -282,8 +281,8 @@ The following decisions remain provisional:
 - All integer widths currently use unbounded `Integer`.
 - Parser-produced `InlineBoundsCheck` nodes are enforced.
 - `super` executes in the selected parent context, matching STRATO dispatch.
-- Catch handles `Revert` and STRATO `SolidException`, including exhaustion;
-  engine failures remain uncaught.
+- Catch handles ordinary contract failures. Gas exhaustion aborts the
+  transaction and cannot be caught; engine failures also remain uncaught.
 - STRATO supplies the canonical gas meter through `RT.rtChargeGas`.
 - Events use the contract context containing the executing body, including
   inherited `super` calls (`ERC20` versus `Token` in the fee path).
@@ -294,10 +293,10 @@ data, return values, and failure behavior also matter.
 
 ## Integration plan
 
-The uncommitted integration provides generic dispatch, an `SM` runtime
-adapter, and a bounded compiled-contract cache. The steps below preserve the
-original production plan; strict whole-contract rejection currently leaves
-parts of the fee chain on the interpreter.
+The independent engine implements generic dispatch, deployment, builtin
+actions, an `SM` runtime adapter, and a bounded compiled-contract cache. The
+following roadmap records the original integration plan. Callers still select
+the interpreter until the package dependency is substituted explicitly.
 
 ### 1. Adapt the execution monad
 
@@ -339,10 +338,10 @@ At a SolidVM call:
 3. Convert transaction text arguments once using the declared signature.
 4. Run `callDyn` at the dynamic boundary.
 5. Convert return values to the existing VM result format.
-6. Fall back to the interpreter when the entire contract did not compile.
+6. Fail hard when the entire contract did not compile.
 
-Track compiled hits, fallbacks, compilation failures, and runtime divergences.
-The experimental live engine uses whole-contract fallback. The historical
+Track compiled hits, compilation failures, and runtime divergences.
+The live engine requires whole-contract compilation. The historical
 function census therefore overstates the fraction eligible for native execution.
 
 ### 4. Integrate the fee path first

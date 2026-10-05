@@ -17,7 +17,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
-import Blockchain.SolidVM.Exception (SolidException)
+import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
 import Data.Bits (shiftR)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
@@ -300,7 +300,9 @@ catchContractFailure action handler = do
   state <- ask
   liftIO $ runReaderT action state `catches`
     [ Handler (\(_ :: Revert) -> runReaderT handler state)
-    , Handler (\(_ :: SolidException) -> runReaderT handler state)
+    , Handler (\(e :: SolidException) -> case e of
+        TooMuchGas{} -> throwIO e
+        _ -> runReaderT handler state)
     ]
 
 rt :: M RT

@@ -9,6 +9,7 @@
 
 module SolidVM.Values where
 
+import Blockchain.SolidVM.Exception (SolidException (TypeError, InvalidArguments))
 import Blockchain.DB.SolidStorageDB
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import qualified Blockchain.SolidVM.Environment as Env
@@ -195,7 +196,7 @@ convertArgs ctx (N.SigCons N.TVariadic (N.SigNil _)) values = do
   pure [N.Dyn N.TVariadic args]
 convertArgs ctx (N.SigCons t rest) (v : vs) =
   (:) <$> (N.Dyn t <$> valueAs ctx t v) <*> convertArgs ctx rest vs
-convertArgs _ _ _ = throwIO $ N.Divergence "native argument count mismatch"
+convertArgs _ _ _ = throwIO $ InvalidArguments "function argument count mismatch" "arguments do not match the compiled signature"
 
 valueAs :: M.Map T.Text N.SType -> N.Ty t -> Value -> SM t
 valueAs ctx t v = do
@@ -222,7 +223,7 @@ valueAsAt addr ctx t v = case (t, v) of
     block <- BlockHeader.number . Env.blockHeader <$> getEnv
     case toBasic block v >>= either (const Nothing) Just . N.fromBasic t of
       Just result -> pure result
-      Nothing -> throwIO $ N.Divergence $ "cannot convert " <> T.pack (show v) <> " to " <> N.showTy t
+      Nothing -> throwIO $ TypeError "external value does not match the declared type" (show v <> " -> " <> T.unpack (N.showTy t))
 
 isVariadic :: N.Ty t -> Bool
 isVariadic N.TVariadic = True
@@ -232,13 +233,13 @@ isVariadic _ = False
 valuesAs :: Address -> M.Map T.Text N.SType -> N.Fields ts -> [Value] -> SM (N.HL ts)
 valuesAs _ _ N.FNil [] = pure N.HNil
 valuesAs addr ctx (N.FCons _ t rest) (v : vs) = (N.:*) <$> valueAsAt addr ctx t v <*> valuesAs addr ctx rest vs
-valuesAs _ _ _ _ = throwIO $ N.Divergence "native tuple size mismatch"
+valuesAs _ _ _ _ = throwIO $ TypeError "external tuple arity mismatch" "returned values do not match the declared type"
 
 structAs :: Address -> M.Map T.Text N.SType -> N.Fields ts -> M.Map T.Text Variable -> SM (N.HL ts)
 structAs _ _ N.FNil _ = pure N.HNil
 structAs addr ctx (N.FCons name t rest) vs = case M.lookup name vs of
   Just var -> (N.:*) <$> (valueAsAt addr ctx t =<< weakGetVar var) <*> structAs addr ctx rest vs
-  Nothing -> throwIO $ N.Divergence $ "native struct field missing: " <> name
+  Nothing -> throwIO $ TypeError "struct argument is missing a field" (T.unpack name)
 
 valueDynAt :: Address -> M.Map T.Text N.SType -> Value -> SM N.Dyn
 valueDynAt addr ctx = \case

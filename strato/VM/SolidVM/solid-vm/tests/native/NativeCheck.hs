@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- A/B check through the real transaction and storage runtime, using fresh
--- in-memory chain state. Run in separate processes with SOLIDVM_NATIVE=0/1.
+-- in-memory chain state. Both packages build this suite against their own API.
 module Main where
 
 import BlockApps.Logging (runLogging)
@@ -101,6 +101,7 @@ source = T.unlines
   , "contract Exploit2 { function attack(address target) public { (bool ok,) = target.delegatecall(hex\"40c10f19\"); } }"
   , "contract NativeLegacyProbe { function failures(address cert, address exploit) public returns (bool) { bool a = false; bool b = false; try { CN4(cert).getName(msg.sender); } catch { a = true; } try { Exploit2(exploit).attack(cert); } catch { b = true; } return a && b; } }"
   , "interface NativeStoreView { function configs(address account) external view returns (uint, bool); }"
+  , "interface WrongNativeStoreView { function configs(address account) external view returns (uint, bool, uint); }"
   , "contract NativeStore { struct Config { uint minReserve; bool enabled; } mapping(address => Config) public configs; }"
   , "contract NativeProbe {"
   , "  struct Params { uint number; bool enabled; }"
@@ -127,6 +128,7 @@ source = T.unlines
   , "  function defaults(address impl) public returns (uint) {"
   , "    (uint reserve, bool enabled) = NativeStoreView(impl).configs(address(this)); require(!enabled); return reserve;"
   , "  }"
+  , "  function catchWrongInterface(address impl) public returns (bool) { try { (uint reserve, bool enabled, uint extra) = WrongNativeStoreView(impl).configs(address(this)); return false; } catch { return true; } }"
   , "  function structGetter(address impl) public returns (uint) { (uint reserve, bool enabled) = NativeStore(impl).configs(address(this)); require(!enabled); return reserve; }"
   , "  function fail() public { counter = 999; require(false, \"probe\"); }"
   , "  function catchFail() public returns (bool) {"
@@ -229,13 +231,8 @@ check result = case erException result of
 
 main :: IO ()
 main = do
-  void $ $initHFlags "native integration correctness and timing check"
-  strictProbe <- lookupEnv "SOLIDVM_NATIVE_STRICT_PROBE"
-  when (strictProbe == Just "1") $ void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
-    result <- create $ def & createNewAddress .~ 0x1000 & createContractName .~ "NativeUnsupported" & createCode .~ Code "contract NativeUnsupported { function probe() public returns (string) { return sha256(\"x\"); } }"
-    liftIO $ check result
-  gasCheck <- (== Just "1") <$> lookupEnv "SOLIDVM_NATIVE_GAS_CHECK"
-  when gasCheck $ void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
+  void $ $initHFlags "native integration correctness and gas check"
+  void $ runEff . runLogging . runMemContextM (const $ pure Nothing) Nothing $ do
     emptyContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
     forM_ [0..1100] $ \limit -> do
       Mod.put (Mod.Proxy :: Mod.Proxy ContextState) emptyContext
@@ -298,6 +295,7 @@ main = do
     expect 0x2005 "forward" ["0x2004"] (SInteger 43)
     expect 0x2005 "forwardArray" ["0x2004"] (SInteger 40)
     expect 0x2000 "defaults" ["0x0000000000000000000000000000000000002003"] (SInteger 0)
+    expect 0x2000 "catchWrongInterface" ["0x2003"] (SBool True)
     expect 0x2000 "structGetter" ["0x0000000000000000000000000000000000002003"] (SInteger 0)
     expect 0x2000 "nestedAt" ["0x0000000000000000000000000000000000002004", "10"] (SInteger 45)
     expect 0x2000 "catchFail" [] (SBool True)

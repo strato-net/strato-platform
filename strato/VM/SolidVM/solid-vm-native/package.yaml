@@ -14,6 +14,14 @@ library:
     - SolidVM.Events
     - SolidVM.Storage
     - SolidVM.Builtins
+    - SolidVM.Blockchain
+    - SolidVM.Runtime
+    - Blockchain.SolidVM
+    - Blockchain.SolidVM.Simple
+  reexported-modules:
+    - solid-vm:Blockchain.SolidVM.SM
+    - solid-vm:Blockchain.SolidVM.Environment
+    - solid-vm:Blockchain.SolidVM.GasInfo
   ghc-options: -O1
   dependencies:
     - Decimal
@@ -40,3 +48,34 @@ library:
     - ethereum-rlp
     - strato-conf
     - utf8-string
+    - lrucache
+    - time
+    - transformers
+    - blockapps-datadefs
+    - data-default
+    - format
+    - merkle-patricia-db
+    - solid-vm-compiler
+
+tests:
+  solid-vm-native-check:
+    source-dirs: ../solid-vm/tests/native
+    other-modules: []
+    main: NativeCheck.hs
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+    - blockapps-data
+    - common-log
+    - composable-monads-base
+    - hflags
+    - lens
+    - monad-alter
+    - prometheus-client
+    - solid-vm-native
+    - solid-vm-model
+    - strato-model
+    - text
+    - time
+    - unliftio
+    - vector
+    - vm-tools

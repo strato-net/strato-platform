@@ -679,3 +679,38 @@ census-final.log,build-aliases.log}`, and
 `features-real-gas-{baseline-clean,native-final,interpreted}/` with metadata,
 metrics, progress, lifecycle and VM logs. The baseline directory also contains
 `process-binary.json` proving which executable ran.
+
+
+## 2026-10-05 — Independent execution engine
+
+Steps 1–4 now provide namespaced compiler/core modules, handwritten builtin
+Actions, copied execution helpers, and independent transaction/deployment entry
+points. `Blockchain.SolidVM` preserves the caller API. Production caller package
+choices remain unchanged; a temporary package substitution built the native
+VM-runner used for this test. There are no interpreter execution fallbacks or
+runtime engine selectors.
+
+The shared differential suite passed against both packages. All **128 return,
+event, and action/storage comparisons match**, including Rewards, constructors,
+external/delegate calls, rollback, and invalid interface return types. Of
+**60,555 varying-budget gas comparisons**, **58,365 match exactly**. The remaining
+**2,190** cover deliberately uncatchable gas exhaustion: the replacement aborts
+the transaction instead of allowing Solidity catch blocks to resume execution.
+Ordinary contract failures remain catchable; compiler and unexpected host
+failures stop block execution. Error wording is not a compatibility requirement.
+
+A clean full Upquark sync reached the live tip at **552,821**, including the
+indexer. The tip timestamp was `2026-10-05T19:26:17Z`. No state-root mismatches
+were observed. At **300 seconds including startup**, the VM reached **162,111**,
+about **4.0% more blocks** than the user's 156,000 reference. Measured from block
+1, the 300-second height was **170,571**. This is one run, not a repeated timing
+study. No builds or correctness checks overlapped the performance window.
+
+The measured native VM-runner SHA256 was
+`eacb08673e9929601ad046161f854fbf83fbbb3961ff540be2281dc2a71e085f`.
+The run used `strato-up`/`strato-down` with fresh QA state. All test services
+stopped and QA `mynode` was removed. Helium was not tested or changed.
+
+Artifacts: `/tmp/solid-vm-native-integration/features-independent-complete/`
+contains the full VM/lifecycle logs, caught-up block, timing, and metadata;
+`architecture-refactor/` contains the build logs and differential comparison.

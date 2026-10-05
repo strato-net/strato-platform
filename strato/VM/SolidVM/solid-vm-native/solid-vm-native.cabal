@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version: 1.22
 
 -- This file has been generated from package.yaml by hpack version 0.38.1.
 --
@@ -18,8 +18,16 @@ library
       SolidVM.Events
       SolidVM.Storage
       SolidVM.Builtins
+      SolidVM.Blockchain
+      SolidVM.Runtime
+      Blockchain.SolidVM
+      Blockchain.SolidVM.Simple
   other-modules:
       Paths_solid_vm_native
+  reexported-modules:
+      solid-vm:Blockchain.SolidVM.SM
+    , solid-vm:Blockchain.SolidVM.Environment
+    , solid-vm:Blockchain.SolidVM.GasInfo
   hs-source-dirs:
       src/
   ghc-options: -O1
@@ -28,16 +36,22 @@ library
     , base
     , base16-bytestring
     , blockapps-data
+    , blockapps-datadefs
     , blockapps-mpdbs
     , bytestring
     , common-log
     , containers
+    , data-default
     , ethereum-rlp
     , evm-solidity
+    , format
     , lens
+    , lrucache
+    , merkle-patricia-db
     , monad-alter
     , mtl
     , solid-vm
+    , solid-vm-compiler
     , solid-vm-model
     , solid-vm-parser
     , solid-vm-static-analysis
@@ -45,8 +59,35 @@ library
     , strato-conf
     , strato-model
     , text
+    , time
+    , transformers
     , unliftio
     , utf8-string
+    , vector
+    , vm-tools
+  default-language: Haskell2010
+
+test-suite solid-vm-native-check
+  type: exitcode-stdio-1.0
+  main-is: NativeCheck.hs
+  hs-source-dirs:
+      ../solid-vm/tests/native
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , blockapps-data
+    , common-log
+    , composable-monads-base
+    , hflags
+    , lens
+    , monad-alter
+    , prometheus-client
+    , solid-vm-model
+    , solid-vm-native
+    , strato-model
+    , text
+    , time
+    , unliftio
     , vector
     , vm-tools
   default-language: Haskell2010
