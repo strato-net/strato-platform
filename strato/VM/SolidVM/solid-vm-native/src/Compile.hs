@@ -7,7 +7,7 @@
 module Compile where
 
 import Control.Exception (try, throwIO)
-import Control.Lens ((^.))
+import Control.Lens ((^.), (&), (.~))
 import Control.Monad
 import Control.Monad.Reader
 import Data.Bifunctor (first)
@@ -313,6 +313,14 @@ compileE' sc e = case e of
     TBytes -> pure $ CE TInt (fmap (fromIntegral . B.length) . f)
     _ -> err Internal "length"
   S.MemberAccess _ _ _ -> do LV t g _ <- compileLV sc e; pure (CE t g)
+  S.IndexAccess _ (S.FunctionCall _ (S.Variable _ "getUserCert") args) (Just ix)
+    | Nothing <- findFun (cFuns c) "getUserCert" (length args) -> do
+        argsF <- compileDynArgs sc args
+        _ <- compileAs sc TStr ix
+        pure $ CE TStr $ \env -> do
+          ds <- argsF env
+          runtime <- rt
+          liftIO (rtBuiltin runtime "__solidvm_missing_getUserCert" ds) >>= fromDyn TStr
   S.IndexAccess _ _ _ -> do LV t g _ <- compileLV sc e; pure (CE t g)
   S.FunctionCall _ callee args -> compileCall sc callee args
   S.Unitary _ op x -> case op of
@@ -705,7 +713,6 @@ compileCall sc callee args = case callee of
   S.Variable _ n | n `elem` ["create", "create2", "ecrecover"] -> builtinCall TAddr n
   S.Variable _ n | n `elem` ["addmod", "mulmod"] -> builtinCall TInt n
   S.Variable _ "selfdestruct" -> builtinCall TBool "selfdestruct"
-  S.Variable _ "getUserCert" -> unsupported "obsolete getUserCert builtin (absent from STRATO)"
   S.MemberAccess _ (S.Variable _ "abi") "encodePacked" -> builtinCall TBytes "abiEncodePacked"
   S.MemberAccess _ (S.Variable _ "abi") "encode" -> builtinCall TBytes "abiEncode"
   S.MemberAccess _ target "derive" -> deriveCall target
@@ -903,19 +910,24 @@ compileCall sc callee args = case callee of
     lowLevel :: CallKind -> Expression -> C (CE ls)
     lowLevel kind target = do
       CE tt tf <- compileE sc target
-      addrOf <- case tt of
+      addrOf <- (case tt of
         TAddr -> pure tf
         TContract _ -> pure tf
-        _ -> typeErr (".call on " <> showTy tt)
+        _ -> typeErr (".call on " <> showTy tt)) :: C (Env ls -> M Address)
       (nameE, rest) <- case args of
         (x : xs) -> pure (x, xs)
         [] -> typeErr ".call needs a function name"
-      nf <- compileAs sc TStr nameE
+      CE nameTy nameF <- compileE sc nameE
       argsF <- dynArgs rest
-      pure $ CE TRaw $ \env -> do
-        a <- addrOf env; n <- nf env; ds <- argsF env
-        (r, f) <- ask
-        liftIO (rtCall r kind f a n ds (Just (SomeTy TRaw)))
+      case nameTy of
+        TStr -> pure $ CE TRaw $ \env -> do
+          n <- nameF env; ds <- argsF env; a <- addrOf env
+          (r, f) <- ask
+          liftIO (rtCall r kind f a n ds (Just (SomeTy TRaw)))
+        _ -> pure $ CE TRaw $ \env -> do
+          n <- nameF env; ds <- argsF env; _ <- addrOf env
+          r <- rt
+          liftIO (rtBuiltin r "__solidvm_invalid_low_level" (Dyn nameTy n : ds)) >>= fromDyn TRaw
 
     externalCall :: T.Text -> (Env ls -> M Address) -> T.Text -> C (CE ls)
     externalCall cn addrOf m = do
@@ -937,33 +949,37 @@ compileCall sc callee args = case callee of
             _ -> fromDyn r (Dyn TVariadic out)
 
     typedArgs :: Sig args r' -> [Expression] -> C (Env ls -> M [Dyn])
-    typedArgs (SigNil _) [] = pure (\_ -> pure [])
-    typedArgs (SigCons TVariadic (SigNil _)) xs | not (singleVariadic xs) = dynArgs xs
-    typedArgs (SigCons t rest) (x : xs) = do
-      f <- compileAs sc t x
-      k <- typedArgs rest xs
-      pure (\env -> (:) <$> (Dyn t <$> f env) <*> k env)
-    typedArgs _ _ = typeErr "argument count mismatch"
+    typedArgs = compileTypedArgs sc
 
-    singleVariadic :: [Expression] -> Bool
+    dynArgs = compileDynArgs sc
+
+compileTypedArgs :: Scope ls r -> Sig args r' -> [Expression] -> C (Env ls -> M [Dyn])
+compileTypedArgs _ (SigNil _) [] = pure (\_ -> pure [])
+compileTypedArgs sc (SigCons TVariadic (SigNil _)) xs | not (singleVariadic xs) = compileDynArgs sc xs
+  where
     singleVariadic [x] = case compileE sc x of Right (CE TVariadic _) -> True; _ -> False
     singleVariadic _ = False
+compileTypedArgs sc (SigCons t rest) (x : xs) = do
+  f <- compileAs sc t x
+  k <- compileTypedArgs sc rest xs
+  pure (\env -> (:) <$> (Dyn t <$> f env) <*> k env)
+compileTypedArgs _ _ _ = typeErr "argument count mismatch"
 
-    dynArgs :: [Expression] -> C (Env ls -> M [Dyn])
-    dynArgs [x] = do
-      CE t f <- compileE sc x
-      pure $ case t of
-        TVariadic -> f
-        TRaw -> \env -> f env >>= \values -> pure $ case values of
-          [Dyn TVariadic remaining] -> remaining
-          _ -> [Dyn TRaw values]
-        _ -> \env -> (: []) . Dyn t <$> f env
-    dynArgs xs = do
-      fs <- forM xs $ \x -> do CE t f <- compileE sc x; pure (\env -> Dyn t <$> f env)
-      pure $ \env -> mapM ($ env) fs >>= \values -> pure $ case reverse values of
-        Dyn TVariadic remaining : rest -> reverse rest ++ remaining
-        Dyn TRaw [Dyn TVariadic remaining] : rest -> reverse rest ++ remaining
-        _ -> values
+compileDynArgs :: Scope ls r -> [Expression] -> C (Env ls -> M [Dyn])
+compileDynArgs sc [x] = do
+  CE t f <- compileE sc x
+  pure $ case t of
+    TVariadic -> f
+    TRaw -> \env -> f env >>= \values -> pure $ case values of
+      [Dyn TVariadic remaining] -> remaining
+      _ -> [Dyn TRaw values]
+    _ -> \env -> (: []) . Dyn t <$> f env
+compileDynArgs sc xs = do
+  fs <- forM xs $ \x -> do CE t f <- compileE sc x; pure (\env -> Dyn t <$> f env)
+  pure $ \env -> mapM ($ env) fs >>= \values -> pure $ case reverse values of
+    Dyn TVariadic remaining : rest -> reverse rest ++ remaining
+    Dyn TRaw [Dyn TVariadic remaining] : rest -> reverse rest ++ remaining
+    _ -> values
 
 -- exact "name/arity" first, else a declaration whose last parameter is `variadic`
 findSig :: M.Map T.Text (C SomeSig) -> T.Text -> Int -> Maybe (C SomeSig)
@@ -1208,6 +1224,9 @@ compileBlock sc (s : rest) = case s of
       TTuple fs -> do
         k <- destructure sc fs entries rest
         pure $ \env -> rf env >>= k env
+      TRaw -> do
+        k <- destructureRaw sc entries rest
+        pure $ \env -> rf env >>= k env
       _ -> typeErr ("destructuring a non-tuple " <> showTy rt')
   S.SimpleStatement (S.VariableDefinition _ Nothing) a -> atLine a (typeErr "tuple declaration without an initialiser")
   _ -> do
@@ -1237,6 +1256,27 @@ destructure sc (FCons _ t fs) (en : ens) rest = case en of
     k <- destructure (pushVar n t sc) fs ens rest
     pure (\env hl -> case hl of (v :* vs) -> do rr <- liftIO (newIORef v); k (rr :& env) vs)
 destructure _ _ _ _ = typeErr "destructuring arity mismatch"
+
+-- Low-level results acquire their types at the destructuring boundary.
+destructureRaw :: Scope ls r -> [VarDefEntry] -> [Statement] -> C (Env ls -> [Dyn] -> M (Flow r))
+destructureRaw sc [] rest = do
+  k <- compileBlock sc rest
+  pure $ \env ds -> if null ds then k env else revert "destructuring arity mismatch"
+destructureRaw sc (S.BlankEntry : entries) rest = do
+  k <- destructureRaw sc entries rest
+  pure $ \env ds -> case ds of
+    _ : values -> k env values
+    [] -> revert "destructuring arity mismatch"
+destructureRaw sc (S.VarDefEntry (Just ty) _ name _ : entries) rest = do
+  SomeTy t <- resolveTy (sC sc) ty
+  k <- destructureRaw (pushVar name t sc) entries rest
+  pure $ \env ds -> case ds of
+    d : values -> do
+      value <- fromDyn t d
+      slot <- liftIO $ newIORef value
+      k (slot :& env) values
+    [] -> revert "destructuring arity mismatch"
+destructureRaw _ _ _ = unsupported "untyped raw result declaration"
 
 compileStmt :: forall ls r. Scope ls r -> Statement -> C (Env ls -> M (Flow r))
 compileStmt sc s = atLine (S.extractStatement s) $ case s of
@@ -1406,6 +1446,8 @@ data CompiledContract = CompiledContract
   , ccStorage :: M.Map T.Text (C SType)
   , ccFuns :: M.Map T.Text (C Fun)        -- "name/arity"
   , ccConstructor :: Maybe (C Fun)
+  , ccInitializers :: C Fun
+  , ccParentArguments :: M.Map T.Text (C Fun)
   }
 
 newtype CompiledCollection = CompiledCollection { colContracts :: M.Map T.Text CompiledContract }
@@ -1459,12 +1501,48 @@ getterEntry c n st = FunEntry (fst <$> g) (snd <$> g)
     scalarField _ = True
 
 compileContract :: CodeCollection -> Contract -> CompiledContract
-compileContract cc c = CompiledContract (c ^. contractName) storageE funsE ctorE
+compileContract cc c = CompiledContract (c ^. contractName) storageE funsE ctorE initE parentE
   where
     ctx = mkCtx cc c
     storageE = M.map (storageTy ctx . (^. varType)) (c ^. storageDefs)
     funsE = M.map (\(FunEntry _ ef) -> ef) (cFuns ctx)
-    ctorE = compileFunction ctx "constructor" <$> (c ^. constructor)
+    ctorE = (\f -> compileFunction ctx "constructor" (f & funcModifiers .~ filter ((`notElem` (c ^. parents)) . fst) (f ^. funcModifiers))) <$> (c ^. constructor)
+    initE = compileConstructorStage ctx "<initializers>" TUnit $ \sc -> do
+      actions <- forM [(n, e) | (n, vd) <- M.toList (c ^. storageDefs), Just e <- [vd ^. varInitialVal]] $ \(n, e) -> do
+        CE _ action <- compileE sc (S.Binary (S.extractExpression e) "=" (S.Variable (S.extractExpression e) n) e)
+        pure (void . action)
+      pure $ \env -> mapM_ ($ env) actions
+    parentE = M.mapWithKey (\n expressions -> compileConstructorStage ctx ("<parent:" <> n <> ">") TVariadic $ \sc -> do
+      parent <- maybe (unknown ("parent contract " <> n)) pure (M.lookup n (cc ^. contracts))
+      case parent ^. constructor of
+        Nothing -> compileDynArgs sc expressions
+        Just ctor -> do
+          SomeSig sig <- funSig (mkCtx cc parent) ctor
+          compileTypedArgs sc sig expressions) $
+      maybe M.empty (^. funcConstructorCalls) (c ^. constructor)
+
+-- Constructor stages share the parameter scope while STRATO controls the order
+-- of initializers, parent construction, and the constructor body.
+compileConstructorStage :: CCtx -> T.Text -> Ty a -> (forall ls. Scope ls a -> C (Env ls -> M a)) -> C Fun
+compileConstructorStage ctx name result compile = inFun (cName ctx <> "." <> name) $ do
+  SomeSig original <- maybe (pure (SomeSig (SigNil TUnit))) (funSig ctx) (cContract ctx ^. constructor)
+  let sig = replaceReturn original result
+      names = maybe [] (map (fromMaybe "" . fst) . (^. funcArgs)) (cContract ctx ^. constructor)
+      sc = paramScope ctx sig names
+      outputSig = replaceReturn original TRaw
+  action <- compile sc
+  pure $ Fun name outputSig $ mkFn outputSig $ \env -> do
+    value <- action env
+    updated <- snapshot sig env
+    pure [Dyn TVariadic updated, Dyn result value]
+  where
+    snapshot :: Sig args r -> Env args -> M [Dyn]
+    snapshot (SigNil _) ENil = pure []
+    snapshot (SigCons t rest) (slot :& env) =
+      (:) <$> (Dyn t <$> liftIO (readIORef slot)) <*> snapshot rest env
+    replaceReturn :: Sig args r -> Ty a -> Sig args a
+    replaceReturn (SigNil _) r = SigNil r
+    replaceReturn (SigCons t rest) r = SigCons t (replaceReturn rest r)
 
 compileCollection :: CodeCollection -> CompiledCollection
 compileCollection cc = CompiledCollection (M.map (compileContract cc) (cc ^. contracts))
@@ -1482,4 +1560,6 @@ collectionErrors (CompiledCollection cs) = concat
   [ [(ccName c <> "." <> k, e) | (k, Left e) <- M.toList (ccStorage c)]
     ++ [(ccName c <> "." <> k, e) | (k, Left e) <- M.toList (ccFuns c)]
     ++ [(ccName c <> ".constructor", e) | Just (Left e) <- [ccConstructor c]]
+    ++ [(ccName c <> ".initializers", e) | Left e <- [ccInitializers c]]
+    ++ [(ccName c <> ".parent:" <> n, e) | (n, Left e) <- M.toList (ccParentArguments c)]
   | c <- M.elems cs ]

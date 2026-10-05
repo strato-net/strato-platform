@@ -525,3 +525,73 @@ confound a speed comparison. The benchmark node is fully stopped and its
 
 Timing artifacts: `features-{on-final,off-final,on-baseline,on-baseline-full}/`
 and `features-performance-final.json` under the artifact directory above.
+
+
+## Native constructors and strict replay (2026-10-05 UTC)
+
+The compiler now lowers storage initializers, parent-constructor arguments, and
+constructor bodies. STRATO retains its existing construction order, default-value
+action diffs, and deployment bookkeeping. Typed argument snapshots carry parameter
+mutations across stages. Parent signatures supply the context for empty arrays and
+contract-to-address arguments. Contracts without a constructor ignore supplied
+factory arguments, matching the existing runtime; this fixed the deployment of
+`ProbeA` at block 262410. No contract-specific compiler branch was added.
+
+The two remaining rejected contexts now compile their existing failure outcomes:
+`getUserCert(...)[key]` reports the removed variable, and low-level byte payloads
+report the existing requirement for a string function name. This does not restore
+certificate lookup or introduce EVM ABI dispatch. Raw results can also be
+destructured into typed locals, including tuple holes. Exact exception-class/text,
+gas, and trace parity remain unfinished.
+
+`SOLIDVM_NATIVE=1 SOLIDVM_NATIVE_STRICT=1` prohibits function and constructor
+fallback. An unavailable native entry raises `NativeUnavailable`, which bypasses
+STRATO's transaction-error handler. A deliberately unsupported SHA256 fixture
+verified that this is an engine failure rather than a swallowed transaction error.
+
+Validation through the root `make` build and real SM runtime:
+
+- 150 cached source collections parse; all 56951 function instances and all 2681
+  whole-contract contexts compile, including initialization and parent arguments.
+- 127 interpreted/native comparisons match returns, events, and action diffs.
+  Added cases cover the legacy failures, constructor parameter mutation, and the
+  no-constructor deployment with a dummy factory argument.
+- The standalone fee-chain fixture completes all five decisions successfully.
+- Clean strict replay reached live block **541298**, with **zero function
+  fallbacks, zero constructor fallbacks, zero rejected contracts, and zero
+  state-root mismatches**. Counters recorded 8952979 native entries and 411230
+  constructor stages. The API independently reached the same block; its header
+  was 2.715 seconds old when the harness confirmed catch-up.
+
+Final live block hash:
+`17bcdf33ad16e4c0755260429941ac01de95149fdbc8b79155e30a51f05ce933`.
+State root:
+`57cc0545c3f2aed59d10ba2694671128820466c3b5e7fb769d6f25cdf96286e0`.
+VM binary SHA256:
+`489e61db6950ba53dda256a5d4827e043e6cdc86d90d91e8838eb0c130b8879f`.
+
+| Metric | Previous expanded native | Strict native with constructors |
+|---|---:|---:|
+| Block at 300 s from block 1 | 170420 | 170163 |
+| Block at 300 s including startup | 161455 | 160626 |
+| Block 1 to 528301 | 1214.015 s | 1097.312 s |
+
+The matched full-prefix replay was **116.703 seconds shorter (9.61%)**.
+The 300-second prefix was essentially unchanged. Including startup, 160626 is
+2.97% above the user's 156000 observation, whose exact stopwatch definition is
+unknown. These are single-run comparisons, not a statistical benchmark.
+Block 1 to the fixed start-of-test tip 540539 took **1130.007 seconds**.
+The indexer lagged during replay and needed additional time to catch up after
+the VM reached the live tip; this wait is excluded from VM replay timings.
+
+One earlier attempt stopped on a missing P2P header batch at 63500; a clean retry
+passed that gap. Another exposed the no-constructor argument mismatch at 262410;
+the regression and final replay verify its fix. Neither failed attempt is a
+performance baseline. The final node was stopped with `strato-down`, all services
+were confirmed down, and its test `mynode` was removed. Original node state is
+preserved. Changes remain uncommitted.
+
+Artifacts under `/tmp/solid-vm-native-integration/`:
+`features-native-strict-fixed/{metadata.json,caught-up-block.json,metrics.txt,
+verified-block-log.txt,comparison.json,vm-runner.log}`, `native-strict-census.log`,
+`native-strict-check-{off,on}.log`, and `native-strict-negative.log`.

@@ -246,6 +246,10 @@ instance Exception Revert
 newtype Divergence = Divergence T.Text deriving Show
 instance Exception Divergence
 
+-- A required native entry is unavailable; this is an engine failure, not a revert.
+newtype NativeUnavailable = NativeUnavailable T.Text deriving Show
+instance Exception NativeUnavailable
+
 data RT = RT
   { rtGet  :: Address -> StoragePath -> IO BasicValue
   , rtPut  :: Address -> StoragePath -> BasicValue -> IO ()

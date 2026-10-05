@@ -82,7 +82,8 @@ The compiler and strict typechecker:
   or `Internal`.
 - Keeps each function as `Either Err Fun` for diagnostics. The blockchain
   integration uses `compileContractChecked`, rejecting the entire contract if
-  any storage declaration, function, or constructor fails compilation.
+  any storage declaration, function, constructor, initializer, or parent-argument
+  expression fails compilation.
 
 `compileCollection` is the main compiler entry point:
 
@@ -103,8 +104,16 @@ fork mode, and contract name. Debugger/tracer calls, memory-reference calls,
 and unsupported contract compilation use the interpreter. Runtime failures
 are reported; execution is never retried through the interpreter after writes.
 
-`solidvm_native_events` exposes execution hits, fallbacks, compiled contracts,
-and rejected contracts on the VM's Prometheus endpoint. Run
+Set `SOLIDVM_NATIVE_STRICT=1` together with `SOLIDVM_NATIVE=1` to prohibit
+interpreter fallback. Missing native functions or constructor stages stop
+execution with an engine error, rather than turning an unsupported operation
+into a failed transaction. Native deployment compiles storage initializers,
+parent arguments, and constructor bodies; the existing runtime retains parent
+ordering, default-value action diffs, and deployment bookkeeping. Parameter
+changes carry across constructor stages.
+
+`solidvm_native_events` exposes execution hits, constructor stages, fallbacks,
+compiled contracts, and rejected contracts on the VM's Prometheus endpoint. Run
 `SOLIDVM_NATIVE=0 solid-vm-native-check --network=upquark` and then the same
 command with `SOLIDVM_NATIVE=1` in separate processes to compare returns,
 events, action diffs, nested calls, delegate calls, rollback, and a timed loop.
@@ -255,6 +264,7 @@ Implemented in the prototype:
 - Declarations, assignment, arithmetic, comparisons, branches, and loops
 - Destructuring
 - Modifiers and `_`, including ownership modifiers forwarding a `variadic` result
+- Native storage initialization, parent-constructor arguments, and constructor bodies
 - Explicit base-constructor calls
 - Ordinary and salted `new Contract(...)`, plus `create`/`create2`, through the live adapter
 - Internal, external, low-level, delegate, library, and `super` calls
@@ -272,11 +282,12 @@ Implemented in the prototype:
 
 Not implemented or incomplete:
 
-- Complete constructor initialization and native deployment; the live adapter
-  still runs constructors through the interpreter
 - Contract creation in the standalone mock runtime
 - Typed catch clauses
 - Several cryptographic/system builtins
+- The removed `getUserCert` lookup and byte payloads for low-level calls compile
+  their existing runtime failure paths; they do not gain certificate lookup or
+  EVM ABI dispatch
 - `msg.data` snapshots parameters at call entry; subsequent parameter reassignment is not tracked
 - Gas accounting
 - Full exception and trace parity
@@ -292,6 +303,12 @@ during the experiment:
 |---|---:|---:|
 | Upquark | 40,340 (71%) | 16,446 |
 | Helium | 221,098 (70%) | 92,563 |
+
+The current cached Upquark census has zero errors: **56,951 function instances**
+and **2,681 whole-contract contexts** across 150 source collections compile,
+including constructor initializers and parent arguments. A clean strict-native
+replay reached live block **541,298** with zero fallbacks and zero state-root
+mismatches. See `notes/RESULTS.md` for the verification scope and measurements.
 
 Most failures are strict typing differences rather than fundamental compiler
 limitations. The dominant deployed pattern is an implicit
