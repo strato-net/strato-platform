@@ -113,7 +113,8 @@ The STRATO Vault (`strato/vault`) holds users' private keys custodially and sign
 
 Users can also sign in a wallet they control:
 
-- **STRATO Wallet browser extension** (`strato-wallet/`):
+- **STRATO Wallet browser extension**
+  ([strato-net/strato-wallet](https://github.com/strato-net/strato-wallet)):
     - **Discovery and provider:** EIP-6963 discovery and an EIP-1193 provider (`window.ethereum`), plus `window.strato` for Bloc transactions.
     - **Methods:** `eth_requestAccounts`, `eth_sendTransaction`, `personal_sign`, `eth_signTypedData_v4`, `wallet_switchEthereumChain`, `wallet_addEthereumChain`, `strato_sendBlocTransaction` and the standard read methods.
     - **Configuration:** you set its RPC, Bloc, strato-api and Vault URLs and the chain ID in its settings.

@@ -11,6 +11,7 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection (invalidPragmasUsedBy)
+import SolidVM.Model.SolidString (labelToString)
 import SolidVM.Solidity.Parse.Declarations (SourceUnit, SourceUnitF (..))
 import SolidVM.Solidity.StaticAnalysis.Types
 
@@ -21,7 +22,7 @@ detector = map (uncurry toAnnotation)
          . map filterPragmas
 
 filterPragmas :: SourceUnit -> Maybe (SourceAnnotation (), (String, String))
-filterPragmas (Pragma p a b) = Just (p,(a,b))
+filterPragmas (Pragma p a b) = Just (p,(labelToString a,b))
 filterPragmas _              = Nothing
 
 toAnnotation :: SourceAnnotation () -> (String, String) -> SourceAnnotation Text

@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds            #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE LambdaCase           #-}
@@ -21,9 +22,7 @@ module Blockchain.SyncDB
     getSyncStatus,
     getSyncStatusNow,
     getCirrusBestBlockNumber,
-    updateCirrusBestBlockNumber,
-    getVmBestBlockNumber,
-    updateVmBestBlockNumber
+    updateCirrusBestBlockNumber
   )
 where
 
@@ -37,6 +36,7 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.RedisBlockDB.Models as Models
 import           Control.Concurrent                    (threadDelay)
 import           Control.Monad
+import           Control.Monad.Composable.Base         (Eff, Logger, runEff)
 import           Control.Monad.Composable.SQL
 import           Control.Monad.Trans
 import qualified Data.ByteString.Char8                 as S8
@@ -53,8 +53,8 @@ import           Text.RawString.QQ
 
 newtype SyncStatus = SyncStatus { unSyncStatus :: Bool }
 
-liftLog :: LoggingT m a -> m a
-liftLog = runLoggingT
+liftLog :: MonadIO m => Eff '[Logger] a -> m a
+liftLog = liftIO . runEff . runLogging
 
 inNamespace ::
   RedisDBKeyable k =>
@@ -327,27 +327,6 @@ updateCirrusBestBlockNumber :: Integer -> Redis ()
 updateCirrusBestBlockNumber n = do
   current <- getCirrusBestBlockNumber
   when (maybe True (< n) current) . void $ REDIS.set cirrusBestBlockNumberKey (toValue n)
-
-vmBestBlockNumberKey :: S8.ByteString
-vmBestBlockNumberKey = "<vm_best>"
-{-# INLINE vmBestBlockNumberKey #-}
-
--- | Highest block number the vm-runner has finished executing. Written by the
--- vm-runner after each block, so it moves in real time; the indexer-written
--- @<best>@ only advances once per vm-runner batch after the indexer has
--- committed that batch to SQL.
-getVmBestBlockNumber :: Redis (Maybe Integer)
-getVmBestBlockNumber = fmap fromValue . eitherToMaybe <$> REDIS.get vmBestBlockNumberKey
-  where
-    eitherToMaybe :: Either a (Maybe b) -> Maybe b
-    eitherToMaybe (Left _)  = Nothing
-    eitherToMaybe (Right a) = a
-
--- | Monotonic, like 'updateCirrusBestBlockNumber'.
-updateVmBestBlockNumber :: Integer -> Redis ()
-updateVmBestBlockNumber n = do
-  current <- getVmBestBlockNumber
-  when (maybe True (< n) current) . void $ REDIS.set vmBestBlockNumberKey (toValue n)
 
 getSyncStatus :: Redis (Maybe Bool)
 getSyncStatus = fmap fromValue . eitherToMaybe <$> REDIS.get syncStatusKey

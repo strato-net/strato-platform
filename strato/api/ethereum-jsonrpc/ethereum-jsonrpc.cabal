@@ -36,9 +36,11 @@ executable ethereum-jsonrpc
     , blockDB
     , blockapps-data
     , blockapps-datadefs
+    , blockapps-mpdbs
     , bytestring
     , case-insensitive
     , codedb-monad
+    , composable-monads-base
     , containers
     , core-api2
     , ethereum-rlp

@@ -309,7 +309,7 @@ contract Describe_Adv_Amm_OracleReads is Authorizable {
         Token(gold).mint(address(this), 100000e18);
         usdstT.mint(address(this), 20000000e18);
         oracle.setAssetPrice(gold, GOLD_PRICE);
-        cdp.setCollateralAssetParams(gold, LR, MINCR, 1000, 5000, 1e27, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(gold, LR, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         address pa = pf.createPool(gold, USDST);
         Token lp = Pool(pa).lpToken();

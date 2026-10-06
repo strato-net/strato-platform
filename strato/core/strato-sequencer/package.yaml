@@ -24,8 +24,10 @@ library:
     - bytestring
     - clock
     - common-log
+    - composable-monads-base
     - conduit
     - directory
+    - exceptions
     - format
     - hflags
     - streaming
@@ -59,6 +61,7 @@ executables:
       - blockDB
       - blockstanbul
       - common-log
+      - composable-monads-base
       - format
       - hedis
       - hflags
@@ -81,10 +84,23 @@ executables:
     other-modules: []
     dependencies:
       - blockstanbul
+      - composable-monads-base
       - hflags
       - streaming
       - seqevents
       - strato-conf
+
+tests:
+  dependent-block-db-test:
+    source-dirs: test-db
+    main: Main.hs
+    ghc-options: -dynamic
+    dependencies:
+      - composable-monads-base
+      - hspec
+      - strato-model
+      - strato-sequencer
+      - temporary
 
 #For now, these tests are causing me more trouble than are useful, so I'm turning them off
 #tests:

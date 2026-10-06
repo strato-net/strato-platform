@@ -5,7 +5,7 @@ module Blockchain.Init.DockerCompose (generateDockerCompose) where
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (apiConfig, apiPort, networkConfig, httpPort)
+import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
@@ -27,10 +27,14 @@ generateDockerCompose = do
   let conf = ethConf
       ssl = not $ null flags_sslDir
       portNum = show $ httpPort (networkConfig conf)
-      rpcPort = "8545"
+      rpcPort = show jsonRpcPort
       stratoApiPort = show $ apiPort (apiConfig conf)
       userGid = uid ++ ":" ++ gid
-      hostGateway = Just [localHostname ++ ":host-gateway"]
+      -- Containers reach host-side processes as host.docker.internal (Docker
+      -- Desktop defines it natively, Linux needs the host-gateway alias). The
+      -- machine hostname stays aliased too: in --localAuth mode the nodeUrl-based
+      -- OAuth discovery and jwks URLs are fetched from inside containers.
+      hostGateway = Just [localHostname ++ ":host-gateway", "host.docker.internal:host-gateway"]
 
   -- Disable Docker logging since we redirect stdout/stderr to files
   let noLogging = Just Logging

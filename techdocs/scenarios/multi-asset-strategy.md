@@ -16,7 +16,7 @@ Everything below is in the current app (sidebar section in brackets):
 | Pool liquidity | **Advanced** → **Swap Pools** [PRO] | Add liquidity to constant-product and stable pools |
 | Concentrated liquidity | **V3 Liquidity** [PRO] | Provide liquidity in a price range you choose |
 | Earn products | **Earn** [EARN] | USDST Savings Vault; Yield Vaults (ETH, WBTC, USDC, GOLDST, SILVST, shown as "Coming Soon" until deployed); Stake STRATO |
-| Diversified Vault | **Advanced** → **Diversified Vault** [PRO] | Multi-asset vault that pools deposits and deploys them through a bot executor |
+| Diversified Vault | **Advanced** → **Diversified Vault** [PRO] | Multi-asset vault, now in wind-down: deposits are closed and existing holders can withdraw |
 | Reward Points | **Rewards** [EARN] | Points for eligible activity; see [Rewards Guide](../guides/rewards.md) |
 
 Every transaction costs 0.01 USDST or one voucher, even if it reverts; approval plus action costs 0.02 USDST. APYs shown in the app are current, variable figures, not promises.

@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -24,6 +25,8 @@ import Control.DeepSeq
 import Control.Lens
 import Data.Aeson
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Source
 import GHC.Generics
 import qualified Generic.Random as GR
@@ -45,6 +48,8 @@ data ConstantDeclF a = ConstantDecl
 makeLenses ''ConstantDeclF
 
 instance Binary a => Binary (ConstantDeclF a)
+
+makeStore ''ConstantDeclF
 
 instance ToJSON a => ToJSON (ConstantDeclF a)
 

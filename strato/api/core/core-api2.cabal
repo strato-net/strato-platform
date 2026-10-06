@@ -19,11 +19,13 @@ library
       Handlers.Peers
       Handlers.QueuedTransactions
       Handlers.Receipts
+      Handlers.StateProof
       Handlers.Stats
       Handlers.Storage
       Handlers.Transaction
       Handlers.TransactionResult
       Handlers.TxLast
+      JsonRpcClient
       Settings
       SortDirection
       SQLM
@@ -44,6 +46,7 @@ library
     , bytestring
     , clock
     , common-log
+    , composable-monads-base
     , conduit
     , containers
     , deepseq
@@ -53,6 +56,7 @@ library
     , ethereum-rlp
     , filepath
     , format
+    , http-client
     , http-types
     , lens
     , merkle-patricia-db

@@ -45,7 +45,7 @@ import qualified Control.Exception as E
 import Control.Monad (unless, when)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import Data.Aeson
@@ -166,7 +166,7 @@ server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawTransaction] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable TxsFilterParams [RawTransaction] (Base.Eff es) where
   select _ t@TxsFilterParams {..}
     | t == txsFilterParams = throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
     | otherwise = do
@@ -216,10 +216,10 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawT
 
       return . Just $ nub txs
 
-instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
+instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] where
   output txs = do
     $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
-    resps <- liftIO $ runStreamMConfigured "strato-api" $ writeUnseqEvents txs
+    resps <- runStreamMConfigured "strato-api" $ writeUnseqEvents txs
     $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256

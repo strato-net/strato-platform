@@ -3,21 +3,6 @@ module SolidVM.Model.SolidString where
 import Data.Text (Text)
 import qualified Data.Text as T
 
-type SolidString = String
-
-labelToString :: SolidString -> String
-labelToString = id
-
-stringToLabel :: String -> SolidString
-stringToLabel = id
-
-labelToText :: SolidString -> Text
-labelToText = T.pack
-
-textToLabel :: Text -> SolidString
-textToLabel = T.unpack
-
-{-
 type SolidString = Text
 
 labelToString :: SolidString -> String
@@ -31,4 +16,19 @@ labelToText = id
 
 textToLabel :: Text -> SolidString
 textToLabel = id
+
+{-
+type SolidString = String
+
+labelToString :: SolidString -> String
+labelToString = id
+
+stringToLabel :: String -> SolidString
+stringToLabel = id
+
+labelToText :: SolidString -> Text
+labelToText = T.pack
+
+textToLabel :: Text -> SolidString
+textToLabel = T.unpack
 -}

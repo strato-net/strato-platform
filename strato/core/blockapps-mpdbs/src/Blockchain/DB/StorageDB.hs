@@ -6,7 +6,6 @@
 module Blockchain.DB.StorageDB
   ( HasStorageDB,
     HasMemStorageDB,
-    flushMemStorageTxDBToBlockDB,
     flushMemStorageDB,
   )
 where
@@ -34,9 +33,6 @@ type FullStorage m =
     HasHashDB m,
     (Address `Alters` AddressState) m
   )
-
-flushMemStorageTxDBToBlockDB :: FullStorage m => m ()
-flushMemStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
 
 flushMemStorageDB :: (MonadLogger m, FullStorage m) => m ()
 flushMemStorageDB = flushMemRawStorageDB

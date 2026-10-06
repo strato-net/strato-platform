@@ -2,10 +2,27 @@ import "../../concrete/Governance/MercataGovernance.sol";
 import "../../concrete/Proxy/Proxy.sol";
 import "../Util.sol";
 
-// Staking-driven validator management on the governance contract. Admin voting
-// cannot be exercised here because admins are only seeded at genesis.
+// Test-only subclass. Admins are otherwise seeded only at genesis, and admin
+// votes only reach the contract through the AdminRegistry that owns it. The
+// harness seeds admins directly and lets a seeded admin vote without being the
+// owner, so the vote paths can be exercised in isolation.
+contract GovernanceHarness is MercataGovernance {
+    constructor(address initialOwner) MercataGovernance(initialOwner) { }
+
+    function seedAdmin(address admin) external {
+        admins.push(admin);
+        adminMap[admin] = admins.length;
+    }
+
+    function _checkOwner() internal view override {
+        if (adminMap[_msgSender()] == 0) super._checkOwner();
+    }
+}
+
+// Staking-driven validator management and admin voting on the governance
+// contract.
 contract Describe_MercataGovernance {
-    MercataGovernance gov;
+    GovernanceHarness gov;
     User staking;
     User stranger;
 
@@ -19,7 +36,7 @@ contract Describe_MercataGovernance {
     }
 
     function beforeEach() public {
-        gov = new MercataGovernance(address(this));
+        gov = new GovernanceHarness(address(this));
         gov.setStakingContract(address(staking));
     }
 
@@ -115,5 +132,74 @@ contract Describe_MercataGovernance {
             rejected = true;
         }
         require(rejected, "cap cannot drop below the current count");
+    }
+
+    // Admin votes on the validator set. An empty set halts consensus for good
+    // ("All participants voted out, consensus is stuck."), so the last validator
+    // must never be removable by vote, unlike the staking path which declines
+    // quietly. Requires inside onlyOwner bodies surface as a generic revert
+    // (Ownable re-routes the failure to the owner), so only the revert and the
+    // untouched state are asserted.
+    function it_never_votes_out_the_last_validator() public {
+        User a1 = new User();
+        gov.seedAdmin(address(this));
+        gov.seedAdmin(address(a1)); // quorum is 2 of 2
+        _add(staking, v1, 1);
+        _add(staking, v2, 2);
+
+        gov.voteToRemoveValidator(v1);
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v1);
+        require(gov.validatorCount() == 1 && !gov.isValidator(v1), "v1 voted out");
+
+        // Even a first, non-quorum vote against the sole validator is refused.
+        bool reverted = false;
+        try gov.voteToRemoveValidator(v2) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "voting out the last validator must revert");
+        require(gov.validatorCount() == 1 && gov.isValidator(v2), "v2 remains");
+        require(gov.validatorVoteMap(v2, address(this)) == 0, "no vote is left behind");
+
+        // Once another validator exists, v2 can be voted out again.
+        _add(staking, v3, 3);
+        gov.voteToRemoveValidator(v2);
+        a1.doSuccessfully(address(gov), "voteToRemoveValidator(address)", v2);
+        require(gov.validatorCount() == 1 && gov.isValidator(v3), "v2 voted out once v3 joined");
+    }
+
+    // At genesis the admin list holds exactly one entry (the AdminRegistry), so
+    // a single executed vote could empty it and strand the contract: every
+    // voteTo* entry point then fails its admin check and nothing can re-seed one.
+    function it_removes_admins_by_vote_but_never_the_last_one() public {
+        User a1 = new User();
+        User a2 = new User();
+        gov.seedAdmin(address(this));
+        gov.seedAdmin(address(a1));
+        gov.seedAdmin(address(a2)); // quorum is 3 of 3
+
+        gov.voteToRemoveAdmin(address(a2));
+        a1.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a2));
+        require(gov.adminMap(address(a2)) == 3, "no quorum yet");
+        a2.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a2));
+        require(gov.adminMap(address(a2)) == 0, "a2 voted out");
+
+        gov.voteToRemoveAdmin(address(a1)); // quorum is now 2 of 2
+        a1.doSuccessfully(address(gov), "voteToRemoveAdmin(address)", address(a1));
+        require(gov.adminMap(address(a1)) == 0, "a1 voted out");
+        require(gov.admins(0) == address(this), "one admin left");
+
+        bool reverted = false;
+        try gov.voteToRemoveAdmin(address(this)) {
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "voting out the last admin must revert");
+        require(gov.adminMap(address(this)) == 1, "the last admin remains");
+        require(gov.adminVoteMap(address(this), address(this)) == 0, "no vote is left behind");
+
+        // Governance is still usable afterwards.
+        gov.voteToAddAdmin(address(stranger));
+        require(gov.adminMap(address(stranger)) == 2, "a new admin can still be added");
     }
 }

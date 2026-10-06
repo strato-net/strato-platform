@@ -29,6 +29,7 @@ import Control.Concurrent (forkIO, myThreadId, threadDelay)
 import Control.Concurrent.MVar
 import Control.Exception (SomeAsyncException, SomeException, bracket, evaluate, fromException, throwIO, try)
 import Control.Monad (forever, void)
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming (consumeFromLatest)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Data.ByteString as B
@@ -68,7 +69,7 @@ startResponseDispatcher = void . forkIO $ do
   labelThread tid "jsonrpcResponseDispatcher"
   forever $ do
     result <-
-      try $
+      try . runEff $
         runStreamMConfigured "ethereum-jsonrpc" $
           consumeFromLatest "jsonrpcresponse" (return ()) deliver
     case result of

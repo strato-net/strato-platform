@@ -15,6 +15,7 @@ library:
   - aeson
   - blockapps-mpdbs
   - bytestring
+  - ghc-compact
   - containers
   - data-default
   - deepseq

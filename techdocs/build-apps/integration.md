@@ -344,7 +344,10 @@ A wrong table name returns a PostgREST error such as `{"code":"42P01", ... "does
 
 ### STRATO Wallet extension
 
-`strato-wallet/` is a self-custody browser extension. To build it, run `npm install` and `npm run build`, then load `.output/chrome-mv3` as an unpacked extension. It:
+The STRATO Wallet extension is a self-custody browser extension developed in its own
+repository, [strato-net/strato-wallet](https://github.com/strato-net/strato-wallet). To
+build it, clone that repository, run `npm install` and `npm run build`, then load
+`.output/chrome-mv3` as an unpacked extension. It:
 
 - announces itself through EIP-6963 (name `STRATO`) and sets `window.ethereum` if no other wallet has claimed it
 - supports `eth_requestAccounts`, `eth_chainId`, `personal_sign`, `eth_signTypedData_v4`, `wallet_addEthereumChain` and `wallet_switchEthereumChain`, plus read methods proxied to the node
@@ -385,7 +388,9 @@ The wallet address pays the fee, so it needs USDST or a voucher.
 - `app/backend/src/utils/txHelper.ts`: submit, poll results, low-nonce retry
 - `app/backend/src/utils/appApiHelper.ts`: API clients
 - `app/backend/src/api/services/`: `tokens`, `cdp`, `lending`, `swapping`, `bridge`, `rewards` and `staking` services
-- `app/ui/src/lib/stratoWallet.ts` and `strato-wallet/src/core/tx-evm.ts`: legacy transaction signing for `/rpc`
+- `app/ui/src/lib/stratoWallet.ts`, and `src/core/tx-evm.ts` in the
+  [strato-wallet](https://github.com/strato-net/strato-wallet) repository: legacy
+  transaction signing for `/rpc`
 
 ## Next steps
 

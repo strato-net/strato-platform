@@ -10,6 +10,7 @@ library:
   source-dirs: src
   dependencies:
     - bytestring
+    - composable-monads-base
     - global-lock
     - hflags
     - monad-logger

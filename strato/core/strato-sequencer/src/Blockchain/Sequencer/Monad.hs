@@ -1,7 +1,10 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -17,16 +20,17 @@ module Blockchain.Sequencer.Monad
     Modification(..),
     SequencerContext (..),
     SequencerConfig (..),
-    SequencerM,
-    SequencerMTest,
+    SequencerM (..),
+    SequencerRow,
     BlockPeriod (..),
     RoundPeriod (..),
     runSequencerM,
-    runSequencerMTest,
+    commitSequencerState,
     pairToVmTx,
     createFirstTimer,
     createNewTimer,
     createNewViewTimer,
+    carryViewTimer,
     updateViewTimer,
     fuseChannels,
     seenTransactionDB,
@@ -35,12 +39,12 @@ module Blockchain.Sequencer.Monad
   )
 where
 
+import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -58,10 +62,12 @@ import Control.Concurrent.AlarmClock
 import Control.Concurrent.STM.TMChan
 import Control.Lens
 import Control.Monad (unless, when)
+import Control.Monad.Catch (MonadCatch, MonadMask)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base (AccessibleEnv, Eff, InternalState, Logger, ReaderEnv, StateCell, evalStateEff, withReaderEnv, withResources)
 import Control.Monad.Composable.Streaming
-import Control.Monad.Composable.Vault (HasVault, VaultM, runVaultM)
+import Control.Monad.Composable.Vault (HasVault, VaultData, runVaultM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Conduit.TMChan
@@ -75,21 +81,35 @@ import qualified Database.LevelDB as LDB
 import System.Directory (createDirectoryIfMissing)
 import Text.Format
 import Prelude hiding (round)
+import Prometheus (MonadMonitor)
 
 data Modification a = Modification a | Deletion deriving (Show)
+
+-- | The no-proposal / no-commit timer armed for a view: when it was armed (a
+-- new transaction arrived), when it is next due, and its clock.
+data ViewTimer = ViewTimer
+  { vtView :: View,
+    vtArmedAt :: UTCTime,
+    vtDue :: UTCTime,
+    vtClock :: AlarmClock UTCTime
+  }
 
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: BlockstanbulContext,
     _latestViewAndProposal :: IORef (View, Maybe Block),
-    -- | The view a no-proposal timer is currently armed for, if any. Keeps
-    -- 'createNewViewTimer' to one live AlarmClock per view.
-    _armedViewTimer :: IORef (Maybe View),
+    -- | The view timer currently armed, if any. Keeps 'createNewViewTimer' to
+    -- one live AlarmClock per view.
+    _armedViewTimer :: IORef (Maybe ViewTimer),
     -- | The round timer's one shared AlarmClock (allocated on first use), and
     -- the (view, fire time) it is currently armed for. Keeps 'createNewTimer'
     -- to a single live AlarmClock no matter how many times it is re-armed.
     _roundTimerClock :: IORef (Maybe (AlarmClock UTCTime)),
-    _armedRoundTimer :: IORef (Maybe (View, UTCTime))
+    _armedRoundTimer :: IORef (Maybe (View, UTCTime)),
+    -- | The best sequenced block not yet published to Redis. p2p and a
+    -- restarting sequencer read Redis as "what is durably sequenced", so it
+    -- is only published by 'commitSequencerState', after the block's output.
+    _pendingBestSequencedBlock :: Maybe BestSequencedBlock
   }
 
 makeLenses ''SequencerContext
@@ -98,7 +118,7 @@ type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
-    Mod.Accessible (IORef (Maybe View)) m,
+    Mod.Accessible (IORef (Maybe ViewTimer)) m,
     Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) m,
     Mod.Accessible (IORef (Maybe (View, UTCTime))) m,
     Mod.Accessible (TMChan View) m,
@@ -127,15 +147,15 @@ data SequencerConfig = SequencerConfig
     redisConn :: RBDB.RedisConnection
   }
 
-type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (VaultM (LoggingT IO)))))
+type SequencerRow = '[StateCell SequencerContext, ReaderEnv SequencerConfig, IORef StreamEnv, InternalState, VaultData, Logger]
 
--- Test version without VaultM - relies on external HasVault instance for the base monad
-type SequencerMTest = StateT SequencerContext (ReaderT SequencerConfig (StreamM (ResourceT (LoggingT IO))))
+newtype SequencerM a = SequencerM {unSequencerM :: Eff SequencerRow a}
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadState SequencerContext, MonadReader SequencerConfig, MonadLogger, MonadLoggerIO, MonadResource, HasVault, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
+instance Mod.Accessible DependentBlockDB SequencerM where
   access _ = asks dependentBlockDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
+instance Mod.Accessible LDB.DB SequencerM where
   access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
 {-
 class HasNamespace a where
@@ -146,107 +166,92 @@ instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
 -}
-instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
+instance Mod.Modifiable SeenTransactionDB SequencerM where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (View, Maybe Block)) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (View, Maybe Block)) SequencerM where
   access _ = use latestViewAndProposal
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe View)) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe ViewTimer)) SequencerM where
   access _ = use armedViewTimer
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) SequencerM where
   access _ = use roundTimerClock
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef (Maybe (View, UTCTime))) (StateT SequencerContext m) where
+instance Mod.Accessible (IORef (Maybe (View, UTCTime))) SequencerM where
   access _ = use armedRoundTimer
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan View) (ReaderT SequencerConfig m) where
+instance Mod.Accessible (TMChan View) SequencerM where
   access _ = asks blockstanbulTimeouts
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible BlockPeriod (ReaderT SequencerConfig m) where
+instance Mod.Accessible BlockPeriod SequencerM where
   access _ = asks blockstanbulBlockPeriod
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RoundPeriod (ReaderT SequencerConfig m) where
+instance Mod.Accessible RoundPeriod SequencerM where
   access _ = asks blockstanbulRoundPeriod
 
-instance {-# OVERLAPPING #-} Mod.Accessible View SequencerM where
+instance Mod.Accessible View SequencerM where
   access _ = currentView
 
-instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RBDB.RedisConnection (ReaderT SequencerConfig m) where
+instance Mod.Accessible RBDB.RedisConnection SequencerM where
   access _ = asks redisConn
 
-instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
+instance (Keccak256 `A.Alters` ()) SequencerM where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
+instance HasBlockstanbulContext SequencerM where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext c = c `deepseq` modify' (blockstanbulContext .~ c)
 
-instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
+instance Mod.Modifiable BestSequencedBlock SequencerM where
   get _ =
-    RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
-      Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
-      Just v -> v
-  put _ bestSequencedBlock =
-    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
-      Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
-      Right _ -> return ()
+    use pendingBestSequencedBlock >>= \case
+      Just v -> return v
+      Nothing ->
+        RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
+          Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) [] [] 0
+          Just v -> v
+  put _ = modify' . (pendingBestSequencedBlock ?~)
 
-instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.Modifiable BestSequencedBlock (StateT SequencerContext m) where
-  get   = lift . Mod.get
-  put p = lift . Mod.put p
+-- | Make the sequencer's record of what it has emitted durable: the
+-- dependent-block DB and the best sequenced block in Redis. 'writeToKafka'
+-- runs this right after each write of the output log and never without one,
+-- so that record can never claim a block the log does not have.
+commitSequencerState :: SequencerM ()
+commitSequencerState = do
+  commitDependentBlockDB
+  use pendingBestSequencedBlock >>= mapM_ (\bsb ->
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bsb) >>= \case
+      Left _ -> $logInfoS "commitSequencerState" $ T.pack "Failed to update BestSequencedBlock"
+      Right _ -> pendingBestSequencedBlock .= Nothing)
 
 
-runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
+runSequencerM :: String -> SequencerConfig -> BlockstanbulContext -> SequencerM a -> Eff '[Logger] a
 runSequencerM vaultUrl' c bc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runVaultM vaultUrl' . runResourceT . runStreamMConfigured (kafkaClientId c) $ do
+  runVaultM vaultUrl' . withResources . runStreamMConfigured (kafkaClientId c) $ do
     let dbCS = depBlockDBCacheSize c
         dbPath = depBlockDBPath c
         stxSize = seenTransactionDBSize c
-    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
+    depBlock <- openDependentBlockDB dbPath dbCS
     latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
     armedVT <- liftIO $ newIORef Nothing
     roundClock <- liftIO $ newIORef Nothing
     armedRT <- liftIO $ newIORef Nothing
-    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
+    withReaderEnv c{dependentBlockDB = depBlock} $ evalStateEff
       SequencerContext
         { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = bc,
           _latestViewAndProposal = latestVandP,
           _armedViewTimer = armedVT,
           _roundTimerClock = roundClock,
-          _armedRoundTimer = armedRT
+          _armedRoundTimer = armedRT,
+          _pendingBestSequencedBlock = Nothing
         }
-  return $ fst a
-
--- Test version without VaultM - relies on external HasVault instance
-runSequencerMTest :: SequencerConfig -> BlockstanbulContext -> SequencerMTest a -> (LoggingT IO) a
-runSequencerMTest c bc m = do
-  liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runStreamMConfigured (kafkaClientId c) $ do
-    let dbCS = depBlockDBCacheSize c
-        dbPath = depBlockDBPath c
-        stxSize = seenTransactionDBSize c
-    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
-    latestVandP <- liftIO $ newIORef (View 0 0, Nothing)
-    armedVT <- liftIO $ newIORef Nothing
-    roundClock <- liftIO $ newIORef Nothing
-    armedRT <- liftIO $ newIORef Nothing
-    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
-      SequencerContext
-        { _seenTransactionDB = mkSeenTxDB stxSize,
-          _blockstanbulContext = bc,
-          _latestViewAndProposal = latestVandP,
-          _armedViewTimer = armedVT,
-          _roundTimerClock = roundClock,
-          _armedRoundTimer = armedRT
-        }
-  return $ fst a
+      (unSequencerM m)
 
 pairToVmTx :: (Timestamp, OutputTx) -> VmTask
 pairToVmTx = uncurry VmTx
@@ -321,8 +326,12 @@ createNewTimer vw = do
           return alarm
     setAlarm alarm due
 
-createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
-createNewViewTimer b = do
+-- | Arm the view timer for the current view. Called when a new transaction
+-- arrives (there is now work the proposer should turn into a block), and when
+-- the round changes while a timer was armed at the same height (that work is
+-- still pending).
+createNewViewTimer :: MonadBlockstanbul m => m ()
+createNewViewTimer = do
   ctx <- getBlockstanbulContext
   let voting = case _selfAddr ctx of
         Just a -> _validatorBehavior ctx && Validator a `S.member` _validators ctx
@@ -333,45 +342,88 @@ createNewViewTimer b = do
   -- proposing. A proposer has nothing to report to itself, and non-voting
   -- nodes (RPC followers with the default validatorBehavior=true) must not
   -- drive round changes at all.
+  --
+  -- It allows 'proposalWait' for the proposal to land. Once it lands, it
+  -- allows as long again as the proposal took, plus 'commitSlack', for the
+  -- block to commit (see 'updateViewTimer'); then it times the round out.
   when (voting && not leading) $ do
     updateViewTimer
     vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-    vCur <- fst <$> liftIO (readIORef vpref)
-    let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
-    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe View)))
+    (v, pCur) <- liftIO (readIORef vpref)
+    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
     ch <- Mod.access (Mod.Proxy @(TMChan View))
     -- At most one live clock per view. This used to allocate a fresh
     -- self-re-arming AlarmClock for every UnannouncedBlock, so a stalled
     -- chain accumulated one per candidate block -- hundreds of them, each
     -- firing every 5s and each emitting a ROUNDCHANGE.
-    fresh <- liftIO . atomicModifyIORef' armedRef $ \armed ->
-      if armed == Just v then (armed, False) else (Just v, True)
-    when fresh $ do
+    armed <- liftIO $ readIORef armedRef
+    unless (fmap vtView armed == Just v) $ do
       let release =
-            atomicModifyIORef' armedRef $ \armed ->
-              (if armed == Just v then Nothing else armed, ())
+            atomicModifyIORef' armedRef $ \cur ->
+              (if fmap vtView cur == Just v then Nothing else cur, ())
           act :: AlarmClock UTCTime -> IO ()
           act this' = do
-            (v', p) <- readIORef vpref
-            if v >= v' && isNothing p
-              then do
-                atomically . writeTMChan ch $ v'
-                next <- addUTCTime 5 <$> getCurrentTime
-                setAlarm this' next
-              else
-                -- Superseded by a later view, or a proposal arrived: give up
-                -- the slot so the next view can arm its own clock.
-                release
+            v' <- fst <$> readIORef vpref
+            readIORef armedRef >>= \case
+              Just vt | vtView vt == v && v >= v' -> do
+                now <- getCurrentTime
+                if now < vtDue vt
+                  then setAlarm this' (vtDue vt) -- pushed back since this wakeup was scheduled
+                  else do
+                    atomically . writeTMChan ch $ v'
+                    let next = addUTCTime 5 now
+                    atomicModifyIORef' armedRef $ \cur ->
+                      (if fmap vtView cur == Just v then (\t -> t{vtDue = next}) <$> cur else cur, ())
+                    setAlarm this' next
+              -- Superseded by a later view: give up the slot so the next
+              -- view can arm its own clock.
+              _ -> release
       alarm <- liftIO $ newAlarmClock act
-      next <- addUTCTime 2 <$> liftIO getCurrentTime
-      liftIO $ setAlarm alarm next
+      now <- liftIO getCurrentTime
+      -- A proposal that landed before our own candidate block took no time.
+      let due = addUTCTime (if isJust pCur then commitSlack else proposalWait) now
+      liftIO $ do
+        atomicModifyIORef' armedRef $ \_ -> (Just (ViewTimer v now due alarm), ())
+        setAlarm alarm due
+
+-- | On entering a new view: a timer armed for an earlier round at the same
+-- height means its transactions are still waiting for a block, so the new
+-- round gets a timer too. A new height means they were committed.
+carryViewTimer :: MonadBlockstanbul m => View -> m ()
+carryViewTimer vw = do
+  armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
+  armed <- liftIO $ readIORef armedRef
+  let pending vt = _sequence (vtView vt) == _sequence vw && _round (vtView vt) < _round vw
+  when (maybe False pending armed) createNewViewTimer
+
+-- | How long a non-proposer waits for the proposal before changing round.
+proposalWait :: NominalDiffTime
+proposalWait = 30
+
+-- | Extra time, on top of the proposal's own latency, allowed for an accepted
+-- proposal to commit before changing round.
+commitSlack :: NominalDiffTime
+commitSlack = 10
 
 updateViewTimer :: MonadBlockstanbul m => m ()
 updateViewTimer = do
   v <- currentView
   p <- _proposal <$> getBlockstanbulContext
   vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  liftIO $ atomicModifyIORef' vpref (\_ -> ((v, p), ()))
+  (v0, p0) <- liftIO $ atomicModifyIORef' vpref (\old -> ((v, p), old))
+  -- The proposal just landed: allow the time it took, plus 'commitSlack', for
+  -- it to commit. 'setAlarm' only moves an alarm earlier; a later due time is
+  -- picked up when the pending wakeup finds it has not arrived yet.
+  when (isJust p && (isNothing p0 || v0 /= v)) $ do
+    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
+    liftIO $ do
+      now <- getCurrentTime
+      rearm <- atomicModifyIORef' armedRef $ \case
+        Just vt | vtView vt >= v ->
+          let due = addUTCTime (commitSlack + max 0 (diffUTCTime now (vtArmedAt vt))) now
+           in (Just vt{vtDue = due}, Just (vtClock vt, due))
+        cur -> (cur, Nothing)
+      mapM_ (uncurry setAlarm) rearm
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())
@@ -381,7 +433,7 @@ fuseChannels = do
       streamingAddress = (fromString $ streamingHost k, fromIntegral $ streamingPort k)
 
   let debugLog = (.| iterMC ($logDebugS "fuseChannels" . T.pack . format))
-  (debugLog . transPipe lift)
+  debugLog
     <$> mergeSources
       [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire

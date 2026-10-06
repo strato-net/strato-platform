@@ -247,8 +247,13 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  whenM mayVote $
-    when (Just leader == fmap Validator self) $ do
+  canVote <- mayVote
+  let isLeader = Just leader == fmap Validator self
+  -- Only the proposer for this view builds a candidate block; every other
+  -- node's VM skips that speculative execution.
+  yieldR $ ProposerStatus (canVote && isLeader)
+  when canVote $
+    when isLeader $ do
       lock <- use blockLock
       v <- use view
       case lock of
@@ -622,3 +627,4 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         RunPreprepare {} -> inc "run_preprepare"
+        ProposerStatus {} -> inc "proposer_status"

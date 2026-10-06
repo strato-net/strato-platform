@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -33,6 +35,7 @@ module Control.Monad.Composable.Streaming.JLog (
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBestEffort,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -55,7 +58,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 import Control.Monad (void, forever, when)
 import Control.Monad.Composable.Base
-import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString.Lazy as LBS
@@ -93,7 +95,7 @@ type ClientId = Text
 type StreamAddress = (String, Int)  -- (basePath, unused port)
 type ConsumerGroup = Text
 
-type StreamM = ReaderT (IORef StreamEnv)
+type StreamM es = Eff (IORef StreamEnv ': es)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 
 data StreamEnv = StreamEnv
@@ -113,18 +115,18 @@ getStreamEnv = do
   ref <- accessEnv
   liftIO $ readIORef ref
 
-runStreamMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runStreamMUsingEnv env f = do
   ref <- liftIO $ newIORef env
-  runReaderT f ref
+  provide ref f
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM clientId addr f = withRunInIO $ \runInIO -> bracket
   (createStreamEnvIO clientId addr)
   closeStreamEnvIO
   (\env -> do
     ref <- newIORef env
-    runInIO $ runReaderT f ref)
+    runInIO $ provide ref f)
 
 createStreamEnvIO :: ClientId -> StreamAddress -> IO StreamEnv
 createStreamEnvIO clientId (basePath, _port) = do
@@ -153,11 +155,24 @@ produceItems topicName events = do
     mapM_ (writeRawMessage ctx . LBS.toStrict . encode) events
   return [ProduceResponse]
 
--- | Append an already-serialized payload to an open writer.
+-- | Interface parity with the Kafka backend's 'produceItemsBestEffort', which
+-- exists because a broker can reject an oversized record and must not be
+-- allowed to kill the producer (see helium block 595971). A JLog write is a
+-- local append with no broker to refuse it, so there is nothing to report and
+-- the result is always empty.
+produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
+produceItemsBestEffort topicName events = [] <$ produceItems topicName events
+
+-- | Append an already-serialized payload to an open writer. A failed append
+-- throws rather than returning: callers commit state that describes the
+-- write once this returns, and must never do so for a write that failed.
 writeRawMessage :: Ptr JLogCtx -> BS.ByteString -> IO ()
 writeRawMessage ctx bs =
-  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-    void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
+    rc <- jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+    when (rc /= 0) $ do
+      errStr <- jlog_ctx_err_string ctx >>= peekCString
+      error $ "jlog_ctx_write failed (rc=" ++ show rc ++ "): " ++ errStr
 
 -- | Append already-encoded payloads to several topics in one call.
 --
@@ -208,13 +223,8 @@ produceItemsAsJSON topicName events = do
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
     ctx <- getOrCreateWriter env topicName topicPath
-    mapM_ (writeMessage ctx) events
+    mapM_ (writeRawMessage ctx . LBS.toStrict . JSON.encode) events
   return [ProduceResponse]
-  where
-    writeMessage ctx e = do
-      let bs = LBS.toStrict $ JSON.encode e
-      BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-        void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
 
 ----------------------
 --Consuming/Fetching--

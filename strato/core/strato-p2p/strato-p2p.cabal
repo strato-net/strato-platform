@@ -62,6 +62,7 @@ library
     , ethereum-discovery
     , ethereum-encryption
     , ethereum-rlp
+    , exceptions
     , format
     , hedis
     , hflags
@@ -107,6 +108,7 @@ executable strato-p2p
       base
     , blockapps-init
     , common-log
+    , composable-monads-base
     , ethereum-discovery
     , hflags
     , lifted-async

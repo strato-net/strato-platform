@@ -1,4 +1,6 @@
 {-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -27,7 +29,7 @@ data MemPeerDBEnv = MemPeerDBEnv {
   stringPPeerMap :: IORef (Map Host PPeer)
 }
 
-type MemPeerDBM = ReaderT MemPeerDBEnv
+type MemPeerDBM es = Eff (MemPeerDBEnv ': es)
 
 type HasMemPeerDB m = (MonadIO m, AccessibleEnv MemPeerDBEnv m)
 
@@ -38,14 +40,13 @@ createMemPeerDBEnv me peers = do
 
   return $ MemPeerDBEnv me peerMap
 
-runMemPeerDBMUsingEnv :: MemPeerDBEnv -> MemPeerDBM m a -> m a
-runMemPeerDBMUsingEnv env f =
-  runReaderT f env
+runMemPeerDBMUsingEnv :: MemPeerDBEnv -> MemPeerDBM es a -> Eff es a
+runMemPeerDBMUsingEnv = provide
 
-runMemPeerDBM :: MonadIO m => Host -> [PPeer] -> MemPeerDBM m a -> m a
+runMemPeerDBM :: Host -> [PPeer] -> MemPeerDBM es a -> Eff es a
 runMemPeerDBM me peers f = flip runMemPeerDBMUsingEnv f =<< createMemPeerDBEnv me peers
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => HasPeerDB (MemPeerDBM m) where
+instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
   getNumAvailablePeers = do
     currentTime <- liftIO getCurrentTime
     host <- accessEnvVar p2pMyIPAddress
@@ -190,13 +191,13 @@ instance HasMemPeerDB m => A.Alters Host PPeer m where
     peerMap <- fmap stringPPeerMap accessEnv
     atomicModifyIORef' peerMap $ \m -> (M.delete host m, ())
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Host PPeer (MemPeerDBM m) where
+instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => A.Selectable Host PPeer (Eff es) where
   select = A.lookup
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Replaceable Host PPeer (MemPeerDBM m) where
+instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => A.Replaceable Host PPeer (Eff es) where
   replace = A.insert
 
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable IP PPeer (MemPeerDBM m) where
+instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => A.Selectable IP PPeer (Eff es) where
   select _ ip = do
     peerMap <- readIORef . stringPPeerMap =<< accessEnv
     pure . listToMaybe $ filter f $ M.elems peerMap

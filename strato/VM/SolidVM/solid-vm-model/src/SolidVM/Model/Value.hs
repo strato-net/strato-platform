@@ -1,5 +1,10 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-} -- Generic/Store (DecimalRaw i)
 
 module SolidVM.Model.Value
   ( Variable (..),
@@ -18,12 +23,14 @@ module SolidVM.Model.Value
     getConst,
     weakGetVar,
     forceLoadVar,
+    renderValue,
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Util (getUtf8String, putUtf8String)
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import Control.Applicative ((<|>))
@@ -32,11 +39,11 @@ import Control.Monad ((<=<))
 import Data.Aeson (ToJSON(..), FromJSON(..), object, (.=), (.:), (.:?), (.!=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Binary as Binary
-import qualified Data.ByteString.Lazy as BSL
 import Text.Format
 import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
+import Data.Bool (bool)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import Data.Decimal
@@ -45,15 +52,19 @@ import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, listToMaybe)
+import Data.Store (Size (VarSize), Store (..))
+import Data.Store.Internal (getSize)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
 import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
+import GHC.Generics (Generic)
 import Numeric
 import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
+import SolidVM.Model.Storable (StoreList (..), StoreMap (..), StoreVector (..))
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 
@@ -114,7 +125,33 @@ data Value
   | SContinue
   | SBytes ByteString
   | SVariadic [Value]
-  deriving (Show)
+  deriving (Show, Generic)
+
+-- See the note on the Store instances in SolidVM.Model.Storable.
+instance Store Value
+
+deriving via (StoreList Value) instance {-# OVERLAPPING #-} Store [Value]
+
+deriving via (StoreVector Variable) instance {-# OVERLAPPING #-} Store (Vector Variable)
+
+deriving via (StoreMap SolidString Variable) instance {-# OVERLAPPING #-} Store (Map SolidString Variable)
+
+deriving via (StoreMap Value Variable) instance {-# OVERLAPPING #-} Store (Map Value Variable)
+
+-- IORef-backed variables are stored as snapshots, as in the Binary and JSON instances:
+-- 'Constant' is its value, 'Variable' is SNULL; reading back gives a 'Constant'.
+instance Store Variable where
+  size = VarSize (getSize . snapshotVariable)
+  poke = poke . snapshotVariable
+  peek = Constant <$> peek
+
+snapshotVariable :: Variable -> Value
+snapshotVariable (Constant c) = c
+snapshotVariable (Variable _) = SNULL
+
+deriving instance Generic (DecimalRaw i)
+
+instance Store i => Store (DecimalRaw i)
 
 --TODO- Remove this sloppy half-measure of Ord, Eq definitions once we move to Solidity static typing
 --This only allows for comparison within the same type of values
@@ -315,11 +352,11 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name) =
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
-        _ -> case T.splitOn "." $ T.pack name of
+        _ -> case T.splitOn "." $ labelToText name of
           [_] -> return $ SContract name 0x0
-          (n:ns) -> case M.lookup (T.unpack n) $ cc ^. CC.contracts of
+          (n:ns) -> case M.lookup (textToLabel n) $ cc ^. CC.contracts of
             Nothing -> return $ SContract name 0x0
-            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . T.unpack $ T.intercalate "." ns)
+            Just c -> createDefaultValue cc c (SVMType.UnknownLabel . textToLabel $ T.intercalate "." ns)
           _ -> return $ SContract name 0x0
 createDefaultValue _ _ _ = pure SNULL
 
@@ -398,6 +435,33 @@ forceLoadVar = forceLoadVal <=< weakGetVar
           SMap m -> SMap . fmap Constant <$> traverse forceLoadVar m
           _ -> pure v
 
+-- | JSON-ish text form of a fully evaluated value (only 'Constant' cells;
+-- see 'forceLoadVar'). Used for event args wherever they are shown as text.
+renderValue :: Value -> T.Text
+renderValue = go False
+  where
+    go _ SNULL = "null"
+    go _ (SInteger v) = T.pack $ show v
+    go b (SString v) = T.pack $ bool id show b v
+    go b (SBytes v) = T.pack . bool id show b . BC.unpack $ B16.encode v
+    go _ (SBool v) = bool "false" "true" v
+    go _ (SEnumVal tn vn _) = labelToText tn <> "." <> labelToText vn
+    go b (SAddress a _) = T.pack . bool id show b $ show a
+    go _ (STuple v) = "[" <> T.intercalate ", " (map (go True . getConst) (V.toList v)) <> "]"
+    go _ (SArray v) = "[" <> T.intercalate ", " (map (go True . getConst) (V.toList v)) <> "]"
+    go _ (SStruct name m) =
+      labelToText name <> "{"
+        <> T.intercalate ", " [T.pack (show (labelToString n)) <> ": " <> go True (getConst var) | (n, var) <- M.toList m]
+        <> "}"
+    go _ (SMap m) =
+      "{"
+        <> T.intercalate ", " [go True key <> ": " <> go True (getConst var) | (key, var) <- M.toList m]
+        <> "}"
+    go b (SContract _ address) = T.pack . bool id show b $ show address
+    go _ (SVariadic xs) = "[" <> T.intercalate ", " (map (go True) xs) <> "]"
+    go _ (SDecimal v) = T.pack $ show v
+    go _ _ = "0"
+
 instance ToJSON Variable where
   toJSON (Constant v) = toJSON v
   toJSON (Variable _) = toJSON SNULL
@@ -442,15 +506,42 @@ instance FromJSON Value where
       _ -> fail $ "Unknown Value tag: " ++ t
   parseJSON _ = pure SNULL
 
--- Binary instance for Value goes through the Aeson encoding so we don't have
--- to duplicate the (already non-trivial) variant logic. Lossy in the same
--- ways that the JSON instance is — IORef-backed aggregates serialize as
--- their resolved snapshots, which is what we want for receipts and Kafka
--- payloads anyway.
+-- Binary instance for Value. Carries the same variants, with the same losses,
+-- as the JSON instance: IORef-backed aggregates serialize as snapshots
+-- ('Variable' becomes SNULL, 'Constant' its value), and variants the JSON
+-- instance maps to () are SNULL. Everything else is a tag and the fields.
 instance Binary.Binary Value where
-  put = Binary.put . Aeson.encode
+  put v = case v of
+    SInteger n -> tag 0 >> Binary.put n
+    SDecimal d -> tag 1 >> Binary.put (decimalPlaces d) >> Binary.put (decimalMantissa d)
+    SString s -> tag 2 >> putUtf8String s
+    SBool b -> tag 3 >> Binary.put b
+    SAddress a p -> tag 4 >> Binary.put a >> Binary.put p
+    SEnumVal tn vn vi -> tag 5 >> Binary.put tn >> Binary.put vn >> Binary.put vi
+    SStruct n vs -> tag 6 >> Binary.put n >> Binary.put (M.map snapshot vs)
+    STuple items -> tag 7 >> Binary.put (map snapshot (V.toList items))
+    SArray items -> tag 8 >> Binary.put (map snapshot (V.toList items))
+    SContract n a -> tag 9 >> Binary.put n >> Binary.put a
+    SBytes bs -> tag 10 >> Binary.put bs
+    _ -> tag 11
+    where
+      tag :: Word8 -> Binary.Put
+      tag = Binary.put
+      snapshot (Constant c) = c
+      snapshot (Variable _) = SNULL
   get = do
-    bs <- Binary.get :: Binary.Get BSL.ByteString
-    case Aeson.eitherDecode bs of
-      Left err -> fail err
-      Right v -> return v
+    t <- Binary.get :: Binary.Get Word8
+    case t of
+      0 -> SInteger <$> Binary.get
+      1 -> SDecimal <$> (Decimal <$> Binary.get <*> Binary.get)
+      2 -> SString <$> getUtf8String
+      3 -> SBool <$> Binary.get
+      4 -> SAddress <$> Binary.get <*> Binary.get
+      5 -> SEnumVal <$> Binary.get <*> Binary.get <*> Binary.get
+      6 -> SStruct <$> Binary.get <*> (M.map Constant <$> Binary.get)
+      7 -> STuple . V.fromList . map Constant <$> Binary.get
+      8 -> SArray . V.fromList . map Constant <$> Binary.get
+      9 -> SContract <$> Binary.get <*> Binary.get
+      10 -> SBytes <$> Binary.get
+      11 -> pure SNULL
+      _ -> fail $ "Unknown Value tag: " ++ show t

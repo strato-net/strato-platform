@@ -31,6 +31,10 @@ const STATUS_LABELS: Record<number, { text: string; color: string }> = {
   2: { text: "Pending", color: "bg-amber-500/15 text-amber-500" },
   4: { text: "Aborted", color: "bg-red-500/15 text-red-500" },
   1: { text: "Initiated", color: "bg-blue-500/15 text-blue-500" },
+  // Deposit received but held: the requested route cannot be minted
+  6: { text: "On Hold", color: "bg-orange-500/15 text-orange-500" },
+  // Posted by a solver against a bond; the relayer has not observed the deposit yet
+  7: { text: "Announced", color: "bg-sky-500/15 text-sky-500" },
 };
 const UNKNOWN_STATUS = { text: "Unknown", color: "bg-muted text-muted-foreground" };
 const METAL_STATUS = STATUS_LABELS[3];

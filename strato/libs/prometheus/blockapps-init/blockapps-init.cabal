@@ -18,11 +18,12 @@ library
       src
   build-depends:
       base
-    , common-log
+    , composable-monads-base
+    , conduit
     , cross-monitoring
     , prometheus-client
-    , resourcet
     , text
+    , transformers
     , unix
   default-language: Haskell2010
 
