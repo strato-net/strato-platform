@@ -149,7 +149,7 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  * @openapi
  * /user/admin/vote:
  *   post:
- *     summary: Create an admin issue by calling the target function directly
+ *     summary: Execute an admin action or explicitly cast a governance vote
  *     tags: [Admin]
  *     requestBody:
  *       required: true
@@ -172,6 +172,10 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  *                 type: array
  *                 description: Positional raw argument values
  *                 items: {}
+ *               requireGovernance:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Submit explicitly through AdminRegistry and fail unless an issue is recorded
  *     responses:
  *       200:
  *         description: Issue transaction payload

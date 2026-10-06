@@ -128,6 +128,50 @@ test("traces create-issue argument transformations through the STRATO request", 
   });
 });
 
+test("required governance submits through AdminRegistry and fails when no issue is recorded", async t => {
+  const target = "0x1111111111111111111111111111111111111111";
+  const user = "0x2222222222222222222222222222222222222222";
+  t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({ status: 200, data: {
+    _contractName: "ExternalAssetBridge",
+    _functions: { approveReviewedDeposit: { _funcArgs: [
+      ["externalChainId", { index: 0, type: { tag: "Int", signed: false, bytes: 32 } }],
+      ["depositRouter", { index: 1, type: { tag: "Address" } }],
+      ["depositId", { index: 2, type: { tag: "Int", signed: false, bytes: 32 } }],
+      ["expectedDigest", { index: 3, type: { tag: "Bytes", bytes: 32 } }],
+    ] } },
+  } })) as typeof bloc.get);
+  let indexed = true, txStatus = "Success", payload: any;
+  t.mock.method(cirrus, "get", (async (_token: string, path: string) => ({ status: 200,
+    data: path.endsWith("-IssueCreated") ? indexed ? [{ issueId: "recorded-issue" }] : [] : [{ value: "1000000000000000000000000" }],
+  })) as typeof cirrus.get);
+  t.mock.method(strato, "post", (async (_token: string, _path: string, body: any) => {
+    payload = body.txs[0].payload;
+    return { status: 200, data: [{ status: txStatus, hash: "0xgoverned" }] };
+  }) as typeof strato.post);
+  const args = ["11155111", "0x" + "3".repeat(40), "22", "0x" + "4".repeat(64)];
+  assert.deepEqual(await createIssue("token", user, target, "approveReviewedDeposit", args, true), {
+    status: "Success", hash: "0xgoverned", issueId: "recorded-issue", governed: true,
+  });
+  assert.equal(payload.contractAddress, constants.adminRegistry);
+  assert.equal(payload.method, "castVoteOnIssue");
+  assert.equal(payload.args._target, target);
+  assert.equal(payload.args._func, "approveReviewedDeposit");
+  assert.equal(String(payload.args._args[2].value), "22");
+  for (const unfinished of ["Queued", "unsigned"]) {
+    txStatus = unfinished;
+    await assert.rejects(
+      createIssue("token", user, target, "approveReviewedDeposit", args, true),
+      new RegExp(`not finalized \\(status ${unfinished}\\)`),
+    );
+  }
+  txStatus = "Success";
+  indexed = false;
+  await assert.rejects(
+    createIssue("token", user, target, "approveReviewedDeposit", args, true),
+    /completed without recording an issue/,
+  );
+});
+
 // ── castVoteOnIssueById: registry fallback ────────────────────────────────────
 // The replay decodes the node's record of an issue's arguments back into the target's
 // declared types, which the node cannot always accept back. These cover the fallback

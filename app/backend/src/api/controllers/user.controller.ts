@@ -93,10 +93,15 @@ class UserController {
   ): Promise<void> {
     try {
       const { accessToken, address: actorAddress } = req;
-      const { target, func, args } = req.body;
+      const { target, func, args, requireGovernance = false } = req.body;
       validateAddressField(target);
+      if (typeof requireGovernance !== "boolean") throw new Error("Invalid governance requirement");
+      if (!(await isUserAdmin(accessToken, actorAddress as string))) {
+        res.status(RestStatus.FORBIDDEN).json({ error: "Administrator access is required" });
+        return;
+      }
 
-      const result = await createIssue(accessToken, actorAddress as string, target, func, args);
+      const result = await createIssue(accessToken, actorAddress as string, target, func, args, requireGovernance);
       res.status(RestStatus.OK).json({
         message: result.governed
           ? "Issue created successfully"

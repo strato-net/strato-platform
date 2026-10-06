@@ -252,6 +252,14 @@ export interface BridgeReviewVote {
   args: string[];
 }
 
+export interface AdminGovernanceVoteResult extends BridgeReviewVote {
+  status: string;
+  hash: string;
+  issueId: string | null;
+  governed: boolean;
+  message: string;
+}
+
 export interface BridgeReviewRow<T = Record<string, any>> {
   key: string;
   key2?: string;

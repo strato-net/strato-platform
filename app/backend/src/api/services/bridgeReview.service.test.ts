@@ -30,11 +30,10 @@ function setup(t: any) {
     state.reads.push({ table, params });
     if (table.endsWith("-depositReviewApprovals")) {
       assert.equal(params.address, `eq.${address}`);
-      assert.equal(params.key, "eq.11155111");
-      assert.equal(params.key2, `eq.${address}`);
-      assert.ok(/^eq.\d+$/.test(params.key3));
+      assert.match(params.or, /key\.eq\.11155111/);
+      assert.match(params.or, new RegExp(`key2\\.eq\\.${address}`));
       if (state.approvalReadFails) throw new Error("Cirrus unavailable");
-      return { data: [{ value: state.approval }] };
+      return { data: params.offset ? [] : [{ key: "11155111", key2: address, key3: depositId, value: state.approval }] };
     }
     assert.ok(params.address, "all reads must be scoped to the configured contract");
     if (table === "/BlockApps-ExternalAssetBridge") return { data: state.tables[table] || [{ settlementVerifierThreshold: state.threshold }] };
@@ -44,6 +43,9 @@ function setup(t: any) {
       const filter = params[`value->>${field}`];
       if (filter?.startsWith("eq.")) rows = rows.filter(row => String(row.value[field]) === filter.slice(3));
       if (filter?.startsWith("in.(")) rows = rows.filter(row => filter.slice(4, -1).split(",").includes(String(row.value[field])));
+    }
+    for (const field of ["key", "key2", "key3"]) {
+      if (params[field]?.startsWith("eq.")) rows = rows.filter(row => String(row[field]) === params[field].slice(3));
     }
     if (params.key?.startsWith("in.(")) rows = rows.filter(row => params.key.slice(4, -1).split(",").includes(row.key));
     if ([`/${constants.AdminRegistry}`, `/${constants.StratoNativeBridge}`, `/${constants.StratoNativeCustodyVault}`].includes(table)) return { data: rows };
@@ -67,6 +69,8 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   state.tables["/BlockApps-StratoNativeBridge-withdrawals"] = [false, true].map((useInstantPath, i) => ({ key: String(i), value: { ...withdrawal("0").value, bridgeStatus: "2", useInstantPath, nativeMintProposalHash: hash } }));
   const items = await getAdminBridgeReviews("token");
   assert.equal(items.filter(item => item.kind === "deposit_review").length, 5, "server row caps must not truncate reviews");
+  assert.equal(state.reads.filter(read => read.table.endsWith("-depositReviewApprovals")).length, 2,
+    "all deposit approvals are fetched in one paginated batch");
   assert.equal(items.filter(item => item.source === "native").length, 2);
   const instant = items.find(item => item.id === "native:withdrawal:1")!;
   assert.deepEqual(instant.actions, ["cancel_withdrawal"], "instant withdrawals remain available for governance cancellation");
@@ -108,7 +112,9 @@ test("deposit governance uses the contract digest and never calls the bridge", a
   assert.deepEqual(await prepareAdminBridgeReview("token", depositKey, "refund"), {
     target: address, func: "requestDepositRefund", args: ["11155111", `0x${address}`, depositId, `0x${address}`],
   });
-  assert.equal(state.rpcCalls, 3);
+  assert.equal(state.rpcCalls, 1, "point preparation reads only the selected deposit digest");
+  assert.ok(state.reads.every(read => !read.table.endsWith("-withdrawals") && !read.table.endsWith("-withdrawalManualReviews")),
+    "deposit vote preparation must not rebuild unrelated queues");
   assert.equal(operations.mock.callCount(), 0);
   state.tables["/BlockApps-ExternalAssetBridge-deposits"] = [];
   await assert.rejects(prepareAdminBridgeReview("token", depositKey, "approve"), /unavailable/);
@@ -156,7 +162,7 @@ test("approved deposits retain their approval status but never expose manual set
 test("refund preparation rejects evidence that changes before returning governance arguments", async t => {
   const { state, operations } = setup(t);
   let calls = 0;
-  t.mock.method(axios, "post", async () => ({ data: { result: ++calls < 3 ? state.digest : hash } }));
+  t.mock.method(axios, "post", async () => ({ data: { result: ++calls < 2 ? state.digest : hash } }));
   await assert.rejects(prepareAdminBridgeReview("token", "eab:withdrawal:2", "refund"), /evidence changed/);
   assert.equal(operations.mock.callCount(), 0);
 });

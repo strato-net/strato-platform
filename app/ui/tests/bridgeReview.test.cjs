@@ -25,7 +25,7 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../s
   require: id => id === 'axios' ? { default: { create: () => ({ interceptors: { request: { use() {} }, response: { use: (...args) => responseInterceptors.push(args) } } }) } } : id === '@/hooks/use-toast' ? { toast: value => globalToasts.push(value) } : {},
 });
 
-function harness({ kind = 'withdrawal_refund', action = 'refund', response, failure, status = 409, unavailable = false, stale = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready', refundEvidenceHash, overrides = {} } = {}) {
+function harness({ kind = 'withdrawal_refund', action = 'refund', response, voteResult, failure, status = 409, unavailable = false, stale = false, approved = true, governanceStatus = "available", progress, approvalStatus, refundStatus = 'ready', refundEvidenceHash, overrides = {} } = {}) {
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
@@ -44,7 +44,10 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, fail
       if (id === 'react/jsx-runtime') return { jsx, jsxs: jsx };
       if (id === 'react') return { useState: initial => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }]; } };
       if (id === '@tanstack/react-query') return { useQuery: () => ({ data: unavailable && !stale ? undefined : [item], isError: unavailable, refetch: async () => {} }) };
-      if (id === '@/context/UserContext') return { useUser: () => ({ userAddress: 'admin', castVoteOnIssue: async (...args) => votes.push(args) }) };
+      if (id === '@/context/UserContext') return { useUser: () => ({ userAddress: 'admin', castVoteOnIssue: async (...args) => {
+        votes.push(args);
+        return voteResult ?? { status: 'Success', governed: true, issueId: 'issue', hash: 'transaction', message: 'Issue created successfully' };
+      } }) };
       if (id === '@/lib/axios') return { extractApiErrorMessage: axiosExports.extractApiErrorMessage, api: { post: async (...args) => { requests.push(args); if (failure) throw { response: { status, data: { error: failure } } }; return { data: response }; } } };
       if (id === '@/lib/bridge/utils') return { ...bridgeUtils, getChainName: () => 'Sepolia' };
       if (id === '@/utils/numberUtils') return { truncateAddress: value => value, formatUnits: require('ethers').formatUnits };
@@ -65,7 +68,8 @@ test('admin refund UI submits a vote only after successful evidence preparation'
   assert.equal(h.requests.length, 0, 'opening confirmation must not attest or vote');
   await h.confirm();
   assert.equal(h.requests[0][0], '/bridge/admin/reviews/prepare');
-  assert.deepEqual(h.votes, [['bridge', 'refundWithdrawal', ['2']]]);
+  assert.deepEqual(h.votes, [['bridge', 'refundWithdrawal', ['2'], true]]);
+  assert.match(h.text(h.render()), /Governance vote recorded · Issue issue · Transaction transaction/);
 });
 
 test('failed refund evidence stays in the dialog and never casts a vote', async () => {
@@ -95,6 +99,18 @@ test('governance API errors render an alert without crashing or closing confirma
   }
 });
 
+test('an unrecorded governance transaction is never shown as a submitted vote', async () => {
+  const h = harness({
+    kind: 'deposit_review',
+    action: 'approve',
+    response: { target: 'bridge', func: 'approveReviewedDeposit', args: ['11155111', 'router', '2', 'digest'] },
+    voteResult: { status: 'Success', governed: false, issueId: null, hash: 'transaction', message: 'No vote was recorded' },
+  });
+  h.select(); await h.confirm();
+  assert.match(h.text(h.render()), /No vote was recorded/);
+  assert.doesNotMatch(h.text(h.render()), /Governance vote recorded|Waiting for indexed status/);
+});
+
 test('deposit rejection explains the lack of external refund', async () => {
   const rejection = harness({ kind: 'deposit_review', action: 'reject', response: { target: 'bridge', func: 'rejectDepositNoFunds', args: ['11155111', 'router', '2'] } });
   rejection.select();
@@ -104,7 +120,7 @@ test('deposit rejection explains the lack of external refund', async () => {
   assert.equal(rejection.requests.length, 0);
   rejection.nodes(rejection.render()).find(node => node.type === 'input' && node.props.type === 'checkbox').props.onChange({ target: { checked: true } });
   await rejection.confirm();
-  assert.deepEqual(rejection.votes, [['bridge', 'rejectDepositNoFunds', ['11155111', 'router', '2']]]);
+  assert.deepEqual(rejection.votes, [['bridge', 'rejectDepositNoFunds', ['11155111', 'router', '2'], true]]);
 });
 
 test('unavailable queue is never presented as an empty healthy queue', () => {
@@ -116,8 +132,8 @@ test('unavailable queue is never presented as an empty healthy queue', () => {
 test('STRATO shows withdrawals pending review with approval handled in Safe', () => {
   const h = harness({ kind: 'withdrawal_review' });
   const text = h.text(h.render());
-  assert.match(text, /Withdrawal pending review/);
-  assert.match(text, /Approval handled in Safe/);
+  assert.match(text, /Withdrawal review/);
+  assert.match(text, /Safe signers — review and execute the mint proposal/);
   assert.doesNotMatch(text, /Reject \/ vote|Refund \/ vote/);
   assert.equal(h.requests.length, 0);
   assert.equal(h.votes.length, 0);
@@ -136,7 +152,7 @@ test('refund votes stay disabled until indexed attestations are ready', () => {
     const h = harness({ refundStatus });
     const tree = h.render();
     assert.equal(h.nodes(tree).find(node => node.type === 'Button' && node.props.children === 'Refund / vote').props.disabled, true);
-    assert.match(h.text(tree), refundStatus === 'pending' ? /Verifiers — confirm.*no admin vote is needed yet/ : /Verifier confirmation is unavailable/);
+    assert.match(h.text(tree), refundStatus === 'pending' ? /Verifiers — confirm that no external payment occurred/ : /Admin — refresh after verifier availability is restored/);
     assert.doesNotMatch(h.text(tree), /STRATO admins: remaining votes required|STRATO admin must execute/);
     assert.equal(h.requests.length, 0);
   }
@@ -145,8 +161,7 @@ test('refund votes stay disabled until indexed attestations are ready', () => {
 test('ready refunds replace the generic rule with the current admin action and destination', () => {
   const h = harness({ overrides: { reason: 'Authorization expired. Refund requires verifier confirmation that no external payment occurred; expiry alone is not proof of non-payment.' } });
   const tree = h.render();
-  assert.match(h.text(tree), /Verifier checks complete\. STRATO admins — select Refund \/ vote/);
-  assert.match(h.text(tree), /user's STRATO wallet/);
+  assert.match(h.text(tree), /STRATO admins — vote to return the escrowed tokens/);
   assert.doesNotMatch(h.text(tree), /Refund requires verifier confirmation|expiry alone/);
   assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'Refund / vote').props.disabled, false);
   h.select();
@@ -168,14 +183,14 @@ test('unavailable or stale readiness never tells admins that a refund is ready t
 
 test('deposit and Safe stages name the next actor without requesting an unnecessary STRATO vote', () => {
   for (const [options, expected] of [
-    [{ kind: 'deposit_review', action: 'approve', approvalStatus: 'approved' }, /Bridge service — retry verification and delivery.*No further admin vote/],
-    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'reopened' } }, /Bridge service — retry verification and delivery/],
-    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending' } }, /Bridge service — verify the original deposit.*No admin vote is needed yet/],
-    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending', source: 'native', safeProposalHash: 'a'.repeat(64) } }, /Safe signers — review and execute the refund proposal in Safe/],
-    [{ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: 'a'.repeat(64) }, /STRATO admins — independently verify the external refund transaction/],
-    [{ kind: 'withdrawal_review' }, /Safe signers — review and execute the proposal in Safe/],
-    [{ kind: 'withdrawal_review', overrides: { safeProposalHash: undefined } }, /Bridge service — prepare the Safe proposal/],
-    [{ kind: 'deposit_review', overrides: { actions: [], source: 'legacy' } }, /Bridge operator — investigate the deposit evidence/],
+    [{ kind: 'deposit_review', action: 'approve', approvalStatus: 'approved' }, /Bridge service — retry verification and STRATO delivery/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'reopened' } }, /Bridge service — retry verification and STRATO delivery/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending' } }, /Bridge service — prepare and verify the external refund/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending', source: 'native', safeProposalHash: 'a'.repeat(64) } }, /Safe signers — execute the external refund proposal/],
+    [{ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: 'a'.repeat(64) }, /STRATO admins — verify the external refund and vote to confirm it/],
+    [{ kind: 'withdrawal_review' }, /Safe signers — review and execute the mint proposal/],
+    [{ kind: 'withdrawal_review', overrides: { safeProposalHash: undefined } }, /Bridge service — prepare the Safe mint proposal/],
+    [{ kind: 'deposit_review', overrides: { actions: [], source: 'legacy' } }, /Bridge service — continue automated processing/],
   ]) {
     const h = harness(options);
     assert.match(h.text(h.render()), expected);
@@ -186,12 +201,12 @@ test('review actions reflect your vote and quorum without claiming approval', ()
   const h = harness({ progress: { votesCast: 1, votesRequired: 2, hasVoted: true } });
   const tree = h.render();
   assert.match(h.text(tree), /Refund\s*:.*1.*of.*2.*votes.*You voted/);
-  assert.match(h.text(tree), /Next step:.*Other STRATO admins.*Your vote is recorded/);
+  assert.match(h.text(tree), /Next step:.*Other STRATO admins — cast the remaining votes/);
   assert.equal(h.nodes(tree).find(node => node.type === 'Button' && h.text(node) === 'You voted').props.disabled, true);
   const quorum = harness({ progress: { votesCast: 2, votesRequired: 2, hasVoted: true } });
   const ready = quorum.render();
   assert.match(quorum.text(ready), /Quorum reached; STRATO admin must execute/);
-  assert.match(quorum.text(ready), /Next step:.*STRATO admin — select Execute/);
+  assert.match(quorum.text(ready), /Next step:.*STRATO admin — execute the decision that reached quorum/);
   assert.equal(quorum.nodes(ready).find(node => node.type === 'Button' && h.text(node) === 'Execute refund').props.disabled, false);
   assert.doesNotMatch(quorum.text(ready), /Approved · awaiting settlement/);
 });
@@ -311,7 +326,7 @@ test('native refund confirmation shows proof, casts its exact vote and rejects c
   assert.match(h.text(h.render()), new RegExp(hash));
   assert.doesNotMatch(h.text(h.render()), /Reopen this deposit/);
   await h.confirm();
-  assert.deepEqual(h.votes, [['bridge', response.func, response.args]]);
+  assert.deepEqual(h.votes, [['bridge', response.func, response.args, true]]);
   const changed = harness({ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: hash,
     response: { ...response, args: ['2', '0x' + 'b'.repeat(64)] } });
   changed.select(); await changed.confirm();
@@ -337,5 +352,5 @@ test('native cancellation refund votes bind to the reviewed external evidence', 
     overrides: { source: 'native', refundEvidenceHash: hash },
     response: { target: 'bridge', func: 'refundCanceledWithdrawal', args: ['2', hash] } });
   h.select(); await h.confirm();
-  assert.deepEqual(h.votes, [['bridge', 'refundCanceledWithdrawal', ['2', hash]]]);
+  assert.deepEqual(h.votes, [['bridge', 'refundCanceledWithdrawal', ['2', hash], true]]);
 });

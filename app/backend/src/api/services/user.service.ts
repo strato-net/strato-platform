@@ -420,11 +420,19 @@ export const createIssue = async (
   target: string,
   func: string,
   args: any[],
+  requireGovernance = false,
 ): Promise<{ status: string; hash: string; issueId: string | null; governed: boolean }> => {
-  const { call } = await resolveIssueCall(accessToken, target, func, args);
+  const { call, typedArgs } = await resolveIssueCall(accessToken, target, func, args);
+  const submittedCall = requireGovernance ? castVoteCall(target, func, typedArgs) : call;
   const { status, hash } = await callTargetFunction(
-    accessToken, userAddress, call.contractName, call.contractAddress, call.method, call.args);
+    accessToken, userAddress, submittedCall.contractName, submittedCall.contractAddress, submittedCall.method, submittedCall.args);
+  if (requireGovernance && status !== "Success") {
+    throw new StratoError(`Governance vote was not finalized (status ${status || "unknown"})`, 409);
+  }
   const issueId = await findIssueIdForTx(accessToken, hash);
+  if (requireGovernance && !issueId) {
+    throw new StratoError(`Governance vote transaction ${hash} completed without recording an issue`, 409);
+  }
 
   return { status, hash, issueId, governed: issueId !== null };
 };

@@ -1,5 +1,5 @@
 import { ExternalBridgeStatus } from "@strato/shared-types";
-import { BridgePolicyOverview, BridgePolicyRecords, buildBridgeReviewQueue, BridgeReviewItem, BridgeReviewRow, BridgeReviewVote } from "@strato/shared-types";
+import { BridgePolicyOverview, BridgePolicyRecords, BridgeReviewRecords, buildBridgeReviewQueue, BridgeReviewItem, BridgeReviewRow, BridgeReviewVote } from "@strato/shared-types";
 import axios from "axios";
 import { nodeUrl, adminRegistry } from "../../config/config";
 import { constants, BRIDGE_REVIEW_PAGE_SIZE, BRIDGE_REVIEW_ID_BATCH_SIZE } from "../../config/constants";
@@ -63,38 +63,63 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
     return digests.get(item.id)!;
   };
   const depositReviews = items.filter(item => item.source === "eab" && item.kind === "deposit_review");
-  for (let offset = 0; offset < depositReviews.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
-    await Promise.all(depositReviews.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).map(async item => {
-      const [, , chainId, router, depositId] = item.id.split(":");
-      let approved = false;
-      item.approvalStatus = "pending";
-      try {
-        const { data } = await cirrus.get(accessToken, `/${ExternalAssetBridge}-depositReviewApprovals`, { params: {
-          address: `eq.${externalAssetBridge}`, key: `eq.${chainId}`, key2: `eq.${router.replace(/^0x/i, "").toLowerCase()}`,
-          key3: `eq.${depositId}`, select: "value", limit: 1,
-        } });
-        const approval = data?.[0]?.value;
-        approved = typeof approval === "string" && /^(0x)?[0-9a-f]{64}$/i.test(approval) &&
-          !/^(0x)?0+$/i.test(approval) && `0x${approval.replace(/^0x/i, "").toLowerCase()}` ===
-          await depositDigest(item);
-      } catch {
-        item.approvalStatus = "unavailable";
-        // Keep the review visible, but never offer settlement on an unverified approval.
-      }
-      if (approved) { item.approvalStatus = "approved"; item.reason = "Approved. The bridge automatically retries settlement; the transfer is not completed until settlement succeeds."; }
-    }));
-  }
   const refunds = items.filter(item => item.kind === "withdrawal_refund");
-  for (let offset = 0; offset < refunds.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
-    await Promise.all(refunds.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).map(async item => {
+  await Promise.all([
+    enrichDepositApprovals(accessToken, depositReviews, depositDigest),
+    enrichRefundReadiness(accessToken, refunds),
+  ]);
+  if (userAddress) await enrichReviewGovernance(accessToken, items, userAddress, depositDigest);
+  return items;
+};
+
+const enrichDepositApprovals = async (
+  accessToken: string,
+  items: BridgeReviewItem[],
+  depositDigest: (item: BridgeReviewItem) => Promise<string>,
+): Promise<void> => {
+  const approvals = new Map<string, unknown>();
+  try {
+    for (let offset = 0; offset < items.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+      const batch = items.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
+      const rows = await readReviewRows(accessToken, constants.ExternalAssetBridge, constants.externalAssetBridge, "depositReviewApprovals", {
+        or: `(${batch.map(item => {
+          const [, , chainId, router, depositId] = item.id.split(":");
+          return `and(key.eq.${chainId},key2.eq.${router.replace(/^0x/i, "").toLowerCase()},key3.eq.${depositId})`;
+        }).join(",")})`,
+        select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc",
+      });
+      for (const row of rows) approvals.set(`${row.key}:${row.key2?.toLowerCase()}:${row.key3}`, row.value);
+    }
+  } catch {
+    for (const item of items) item.approvalStatus = "unavailable";
+    return;
+  }
+  await Promise.all(items.map(async item => {
+    const [, , chainId, router, depositId] = item.id.split(":");
+    const approval = approvals.get(`${chainId}:${router.toLowerCase()}:${depositId}`);
+    item.approvalStatus = "pending";
+    if (typeof approval !== "string" || !/^(0x)?[0-9a-f]{64}$/i.test(approval) || /^(0x)?0+$/i.test(approval)) return;
+    try {
+      if (`0x${approval.replace(/^0x/i, "").toLowerCase()}` !== await depositDigest(item)) return;
+      item.approvalStatus = "approved";
+      item.reason = "Approved. The bridge automatically retries settlement; the transfer is not completed until settlement succeeds.";
+    } catch { item.approvalStatus = "unavailable"; }
+  }));
+};
+
+const enrichRefundReadiness = async (accessToken: string, items: BridgeReviewItem[]): Promise<void> => {
+  if (!items.length) return;
+  let threshold: number;
+  try { threshold = await getSettlementVerifierThreshold(accessToken); }
+  catch { for (const item of items) item.refundStatus = "unavailable"; return; }
+  for (let offset = 0; offset < items.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+    await Promise.all(items.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).map(async item => {
       try {
         const digest = await getReviewDigest(accessToken, "getWithdrawalRefundDigest(uint256)", [item.reference]);
-        item.refundStatus = await hasRefundQuorum(accessToken, digest) ? "ready" : "pending";
+        item.refundStatus = await hasRefundQuorum(accessToken, digest, threshold) ? "ready" : "pending";
       } catch { item.refundStatus = "unavailable"; }
     }));
   }
-  if (userAddress) await enrichReviewGovernance(accessToken, items, userAddress, depositDigest);
-  return items;
 };
 
 const enrichReviewGovernance = async (
@@ -169,25 +194,82 @@ const getReviewDigest = async (accessToken: string, signature: string, args: str
   return parseBridgeDigest(data);
 };
 
-const hasRefundQuorum = async (accessToken: string, digest: string): Promise<boolean> => {
+const getSettlementVerifierThreshold = async (accessToken: string): Promise<number> => {
   const address = `eq.${constants.externalAssetBridge}`;
-  const [bridge, attestations] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.ExternalAssetBridge}`, { params: { address, select: "settlementVerifierThreshold", limit: 1 } }),
-    cirrus.get(accessToken, `/${constants.ExternalAssetBridge}-settlementAttestationCounts`, { params: {
-      address, or: `(key.eq.${digest},key.eq.${digest.slice(2)})`, select: "value", limit: 1,
-    } }),
-  ]);
+  const bridge = await cirrus.get(accessToken, `/${constants.ExternalAssetBridge}`, { params: { address, select: "settlementVerifierThreshold", limit: 1 } });
   const threshold = Number(bridge.data?.[0]?.settlementVerifierThreshold);
+  if (!Number.isSafeInteger(threshold) || threshold < 2) throw new StratoError("Refund attestation state is unavailable", 409);
+  return threshold;
+};
+
+const hasRefundQuorum = async (accessToken: string, digest: string, threshold: number): Promise<boolean> => {
+  const address = `eq.${constants.externalAssetBridge}`;
+  const attestations = await cirrus.get(accessToken, `/${constants.ExternalAssetBridge}-settlementAttestationCounts`, { params: {
+    address, or: `(key.eq.${digest},key.eq.${digest.slice(2)})`, select: "value", limit: 1,
+  } });
   const count = Number(attestations.data?.[0]?.value ?? 0);
-  if (!Number.isSafeInteger(threshold) || threshold < 2 || !Number.isSafeInteger(count) || count < 0) {
+  if (!Number.isSafeInteger(count) || count < 0) {
     throw new StratoError("Refund attestation state is unavailable", 409);
   }
   return count >= threshold;
 };
 
+const getAdminBridgeReviewItem = async (accessToken: string, id: string): Promise<BridgeReviewItem | undefined> => {
+  const [source, kind, ...parts] = id.split(":");
+  const records: BridgeReviewRecords = { deposits: [], withdrawals: [], reviews: [], nativeDeposits: [], nativeWithdrawals: [], legacyDeposits: [], legacyWithdrawals: [] };
+  let eabChain: BridgeReviewRow | undefined;
+  const readOne = async (contract: string, address: string, table: string, params: Record<string, string>) => {
+    const { data } = await cirrus.get(accessToken, `/${contract}-${table}`, { params: {
+      address: `eq.${address}`, order: "key.asc", offset: 0, ...params, limit: 1,
+    } });
+    if (!Array.isArray(data)) throw new Error("Invalid bridge review response from Cirrus");
+    return data[0] as BridgeReviewRow | undefined;
+  };
+  if (source === "eab" && kind === "deposit" && parts.length === 3) {
+    const [chainId, router, depositId] = parts;
+    const [deposit, chain] = await Promise.all([
+      readOne(constants.ExternalAssetBridge, constants.externalAssetBridge, "deposits",
+        { key: `eq.${chainId}`, key2: `eq.${router}`, key3: `eq.${depositId}`, select: "key,key2,key3,value" }),
+      readOne(constants.ExternalAssetBridge, constants.externalAssetBridge, "chains", { key: `eq.${chainId}`, select: "key,value" }),
+    ]);
+    if (deposit) records.deposits.push(deposit);
+    eabChain = chain;
+  } else if (source === "eab" && kind === "withdrawal" && parts.length === 1) {
+    const [withdrawal, review] = await Promise.all([
+      readOne(constants.ExternalAssetBridge, constants.externalAssetBridge, "withdrawals", { key: `eq.${parts[0]}`, select: "key,value" }),
+      readOne(constants.ExternalAssetBridge, constants.externalAssetBridge, "withdrawalManualReviews", { key: `eq.${parts[0]}`, select: "key,value" }),
+    ]);
+    if (withdrawal) records.withdrawals.push(withdrawal);
+    if (review) records.reviews.push(review);
+  } else if (source === "native" && kind === "deposit" && parts.length === 2) {
+    const [chainId, depositId] = parts;
+    const [deposit, proposal, evidence] = await Promise.all([
+      readOne(constants.StratoNativeBridge, constants.stratoNativeBridge, "deposits",
+        { key: `eq.${chainId}`, ...(depositId ? { key2: `eq.${depositId}` } : {}), select: "key,key2,value" }),
+      readOne(constants.StratoNativeBridge, constants.stratoNativeBridge, "depositRefundProposals", { key: `eq.${chainId}`, select: "key,value" }),
+      readOne(constants.StratoNativeBridge, constants.stratoNativeBridge, "depositRefundEvidence", { key: `eq.${chainId}`, select: "key,value" }),
+    ]);
+    if (deposit) {
+      if (proposal) deposit.value.refundProposalHash = proposal.value;
+      if (evidence) deposit.value.refundEvidenceHash = evidence.value;
+      records.nativeDeposits.push(deposit);
+    }
+  } else if (source === "native" && kind === "withdrawal" && parts.length === 1) {
+    const withdrawal = await readOne(constants.StratoNativeBridge, constants.stratoNativeBridge, "withdrawals", { key: `eq.${parts[0]}`, select: "key,value" });
+    if (withdrawal) records.nativeWithdrawals.push(withdrawal);
+  } else return undefined;
+  const item = buildBridgeReviewQueue(records).find(entry => entry.id === id);
+  if (item?.source === "eab" && item.actions.includes("refund") && item.kind !== "withdrawal_refund") {
+    const vault = eabChain?.value?.vault;
+    if (typeof vault === "string" && /^(0x)?[a-f0-9]{40}$/i.test(vault) && !/^(0x)?0+$/.test(vault)) item.refundVault = vault.replace(/^0x/i, "").toLowerCase();
+    else item.actions = item.actions.filter(action => action !== "refund");
+  }
+  return item;
+};
+
 export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote> => {
   if (!["approve", "reject", "refund", "confirm_refund", "cancel_withdrawal", "confirm_cancellation"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
-  const item = (await getAdminBridgeReviews(accessToken)).find(entry => entry.id === id);
+  const item = await getAdminBridgeReviewItem(accessToken, id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
   const target = item.source === "native" ? constants.stratoNativeBridge : constants.externalAssetBridge;
   if (action === "cancel_withdrawal" || action === "confirm_cancellation") {
@@ -224,7 +306,7 @@ export const prepareAdminBridgeReview = async (accessToken: string, id: string, 
   const signature = "getWithdrawalRefundDigest(uint256)";
   const args = [item.reference];
   const digest = await getReviewDigest(accessToken, signature, args);
-  if (!await hasRefundQuorum(accessToken, digest)) {
+  if (!await hasRefundQuorum(accessToken, digest, await getSettlementVerifierThreshold(accessToken))) {
     throw new StratoError("Awaiting verifier attestations. The bridge prepares refund evidence automatically; refresh before voting", 409);
   }
   if (await getReviewDigest(accessToken, signature, args) !== digest) {

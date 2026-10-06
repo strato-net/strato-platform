@@ -41,6 +41,8 @@ const BridgeReviewQueue = () => {
     queryKey: ['admin-bridge-reviews', userAddress],
     queryFn: async () => (await api.get<BridgeReviewItem[]>('/bridge/admin/reviews')).data,
     refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
   const submit = async () => {
     if (!selected || (selected.action === 'reject' && !noFundsConfirmed)) return;
@@ -54,13 +56,16 @@ const BridgeReviewQueue = () => {
         setError('Refund evidence changed. Refresh the queue and review the new transaction before voting.');
         return;
       }
-      await castVoteOnIssue(data.target, data.func, data.args);
+      const vote = await castVoteOnIssue(data.target, data.func, data.args, true);
+      if (vote.status !== 'Success' || !vote.governed || !vote.issueId) {
+        throw new Error(vote.message || `Governance vote ${vote.hash || ''} was not recorded`);
+      }
       setSubmittedVotes(previous => ({ ...previous, [voteKey(selected.item, selected.action)]: Date.now() }));
-      setMessage('Governance transaction submitted. Refreshing the queue to show the next step; submission alone does not confirm that funds were delivered or returned.');
+      setMessage(`Governance vote recorded · Issue ${vote.issueId} · Transaction ${vote.hash}. Refreshing the queue; the vote alone does not confirm that funds were delivered or returned.`);
       setSelected(null);
       await reviews.refetch();
     } catch (e: unknown) {
-      setError(extractApiErrorMessage(e));
+      setError(e instanceof Error ? e.message : extractApiErrorMessage(e));
     } finally { setSubmitting(false); }
   };
   return <Card>
