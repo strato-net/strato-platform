@@ -17,6 +17,7 @@ library
       Blockchain.Sequencer.HexData
       Blockchain.Sequencer.Kafka
       Blockchain.Sequencer.Kafka.Metrics
+      Blockchain.Sequencer.StateProof
       Blockchain.Sequencer.TxCallObject
   other-modules:
       Paths_seqevents

@@ -24,13 +24,16 @@ import Blockchain.Data.BlockHeader (BlockHeader)
 import Blockchain.DB.CodeDB
 import Blockchain.DB.SolidStorageDB (getSolidStorageKeyVal')
 import Blockchain.Data.AddressStateDB
+import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpSerialize)
 import Blockchain.Data.VmTrace (CallFrame, TraceLog (..), VmTracer, newVmTracer, takeTraceRoots)
 import Blockchain.Data.ExecResults (ExecResults (..))
+import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.VMContext (ContextM, evalSandboxedContextM)
 import Blockchain.Wiring ()
 import Blockchain.Sequencer.CallSpec (CallSpec (..), TraceOptions (..), TxCreateObject (..), TxFuncCallObject (..))
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
+import Blockchain.Sequencer.StateProof (StateProof (..), StorageProof (..))
 import Data.Aeson ((.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -48,7 +51,8 @@ import Blockchain.Strato.Model.Code (Code (..))
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Gas (Gas (..))
 import SolidVM.Model.Event (Event (..))
-import Blockchain.Strato.Model.Keccak256 (hash)
+import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
+import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Blockchain.VMContext (ContextBestBlockInfo (..), CurrentBlockHash (..), VMBase, getContextBestBlockInfo, getNewAddress, checkIfRunningTests)
 import Control.Lens ((^.))
 import Control.Applicative ((<|>))
@@ -64,6 +68,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Read as TR
+import Data.Traversable (for)
 import Prelude hiding (id)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.CodeCollection.VarDef (IndexedType (..))
@@ -71,7 +76,7 @@ import SolidVM.Model.CodeCollection.Visibility (Visibility (..))
 import SolidVM.Model.SolidString (SolidString, labelToText, stringToLabel)
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as SVMType
-import SolidVM.Model.Value (Variable(..), forceLoadVar)
+import SolidVM.Model.Value (Variable(..), forceLoadVar, renderValue)
 import Numeric (showHex)
 import Text.Format (format)
 
@@ -166,6 +171,21 @@ runJsonRpcCommand' c@(JRCSimulate simBlocks mHeader id) = do
   withExecHeader mHeader id $ \header -> do
     results <- mapM (mapM (simulateOne header)) simBlocks
     return . SuccessJson id . BL.toStrict $ Aeson.encode results
+runJsonRpcCommand' c@(JRCGetProof sr@(MP.StateRoot srBytes) address keys id) = do
+  $logInfoS "JRCGetProof" . T.pack $ format c
+  let trieKey = keccak256ToByteString . hash
+  A.lookup (A.Proxy @MP.NodeData) sr >>= \case
+    Nothing -> return . Error id $ "state root not available on this node: " ++ BC.unpack (B16.encode srBytes)
+    Just _ -> do
+      (mAccount, accountProof) <- MP.getProof sr . byteString2NibbleString . trieKey $ addressToByteString address
+      -- The account leaf holds an RLP string wrapping the account's RLP.
+      let accountLeaf = rlpDecode <$> mAccount
+          contractRoot = maybe MP.emptyTriePtr (addressStateContractRoot . rlpDecode . rlpDeserialize) accountLeaf
+      storage <- for keys $ \key -> do
+        (mVal, proof) <- MP.getProof contractRoot . byteString2NibbleString $ trieKey key
+        return $ StorageProof (HexData key) (HexData $ trieKey key) (HexData . rlpSerialize <$> mVal) (map HexData proof)
+      return . SuccessJson id . BL.toStrict . Aeson.encode $
+        StateProof (map HexData accountProof) (HexData <$> accountLeaf) storage
 
 simulateOne :: VMBase m => BlockHeader -> CallSpec -> m Aeson.Value
 simulateOne header spec = do
@@ -191,7 +211,7 @@ simulateOne header spec = do
         [ TraceLog
             (evContractAddress ev)
             (evName ev)
-            [(n, v) | (n, _, v, _) <- evArgs ev]
+            [(n, renderValue v) | (n, v) <- evArgs ev]
           | ev <- maybe [] erEvents mEr
         ]
       hex n = "0x" ++ showHex n ""

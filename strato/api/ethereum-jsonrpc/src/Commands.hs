@@ -25,6 +25,7 @@ import qualified Blockchain.EthConf.Model as EthConf
 import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
+import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState, codePtrToSHA)
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
@@ -36,8 +37,10 @@ import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction
 import Blockchain.Sequencer.CallSpec (CallSpec(..), TraceOptions(..), TxCreateObject(..), TxFuncCallObject(..))
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), JsonRpcResponse(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
+import Blockchain.Sequencer.StateProof (StateProof (..), StorageProof (..))
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
+import Blockchain.Strato.Model.StateRoot (StateRoot (..), unboxStateRoot)
 import Text.Format (format)
 import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (void, when, zipWithM)
@@ -66,7 +69,7 @@ import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
 import Data.List (find, findIndex)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
@@ -133,6 +136,7 @@ methods =
     eth_blockNumber,
     eth_getBalance,
     eth_getStorageAt,
+    eth_getProof,
     eth_getTransactionCount,
     eth_getBlockTransactionCountByHash,
     eth_getBlockTransactionCountByNumber,
@@ -145,6 +149,7 @@ methods =
     eth_call,
     strato_getFinalizedHeader,
     strato_getReceiptProof,
+    strato_getStateProof,
     strato_simulateV1,
     strato_traceCall,
     strato_traceTransaction,
@@ -387,6 +392,51 @@ eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Require
     f :: String -> String -> String -> RpcResult Server String
     f _addressString _key _blockString = do
       throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
+
+-- | Ask the VM for Merkle-Patricia proofs of an account and of raw (unhashed)
+-- keys of its storage against a state root. The VM answers between blocks, so
+-- the number of keys per request is capped.
+getStateProof :: StateRoot -> Address -> [HexData] -> RpcResult Server StateProof
+getStateProof sr addr keys = do
+  when (length keys > maxProofKeys) . throwError $
+    rpcError (-32602) (T.pack $ "too many storage keys (max " ++ show maxProofKeys ++ ")")
+  rpcId <- mkRpcId $ "getStateProof_" ++ showHex addr ""
+  resp <- liftIO . callVM $ JRCGetProof sr addr (map unHexData keys) rpcId
+  v <- decodeTraceResponse resp
+  case Ae.fromJSON v of
+    Ae.Success proof -> return proof
+    Ae.Error e -> throwError $ rpcError (-32603) (T.pack $ "bad proof payload: " ++ e)
+
+maxProofKeys :: Int
+maxProofKeys = 256
+
+-- | EIP-1186 account and storage proofs against the state root of a block
+-- (a tag, a hex number, or a block hash). STRATO storage keys are not 32-byte
+-- slots: a storage key is the hex of the raw key bytes (for SolidVM, the ASCII
+-- storage path, e.g. @balances[deadbeef...]@), and its trie key is the
+-- keccak256 of those bytes. A storage @value@ is the leaf's RLP item as stored
+-- (@0x@ when the key is absent); absent keys and accounts get exclusion proofs.
+eth_getProof :: Method Server
+eth_getProof = toMethod "eth_getProof" f (Required "address" :+: Required "storageKeys" :+: Optional "blockTag" "latest" :+: ())
+  where
+    f :: Address -> [HexData] -> String -> RpcResult Server Value
+    f addr keys blockTag = do
+      mBlk <- liftIO $ (if length blockTag == 66 then fetchBlockByHash else fetchBlockByNumber) blockTag
+      blk <- maybe (throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockTag)) return mBlk
+      proof <- getStateProof (stateRoot . blockBlockData $ bPrimeToB blk) addr keys
+      let account = maybe blankAddressState (rlpDecode . rlpDeserialize . unHexData) (stpAccountLeaf proof)
+      return $ object
+        [ "address" .= EthHex addr,
+          "accountProof" .= stpAccountProof proof,
+          "balance" .= EthHex (addressStateBalance account),
+          "codeHash" .= EthHex (codePtrToSHA $ addressStateCodeHash account),
+          "nonce" .= EthHex (addressStateNonce account),
+          "storageHash" .= HexData (unboxStateRoot $ addressStateContractRoot account),
+          "storageProof"
+            .= [ object ["key" .= spKey sp, "value" .= fromMaybe (HexData B.empty) (spValue sp), "proof" .= spProof sp]
+                 | sp <- stpStorage proof
+               ]
+        ]
 
 eth_call :: Method Server
 eth_call = toMethod "eth_call" f (Required "txObject" :+: Optional "blockTag" "latest" :+: ())
@@ -1093,6 +1143,16 @@ strato_getFinalizedHeader =
               (rlpHex, sigsHex) = headerBytesAndSigs hdr
            in Just $ FinalizedHeaderResponse rlpHex sigsHex
         Nothing -> Nothing
+
+-- | The raw proofs behind 'eth_getProof', against an explicit state root. The
+-- REST state-proof route resolves a block itself and calls this, so the header
+-- it returns and the proofs always describe the same state.
+strato_getStateProof :: Method Server
+strato_getStateProof =
+  toMethod "strato_getStateProof" f (Required "stateRoot" :+: Required "address" :+: Required "keys" :+: ())
+  where
+    f :: EthHex Keccak256 -> Address -> [HexData] -> RpcResult Server StateProof
+    f (EthHex sr) = getStateProof (StateRoot $ keccak256ToByteString sr)
 
 strato_getReceiptProof :: Method Server
 strato_getReceiptProof =

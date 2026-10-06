@@ -54,6 +54,7 @@ library
     , format
     , hedis
     , hflags
+    , http-client
     , labeled-error
     , leveldb-haskell
     , merkle-patricia-db

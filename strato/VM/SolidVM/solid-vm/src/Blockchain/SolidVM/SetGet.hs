@@ -31,7 +31,7 @@ module Blockchain.SolidVM.SetGet
     toBasic,
     fromBasic,
     showSM,
-    jsonSM
+    forceValue
   )
 where
 
@@ -49,19 +49,14 @@ import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8 as UTF8
-import Data.Bool (bool)
 import Data.Decimal
-import Data.List
 import qualified Data.Map as M
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
-import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
-import Text.Format
-import Text.Printf
 import Text.Read (readMaybe)
 import UnliftIO
 
@@ -207,6 +202,23 @@ getVar (Constant (SPush v (Just var))) = do
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
+-- | Fully evaluate a value: every nested cell and storage reference is
+-- resolved, so the result holds only 'Constant's and can leave the VM.
+forceValue :: MonadSM m => Value -> m Value
+forceValue = \case
+  v@(SReference _) -> do
+    v' <- getVar (Constant v)
+    case v' of
+      SReference _ -> pure v' -- unset storage slot resolves to itself
+      _ -> forceValue v'
+  SStruct n m -> SStruct n <$> traverse forceVar m
+  STuple vs -> STuple <$> traverse forceVar vs
+  SArray vs -> SArray <$> traverse forceVar vs
+  SMap m -> SMap <$> traverse forceVar m
+  v -> pure v
+  where
+    forceVar var = Constant <$> (getVar var >>= forceValue)
+
 getIntEither :: MonadSM m => Variable -> m (Either Value Integer)
 getIntEither p = getIntValEither <$> getVar p
 
@@ -296,96 +308,6 @@ deleteVar (Constant (SReference path)) = do
   putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
+-- | Trace/debug text for a value: force it, then use the one renderer.
 showSM :: MonadSM m => Value -> m String
-showSM SNULL = return "NULL"
-showSM (SInteger v) = return $ show v
-showSM (SString v) = return v
-showSM (SBytes v) = return . BC.unpack $ B16.encode v
-showSM (SDecimal v) = return $ show v
-showSM (SBool v) = return $ show v
-showSM (SEnumVal enumName valName num) =
-  return $
-    printf "%s.%s (= %x)" enumName valName num
-showSM (SAddress a _) = return $ show a
-showSM (STuple v) = do
-  vals <- mapM getVar (V.toList v)
-  strings <- forM vals showSM
-  return $ "(" ++ intercalate ", " strings ++ ")"
-showSM (SArray v) = do
-  vals <- mapM getVar (V.toList v)
-  strings <- forM vals showSM
-  return $ "[" ++ intercalate ", " strings ++ "]"
-showSM (SStruct name m) = do
-  valStrings <-
-    forM (M.toList m) $ \(n, var) -> do
-      val <- getVar var
-      valString <- showSM val
-      return (n, valString)
-  return $
-    labelToString name ++ "{"
-      ++ intercalate ", " (map (\(n, v) -> labelToString n ++ ": " ++ v) valStrings)
-      ++ "}"
-showSM (SMap m) = do
-  valStrings <-
-    forM (M.toList m) $ \(key, var) -> do
-      val <- getVar var
-      valString <- showSM val
-      keyString <- showSM key
-      return (keyString, valString)
-  return $
-    "{"
-      ++ intercalate ", " (map (\(k, v) -> k ++ ": " ++ v) valStrings)
-      ++ "}"
-showSM (SContract name address) = do
-  return $ "Contract: " ++ labelToString name ++ "/" ++ format address
-showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
-showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
-showSM (SContractFunction address functionName) = do
-  contractName <- CC._contractName <$> getCurrentContract
-  return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
-showSM (SVariadic xs) = ("variadic(" ++) . (++ ")") . intercalate ", " <$> traverse showSM xs
-showSM x = todo "showSM called for unsupported value: " x
-
-jsonSM :: MonadSM m => Value -> m T.Text
-jsonSM = go False
-  where
-    go _ SNULL = return "null"
-    go _ (SInteger v) = return . T.pack $ show v
-    go b (SString v) = return . T.pack $ bool id show b v
-    go b (SBytes v) = return . T.pack . bool id show b . BC.unpack $ B16.encode v
-    go _ (SBool v) = return $ bool "false" "true" v
-    go _ (SEnumVal _ _ num) = return . T.pack $ show num
-    go b (SAddress a _) = return . T.pack . bool id show b $ show a
-    go _ (STuple v) = do
-      vals <- mapM getVar (V.toList v)
-      strings <- forM vals (go True)
-      return $ "[" <> T.intercalate ", " strings <> "]"
-    go _ (SArray v) = do
-      vals <- mapM getVar (V.toList v)
-      strings <- forM vals (go True)
-      return $ "[" <> T.intercalate ", " strings <> "]"
-    go _ (SStruct name m) = do
-      valStrings <-
-        forM (M.toList m) $ \(n, var) -> do
-          val <- getVar var
-          valString <- go True val
-          return (n, valString)
-      return $
-        labelToText name <> "{"
-          <> T.intercalate ", " (map (\(n, v) -> T.pack (show (labelToString n)) <> ": " <> v) valStrings)
-          <> "}"
-    go _ (SMap m) = do
-      valStrings <-
-        forM (M.toList m) $ \(key, var) -> do
-          val <- getVar var
-          valString <- go True val
-          keyString <- go True key
-          return (keyString, valString)
-      return $
-        "{"
-          <> T.intercalate ", " (map (\(k, v) -> k <> ": " <> v) valStrings)
-          <> "}"
-    go b (SContract _ address) = return . T.pack . bool id show b $ show address
-    go _ (SVariadic xs) = (\xs' -> "[" <> T.intercalate ", " xs' <> "]") <$> traverse (go True) xs
-    go _ (SDecimal v) = return . T.pack $ show v
-    go _ _ = return "0"
+showSM = fmap (T.unpack . renderValue) . forceValue

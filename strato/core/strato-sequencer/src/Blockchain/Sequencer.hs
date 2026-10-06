@@ -40,7 +40,7 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, void, when)
+import Control.Monad (forever, forM, unless, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
@@ -306,7 +306,11 @@ unseqEventHandler events = do
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
   when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
-  transformFullTransactions transactions
+  newTxs <- transformFullTransactions transactions
+  -- Only the proposer's VM builds blocks, so a new transaction is what tells
+  -- the other validators to expect a proposal. Re-gossip of a transaction we
+  -- already witnessed does not count: it may be committed already.
+  unless (newTxs == 0) $ lift createNewViewTimer
 
   forM_ events $ \event ->
     case event of
@@ -364,13 +368,10 @@ blockstanbulSend' ::
   InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
   (p2pevs, vmevs, committedBlocks) <- lift $ do
-    case msg of
-      UnannouncedBlock blk -> createNewViewTimer blk
-      _ -> pure ()
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
     for_ resp $ \case
-      ResetTimer vw -> createNewTimer vw
+      ResetTimer vw -> createNewTimer vw >> carryViewTimer vw
       FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
       _ -> pure ()
     updateViewTimer
@@ -437,7 +438,7 @@ transformFullTransactions ::
     MonadMonitor m,
     (Keccak256 `A.Alters` ()) m
   ) =>
-  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m ()
+  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- lift . forM pairs $ \(ts, itx) ->
@@ -461,6 +462,7 @@ transformFullTransactions pairs = do
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yieldToVm $ map pairToVmTx txs
   yieldToP2p $ map (P2pTx . snd) txs
+  pure $ length txs
 
 emitOrCacheHistoricBlock ::
   ( MonadLogger m,
