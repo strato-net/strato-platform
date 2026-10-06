@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
+import { CopyValueButton } from "@/components/staking/AuthorizationInstructions";
 import BecomeValidatorCard, { type ChangeOperatorInput, type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
 import { withHexPrefix } from "@/components/staking/authorization";
 
@@ -463,17 +464,20 @@ const OperatorPanel = ({
       <CardContent className="p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{isV2 && validator ? `Operator · ${validatorLabel}` : "Operator"}</h2>
+            <h2 className="text-lg font-semibold">{isV2 && validator ? `You operate ${validatorLabel}` : "Operator"}</h2>
             <p className="text-sm text-muted-foreground">
               {active
                 ? "Claim validator rewards, update commission, or manage self-bond."
                 : "Claim accrued validator rewards or unbond existing self-bond."}
             </p>
             {validator && validatorSetDeployed && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Validator {truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6) || "not set"}
-                {" · "}{validator.blocksProposed} blocks proposed · {validator.missedProposals} missed
-                {inSet || !active ? "" : ` · needs ${formatToken(minStake, decimals, 0)} ${symbol} ${activationStake} to activate`}
+              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                <span>Validator {truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6) || "not set"}</span>
+                {((isV2 ? validator.address : validator.validatorAddress) || "") && (
+                  <CopyValueButton value={withHexPrefix((isV2 ? validator.address : validator.validatorAddress) || "")} />
+                )}
+                <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
+                {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
               </p>
             )}
             {selfBondNote && (
@@ -530,7 +534,7 @@ const OperatorPanel = ({
           </div>
         </div>
 
-        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
@@ -1429,7 +1433,17 @@ const EarnStaking = () => {
           </Alert>
         )}
 
-        {isLoggedIn && (isV2 || !info.isOperator) && validatorSetDeployed && (
+        {isLoggedIn && isV2 && operatedValidators[0] && deepLink.validator && !deepLinkOperatorMismatch && (
+          <Alert>
+            <AlertDescription>
+              {sameAddress(deepLink.validator, operatedValidators[0].address)
+                ? "You already operate this validator."
+                : `This account already operates ${operatedValidators[0].name || truncateAddress(withHexPrefix(operatedValidators[0].address), 8, 6)}. An operator can run one validator; log in with a different account to bind ${truncateAddress(withHexPrefix(deepLink.validator), 8, 6)}.`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoggedIn && (isV2 ? operatedValidators.length === 0 : !info.isOperator) && validatorSetDeployed && (
           <BecomeValidatorCard
             isV2={isV2}
             connectedAddress={userAddress}
