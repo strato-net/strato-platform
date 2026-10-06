@@ -219,6 +219,8 @@ compileE sc e = atLine (S.extractExpression e) $ do
       result :: forall t. Ty t -> Code (Env ls -> M t) -> C (CE ls)
       result t action = pure (CE t (typedCode (scopeTypes sc) t action))
   case base of
+    S.Binary _ op left right | Just action <- atomicIntegerExpression sc (T.pack op) left right charges ->
+      result TInt action
     S.NumberLiteral _ n unit ->
       let value = n * unitMul unit in result TInt $(Quotation.quoteAction [|
         \_ -> runCode charges >> pure value |])
@@ -242,6 +244,43 @@ chargeUnits = \case
   2 -> $(Quotation.quoteAction [| chargeGas 1 >> chargeGas 1 |])
   3 -> $(Quotation.quoteAction [| chargeGas 1 >> chargeGas 1 >> chargeGas 1 |])
   count -> $(Quotation.quoteAction [| replicateM_ count (chargeGas 1) |])
+
+data IntegerAtom ls where
+  IntegerLiteral :: Integer -> IntegerAtom ls
+  IntegerLocal :: IntegerAtom (Integer ': ls)
+
+integerAtom :: Scope ls r -> Expression -> Maybe (IntegerAtom ls, Int)
+integerAtom sc = go 1
+  where
+    go units (S.InlineBoundsCheck _ lo hi e) | boundsImplied sc lo hi e = go (units + 1) e
+    go units (S.NumberLiteral _ n unit) = Just (IntegerLiteral (n * unitMul unit), units)
+    go units (S.Variable _ n)
+      | n `notElem` ["this", "now"], Just (ValueVar _ TInt IZ _) <- lookupVar sc n = Just (IntegerLocal, units)
+    go _ _ = Nothing
+
+atomicIntegerExpression :: Scope ls r -> T.Text -> Expression -> Expression -> Code (M ()) -> Maybe (Code (Env ls -> M Integer))
+atomicIntegerExpression sc op left right charges = do
+  (lhs, leftUnits) <- integerAtom sc left
+  (rhs, rightUnits) <- integerAtom sc right
+  let leftCharges = chargeUnits leftUnits
+      rightCharges = chargeUnits rightUnits
+  case (lhs, rhs) of
+    (IntegerLocal, IntegerLiteral b) -> $(Quotation.quoteIntegerExpression [| op |]
+      [| \(value :& _) -> runCode leftCharges >> pure value |]
+      [| \_ -> runCode rightCharges >> pure b |]
+      [| runCode charges |])
+    (IntegerLiteral a, IntegerLocal) -> $(Quotation.quoteIntegerExpression [| op |]
+      [| \_ -> runCode leftCharges >> pure a |]
+      [| \(value :& _) -> runCode rightCharges >> pure value |]
+      [| runCode charges |])
+    (IntegerLocal, IntegerLocal) -> $(Quotation.quoteIntegerExpression [| op |]
+      [| \(value :& _) -> runCode leftCharges >> pure value |]
+      [| \(value :& _) -> runCode rightCharges >> pure value |]
+      [| runCode charges |])
+    (IntegerLiteral a, IntegerLiteral b) -> $(Quotation.quoteIntegerExpression [| op |]
+      [| \_ -> runCode leftCharges >> pure a |]
+      [| \_ -> runCode rightCharges >> pure b |]
+      [| runCode charges |])
 
 compileE' :: forall ls r. Scope ls r -> Expression -> C (CE ls)
 compileE' sc = compileExpression sc True
@@ -762,15 +801,9 @@ integerOpSize = \case
 
 intOp :: T.Text -> C (Code (Integer -> Integer -> M Integer))
 intOp = \case
-  "+" -> pure ($(Quotation.quoteIntegerAction "+" [|
-               \a b -> pure (a + b)
-               |]))
-  "-" -> pure ($(Quotation.quoteIntegerAction "-" [|
-               \a b -> pure (a - b)
-               |]))
-  "*" -> pure ($(Quotation.quoteIntegerAction "*" [|
-               \a b -> pure (a * b)
-               |]))
+  "+" -> pure $(Quotation.quoteIntegerPrimitive "+")
+  "-" -> pure $(Quotation.quoteIntegerPrimitive "-")
+  "*" -> pure $(Quotation.quoteIntegerPrimitive "*")
   "/" -> pure ($(Quotation.quoteIntegerAction "/" [|
                \a b -> if b == 0 then revert "division by zero" else pure (a `div` b)
                |]))

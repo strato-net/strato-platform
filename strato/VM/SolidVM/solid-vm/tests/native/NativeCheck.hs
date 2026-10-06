@@ -72,6 +72,10 @@ gasSource = T.unlines
   , " function literal() returns (uint) { return 3; }"
   , " function local() returns (uint) { uint x = 1; x = 2; return x; }"
   , " function valueChain() { uint x = 5; x = x + 1; value = x; }"
+  , " function literalFirst() { uint x = 5; value = 1 + x; }"
+  , " function valueSelfAdd() { uint x = 5; x = x + x; value = x; }"
+  , " function valueMultiply() { uint x = 5; value = x * 3; }"
+  , " function valueUnderflow() { uint x = 5; x = x - 6; value = x; }"
   , " function valueFromStorage() returns (uint) { uint x = value; x = x + 1; value = x; return value; }"
   , " function localBytesRead() returns (uint) { bytes x = hex\"0102\"; return x[0]; }"
   , " function localBytesWrite() returns (uint) { bytes x = hex\"0102\"; x[0] = 9; return x[0]; }"
@@ -248,7 +252,7 @@ main = do
     deployment <- create $ def & createNewAddress .~ 0x2100 & createContractName .~ "GasProbe" & createCode .~ Code gasSource
     liftIO $ check deployment
     savedContext <- Mod.get (Mod.Proxy :: Mod.Proxy ContextState)
-    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "catchGas", "catchGasBody"] $ \fn ->
+    forM_ ["aliasIndex", "aliasIndexWrite", "aliasIncrement", "storageIncrement", "guardedArgs", "libraryConstant", "qualifiedCall", "usingCall", "superCall", "decimalCompound", "tupleAssign", "aliasRebind", "message", "blockNumber", "constantRead", "enumRead", "externalCall", "scalarWrite", "memberWrite", "indexWrite", "mappingWrite", "copyStorage", "push", "memoryIndexWrite", "aliasWrite", "stringAdd", "bytesAdd", "abiEncode", "shifts", "bigMultiply", "decimalDivide", "compare", "literal", "local", "valueChain", "literalFirst", "valueSelfAdd", "valueMultiply", "valueUnderflow", "valueFromStorage", "localBytesRead", "localBytesWrite", "storageRead", "member", "index", "mappingRead", "callInternal", "castContract", "arithmetic", "divide", "modulo", "compound", "decimalMath", "loop", "breakLoop", "whileLoop", "doLoop", "tuple", "arrayLiteral", "guarded", "catchGas", "catchGasBody"] $ \fn ->
       forM_ [0..1100] $ \limit -> do
         Mod.put (Mod.Proxy :: Mod.Proxy ContextState) savedContext
         Mod.put (Mod.Proxy :: Mod.Proxy GasCap) (GasCap (Gas limit))

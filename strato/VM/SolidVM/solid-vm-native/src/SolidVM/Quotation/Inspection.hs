@@ -1,6 +1,6 @@
-module SolidVM.Quotation.Inspection (quoteAction, quoteIntegerSize, quoteIntegerAction, quoteBlockAction, helperDeclarations) where
+module SolidVM.Quotation.Inspection (quoteAction, quoteIntegerSize, quoteIntegerAction, quoteIntegerPrimitive, quoteIntegerExpression, quoteBlockAction, helperDeclarations) where
 import Language.Haskell.TH (Q, Exp)
-import SolidVM.Quotation (inspect, helperDeclarations, integerSize, integerAction, blockAction)
+import SolidVM.Quotation (inspect, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, blockAction)
 quoteAction :: Q Exp -> Q Exp
 quoteAction = inspect
 
@@ -8,6 +8,12 @@ quoteIntegerSize :: String -> Q Exp
 quoteIntegerSize op = inspect (integerSize op)
 quoteIntegerAction :: String -> Q Exp -> Q Exp
 quoteIntegerAction op quotation = inspect (integerAction op quotation)
+
+quoteIntegerPrimitive :: String -> Q Exp
+quoteIntegerPrimitive op = inspect (integerAction op (integerPrimitive op))
+
+quoteIntegerExpression :: Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp
+quoteIntegerExpression = integerExpression inspect
 
 quoteBlockAction :: Q Exp -> Q Exp
 quoteBlockAction quotation = inspect (blockAction quotation)

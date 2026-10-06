@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, CPP, DataKinds, GADTs, TypeOperators, LambdaCase, OverloadedStrings #-}
 -- Quotations have two concrete build-time interpretations. Execution erases
 -- all inspection machinery; inspection substitutes the captured expressions.
-module SolidVM.Quotation (execute, inspect, helperDeclarations, integerSize, integerAction, blockAction) where
+module SolidVM.Quotation (execute, inspect, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, blockAction) where
 
 import Language.Haskell.TH hiding (Code)
 import Language.Haskell.TH.Syntax (liftData)
@@ -85,6 +85,57 @@ integerAction op quotation = do
       charge <- [| chargeOp $(pure (transform rename size)) |]
       pure (LamE [VarP a, VarP b] (InfixE (Just charge) (VarE '(>>)) (Just body)))
     _ -> fail "integer arithmetic quotation must have two value arguments"
+
+integerPrimitive :: String -> Q Exp
+integerPrimitive "+" = [| \a b -> pure (a + b) |]
+integerPrimitive "-" = [| \a b -> pure (a - b) |]
+integerPrimitive "*" = [| \a b -> pure (a * b) |]
+integerPrimitive _ = fail "unsupported fused integer operation"
+
+-- Fuse atomic reads and arithmetic in both backends at GHC build time.
+integerExpression :: (Q Exp -> Q Exp) -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp
+integerExpression backend operator left right after = do
+  op <- operator
+  lhs <- left
+  rhs <- right
+  finalCharge <- after
+  local <- newName "local"
+  (leftCharges, leftValue) <- applyRead local lhs >>= splitValue
+  (rightCharges, rightValue) <- applyRead local rhs >>= splitValue
+  alternatives <- mapM (\symbol -> do
+    primitive <- integerAction symbol (integerPrimitive symbol)
+    arithmetic <- case primitive of
+      LamE [VarP x, VarP y] body -> pure $ rename [(x, leftValue), (y, rightValue)] body
+      _ -> fail "integer primitive must have two value arguments"
+    (operationCharges, value) <- splitValue arithmetic
+    let body = DoE Nothing $ leftCharges ++ rightCharges ++ operationCharges ++
+          [NoBindS finalCharge, NoBindS (AppE (VarE 'pure) value)]
+        slotPattern = ConP '(:&) [] [VarP local, WildP]
+        environmentPattern
+          | headRead lhs || headRead rhs = slotPattern
+          | otherwise = WildP
+        expression = LamE [environmentPattern] body
+    emitted <- backend (pure expression)
+    pure $ Match (LitP (StringL symbol)) (NormalB (AppE (ConE 'Just) emitted)) []) ["+", "-", "*"]
+  pure $ CaseE op (alternatives ++ [Match WildP (NormalB (ConE 'Nothing)) []])
+  where
+    rename values = transform $ \e -> case e of
+      VarE n -> maybe e id (lookup n values)
+      _ -> e
+    headSlot (ParensP p) = headSlot p
+    headSlot (InfixP (VarP n) constructor WildP) | constructor == '(:&) = Just n
+    headSlot (ConP constructor [] [VarP n, WildP]) | constructor == '(:&) = Just n
+    headSlot _ = Nothing
+    headRead (LamE [p] _) = case headSlot p of Just _ -> True; _ -> False
+    headRead _ = False
+    applyRead local (LamE [p] body) | Just n <- headSlot p = pure (rename [(n, VarE local)] body)
+    applyRead _ (LamE [WildP] body) = pure body
+    applyRead _ _ = fail "atomic integer read must be a literal or the first local slot"
+    splitValue (InfixE (Just before) (VarE thenName) (Just value)) | thenName == '(>>) = do
+      (statements, result) <- splitValue value
+      pure (NoBindS before : statements, result)
+    splitValue (AppE (VarE pureName) value) | pureName == 'pure = pure ([], value)
+    splitValue _ = fail "atomic integer expression must contain charges followed by a pure value"
 
 blockAction :: Q Exp -> Q Exp
 blockAction quotation = do
