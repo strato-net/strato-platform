@@ -418,7 +418,10 @@ async function inspect(context, artifacts, options = {}) {
   else {
     const request = new ethers.FetchRequest(rpcUrl);
     request.timeout = TIMEOUT_MS;
-    const provider = options.provider || new ethers.JsonRpcProvider(request, undefined, { cacheTimeout: -1 });
+    const provider = options.provider || new ethers.JsonRpcProvider(request, undefined, {
+      batchMaxCount: 1,
+      cacheTimeout: -1,
+    });
     try {
       const identity = await check("external-identity", async () => {
         if ((await provider.getNetwork()).chainId !== BigInt(context.rollout.chainId)) throw new Error("External RPC chain ID mismatch");
@@ -514,17 +517,24 @@ async function inspect(context, artifacts, options = {}) {
     }
   }
   const ready = checks.every(({ status }) => status === "PASSED");
-  const passed = (name) => checks.find((item) => item.name === name)?.status === "PASSED";
+  const configurationStatus = (name) => {
+    const checkResult = checks.find((item) => item.name === name);
+    if (checkResult?.status === "PASSED") return "DONE";
+    return !checkResult || checkResult.error ? "UNVERIFIED" : "PENDING";
+  };
   const safeExecutionOrder = [
-    { step: "pause-router", path: artifacts.depositRouterPausePath, status: router?.paused === true ? "DONE" : "PENDING" },
-    { step: "pause-vault", path: artifacts.vaultPausePath, status: vaultState?.paused === true ? "DONE" : "PENDING" },
+    { step: "pause-router", path: artifacts.depositRouterPausePath,
+      status: router?.paused === true ? "DONE" : router?.paused === false ? "PENDING" : "UNVERIFIED" },
+    { step: "pause-vault", path: artifacts.vaultPausePath,
+      status: vaultState?.paused === true ? "DONE" : vaultState?.paused === false ? "PENDING" : "UNVERIFIED" },
     ...artifacts.depositRouterBatchPaths.map((file, index) =>
-      ({ step: `configure-router-${index + 1}`, path: file, status: passed("deposit-router") ? "DONE" : "PENDING" })),
+      ({ step: `configure-router-${index + 1}`, path: file, status: configurationStatus("deposit-router") })),
     ...(artifacts.vaultConfigurePath
-      ? [{ step: "configure-vault", path: artifacts.vaultConfigurePath, status: passed("vault-configuration") ? "DONE" : "PENDING" }]
+      ? [{ step: "configure-vault", path: artifacts.vaultConfigurePath, status: configurationStatus("vault-configuration") }]
       : []),
   ];
   const pendingSafeConfiguration = safeExecutionOrder.some(({ status }) => status === "PENDING");
+  const unverifiedSafeConfiguration = safeExecutionOrder.some(({ status }) => status === "UNVERIFIED");
   const report = {
     revision: context.revision, observedAt: new Date().toISOString(), checks, calls, activationChecksRequired,
     governance: source?.votingPolicy
@@ -543,7 +553,11 @@ async function inspect(context, artifacts, options = {}) {
       : calls.some(({ status }) => status === "READY") ? "Review READY governance calls and run vote with approvalHash" : !ready
       ? pendingSafeConfiguration
         ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun status"
-        : "Resolve failed readiness checks; no Safe configuration remains; rerun status"
+        : unverifiedSafeConfiguration
+          ? "EAB configuration could not be verified. Do not execute generated Safe files; rerun status after the failed reads recover"
+          : activationChecksRequired
+          ? "EAB step 6.1 is complete. Continue BRIDGE_ROLLOUT.md steps 6.2 (STRATO native routes), 6.3 (external native Safe), and 7 (verifiers and Runtime), then rerun status"
+          : "Resolve failed EAB readiness checks and rerun status"
       : router.paused ? "Review activation, then generate the Safe unpause file with activate --approve" : "Reconcile canary custody and issuance before declaring launch complete",
   };
   return { report, source, externalReady, router };
@@ -654,6 +668,65 @@ function recordedVoteCounts(calls, artifacts) {
   return calls.map(({ id }) => [...journals.values()].filter((journal) => journal[id]?.status === "VOTED").length);
 }
 
+function approvedCallsCompleted(artifacts, approval, currentCalls = []) {
+  if (!artifacts?.directory || !fs.existsSync(artifacts.directory)) return false;
+  const currentStatuses = new Map(currentCalls.map(({ id, status }) => [id, status]));
+  for (const file of fs.readdirSync(artifacts.directory).filter((name) => /^report-.*\.json$/.test(name))) {
+    const prior = readJson(path.join(artifacts.directory, file));
+    if (prior.approvalHash !== approval) continue;
+    const approvedCallIds = (prior.calls || [])
+      .filter(({ status }) => status === "READY")
+      .map(({ id }) => id);
+    if (approvedCallIds.length &&
+        approvedCallIds.every((id) => currentStatuses.get(id) === "COMPLETE")) return true;
+  }
+  return false;
+}
+
+function nativeDeploymentSteps(context, args) {
+  if (!context?.manifest?.settings?.depositPlan || !args?.manifest) return [];
+  const manifestDirectory = path.dirname(path.resolve(args.manifest));
+  const preparedDirectory = path.dirname(path.resolve(
+    manifestDirectory,
+    context.manifest.settings.depositPlan,
+  ));
+  const routesPath = path.join(preparedDirectory, "native-routes.json");
+  const nativePath = path.join(preparedDirectory, "native.json");
+  if (!fs.existsSync(routesPath) || !fs.existsSync(nativePath)) return [];
+  const repoRoot = path.resolve(__dirname, "../../..");
+  const rolloutDirectory = manifestDirectory;
+  const routeCount = readJson(routesPath).length;
+  const steps = [];
+  for (let route = 0; route < routeCount; route++) {
+    const command = `cd ${repoRoot}/app/contracts && npm run configure:native-route -- --config ${routesPath} --route ${route} --enabled false --auto-route-enabled false`;
+    steps.push({
+      step: `6.2.${route + 1}`,
+      action: `DRY_RUN_NATIVE_ROUTE_${route}`,
+      run: command,
+      then: `Each required STRATO administrator reruns this exact command with --execute; wait for execution${route + 1 < routeCount ? ` before route ${route + 1}` : " before external native Safe configuration"}.`,
+    });
+  }
+  const nativeSafe = path.join(rolloutDirectory, "native-configure.safe.json");
+  steps.push({
+    step: "6.3",
+    action: "GENERATE_NATIVE_SAFE_CONFIGURATION",
+    run: `cd ${repoRoot}/app/ethereum && npm run native:configure -- --config ${nativePath} --stage configure --output ${nativeSafe}`,
+    then: `Safe owners review and execute ${nativeSafe}.`,
+  });
+  steps.push({
+    step: "6.3 verify",
+    action: "VERIFY_NATIVE_SAFE_CONFIGURATION",
+    run: `cd ${repoRoot}/app/ethereum && npm run native:configure -- --config ${nativePath} --stage configure`,
+    then: "Require 0 pending native configuration calls before service deployment.",
+  });
+  steps.push({
+    step: "7",
+    action: "DEPLOY_VERIFIERS_AND_RUNTIME",
+    then: "Start all three reviewed verifier stacks and Runtime, set BRIDGE_HEALTH_URL, then rerun EAB status.",
+  });
+  return steps;
+}
+
 function operatorGuidance(report, args, artifacts, context, environmentFile) {
   const common = args.config ? [`--config ${args.config}`] : [`--manifest ${args.manifest}`];
   if (!args.config && args["output-dir"]) common.push(`--output-dir ${args["output-dir"]}`);
@@ -679,8 +752,36 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
     ].filter(Boolean),
     runtimeServiceVariables: "Not rollout inputs; fill the generated bridge/verifier env templates only when deploying services.",
   };
+  if (report.previousStageCompleted) {
+    return {
+      action: "The previously approved stage completed. Run status to review the next stage.",
+      stageExecuted: true,
+      safeChecklist,
+      environment,
+      resumeCommand,
+    };
+  }
   if (report.operationError) {
+    if (report.operationError.startsWith("Approval is stale")) {
+      return {
+        action: "The approval no longer matches live state, and completion of its approved calls could not be confirmed. Run status and review the current stage.",
+        approvalInvalidated: true,
+        safeChecklist,
+        environment,
+        resumeCommand,
+      };
+    }
     return { action: "The operation submitted no new work. Resolve the error and rerun resume.", safeChecklist, environment, resumeCommand };
+  }
+  const safeAction = safeChecklist?.find(({ status }) => status === "PENDING");
+  if (safeAction) {
+    return {
+      action: "Execute the next generated Safe transaction, then rerun status.",
+      safeAction,
+      safeChecklist,
+      environment,
+      resumeCommand,
+    };
   }
   const ready = report.calls?.filter(({ status }) => status === "READY") || [];
   if (ready.length) {
@@ -712,7 +813,9 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
       return counts;
     }, {})).map(([method, count]) => ({ method, count }));
     const voteCommand = `npm run external:rollout -- vote ${common.join(" ")} --approve ${report.approvalHash}`;
-    const adminHandoffCommand = `npm run external:rollout -- vote --approve ${report.approvalHash}`;
+    const adminHandoffCommand = args.config
+      ? `npm run external:rollout -- vote --approve ${report.approvalHash}`
+      : voteCommand;
     const voteState = !requirementsKnown ? "GOVERNANCE_THRESHOLD_UNAVAILABLE"
       : maximumRemainingVotes === 0 ? "WAITING_FOR_EXECUTION"
       : maximumRemainingVotes === 1 && minimumRecordedVotes === 1 &&
@@ -748,12 +851,15 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
       action: "All governance and verification gates pass. Review and generate the Safe unpause transaction.",
       safeChecklist,
       environment,
-      activateCommand: `npm run external:rollout -- activate --approve ${report.approvalHash}`,
+      activateCommand: `npm run external:rollout -- activate ${common.join(" ")} --approve ${report.approvalHash}`,
     };
   }
+  const nextSteps = report.activationChecksRequired && safeChecklist?.every(({ status }) => status === "DONE")
+    ? nativeDeploymentSteps(context, args) : [];
   return {
     action: report.next,
     failedChecks: report.checks?.filter(({ status }) => status === "FAILED").map(({ name }) => name) || [],
+    nextSteps,
     safeChecklist,
     environment,
     resumeCommand,
@@ -763,6 +869,24 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
 function terminalSummary(report, reportFile) {
   const operator = report.operator || {};
   const details = reportFile;
+  if (operator.stageExecuted) {
+    return {
+      status: "STAGE_EXECUTED",
+      action: "RERUN_STATUS",
+      run: operator.resumeCommand,
+      then: "Review the next stage and use only its newly reported approval hash.",
+      details,
+    };
+  }
+  if (operator.approvalInvalidated) {
+    return {
+      status: "APPROVAL_INVALIDATED",
+      action: "RERUN_STATUS",
+      run: operator.resumeCommand,
+      then: "Review live state before submitting any further transaction.",
+      details,
+    };
+  }
   if (report.activationFile) {
     return {
       status: "ACTION_REQUIRED",
@@ -796,6 +920,16 @@ function terminalSummary(report, reportFile) {
       action: "ADMIN_2_VOTE",
       run: operator.adminHandoffCommand,
       then: "The coordinator runs status after Admin 2 votes.",
+      details,
+    };
+  }
+  if (operator.safeAction) {
+    return {
+      status: "ACTION_REQUIRED",
+      action: "EXECUTE_SAFE_TRANSACTION",
+      step: operator.safeAction.step,
+      file: operator.safeAction.path,
+      then: "Run status again after the Safe transaction executes.",
       details,
     };
   }
@@ -868,7 +1002,8 @@ function terminalSummary(report, reportFile) {
   return {
     status: report.status,
     action: operator.action || report.next,
-    run: operator.resumeCommand,
+    run: operator.nextSteps?.[0]?.run || operator.resumeCommand,
+    nextSteps: operator.nextSteps?.length ? operator.nextSteps : undefined,
     failedChecks: operator.failedChecks?.length ? operator.failedChecks : undefined,
     details,
   };
@@ -966,9 +1101,15 @@ async function main(argv = process.argv.slice(2)) {
             report.next = "Review and execute this Safe transaction manually, then run resume and reconcile the canary";
           }
         } catch (error) {
-          report.operationError = redactFor(context, error.message);
-          report.status = "OPERATION_FAILED";
-          process.exitCode = 1;
+          const staleApproval = error.message.startsWith("Approval is stale");
+          if (staleApproval && approvedCallsCompleted(artifacts, args.approve, report.calls)) {
+            report.previousStageCompleted = true;
+            report.status = "STAGE_EXECUTED";
+          } else {
+            report.operationError = redactFor(context, error.message);
+            report.status = staleApproval ? "APPROVAL_INVALIDATED" : "OPERATION_FAILED";
+            process.exitCode = 1;
+          }
         }
       }
     }
@@ -982,4 +1123,4 @@ async function main(argv = process.argv.slice(2)) {
 }
 
 if (require.main === module) main().catch((error) => { console.error(redact(error.message)); process.exitCode = 1; });
-module.exports = { parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl, normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, recordedIssueIds, fetchLiveAdminVoteCounts, sourceState, checkImplementations, inspect, vote, activate, recordedVoteCounts, operatorGuidance, terminalSummary, main };
+module.exports = { parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl, normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, recordedIssueIds, fetchLiveAdminVoteCounts, sourceState, checkImplementations, inspect, vote, activate, recordedVoteCounts, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary, main };

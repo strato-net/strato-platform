@@ -732,7 +732,7 @@ const validatePolicyAgainstContracts = async (): Promise<void> => {
           externalToken: route.externalToken,
           stratoToken: route.stratoToken,
           action: route.autoRouteEnabled ? "4" : "0",
-        } as DepositSettlementAttestation),
+        } as DepositSettlementAttestation, true),
       ),
     ...verifierPolicy.tokens
       .filter(({ withdrawalsEnabled }) => withdrawalsEnabled)

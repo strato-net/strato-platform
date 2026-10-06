@@ -22,6 +22,16 @@ function readManifestOutput(manifestDirectory, file, label) {
   return readJson(resolvedPath, label);
 }
 
+async function queryFilterInChunks(contract, filter, fromBlock, provider) {
+  const latestBlock = await provider.getBlockNumber();
+  const events = [];
+  for (let start = fromBlock; start <= latestBlock; start += 500) {
+    const end = Math.min(start + 499, latestBlock);
+    events.push(...await contract.queryFilter(filter, start, end));
+  }
+  return events;
+}
+
 function buildExpectedConfiguration(manifest, manifestDirectory) {
   const chainId = Number(manifest.chainId);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) {
@@ -120,10 +130,11 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
     contract.paused(),
     contract.owner(),
     contract.externalBridgeVault(),
-    contract.queryFilter(
+    queryFilterInChunks(
+      contract,
       contract.filters.RoutePermittedUpdated(),
       expected.deploymentBlock,
-      "latest",
+      provider,
     ),
   ]);
   const errors = [];

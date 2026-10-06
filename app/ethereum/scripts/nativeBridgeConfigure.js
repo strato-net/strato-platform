@@ -79,10 +79,15 @@ async function main(argv) {
     if (!["--config", "--stage", "--output"].includes(argv[i]) || !argv[i + 1] || args[argv[i]]) throw new Error("Use --config FILE --stage configure|activate|verify [--output FILE]");
     args[argv[i]] = argv[i + 1];
   }
-  if (!args["--config"] || !args["--stage"] || (args["--stage"] !== "verify" && !args["--output"])) throw new Error("Missing config, stage or output");
+  if (!args["--config"] || !args["--stage"] || (args["--stage"] === "activate" && !args["--output"])) {
+    throw new Error("Missing config or stage; activate also requires output");
+  }
   require("dotenv").config({ quiet: true });
   const input = JSON.parse(fs.readFileSync(args["--config"], "utf8"));
-  const provider = new ethers.JsonRpcProvider(getRpcUrl(input.chainId));
+  const provider = new ethers.JsonRpcProvider(getRpcUrl(input.chainId), undefined, {
+    batchMaxCount: 1,
+    cacheTimeout: -1,
+  });
   try {
     const result = await plan(input, provider, args["--stage"]);
     if (args["--output"]) {

@@ -395,10 +395,15 @@ Follow only the command printed by `status`. In order:
 1. Safe owners execute pending pause/configuration JSON from `safeChecklist`.
 2. Each STRATO admin executes the printed vote command using its own profile.
 3. Rerun `status` after each Safe execution or vote.
-4. Stop after Safe configuration and STRATO governance are complete. If service
-   health is still pending, continue with step 7. Do not activate yet.
+4. Stop after EAB Safe configuration and STRATO governance through route/rebase
+   configuration are complete. Continue with steps 6.2 and 6.3; do not skip
+   directly to service deployment or activation.
 
 Approval hashes are state-specific. Never reuse one from an older report.
+
+`external:rollout status` covers EAB only. It does not replace the native
+checks below. The required combined order is 6.1 EAB, 6.2 STRATO native routes,
+6.3 external native Safe configuration, 7 service readiness, then 8 activation.
 
 ### 6.2 Native route on STRATO
 
@@ -415,6 +420,9 @@ npm run configure:native-route -- \
 
 Review the exact calls. Every required admin reruns the same command with
 `--execute`. Do not change arguments between voters.
+
+Complete each route index in numerical order. Wait for every AdminRegistry issue
+for an index to execute before moving to the next index.
 
 `sharedTokenSettings` in `native-routes.json` are not applied automatically.
 When approved settings are missing or changing, add all three flags to one
@@ -444,6 +452,9 @@ npm run native:configure -- \
 Safe owners review and execute it. It pauses the bridge when needed, configures
 signers, executor permissions, token mappings and transfer controls. Output
 files are immutable; use a new filename if configuration must be regenerated.
+
+After execution, rerun the same command with `--stage configure` and without
+`--output`. Require `0 pending calls` before continuing to step 7.
 
 ## 7. Deploy services and pass readiness
 

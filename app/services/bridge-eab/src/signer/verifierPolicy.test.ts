@@ -228,6 +228,21 @@ const loadSignerChecks = (names: string[], context: Record<string, unknown>) => 
   }).outputText + `\n({${names.join(",")}})`, context);
 };
 
+test("verifier startup permits AUTO_ROUTE to remain disabled until activation", async () => {
+  const calls: unknown[][] = [];
+  const { validatePolicyAgainstContracts } = loadSignerChecks(["validatePolicyAgainstContracts"], {
+    sourceBridge: policy.sourceBridge,
+    destinationChainId: BigInt(policy.destinationChainId),
+    verifierPolicy: { ...policy, routes: [{ ...policy.routes[0], autoRouteEnabled: true }], tokens: [] },
+    stratoGet: async () => ({ data: [{ MAX_AUTHORIZATION_VALIDITY_SECONDS: "3600" }] }),
+    vault: { maxAuthorizationValiditySeconds: async () => 3600n },
+    validateSourceDepositRoute: async (...args: unknown[]) => { calls.push(args); },
+  });
+  await validatePolicyAgainstContracts();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][1], true);
+});
+
 test("pins actual RPC identities without truncating STRATO network IDs", async () => {
   let externalId = "0x1";
   let networkID: string | undefined = "123456789012345678901234";

@@ -11,7 +11,7 @@ const {
 const {
   parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl,
   normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, fetchLiveAdminVoteCounts,
-  vote, activate, inspect, operatorGuidance, terminalSummary,
+  vote, activate, inspect, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary,
 } = require("../scripts/externalBridgeRollout");
 const { verifyUninitializedProxy } = require("../../contracts/deploy/external-bridge-verification");
 
@@ -283,12 +283,24 @@ test("operator guidance identifies first and second administrator vote state", (
     }],
   };
   let guidance = operatorGuidance(report, args, artifacts);
+  assert.equal(guidance.safeAction.step, "pause-router");
+  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
+    status: "ACTION_REQUIRED",
+    action: "EXECUTE_SAFE_TRANSACTION",
+    step: "pause-router",
+    file: "/secure/router-pause.json",
+    then: "Run status again after the Safe transaction executes.",
+    details: "/secure/report.json",
+  });
+  report.safe.executionOrder[0].status = "DONE";
+  guidance = operatorGuidance(report, args, artifacts);
   assert.equal(guidance.currentStage, "6/12: settlement verifier threshold");
   assert.deepEqual(guidance.readyMethods, [{ method: "setSettlementVerifierThreshold", count: 1 }]);
   assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED");
   assert.equal(guidance.safeChecklist[0].step, "pause-router");
   assert.match(guidance.voteCommand, /external:rollout -- vote/);
   assert.match(guidance.voteCommand, new RegExp(report.approvalHash));
+  assert.equal(guidance.adminHandoffCommand, guidance.voteCommand);
   assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
     status: "ACTION_REQUIRED",
     step: "6/12: settlement verifier threshold",
@@ -338,9 +350,49 @@ test("operator guidance identifies first and second administrator vote state", (
     safe: { executionOrder: [] },
   }, args, artifacts);
   assert.equal(guidance.activateCommand,
-    `npm run external:rollout -- activate --approve ${"b".repeat(64)}`);
+    `npm run external:rollout -- activate --manifest /secure/manifest.json --output-dir /secure/output --stage activation --approve ${"b".repeat(64)}`);
   assert.equal(terminalSummary({ operator: guidance }, "/secure/report.json").action,
     "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION");
+  guidance = operatorGuidance({ operationError: "Approval is stale; review a fresh resume report" }, args, artifacts);
+  assert.deepEqual(terminalSummary({ status: "APPROVAL_INVALIDATED", operator: guidance }, "/secure/report.json"), {
+    status: "APPROVAL_INVALIDATED",
+    action: "RERUN_STATUS",
+    run: "npm run external:rollout -- status --manifest /secure/manifest.json --output-dir /secure/output --stage activation",
+    then: "Review live state before submitting any further transaction.",
+    details: "/secure/report.json",
+  });
+  writeJson(path.join(directory, "report-prior.json"), {
+    approvalHash: "c".repeat(64),
+    calls: [{ id: "completed-call", status: "READY" }],
+  });
+  assert.equal(approvedCallsCompleted(
+    artifacts,
+    "c".repeat(64),
+    [{ id: "completed-call", status: "COMPLETE" }],
+  ), true);
+  guidance = operatorGuidance({ previousStageCompleted: true }, args, artifacts);
+  assert.equal(terminalSummary({ status: "STAGE_EXECUTED", operator: guidance }, "/secure/report.json").status,
+    "STAGE_EXECUTED");
+});
+
+test("combined rollout guidance emits ordered native and service steps", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "combined-rollout-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const prepared = path.join(root, "prepared");
+  fs.mkdirSync(prepared);
+  writeJson(path.join(prepared, "native-routes.json"), [{}, {}]);
+  writeJson(path.join(prepared, "native.json"), {});
+  const steps = nativeDeploymentSteps({
+    manifest: { settings: { depositPlan: path.join(prepared, "deposit-plan.json") } },
+  }, { manifest: path.join(root, "deployment-manifest.json") });
+  assert.equal(steps.length, 5);
+  assert.match(steps[0].run, /--route 0 --enabled false --auto-route-enabled false$/);
+  assert.match(steps[1].run, /--route 1 --enabled false --auto-route-enabled false$/);
+  assert.equal(steps[2].action, "GENERATE_NATIVE_SAFE_CONFIGURATION");
+  assert.equal(steps[3].action, "VERIFY_NATIVE_SAFE_CONFIGURATION");
+  assert.match(steps[3].run, /--stage configure$/);
+  assert.doesNotMatch(steps[3].run, /--output/);
+  assert.equal(steps[4].action, "DEPLOY_VERIFIERS_AND_RUNTIME");
 });
 
 test("rollout automatically loads deployment.env beside the manifest", (t) => {
@@ -678,6 +730,7 @@ test("missing external access and verifier setup produce a pending consolidated 
   assert.equal(strato.status, "PENDING");
   assert(strato.data.errors.length);
   assert.equal(inspection.report.checks.find(({ name }) => name === "external").status, "FAILED");
+  assert(inspection.report.safe.executionOrder.every(({ status }) => status === "UNVERIFIED"));
   assert.equal(inspection.report.checks.find(({ name }) => name === "verifiers").status, "DEFERRED");
   assert.equal(inspection.report.checks.find(({ name }) => name === "bridge-health").status, "DEFERRED");
 });
@@ -817,7 +870,12 @@ test("router scanner supports active-state reconciliation without changing its p
     "function routePermitted(address,address) view returns (bool)",
   ]);
   const provider = {
-    getNetwork: async () => ({ chainId: 11155111n }), getCode: async () => "0x01", getLogs: async () => [],
+    getNetwork: async () => ({ chainId: 11155111n }), getBlockNumber: async () => 2234,
+    getCode: async () => "0x01",
+    getLogs: async ({ fromBlock, toBlock }) => {
+      assert(Number(toBlock) - Number(fromBlock) <= 499);
+      return [];
+    },
     call: async (transaction) => {
       const parsed = abi.parseTransaction(transaction);
       const values = { paused: [false], owner: [addr("1")], externalBridgeVault: [addr("2")], tokenConfig: [1n, true], routePermitted: [true] };
