@@ -1,6 +1,6 @@
-{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase, CPP, TemplateHaskell #-}
 -- Builtins are ordinary actions. Selection happens while compiling the call.
-module SolidVM.Builtins (lookupAction, derive, missingUserCert, invalidLowLevel) where
+module SolidVM.Builtins where
 
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
@@ -24,23 +24,6 @@ import Numeric (showHex)
 import SolidVM.Core
 import Text.Printf (printf)
 import Text.Read (readEither, readMaybe)
-
-lookupAction :: T.Text -> Maybe ([Dyn] -> M Dyn)
-lookupAction = \case
-  "keccak256" -> Just keccak
-  "ecrecover" -> Just recover
-  "addmod" -> Just (modular (+))
-  "mulmod" -> Just (modular (*))
-  "string" -> Just string
-  "decimal" -> Just decimal
-  "int" -> Just integer
-  "address" -> Just address
-  "abiEncode" -> Just (encode False)
-  "abiEncodePacked" -> Just (encode True)
-  "selfdestruct" -> Just destroy
-  "create" -> Just (create False)
-  "create2" -> Just (create True)
-  _ -> Nothing
 
 flatten :: [Dyn] -> [Dyn]
 flatten ds = case reverse ds of
@@ -206,3 +189,7 @@ encodeValue (Dyn ty v) = case ty of
     fields :: Fields ts -> HL ts -> [(T.Text, Dyn)]
     fields FNil HNil = []
     fields (FCons n t rest) (x :* xs) = (n, Dyn t x) : fields rest xs
+
+$( [d|
+#include "BuiltinActions.inc"
+  |])

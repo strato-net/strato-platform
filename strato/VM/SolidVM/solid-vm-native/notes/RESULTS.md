@@ -714,3 +714,123 @@ stopped and QA `mynode` was removed. Helium was not tested or changed.
 Artifacts: `/tmp/solid-vm-native-integration/features-independent-complete/`
 contains the full VM/lifecycle logs, caught-up block, timing, and metadata;
 `architecture-refactor/` contains the build logs and differential comparison.
+
+
+## 2026-10-05 — Inspectable compiled Haskell
+
+`solid-vm-source FILE [CONTRACT]` emits a Haskell module containing the compiled
+action definitions and their captured values. Execution and inspection instantiate
+one shared compiler body (`Compiler.inc`); action expressions are shared Haskell
+quotations. Builtin selection shares `BuiltinActions.inc`. GHC interprets these
+quotations when building STRATO. No Haskell compiler is invoked or shipped for
+contract compilation or source inspection.
+
+The execution instantiation uses the identity representation (`Code a = a`),
+with inline identity annotation helpers. It stores no source graph and uses no
+runtime backend dictionaries. The inspection instantiation builds a graph only
+on request. Its renderer preserves shared captures, supplies GADT types, and
+includes the actual referenced function and constructor variants. Source is
+verbose and depends on the package's existing action helpers rather than
+expanding those helpers into every function body.
+
+Generated PriceOracle and Rewards modules both pass development GHC typechecking.
+A generated example containing a constructor, public getter, internal calls,
+loop, and event executes with returns `[10,12,5,10]`, gas 104, and the expected
+Updated event. All 60,683 native GAS/CHECK records remain byte-identical to the
+pre-change native suite; the 128 interpreter return/event/action comparisons
+also match. The execution compiler has no runtime references to inspection modules;
+the stripped VM binary contains no inspection module or selector strings. These GHC checks and microbenchmarks are temporary development tools,
+not installed runtime compilation services.
+
+An isolated 10,000-compilation PriceOracle benchmark measured the original at
+0.504–0.509 seconds and the final executable compiler at 0.502–0.503 seconds.
+Allocations were approximately 3.132 GB versus 3.132 GB (slightly lower for the
+new compiler), showing no added construction allocation in this workload.
+Moving loop/comparison helpers out of local scope initially changed execution
+optimization. Explicit INLINE pragmas restored the loop benchmark's allocation
+to exactly the original count. Direct execution timings still differed by a
+few percent in some trials; zero execution overhead is not established.
+
+A clean full Upquark replay caught the live tip at **554,318**, including the
+indexer, with **zero state-root mismatches**. Its tip timestamp is recorded in
+the caught-up-block artifact. That run preceded the final two INLINE pragmas;
+subsequent clean 300-second runs checked the final binary without mismatches.
+An earlier full replay was interrupted by an external Docker package upgrade
+restarting Docker; no STRATO shutdown or restart handling was changed.
+
+All heights below are measured from the VM log timestamp of block 1:
+
+| Run | Original native | Inspectable compiler, final INLINE adjustment |
+| --- | ---: | ---: |
+| First fresh pair | 166,187 | 163,793 |
+| Reverse-order repeat | 164,499 | 163,832 |
+
+The averages are 165,343 versus 163,812.5: **0.93% fewer blocks** for the new
+compiler. The repeat pair differs by **0.41%**. The historical original reference
+was 170,571, so today's baseline is also below that measurement. Earlier new
+compiler runs ranged from 159,109 to 170,420. These measurements exclude a large
+regression but do not demonstrate an exactly zero performance cost. No build or
+correctness benchmark overlapped a measured 300-second window.
+
+The final tested native binary SHA256 is
+`6d7474f7f25e363f8ba4d693f1808d5cbcd25f83a63dc5585c198ab9151ab55c`.
+Tests used only strato-up/strato-down with fully cleared QA state. The temporary
+VM-runner package substitution was restored after testing. No changes were
+committed, and Helium was not tested or changed.
+
+Artifacts: `/tmp/solid-vm-source-work/` contains emitted Haskell, development
+execution/typechecking logs, construction/runtime microbenchmarks, and build
+logs. `/tmp/solid-vm-native-integration/features-haskell-source-complete/` contains
+the full replay; `features-haskell-source-{baseline,inline}-{paired,repeat}/`
+contains the fresh timing comparisons and their binaries' recorded hashes.
+
+
+## 2026-10-05 — Recovering optimization scope for inspectable actions
+
+The complete source-inspection implementation before this experiment is saved
+in `/tmp/solid-vm-source-local-helpers/source-feature-before.tar.gz`. Inspection
+remains available; no commits were made.
+
+The optimized GHC Core identified a concrete execution difference. The previous
+source-capable compiler retained two calls to the top-level `loop` factory in
+its statement compiler despite the INLINE pragma. The original compiler did
+not retain these calls. Those calls partially applied a four-argument helper,
+leaving the environment argument for action execution. Moving the shared helper
+bodies into local action bindings removed the calls from the optimized factory
+code. This supports helper placement as the source of the slowdown; it does
+not prove that loop placement alone accounts for every timing difference.
+
+`HelperActions.inc` now holds the single definitions of comparison, decimal
+rounding, bounds checking, typed function application, loops, and argument
+snapshotting. Build-time quotations insert the relevant definitions locally
+in both execution and inspection. The generated module therefore shows the
+same local definitions. Source rendering now separates equations of local
+functions when printing explicit-brace lets; TH's default printing otherwise
+omitted the necessary equation separators.
+
+In four direct loop-execution comparisons, the original averaged **0.771867 s**
+and the local-helper compiler **0.766172 s** (about **0.74% faster**). The measured
+execution allocation was slightly lower, not higher. PriceOracle compilation
+remained approximately **0.515 s per 10,000 compilations** for both versions;
+the new version again allocated slightly less. These are small workloads and
+are evidence about the affected code, not a universal performance guarantee.
+
+A fresh clean Upquark run reached **166,499 at 300 seconds from block 1**, with
+zero state-root mismatches. The previous source-capable binary reached
+163,793 and 163,832; fresh original-native runs reached 166,187 and 164,499.
+The local-helper result is **1.64% above** the previous source-capable average
+and is slightly above both fresh original-native measurements. This follow-up replay stopped after the measurement window;
+the preceding full replay already reached live block 554,318.
+
+All **60,683 GAS/CHECK records** still exactly match the pre-change native
+suite. Generated PriceOracle and Rewards Haskell typecheck, and the generated
+example still returns `[10,12,5,10]`, charges gas 104, and emits Updated(value10).
+The tested native VM-runner SHA256 is
+`bdcfe7c4136b3d202cde0db3abf9e07cac4a35c9a0e6d4c27020a0eef77f34d8`.
+
+Artifacts: `/tmp/solid-vm-source-local-helpers/` contains before/after/original
+optimized Core, the shared-code backup, emitted modules, typechecking and
+execution checks, microbenchmarks, and build logs. The sync artifacts are under
+`/tmp/solid-vm-native-integration/features-haskell-source-local-helpers/`.
+Caller package choices were restored afterward, QA services stopped, and fresh
+QA state was removed. No other optimizations or shutdown changes were made.

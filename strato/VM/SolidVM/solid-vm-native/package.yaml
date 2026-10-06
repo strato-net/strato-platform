@@ -1,5 +1,9 @@
 name: solid-vm-native
 license: Apache-2.0
+extra-source-files:
+  - src/SolidVM/Compiler.inc
+  - src/SolidVM/BuiltinActions.inc
+  - src/SolidVM/HelperActions.inc
 
 dependencies:
   - base
@@ -9,6 +13,9 @@ library:
   exposed-modules:
     - SolidVM.Core
     - SolidVM.Compile
+    - SolidVM.Source
+    - SolidVM.SourceCode
+    - SolidVM.Quotation
     - SolidVM.Gas
     - SolidVM.Values
     - SolidVM.Events
@@ -51,6 +58,7 @@ library:
     - lrucache
     - time
     - transformers
+    - template-haskell
     - blockapps-datadefs
     - data-default
     - format
@@ -79,3 +87,20 @@ tests:
     - unliftio
     - vector
     - vm-tools
+
+executables:
+  solid-vm-source:
+    source-dirs: app
+    main: Source.hs
+    ghc-options: -O2 -threaded -rtsopts
+    dependencies:
+      - solid-vm-native
+      - solid-vm-compiler
+      - strato-model
+      - vm-tools
+      - common-log
+      - composable-monads-base
+      - hflags
+      - bytestring
+      - text
+      - unliftio

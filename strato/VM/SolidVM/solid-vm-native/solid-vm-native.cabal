@@ -8,11 +8,18 @@ name:           solid-vm-native
 version:        0.0.0
 license:        Apache-2.0
 build-type:     Simple
+extra-source-files:
+    src/SolidVM/Compiler.inc
+    src/SolidVM/BuiltinActions.inc
+    src/SolidVM/HelperActions.inc
 
 library
   exposed-modules:
       SolidVM.Core
       SolidVM.Compile
+      SolidVM.Source
+      SolidVM.SourceCode
+      SolidVM.Quotation
       SolidVM.Gas
       SolidVM.Values
       SolidVM.Events
@@ -23,6 +30,10 @@ library
       Blockchain.SolidVM
       Blockchain.SolidVM.Simple
   other-modules:
+      SolidVM.BuiltinQuotation
+      SolidVM.BuiltinSource
+      SolidVM.Quotation.Execution
+      SolidVM.Quotation.Inspection
       Paths_solid_vm_native
   reexported-modules:
       solid-vm:Blockchain.SolidVM.SM
@@ -58,12 +69,34 @@ library
     , source-tools
     , strato-conf
     , strato-model
+    , template-haskell
     , text
     , time
     , transformers
     , unliftio
     , utf8-string
     , vector
+    , vm-tools
+  default-language: Haskell2010
+
+executable solid-vm-source
+  main-is: Source.hs
+  other-modules:
+      Paths_solid_vm_native
+  hs-source-dirs:
+      app
+  ghc-options: -O2 -threaded -rtsopts
+  build-depends:
+      base
+    , bytestring
+    , common-log
+    , composable-monads-base
+    , hflags
+    , solid-vm-compiler
+    , solid-vm-native
+    , strato-model
+    , text
+    , unliftio
     , vm-tools
   default-language: Haskell2010
 

@@ -93,6 +93,40 @@ The compiler and strict typechecker:
 compileCollection :: CodeCollection -> CompiledCollection
 ```
 
+### Inspecting compiled Haskell
+
+After the root `make` build, emit a contract's action definitions with:
+
+```bash
+solid-vm-source contract.sol ContractName > CompiledContracts.hs
+```
+
+Printed functions retain their Solidity names with a contract prefix, such as
+`priceOracle_getAssetPrice`. Conflicting overloads or generated variants receive
+short numeric suffixes. Imports use public, unqualified names where possible;
+collisions retain short module qualifiers.
+
+Omit `ContractName` to emit the whole source collection. A selected contract's
+referenced internal functions and constructor stages are included. The generated
+module imports the existing SolidVM action helpers and can be compiled against
+`solid-vm-native` in a development environment. STRATO does not invoke GHC to
+compile contracts or produce this dump.
+
+`Compile.hs` and `Source.hs` instantiate the same `Compiler.inc`. Action
+expressions are Haskell quotations interpreted at the time GHC builds the
+package: execution emits the original expression; inspection retains that
+expression and substitutes its captured values. Builtin selection likewise
+shares `BuiltinActions.inc`. Runtime helpers share `HelperActions.inc` and
+are inserted as local definitions in both interpretations, preserving the
+execution optimizer's scope. There is one typechecker and one set of compiler
+cases to maintain.
+
+The executable instantiation uses `type Code a = a`. It allocates ordinary
+closures, with no attached source, inspection tuples, or runtime backend
+dictionaries. Source annotations are inline identities in that instantiation.
+Inspection builds its expression graph only on request, preserving shared
+captures and giving GADT closures explicit types for the emitted module.
+
 ### Execution modules
 
 - `SolidVM.Builtins`: handwritten actions selected by the compiler. Pure
