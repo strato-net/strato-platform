@@ -467,7 +467,7 @@ const OperatorPanel = ({
             <h2 className="text-lg font-semibold">{isV2 && validator ? `You operate ${validatorLabel}` : "Operator"}</h2>
             <p className="text-sm text-muted-foreground">
               {active
-                ? "Claim validator rewards, update commission, or manage self-bond."
+                ? "Claim validator rewards here; commission and self-bond are under Edit."
                 : "Claim accrued validator rewards or unbond existing self-bond."}
             </p>
             {validator && validatorSetDeployed && (
@@ -479,6 +479,7 @@ const OperatorPanel = ({
                     display={truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6)}
                   />
                 ) : <span>not set</span>}
+                <span>· Self-bond {formatToken(validator.selfBond, decimals)} {symbol}</span>
                 <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
                 {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
               </p>
@@ -537,7 +538,7 @@ const OperatorPanel = ({
           </div>
         </div>
 
-        <div className={active || selfBond > 0n ? "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" : "mt-4 grid grid-cols-1 gap-3"}>
+        <div className="mt-4">
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
@@ -558,69 +559,6 @@ const OperatorPanel = ({
             )}
           </div>
 
-          {(active || selfBond > 0n) && (
-            <div className="rounded-md bg-muted/30 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Self-Bond</p>
-                  <p className="mt-1 font-semibold">{formatToken(validator?.selfBond, decimals)} {symbol}</p>
-                </div>
-                {active && (
-                  <p className="text-xs text-muted-foreground">Wallet {formatToken(walletBalance, decimals)}</p>
-                )}
-              </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {active && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <label className="text-xs font-medium">Add</label>
-                      <button
-                        type="button"
-                        className="text-xs font-medium text-primary disabled:text-muted-foreground"
-                        onClick={() => setSelfBondAmount(formatAmountInput(wallet, decimals))}
-                        disabled={submitting || wallet <= 0n}
-                      >
-                        Max
-                      </button>
-                    </div>
-                    <Input
-                      value={selfBondAmount}
-                      onChange={(event) => setSelfBondAmount(event.target.value)}
-                      placeholder={`0 ${symbol}`}
-                      inputMode="decimal"
-                      disabled={submitting}
-                    />
-                    <Button className="w-full" size="sm" onClick={submitSelfBond} disabled={!selfBondReady || submitting}>
-                      {buttonLabel("bond", "Bond", "Bonding")}
-                    </Button>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <label className="text-xs font-medium">Unbond</label>
-                    <button
-                      type="button"
-                      className="text-xs font-medium text-primary disabled:text-muted-foreground"
-                      onClick={() => setSelfUnbondAmount(formatAmountInput(selfBond, decimals))}
-                      disabled={submitting || selfBond <= 0n}
-                    >
-                      Max
-                    </button>
-                  </div>
-                  <Input
-                    value={selfUnbondAmount}
-                    onChange={(event) => setSelfUnbondAmount(event.target.value)}
-                    placeholder={`0 ${symbol}`}
-                    inputMode="decimal"
-                    disabled={submitting || selfBond <= 0n}
-                  />
-                  <Button className="w-full" variant="outline" size="sm" onClick={submitSelfUnbond} disabled={!selfUnbondReady || submitting}>
-                    {buttonLabel("self-unbond", "Unbond", "Unbonding")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {profileDraft && (
@@ -662,6 +600,69 @@ const OperatorPanel = ({
                   </Button>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">Commission changes are a separate transaction from the profile.</p>
+              </div>
+            )}
+            {(active || selfBond > 0n) && (
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Self-Bond</p>
+                    <p className="mt-1 font-semibold">{formatToken(validator?.selfBond, decimals)} {symbol}</p>
+                  </div>
+                  {active && (
+                    <p className="text-xs text-muted-foreground">Wallet {formatToken(walletBalance, decimals)}</p>
+                  )}
+                </div>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2 md:max-w-xl">
+                  {active && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-xs font-medium">Add</label>
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-primary disabled:text-muted-foreground"
+                          onClick={() => setSelfBondAmount(formatAmountInput(wallet, decimals))}
+                          disabled={submitting || wallet <= 0n}
+                        >
+                          Max
+                        </button>
+                      </div>
+                      <Input
+                        value={selfBondAmount}
+                        onChange={(event) => setSelfBondAmount(event.target.value)}
+                        placeholder={`0 ${symbol}`}
+                        inputMode="decimal"
+                        disabled={submitting}
+                      />
+                      <Button className="w-full" size="sm" onClick={submitSelfBond} disabled={!selfBondReady || submitting}>
+                        {buttonLabel("bond", "Bond", "Bonding")}
+                      </Button>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-medium">Unbond</label>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary disabled:text-muted-foreground"
+                        onClick={() => setSelfUnbondAmount(formatAmountInput(selfBond, decimals))}
+                        disabled={submitting || selfBond <= 0n}
+                      >
+                        Max
+                      </button>
+                    </div>
+                    <Input
+                      value={selfUnbondAmount}
+                      onChange={(event) => setSelfUnbondAmount(event.target.value)}
+                      placeholder={`0 ${symbol}`}
+                      inputMode="decimal"
+                      disabled={submitting || selfBond <= 0n}
+                    />
+                    <Button className="w-full" variant="outline" size="sm" onClick={submitSelfUnbond} disabled={!selfUnbondReady || submitting}>
+                      {buttonLabel("self-unbond", "Unbond", "Unbonding")}
+                    </Button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
