@@ -30,6 +30,7 @@ module Blockchain.Sequencer.Monad
     createFirstTimer,
     createNewTimer,
     createNewViewTimer,
+    carryViewTimer,
     updateViewTimer,
     fuseChannels,
     seenTransactionDB,
@@ -44,7 +45,6 @@ import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader
 import Blockchain.EthConf
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
@@ -85,8 +85,8 @@ import Prometheus (MonadMonitor)
 
 data Modification a = Modification a | Deletion deriving (Show)
 
--- | The no-proposal / no-commit timer armed for a view: when it was armed (the
--- node's own candidate block arrived), when it is next due, and its clock.
+-- | The no-proposal / no-commit timer armed for a view: when it was armed (a
+-- new transaction arrived), when it is next due, and its clock.
 data ViewTimer = ViewTimer
   { vtView :: View,
     vtArmedAt :: UTCTime,
@@ -326,8 +326,12 @@ createNewTimer vw = do
           return alarm
     setAlarm alarm due
 
-createNewViewTimer :: MonadBlockstanbul m => Block -> m ()
-createNewViewTimer b = do
+-- | Arm the view timer for the current view. Called when a new transaction
+-- arrives (there is now work the proposer should turn into a block), and when
+-- the round changes while a timer was armed at the same height (that work is
+-- still pending).
+createNewViewTimer :: MonadBlockstanbul m => m ()
+createNewViewTimer = do
   ctx <- getBlockstanbulContext
   let voting = case _selfAddr ctx of
         Just a -> _validatorBehavior ctx && Validator a `S.member` _validators ctx
@@ -345,8 +349,7 @@ createNewViewTimer b = do
   when (voting && not leading) $ do
     updateViewTimer
     vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-    (vCur, pCur) <- liftIO (readIORef vpref)
-    let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
+    (v, pCur) <- liftIO (readIORef vpref)
     armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
     ch <- Mod.access (Mod.Proxy @(TMChan View))
     -- At most one live clock per view. This used to allocate a fresh
@@ -382,6 +385,16 @@ createNewViewTimer b = do
       liftIO $ do
         atomicModifyIORef' armedRef $ \_ -> (Just (ViewTimer v now due alarm), ())
         setAlarm alarm due
+
+-- | On entering a new view: a timer armed for an earlier round at the same
+-- height means its transactions are still waiting for a block, so the new
+-- round gets a timer too. A new height means they were committed.
+carryViewTimer :: MonadBlockstanbul m => View -> m ()
+carryViewTimer vw = do
+  armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
+  armed <- liftIO $ readIORef armedRef
+  let pending vt = _sequence (vtView vt) == _sequence vw && _round (vtView vt) < _round vw
+  when (maybe False pending armed) createNewViewTimer
 
 -- | How long a non-proposer waits for the proposal before changing round.
 proposalWait :: NominalDiffTime
