@@ -35,7 +35,7 @@ Rounds persist across heights: committing a block advances the sequence number b
 
 ### Block timing
 
-`--blockstanbul_block_period_ms` (default 1000) is the minimum delay between block creations. After a block commits, a node paces its execution to the block period, but never waits longer than one block period regardless of the header timestamp.
+`--blockstanbul_block_period_ms` (default 1000) is the minimum delay between block creations.
 
 ### Block timestamps
 
