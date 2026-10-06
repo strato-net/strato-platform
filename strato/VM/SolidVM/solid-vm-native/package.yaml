@@ -59,6 +59,7 @@ library:
     - time
     - transformers
     - template-haskell
+    - haskell-src-exts
     - blockapps-datadefs
     - data-default
     - format

@@ -56,6 +56,7 @@ library
     , ethereum-rlp
     , evm-solidity
     , format
+    , haskell-src-exts
     , lens
     , lrucache
     , merkle-patricia-db

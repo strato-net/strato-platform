@@ -36,6 +36,7 @@ import SolidVM.SourceCode
 import qualified SolidVM.Quotation.Inspection as Quotation
 import qualified SolidVM.Builtins as Builtins
 import qualified Language.Haskell.TH as TH
+import qualified Language.Haskell.Exts as Haskell
 import qualified Language.Haskell.TH.Syntax as TH (NameSpace(..))
 import qualified Control.Monad.State.Strict as State
 import Data.Data (Data, gmapT, gmapQ, gmapM)
@@ -100,7 +101,7 @@ renderAccepted selection cc collection = do
     (["{-# LANGUAGE DataKinds, GADTs, LambdaCase, OverloadedStrings, TypeOperators, TupleSections, ExplicitNamespaces, PatternSynonyms #-}",
       "module CompiledContracts where", ""]
       ++ importLines
-      ++ ["", TH.pprint declarations])
+      ++ ["", renderDeclarations declarations])
   where
     emit :: M.Map TH.Name Fun -> TH.Name -> State.StateT ([TH.Name], [TH.Dec]) IO ()
     emit registry name = do
@@ -116,6 +117,16 @@ renderAccepted selection cc collection = do
     referencedNames x = case Data.cast x of
       Just (TH.VarE name) -> [name]
       _ -> concat (gmapQ referencedNames x)
+renderDeclarations :: [TH.Dec] -> String
+renderDeclarations declarations =
+  let source = TH.pprint declarations
+      mode = Haskell.defaultParseMode { Haskell.fixities = Nothing, Haskell.extensions = map Haskell.EnableExtension
+        [Haskell.DataKinds, Haskell.GADTs, Haskell.LambdaCase, Haskell.OverloadedStrings,
+         Haskell.TypeOperators, Haskell.TupleSections, Haskell.ExplicitNamespaces, Haskell.PatternSynonyms] }
+  in case Haskell.parseModuleWithMode mode source of
+    Haskell.ParseOk parsed -> Haskell.prettyPrintWithMode Haskell.defaultMode { Haskell.spacing = False } parsed
+    Haskell.ParseFailed _ _ -> source
+
 -- Fingerprints remain internal link identities. Printed names retain the original
 -- contract/function spelling, with numeric suffixes only for conflicting variants.
 readableName :: T.Text -> String
@@ -240,17 +251,19 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
             pure $ fromMaybe x (Data.cast body)
       Nothing -> gmapM lower x
     lowerExpression (TH.LetE (TH.PragmaD (TH.LineP 0 "solidvm-captures") : bindings) body) = do
-      names <- forM bindings $ \case
-        TH.ValD (TH.VarP name) _ _ -> do
-          (index, accumulated, cache) <- State.get
-          State.put (index + 1, accumulated, cache)
-          pure (name, TH.mkName ("capture_" ++ TH.nameBase name ++ "_" ++ show index))
-        _ -> error "unexpected capture declaration"
-      renamed <- forM bindings $ \case
-        TH.ValD (TH.VarP name) rhs [] -> do
+      captures <- forM bindings $ \case
+        TH.ValD (TH.VarP name) (TH.NormalB rhs) [] -> do
           rhs' <- lower rhs
-          pure $ TH.ValD (TH.VarP (fromMaybe name (lookup name names))) rhs' []
+          case rhs' of
+            TH.VarE action -> pure ((name, action), Nothing)
+            _ -> do
+              (index, accumulated, cache) <- State.get
+              let capture = TH.mkName ("capture_" ++ TH.nameBase name ++ "_" ++ show index)
+              State.put (index + 1, accumulated, cache)
+              pure ((name, capture), Just (TH.ValD (TH.VarP capture) (TH.NormalB rhs') []))
         _ -> error "unexpected capture declaration"
+      let names = map fst captures
+          renamed = mapMaybe snd captures
       State.modify (\(index, accumulated, cache) -> (index, reverse renamed ++ accumulated, cache))
       lowered <- lower (renameNames names body)
       (index, accumulated, cache) <- State.get

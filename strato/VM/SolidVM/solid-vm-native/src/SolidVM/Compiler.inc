@@ -273,13 +273,24 @@ compileExpressionBody sc chargeDestination e = case e of
       _ -> typeErr ("new " <> showTy t)
   S.InlineBoundsCheck _ lo hi x -> do
     f <- compileAs sc TInt x
-    pure $ CE TInt $ $(Quotation.quoteAction [|
-                     \env -> do
-      v <- (runCode f) env
-      when (maybe False (v <) lo) $ revert ("underflow: " <> T.pack (show v))
-      when (maybe False (v >) hi) $ revert ("overflow: " <> T.pack (show v))
-      pure v
-                     |])
+    pure $ CE TInt $ if boundsImplied lo hi x then f else case (lo, hi) of
+      (Nothing, Nothing) -> f
+      (Just lower, Nothing) -> $(Quotation.quoteAction [|
+        \env -> do
+          v <- runCode f env
+          when (v < lower) $ revert ("underflow: " <> T.pack (show v))
+          pure v |])
+      (Nothing, Just upper) -> $(Quotation.quoteAction [|
+        \env -> do
+          v <- runCode f env
+          when (v > upper) $ revert ("overflow: " <> T.pack (show v))
+          pure v |])
+      (Just lower, Just upper) -> $(Quotation.quoteAction [|
+        \env -> do
+          v <- runCode f env
+          when (v < lower) $ revert ("underflow: " <> T.pack (show v))
+          when (v > upper) $ revert ("overflow: " <> T.pack (show v))
+          pure v |])
   S.Variable _ "this" -> pure $ CE (TContract (cName c)) ($(Quotation.quoteAction [|
                                                           \_ -> fThis <$> frame
                                                           |]))
@@ -513,19 +524,25 @@ compileExpressionBody sc chargeDestination e = case e of
             (TDecimal, _) -> do
               rf <- compileAs sc TDecimal r
               f <- decimalOp True (isDecimal r) op
-              pure $ CE TDecimal $ $(Quotation.quoteAction [|
-                                   \env -> do
-                when (op `elem` ["/", "%"]) $ (runCode rf) env >>= \b -> when (b == 0) (revert "division by zero")
-                a <- (runCode lf) env; b <- (runCode rf) env; (runCode f) a b
-                                   |])
+              pure $ CE TDecimal $ if op `elem` ["/", "%"]
+                then $(Quotation.quoteAction [|
+                  \env -> do
+                    runCode rf env >>= \b -> when (b == 0) (revert "division by zero")
+                    a <- runCode lf env; b <- runCode rf env; runCode f a b |])
+                else $(Quotation.quoteAction [|
+                  \env -> do
+                    a <- runCode lf env; b <- runCode rf env; runCode f a b |])
             (TInt, _) | Right (CE TDecimal _) <- compileE sc r -> do
               rf <- compileAs sc TDecimal r
               f <- decimalOp False True op
-              pure $ CE TDecimal $ $(Quotation.quoteAction [|
-                                   \env -> do
-                when (op `elem` ["/", "%"]) $ (runCode rf) env >>= \b -> when (b == 0) (revert "division by zero")
-                a <- (runCode lf) env; b <- (runCode rf) env; (runCode f) (fromInteger a) b
-                                   |])
+              pure $ CE TDecimal $ if op `elem` ["/", "%"]
+                then $(Quotation.quoteAction [|
+                  \env -> do
+                    runCode rf env >>= \b -> when (b == 0) (revert "division by zero")
+                    a <- runCode lf env; b <- runCode rf env; runCode f (fromInteger a) b |])
+                else $(Quotation.quoteAction [|
+                  \env -> do
+                    a <- runCode lf env; b <- runCode rf env; runCode f (fromInteger a) b |])
             (TStr, "+") -> do rf <- compileAs sc TStr r; pure $ CE TStr ($(Quotation.quoteAction [|
                                                                          \env -> do a <- (runCode lf) env; b <- (runCode rf) env; chargeOp (fromIntegral (T.length a + T.length b)); pure (a <> b)
                                                                          |]))
@@ -536,11 +553,14 @@ compileExpressionBody sc chargeDestination e = case e of
               Refl <- sameTy TInt lt
               rf <- compileAs sc TInt r
               f <- intOp op
-              pure $ CE TInt $ $(Quotation.quoteAction [|
-                               \env -> do
-                when (op `elem` ["/", "%"]) $ (runCode rf) env >>= \b -> when (b == 0) (revert "division by zero")
-                a <- (runCode lf) env; b <- (runCode rf) env; (runCode f) a b
-                               |])
+              pure $ CE TInt $ if op `elem` ["/", "%"]
+                then $(Quotation.quoteAction [|
+                  \env -> do
+                    runCode rf env >>= \b -> when (b == 0) (revert "division by zero")
+                    a <- runCode lf env; b <- runCode rf env; runCode f a b |])
+                else $(Quotation.quoteAction [|
+                  \env -> do
+                    a <- runCode lf env; b <- runCode rf env; runCode f a b |])
       | op `elem` ["==", "!="] = do
           CE lt lf <- compileE sc l
           rf <- compileAs sc lt r
@@ -553,14 +573,16 @@ compileExpressionBody sc chargeDestination e = case e of
           if isDecimal l || isDecimal r then do
             lf <- compileAs sc TDecimal l
             rf <- compileAs sc TDecimal r
+            let comparison = comparisonOp op
             pure $ CE TBool ($(Quotation.quoteAction [|
-                             \env -> comparison op <$> (runCode lf) env <*> (runCode rf) env
+                             \env -> runCode comparison <$> runCode lf env <*> runCode rf env
                              |]))
           else do
             lf <- compileAs sc TInt l
             rf <- compileAs sc TInt r
+            let comparison = comparisonOp op
             pure $ CE TBool ($(Quotation.quoteAction [|
-                             \env -> comparison op <$> (runCode lf) env <*> (runCode rf) env
+                             \env -> runCode comparison <$> runCode lf env <*> runCode rf env
                              |]))
       | op == "&&" = do
           lf <- compileAs sc TBool l; rf <- compileAs sc TBool r
@@ -582,15 +604,32 @@ compileExpressionBody sc chargeDestination e = case e of
       TEnum _ _ -> pure $(Quotation.quoteAction [| (==) |]); TContract _ -> pure $(Quotation.quoteAction [| (==) |])
       t -> typeErr ("no equality on " <> showTy t)
 
+boundsImplied :: Maybe Integer -> Maybe Integer -> Expression -> Bool
+boundsImplied lo hi = \case
+  S.NumberLiteral _ n unit -> let value = n * unitMul unit
+    in maybe True (<= value) lo && maybe True (>= value) hi
+  S.InlineBoundsCheck _ innerLo innerHi _ ->
+    maybe True (\lower -> maybe False (>= lower) innerLo) lo &&
+    maybe True (\upper -> maybe False (<= upper) innerHi) hi
+  _ -> False
+
+comparisonOp :: Ord a => T.Text -> Code (a -> a -> Bool)
+comparisonOp = \case
+  "<" -> $(Quotation.quoteAction [| (<) |])
+  ">" -> $(Quotation.quoteAction [| (>) |])
+  "<=" -> $(Quotation.quoteAction [| (<=) |])
+  _ -> $(Quotation.quoteAction [| (>=) |])
+
 decimalOp :: Bool -> Bool -> T.Text -> C (Code (Decimal -> Decimal -> M Decimal))
 decimalOp leftDecimal rightDecimal op = do
   operation <- decimalOp' op
+  let size = if op == "/" && leftDecimal && rightDecimal
+        then $(Quotation.quoteAction [| \a b -> max (byteWidth a) (byteWidth b) |])
+        else integerOpSize op
   pure $ $(Quotation.quoteAction [|
          \a b -> do
     let places = fromIntegral (max (decimalPlaces a) (decimalPlaces b))
-        bytes = if op == "/"
-          then if leftDecimal && rightDecimal then max (byteWidth (decimalMantissa a)) (byteWidth (decimalMantissa b)) else byteWidth (decimalMantissa a)
-          else integerOpBytes op (decimalMantissa a) (decimalMantissa b)
+        bytes = runCode size (decimalMantissa a) (decimalMantissa b)
     chargeOp (places + bytes)
     runCode operation a b
          |])
@@ -664,23 +703,24 @@ tupleSettersBody sc (FCons _ t rest) (mx : xs) = do
          |])
 tupleSettersBody _ _ _ = typeErr "destructuring arity mismatch"
 
-integerOpBytes :: T.Text -> Integer -> Integer -> Integer
-integerOpBytes op a b = case op of
-  "+" -> 1 + max (byteWidth a) (byteWidth b)
-  "-" -> 1 + max (byteWidth a) (byteWidth b)
-  "*" -> byteWidth a + byteWidth b
-  "/" -> byteWidth a
-  "%" -> byteWidth b
-  "**" -> byteWidth a * b
-  "<<" -> byteWidth a + b
-  ">>" -> byteWidth a
-  _ -> max (byteWidth a) (byteWidth b)
+integerOpSize :: T.Text -> Code (Integer -> Integer -> Integer)
+integerOpSize = \case
+  "+" -> $(Quotation.quoteAction [| \a b -> 1 + max (byteWidth a) (byteWidth b) |])
+  "-" -> $(Quotation.quoteAction [| \a b -> 1 + max (byteWidth a) (byteWidth b) |])
+  "*" -> $(Quotation.quoteAction [| \a b -> byteWidth a + byteWidth b |])
+  "/" -> $(Quotation.quoteAction [| \a _ -> byteWidth a |])
+  "%" -> $(Quotation.quoteAction [| \_ b -> byteWidth b |])
+  "**" -> $(Quotation.quoteAction [| \a b -> byteWidth a * b |])
+  "<<" -> $(Quotation.quoteAction [| \a b -> byteWidth a + b |])
+  ">>" -> $(Quotation.quoteAction [| \a _ -> byteWidth a |])
+  _ -> $(Quotation.quoteAction [| \a b -> max (byteWidth a) (byteWidth b) |])
 
 intOp :: T.Text -> C (Code (Integer -> Integer -> M Integer))
 intOp op = do
   operation <- intOp' op
+  let size = integerOpSize op
   pure $ $(Quotation.quoteAction [|
-         \a b -> chargeOp (integerOpBytes op a b) >> runCode operation a b
+         \a b -> chargeOp (runCode size a b) >> runCode operation a b
          |])
 
 intOp' :: T.Text -> C (Code (Integer -> Integer -> M Integer))
@@ -1115,7 +1155,52 @@ compileAliasDestinationBody sc metered expression = case expression of
   _ -> typeErr "not an aggregate alias"
 
 compileAssignment :: Scope ls r -> Bool -> Bool -> Expression -> Expression -> C (CE ls)
-compileAssignment sc destinationFirst metered l r = do
+compileAssignment sc destinationFirst metered l r
+  | S.Variable _ name <- l
+  , not scalarSource
+  , Just (Var _ t i) <- lookupVar sc name
+  , plainLocal t = do
+      valueF <- compileAs sc t r
+      let evaluateValue = if not metered then valueF
+            else if destinationFirst
+              then $(Quotation.quoteAction [| charged 1 . runCode valueF |])
+              else $(Quotation.quoteAction [| chargeAfter 1 . runCode valueF |])
+      pure $ CE t $ typedCode (scopeTypes sc) t $(Quotation.quoteAction [|
+        \env -> do
+          value <- runCode evaluateValue env
+          liftIO $ writeIORef (ref i env) value
+          pure value |])
+  | S.Variable{} <- l
+  , not scalarSource
+  , Right (SScalar (SomeTy t), pathOf) <- compileStorage' sc l = do
+      valueF <- compileAs sc t r
+      let pathF = if metered
+            then $(Quotation.quoteAction [| chargeAfter 1 . runCode pathOf |])
+            else pathOf
+          write = case (t, compileE sc r) of
+            (TContract _, Right (CE TAddr _)) -> $(Quotation.quoteAction [| writeSlot TAddr |])
+            _ -> $(Quotation.quoteAction [| writeVal t |])
+      pure $ CE t $ typedCode (scopeTypes sc) t $ if destinationFirst
+        then $(Quotation.quoteAction [|
+          \env -> do
+            path <- runCode pathF env
+            value <- runCode valueF env
+            runCode write path value
+            pure value |])
+        else $(Quotation.quoteAction [|
+          \env -> do
+            value <- runCode valueF env
+            path <- runCode pathF env
+            runCode write path value
+            pure value |])
+  | otherwise = compileGeneralAssignment sc destinationFirst metered l r
+  where
+    scalarSource = case compileStorage sc r of Right (SScalar{}, _) -> True; _ -> False
+    plainLocal :: Ty t -> Bool
+    plainLocal = \case TRef{} -> False; TAlias{} -> False; _ -> True
+
+compileGeneralAssignment :: Scope ls r -> Bool -> Bool -> Expression -> Expression -> C (CE ls)
+compileGeneralAssignment sc destinationFirst metered l r = do
   let indexedMemory = case l of
         S.IndexAccess _ _ _ -> case compileStorage sc l of Left _ -> True; _ -> False
         _ -> False
@@ -1857,6 +1942,13 @@ compileBlockStatements sc (s : rest) = case s of
                |])
       _ -> typeErr ("destructuring a non-tuple " <> showTy rt')
   S.SimpleStatement (S.VariableDefinition _ Nothing) a -> atLine a (typeErr "tuple declaration without an initialiser")
+  S.SimpleStatement (S.ExpressionStatement e) a -> atLine a $ do
+    CE _ action <- compileStatementExpression sc e
+    case rest of
+      [] -> pure $(Quotation.quoteAction [| \env -> Next <$ runCode action env |])
+      _ -> do
+        k <- compileBlock sc rest
+        pure $(Quotation.quoteAction [| \env -> runCode action env >> runCode k env |])
   _ -> do
     sf <- compileStmt sc s
     k <- compileBlock sc rest
@@ -1923,31 +2015,32 @@ destructureRaw sc (S.VarDefEntry (Just ty) _ name _ : entries) rest = do
          |])
 destructureRaw _ _ _ = unsupported "untyped raw result declaration"
 
+compileStatementExpression :: Scope ls r -> Expression -> C (CE ls)
+compileStatementExpression sc e = case e of
+  S.Binary _ "=" l r -> case l of
+    S.TupleExpression _ lhss -> compileTupleAssignment sc True lhss r
+    S.Variable _ n | Just (Var _ (TRef _) _) <- lookupVar sc n -> do
+      CE t action <- compileExpression sc False e
+      pure (CE t ($(Quotation.quoteAction [|
+                  charged 1 . (runCode action)
+                  |])))
+    S.Variable _ n | Just (Var _ (TAlias _ _) _) <- lookupVar sc n -> do
+      CE t action <- compileExpression sc False e
+      pure (CE t ($(Quotation.quoteAction [|
+                  charged 1 . (runCode action)
+                  |])))
+    S.IndexAccess{} -> compileAssignment sc False True l r
+    _ -> compileAssignment sc True True l r
+  _ -> compileE sc e
+
 compileStmt :: forall ls r. Scope ls r -> Statement -> C (Code (Env ls -> M (Flow r)))
 compileStmt sc statement = typedBody (scopeTypes sc) (sRet sc) <$> compileStmtBody sc statement
 
 compileStmtBody :: forall ls r. Scope ls r -> Statement -> C (Code (Env ls -> M (Flow r)))
 compileStmtBody sc s = atLine (S.extractStatement s) $ case s of
   S.SimpleStatement (S.ExpressionStatement e) _ -> do
-    CE _ f <- case e of
-      S.Binary _ "=" l r -> case l of
-        S.TupleExpression _ lhss -> compileTupleAssignment sc True lhss r
-        S.Variable _ n | Just (Var _ (TRef _) _) <- lookupVar sc n -> do
-          CE t action <- compileExpression sc False e
-          pure (CE t ($(Quotation.quoteAction [|
-                      charged 1 . (runCode action)
-                      |])))
-        S.Variable _ n | Just (Var _ (TAlias _ _) _) <- lookupVar sc n -> do
-          CE t action <- compileExpression sc False e
-          pure (CE t ($(Quotation.quoteAction [|
-                      charged 1 . (runCode action)
-                      |])))
-        S.IndexAccess{} -> compileAssignment sc False True l r
-        _ -> compileAssignment sc True True l r
-      _ -> compileE sc e
-    pure $ $(Quotation.quoteAction [|
-           \env -> Next <$ (runCode f) env
-           |])
+    CE _ f <- compileStatementExpression sc e
+    pure $(Quotation.quoteAction [| \env -> Next <$ runCode f env |])
   S.SimpleStatement{} -> err Internal "declaration outside compileBlock"
   S.IfStatement cnd th mel _ -> do
     cf <- compileAs sc TBool cnd

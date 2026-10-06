@@ -1,6 +1,3 @@
-  comparison :: Ord a => T.Text -> a -> a -> Bool
-  comparison op a b = case op of "<" -> a < b; ">" -> a > b; "<=" -> a <= b; _ -> a >= b
-
   rounded :: (Decimal -> Decimal -> Decimal) -> Decimal -> Decimal -> M Decimal
   rounded f a b = pure $ roundTo (max (decimalPlaces a) (decimalPlaces b)) (f a b)
 
