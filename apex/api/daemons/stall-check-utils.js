@@ -83,7 +83,7 @@ async function getVmBlocksValid() {
         return 0;
     }
     try {
-        return response.data.result[0].value[1];
+        return toCount(response.data.result[0].value[1]);
     } catch (error) {
         winston.warn(`Error ${error.message ? error.message : ''} occurred while querying vm blocks valid`);
     }
@@ -109,16 +109,47 @@ async function getBaggerPending() {
         return 0;
     }
     try {
-        return response.data.result[0].value[1];   //to confirm if pending is at index 0 always
+        return toCount(pendingSeries(response.data.result).value[1]);
     } catch (error) {
         winston.warn(`Error ${error.message ? error.message : ''} occurred while querying vm blocks pending`);
     }
 }
 
+/**
+ * vm_bagger_txs has one series per bagger group: "pending" (ready to be put in
+ * a block), "queued" (waiting for an earlier nonce - these can stay for good)
+ * and "seen". Prometheus does not guarantee the series order, so pick the
+ * pending one by its label; a vm-runner without the group label reports a
+ * single series.
+ */
+function pendingSeries(result) {
+    return result.find((series) => series.metric && series.metric.group === 'pending') || result[0];
+}
+
+/**
+ * Prometheus returns sample values as strings ("715092") while the previous
+ * counts come back from the StallStat INTEGER column as numbers - compare
+ * numbers only, or the "no new valid blocks" check (===) never matches and a
+ * stalled node is reported healthy. Undefined for a missing or non-numeric
+ * value (NaN would make every comparison false as well).
+ */
+function toCount(value) {
+    if (value === null || value === undefined || value === '') {
+        return undefined;
+    }
+    const count = Number(value);
+    return Number.isFinite(count) ? count : undefined;
+}
+
 async function getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current){
+    pendingTxsCount_prev = toCount(pendingTxsCount_prev);
+    pendingTxsCount_current = toCount(pendingTxsCount_current);
+    validBlocksCount_prev = toCount(validBlocksCount_prev);
+    validBlocksCount_current = toCount(validBlocksCount_current);
     // If previous check had pending transactions and the current check has the same number of valid blocks as the previous node - the network is considered stalled
     // TODO: Potential flaw - what if the prev pending transaction got discarded and the current pending transactions are just new pending to be processed?
-    const stallHealthStatus = ! (pendingTxsCount_prev > 0 && pendingTxsCount_current > 0 && validBlocksCount_current === validBlocksCount_prev);
+    // An unreadable block count (undefined) is no evidence of a stall
+    const stallHealthStatus = ! (pendingTxsCount_prev > 0 && pendingTxsCount_current > 0 && validBlocksCount_current !== undefined && validBlocksCount_current === validBlocksCount_prev);
     const validBlocksCountIncreased = validBlocksCount_current > validBlocksCount_prev;
     const hasPendingTxs = pendingTxsCount_current > 0
     return {stallHealthStatus, validBlocksCountIncreased, hasPendingTxs}
@@ -172,4 +203,6 @@ module.exports = {
     singleCheck,
     getCurrentHealth,
     updateCurrentStallStat,
+    pendingSeries,
+    toCount,
 }
