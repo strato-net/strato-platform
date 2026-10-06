@@ -85,13 +85,22 @@ import Prometheus (MonadMonitor)
 
 data Modification a = Modification a | Deletion deriving (Show)
 
+-- | The no-proposal / no-commit timer armed for a view: when it was armed (the
+-- node's own candidate block arrived), when it is next due, and its clock.
+data ViewTimer = ViewTimer
+  { vtView :: View,
+    vtArmedAt :: UTCTime,
+    vtDue :: UTCTime,
+    vtClock :: AlarmClock UTCTime
+  }
+
 data SequencerContext = SequencerContext
   { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: BlockstanbulContext,
     _latestViewAndProposal :: IORef (View, Maybe Block),
-    -- | The view a no-proposal timer is currently armed for, if any. Keeps
-    -- 'createNewViewTimer' to one live AlarmClock per view.
-    _armedViewTimer :: IORef (Maybe View),
+    -- | The view timer currently armed, if any. Keeps 'createNewViewTimer' to
+    -- one live AlarmClock per view.
+    _armedViewTimer :: IORef (Maybe ViewTimer),
     -- | The round timer's one shared AlarmClock (allocated on first use), and
     -- the (view, fire time) it is currently armed for. Keeps 'createNewTimer'
     -- to a single live AlarmClock no matter how many times it is re-armed.
@@ -109,7 +118,7 @@ type MonadBlockstanbul m =
   ( MonadIO m,
     HasBlockstanbulContext m,
     Mod.Accessible (IORef (View, Maybe Block)) m,
-    Mod.Accessible (IORef (Maybe View)) m,
+    Mod.Accessible (IORef (Maybe ViewTimer)) m,
     Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) m,
     Mod.Accessible (IORef (Maybe (View, UTCTime))) m,
     Mod.Accessible (TMChan View) m,
@@ -164,7 +173,7 @@ instance Mod.Modifiable SeenTransactionDB SequencerM where
 instance Mod.Accessible (IORef (View, Maybe Block)) SequencerM where
   access _ = use latestViewAndProposal
 
-instance Mod.Accessible (IORef (Maybe View)) SequencerM where
+instance Mod.Accessible (IORef (Maybe ViewTimer)) SequencerM where
   access _ = use armedViewTimer
 
 instance Mod.Accessible (IORef (Maybe (AlarmClock UTCTime))) SequencerM where
@@ -329,45 +338,79 @@ createNewViewTimer b = do
   -- proposing. A proposer has nothing to report to itself, and non-voting
   -- nodes (RPC followers with the default validatorBehavior=true) must not
   -- drive round changes at all.
+  --
+  -- It allows 'proposalWait' for the proposal to land. Once it lands, it
+  -- allows as long again as the proposal took, plus 'commitSlack', for the
+  -- block to commit (see 'updateViewTimer'); then it times the round out.
   when (voting && not leading) $ do
     updateViewTimer
     vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-    vCur <- fst <$> liftIO (readIORef vpref)
+    (vCur, pCur) <- liftIO (readIORef vpref)
     let v = vCur{ _sequence = max 1 $ fromIntegral (number $ blockBlockData b) - 1 }
-    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe View)))
+    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
     ch <- Mod.access (Mod.Proxy @(TMChan View))
     -- At most one live clock per view. This used to allocate a fresh
     -- self-re-arming AlarmClock for every UnannouncedBlock, so a stalled
     -- chain accumulated one per candidate block -- hundreds of them, each
     -- firing every 5s and each emitting a ROUNDCHANGE.
-    fresh <- liftIO . atomicModifyIORef' armedRef $ \armed ->
-      if armed == Just v then (armed, False) else (Just v, True)
-    when fresh $ do
+    armed <- liftIO $ readIORef armedRef
+    unless (fmap vtView armed == Just v) $ do
       let release =
-            atomicModifyIORef' armedRef $ \armed ->
-              (if armed == Just v then Nothing else armed, ())
+            atomicModifyIORef' armedRef $ \cur ->
+              (if fmap vtView cur == Just v then Nothing else cur, ())
           act :: AlarmClock UTCTime -> IO ()
           act this' = do
-            (v', p) <- readIORef vpref
-            if v >= v' && isNothing p
-              then do
-                atomically . writeTMChan ch $ v'
-                next <- addUTCTime 5 <$> getCurrentTime
-                setAlarm this' next
-              else
-                -- Superseded by a later view, or a proposal arrived: give up
-                -- the slot so the next view can arm its own clock.
-                release
+            v' <- fst <$> readIORef vpref
+            readIORef armedRef >>= \case
+              Just vt | vtView vt == v && v >= v' -> do
+                now <- getCurrentTime
+                if now < vtDue vt
+                  then setAlarm this' (vtDue vt) -- pushed back since this wakeup was scheduled
+                  else do
+                    atomically . writeTMChan ch $ v'
+                    let next = addUTCTime 5 now
+                    atomicModifyIORef' armedRef $ \cur ->
+                      (if fmap vtView cur == Just v then (\t -> t{vtDue = next}) <$> cur else cur, ())
+                    setAlarm this' next
+              -- Superseded by a later view: give up the slot so the next
+              -- view can arm its own clock.
+              _ -> release
       alarm <- liftIO $ newAlarmClock act
-      next <- addUTCTime 2 <$> liftIO getCurrentTime
-      liftIO $ setAlarm alarm next
+      now <- liftIO getCurrentTime
+      -- A proposal that landed before our own candidate block took no time.
+      let due = addUTCTime (if isJust pCur then commitSlack else proposalWait) now
+      liftIO $ do
+        atomicModifyIORef' armedRef $ \_ -> (Just (ViewTimer v now due alarm), ())
+        setAlarm alarm due
+
+-- | How long a non-proposer waits for the proposal before changing round.
+proposalWait :: NominalDiffTime
+proposalWait = 30
+
+-- | Extra time, on top of the proposal's own latency, allowed for an accepted
+-- proposal to commit before changing round.
+commitSlack :: NominalDiffTime
+commitSlack = 10
 
 updateViewTimer :: MonadBlockstanbul m => m ()
 updateViewTimer = do
   v <- currentView
   p <- _proposal <$> getBlockstanbulContext
   vpref <- Mod.access (Mod.Proxy @(IORef (View, Maybe Block)))
-  liftIO $ atomicModifyIORef' vpref (\_ -> ((v, p), ()))
+  (v0, p0) <- liftIO $ atomicModifyIORef' vpref (\old -> ((v, p), old))
+  -- The proposal just landed: allow the time it took, plus 'commitSlack', for
+  -- it to commit. 'setAlarm' only moves an alarm earlier; a later due time is
+  -- picked up when the pending wakeup finds it has not arrived yet.
+  when (isJust p && (isNothing p0 || v0 /= v)) $ do
+    armedRef <- Mod.access (Mod.Proxy @(IORef (Maybe ViewTimer)))
+    liftIO $ do
+      now <- getCurrentTime
+      rearm <- atomicModifyIORef' armedRef $ \case
+        Just vt | vtView vt >= v ->
+          let due = addUTCTime (commitSlack + max 0 (diffUTCTime now (vtArmedAt vt))) now
+           in (Just vt{vtDue = due}, Just (vtClock vt, due))
+        cur -> (cur, Nothing)
+      mapM_ (uncurry setAlarm) rearm
 
 fuseChannels :: (MonadIO m, MonadReader SequencerConfig m) =>
                 m (ConduitM () SeqLoopEvent SequencerM ())
