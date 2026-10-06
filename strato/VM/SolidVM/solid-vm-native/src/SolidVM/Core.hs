@@ -214,16 +214,29 @@ encodeKey t v = Index $ case t of
 
 data Env (ls :: [Type]) where
   ENil :: Env '[]
-  (:&) :: IORef t -> Env ls -> Env (t ': ls)
+  (:&) :: t -> Env ls -> Env (t ': ls)
 infixr 5 :&
+
+type family RefTypes (ts :: [Type]) :: [Type] where
+  RefTypes '[] = '[]
+  RefTypes (t ': ts) = IORef t ': RefTypes ts
+
+data EnvTy = forall t. RefSlot (Ty t) | forall t. ValueSlot (Ty t)
 
 data Ix (ls :: [Type]) t where
   IZ :: Ix (t ': ls) t
   IS :: Ix ls t -> Ix (u ': ls) t
 
-ref :: Ix ls t -> Env ls -> IORef t
-ref IZ (r :& _) = r
-ref (IS i) (_ :& env) = ref i env
+ref :: Ix ls (IORef t) -> Env ls -> IORef t
+ref = localValue
+
+localValue :: Ix ls t -> Env ls -> t
+localValue IZ (v :& _) = v
+localValue (IS i) (_ :& env) = localValue i env
+
+replaceValue :: Ix ls t -> t -> Env ls -> Env ls
+replaceValue IZ v (_ :& env) = v :& env
+replaceValue (IS i) v (x :& env) = x :& replaceValue i v env
 
 -- ---------------------------------------------------------------- runtime
 
@@ -400,7 +413,7 @@ showSig (SigCons a s) = showTy a <> " -> " <> showSig s
 
 -- Build the typed action from a body that sees its arguments as typed mutable locals.
 -- First argument is at index IZ.
-mkFn :: Sig args r -> (Env args -> M r) -> Fn args r
+mkFn :: Sig args r -> (Env (RefTypes args) -> M r) -> Fn args r
 mkFn (SigNil _) body = body ENil
 mkFn (SigCons _ rest) body = \a -> mkFn rest (\env -> do r <- liftIO (newIORef a); body (r :& env))
 

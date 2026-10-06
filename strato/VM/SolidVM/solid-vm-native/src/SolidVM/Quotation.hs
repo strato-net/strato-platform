@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, CPP, DataKinds, GADTs, TypeOperators, LambdaCase, OverloadedStrings #-}
 -- Quotations have two concrete build-time interpretations. Execution erases
 -- all inspection machinery; inspection substitutes the captured expressions.
-module SolidVM.Quotation (execute, inspect, helperDeclarations) where
+module SolidVM.Quotation (execute, inspect, helperDeclarations, integerSize, integerAction, blockAction) where
 
 import Language.Haskell.TH hiding (Code)
 import Language.Haskell.TH.Syntax (liftData)
@@ -58,3 +58,39 @@ localHelpers expression = do
         , [local] <- filter ((== nameBase n) . nameBase) used = VarE local
       replace e = e
   pure $ if null used then expression else LetE (filter belongs declarations) (transform replace expression)
+
+-- Combine primitive sizing and arithmetic before GHC compiles either backend.
+-- These expressions become one executable lambda and one matching source lambda.
+integerSize :: String -> Q Exp
+integerSize op = case op of
+  "+" -> [| \a b -> 1 + max (byteWidth a) (byteWidth b) |]
+  "-" -> [| \a b -> 1 + max (byteWidth a) (byteWidth b) |]
+  "*" -> [| \a b -> byteWidth a + byteWidth b |]
+  "/" -> [| \a _ -> byteWidth a |]
+  "%" -> [| \_ b -> byteWidth b |]
+  "**" -> [| \a b -> byteWidth a * b |]
+  "<<" -> [| \a b -> byteWidth a + b |]
+  ">>" -> [| \a _ -> byteWidth a |]
+  _ -> [| \a b -> max (byteWidth a) (byteWidth b) |]
+
+integerAction :: String -> Q Exp -> Q Exp
+integerAction op quotation = do
+  expression <- quotation
+  sizing <- integerSize op
+  case (expression, sizing) of
+    (LamE [VarP a, VarP b] body, LamE [left, right] size) -> do
+      let bindings = [(n, v) | (VarP n, v) <- [(left, a), (right, b)]]
+          rename (VarE n) = VarE (maybe n id (lookup n bindings))
+          rename e = e
+      charge <- [| chargeOp $(pure (transform rename size)) |]
+      pure (LamE [VarP a, VarP b] (InfixE (Just charge) (VarE '(>>)) (Just body)))
+    _ -> fail "integer arithmetic quotation must have two value arguments"
+
+blockAction :: Q Exp -> Q Exp
+blockAction quotation = do
+  expression <- quotation
+  charge <- [| chargeGas 1 |]
+  case expression of
+    LamE parameters body -> pure $ LamE parameters $ DoE Nothing $
+      NoBindS charge : case body of DoE Nothing statements -> statements; _ -> [NoBindS body]
+    _ -> fail "block quotation must be an environment lambda"

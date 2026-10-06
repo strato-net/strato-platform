@@ -17,6 +17,7 @@ import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import SolidVM.Model.CodeCollection (Func)
 import qualified Data.Sequence
 import Data.Decimal
+import Data.IORef (IORef)
 import Blockchain.Strato.Model.Address (Address(..))
 import SolidVM.Model.Storable (StoragePath(..), StoragePathPiece(..))
 
@@ -177,8 +178,11 @@ functionDeclarations (Fun _ sig body) = case codeName body of
   Just name -> [SigD (functionName name) (signatureType sig), ValD (VarP (functionName name)) (NormalB (sourceExpression body)) []]
   Nothing -> error "compiled function has no inspection name"
 
-environmentType :: [SomeTy] -> Type
-environmentType types = AppT (ConT ''Env) (foldr (\(SomeTy t) rest -> AppT (AppT PromotedConsT (haskellType t)) rest) PromotedNilT types)
+environmentType :: [EnvTy] -> Type
+environmentType types = AppT (ConT ''Env) (foldr (\slot rest -> AppT (AppT PromotedConsT (slotType slot)) rest) PromotedNilT types)
+  where
+    slotType (RefSlot t) = AppT (ConT ''IORef) (haskellType t)
+    slotType (ValueSlot t) = haskellType t
 
 arrow :: Type -> Type -> Type
 arrow a b = AppT (AppT ArrowT a) b
@@ -189,36 +193,36 @@ monadType = AppT (ConT ''M)
 annotate :: Type -> Code a -> Code a
 annotate t code = code { codeType = Just t }
 
-typedCode :: [SomeTy] -> Ty r -> Code (Env ls -> M r) -> Code (Env ls -> M r)
+typedCode :: [EnvTy] -> Ty r -> Code (Env ls -> M r) -> Code (Env ls -> M r)
 typedCode env r = annotate (arrow (environmentType env) (monadType (haskellType r)))
 
-typedBody :: [SomeTy] -> Ty r -> Code (Env ls -> M (Flow r)) -> Code (Env ls -> M (Flow r))
+typedBody :: [EnvTy] -> Ty r -> Code (Env ls -> M (Flow r)) -> Code (Env ls -> M (Flow r))
 typedBody env r = annotate (arrow (environmentType env) (monadType (AppT (ConT ''Flow) (haskellType r))))
 
-typedSetter :: [SomeTy] -> Ty a -> Code (Env ls -> a -> M ()) -> Code (Env ls -> a -> M ())
+typedSetter :: [EnvTy] -> Ty a -> Code (Env ls -> a -> M ()) -> Code (Env ls -> a -> M ())
 typedSetter env t = annotate (arrow (environmentType env) (arrow (haskellType t) (monadType (TupleT 0))))
 
-typedPath :: [SomeTy] -> Code (Env ls -> M (Maybe StoragePath)) -> Code (Env ls -> M (Maybe StoragePath))
+typedPath :: [EnvTy] -> Code (Env ls -> M (Maybe StoragePath)) -> Code (Env ls -> M (Maybe StoragePath))
 typedPath env = annotate (arrow (environmentType env) (monadType (AppT (ConT ''Maybe) (ConT ''StoragePath))))
 
-typedDestination :: [SomeTy] -> Ty a -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ())) -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ()))
+typedDestination :: [EnvTy] -> Ty a -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ())) -> Code (Env ls -> M (Maybe StoragePath, M a, a -> M ()))
 typedDestination env t = annotate (arrow (environmentType env) (monadType
   (AppT (AppT (AppT (TupleT 3) (AppT (ConT ''Maybe) (ConT ''StoragePath))) (monadType (haskellType t)))
     (arrow (haskellType t) (monadType (TupleT 0))))))
 
-typedGetter :: Sig args r -> Code (StoragePath -> Env args -> M r) -> Code (StoragePath -> Env args -> M r)
+typedGetter :: Sig args r -> Code (StoragePath -> Env (RefTypes args) -> M r) -> Code (StoragePath -> Env (RefTypes args) -> M r)
 typedGetter sig = annotate (arrow (ConT ''StoragePath) (arrow (arguments sig) (monadType (haskellType (sigRet sig)))))
   where
     arguments :: Sig args r -> Type
     arguments = environmentType . types
-    types :: Sig args r -> [SomeTy]
+    types :: Sig args r -> [EnvTy]
     types (SigNil _) = []
-    types (SigCons t rest) = SomeTy t : types rest
+    types (SigCons t rest) = RefSlot t : types rest
 
-typedDestructure :: [SomeTy] -> Fields ts -> Ty r -> Code (Env ls -> HL ts -> M (Flow r)) -> Code (Env ls -> HL ts -> M (Flow r))
+typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> Code (Env ls -> HL ts -> M (Flow r)) -> Code (Env ls -> HL ts -> M (Flow r))
 typedDestructure env fs r = annotate (arrow (environmentType env)
   (arrow (haskellType (TTuple fs)) (monadType (AppT (ConT ''Flow) (haskellType r)))))
 
-typedTupleSetters :: [SomeTy] -> Fields ts -> Code (Env ls -> M (HL ts -> M ())) -> Code (Env ls -> M (HL ts -> M ()))
+typedTupleSetters :: [EnvTy] -> Fields ts -> Code (Env ls -> M (HL ts -> M ())) -> Code (Env ls -> M (HL ts -> M ()))
 typedTupleSetters env fs = annotate (arrow (environmentType env)
   (monadType (arrow (haskellType (TTuple fs)) (monadType (TupleT 0)))))

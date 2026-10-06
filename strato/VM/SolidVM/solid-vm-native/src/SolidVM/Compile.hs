@@ -53,29 +53,29 @@ builtinCode :: T.Text -> a -> a
 builtinCode _ a = a
 {-# INLINE builtinCode #-}
 
-typedCode :: [SomeTy] -> Ty r -> a -> a
+typedCode :: [EnvTy] -> Ty r -> a -> a
 typedCode _ _ a = a
 {-# INLINE typedCode #-}
-typedBody :: [SomeTy] -> Ty r -> a -> a
+typedBody :: [EnvTy] -> Ty r -> a -> a
 typedBody _ _ a = a
 {-# INLINE typedBody #-}
-typedSetter :: [SomeTy] -> Ty r -> a -> a
+typedSetter :: [EnvTy] -> Ty r -> a -> a
 typedSetter _ _ a = a
 {-# INLINE typedSetter #-}
-typedPath :: [SomeTy] -> a -> a
+typedPath :: [EnvTy] -> a -> a
 typedPath _ a = a
 {-# INLINE typedPath #-}
-typedDestination :: [SomeTy] -> Ty r -> a -> a
+typedDestination :: [EnvTy] -> Ty r -> a -> a
 typedDestination _ _ a = a
 {-# INLINE typedDestination #-}
 typedGetter :: Sig args r -> a -> a
 typedGetter _ a = a
 {-# INLINE typedGetter #-}
 
-typedDestructure :: [SomeTy] -> Fields ts -> Ty r -> a -> a
+typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> a -> a
 typedDestructure _ _ _ a = a
 {-# INLINE typedDestructure #-}
-typedTupleSetters :: [SomeTy] -> Fields ts -> a -> a
+typedTupleSetters :: [EnvTy] -> Fields ts -> a -> a
 typedTupleSetters _ _ a = a
 {-# INLINE typedTupleSetters #-}
 

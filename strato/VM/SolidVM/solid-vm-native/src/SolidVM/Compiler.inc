@@ -57,8 +57,9 @@ data CCtx = CCtx
   }
 
 data Var ls
-  = forall t. Var T.Text (Ty t) (Ix ls t)
-  | RefVar T.Text SType (Ix ls StoragePath)   -- `T storage x = ...` pointer
+  = forall t. Var T.Text (Ty t) (Ix ls (IORef t))
+  | forall t. ValueVar T.Text (Ty t) (Ix ls t) (Maybe Integer)
+  | RefVar T.Text SType (Ix ls (IORef StoragePath))   -- `T storage x = ...` pointer
 
 data Scope ls r = Scope
   { sVars :: [Var ls]
@@ -68,30 +69,33 @@ data Scope ls r = Scope
   , sC :: CCtx
   }
 
-pushVar :: T.Text -> Ty t -> Scope ls r -> Scope (t ': ls) r
+pushVar :: T.Text -> Ty t -> Scope ls r -> Scope (IORef t ': ls) r
 pushVar n t sc@(Scope vs r nr inner c) =
-  Scope (Var n t IZ : map weaken vs) r nr (fmap (\f -> typedBody (SomeTy t : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& env) -> runCode f env |])) inner) c
+  Scope (Var n t IZ : map weaken vs) r nr (fmap (\f -> typedBody (RefSlot t : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& env) -> runCode f env |])) inner) c
 
-pushRef :: T.Text -> SType -> Scope ls r -> Scope (StoragePath ': ls) r
+pushRef :: T.Text -> SType -> Scope ls r -> Scope (IORef StoragePath ': ls) r
 pushRef n st sc@(Scope vs r nr inner c) =
-  Scope (RefVar n st IZ : map weaken vs) r nr (fmap (\f -> typedBody (SomeTy (TRef st) : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& env) -> runCode f env |])) inner) c
+  Scope (RefVar n st IZ : map weaken vs) r nr (fmap (\f -> typedBody (RefSlot (TRef st) : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& env) -> runCode f env |])) inner) c
 
 weaken :: Var ls -> Var (u ': ls)
 weaken (Var n t i) = Var n t (IS i)
 weaken (RefVar n st i) = RefVar n st (IS i)
+weaken (ValueVar n t i value) = ValueVar n t (IS i) value
 
 varName :: Var ls -> T.Text
 varName (Var n _ _) = n
 varName (RefVar n _ _) = n
+varName (ValueVar n _ _ _) = n
 
 lookupVar :: Scope ls r -> T.Text -> Maybe (Var ls)
 lookupVar sc n = listToMaybe [v | v <- sVars sc, varName v == n]
 
-scopeTypes :: Scope ls r -> [SomeTy]
+scopeTypes :: Scope ls r -> [EnvTy]
 scopeTypes = map variableType . sVars
   where
-    variableType (Var _ t _) = SomeTy t
-    variableType (RefVar _ st _) = SomeTy (TRef st)
+    variableType (Var _ t _) = RefSlot t
+    variableType (RefVar _ st _) = RefSlot (TRef st)
+    variableType (ValueVar _ t _ _) = ValueSlot t
 
 -- ---------------------------------------------------------------- type resolution
 
@@ -206,12 +210,38 @@ compileFieldsBody sc (FCons _ t rest) (x : xs) = do
         |]))
 compileFieldsBody _ _ _ = typeErr "tuple arity mismatch"
 
-compileE :: Scope ls r -> Expression -> C (CE ls)
+compileE :: forall ls r. Scope ls r -> Expression -> C (CE ls)
 compileE sc e = atLine (S.extractExpression e) $ do
-  CE t action <- compileE' sc e
-  pure $ CE t ($(Quotation.quoteAction [|
-               chargeAfter 1 . (runCode action)
-               |]))
+  let (base, units) = peel 1 e
+      charges = chargeUnits units
+      peel n (S.InlineBoundsCheck _ lo hi inner) | boundsImplied sc lo hi inner = peel (n + 1) inner
+      peel n expression = (expression, n)
+      result :: forall t. Ty t -> Code (Env ls -> M t) -> C (CE ls)
+      result t action = pure (CE t (typedCode (scopeTypes sc) t action))
+  case base of
+    S.NumberLiteral _ n unit ->
+      let value = n * unitMul unit in result TInt $(Quotation.quoteAction [|
+        \_ -> runCode charges >> pure value |])
+    S.Variable _ n | n `notElem` ["this", "now"], Just (ValueVar _ t i _) <- lookupVar sc n ->
+      case i of
+        IZ -> result t $(Quotation.quoteAction [| \(value :& _) -> runCode charges >> pure value |])
+        _ -> result t $(Quotation.quoteAction [| \env -> runCode charges >> pure (localValue i env) |])
+    S.Variable _ n | n `notElem` ["this", "now"], Just (Var _ t i) <- lookupVar sc n, scalarLocal t ->
+      result t $(Quotation.quoteAction [|
+        \env -> do value <- liftIO (readIORef (ref i env)); runCode charges; pure value |])
+    _ -> do
+      CE t action <- compileE' sc base
+      if units == 1
+        then result t $(Quotation.quoteAction [| chargeAfter 1 . runCode action |])
+        else result t $(Quotation.quoteAction [|
+          \env -> do value <- runCode action env; runCode charges; pure value |])
+
+chargeUnits :: Int -> Code (M ())
+chargeUnits = \case
+  1 -> $(Quotation.quoteAction [| chargeGas 1 |])
+  2 -> $(Quotation.quoteAction [| chargeGas 1 >> chargeGas 1 |])
+  3 -> $(Quotation.quoteAction [| chargeGas 1 >> chargeGas 1 >> chargeGas 1 |])
+  count -> $(Quotation.quoteAction [| replicateM_ count (chargeGas 1) |])
 
 compileE' :: forall ls r. Scope ls r -> Expression -> C (CE ls)
 compileE' sc = compileExpression sc True
@@ -273,7 +303,7 @@ compileExpressionBody sc chargeDestination e = case e of
       _ -> typeErr ("new " <> showTy t)
   S.InlineBoundsCheck _ lo hi x -> do
     f <- compileAs sc TInt x
-    pure $ CE TInt $ if boundsImplied lo hi x then f else case (lo, hi) of
+    pure $ CE TInt $ if boundsImplied sc lo hi x then f else case (lo, hi) of
       (Nothing, Nothing) -> f
       (Just lower, Nothing) -> $(Quotation.quoteAction [|
         \env -> do
@@ -303,6 +333,8 @@ compileExpressionBody sc chargeDestination e = case e of
     Just (Var _ t i) -> pure $ CE t ($(Quotation.quoteAction [|
                                      \env -> liftIO (readIORef (ref i env))
                                      |]))
+    Just (ValueVar _ t i _) -> pure $ CE t ($(Quotation.quoteAction [|
+      \env -> pure (localValue i env) |]))
     Just (RefVar{}) -> do LV t g _ <- compileLV sc e; pure (CE t g)
     Nothing
       | Just _ <- M.lookup n (cStorage c) -> do LV t g _ <- compileLV sc e; pure (CE t g)
@@ -604,14 +636,27 @@ compileExpressionBody sc chargeDestination e = case e of
       TEnum _ _ -> pure $(Quotation.quoteAction [| (==) |]); TContract _ -> pure $(Quotation.quoteAction [| (==) |])
       t -> typeErr ("no equality on " <> showTy t)
 
-boundsImplied :: Maybe Integer -> Maybe Integer -> Expression -> Bool
-boundsImplied lo hi = \case
-  S.NumberLiteral _ n unit -> let value = n * unitMul unit
-    in maybe True (<= value) lo && maybe True (>= value) hi
-  S.InlineBoundsCheck _ innerLo innerHi _ ->
-    maybe True (\lower -> maybe False (>= lower) innerLo) lo &&
-    maybe True (\upper -> maybe False (<= upper) innerHi) hi
-  _ -> False
+boundsImplied :: Scope ls r -> Maybe Integer -> Maybe Integer -> Expression -> Bool
+boundsImplied sc lo hi expression = case knownInteger sc expression of
+  Just value -> maybe True (<= value) lo && maybe True (>= value) hi
+  Nothing -> case expression of
+    S.InlineBoundsCheck _ innerLo innerHi _ ->
+      maybe True (\lower -> maybe False (>= lower) innerLo) lo &&
+      maybe True (\upper -> maybe False (<= upper) innerHi) hi
+    _ -> False
+
+knownInteger :: Scope ls r -> Expression -> Maybe Integer
+knownInteger sc = \case
+  S.NumberLiteral _ n unit -> Just (n * unitMul unit)
+  S.Variable _ n | n `notElem` ["this", "now"], Just (ValueVar _ TInt _ value) <- lookupVar sc n -> value
+  S.InlineBoundsCheck _ lo hi e -> do
+    value <- knownInteger sc e
+    guard (maybe True (<= value) lo && maybe True (>= value) hi)
+    pure value
+  S.Unitary _ "-" e -> negate <$> knownInteger sc e
+  S.Binary _ "+" l r -> (+) <$> knownInteger sc l <*> knownInteger sc r
+  S.Binary _ "-" l r -> (-) <$> knownInteger sc l <*> knownInteger sc r
+  _ -> Nothing
 
 comparisonOp :: Ord a => T.Text -> Code (a -> a -> Bool)
 comparisonOp = \case
@@ -705,57 +750,49 @@ tupleSettersBody _ _ _ = typeErr "destructuring arity mismatch"
 
 integerOpSize :: T.Text -> Code (Integer -> Integer -> Integer)
 integerOpSize = \case
-  "+" -> $(Quotation.quoteAction [| \a b -> 1 + max (byteWidth a) (byteWidth b) |])
-  "-" -> $(Quotation.quoteAction [| \a b -> 1 + max (byteWidth a) (byteWidth b) |])
-  "*" -> $(Quotation.quoteAction [| \a b -> byteWidth a + byteWidth b |])
-  "/" -> $(Quotation.quoteAction [| \a _ -> byteWidth a |])
-  "%" -> $(Quotation.quoteAction [| \_ b -> byteWidth b |])
-  "**" -> $(Quotation.quoteAction [| \a b -> byteWidth a * b |])
-  "<<" -> $(Quotation.quoteAction [| \a b -> byteWidth a + b |])
-  ">>" -> $(Quotation.quoteAction [| \a _ -> byteWidth a |])
-  _ -> $(Quotation.quoteAction [| \a b -> max (byteWidth a) (byteWidth b) |])
+  "+" -> $(Quotation.quoteIntegerSize "+")
+  "-" -> $(Quotation.quoteIntegerSize "-")
+  "*" -> $(Quotation.quoteIntegerSize "*")
+  "/" -> $(Quotation.quoteIntegerSize "/")
+  "%" -> $(Quotation.quoteIntegerSize "%")
+  "**" -> $(Quotation.quoteIntegerSize "**")
+  "<<" -> $(Quotation.quoteIntegerSize "<<")
+  ">>" -> $(Quotation.quoteIntegerSize ">>")
+  _ -> $(Quotation.quoteIntegerSize "")
 
 intOp :: T.Text -> C (Code (Integer -> Integer -> M Integer))
-intOp op = do
-  operation <- intOp' op
-  let size = integerOpSize op
-  pure $ $(Quotation.quoteAction [|
-         \a b -> chargeOp (runCode size a b) >> runCode operation a b
-         |])
-
-intOp' :: T.Text -> C (Code (Integer -> Integer -> M Integer))
-intOp' = \case
-  "+" -> pure ($(Quotation.quoteAction [|
+intOp = \case
+  "+" -> pure ($(Quotation.quoteIntegerAction "+" [|
                \a b -> pure (a + b)
                |]))
-  "-" -> pure ($(Quotation.quoteAction [|
+  "-" -> pure ($(Quotation.quoteIntegerAction "-" [|
                \a b -> pure (a - b)
                |]))
-  "*" -> pure ($(Quotation.quoteAction [|
+  "*" -> pure ($(Quotation.quoteIntegerAction "*" [|
                \a b -> pure (a * b)
                |]))
-  "/" -> pure ($(Quotation.quoteAction [|
+  "/" -> pure ($(Quotation.quoteIntegerAction "/" [|
                \a b -> if b == 0 then revert "division by zero" else pure (a `div` b)
                |]))
-  "%" -> pure ($(Quotation.quoteAction [|
+  "%" -> pure ($(Quotation.quoteIntegerAction "%" [|
                \a b -> if b == 0 then revert "modulo by zero" else pure (a `rem` b)
                |]))
-  "**" -> pure ($(Quotation.quoteAction [|
+  "**" -> pure ($(Quotation.quoteIntegerAction "**" [|
                 \a b -> if b < 0 then revert "negative exponent" else pure (a ^ b)
                 |]))
-  "|" -> pure ($(Quotation.quoteAction [|
+  "|" -> pure ($(Quotation.quoteIntegerAction "|" [|
                \a b -> pure (a .|. b)
                |]))
-  "&" -> pure ($(Quotation.quoteAction [|
+  "&" -> pure ($(Quotation.quoteIntegerAction "&" [|
                \a b -> pure (a .&. b)
                |]))
-  "^" -> pure ($(Quotation.quoteAction [|
+  "^" -> pure ($(Quotation.quoteIntegerAction "^" [|
                \a b -> pure (xor a b)
                |]))
-  "<<" -> pure ($(Quotation.quoteAction [|
+  "<<" -> pure ($(Quotation.quoteIntegerAction "<<" [|
                 \a b -> pure (shiftL a (fromIntegral b))
                 |]))
-  ">>" -> pure ($(Quotation.quoteAction [|
+  ">>" -> pure ($(Quotation.quoteIntegerAction ">>" [|
                 \a b -> pure (shiftR a (fromIntegral b))
                 |]))
   op -> unsupported ("operator " <> op)
@@ -933,6 +970,7 @@ compileLVBody sc e = atLine (S.extractExpression e) $ case e of
       S.Variable _ n -> case lookupVar sc n of
         Just (Var _ (TRef _) _) -> True
         Just (Var{}) -> False
+        Just (ValueVar{}) -> False
         Just (RefVar{}) -> True
         Nothing -> M.member n (cStorage (sC sc))
       fc@S.FunctionCall{} -> case compileE sc fc of Right (CE (TRef _) _) -> True; _ -> False
@@ -969,6 +1007,7 @@ compileStorage' sc = \case
     Just (Var _ (TRef st) i) -> pure (st, $(Quotation.quoteAction [|
                                           \env -> liftIO (readIORef (ref i env))
                                           |]))
+    Just (ValueVar{}) -> typeErr ("local value " <> n <> " used where a storage location is required")
     Just (Var{}) -> typeErr ("local value " <> n <> " used where a storage location is required")
     Nothing -> case M.lookup n (cStorage (sC sc)) of
       Just st -> pure (st, $(Quotation.quoteAction [|
@@ -1736,7 +1775,7 @@ funSig c f = do
       pure (SomeFields (FCons (fromMaybe "" n) t fs))
 
 -- Scope with the parameters as typed locals (first parameter at IZ); storage pointers carry their layout.
-paramScope :: CCtx -> Sig args r -> [T.Text] -> Scope args r
+paramScope :: CCtx -> Sig args r -> [T.Text] -> Scope (RefTypes args) r
 paramScope c (SigNil r) _ = Scope [] r [] Nothing c
 paramScope c (SigCons t rest) (n : ns) = pushVar n t (paramScope c rest ns)
 paramScope c (SigCons t rest) [] = pushVar "" t (paramScope c rest [])
@@ -1763,12 +1802,19 @@ compileFunction c name f = inFun (cName c <> "." <> name) $ do
     -- several named return values: locals, gathered by a bare `return`
     (TTuple fs, _ : _ : _) | length names == fieldsLen fs -> namedReturns sc0 fs names (f ^. funcModifiers) body
     _ -> withModifiers sc0 (f ^. funcModifiers) body
-  pure $ Fun name sig $ namedFunction (cName c <> "." <> name <> "/" <> T.pack (show (sigArity sig))) f $ $(Quotation.quoteAction [|
-                        mkFn sig $ \env -> (runCode inner) env >>= \case
-    Ret v -> pure v
-    RetDynamic ds -> liftIO $ throwIO $ ForwardReturn ds
-    _ -> pure (defaultOf r)
-                        |])
+  let straightLine = null (f ^. funcModifiers) && null names && all simpleStatement body
+      action = case sig of
+        SigNil TUnit | straightLine -> $(Quotation.quoteAction [| void (runCode inner ENil) |])
+        _ -> case r of
+          TUnit | straightLine -> $(Quotation.quoteAction [| mkFn sig (\env -> void (runCode inner env)) |])
+          _ -> $(Quotation.quoteAction [|
+            mkFn sig $ \env -> runCode inner env >>= \case
+              Ret v -> pure v
+              RetDynamic ds -> liftIO $ throwIO $ ForwardReturn ds
+              _ -> pure (defaultOf r) |])
+      simpleStatement S.SimpleStatement{} = True
+      simpleStatement _ = False
+  pure $ Fun name sig $ namedFunction (cName c <> "." <> name <> "/" <> T.pack (show (sigArity sig))) f action
 
 -- Push each named return value as a local; `return;` reads them back as a tuple.
 namedReturns :: forall ls ts. Scope ls (HL ts) -> Fields ts -> [T.Text] -> [(T.Text, [Expression])] -> [Statement] -> C (Code (Env ls -> M (Flow (HL ts))))
@@ -1836,7 +1882,7 @@ withModifier sc mn margs inner = do
   let r = sRet sc
       -- hidden slot: a `return` inside the body is stashed here by `_` and the modifier continues
       sc1 = (pushVar "$rawRet" (TMaybe TVariadic) (pushVar "$ret" (TMaybe r) sc))
-        { sInner = Just (typedBody (SomeTy (TMaybe TVariadic) : SomeTy (TMaybe r) : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& _ :& env) -> runCode inner env |])) }
+        { sInner = Just (typedBody (RefSlot (TMaybe TVariadic) : RefSlot (TMaybe r) : scopeTypes sc) r $(Quotation.quoteAction [| \e -> case e of (_ :& _ :& env) -> runCode inner env |])) }
   k <- withParams @_ @_ @(Flow r) sc1 params $ \sc2 -> do
     bodyK <- compileBlock sc2 mbody
     retSlot <- maybe (err Internal "lost $ret") pure (lookupVar sc2 "$ret")
@@ -1874,6 +1920,44 @@ withParams sc ((n, SomeTy t, e) : ps) k = do
 
 -- ---------------------------------------------------------------- statements
 
+-- Straight-line scalar locals need values, not mutable references. Nested writes
+-- and control flow retain the general local representation.
+scalarLocal :: Ty t -> Bool
+scalarLocal = \case
+  TInt -> True; TDecimal -> True; TBool -> True; TAddr -> True
+  TStr -> True; TBytes -> True; TEnum{} -> True; TContract{} -> True
+  _ -> False
+
+valueLocalTail :: Scope ls r -> T.Text -> [Statement] -> Bool
+valueLocalTail sc name = all safeStatement
+  where
+    safeStatement (S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" lhs rhs)) _) =
+      readOnly lhs && readOnly rhs && case lhs of
+        S.Variable _ n | n == name -> case compileStorage sc rhs of Right _ -> False; _ -> True
+        _ -> not (localDestination lhs)
+    safeStatement (S.SimpleStatement (S.ExpressionStatement e) _) = readOnly e
+    safeStatement (S.Return (Just e) _) = readOnly e
+    safeStatement _ = False
+    localDestination = \case
+      S.Variable _ n -> n == name
+      S.MemberAccess _ e _ -> localDestination e
+      S.IndexAccess _ e _ -> localDestination e
+      S.InlineBoundsCheck _ _ _ e -> localDestination e
+      S.TupleExpression _ es -> any (maybe False localDestination) es
+      _ -> True
+    readOnly = \case
+      S.Variable{} -> True; S.NumberLiteral{} -> True; S.DecimalLiteral{} -> True
+      S.BoolLiteral{} -> True; S.StringLiteral{} -> True; S.AddressLiteral{} -> True; S.HexaLiteral{} -> True
+      S.InlineBoundsCheck _ _ _ e -> readOnly e
+      S.Binary _ op l r -> op `elem` ["+", "-", "*", "/", "%", "**", "<<", ">>", "&", "|", "^", "==", "!=", "<", ">", "<=", ">=", "&&", "||"] && readOnly l && readOnly r
+      S.Unitary _ op e -> op `elem` ["!", "-", "~", "+"] && readOnly e
+      S.MemberAccess _ e _ -> readOnly e
+      S.IndexAccess _ e i -> readOnly e && maybe True readOnly i
+      S.Ternary _ c a b -> all readOnly [c, a, b]
+      S.TupleExpression _ es -> all (maybe True readOnly) es
+      S.ArrayExpression _ es -> all readOnly es
+      _ -> False
+
 compileBlock :: Scope ls r -> [Statement] -> C (Code (Env ls -> M (Flow r)))
 compileBlock sc body = typedBody (scopeTypes sc) (sRet sc) <$> compileBlockBody sc body
 
@@ -1881,11 +1965,7 @@ compileBlockBody :: Scope ls r -> [Statement] -> C (Code (Env ls -> M (Flow r)))
 compileBlockBody _ [] = pure ($(Quotation.quoteAction [|
                           \_ -> pure Next
                           |]))
-compileBlockBody sc statements@(_ : _) = do
-  action <- compileBlockStatements sc statements
-  pure $ $(Quotation.quoteAction [|
-         \env -> charged 1 ((runCode action) env)
-         |])
+compileBlockBody sc statements@(_ : _) = compileBlockStatements sc statements
 
 compileBlockStatements :: Scope ls r -> [Statement] -> C (Code (Env ls -> M (Flow r)))
 compileBlockStatements _ [] = pure ($(Quotation.quoteAction [|
@@ -1903,12 +1983,12 @@ compileBlockStatements sc (s : rest) = case s of
           SStruct{} | loc /= Just S.Storage -> do
             SomeTy t <- stypeTy st
             k <- compileBlock (pushVar n (TAlias t st) sc) rest
-            pure $ $(Quotation.quoteAction [|
+            pure $ $(Quotation.quoteBlockAction [|
                    \env -> do p <- (runCode pathOf) env; rr <- liftIO (newIORef (Left p)); (runCode k) (rr :& env)
                    |])
           _ -> do
             k <- compileBlock (pushVar n (TRef st) sc) rest
-            pure $ $(Quotation.quoteAction [|
+            pure $ $(Quotation.quoteBlockAction [|
                    \env -> do p <- (runCode pathOf) env; rr <- liftIO (newIORef p); (runCode k) (rr :& env)
                    |])
       else do
@@ -1916,10 +1996,19 @@ compileBlockStatements sc (s : rest) = case s of
         initF <- maybe (pure ($(Quotation.quoteAction [|
                               \_ -> pure (defaultOf t)
                               |]))) (compileAs sc t) mInit
-        k <- compileBlock (pushVar n t sc) rest
-        pure $ $(Quotation.quoteAction [|
-               \env -> do v <- (runCode initF) env; rr <- liftIO (newIORef v); (runCode k) (rr :& env)
-               |])
+        if scalarLocal t && valueLocalTail sc n rest
+          then do
+            let known = mInit >>= knownInteger sc
+                sc' = Scope (ValueVar n t IZ known : map weaken (sVars sc)) (sRet sc) (sNamedRet sc)
+                  (fmap (\f -> $(Quotation.quoteAction [| \e -> case e of (_ :& env) -> runCode f env |])) (sInner sc)) (sC sc)
+            k <- compileBlock sc' rest
+            pure $(Quotation.quoteBlockAction [|
+              \env -> do value <- runCode initF env; runCode k (value :& env) |])
+          else do
+            k <- compileBlock (pushVar n t sc) rest
+            pure $ $(Quotation.quoteBlockAction [|
+                   \env -> do v <- (runCode initF) env; rr <- liftIO (newIORef v); (runCode k) (rr :& env)
+                   |])
   S.SimpleStatement (S.VariableDefinition [S.VarDefEntry Nothing _ _ _] _) a -> atLine a (unsupported "untyped `var` declaration")
   S.SimpleStatement (S.VariableDefinition entries (Just initE)) a -> atLine a $ do
     -- (T1 a, T2 b) = rhs
@@ -1927,32 +2016,49 @@ compileBlockStatements sc (s : rest) = case s of
     case rt' of
       TStruct _ fs -> do
         k <- destructure sc fs entries rest
-        pure $ $(Quotation.quoteAction [|
+        pure $ $(Quotation.quoteBlockAction [|
                \env -> (runCode rf) env >>= (runCode k) env
                |])
       TTuple fs -> do
         k <- destructure sc fs entries rest
-        pure $ $(Quotation.quoteAction [|
+        pure $ $(Quotation.quoteBlockAction [|
                \env -> (runCode rf) env >>= (runCode k) env
                |])
       TRaw -> do
         k <- destructureRaw sc entries rest
-        pure $ $(Quotation.quoteAction [|
+        pure $ $(Quotation.quoteBlockAction [|
                \env -> (runCode rf) env >>= (runCode k) env
                |])
       _ -> typeErr ("destructuring a non-tuple " <> showTy rt')
   S.SimpleStatement (S.VariableDefinition _ Nothing) a -> atLine a (typeErr "tuple declaration without an initialiser")
+  S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ name) rhs)) a
+    | Just (ValueVar _ t i _) <- lookupVar sc name -> atLine a $ do
+        valueF <- compileAs sc t rhs
+        let sc' = sc { sVars = updateKnown (sVars sc) }
+            updateKnown (ValueVar n vt ix _ : vs) | n == name = ValueVar n vt ix (knownInteger sc rhs) : vs
+            updateKnown (v : vs) = v : updateKnown vs
+            updateKnown [] = []
+        k <- compileBlock sc' rest
+        case i of
+          IZ -> pure $(Quotation.quoteBlockAction [|
+            \env@(_ :& outer) -> do
+              value <- charged 1 (runCode valueF env)
+              runCode k (value :& outer) |])
+          _ -> pure $(Quotation.quoteBlockAction [|
+            \env -> do
+              value <- charged 1 (runCode valueF env)
+              runCode k (replaceValue i value env) |])
   S.SimpleStatement (S.ExpressionStatement e) a -> atLine a $ do
     CE _ action <- compileStatementExpression sc e
     case rest of
-      [] -> pure $(Quotation.quoteAction [| \env -> Next <$ runCode action env |])
+      [] -> pure $(Quotation.quoteBlockAction [| \env -> Next <$ runCode action env |])
       _ -> do
         k <- compileBlock sc rest
-        pure $(Quotation.quoteAction [| \env -> runCode action env >> runCode k env |])
+        pure $(Quotation.quoteBlockAction [| \env -> runCode action env >> runCode k env |])
   _ -> do
     sf <- compileStmt sc s
     k <- compileBlock sc rest
-    pure $ $(Quotation.quoteAction [|
+    pure $ $(Quotation.quoteBlockAction [|
            \env -> (runCode sf) env >>= \case
       Next -> (runCode k) env
       fl -> pure fl
@@ -2281,7 +2387,7 @@ getterArity (SMap _ v) = 1 + getterArity v
 getterArity (SArray v) = 1 + getterArity v
 getterArity _ = 0
 
-data Getter = forall args r. Getter (Sig args r) (Code (StoragePath -> Env args -> M r))
+data Getter = forall args r. Getter (Sig args r) (Code (StoragePath -> Env (RefTypes args) -> M r))
 
 getterEntry :: CCtx -> T.Text -> SType -> FunEntry
 getterEntry c n st = FunEntry (fst <$> g) (snd <$> g)

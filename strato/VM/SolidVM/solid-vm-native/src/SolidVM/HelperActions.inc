@@ -17,7 +17,7 @@
         RetDynamic ds -> pure (RetDynamic ds)
         _ -> stepF env >> go
 
-  snapshot :: Sig args r -> Env args -> M [Dyn]
+  snapshot :: Sig args r -> Env (RefTypes args) -> M [Dyn]
   snapshot (SigNil _) ENil = pure []
   snapshot (SigCons t rest) (slot :& env) =
     (:) <$> (Dyn t <$> liftIO (readIORef slot)) <*> snapshot rest env
