@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell, ScopedTypeVariables, CPP, DataKinds, GADTs, TypeOperators, LambdaCase, OverloadedStrings #-}
 -- Quotations have two concrete build-time interpretations. Execution erases
 -- all inspection machinery; inspection substitutes the captured expressions.
-module SolidVM.Quotation (execute, inspect, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, blockAction) where
+module SolidVM.Quotation (execute, inspect, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, integerSequence, blockAction) where
 
 import Language.Haskell.TH hiding (Code)
 import Language.Haskell.TH.Syntax (liftData)
@@ -140,6 +140,34 @@ integerExpression backend operator left right after = do
       pure (NoBindS before : statements, result)
     splitValue (AppE (VarE pureName) value) | pureName == 'pure = pure ([], value)
     splitValue _ = fail "atomic integer expression must contain charges followed by a pure value"
+
+-- Join the statement templates before either backend constructs an action.
+-- No initializer, arithmetic, or store action is captured by the resulting block.
+integerSequence :: (Q Exp -> Q Exp) -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp
+integerSequence backend operator initial left right after final =
+  integerExpression fused operator left right after
+  where
+    fused middle = do
+      (initialStatements, initialValue) <- initial >>= splitValue
+      (middleStatements, middleValue) <- middle >>= applyValue initialValue >>= splitValue
+      finalBody <- final >>= applyValue middleValue
+      backend $ pure $ DoE Nothing $ initialStatements ++ middleStatements ++
+        case finalBody of DoE Nothing statements -> statements; _ -> [NoBindS finalBody]
+    applyValue value (LamE [VarP name] body) = pure $ transform (\case
+      VarE n | n == name -> value
+      expression -> expression) body
+    applyValue _ (LamE [WildP] body) = pure body
+    applyValue _ _ = fail "sequential integer action must have one scalar argument"
+    splitValue (InfixE (Just before) (VarE thenName) (Just rest)) | thenName == '(>>) = do
+      (statements, value) <- splitValue rest
+      pure (NoBindS before : statements, value)
+    splitValue (DoE Nothing statements) = case reverse statements of
+      NoBindS result : preceding -> do
+        (following, value) <- splitValue result
+        pure (reverse preceding ++ following, value)
+      _ -> fail "sequential integer action must end in a pure value"
+    splitValue (AppE (VarE pureName) value) | pureName == 'pure = pure ([], value)
+    splitValue _ = fail "sequential integer action must contain charges followed by a pure value"
 
 blockAction :: Q Exp -> Q Exp
 blockAction quotation = do

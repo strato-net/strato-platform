@@ -232,8 +232,24 @@ publicModule modul name = case modul of
 flattenDeclaration :: TH.Dec -> IO TH.Dec
 flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = do
   (body, (_, bindings, _)) <- State.runStateT (lower rootExpression) (0 :: Int, [], M.empty)
-  pure $ TH.ValD pattern (TH.NormalB (if null bindings then body else TH.LetE (reverse bindings) body)) declarations
+  let (body', bindings') = case body of
+        TH.VarE name
+          | take 7 (TH.nameBase name) == "action_"
+          , [rhs] <- [expression | TH.ValD (TH.VarP n) (TH.NormalB expression) [] <- bindings, n == name]
+          , let remaining = filter (\case
+                  TH.ValD (TH.VarP n) _ _ -> n /= name
+                  TH.SigD n _ -> n /= name
+                  _ -> True) bindings
+          , not (references name (rhs, remaining)) ->
+              (case [annotation | TH.SigD n annotation <- bindings, n == name] of
+                 [annotation] -> TH.SigE rhs annotation
+                 _ -> rhs, remaining)
+        _ -> (body, bindings)
+  pure $ TH.ValD pattern (TH.NormalB (if null bindings' then body' else TH.LetE (reverse bindings') body')) declarations
   where
+    references :: Data a => TH.Name -> a -> Bool
+    references name x = maybe False (\case TH.VarE n -> n == name; _ -> False) (Data.cast x)
+      || or (gmapQ (references name) x)
     -- Preserve sharing in the compiler's closure graph rather than expanding
     -- the same captured action once for every use. Stable names are inspection
     -- bookkeeping only; they do not enter the executable compiler.

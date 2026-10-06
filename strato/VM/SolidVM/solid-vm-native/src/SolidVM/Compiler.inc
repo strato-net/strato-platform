@@ -2007,8 +2007,11 @@ compileLinearInteger c (S.SimpleStatement (S.VariableDefinition [S.VarDefEntry (
   let charges = chargeUnits units
       initializer = $(Quotation.quoteAction [| chargeGas 1 >> runCode charges >> pure value |])
       sc = Scope [ValueVar name TInt IZ (Just value)] TUnit [] Nothing c
-  (steps, final) <- commands sc rest
-  pure (bindCodeChain name initializer steps final)
+  case fusedIntegerSequence sc name value units rest of
+    Just action -> Just action
+    Nothing -> do
+      (steps, final) <- commands sc rest
+      pure (bindCodeChain name initializer steps final)
   where
     commands :: Scope '[Integer] () -> [Statement] -> Maybe ([Code (Integer -> M Integer)], Code (Integer -> M ()))
     commands _ [] = Just ([], $(Quotation.quoteAction [| \_ -> pure () |]))
@@ -2038,14 +2041,8 @@ linearIntegerExpression sc expression before = case integerAtom sc expression of
     let charges = chargeUnits units in Just $(Quotation.quoteAction [|
       \x -> runCode before >> runCode charges >> pure x |])
   Nothing -> do
-    let peel count (S.InlineBoundsCheck _ lo hi inner) | boundsImplied sc lo hi inner = peel (count + 1) inner
-        peel count e = (e, count)
-        (base, units) = peel 1 expression
-    S.Binary _ symbol left right <- Just base
-    (lhs, leftUnits) <- integerAtom sc left
-    (rhs, rightUnits) <- integerAtom sc right
-    let op = T.pack symbol
-        leftCharges = chargeUnits leftUnits
+    (op, lhs, leftUnits, rhs, rightUnits, units) <- integerBinaryAtoms sc expression
+    let leftCharges = chargeUnits leftUnits
         rightCharges = chargeUnits rightUnits
         charges = chargeUnits units
     case (lhs, rhs) of
@@ -2065,6 +2062,70 @@ linearIntegerExpression sc expression before = case integerAtom sc expression of
         [| \_ -> runCode before >> runCode leftCharges >> pure a |]
         [| \_ -> runCode rightCharges >> pure b |]
         [| runCode charges |])
+
+integerBinaryAtoms :: Scope ls r -> Expression -> Maybe (T.Text, IntegerAtom ls, Int, IntegerAtom ls, Int, Int)
+integerBinaryAtoms sc expression = do
+  let peel count (S.InlineBoundsCheck _ lo hi inner) | boundsImplied sc lo hi inner = peel (count + 1) inner
+      peel count e = (e, count)
+      (base, units) = peel 1 expression
+  S.Binary _ symbol left right <- Just base
+  (lhs, leftUnits) <- integerAtom sc left
+  (rhs, rightUnits) <- integerAtom sc right
+  pure (T.pack symbol, lhs, leftUnits, rhs, rightUnits, units)
+
+-- Fuse a scalar initialization, arithmetic assignment, and final storage write.
+-- Other straight-line blocks keep their existing bind-chain compilation.
+fusedIntegerSequence :: Scope '[Integer] () -> T.Text -> Integer -> Int -> [Statement] -> Maybe (Code (M ()))
+fusedIntegerSequence sc name value initialUnits
+  [S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ assigned) expression)) _,
+   S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ target) source)) _] = do
+  guard (assigned == name && target /= name)
+  guard $ case M.lookup target (cStorage (sC sc)) of Just (SScalar (SomeTy TInt)) -> True; _ -> False
+  let nextScope = sc { sVars = [ValueVar name TInt IZ (knownInteger sc expression)] }
+  (IntegerLocal, storeUnits) <- integerAtom nextScope source
+  (op, lhs, leftUnits, rhs, rightUnits, units) <- integerBinaryAtoms sc expression
+  case (lhs, rhs) of
+    (IntegerLocal, IntegerLiteral b) -> $(Quotation.quoteIntegerSequence [| op |]
+      [| chargeGas 1 >> replicateM_ initialUnits (chargeGas 1) >> pure value |]
+      [| \x -> chargeGas 1 >> chargeGas 1 >> replicateM_ leftUnits (chargeGas 1) >> pure x |]
+      [| \_ -> replicateM_ rightUnits (chargeGas 1) >> pure b |]
+      [| replicateM_ units (chargeGas 1) |]
+      [| \x -> do
+        chargeGas 1
+        chargeGas 1
+        replicateM_ storeUnits (chargeGas 1)
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) x |])
+    (IntegerLiteral a, IntegerLocal) -> $(Quotation.quoteIntegerSequence [| op |]
+      [| chargeGas 1 >> replicateM_ initialUnits (chargeGas 1) >> pure value |]
+      [| \_ -> chargeGas 1 >> chargeGas 1 >> replicateM_ leftUnits (chargeGas 1) >> pure a |]
+      [| \x -> replicateM_ rightUnits (chargeGas 1) >> pure x |]
+      [| replicateM_ units (chargeGas 1) |]
+      [| \x -> do
+        chargeGas 1
+        chargeGas 1
+        replicateM_ storeUnits (chargeGas 1)
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) x |])
+    (IntegerLocal, IntegerLocal) -> $(Quotation.quoteIntegerSequence [| op |]
+      [| chargeGas 1 >> replicateM_ initialUnits (chargeGas 1) >> pure value |]
+      [| \x -> chargeGas 1 >> chargeGas 1 >> replicateM_ leftUnits (chargeGas 1) >> pure x |]
+      [| \x -> replicateM_ rightUnits (chargeGas 1) >> pure x |]
+      [| replicateM_ units (chargeGas 1) |]
+      [| \x -> do
+        chargeGas 1
+        chargeGas 1
+        replicateM_ storeUnits (chargeGas 1)
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) x |])
+    (IntegerLiteral a, IntegerLiteral b) -> $(Quotation.quoteIntegerSequence [| op |]
+      [| chargeGas 1 >> replicateM_ initialUnits (chargeGas 1) >> pure value |]
+      [| \_ -> chargeGas 1 >> chargeGas 1 >> replicateM_ leftUnits (chargeGas 1) >> pure a |]
+      [| \_ -> replicateM_ rightUnits (chargeGas 1) >> pure b |]
+      [| replicateM_ units (chargeGas 1) |]
+      [| \x -> do
+        chargeGas 1
+        chargeGas 1
+        replicateM_ storeUnits (chargeGas 1)
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) x |])
+fusedIntegerSequence _ _ _ _ _ = Nothing
 
 linearIntegerWrite :: Scope '[Integer] () -> T.Text -> Expression -> Maybe (Code (Integer -> M ()))
 linearIntegerWrite sc target rhs = do

@@ -1,6 +1,6 @@
-module SolidVM.Quotation.Execution (quoteAction, quoteIntegerSize, quoteIntegerAction, quoteIntegerPrimitive, quoteIntegerExpression, quoteBlockAction, helperDeclarations) where
+module SolidVM.Quotation.Execution (quoteAction, quoteIntegerSize, quoteIntegerAction, quoteIntegerPrimitive, quoteIntegerExpression, quoteIntegerSequence, quoteBlockAction, helperDeclarations) where
 import Language.Haskell.TH (Q, Exp)
-import SolidVM.Quotation (execute, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, blockAction)
+import SolidVM.Quotation (execute, helperDeclarations, integerSize, integerAction, integerPrimitive, integerExpression, integerSequence, blockAction)
 quoteAction :: Q Exp -> Q Exp
 quoteAction = execute
 
@@ -14,6 +14,9 @@ quoteIntegerPrimitive op = execute (integerAction op (integerPrimitive op))
 
 quoteIntegerExpression :: Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp
 quoteIntegerExpression = integerExpression execute
+
+quoteIntegerSequence :: Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp -> Q Exp
+quoteIntegerSequence = integerSequence execute
 
 quoteBlockAction :: Q Exp -> Q Exp
 quoteBlockAction quotation = execute (blockAction quotation)
