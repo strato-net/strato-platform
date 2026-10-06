@@ -517,6 +517,7 @@ async function inspect(context, artifacts, options = {}) {
     }
   }
   const ready = checks.every(({ status }) => status === "PASSED");
+  const failedCheckNames = checks.filter(({ status }) => status === "FAILED").map(({ name }) => name);
   const configurationStatus = (name) => {
     const checkResult = checks.find((item) => item.name === name);
     if (checkResult?.status === "PASSED") return "DONE";
@@ -556,7 +557,9 @@ async function inspect(context, artifacts, options = {}) {
         : unverifiedSafeConfiguration
           ? "EAB configuration could not be verified. Do not execute generated Safe files; rerun status after the failed reads recover"
           : activationChecksRequired
-          ? "EAB step 6.1 is complete. Continue BRIDGE_ROLLOUT.md steps 6.2 (STRATO native routes), 6.3 (external native Safe), and 7 (verifiers and Runtime), then rerun status"
+          ? failedCheckNames.length
+            ? `Resolve failed activation checks (${failedCheckNames.join(", ")}); activation governance remains blocked until they pass`
+            : "Resolve remaining activation readiness checks and rerun status"
           : "Resolve failed EAB readiness checks and rerun status"
       : router.paused ? "Review activation, then generate the Safe unpause file with activate --approve" : "Reconcile canary custody and issuance before declaring launch complete",
   };
@@ -854,11 +857,13 @@ function operatorGuidance(report, args, artifacts, context, environmentFile) {
       activateCommand: `npm run external:rollout -- activate ${common.join(" ")} --approve ${report.approvalHash}`,
     };
   }
-  const nextSteps = report.activationChecksRequired && safeChecklist?.every(({ status }) => status === "DONE")
+  const failedChecks = report.checks?.filter(({ status }) => status === "FAILED").map(({ name }) => name) || [];
+  const nextSteps = report.activationChecksRequired && !failedChecks.length &&
+    safeChecklist?.every(({ status }) => status === "DONE")
     ? nativeDeploymentSteps(context, args) : [];
   return {
     action: report.next,
-    failedChecks: report.checks?.filter(({ status }) => status === "FAILED").map(({ name }) => name) || [],
+    failedChecks,
     nextSteps,
     safeChecklist,
     environment,

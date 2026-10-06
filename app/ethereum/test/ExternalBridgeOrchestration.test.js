@@ -780,7 +780,26 @@ test("activation enablement remains blocked when service and external gates fail
   const action = inspection.report.calls.find(({ call }) => call.args._func === "setDepositAction");
   assert.equal(action.status, "BLOCKED");
   assert.match(action.reason, /verifier policies/);
+  assert.doesNotMatch(inspection.report.next, /steps 6\.2|steps 6\.3/);
   assert.throws(() => activate(f.context, f.artifacts, inspection, inspection.report.approvalHash), /gates/);
+});
+
+test("failed activation checks do not repeat unverified native deployment reminders", () => {
+  const report = {
+    status: "PENDING",
+    next: "Resolve failed activation checks (verifiers, bridge-health); activation governance remains blocked until they pass",
+    activationChecksRequired: true,
+    checks: [
+      { name: "verifiers", status: "FAILED" },
+      { name: "bridge-health", status: "FAILED" },
+    ],
+    calls: [],
+    safe: { executionOrder: [{ step: "configure-vault", status: "DONE" }] },
+  };
+  const guidance = operatorGuidance(report, { manifest: "/secure/manifest.json", stage: "activation" }, {});
+  assert.deepEqual(guidance.failedChecks, ["verifiers", "bridge-health"]);
+  assert.deepEqual(guidance.nextSteps, []);
+  assert.doesNotMatch(guidance.action, /steps 6\.2|steps 6\.3/);
 });
 
 test("activation cannot vote after fresh gates fail", async (t) => {

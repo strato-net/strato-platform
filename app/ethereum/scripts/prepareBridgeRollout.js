@@ -238,7 +238,9 @@ function prepare(input, state, external = {}) {
       autoRouteEnabled: autoRouteEnabled === REQUIRED ? true : autoRouteEnabled,
     };
     items.push({ token, target, isPermitted: true, externalDecimals: uint(route.externalDecimals),
-      externalName: route.externalName || REQUIRED, externalSymbol: route.externalSymbol || REQUIRED, stratoTokenStatus: uint(state.tokens?.[target]?.status) });
+      externalName: route.externalName || REQUIRED,
+      externalSymbol: token === ethers.ZeroAddress ? "ETH" : route.externalSymbol || REQUIRED,
+      stratoTokenStatus: uint(state.tokens?.[target]?.status) });
   }
   const native = (input.nativeRoutes || []).map(route => {
     const token = address(route.stratoToken);

@@ -30,6 +30,11 @@ test('different external decimals never copy raw limits', () => {
   const result = prepare({ ...input, eabRoutes:[{ ...input.eabRoutes[0], externalDecimals:'18' }] }, state);
   assert.equal(result.policy.tokens[a(2)].maxPerWithdrawal, 'REVIEW_REQUIRED');
 });
+test('native external routes use the canonical ETH symbol', () => {
+  const route = { ...input.eabRoutes[0], externalToken: a(0), externalSymbol: 'Eth' };
+  const result = prepare({ ...input, eabRoutes:[route] }, state);
+  assert.equal(result.depositPlan.operations[0].transactions[0].meta.items[0].externalSymbol, 'ETH');
+});
 test('pagination continues under a server row cap', async () => {
   const offsets = [];
   const rows = await readRows(input.source, 'mapping', {}, 'secret', async url => {
