@@ -62,12 +62,13 @@ main = hspec $ do
       T.isInfixOf (T.replicate 64 "0") sql `shouldBe` True
     it "uses declared bytes types for nested view keys, preserving numeric and address keys" $ do
       queries <- runNoLoggingT $ runConduit $
-        (createCollectionTable ("Test", "Keys") def emptyCodeCollection []
+        (createCollectionTable ("Test", "Keys") def emptyCodeCollection
           ("counts", [SVMType.Bytes Nothing (Just 32), SVMType.Int Nothing Nothing, SVMType.Address False, SVMType.Bytes Nothing Nothing], SVMType.Int Nothing Nothing) >> pure ()) .| sinkList
       case queries of
         [query@CreateView{}] -> do
           viewColumns query `shouldBe` [([("key", SqlBytesKey), ("key2", SqlDecimal), ("key3", SqlText), ("key4", SqlBytesKey)], "key")]
-          let sql = slipstreamQueryPostgres query
+          -- column expressions travel to slipstream_upsert_view as quoted literals
+          let sql = T.replace "''" "'" $ slipstreamQueryPostgres query
           T.isInfixOf "THEN s.\"key\"->>'key_hex'" sql `shouldBe` True
           T.isInfixOf "THEN s.\"key\"->>'key4_hex'" sql `shouldBe` True
           T.isInfixOf "->>'key2')::numeric" sql `shouldBe` True

@@ -306,129 +306,128 @@ slipstreamQueryText _ CreateView{..} =
               , deeperKey
               , "')), '[]'::jsonb) END"
               ]
+      outName c = if c `Set.member` baseColumnSet then "arg_" <> c else c
+      columnExpr dataColumn (c, t) = T.concat
+        [ "CASE WHEN jsonb_exists(s."
+        , wrapEscapeDouble dataColumn
+        , ", '"
+        , c
+        , "') "
+        , case t of
+            SqlDecimal -> T.concat
+              [ "AND (s."
+              , wrapEscapeDouble dataColumn
+              , "->>'"
+              , c
+              , "') ~ '^\\s*-{0,1}\\d+(\\.\\d*){0,1}\\s*$' "
+              ]
+            SqlBool -> T.concat
+              [ "AND jsonb_typeof(s."
+              , wrapEscapeDouble dataColumn
+              , "->'"
+              , c
+              , "') = 'string' "
+              ]
+            _ -> ""
+        , case t of
+            SqlBytesKey -> T.concat
+              [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
+            SqlJsonbArray -> T.concat
+              [ "THEN jsonb_obj_to_array(s."
+              , wrapEscapeDouble dataColumn
+              , "->'"
+              , c
+              , "')"
+              , " ELSE '[]'::jsonb"
+              ]
+            SqlJsonb -> T.concat
+              [ "THEN (s."
+              , wrapEscapeDouble dataColumn
+              , "->'"
+              , c
+              , "')"
+              , " ELSE to_jsonb(''::text)"
+              ]
+            _ -> T.concat
+              [ "THEN (s."
+              , wrapEscapeDouble dataColumn
+              , "->>'"
+              , c
+              , "')"
+              , case t of
+                  SqlDecimal -> "::numeric"
+                  SqlBool -> " = 'true'"
+                  _ -> ""
+              , " ELSE "
+              , case t of
+                  SqlBool      -> "false::boolean"
+                  SqlDecimal   -> "0::numeric"
+                  SqlText      -> "''::text"
+                  SqlTimestamp -> "'infinity'::timestamp)"
+                  SqlSerial    -> "0::numeric"
+              ]
+        , " END"
+        ]
+      fieldExpr dataColumn (c, t) = case t of
+        SqlJsonbArray -> arrayFieldColumn dataColumn c
+        _ -> T.concat
+          [ "to_jsonb(CASE WHEN jsonb_exists(s."
+          , wrapEscapeDouble dataColumn
+          , ", '"
+          , c
+          , "') "
+          , case t of
+              SqlJsonb -> T.concat
+                [ "THEN (s."
+                , wrapEscapeDouble dataColumn
+                , "->'"
+                , c
+                , "')"
+                ]
+              _ -> T.concat
+                [ "THEN (s."
+                , wrapEscapeDouble dataColumn
+                , "->>'"
+                , c
+                , "')"
+                ]
+          , case t of
+              SqlBool -> "::text = 'true'"
+              _ -> ""
+          , " ELSE "
+          , case t of
+              SqlBool      -> "false::boolean"
+              SqlDecimal   -> "'0'::text"
+              SqlText      -> "''::text"
+              SqlBytesKey  -> "NULL::text"
+              SqlJsonb     -> "to_jsonb(''::text)"
+              SqlTimestamp -> "'infinity'::timestamp)"
+              SqlSerial    -> "0::numeric"
+          , " END)"
+          ]
       -- The view is handed to slipstream_upsert_view rather than dropped and
       -- recreated here: DROP VIEW ... CASCADE takes every fkey function touching
       -- the view with it, including those owned by contracts that are not part of
       -- this code collection and so would never be recreated (#5665).
-      upsertView body = T.concat
-        [ "CALL slipstream_upsert_view("
-        , wrapEscapeSingle $ tableNameToTextPostgres viewName
-        , ", "
-        , wrapEscapeSingle body
-        , ");\n"
-        ]
-   in upsertView . T.concat $
-        [ "SELECT "
-        , T.intercalate ", " $
-            (("s." <>) <$> sourceTableColumns)
-         ++ (("x." <>) <$> codeTableColumns)
-         ++ (("c." <>) <$> contractTableColumns)
-         ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
-            [ "CASE WHEN jsonb_exists(s."
-            , wrapEscapeDouble dataColumn
-            , ", '"
-            , c
-            , "') "
-            , case t of
-                SqlDecimal -> T.concat
-                  [ "AND (s."
-                  , wrapEscapeDouble dataColumn
-                  , "->>'"
-                  , c
-                  , "') ~ '^\\s*-{0,1}\\d+(\\.\\d*){0,1}\\s*$' "
-                  ]
-                SqlBool -> T.concat
-                  [ "AND jsonb_typeof(s."
-                  , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "') = 'string' "
-                  ]
-                _ -> ""
-            , case t of
-                SqlBytesKey -> T.concat
-                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
-                SqlJsonbArray -> T.concat
-                  [ "THEN jsonb_obj_to_array(s."
-                  , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "')"
-                  , " ELSE '[]'::jsonb"
-                  ]
-                SqlJsonb -> T.concat
-                  [ "THEN (s."
-                  , wrapEscapeDouble dataColumn
-                  , "->'"
-                  , c
-                  , "')"
-                  , " ELSE to_jsonb(''::text)"
-                  ]
-                _ -> T.concat
-                  [ "THEN (s."
-                  , wrapEscapeDouble dataColumn
-                  , "->>'"
-                  , c
-                  , "')"
-                  , case t of
-                      SqlDecimal -> "::numeric"
-                      SqlBool -> " = 'true'"
-                      _ -> ""
-                  , " ELSE "
-                  , case t of
-                      SqlBool      -> "false::boolean"
-                      SqlDecimal   -> "0::numeric"
-                      SqlText      -> "''::text"
-                      SqlTimestamp -> "'infinity'::timestamp)"
-                      SqlSerial    -> "0::numeric"
-                  ]
-            , " END AS "
-            , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
-            ]) <$> cols') viewColumns
-         ++ ((\(cols', dataColumn) ->
-            (<> T.concat [") AS ", wrapEscapeDouble dataColumn])
-            . ("jsonb_build_object(" <>)
-            . T.intercalate ", " $ concatMap (\(c, t) ->
-            [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
-            , case t of
-                SqlJsonbArray -> arrayFieldColumn dataColumn c
-                _ -> T.concat
-                  [ "to_jsonb(CASE WHEN jsonb_exists(s."
-                  , wrapEscapeDouble dataColumn
-                  , ", '"
-                  , c
-                  , "') "
-                  , case t of
-                      SqlJsonb -> T.concat
-                        [ "THEN (s."
-                        , wrapEscapeDouble dataColumn
-                        , "->'"
-                        , c
-                        , "')"
-                        ]
-                      _ -> T.concat
-                        [ "THEN (s."
-                        , wrapEscapeDouble dataColumn
-                        , "->>'"
-                        , c
-                        , "')"
-                        ]
-                  , case t of
-                      SqlBool -> "::text = 'true'"
-                      _ -> ""
-                  , " ELSE "
-                  , case t of
-                      SqlBool      -> "false::boolean"
-                      SqlDecimal   -> "'0'::text"
-                      SqlText      -> "''::text"
-                      SqlBytesKey  -> "NULL::text"
-                      SqlJsonb     -> "to_jsonb(''::text)"
-                      SqlTimestamp -> "'infinity'::timestamp)"
-                      SqlSerial    -> "0::numeric"
-                  , " END)"
-                  ]
-            ]) cols') <$> jsonbColumns)
-        , " FROM "
+      -- Each column goes to slipstream_upsert_view as a (slot, name, expression)
+      -- fragment: slot '' is a view column, any other slot is a key of the jsonb
+      -- column of that name, whose own fragment has no expression. The procedure
+      -- merges them into every column the view has ever had, so registering an
+      -- older copy of a contract cannot take columns away from the view.
+      fragments :: [(Text, Text, Maybe Text)]
+      fragments =
+           [ ("", c, Just $ "s." <> c) | c <- sourceTableColumns ]
+        ++ [ ("", c, Just $ "x." <> c) | c <- codeTableColumns ]
+        ++ [ ("", c, Just $ "c." <> c) | c <- contractTableColumns ]
+        ++ [ ("", outName c, Just $ columnExpr dataColumn col)
+           | (cols', dataColumn) <- viewColumns, col@(c, _) <- cols' ]
+        ++ concat
+           [ ("", dataColumn, Nothing)
+             : [ (dataColumn, outName c, Just $ fieldExpr dataColumn col) | col@(c, _) <- cols' ]
+           | (cols', dataColumn) <- jsonbColumns ]
+      textArray xs = "ARRAY[" <> T.intercalate ", " (maybe "NULL" wrapEscapeSingle <$> xs) <> "]::text[]"
+      fromClause = T.concat
+        [ " FROM "
         , tableNameToDoubleQuoteText sourceTableName
         , " s INNER JOIN "
         , tableNameToText contractTableName
@@ -478,6 +477,20 @@ slipstreamQueryText _ CreateView{..} =
         -- , tableNameToDoubleQuoteText viewName
         -- , ";"
         ]
+   in T.concat
+        [ "CALL slipstream_upsert_view("
+        , wrapEscapeSingle $ tableNameToTextPostgres viewName
+        , ", "
+        , wrapEscapeSingle fromClause
+        , ", "
+        , textArray $ (\(s, _, _) -> Just s) <$> fragments
+        , ", "
+        , textArray $ (\(_, n, _) -> Just n) <$> fragments
+        , ", "
+        , textArray $ (\(_, _, e) -> e) <$> fragments
+        , ");\n"
+        ]
+
 slipstreamQueryText _ InsertTable{..} = T.concat $
   [ "INSERT INTO ",
     tableNameToDoubleQuoteText tableName,
@@ -1251,6 +1264,9 @@ codeTableName = indexTableName "" "code"
 inheritanceTableName :: TableName
 inheritanceTableName = indexTableName "" "contract_inheritance"
 
+viewColumnTableName :: TableName
+viewColumnTableName = indexTableName "" "slipstream_view_column"
+
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"
 
@@ -1374,6 +1390,17 @@ initialSlipstreamQueries =
       Nothing
       []
   , RawSQL backfillInheritanceSQL
+  , CreateTable
+      viewColumnTableName
+      [ ("view_name", SqlText)
+      , ("slot", SqlText)
+      , ("column_name", SqlText)
+      , ("ordinal", SqlDecimal)
+      , ("expr", SqlText)
+      ]
+      ["view_name", "slot", "column_name"]
+      Nothing
+      []
   , RawSQL genericBaseTableIndexesSQL
   , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
@@ -1482,11 +1509,31 @@ jsonbMergeDeepSQL = T.unlines
 -- the view is dropped and recreated, and the functions are replayed. A function
 -- that no longer compiles against the new columns is a stale relationship and is
 -- left dropped.
+--
+-- The select list is the union of every column the view has been registered
+-- with, kept in slipstream_view_column. Registering an older copy of a contract
+-- used to rebuild its view from that copy alone, dropping columns the live logic
+-- still writes. Columns keep the position they were first seen at and new ones
+-- are appended, so CREATE OR REPLACE succeeds unless a column changes type; the
+-- newest expression for a column always wins.
 upsertViewSQL :: Text
 upsertViewSQL = T.unlines
-  [ "CREATE OR REPLACE PROCEDURE slipstream_upsert_view(vname text, vbody text) AS $fn$"
-  , "DECLARE defs text[]; d text;"
+  [ "DROP PROCEDURE IF EXISTS slipstream_upsert_view(text, text);"
+  , "CREATE OR REPLACE PROCEDURE slipstream_upsert_view(vname text, vfrom text, slots text[], names text[], exprs text[]) AS $fn$"
+  , "DECLARE defs text[]; d text; vbody text;"
   , "BEGIN"
+  , "  INSERT INTO " <> vc <> " (view_name, slot, column_name, ordinal, expr)"
+  , "  SELECT DISTINCT ON (f.slot, f.name) vname, f.slot, f.name,"
+  , "         coalesce((SELECT max(t.ordinal) FROM " <> vc <> " t WHERE t.view_name = vname), 0) + f.idx, f.expr"
+  , "    FROM unnest(slots, names, exprs) WITH ORDINALITY AS f(slot, name, expr, idx)"
+  , "   ORDER BY f.slot, f.name, f.idx DESC"
+  , "  ON CONFLICT (view_name, slot, column_name) DO UPDATE SET expr = excluded.expr;"
+  , "  SELECT 'SELECT ' || string_agg(coalesce(t.expr,"
+  , "           'jsonb_build_object(' || coalesce((SELECT string_agg(quote_literal(j.column_name) || ', ' || j.expr, ', ' ORDER BY j.ordinal)"
+  , "                                                FROM " <> vc <> " j WHERE j.view_name = vname AND j.slot = t.column_name), '') || ')')"
+  , "         || ' AS ' || quote_ident(t.column_name), ', ' ORDER BY t.ordinal) || vfrom"
+  , "    INTO vbody"
+  , "    FROM " <> vc <> " t WHERE t.view_name = vname AND t.slot = '';"
   , "  BEGIN"
   , "    EXECUTE format('CREATE OR REPLACE VIEW %I AS %s', vname, vbody);"
   , "    RETURN;"
@@ -1509,6 +1556,7 @@ upsertViewSQL = T.unlines
   , "END;"
   , "$fn$ LANGUAGE plpgsql;"
   ]
+  where vc = tableNameToDoubleQuoteText viewColumnTableName
 
 -- | Views created before the inheritance table existed carry their derived
 -- contracts inline (c.contract_name = 'Parent' OR c.contract_name = 'Child' ...),
