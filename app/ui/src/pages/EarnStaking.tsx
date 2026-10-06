@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, Shield, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
@@ -537,7 +537,7 @@ const OperatorPanel = ({
           </div>
         </div>
 
-        <div className={active || selfBond > 0n ? "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" : "mt-4 grid grid-cols-1 gap-3"}>
+        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
@@ -812,10 +812,6 @@ const EarnStaking = () => {
       : []),
     [info?.operatedValidators, isV2, validators]
   );
-  const showOperatorSelfBond = isV2 ? operatedValidators.length > 0 : !!info?.isOperator;
-  const operatorSelfBondTotal = isV2
-    ? operatedValidators.reduce((total, validator) => total + BigInt(validator.selfBond || "0"), 0n).toString()
-    : operatorValidator?.selfBond;
   // A backend that predates the flag still reports the full validator set, so only an
   // explicit false hides these controls.
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
@@ -1346,16 +1342,6 @@ const EarnStaking = () => {
               tooltip="Your share of the transaction fees earned by the validators you delegate to, paid in USDST."
               value={`${formatToken(info.claimableFees, 18, 2)} USDST`}
               icon={Gift}
-            />
-          )}
-          {showOperatorSelfBond && (
-            <StatCard
-              label="Self-Bond"
-              tooltip={isV2
-                ? "STRATO you've bonded across the validators you operate. Separate from delegated stake."
-                : "STRATO you've bonded as a validator operator. Separate from delegated stake."}
-              value={`${formatToken(operatorSelfBondTotal, decimals)} ${symbol}`}
-              icon={Shield}
             />
           )}
         </div>
