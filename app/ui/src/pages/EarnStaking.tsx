@@ -261,6 +261,15 @@ const readStakingDeepLink = (): string => {
   try { return sessionStorage.getItem(DEEP_LINK_STORAGE_KEY) || ""; } catch { return ""; }
 };
 
+// Share of a validator's proposal slots it actually produced: proposed / (proposed + missed).
+const formatUptime = (proposed: string, missed: string): string => {
+  const p = Number(proposed || "0");
+  const m = Number(missed || "0");
+  if (!Number.isFinite(p) || !Number.isFinite(m) || p + m === 0) return "—";
+  const pct = (p / (p + m)) * 100;
+  return `${pct >= 99.995 ? "100" : pct.toFixed(2)}%`;
+};
+
 // V2: minStake is a self-bond requirement.
 const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
 
@@ -1540,7 +1549,13 @@ const EarnStaking = () => {
                         {validatorSetDeployed && (
                           <div className="rounded-md bg-muted/30 px-3 py-2">
                             <p className="text-xs text-muted-foreground">Blocks</p>
-                            <p className="font-semibold">{validator.blocksProposed} <span className="text-xs font-normal text-muted-foreground">({validator.missedProposals} missed)</span></p>
+                            <p className="font-semibold tabular-nums">{validator.blocksProposed}</p>
+                          </div>
+                        )}
+                        {validatorSetDeployed && (
+                          <div className="rounded-md bg-muted/30 px-3 py-2">
+                            <p className="text-xs text-muted-foreground">Uptime</p>
+                            <p className="font-semibold tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</p>
                           </div>
                         )}
                         <div className="rounded-md bg-muted/30 px-3 py-2">
@@ -1612,7 +1627,7 @@ const EarnStaking = () => {
               </div>
 
               <div className="hidden max-h-[34rem] overflow-auto rounded-lg border border-border md:block">
-                <table className="w-full min-w-[1320px]">
+                <table className="w-full min-w-[1400px]">
                   <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Validator</th>
@@ -1624,7 +1639,12 @@ const EarnStaking = () => {
                       </th>
                       {validatorSetDeployed && (
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed, and proposals it missed when it was the intended proposer." />
+                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed." />
+                        </th>
+                      )}
+                      {validatorSetDeployed && (
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                          <TipLabel label="Uptime" tooltip="Share of this validator's proposal slots it actually produced: blocks proposed over blocks proposed plus proposals missed." />
                         </th>
                       )}
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
@@ -1673,10 +1693,10 @@ const EarnStaking = () => {
                           </td>
                           <td className="px-4 py-3 text-sm"><ValidatorStatusBadge validator={validator} /></td>
                           {validatorSetDeployed && (
-                            <td className="px-4 py-3 text-right text-sm">
-                              {validator.blocksProposed}
-                              <span className="ml-1 text-xs text-muted-foreground">({validator.missedProposals} missed)</span>
-                            </td>
+                            <td className="px-4 py-3 text-right text-sm tabular-nums">{validator.blocksProposed}</td>
+                          )}
+                          {validatorSetDeployed && (
+                            <td className="px-4 py-3 text-right text-sm tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</td>
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
