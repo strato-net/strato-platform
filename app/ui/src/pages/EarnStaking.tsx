@@ -40,7 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
-import { CopyValueButton } from "@/components/staking/AuthorizationInstructions";
+import { CopyableText } from "@/components/staking/AuthorizationInstructions";
 import BecomeValidatorCard, { type ChangeOperatorInput, type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
 import { withHexPrefix } from "@/components/staking/authorization";
 
@@ -472,10 +472,13 @@ const OperatorPanel = ({
             </p>
             {validator && validatorSetDeployed && (
               <p className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
-                <span>Validator {truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6) || "not set"}</span>
-                {((isV2 ? validator.address : validator.validatorAddress) || "") && (
-                  <CopyValueButton value={withHexPrefix((isV2 ? validator.address : validator.validatorAddress) || "")} />
-                )}
+                <span>Validator</span>
+                {((isV2 ? validator.address : validator.validatorAddress) || "") ? (
+                  <CopyableText
+                    value={withHexPrefix((isV2 ? validator.address : validator.validatorAddress) || "")}
+                    display={truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6)}
+                  />
+                ) : <span>not set</span>}
                 <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
                 {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
               </p>
@@ -534,7 +537,7 @@ const OperatorPanel = ({
           </div>
         </div>
 
-        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "md:grid-cols-2" : "md:grid-cols-1"}`}>
+        <div className={active || selfBond > 0n ? "mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2" : "mt-4 grid grid-cols-1 gap-3"}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>

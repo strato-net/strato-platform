@@ -4,6 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { AuthorizationDigest } from "@/components/staking/authorization";
 
+// Plain text that copies itself when clicked; no button chrome.
+export const CopyableText = ({ value, display, className = "" }: { value: string; display?: string; className?: string }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // Clipboard unavailable; the value stays selectable on screen.
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      title={copied ? "Copied" : `Click to copy ${value}`}
+      className={`cursor-pointer rounded font-mono underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${className}`}
+    >
+      {copied ? "Copied" : (display ?? value)}
+    </button>
+  );
+};
+
 export const CopyValueButton = ({ value, label = "Copy" }: { value: string; label?: string }) => {
   const [copied, setCopied] = useState(false);
 
