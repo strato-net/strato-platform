@@ -40,6 +40,10 @@ runCode :: a -> a
 runCode = id
 {-# INLINE runCode #-}
 
+bindCodeChain :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindCodeChain _ = bindActionChain
+{-# INLINE bindCodeChain #-}
+
 constantCode :: Ty a -> a -> Code (b -> M a)
 constantCode _ v = \_ -> pure v
 {-# INLINE constantCode #-}

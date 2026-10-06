@@ -196,6 +196,7 @@ shortenImports declarations = (importLines, replaceNames shorten declarations)
     collectReferences x = specific ++ concat (gmapQ collectReferences x)
       where
         specific = case Data.cast x of
+          Just (TH.DoE Nothing _) -> reference '(>>=) TH.VarName ++ reference '(>>) TH.VarName
           Just (TH.VarE name) -> reference name TH.VarName
           Just (TH.ConE name) -> reference name TH.DataName
           _ -> case Data.cast x of
@@ -255,17 +256,20 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
         TH.ValD (TH.VarP name) (TH.NormalB rhs) [] -> do
           rhs' <- lower rhs
           case rhs' of
-            TH.VarE action -> pure ((name, action), Nothing)
+            TH.VarE _ -> pure ((name, rhs'), Nothing)
+            TH.LitE _ -> pure ((name, rhs'), Nothing)
             _ -> do
               (index, accumulated, cache) <- State.get
               let capture = TH.mkName ("capture_" ++ TH.nameBase name ++ "_" ++ show index)
               State.put (index + 1, accumulated, cache)
-              pure ((name, capture), Just (TH.ValD (TH.VarP capture) (TH.NormalB rhs') []))
+              pure ((name, TH.VarE capture), Just (TH.ValD (TH.VarP capture) (TH.NormalB rhs') []))
         _ -> error "unexpected capture declaration"
       let names = map fst captures
           renamed = mapMaybe snd captures
       State.modify (\(index, accumulated, cache) -> (index, reverse renamed ++ accumulated, cache))
-      lowered <- lower (renameNames names body)
+      lowered <- lower $ transform (\case
+        TH.VarE name -> fromMaybe (TH.VarE name) (lookup name names)
+        expression -> expression) body
       (index, accumulated, cache) <- State.get
       let name = TH.mkName ("action_" ++ show index)
       State.put (index + 1, TH.ValD (TH.VarP name) (TH.NormalB lowered) [] : accumulated, cache)
@@ -287,8 +291,4 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
           pure lowered
         _ -> pure (TH.SigE lowered annotation)
     lowerExpression expression = gmapM lower expression
-    renameNames :: Data a => [(TH.Name, TH.Name)] -> a -> a
-    renameNames names x = case Data.cast x of
-      Just n -> fromMaybe x (Data.cast (fromMaybe n (lookup n names)))
-      Nothing -> gmapT (renameNames names) x
 flattenDeclaration declaration = pure declaration

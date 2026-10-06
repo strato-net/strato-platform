@@ -1821,32 +1821,38 @@ compileFunction c name f = inFun (cName c <> "." <> name) $ do
       sc0 = paramScope c sig argNames
       r = sigRet sig
   let names = [n | (Just n, _) <- f ^. funcVals, not (T.null n)]
-  inner <- case (r, names) of
-    -- a single named return value is a local initialised to its default
-    (_, [rn]) | [_] <- f ^. funcVals -> do
-      k <- withModifiers (pushVar rn r sc0) { sNamedRet = [rn] } (f ^. funcModifiers) body
-      pure $ $(Quotation.quoteAction [|
-             \env -> do
-        rr <- liftIO (newIORef (defaultOf r))
-        (runCode k) (rr :& env) >>= \case
-          Next -> Ret <$> liftIO (readIORef rr)
-          flow -> pure flow
-             |])
-    -- several named return values: locals, gathered by a bare `return`
-    (TTuple fs, _ : _ : _) | length names == fieldsLen fs -> namedReturns sc0 fs names (f ^. funcModifiers) body
-    _ -> withModifiers sc0 (f ^. funcModifiers) body
-  let straightLine = null (f ^. funcModifiers) && null names && all simpleStatement body
-      action = case sig of
-        SigNil TUnit | straightLine -> $(Quotation.quoteAction [| void (runCode inner ENil) |])
-        _ -> case r of
-          TUnit | straightLine -> $(Quotation.quoteAction [| mkFn sig (\env -> void (runCode inner env)) |])
-          _ -> $(Quotation.quoteAction [|
-            mkFn sig $ \env -> runCode inner env >>= \case
-              Ret v -> pure v
-              RetDynamic ds -> liftIO $ throwIO $ ForwardReturn ds
-              _ -> pure (defaultOf r) |])
-      simpleStatement S.SimpleStatement{} = True
-      simpleStatement _ = False
+  let ordinary = do
+        inner <- case (r, names) of
+          -- a single named return value is a local initialised to its default
+          (_, [rn]) | [_] <- f ^. funcVals -> do
+            k <- withModifiers (pushVar rn r sc0) { sNamedRet = [rn] } (f ^. funcModifiers) body
+            pure $ $(Quotation.quoteAction [|
+                   \env -> do
+              rr <- liftIO (newIORef (defaultOf r))
+              (runCode k) (rr :& env) >>= \case
+                Next -> Ret <$> liftIO (readIORef rr)
+                flow -> pure flow
+                   |])
+          -- several named return values: locals, gathered by a bare `return`
+          (TTuple fs, _ : _ : _) | length names == fieldsLen fs -> namedReturns sc0 fs names (f ^. funcModifiers) body
+          _ -> withModifiers sc0 (f ^. funcModifiers) body
+        let straightLine = null (f ^. funcModifiers) && null names && all simpleStatement body
+            action = case sig of
+              SigNil TUnit | straightLine -> $(Quotation.quoteAction [| void (runCode inner ENil) |])
+              _ -> case r of
+                TUnit | straightLine -> $(Quotation.quoteAction [| mkFn sig (\env -> void (runCode inner env)) |])
+                _ -> $(Quotation.quoteAction [|
+                  mkFn sig $ \env -> runCode inner env >>= \case
+                    Ret v -> pure v
+                    RetDynamic ds -> liftIO $ throwIO $ ForwardReturn ds
+                    _ -> pure (defaultOf r) |])
+            simpleStatement S.SimpleStatement{} = True
+            simpleStatement _ = False
+        pure action
+  action <- case sig of
+    SigNil TUnit | null (f ^. funcModifiers), null names,
+      Just compiled <- compileLinearInteger c body -> pure compiled
+    _ -> ordinary
   pure $ Fun name sig $ namedFunction (cName c <> "." <> name <> "/" <> T.pack (show (sigArity sig))) f action
 
 -- Push each named return value as a local; `return;` reads them back as a tuple.
@@ -1990,6 +1996,93 @@ valueLocalTail sc name = all safeStatement
       S.TupleExpression _ es -> all (maybe True readOnly) es
       S.ArrayExpression _ es -> all readOnly es
       _ -> False
+
+-- Compile a straight-line integer local as actions joined by binds. The scope
+-- here describes expressions at compile time; execution passes the value itself.
+compileLinearInteger :: CCtx -> [Statement] -> Maybe (Code (M ()))
+compileLinearInteger c (S.SimpleStatement (S.VariableDefinition [S.VarDefEntry (Just ty) loc name _] (Just initial)) _ : rest) = do
+  guard (loc /= Just S.Storage && name `notElem` ["this", "now"])
+  guard $ case resolveTy c ty of Right (SomeTy TInt) -> True; _ -> False
+  (IntegerLiteral value, units) <- integerAtom (Scope [] TUnit [] Nothing c) initial
+  let charges = chargeUnits units
+      initializer = $(Quotation.quoteAction [| chargeGas 1 >> runCode charges >> pure value |])
+      sc = Scope [ValueVar name TInt IZ (Just value)] TUnit [] Nothing c
+  (steps, final) <- commands sc rest
+  pure (bindCodeChain name initializer steps final)
+  where
+    commands :: Scope '[Integer] () -> [Statement] -> Maybe ([Code (Integer -> M Integer)], Code (Integer -> M ()))
+    commands _ [] = Just ([], $(Quotation.quoteAction [| \_ -> pure () |]))
+    commands sc (S.SimpleStatement (S.ExpressionStatement (S.Binary _ "=" (S.Variable _ target) rhs)) _ : remaining)
+      | target == name = do
+          command <- linearIntegerExpression sc rhs (chargeUnits 2)
+          let nextScope = sc { sVars = [ValueVar name TInt IZ (knownInteger sc rhs)] }
+          (steps, final) <- commands nextScope remaining
+          pure (command : steps, final)
+      | Just (SScalar (SomeTy TInt)) <- M.lookup target (cStorage c) = do
+          write <- linearIntegerWrite sc target rhs
+          case remaining of
+            [] -> Just ([], write)
+            _ -> do
+              (steps, final) <- commands sc remaining
+              let command = $(Quotation.quoteAction [| \x -> runCode write x >> pure x |])
+              pure (command : steps, final)
+    commands _ _ = Nothing
+compileLinearInteger _ _ = Nothing
+
+linearIntegerExpression :: Scope '[Integer] () -> Expression -> Code (M ()) -> Maybe (Code (Integer -> M Integer))
+linearIntegerExpression sc expression before = case integerAtom sc expression of
+  Just (IntegerLiteral value, units) ->
+    let charges = chargeUnits units in Just $(Quotation.quoteAction [|
+      \_ -> runCode before >> runCode charges >> pure value |])
+  Just (IntegerLocal, units) ->
+    let charges = chargeUnits units in Just $(Quotation.quoteAction [|
+      \x -> runCode before >> runCode charges >> pure x |])
+  Nothing -> do
+    let peel count (S.InlineBoundsCheck _ lo hi inner) | boundsImplied sc lo hi inner = peel (count + 1) inner
+        peel count e = (e, count)
+        (base, units) = peel 1 expression
+    S.Binary _ symbol left right <- Just base
+    (lhs, leftUnits) <- integerAtom sc left
+    (rhs, rightUnits) <- integerAtom sc right
+    let op = T.pack symbol
+        leftCharges = chargeUnits leftUnits
+        rightCharges = chargeUnits rightUnits
+        charges = chargeUnits units
+    case (lhs, rhs) of
+      (IntegerLocal, IntegerLiteral b) -> $(Quotation.quoteIntegerExpression [| op |]
+        [| \x -> runCode before >> runCode leftCharges >> pure x |]
+        [| \_ -> runCode rightCharges >> pure b |]
+        [| runCode charges |])
+      (IntegerLiteral a, IntegerLocal) -> $(Quotation.quoteIntegerExpression [| op |]
+        [| \_ -> runCode before >> runCode leftCharges >> pure a |]
+        [| \x -> runCode rightCharges >> pure x |]
+        [| runCode charges |])
+      (IntegerLocal, IntegerLocal) -> $(Quotation.quoteIntegerExpression [| op |]
+        [| \x -> runCode before >> runCode leftCharges >> pure x |]
+        [| \x -> runCode rightCharges >> pure x |]
+        [| runCode charges |])
+      (IntegerLiteral a, IntegerLiteral b) -> $(Quotation.quoteIntegerExpression [| op |]
+        [| \_ -> runCode before >> runCode leftCharges >> pure a |]
+        [| \_ -> runCode rightCharges >> pure b |]
+        [| runCode charges |])
+
+linearIntegerWrite :: Scope '[Integer] () -> T.Text -> Expression -> Maybe (Code (Integer -> M ()))
+linearIntegerWrite sc target rhs = do
+  (source, units) <- integerAtom sc rhs
+  let charges = chargeUnits units
+  case source of
+    IntegerLocal -> Just $(Quotation.quoteAction [|
+      \x -> do
+        chargeGas 1
+        chargeGas 1
+        runCode charges
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) x |])
+    IntegerLiteral value -> Just $(Quotation.quoteAction [|
+      \_ -> do
+        chargeGas 1
+        chargeGas 1
+        runCode charges
+        writeVal TInt (StoragePath [Field (TE.encodeUtf8 target)]) value |])
 
 compileBlock :: Scope ls r -> [Statement] -> C (Code (Env ls -> M (Flow r)))
 compileBlock sc body = typedBody (scopeTypes sc) (sRet sc) <$> compileBlockBody sc body

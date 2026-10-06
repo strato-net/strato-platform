@@ -99,7 +99,7 @@ integerExpression backend operator left right after = do
   lhs <- left
   rhs <- right
   finalCharge <- after
-  local <- newName "local"
+  local <- newName $ case lhs of LamE [VarP n] _ -> nameBase n; _ -> "local"
   (leftCharges, leftValue) <- applyRead local lhs >>= splitValue
   (rightCharges, rightValue) <- applyRead local rhs >>= splitValue
   alternatives <- mapM (\symbol -> do
@@ -110,7 +110,10 @@ integerExpression backend operator left right after = do
     (operationCharges, value) <- splitValue arithmetic
     let body = DoE Nothing $ leftCharges ++ rightCharges ++ operationCharges ++
           [NoBindS finalCharge, NoBindS (AppE (VarE 'pure) value)]
-        slotPattern = ConP '(:&) [] [VarP local, WildP]
+        slotPattern = case (lhs, rhs) of
+          (LamE [VarP _] _, _) -> VarP local
+          (_, LamE [VarP _] _) -> VarP local
+          _ -> ConP '(:&) [] [VarP local, WildP]
         environmentPattern
           | headRead lhs || headRead rhs = slotPattern
           | otherwise = WildP
@@ -122,6 +125,7 @@ integerExpression backend operator left right after = do
     rename values = transform $ \e -> case e of
       VarE n -> maybe e id (lookup n values)
       _ -> e
+    headSlot (VarP n) = Just n
     headSlot (ParensP p) = headSlot p
     headSlot (InfixP (VarP n) constructor WildP) | constructor == '(:&) = Just n
     headSlot (ConP constructor [] [VarP n, WildP]) | constructor == '(:&) = Just n

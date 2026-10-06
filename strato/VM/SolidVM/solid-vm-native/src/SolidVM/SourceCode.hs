@@ -25,6 +25,19 @@ import SolidVM.Model.Storable (StoragePath(..), StoragePathPiece(..))
 -- types. Inspection only demands the expression field, never executes it.
 data Code a = Code { runCode :: a, sourceExpression :: Exp, codeName :: Maybe T.Text, codeType :: Maybe Type }
 
+-- A do block is the syntax for this same right-associated chain of binds.
+-- Command expressions remain separate: only bind continuations are expanded.
+bindCodeChain :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindCodeChain name initial commands final = Code executable expression Nothing Nothing
+  where
+    executable = bindActionChain (runCode initial) (map runCode commands) (runCode final)
+    variable index = mkName (T.unpack (T.toLower (T.take 1 name) <> T.drop 1 name) ++ "_" ++ show (index :: Int))
+    expression = DoE Nothing $
+      BindS (VarP (variable 0)) (toSource initial) :
+      [BindS (VarP (variable (index + 1))) (AppE (toSource command) (VarE (variable index))) |
+        (index, command) <- zip [0 ..] commands] ++
+      [NoBindS (AppE (toSource final) (VarE (variable (length commands))))]
+
 data Fun = forall args r. Fun T.Text (Sig args r) (Code (Fn args r))
 
 class ToSource a where

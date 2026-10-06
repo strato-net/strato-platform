@@ -286,6 +286,12 @@ data RT = RT
 
 type M = ReaderT (RT, Frame) IO
 
+bindActionChain :: M a -> [a -> M a] -> (a -> M b) -> M b
+bindActionChain initial commands final = continuation `seq` (initial >>= continuation)
+  where
+    continuation = foldr step final commands
+    step command next = next `seq` (\value -> command value >>= next)
+
 chargeGas :: Integer -> M ()
 chargeGas amount = rt >>= \runtime -> liftIO (rtChargeGas runtime amount)
 
