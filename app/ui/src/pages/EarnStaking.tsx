@@ -1627,7 +1627,7 @@ const EarnStaking = () => {
               </div>
 
               <div className="hidden max-h-[34rem] overflow-auto rounded-lg border border-border md:block">
-                <table className="w-full min-w-[1400px]">
+                <table className="w-full min-w-[1180px]">
                   <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Validator</th>
@@ -1680,11 +1680,11 @@ const EarnStaking = () => {
 
                       return (
                         <tr key={rowKey} className="border-b border-border/50 last:border-b-0 hover:bg-muted/40">
-                          <td className="px-4 py-3">
-                            <div className="min-w-0">
-                              <p className="font-medium">{label}</p>
+                          <td className="w-56 max-w-[14rem] px-4 py-3">
+                            <div className="min-w-0 max-w-[12rem]">
+                              <p className="truncate font-medium" title={label}>{label}</p>
                               {validator.description && (
-                                <p className="mt-0.5 max-w-[28rem] truncate text-xs text-muted-foreground">{validator.description}</p>
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground" title={validator.description}>{validator.description}</p>
                               )}
                               {isV2 && validator.operator && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">Operator {truncateAddress(validator.operator, 8, 6)}</p>
