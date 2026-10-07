@@ -10,6 +10,7 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.HexData (HexData (..))
 import Blockchain.Sequencer.TxCallObject (TxCallObject (..))
 import Blockchain.Strato.Model.Address (Address (..))
+import Blockchain.Strato.Model.StateRoot (emptyTriePtr)
 import qualified Data.ByteString as B
 import Data.Binary
 import qualified Data.Aeson as Ae
@@ -124,6 +125,8 @@ spec = parallel $ do
     it "round-trips JRCSimulate" $
       property $
         \h -> binaryFidelity $ JRCSimulate [[SpecCall txObj], [SpecCreate createObj, SpecCall txObj]] (h :: Maybe BlockHeader) "id5"
+    it "round-trips JRCGetProof" $
+      binaryFidelity $ JRCGetProof emptyTriePtr (Address 9) ["sentHash[5]"] "id6"
     it "round-trips JRCCallV2 with a direct function-call spec" $
       property $
         \h -> binaryFidelity $ JRCCallV2 (SpecFuncCall funcCallObj) (h :: Maybe BlockHeader) "id7"

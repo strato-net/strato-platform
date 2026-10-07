@@ -18,7 +18,6 @@ library
       Bloc.Monad
       Bloc.Server
       Bloc.Server.Contracts
-      Bloc.Server.JsonRpc
       Bloc.Server.Simulate
       Bloc.Server.Transaction
       Bloc.Server.TransactionResult
@@ -53,7 +52,6 @@ library
     , extra
     , format
     , hashable
-    , http-client
     , insert-ordered-containers
     , labeled-error
     , lens

@@ -63,6 +63,13 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_parent_hash_idx ON block_data_ref (parent_hash);"
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_data_ref_coinbase_idx ON block_data_ref (coinbase);"
 
+  -- The API rebuilds a block header from these tables, one lookup by block each.
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_validator_ref_block_data_ref_id_idx ON block_validator_ref (block_data_ref_id);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS validator_delta_ref_block_data_ref_id_idx ON validator_delta_ref (block_data_ref_id);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS proposal_signature_ref_block_data_ref_id_idx ON proposal_signature_ref (block_data_ref_id);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS commitment_signature_ref_block_data_ref_id_idx ON commitment_signature_ref (block_data_ref_id);"
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS block_stake_ref_block_data_ref_id_idx ON block_stake_ref (block_data_ref_id);"
+
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS address_state_ref_address_idx ON address_state_ref (address);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_from_address_idx ON raw_transaction (from_address);"
@@ -71,6 +78,8 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_tx_hash_idx ON raw_transaction (tx_hash);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_key_idx ON storage (key);"
+  -- State diffs look up and delete storage rows by account and key.
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_address_state_ref_id_key_idx ON storage (address_state_ref_id, key);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS transaction_result_transaction_hash_idx ON transaction_result (transaction_hash);"
 

@@ -14,7 +14,12 @@ module.exports = {
     pollTimeoutsForUnhealthy: 3, // number of timed out polls in a row to consider node unhealthy
     cleanFrequency: 5 * 60 * 1000, //clean db every 5 mins
     retentionHours: 1 * 24,
-    stallCheckFrequency: 5 * 60 * 1000,
+    // A node is stalled when it had pending transactions at two checks in a
+    // row and no new valid block in between. On testnet (2026-10-06, 12h of
+    // metrics) a 1 minute interval also caught single minutes without a block
+    // under load; 2 minutes caught only the real stalls, within 2-4 minutes
+    // instead of 5-10.
+    stallCheckFrequency: 2 * 60 * 1000,
     memoryUsedAlertLevel: 80, // Alert when used memory (RAM) >= N%
     memoryUsedCloseLevel: 75,
     diskspaceUsedAlertLevel: 80, // Alert when used diskspace >= N%
