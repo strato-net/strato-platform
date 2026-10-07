@@ -263,6 +263,7 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
           const traces = unwrapRpcResult(await fetch.post(url, {
             jsonrpc: "2.0", id: 1, method: "trace_transaction", params: [hash],
           }), "trace_transaction", chainId);
+          if (traces == null) continue;
           if (!Array.isArray(traces)) throw new Error("Invalid trace_transaction response");
           if (traces.length === 0) continue;
           traceFingerprint(traces);
