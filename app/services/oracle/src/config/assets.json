@@ -333,6 +333,20 @@
             "KHYPE"
           ]
         },
+        "Alchemy by address": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
+          "method": "POST",
+          "body": "addresses",
+          "parse": "data[].prices[0].value",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "comment": "Same Prices API as Alchemy, keyed by network:contract instead of ticker, for tokens whose symbol is ambiguous (SPY matches a dozen tokens; this is the Robinhood SPY stock token on Robinhood Chain). Max 25 addresses / 3 networks per call.",
+          "assets": [
+            "SPY"
+          ],
+          "symbolMapping": {
+            "SPY": "robinhood-mainnet:0x117cc2133c37b721f49de2a7a74833232b3b4c0c"
+          }
+        },
         "CoinMarketCap": {
           "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
           "params": "symbol,convert=USD",
@@ -373,16 +387,20 @@
             "XAG": "silver"
           }
         },
-        "MetalsAPI": {
-          "url": "https://metals-api.com/api/latest",
-          "params": "access_key,base=USD,symbols",
-          "parse": "rates.USD{symbol}",
-          "timestamp": "timestamp",
-          "apiKeyEnvVar": "METALS_API_API_KEY",
+        "Pure": {
+          "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
+          "headers": "x-api-key",
+          "parse": "pure",
+          "apiKeyEnvVar": "PURE_API_KEY",
+          "comment": "Pure (collectpure.com) bullion marketplace spot feed: {data:[{material,bid,ask}]} in USD cents per troy ounce for Gold, Silver, Platinum, Palladium and Bitcoin; the adapter submits the bid/ask mid. Key from the collectpure.com API Keys dashboard (x-api-key); 60 requests/min sustained, 120 burst.",
           "assets": [
             "XAU",
             "XAG"
-          ]
+          ],
+          "symbolMapping": {
+            "XAU": "Gold",
+            "XAG": "Silver"
+          }
         },
         "CoinGecko": {
           "url": "https://pro-api.coingecko.com/api/v3/simple/price",
@@ -437,13 +455,11 @@
             "BOOE": "book-of-ethereum"
           }
         },
-        "CoinAPI": {
-          "url": "https://rest.coinapi.io/v1/assets",
-          "params": "filter_asset_id",
-          "headers": "X-CoinAPI-Key",
-          "parse": "assets",
-          "timestamp": "data_quote_start",
-          "apiKeyEnvVar": "COINAPI_API_KEY",
+        "Kraken": {
+          "url": "https://api.kraken.com/0/public/Ticker",
+          "params": "pair,assetVersion=1",
+          "parse": "kraken",
+          "comment": "Public, no API key. assetVersion=1 makes request and response keys the display names (ETH/USD, BTC/USD) instead of legacy XXBTZUSD; WHYPE is priced as native HYPE. Any unknown pair fails the whole request, so a delisting here takes every Kraken price with it for that cycle.",
           "assets": [
             "ETH",
             "WBTC",
@@ -451,16 +467,32 @@
             "XAUT",
             "USDC",
             "USDT",
-            "TSLAX",
-            "SPY",
-            "SPYX",
-            "WEETH",
             "WHYPE",
-            "KHYPE",
             "DOGE"
           ],
           "symbolMapping": {
-            "WHYPE": "HYPE"
+            "ETH": "ETH/USD",
+            "WBTC": "WBTC/USD",
+            "PAXG": "PAXG/USD",
+            "XAUT": "XAUT/USD",
+            "USDC": "USDC/USD",
+            "USDT": "USDT/USD",
+            "WHYPE": "HYPE/USD",
+            "DOGE": "DOGE/USD"
+          }
+        },
+        "Kraken xStocks": {
+          "url": "https://api.kraken.com/0/public/Ticker",
+          "params": "pair,asset_class=tokenized_asset,assetVersion=1",
+          "parse": "kraken",
+          "comment": "Kraken xStocks (Backed tokenized equities) trade on a separate book: asset_class=tokenized_asset is required and cannot be mixed with spot pairs in one call. Pair names are case-sensitive (TSLAx/USD). SPYx and TSLAx are among the ten flagship xStocks quoted 24/7, so this source also prices weekends when the stock feeds are frozen.",
+          "assets": [
+            "TSLAX",
+            "SPYX"
+          ],
+          "symbolMapping": {
+            "TSLAX": "TSLAx/USD",
+            "SPYX": "SPYx/USD"
           }
         },
         "DefiLlama": {
@@ -517,18 +549,22 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair with at least DEXSCREENER_MIN_TXNS_24H trades in the last 24h (the deepest weETH pool is idle and reports a stale price). symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",
             "BOOE",
-            "CBDOGE"
+            "CBDOGE",
+            "WEETH",
+            "KHYPE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
             "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
-            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510"
+            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510",
+            "WEETH": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
+            "KHYPE": "0xfd739d4e423301ce9385c1fb8850539d657c296d"
           }
         },
         "DIA": {
@@ -943,6 +979,20 @@
             "KHYPE"
           ]
         },
+        "Alchemy by address": {
+          "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
+          "method": "POST",
+          "body": "addresses",
+          "parse": "data[].prices[0].value",
+          "apiKeyEnvVar": "ALCHEMY_API_KEY",
+          "comment": "Same Prices API as Alchemy, keyed by network:contract instead of ticker, for tokens whose symbol is ambiguous (SPY matches a dozen tokens; this is the Robinhood SPY stock token on Robinhood Chain). Max 25 addresses / 3 networks per call.",
+          "assets": [
+            "SPY"
+          ],
+          "symbolMapping": {
+            "SPY": "robinhood-mainnet:0x117cc2133c37b721f49de2a7a74833232b3b4c0c"
+          }
+        },
         "CoinMarketCap": {
           "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
           "params": "symbol,convert=USD",
@@ -983,16 +1033,20 @@
             "XAG": "silver"
           }
         },
-        "MetalsAPI": {
-          "url": "https://metals-api.com/api/latest",
-          "params": "access_key,base=USD,symbols",
-          "parse": "rates.USD{symbol}",
-          "timestamp": "timestamp",
-          "apiKeyEnvVar": "METALS_API_API_KEY",
+        "Pure": {
+          "url": "https://api.collectpure.com/marketplace/get-spot-price/v1",
+          "headers": "x-api-key",
+          "parse": "pure",
+          "apiKeyEnvVar": "PURE_API_KEY",
+          "comment": "Pure (collectpure.com) bullion marketplace spot feed: {data:[{material,bid,ask}]} in USD cents per troy ounce for Gold, Silver, Platinum, Palladium and Bitcoin; the adapter submits the bid/ask mid. Key from the collectpure.com API Keys dashboard (x-api-key); 60 requests/min sustained, 120 burst.",
           "assets": [
             "XAU",
             "XAG"
-          ]
+          ],
+          "symbolMapping": {
+            "XAU": "Gold",
+            "XAG": "Silver"
+          }
         },
         "CoinGecko": {
           "url": "https://pro-api.coingecko.com/api/v3/simple/price",
@@ -1047,13 +1101,11 @@
             "BOOE": "book-of-ethereum"
           }
         },
-        "CoinAPI": {
-          "url": "https://rest.coinapi.io/v1/assets",
-          "params": "filter_asset_id",
-          "headers": "X-CoinAPI-Key",
-          "parse": "assets",
-          "timestamp": "data_quote_start",
-          "apiKeyEnvVar": "COINAPI_API_KEY",
+        "Kraken": {
+          "url": "https://api.kraken.com/0/public/Ticker",
+          "params": "pair,assetVersion=1",
+          "parse": "kraken",
+          "comment": "Public, no API key. assetVersion=1 makes request and response keys the display names (ETH/USD, BTC/USD) instead of legacy XXBTZUSD; WHYPE is priced as native HYPE. Any unknown pair fails the whole request, so a delisting here takes every Kraken price with it for that cycle.",
           "assets": [
             "ETH",
             "WBTC",
@@ -1061,16 +1113,32 @@
             "XAUT",
             "USDC",
             "USDT",
-            "TSLAX",
-            "SPY",
-            "SPYX",
-            "WEETH",
             "WHYPE",
-            "KHYPE",
             "DOGE"
           ],
           "symbolMapping": {
-            "WHYPE": "HYPE"
+            "ETH": "ETH/USD",
+            "WBTC": "WBTC/USD",
+            "PAXG": "PAXG/USD",
+            "XAUT": "XAUT/USD",
+            "USDC": "USDC/USD",
+            "USDT": "USDT/USD",
+            "WHYPE": "HYPE/USD",
+            "DOGE": "DOGE/USD"
+          }
+        },
+        "Kraken xStocks": {
+          "url": "https://api.kraken.com/0/public/Ticker",
+          "params": "pair,asset_class=tokenized_asset,assetVersion=1",
+          "parse": "kraken",
+          "comment": "Kraken xStocks (Backed tokenized equities) trade on a separate book: asset_class=tokenized_asset is required and cannot be mixed with spot pairs in one call. Pair names are case-sensitive (TSLAx/USD). SPYx and TSLAx are among the ten flagship xStocks quoted 24/7, so this source also prices weekends when the stock feeds are frozen.",
+          "assets": [
+            "TSLAX",
+            "SPYX"
+          ],
+          "symbolMapping": {
+            "TSLAX": "TSLAx/USD",
+            "SPYX": "SPYx/USD"
           }
         },
         "DefiLlama": {
@@ -1127,18 +1195,22 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum' or 'base' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair with at least DEXSCREENER_MIN_TXNS_24H trades in the last 24h (the deepest weETH pool is idle and reports a stale price). symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",
             "BOOE",
-            "CBDOGE"
+            "CBDOGE",
+            "WEETH",
+            "KHYPE"
           ],
           "symbolMapping": {
             "SUSDS": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
             "LIT": "0x232ce3bd40fcd6f80f3d55a522d03f25df784ee2",
             "BOOE": "0x289ff00235d2b98b0145ff5d4435d3e92f9540a6",
-            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510"
+            "CBDOGE": "0xcbd06e5a2b0c65597161de254aa074e489deb510",
+            "WEETH": "0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee",
+            "KHYPE": "0xfd739d4e423301ce9385c1fb8850539d657c296d"
           }
         },
         "DIA": {
