@@ -76,7 +76,9 @@ end
 
 function _M.build_csrf_cookie(token)
     local cookie = "CSRF-TOKEN=" .. token .. "; Path=/; SameSite=Strict"
-    if ngx.var.https == "on" then
+    -- Secure over TLS, or when the public scheme is https and TLS ends at
+    -- the load balancer in front of this nginx (PUBLIC_SCHEME).
+    if ngx.var.https == "on" or os.getenv("PUBLIC_SCHEME") == "https" then
         cookie = cookie .. "; Secure"
     end
     return cookie

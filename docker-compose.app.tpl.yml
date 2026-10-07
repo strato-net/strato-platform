@@ -8,7 +8,6 @@
 #                       managed cluster exists
 #   OAUTH_*             the app's own OIDC client
 # Put secrets/session_secret and secrets/postgres_password next to this file.
-volumes: {}
 services:
   backend:
     image: ${APP_BACKEND_IMAGE:-<REPO_URL>app-backend:<VERSION>-<HASH_APP_BACKEND>}
@@ -78,6 +77,13 @@ services:
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:?OAUTH_CLIENT_SECRET is required}
       - NODE_URL=${NODE_URL:?NODE_URL is required}
       - ssl=${ssl:-false}
+      # Several copies behind one load balancer share no memory, so CSRF
+      # tokens are derived from the session (HMAC) instead of kept per process.
+      - CSRF_STATELESS=${CSRF_STATELESS:-true}
+      # Scheme browsers use to reach this tier; https marks cookies Secure
+      # when TLS terminates at the load balancer.
+      - PUBLIC_SCHEME=${PUBLIC_SCHEME:-}
+      - HISTORY_HOST=${HISTORY_HOST:-}
     ports:
       - ${HTTP_PORT:-80}:80
       - ${HTTPS_PORT:-443}:443

@@ -59,7 +59,9 @@ HASH_NGINX := $(call dir_hash,nginx-packager)
 HASH_APEX := $(call dir_hash,apex)
 HASH_APP_BACKEND := $(call dir_hash,app/backend)
 HASH_APP_UI := $(call dir_hash,app/ui)
-HASH_APP_NGINX := $(call dir_hash,app/nginx)
+# app/nginx is built from the Lua files copied in from nginx-packager (see
+# the app-nginx target), so its tag covers both or it would describe stale Lua.
+HASH_APP_NGINX := $(call dir_hash,app/nginx nginx-packager/openid.tpl.lua nginx-packager/csrf.lua nginx-packager/tracing.lua)
 HASH_PROMETHEUS := $(call dir_hash,prometheus-packager)
 HASH_SMD := $(call dir_hash,smd-ui)
 HASH_BRIDGE := $(call dir_hash,app/services/bridge)

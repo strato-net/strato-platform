@@ -49,6 +49,15 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   fi
   sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
   sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
+  # Behind CloudFront or a TLS-terminating load balancer nginx itself sees
+  # plain HTTP, so the session cookie's Secure flag follows PUBLIC_SCHEME
+  # (ssl=true already implies it through $https); otherwise the library's
+  # own default (Secure when the request came over TLS) stays.
+  if [ "${PUBLIC_SCHEME:-}" = "https" ]; then
+    sed -i 's/[[:space:]]*#TEMPLATE_MARK_COOKIE_SECURE//g' /tmp/nginx.conf
+  else
+    sed -i '/#TEMPLATE_MARK_COOKIE_SECURE/d' /tmp/nginx.conf
+  fi
 
   DOCKER_NETWORK_CIDR=$(ip route | awk '/src/ {print $1}')
   sed -i "s|__DOCKER_NETWORK_CIDR__|$DOCKER_NETWORK_CIDR|g" /tmp/nginx.conf

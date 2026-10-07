@@ -93,7 +93,9 @@ function _M.finish()
     endTimeUnixNano = string.format("%.0f", finish * 1e9),
     attributes = {
       attr("http.method", ngx.var.request_method),
-      attr("http.target", ngx.var.request_uri or ""),
+      -- the path only: request_uri carries the query string, which on the
+      -- OIDC return leg holds the authorization code and state
+      attr("http.target", ngx.var.uri or ""),
       attr("http.status_code", status),
       attr("http.host", ngx.var.host or ""),
       attr("net.peer.ip", ngx.var.remote_addr or ""),

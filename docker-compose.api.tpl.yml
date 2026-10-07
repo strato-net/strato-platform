@@ -8,8 +8,6 @@
 # Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
 # parameters, and the node's secrets/ (postgres_password, session_secret,
 # oauth_credentials.yaml) at ./secrets/.
-volumes:
-    driver: local
 services:
   strato-api:
     image: ${STRATO_IMAGE:-<REPO_URL>strato:<VERSION>-<HASH_STRATO>}
@@ -109,6 +107,12 @@ services:
       - TRACKING_URL=${TRACKING_URL:-https://go.strato.nexus}
       - ssl=${ssl:-false}
       - sslCertFileType=${sslCertFileType:-}
+      # Several copies behind one load balancer share no memory, so CSRF
+      # tokens are derived from the session (HMAC) instead of kept per process.
+      - CSRF_STATELESS=${CSRF_STATELESS:-true}
+      # Scheme browsers use to reach this tier; https marks cookies Secure
+      # when TLS terminates at the load balancer.
+      - PUBLIC_SCHEME=${PUBLIC_SCHEME:-}
     ports:
       # Must match networkConfig.httpPort in the mounted ethconf.yaml (8081 by default).
       - ${HTTP_PORT:-8081}:${HTTP_PORT:-8081}
