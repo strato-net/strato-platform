@@ -2,7 +2,7 @@ import { receiptFingerprint, traceFingerprint, sanitizeRpcError } from "../utils
 export { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
 import { JsonRpcProvider } from "ethers";
 import { fetch } from "../utils/api";
-import { getChainRpcUrl, getChainRpcUrls, RPC_BATCH_LIMIT, TRACE_RPC_PROBE_BLOCKS } from "../config";
+import { getChainRpcUrl, getChainRpcUrls, RPC_BATCH_LIMIT, TRACE_RPC_PROBE_BLOCKS, TRACE_RPC_PROBE_TRANSACTIONS_PER_BLOCK } from "../config";
 import type { TransactionTraceResult } from "../types";
 import { ensureHexPrefix, decimalToHex } from "../utils/utils";
 
@@ -254,14 +254,17 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
         jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false],
       }), "eth_getBlockByNumber", chainId);
       for (let scanned = 0; scanned < TRACE_RPC_PROBE_BLOCKS; scanned++) {
-        const hash = block?.transactions?.[0];
-        if (typeof hash === "string" && /^0x[0-9a-f]{64}$/i.test(hash)) {
+        const hashes = Array.isArray(block?.transactions)
+          ? block.transactions.filter((hash: unknown) =>
+              typeof hash === "string" && /^0x[0-9a-f]{64}$/i.test(hash),
+            ).slice(0, TRACE_RPC_PROBE_TRANSACTIONS_PER_BLOCK)
+          : [];
+        for (const hash of hashes) {
           const traces = unwrapRpcResult(await fetch.post(url, {
             jsonrpc: "2.0", id: 1, method: "trace_transaction", params: [hash],
           }), "trace_transaction", chainId);
-          if (!Array.isArray(traces) || traces.length === 0) {
-            throw new Error("trace_transaction did not return evidence for a mined transaction");
-          }
+          if (!Array.isArray(traces)) throw new Error("Invalid trace_transaction response");
+          if (traces.length === 0) continue;
           traceFingerprint(traces);
           return;
         }
@@ -270,7 +273,7 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
           jsonrpc: "2.0", id: 1, method: "eth_getBlockByHash", params: [block.parentHash, false],
         }), "eth_getBlockByHash", chainId);
       }
-      throw new Error(`Cannot verify trace_transaction support: no transaction in ${TRACE_RPC_PROBE_BLOCKS} recent blocks`);
+      throw new Error(`Cannot verify trace_transaction support: no non-empty trace in ${TRACE_RPC_PROBE_BLOCKS} recent blocks`);
     } catch (error) {
       throw new Error(`Verification RPC chain=${chainId} provider=${new URL(url).hostname}: ${sanitizeRpcError(error, url)}`);
     }

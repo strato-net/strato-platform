@@ -891,12 +891,14 @@ test("startup checks real mined transaction traces on every RPC and skips empty 
   const { fetch } = await import("../utils/api");
   const { validateVerificationRpcEndpoints } = await import("./rpcService");
   const traced: string[] = [];
+  const emptyHash = ethers.toBeHex(41, 32);
   const hash = ethers.toBeHex(42, 32);
   t.mock.method(fetch, "post", async (url: string, request: any) => {
     if (request.method === "eth_chainId") return { result: ethers.toBeHex(chainId) };
     if (request.method === "eth_getBlockByNumber") return { result: { transactions: [], parentHash: ethers.toBeHex(1, 32) } };
-    if (request.method === "eth_getBlockByHash") return { result: { transactions: [hash] } };
+    if (request.method === "eth_getBlockByHash") return { result: { transactions: [emptyHash, hash] } };
     assert.equal(request.method, "trace_transaction");
+    if (request.params[0] === emptyHash) return { result: [] };
     assert.deepEqual(request.params, [hash]);
     traced.push(url);
     return { result: ethTracePair(0) };

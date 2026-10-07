@@ -13,6 +13,7 @@ export const EXTERNAL_BRIDGE_LOG_BLOCK_RANGE = 1_000;
 // HyperEVM caps JSON-RPC batches at 20 calls per HTTP request
 export const RPC_BATCH_LIMIT = 20;
 export const TRACE_RPC_PROBE_BLOCKS = 20;
+export const TRACE_RPC_PROBE_TRANSACTIONS_PER_BLOCK = 3;
 export const CIRRUS_PAGE_SIZE = 200;
 export const CIRRUS_FILTER_BATCH_SIZE = 20;
 
