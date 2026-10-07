@@ -8,6 +8,7 @@ import {
   Contract,
   Interface,
   JsonRpcProvider,
+  MaxUint256,
   Signature,
   TypedDataEncoder,
   keccak256,
@@ -58,6 +59,7 @@ export interface WithdrawalReview {
 
 const EXTERNAL_VAULT_ABI = [
   "function withdrawalCapacity(address token,uint256 amount) view returns (uint256 available,uint256 retryAfterSeconds)",
+  "function availableLiquidity(address token) view returns (uint256)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAuthorizationValiditySeconds() view returns (uint256)",
   "function signerSetVersion() view returns (uint256)",
@@ -442,10 +444,25 @@ export const getWithdrawalCapacity = async (withdrawal: WithdrawalInfo) => {
   if (!withdrawal.vault) throw new Error(`Withdrawal ${withdrawal.withdrawalId} is missing its vault`);
   const provider = getChainProvider(BigInt(withdrawal.externalChainId));
   const vault = new Contract(safeChecksum(withdrawal.vault), EXTERNAL_VAULT_ABI, provider);
-  const capacity = await vault.withdrawalCapacity(
-    safeChecksum(withdrawal.externalToken), withdrawal.externalTokenAmount,
-  );
-  return { available: BigInt(capacity.available), retryAfterSeconds: BigInt(capacity.retryAfterSeconds) };
+  const token = safeChecksum(withdrawal.externalToken);
+  const [capacity, liquidity] = await Promise.all([
+    vault.withdrawalCapacity(token, withdrawal.externalTokenAmount),
+    vault.availableLiquidity(token),
+  ]);
+  // withdrawalCapacity only checks the rate-limit bucket; reserve additionally
+  // requires availableLiquidity (vault balance minus reservations). A withdrawal
+  // marked READY without liquidity cannot be reserved, cannot be aborted by the
+  // user, and expires into a governance refund, so cap the reported capacity by
+  // liquidity here. This is a snapshot, not a reservation: a concurrent
+  // reservation can still consume liquidity before reserve(), where the
+  // retry-until-deadline and refund paths remain the backstop. Liquidity
+  // refills only when deposits arrive, so a shortfall has no retry schedule.
+  const bucket = BigInt(capacity.available);
+  return {
+    available: BigInt(liquidity) < bucket ? BigInt(liquidity) : bucket,
+    retryAfterSeconds: BigInt(withdrawal.externalTokenAmount) > BigInt(liquidity)
+      ? MaxUint256 : BigInt(capacity.retryAfterSeconds),
+  };
 };
 
 export const buildWithdrawalAuthorization = async (

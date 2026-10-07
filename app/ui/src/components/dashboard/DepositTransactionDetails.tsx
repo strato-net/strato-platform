@@ -165,7 +165,7 @@ const DepositTransactionDetails = ({ context }: { context?: string }) => {
       render: (_: any, record: any) => {
         if (getDepositStatusLabel(record?.DepositInfo?.bridgeStatus, record.bridgeSource).description) return <span className="text-sm text-muted-foreground">Not received</span>;
         const outcome = record.depositOutcome;
-        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "fallback") && record.finalTokenSymbol;
+        const hasFinal = (outcome === "forge" || outcome === "save" || outcome === "route" || outcome === "fallback") && record.finalTokenSymbol;
         const symbol = hasFinal ? record.finalTokenSymbol : record.stratoTokenSymbol || '-';
         const amount = hasFinal && record.finalAmount
           ? formatWeiToDecimalHP(record.finalAmount, 18)

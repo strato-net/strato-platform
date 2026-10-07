@@ -260,19 +260,19 @@ export const validateNativeWithdrawalRoute = (
   stratoTokenAmount: string
 ): void => {
   if (!nativeRoute || !nativeRoute.enabled) {
-    throw new Error("Native bridge route is unavailable");
+    throw new StratoError("Native bridge route is unavailable");
   }
   if (nativeRoute.withdrawalsPaused) {
-    throw new Error("Native bridge withdrawals are paused");
+    throw new StratoError("Native bridge withdrawals are paused");
   }
   if (nativeRoute.withdrawalsDisabled) {
-    throw new Error("Native token withdrawals are disabled");
+    throw new StratoError("Native token withdrawals are disabled");
   }
 
   const requestedAmount = BigInt(stratoTokenAmount);
   const maxPerWithdrawal = BigInt(nativeRoute.maxPerWithdrawal || "0");
   if (maxPerWithdrawal > 0n && requestedAmount > maxPerWithdrawal) {
-    throw new Error("Native withdrawal exceeds the per-withdrawal cap");
+    throw new StratoError("Native withdrawal exceeds the per-withdrawal cap");
   }
 
   const maxOutstandingWithdrawal = BigInt(nativeRoute.maxOutstandingWithdrawal || "0");
@@ -283,7 +283,7 @@ export const validateNativeWithdrawalRoute = (
     maxOutstandingWithdrawal > 0n
     && requestedAmount > remainingOutstandingWithdrawal
   ) {
-    throw new Error("Native withdrawal exceeds the remaining aggregate capacity");
+    throw new StratoError("Native withdrawal exceeds the remaining aggregate capacity");
   }
 };
 

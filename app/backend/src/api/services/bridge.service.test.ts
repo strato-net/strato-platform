@@ -275,12 +275,35 @@ test("rejects native withdrawals that are disabled or exceed remaining capacity"
   );
   assert.throws(
     () => validateNativeWithdrawalRoute(nativeRoute, "25000000000000000001"),
-    /remaining aggregate capacity/
+    { status: 400, message: /remaining aggregate capacity/ }
   );
   assert.throws(
     () => validateNativeWithdrawalRoute({ ...nativeRoute, withdrawalsDisabled: true }, "1"),
-    /withdrawals are disabled/
+    { status: 400, message: /withdrawals are disabled/ }
   );
+});
+
+test("invalid withdrawal input is a 400, not a generic 500", async () => {
+  const { validateRequestWithdrawal, validateTransactionType } = await import("../validators/bridge.validators");
+  const base = {
+    externalChainId: "11155111",
+    externalToken: "0x2222222222222222222222222222222222222222",
+    stratoToken: "0x1111111111111111111111111111111111111111",
+    stratoTokenAmount: "1000",
+    externalRecipient: "0x3333333333333333333333333333333333333333",
+  };
+  assert.doesNotThrow(() => validateRequestWithdrawal(base));
+  for (const args of [
+    { ...base, externalChainId: "0" },
+    { ...base, routeType: "native" },
+    { ...base, stratoTokenAmount: "not-a-number" },
+    // Raw-integer base units only: a decimal would make downstream BigInt() throw a 500.
+    { ...base, stratoTokenAmount: "1.5" },
+    { ...base, stratoTokenAmount: "0" },
+    undefined,
+  ]) assert.throws(() => validateRequestWithdrawal(args), { status: 400 });
+  assert.equal(validateTransactionType("deposit"), "deposit");
+  assert.throws(() => validateTransactionType("mint"), { status: 400, message: /Invalid transaction type/ });
 });
 
 test("uses the saveUSDST vault ABI for native withdrawal approvals", () => {

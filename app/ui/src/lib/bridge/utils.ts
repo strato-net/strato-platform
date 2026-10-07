@@ -302,7 +302,7 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
  */
 export function getChainName(chainId: number | string): string {
   const chainEntries = Object.entries(SUPPORTED_CHAINS);
-  const chainEntry = chainEntries.find(([_, id]) => id === chainId);
+  const chainEntry = chainEntries.find(([_, id]) => String(id) === String(chainId));
   return chainEntry ? chainEntry[0] : "Unknown Chain";
 }
 

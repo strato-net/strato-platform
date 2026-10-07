@@ -76,6 +76,11 @@ test('legacy statuses stay separate from EAB and normalized native history', () 
   assert(!bridgeUtils.LEGACY_DEPOSIT_STATUS_OPTIONS.some(o => o.value === 8));
 });
 
+test('chain names resolve for numeric and Cirrus string IDs', () => {
+  assert.equal(bridgeUtils.getChainName(84532), 'BASE_SEPOLIA');
+  assert.equal(bridgeUtils.getChainName('84532'), 'BASE_SEPOLIA');
+});
+
 test('EAB deposit rejection and reuse explain recovery without changing withdrawal or legacy statuses', () => {
   const label = bridgeUtils.getDepositStatusLabel;
   assert.equal(label('7', 'external').text, 'Rejected');
