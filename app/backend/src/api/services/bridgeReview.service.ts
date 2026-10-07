@@ -21,34 +21,38 @@ const readReviewRows = async <T = BridgeReviewRow>(accessToken: string, contract
   }
 };
 
+const reviewBatches = <T>(items: T[]): T[][] =>
+  Array.from({ length: Math.ceil(items.length / BRIDGE_REVIEW_ID_BATCH_SIZE) },
+    (_, index) => items.slice(index * BRIDGE_REVIEW_ID_BATCH_SIZE, (index + 1) * BRIDGE_REVIEW_ID_BATCH_SIZE));
+
 export const getAdminBridgeReviews = async (accessToken: string, userAddress?: string): Promise<BridgeReviewItem[]> => {
   const { ExternalAssetBridge, externalAssetBridge, StratoNativeBridge, stratoNativeBridge } = constants;
-  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals] = await Promise.all([
+  const [deposits, withdrawals, nativeDeposits, nativeWithdrawals, chainRows] = await Promise.all([
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "deposits", { select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc", "value->>status": `in.(0,${"0".repeat(40)},2,7,8)` }),
     readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawals", { "value->>status": "in.(2,3)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "deposits", { "value->>bridgeStatus": "in.(2,4,7)" }),
     readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, "withdrawals", { "value->>bridgeStatus": `in.(2,${ExternalBridgeStatus.CANCELLATION_PENDING})` }),
+    readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "chains", {}),
   ]);
   const ids = withdrawals.filter(row => String(row.value.status) === "2").map(row => row.key);
-  const reviews: BridgeReviewRow[] = [];
-  for (let offset = 0; offset < ids.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
-    reviews.push(...await readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawalManualReviews", {
-      key: `in.(${ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).join(",")})`,
-    }));
-  }
+  const reviews = (await Promise.all(reviewBatches(ids).map(batch =>
+    readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "withdrawalManualReviews", {
+      key: `in.(${batch.join(",")})`,
+    })))).flat();
   const nativeRefundIds = nativeDeposits.filter(row => Number(row.value.bridgeStatus) === 7).map(row => row.key);
-  for (let offset = 0; offset < nativeRefundIds.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
-    const [proposals, evidence] = await Promise.all(["depositRefundProposals", "depositRefundEvidence"].map(table =>
+  const nativeRefundRows = await Promise.all(reviewBatches(nativeRefundIds).map(batch =>
+    Promise.all(["depositRefundProposals", "depositRefundEvidence"].map(table =>
       readReviewRows(accessToken, StratoNativeBridge, stratoNativeBridge, table, {
-        key: `in.(${nativeRefundIds.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE).join(",")})`,
-      })));
+        key: `in.(${batch.join(",")})`,
+      })))));
+  for (const [proposals, evidence] of nativeRefundRows) {
     const evidenceHashes = new Map(evidence.map(row => [String(row.key), row.value]));
     for (const row of nativeDeposits) if (evidenceHashes.has(String(row.key))) row.value.refundEvidenceHash = evidenceHashes.get(String(row.key));
     const hashes = new Map(proposals.map(row => [String(row.key), row.value]));
     for (const row of nativeDeposits) if (hashes.has(String(row.key))) row.value.refundProposalHash = hashes.get(String(row.key));
   }
   const items = buildBridgeReviewQueue({ deposits, withdrawals, reviews, nativeDeposits, nativeWithdrawals, legacyDeposits: [], legacyWithdrawals: [] });
-  const chains = new Map((await readReviewRows(accessToken, ExternalAssetBridge, externalAssetBridge, "chains", {})).map(row => [String(row.key), row.value]));
+  const chains = new Map(chainRows.map(row => [String(row.key), row.value]));
   for (const item of items.filter(item => item.source === "eab" && item.actions.includes("refund") && item.kind !== "withdrawal_refund")) {
     const vault = chains.get(item.chainId)?.vault;
     if (typeof vault === "string" && /^(0x)?[a-f0-9]{40}$/i.test(vault) && !/^(0x)?0+$/.test(vault)) item.refundVault = vault.replace(/^0x/i, "").toLowerCase();
@@ -79,17 +83,15 @@ const enrichDepositApprovals = async (
 ): Promise<void> => {
   const approvals = new Map<string, unknown>();
   try {
-    for (let offset = 0; offset < items.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
-      const batch = items.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
-      const rows = await readReviewRows(accessToken, constants.ExternalAssetBridge, constants.externalAssetBridge, "depositReviewApprovals", {
+    const rows = (await Promise.all(reviewBatches(items).map(batch =>
+      readReviewRows(accessToken, constants.ExternalAssetBridge, constants.externalAssetBridge, "depositReviewApprovals", {
         or: `(${batch.map(item => {
           const [, , chainId, router, depositId] = item.id.split(":");
           return `and(key.eq.${chainId},key2.eq.${router.replace(/^0x/i, "").toLowerCase()},key3.eq.${depositId})`;
         }).join(",")})`,
         select: "key,key2,key3,value", order: "key.asc,key2.asc,key3.asc",
-      });
-      for (const row of rows) approvals.set(`${row.key}:${row.key2?.toLowerCase()}:${row.key3}`, row.value);
-    }
+      })))).flat();
+    for (const row of rows) approvals.set(`${row.key}:${row.key2?.toLowerCase()}:${row.key3}`, row.value);
   } catch {
     for (const item of items) item.approvalStatus = "unavailable";
     return;

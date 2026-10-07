@@ -3,6 +3,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database, ChevronDown, ArrowRightLeft, Vault, Layers } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -28,6 +29,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') === 'bridge' ? 'bridge' : 'tokens');
+  const [bridgeHistoryOpen, setBridgeHistoryOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -216,7 +218,25 @@ const Admin = () => {
           <TabsContent value="bridge" className="space-y-6">
             <BridgeReviewQueue />
             <BridgePolicies />
-            <BridgeTransactionsPage isAdmin={true} />
+            <Card>
+              <Collapsible open={bridgeHistoryOpen} onOpenChange={setBridgeHistoryOpen}>
+                <CardHeader className="p-3">
+                  <CardTitle className="text-sm">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="group w-full justify-start px-2">
+                        <span>All Bridge Transactions</span>
+                        <ChevronDown className="ml-auto group-data-[state=open]:rotate-180" />
+                      </Button>
+                    </CollapsibleTrigger>
+                  </CardTitle>
+                </CardHeader>
+                <CollapsibleContent asChild>
+                  <CardContent>
+                    {bridgeHistoryOpen && <BridgeTransactionsPage isAdmin={true} />}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
           </TabsContent>
           <TabsContent value="staking" className="space-y-6">
             <Card>
