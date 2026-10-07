@@ -1,11 +1,16 @@
+{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
 module BlockApps.Tools.SyncStats where
 
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
+import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, lookupRedisBlockDBConfig)
 import Blockchain.Model.SyncState
 import Blockchain.SyncDB
+import Control.Exception (SomeException, try)
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Database.Redis
+import Network.HTTP.Client (defaultManagerSettings, httpLbs, newManager, parseRequest, responseBody)
 import Text.Format
 import Text.Printf (printf)
+import Text.Read (readMaybe)
 
 syncStats :: IO ()
 syncStats = do
@@ -14,7 +19,7 @@ syncStats = do
   bestBlock <- runRedis conn getBestBlockInfo
   bestSequencedBlock <- runRedis conn getBestSequencedBlockInfo
   worldsBestBlock <- runRedis conn getWorldBestBlockInfo
-  vmBest <- runRedis conn getVmBestBlockNumber
+  vmBest <- vmBestBlock
   cirrusBest <- runRedis conn getCirrusBestBlockNumber
   syncStatus <- runRedis conn getSyncStatus
   syncStatusNow <- runRedis conn getSyncStatusNow
@@ -25,7 +30,7 @@ syncStats = do
   putStrLn "Block Positions:"
   putStrLn "================"
   position "sequencer" (bestSequencedBlockNumber <$> bestSequencedBlock) "<best_sequenced>  strato-sequencer, last committed block"
-  position "vm"        vmBest                                            "<vm_best>         vm-runner, last block executed"
+  position "vm"        vmBest                                            "vm_best_block     vm-runner :8009/metrics, last block executed"
   position "indexed"   (bestBlockNumber <$> bestBlock)                   "<best>            strato-indexer, last vm-runner batch committed to SQL/Redis"
   position "cirrus"    cirrusBest                                        "<cirrus_best>     slipstream, last block indexed into Cirrus"
   position "world"     (bestBlockNumber <$> worldsBestBlock)             "<worldbest>       strato-p2p, highest block reported by any peer"
@@ -65,5 +70,17 @@ syncStats = do
 
   putStrLn ""
   where
+    -- The vm-runner exposes its position as a Prometheus gauge; no store in between.
+    vmBestBlock :: IO (Maybe Integer)
+    vmBestBlock = do
+      let url = "http://" ++ apiListenAddress (apiConfig ethConf) ++ ":8009/metrics"
+      r <- try $ newManager defaultManagerSettings >>= \m -> parseRequest url >>= \q -> httpLbs q m
+      pure $ case r of
+        Left (_ :: SomeException) -> Nothing
+        Right resp ->
+          case [v | l <- BL.lines (responseBody resp), ["vm_best_block", v] <- [BL.words l]] of
+            (v : _) -> truncate <$> (readMaybe (BL.unpack v) :: Maybe Double)
+            [] -> Nothing
+
     position :: String -> Maybe Integer -> String -> IO ()
     position label n desc = printf "%-10s %-12s %s\n" (label ++ ":") (maybe "-" show n) desc

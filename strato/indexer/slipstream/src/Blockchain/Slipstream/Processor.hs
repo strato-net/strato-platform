@@ -24,6 +24,7 @@
 module Blockchain.Slipstream.Processor
   ( processTheMessages,
     parseActions,
+    processedContractToProcessedCollectionRows,
     )
 where
 
@@ -47,6 +48,8 @@ import Control.Monad (forM, forM_, unless, when, void)
 import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Reader
 import qualified Data.Aeson as JSON
+import qualified Data.ByteString as BS
+import Data.Text.Encoding (decodeUtf8)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
@@ -106,18 +109,18 @@ rowToInsert row =
    in processedContract newState row
 
 
-rowToCollections :: AggregateAction -> Map.Map (NE.NonEmpty (Bool, Text)) Value
+rowToCollections :: AggregateAction -> Map.Map (NE.NonEmpty (Bool, BS.ByteString)) Value
 rowToCollections row = case actionStorage row of
   Action.SolidVMDiff mp -> Map.fromList $ SolidVM.decodeCacheValuesForCollections mp
 
 -- Struct fields render with dot notation, mapping/array indexes with brackets:
 -- activities[24].actionableEvents[0]
-renderCollectionPath :: Text -> [(Bool, Text)] -> Text
-renderCollectionPath collection ks = T.concat $ collection : map renderPiece ks
+renderCollectionPath :: BS.ByteString -> [(Bool, BS.ByteString)] -> Text
+renderCollectionPath collection ks = pathToStorageKey $ StoragePath (Field collection : map renderPiece ks)
   where
     renderPiece (isField, k)
-      | isField = "." <> k
-      | otherwise = "[" <> k <> "]"
+      | isField = Field k
+      | otherwise = Index k
 
 processedContractToProcessedCollectionRows :: AggregateAction -> [ProcessedCollectionRow]
 processedContractToProcessedCollectionRows row =
@@ -125,7 +128,7 @@ processedContractToProcessedCollectionRows row =
       recordVMs = mapMaybe
         (\((_, a) NE.:| ks, v) -> case ks of
             [] -> Nothing
-            _ -> Just (a, "Mapping", SimpleValue . ValueString . snd <$> ks, renderCollectionPath a ks, v)
+            _ -> Just (decodeUtf8 a, "Mapping", SimpleValue . ValueBytes Nothing . snd <$> ks, renderCollectionPath a ks, v)
         ) $ Map.toList state
       processRecord (n, t, ks, p, v) = processedCollectionRow n t row ks p v
    in processRecord <$> recordVMs
@@ -226,9 +229,10 @@ processTheMessages messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> labelToText (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (labelToText . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts inherited
+      insertInheritance cr' n'' inherited
+      indexFkeys <- createIndexTable c cc nameParts
+      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do

@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
@@ -48,7 +50,10 @@ import qualified Data.Aeson.Key as DAK
 import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types
 import Data.Binary
+import Data.Binary.Put (putBuilder)
 import qualified Data.Bifunctor as BF
+import qualified Data.ByteString as B
+import Data.ByteString.Builder.Extra (byteStringInsert)
 import qualified Data.ByteString.Char8 as BC
 import Data.Foldable
 import Data.List
@@ -57,6 +62,9 @@ import qualified Data.Map.Ordered as OMap
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Sequence as S
+import Data.Store (Size (VarSize), Store (..))
+import qualified Data.Store as Store
+import Data.Store.Internal (getSize)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time
@@ -255,13 +263,17 @@ instance Format Action where
       ++ unlines (map show $ toList _delegatecalls)
       ++ "\n"
 
-instance Binary Action
-
 instance (Ord k, Binary k, Binary v) => Binary (OMap.OMap k v) where
     put omap = put (OMap.assocs omap) -- Serialize OMap as list of key-value pairs
     get = do
         kvPairs <- get -- Deserialize a list of key-value pairs
         return $ OMap.fromList kvPairs -- Convert list back to OMap
+
+-- Stored as a list of key/value pairs, as in the Binary instance.
+instance (Ord k, Store k, Store v) => Store (OMap.OMap k v) where
+    size = VarSize (getSize . OMap.assocs)
+    poke = poke . OMap.assocs
+    peek = OMap.fromList <$> peek
 
 instance (ToJSON k, ToJSON v) => ToJSON (OMap.OMap k v) where
     toJSON omap = object [ "omapData" .= OMap.assocs omap ]
@@ -318,3 +330,26 @@ instance (Ord k, Arbitrary k, Arbitrary v) => Arbitrary (OMap.OMap k v) where
         kvPairs <- listOf arbitrary -- Generate a list of key-value pairs
         return $ OMap.fromList kvPairs -- Convert list to OMap
 -}
+
+-- See the note on the Store instances in SolidVM.Model.Storable.
+deriving via (StoreMap StoragePath BasicValue) instance {-# OVERLAPPING #-} Store (M.Map StoragePath BasicValue)
+
+deriving via (StoreSeq Event) instance {-# OVERLAPPING #-} Store (S.Seq Event)
+
+deriving via (StoreSeq Delegatecall) instance {-# OVERLAPPING #-} Store (S.Seq Delegatecall)
+
+deriving via (StoreList (Address, ActionData)) instance {-# OVERLAPPING #-} Store [(Address, ActionData)]
+
+instance Store DataDiff
+
+instance Store ActionData
+
+instance Store Delegatecall
+
+instance Store Action
+
+-- | On the wire an Action is its Store encoding as one length-prefixed ByteString
+-- (the same layout as @put (Store.encode a)@, without copying the bytes into the Put buffer).
+instance Binary Action where
+    put a = let bs = Store.encode a in put (B.length bs) >> putBuilder (byteStringInsert bs)
+    get = either (fail . show) pure . Store.decode =<< get

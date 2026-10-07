@@ -37,8 +37,10 @@ import UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
-commitSqlDiffs = sqlQuery . commitSqlDiffsSql
+-- | Commit a batch of state diffs in a single transaction (one commit per
+-- batch instead of one per statement).
+commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => [StateDiff] -> m ()
+commitSqlDiffs = sqlQuery . mapM_ commitSqlDiffsSql
 
 -- | One state diff's writes as a single 'SQL.SqlPersistT' action, so the
 -- indexer can commit it in the same transaction as the block it belongs to.

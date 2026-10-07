@@ -31,6 +31,7 @@ module Blockchain.Slipstream.OutputData (
   insertCollectionTable,
   refreshMaterializedView,
   createFkeyFunctions,
+  insertInheritance,
   createIndexTable,
   createCollectionTable,
   createExpandEventTables,
@@ -49,6 +50,7 @@ import           Control.Monad
 import qualified Data.Aeson                      as Aeson
 import           Data.Bool                       (bool)
 import qualified Data.Set as Set
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Base16         as Base16
 import qualified Data.ByteString.Lazy            as BL
 import           Data.Map                        (Map)
@@ -113,7 +115,6 @@ data SlipstreamQuery = CreateTable
                         }
                      | CreateView
                         { viewName :: TableName
-                        , inheritedContractNames :: [Text]
                         , sourceTableName :: TableName
                         , sourceTableColumns :: [Text]
                         , contractTableColumns :: [Text]
@@ -292,7 +293,7 @@ slipstreamQueryText _ CreateView{..} =
               , tableNameToDoubleQuoteText sourceTableName
               , " e WHERE e.address = s.address AND e.collection_name = s.collection_name"
               ]
-           ++ [ T.concat [" AND e.\"key\"->>'", k, "' = s.\"key\"->>'", k, "'"]
+           ++ [ T.concat [" AND e.\"key\"->>'", k, "_hex' = s.\"key\"->>'", k, "_hex'"]
               | k <- mappingKeyName <$> [1 .. mappingKeyCount]
               ]
            ++ [ " AND e.\"key\"->>'"
@@ -305,12 +306,19 @@ slipstreamQueryText _ CreateView{..} =
               , deeperKey
               , "')), '[]'::jsonb) END"
               ]
-   in T.concat $
-        [ "DROP VIEW IF EXISTS "
-        , tableNameToDoubleQuoteText viewName
-        , " CASCADE;\nCREATE VIEW " -- \nBEGIN;\nCREATE VIEW "
-        , tableNameToDoubleQuoteText viewName
-        , " AS SELECT "
+      -- The view is handed to slipstream_upsert_view rather than dropped and
+      -- recreated here: DROP VIEW ... CASCADE takes every fkey function touching
+      -- the view with it, including those owned by contracts that are not part of
+      -- this code collection and so would never be recreated (#5665).
+      upsertView body = T.concat
+        [ "CALL slipstream_upsert_view("
+        , wrapEscapeSingle $ tableNameToTextPostgres viewName
+        , ", "
+        , wrapEscapeSingle body
+        , ");\n"
+        ]
+   in upsertView . T.concat $
+        [ "SELECT "
         , T.intercalate ", " $
             (("s." <>) <$> sourceTableColumns)
          ++ (("x." <>) <$> codeTableColumns)
@@ -338,6 +346,8 @@ slipstreamQueryText _ CreateView{..} =
                   ]
                 _ -> ""
             , case t of
+                SqlBytesKey -> T.concat
+                  [ "THEN s.", wrapEscapeDouble dataColumn, "->>'", c, "_hex' ELSE NULL::text" ]
                 SqlJsonbArray -> T.concat
                   [ "THEN jsonb_obj_to_array(s."
                   , wrapEscapeDouble dataColumn
@@ -411,6 +421,7 @@ slipstreamQueryText _ CreateView{..} =
                       SqlBool      -> "false::boolean"
                       SqlDecimal   -> "'0'::text"
                       SqlText      -> "''::text"
+                      SqlBytesKey  -> "NULL::text"
                       SqlJsonb     -> "to_jsonb(''::text)"
                       SqlTimestamp -> "'infinity'::timestamp)"
                       SqlSerial    -> "0::numeric"
@@ -425,10 +436,19 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameToText codeTableName
         , " x ON c.code_hash = x.code_hash WHERE x.creator = '"
         , tableNameCreator viewName
-        , "' AND (c.contract_name = '"
-        , tableNameContractName viewName
-        , T.concat $ ("' OR c.contract_name = '" <>) <$> inheritedContractNames
-        , "')"
+        -- Derived contracts are looked up in the inheritance table rather than
+        -- listed here, so that registering a code collection holding only some of
+        -- a contract's children cannot shrink the view (#5665). The ARRAY subquery
+        -- is an uncorrelated InitPlan, evaluated once per query.
+        , "' AND c.contract_name = ANY (ARRAY(SELECT i.child FROM "
+        , tableNameToDoubleQuoteText inheritanceTableName
+        , " i WHERE i.creator = "
+        , wrapEscapeSingle $ tableNameCreator viewName
+        , " AND i.parent = "
+        , wrapEscapeSingle $ tableNameContractName viewName
+        , ") || "
+        , wrapEscapeSingle $ tableNameContractName viewName
+        , "::text)"
         , T.concat $ (\(cols, mOp, val) -> T.concat
             [ " AND "
             , T.concat $ (\case
@@ -442,7 +462,6 @@ slipstreamQueryText _ CreateView{..} =
             ]
           ) <$> extraJoinColumns
         , maybe "" ((" GROUP BY " <>) . T.intercalate ", ") groupByClause
-        , ";\n"
         -- , " WITH NO DATA;\n"
         -- , "CREATE UNIQUE INDEX \""
         -- , T.pack
@@ -641,9 +660,8 @@ createIndexTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
-  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createIndexTable contract cc (creator, n) inherited = do
+createIndexTable contract cc (creator, n) = do
   let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
@@ -653,7 +671,6 @@ createIndexTable contract cc (creator, n) inherited = do
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo (x <> "_fkey") tableName (indexTableName creator f) False x t) <$> mf) cols
   yield $ CreateView
     tableName
-    inherited
     storageTableName
     (fst <$> baseColumns)
     contractCols
@@ -670,12 +687,13 @@ createCollectionTable ::
   (Text, Text) ->
   ContractF () ->
   CodeCollectionF () ->
-  [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
+createCollectionTable (creator, n) c cc (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator n collectionName
-      keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
+      keySqlTypes = (\case
+        SVMType.Bytes{} -> SqlBytesKey
+        keyType -> fromMaybe SqlText $ solidityTypeToSQLType False (Just c) cc keyType) <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       keyCount = length keyNames
       lastKeyName = if keyCount <= 1 then "key" else "key" <> tshow keyCount
@@ -696,7 +714,6 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
         ++ maybe ["value"] (const []) mStructVal
   yield $ CreateView
     tableName
-    inherited
     mappingTableName
     mappingCols
     []
@@ -725,10 +742,9 @@ createEventArrayTable ::
   OutputM m =>
   (Text, Text, Text) ->
   CodeCollectionF () ->
-  [Text] ->
   (Text, SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
+createEventArrayTable (creator, n, e) cc (arr, arrType) = do
   let keyTypes (SVMType.Array t _) = SqlDecimal : keyTypes t
       keyTypes _                   = []
       tableName = eventCollectionTableName creator n e arr
@@ -743,7 +759,6 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ CreateView
     tableName
-    inherited
     eventArrayTableName
     cols
     ["contract_name"]
@@ -813,6 +828,19 @@ processGroupedData rows@(row:_) =
     "Event Array" -> insertEventArrayTableQuery rows
     _ -> insertCollectionTableQuery rows
 processGroupedData [] = []
+
+insertInheritance ::
+  OutputM m =>
+  Text ->
+  Text ->
+  [Text] ->
+  ConduitM () SlipstreamQuery m ()
+insertInheritance _ _ [] = pure ()
+insertInheritance creator parent children = yield $ InsertTable
+  inheritanceTableName
+  [("creator", SqlText), ("parent", SqlText), ("child", SqlText)]
+  [Just . SimpleValue . ValueString <$> [creator, parent, child] | child <- children]
+  (Just DoNothing)
 
 createFkeyFunctions ::
   OutputM m =>
@@ -896,12 +924,24 @@ insertCollectionTableQuery rows =
           keyValuePairs =
             [ ValueMapping
               . Map.fromList
-              $ (\(t,k) -> (ValueString t, k))
-              <$> keyColumnNames (collectionDataKeys m)
+              $ concatMap keyValues $ keyColumnNames (collectionDataKeys m)
             , SimpleValue . ValueString $ collectionDataPath m
             , val
             ]
        in (m, isObject,) $ Just <$> keyValuePairs
+
+    -- Store readable keys plus their lossless bytes. Collection views use the
+    -- bytes for Solidity bytes/bytesN keys, even when those bytes are valid UTF-8.
+    -- Existing rows/views require a clean reindex to populate/use the hex keys.
+    keyValues (name, SimpleValue (ValueBytes _ raw)) =
+      let hex = decodeUtf8 $ Base16.encode raw
+          readable = case decodeUtf8' raw of
+            Right text | not (BS.elem 0 raw) -> text
+            _ -> "~hex:" <> hex
+       in [ (ValueString name, SimpleValue $ ValueString readable)
+          , (ValueString $ name <> "_hex", SimpleValue $ ValueString hex)
+          ]
+    keyValues (name, value) = [(ValueString name, value)]
 
     preparedRows = map prepareRow rows
 
@@ -982,11 +1022,10 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text) ->
-  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
+createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
-    go (evName, ev) = createEventTable nameParts evName ev cc inherited
+    go (evName, ev) = createEventTable nameParts evName ev cc
 
 createEventTable ::
   OutputM m =>
@@ -994,9 +1033,8 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createEventTable (creator, n) evName ev cc inherited = do
+createEventTable (creator, n) evName ev cc = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, cname) = constructTableNameParameters creator n
       evNameText = escapeQuotes $ labelToText evName
@@ -1013,7 +1051,6 @@ createEventTable (creator, n) evName ev cc inherited = do
           cols' = (\(x, v, _) -> (x, v)) <$> cols
        in CreateView
             tableName'
-            inherited
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
             ["contract_name"]
@@ -1025,7 +1062,7 @@ createEventTable (creator, n) evName ev cc inherited = do
             (Just $ ["s.address", "s.block_hash", "s.event_index", "x.creator", "c.contract_name"])
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
+    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc
   let addressFK = ForeignKeyInfo (tableNameToText $ indexTableName creator n) eventTable (indexTableName creator n) False "address" SqlText
   let o2mFK = ForeignKeyInfo (tableNameToText eventTable) (indexTableName creator n) eventTable True "address" SqlText
   pure . ([addressFK, o2mFK] ++) $ fcols ++ catMaybes arrayFkeys
@@ -1057,11 +1094,9 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataValue = value
     }
 
-getArraysFromEvents :: [(Text, SVMValue.Value, Text, SVMType.Type)] -> (Text, [(Value, Value)])
+getArraysFromEvents :: [(Text, SVMValue.Value)] -> (Text, [(Value, Value)])
 getArraysFromEvents evArgs = do
-  let li = [(name, valStr) | (name, _, valStr, t) <- evArgs, isArrayType t]
-      isArrayType (SVMType.Array _ _) = True
-      isArrayType _ = False
+  let li = [(name, SVMValue.renderValue v) | (name, v@(SVMValue.SArray _)) <- evArgs]
   case li of
     [] -> ("", [])
     (arrayName, arrayStr):_ ->
@@ -1099,7 +1134,7 @@ insertGlobalEventTableQuery aggregatedEvents =
 
     eventValues agEv@AggregateEvent {eventEvent = ev} =
       let attributesMap = ValueMapping $
-            Map.fromList [(ValueString name, SimpleValue . ValueString $ valStr) | (name, _, valStr, _) <- Action.evArgs ev]
+            Map.fromList [(ValueString name, SimpleValue . ValueString $ SVMValue.renderValue v) | (name, v) <- Action.evArgs ev]
        in Just <$>
             [ SimpleValue . ValueAddress $ Action.evContractAddress ev
             , SimpleValue . ValueString . T.pack . keccak256ToHex $ eventBlockHash agEv
@@ -1154,10 +1189,7 @@ valueToSQLText' _ (SimpleValue (ValueString s)) = Just $ escapeQuestionMarks s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks $
-  case decodeUtf8' bytes of
-    Left _ -> decodeUtf8 $ Base16.encode bytes
-    Right x -> x
+valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just . escapeQuestionMarks $ decodeValueBytes bytes
 valueToSQLText' _ (ValueEnum _ _ index) = Just . T.pack $ show index
 valueToSQLText' _ (ValueContract addr) =
   if addr == 0
@@ -1211,6 +1243,13 @@ contractTableName = indexTableName "" "contract"
 
 codeTableName :: TableName
 codeTableName = indexTableName "" "code"
+
+-- | (creator, parent, child) for every derivation seen in any code collection.
+-- Views select the contracts deriving from theirs out of this table; rows are only
+-- ever added, so a later collection that holds a subset of the children (or none)
+-- leaves the view's contents alone.
+inheritanceTableName :: TableName
+inheritanceTableName = indexTableName "" "contract_inheritance"
 
 mappingTableName :: TableName
 mappingTableName = indexTableName "" "mapping"
@@ -1325,10 +1364,21 @@ initialSlipstreamQueries =
       ["address", "block_hash", "event_index", "collection_name", "key"]
       Nothing -- (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
       []
+  , CreateTable
+      inheritanceTableName
+      [ ("creator", SqlText)
+      , ("parent", SqlText)
+      , ("child", SqlText)
+      ]
+      ["creator", "parent", "child"]
+      Nothing
+      []
+  , RawSQL backfillInheritanceSQL
   , RawSQL genericBaseTableIndexesSQL
   , RawSQL "DROP INDEX IF EXISTS mapping_idx, storage_status_address_idx;"
   , RawSQL jsonbMergeDeepSQL
   , RawSQL jsonbObjToArraySQL
+  , RawSQL upsertViewSQL
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "event") (indexTableName "" "storage") False "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "event" (indexTableName "" "storage") (indexTableName "" "event") True "address" SqlText
   , CreateFkeyFunction $ ForeignKeyInfo "storage" (indexTableName "" "mapping") (indexTableName "" "storage") False "address" SqlText
@@ -1389,6 +1439,9 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_timestamp_idx"
   , "  ON event (block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_block_number_idx"
+  , "  ON event ((block_number::numeric), event_index);"
   ]
 
 jsonbMergeDeepSQL :: Text
@@ -1425,6 +1478,76 @@ jsonbMergeDeepSQL = T.unlines
   , "  RETURN b;"
   , "END;"
   , "$fn$ LANGUAGE plpgsql IMMUTABLE;"
+  ]
+
+-- | Replace a Cirrus view without losing the fkey functions attached to it.
+-- PostgREST discovers relationships between views through functions that take or
+-- return the view's row type, so dropping a view cascades to all of them. Only
+-- the functions belonging to contracts in the code collection being registered
+-- get recreated afterwards, which is why a partial upload used to break the
+-- relationships of every other contract pointing at (or pointed to by) the view.
+--
+-- CREATE OR REPLACE VIEW keeps the view's identity, so nothing is dropped when
+-- the columns are unchanged or only appended to. When Postgres refuses (a column
+-- was removed, reordered or retyped) the dependent functions are captured,
+-- the view is dropped and recreated, and the functions are replayed. A function
+-- that no longer compiles against the new columns is a stale relationship and is
+-- left dropped.
+upsertViewSQL :: Text
+upsertViewSQL = T.unlines
+  [ "CREATE OR REPLACE PROCEDURE slipstream_upsert_view(vname text, vbody text) AS $fn$"
+  , "DECLARE defs text[]; d text;"
+  , "BEGIN"
+  , "  BEGIN"
+  , "    EXECUTE format('CREATE OR REPLACE VIEW %I AS %s', vname, vbody);"
+  , "    RETURN;"
+  , "  EXCEPTION WHEN invalid_table_definition THEN NULL;"
+  , "  END;"
+  , "  SELECT array_agg(pg_get_functiondef(p.oid)) INTO defs"
+  , "    FROM pg_proc p, pg_class c"
+  , "   WHERE c.oid = to_regclass(format('%I', vname))"
+  , "     AND p.prokind = 'f'"
+  , "     AND (p.prorettype = c.reltype OR c.reltype = ANY (p.proargtypes));"
+  , "  EXECUTE format('DROP VIEW IF EXISTS %I CASCADE', vname);"
+  , "  EXECUTE format('CREATE VIEW %I AS %s', vname, vbody);"
+  , "  FOREACH d IN ARRAY coalesce(defs, '{}') LOOP"
+  , "    BEGIN"
+  , "      EXECUTE d;"
+  , "    EXCEPTION WHEN OTHERS THEN"
+  , "      RAISE WARNING 'slipstream_upsert_view(%): not restoring stale function: %', vname, SQLERRM;"
+  , "    END;"
+  , "  END LOOP;"
+  , "END;"
+  , "$fn$ LANGUAGE plpgsql;"
+  ]
+
+-- | Views created before the inheritance table existed carry their derived
+-- contracts inline (c.contract_name = 'Parent' OR c.contract_name = 'Child' ...),
+-- and that list is the only record of them on a node that does not resync. Copy
+-- it into the table so the first redefinition of such a view keeps its children.
+-- The columns are varchar, so Postgres prints each comparison with a cast,
+-- ((c.contract_name)::text = 'Child'::text); [):tex]* skips that cast. The
+-- pattern avoids '?' because these startup queries go through pgQuery, which
+-- reads it as a parameter placeholder.
+-- The view's own contract is always the first name in the list. Views already in
+-- the new form contain no such comparison and contribute nothing, so this is safe
+-- to run on every start. It must never stop slipstream from starting.
+backfillInheritanceSQL :: Text
+backfillInheritanceSQL = T.unlines
+  [ "DO $fn$"
+  , "BEGIN"
+  , "  INSERT INTO " <> tableNameToDoubleQuoteText inheritanceTableName <> " (creator, parent, child)"
+  , "  SELECT DISTINCT v.creator, v.names[1], child"
+  , "    FROM (SELECT (regexp_match(definition, 'x\\.creator[):tex]* = ''([^'']*)'''))[1] AS creator,"
+  , "                 ARRAY(SELECT m[1] FROM regexp_matches(definition, 'c\\.contract_name[):tex]* = ''([^'']*)''', 'g') AS m) AS names"
+  , "            FROM pg_views WHERE schemaname = current_schema()) v,"
+  , "         unnest(v.names[2:]) AS child"
+  , "   WHERE v.creator IS NOT NULL"
+  , "  ON CONFLICT DO NOTHING;"
+  , "EXCEPTION WHEN OTHERS THEN"
+  , "  RAISE WARNING 'contract_inheritance backfill skipped: %', SQLERRM;"
+  , "END;"
+  , "$fn$;"
   ]
 
 jsonbObjToArraySQL :: Text

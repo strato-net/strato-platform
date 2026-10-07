@@ -328,3 +328,86 @@ test("reports a vote that hashed to a different issue instead of claiming succes
     /landed on issue aaaa0000/,
   );
 });
+
+// ── castVoteOnIssueById: replaying a registry-created issue ──────────────────
+// Deploy scripts open issues through the registry's own castVoteOnIssue, whose variadic
+// tail the node records as its own renderings: `false`, `12`, `"abc"`. The replay must
+// hand those back so the node's shape inference types them as it did at creation
+// (strato-net/private#205)
+
+const REGISTRY = "000000000000000000000000000000000000100c";
+const BRIDGE = "394d276e3b6109d6c58444653c26996bf3ae3eda";
+const TOKEN = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
+
+const mockRegistryReplay = (t: any, txArgs: string[]) => {
+  const posted: any[] = [];
+
+  t.mock.method(bloc, "get", (async (_token: string, _path: string) => ({
+    status: 200,
+    data: {
+      _contractName: "AdminRegistry",
+      _functions: {
+        castVoteOnIssue: {
+          _funcArgs: [
+            ["_target", { index: 0, type: { tag: "Address" } }],
+            ["_func", { index: 1, type: { tag: "String" } }],
+            ["_args", { index: 2, type: { tag: "Variadic" } }],
+          ],
+        },
+      },
+    },
+  })) as typeof bloc.get);
+  t.mock.method(eth, "get", (async (_token: string, _path: string) => ({
+    status: 200,
+    data: [{ to: REGISTRY, funcName: "castVoteOnIssue", args: txArgs }],
+  })) as typeof eth.get);
+  t.mock.method(cirrus, "get", (async (_token: string, path: string, config: any) => {
+    if (path.endsWith("-IssueCreated") && config?.params?.issueId?.startsWith("eq.")) {
+      return {
+        status: 200,
+        data: [{
+          issueId: ISSUE_ID,
+          target: JSON.parse(txArgs[0]),
+          func: JSON.parse(txArgs[1]),
+          args: `[${txArgs.slice(2).join(", ")}]`,
+          block_number: "100",
+          transaction_hash: "0xcreatingtx",
+        }],
+      };
+    }
+    if (path.endsWith("-IssueCreated") || path.endsWith("-IssueVoted")) {
+      return { status: 200, data: [{ issueId: ISSUE_ID }] };
+    }
+    return { status: 200, data: [{ value: "1000000000000000000000000" }] };
+  }) as typeof cirrus.get);
+  t.mock.method(strato, "post", (async (_token: string, _path: string, body: any, config: any) => {
+    posted.push(JSONBigString.parse(config.transformRequest[0](body)).txs[0].payload);
+    return { status: 200, data: [{ status: "Success", hash: "0xvote1" }] };
+  }) as typeof strato.post);
+
+  return posted;
+};
+
+test("replays a registry-created issue's variadic tail as the values it rendered, not as text", async (t) => {
+  // Re-sent verbatim, a rendered `false` arrives as the string "false", which the node
+  // types as a string, so the vote hashes to a different issue than the one it replays
+  const posted = mockRegistryReplay(t, [`"${BRIDGE}"`, "\"setPause\"", "false", "true"]);
+
+  const result = await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.equal(result.votedVia, "replay");
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].method, "castVoteOnIssue");
+  assert.deepEqual(posted[0].args._args, [false, true]);
+});
+
+test("keeps quoted variadic renderings verbatim so the node strips exactly one quote level", async (t) => {
+  // Unquoted, the node re-types them by shape: "0000…1008" becomes the integer 1008
+  // (integer is tried before address) and "\"mint\"" loses a quote level
+  const tail = [`"${TOKEN}"`, "\"\\\"mint\\\"\"", "\"0000000000000000000000000000000000001008\""];
+  const posted = mockRegistryReplay(t, [`"${REGISTRY}"`, "\"addWhitelist\"", ...tail]);
+
+  await castVoteOnIssueById("access-token", VOTER, ISSUE_ID);
+
+  assert.deepEqual(posted[0].args._args, tail);
+});

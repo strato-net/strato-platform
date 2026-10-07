@@ -60,8 +60,6 @@ import qualified SolidVM.Model.Storable as MS
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.SyncDB (updateVmBestBlockNumber)
 import SolidVM.Model.Delta
 import SolidVM.Model.Value (Value (SAddress))
 import Blockchain.Strato.Model.ExtendedWord
@@ -156,7 +154,7 @@ addBlocks unfiltered = do
               failures <- addBlock block
               if null failures
                 then do
-                  RBDB.withRedisBlockDB $ updateVmBestBlockNumber blockNo
+                  P.setGauge vmBestBlock (fromIntegral blockNo)
                   (didReplaceThisTime, replacedBits@(hsh, num)) <- replaceBestIfBetter block
                   if didReplaceThisTime
                     then do
@@ -538,7 +536,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               proposer
               (fromIntegral availableGas)
               tAddr
-              (txHash ut)
+              (otHash t)
               "transfer"
               [recipientArg, amountArg]
               Nothing
@@ -562,7 +560,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                   proposer
                   (fromIntegral availableGas)
                   tAddr
-                  (txHash ut)
+                  (otHash t)
                   (labelToText fName)
                   argTexts
                   Nothing
@@ -585,7 +583,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
             availableGas
             newAddress
             (TD.code ut)
-            (txHash ut)
+            (otHash t)
             (fromJust $ txContractName ut)
             (txArgs ut)
 
@@ -599,7 +597,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                 proposer -- proposer
                 (fromIntegral availableGas) -- availableGas
                 tAddr -- origin
-                (txHash ut) -- txHash
+                (otHash t) -- txHash
                 (TD.funcName ut)
                 (TD.args ut)
                 Nothing
@@ -800,7 +798,7 @@ printTransactionMessage ::
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
   let tNonce = TD.nonce $ otBaseTx ot
-  multilineLog "printTx/err" $
+  multilineDebugLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
@@ -816,7 +814,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right 
           then ""
           else fromMaybe (CL.blink "<failed>") $ fmap format $ erNewContractAddress results
 
-  multilineLog "printTx/ok" $
+  multilineDebugLog "printTx/ok" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
         "Tx hash:  " ++ format theHash,
