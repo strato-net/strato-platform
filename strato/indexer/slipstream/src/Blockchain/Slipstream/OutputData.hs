@@ -1431,6 +1431,9 @@ genericBaseTableIndexesSQL = T.unlines
   , ""
   , "CREATE INDEX IF NOT EXISTS event_timestamp_idx"
   , "  ON event (block_timestamp DESC);"
+  , ""
+  , "CREATE INDEX IF NOT EXISTS event_block_number_idx"
+  , "  ON event ((block_number::numeric), event_index);"
   ]
 
 jsonbMergeDeepSQL :: Text
