@@ -2656,7 +2656,11 @@ cmd_create() {
 
   assert_no_running_containers "$node_dir"
   assert_no_open_files "$node_dir"
-  assert_clean_postgres "$node_dir"
+  # The local data directory is only dumped when the node runs its own
+  # postgres; with --postgres-host or --state-only it is empty or absent.
+  if [[ "$SNAPSHOT_STATE_ONLY" != "true" && -z "$SNAPSHOT_PG_HOST" ]]; then
+    assert_clean_postgres "$node_dir"
+  fi
 
   local staging payload_checksum
   staging="$(mktemp_dir)"

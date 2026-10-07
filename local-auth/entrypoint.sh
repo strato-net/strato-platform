@@ -188,25 +188,27 @@ if [ -f /run/secrets/oauth_credentials.yaml ]; then
     OAUTH_CLIENT_SECRET=$(grep "clientSecret:" /run/secrets/oauth_credentials.yaml | cut -d'"' -f2)
 fi
 
-# Create OAuth client in Hydra if it doesn't exist
-echo "Creating default OAuth client..."
+# Create the OAuth client in Hydra, or bring the persisted one up to date:
+# the databases survive restarts, and a changed secret, NODE_URL or port
+# would otherwise leave a stale client (invalid_client / redirect mismatch).
+echo "Configuring default OAuth client..."
+CLIENT_JSON="{
+    \"client_id\": \"${OAUTH_CLIENT_ID}\",
+    \"client_secret\": \"${OAUTH_CLIENT_SECRET}\",
+    \"grant_types\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"],
+    \"response_types\": [\"code\", \"token\", \"id_token\"],
+    \"scope\": \"openid offline email profile\",
+    \"redirect_uris\": [\"${NODE_URL}/auth/openidc/return\", \"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
+    \"post_logout_redirect_uris\": [\"${NODE_URL}/\", \"http://localhost:${HTTP_PORT}/\", \"http://127.0.0.1:${HTTP_PORT}/\"],
+    \"token_endpoint_auth_method\": \"client_secret_basic\"
+}"
 CLIENT_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}")
 if [ "$CLIENT_EXISTS" != "200" ]; then
-    curl -s -X POST "http://localhost:4445/admin/clients" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \"client_id\": \"${OAUTH_CLIENT_ID}\",
-            \"client_secret\": \"${OAUTH_CLIENT_SECRET}\",
-            \"grant_types\": [\"authorization_code\", \"refresh_token\", \"client_credentials\"],
-            \"response_types\": [\"code\", \"token\", \"id_token\"],
-            \"scope\": \"openid offline email profile\",
-            \"redirect_uris\": [\"${NODE_URL}/auth/openidc/return\", \"http://localhost:${HTTP_PORT}/auth/openidc/return\", \"http://127.0.0.1:${HTTP_PORT}/auth/openidc/return\"],
-            \"post_logout_redirect_uris\": [\"${NODE_URL}/\", \"http://localhost:${HTTP_PORT}/\", \"http://127.0.0.1:${HTTP_PORT}/\"],
-            \"token_endpoint_auth_method\": \"client_secret_basic\"
-        }" > /dev/null
+    curl -s -X POST "http://localhost:4445/admin/clients" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null
     echo "OAuth client '${OAUTH_CLIENT_ID}' created."
 else
-    echo "OAuth client '${OAUTH_CLIENT_ID}' already exists."
+    curl -s -X PUT "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null
+    echo "OAuth client '${OAUTH_CLIENT_ID}' updated."
 fi
 
 echo "Local auth admin user is created with strato-user-add."

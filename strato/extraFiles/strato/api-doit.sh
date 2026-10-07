@@ -56,7 +56,9 @@ fi
 # Endpoint overrides. Anything unset keeps the mounted config's value.
 override() {
   local path=$1 value=$2
-  [[ -n "$value" ]] && yq -i "$path = \"$value\"" "$CONF"
+  # strenv: the value is read from the environment, so quotes and
+  # backslashes in a secret are not interpolated into the expression
+  [[ -n "$value" ]] && OVERRIDE_VALUE="$value" yq -i "$path = strenv(OVERRIDE_VALUE)" "$CONF"
   return 0
 }
 override_num() {
