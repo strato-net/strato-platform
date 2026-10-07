@@ -47,6 +47,7 @@ defineFlag "notificationServerUrl" "" "URL of the notification server for market
 
 defineFlag "generateKey" (True :: Bool) "Whether or not to generate a new nodekey, if there isn't one in the vault"
 defineFlag "jsonrpc" (True :: Bool) "Start the Ethereum JSON-RPC server (port 8545) for wallet integration"
+defineFlag "validator" (False :: Bool) "Lite validator: run only what the chain needs (ethereum-discover, strato-p2p, strato-sequencer, vm-runner, the Redis block index) with Postgres, Redis and Prometheus. Nothing else is generated: no app, SMD, apex, nginx, PostgREST or Swagger docs, no Cirrus (slipstream), no strato-api or JSON-RPC, no SQL state mirror, and no vmevents stream. The node key still comes from the Vault (run strato-login first). Incompatible with --localAuth"
 defineFlag "publicStratoRpc" (False :: Bool) "Expose the strato_* simulation/trace methods on the public /rpc endpoint (default: blocked; the bloc simulate endpoint is unaffected)"
 defineFlag "localAuth" (False :: Bool) "Use local auth (Kratos/Hydra) instead of external Keycloak"
 defineFlag "sslDir" ("" :: String) "Path to directory containing server.pem and server.key (enables SSL)"

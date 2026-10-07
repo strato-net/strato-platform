@@ -320,6 +320,11 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
+  -- | Publish transaction results, actions and code collections on the
+  -- @vmevents@ stream for slipstream. Off on a node that runs no slipstream
+  -- (a lite validator): JLog only trims a topic as its readers advance, so a
+  -- stream nobody reads would grow for good.
+  , publishVmEvents :: Bool
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
@@ -332,6 +337,7 @@ instance FromJSON VmConf where
   parseJSON = withObject "VmConf" $ \v -> VmConf
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
+    <*> v .:? "publishVmEvents" .!= True
     <*> v .:? "simMaxConcurrent" .!= 8
 
 -- Default instances
@@ -407,6 +413,7 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
+    , publishVmEvents = True
     , simMaxConcurrent = 8
     }
 

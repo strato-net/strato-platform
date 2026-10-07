@@ -28,6 +28,7 @@ library:
     - Blockchain.Init.Monad
     - Blockchain.Init.Options
     - Blockchain.Init.RtsFlags
+    - Blockchain.Init.Validator
   dependencies:
   - aeson
   - composable-monads-base

@@ -79,7 +79,15 @@ runtimeConfig = def
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
-  , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
+  -- A validator serves no API and runs no slipstream: no SQL state mirror
+  -- (sqlDiff), no state diffs on the VM event stream (diffPublish), and no VM
+  -- event stream at all (publishVmEvents): with nobody reading it, JLog would
+  -- never trim it.
+  , vmConfig = def
+      { sqlDiff = flags_sqlDiff && not flags_validator
+      , diffPublish = flags_diffPublish && not flags_validator
+      , publishVmEvents = not flags_validator
+      }
   }
 
 getNodeKey :: IO (VC.PublicKey, Address)

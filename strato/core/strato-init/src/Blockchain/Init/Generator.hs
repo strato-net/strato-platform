@@ -17,8 +17,9 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir, flags_validator)
 import Blockchain.Init.RtsFlags
+import Blockchain.Init.Validator (validatorCommands)
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
 import Blockchain.Init.Monad
@@ -132,7 +133,10 @@ createCommandsFile = do
           then ["ethereum-jsonrpc +RTS -T -N -maxN4 -RTS"]
           else []
 
-  writeFile "commands.txt" $ unlines (localAuthCommands ++ baseCommands ++ jsonrpcCommands)
+  -- A validator keeps the chain processes only (Blockchain.Init.Validator).
+  let allCommands = localAuthCommands ++ baseCommands ++ jsonrpcCommands
+  writeFile "commands.txt" . unlines $
+    if flags_validator then validatorCommands allCommands else allCommands
 
 -- | The computed RTS flags for a process, unless its escape-hatch env var is
 -- set, in which case the env var's value is used verbatim (wrapped in
@@ -170,6 +174,13 @@ mkFilesAndGenesis nodeDir hasFlags network = do
   unless nodeExists $ do
     liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
+
+    when flags_validator $ liftIO $ do
+      when flags_localAuth $
+        error "--validator cannot be combined with --localAuth: a validator runs no identity provider; its node key comes from the shared Vault (run strato-login first)"
+      when (flags_dockerMode == "allDocker") $
+        error "--validator is not supported with --dockerMode=allDocker"
+      putStrLn "  Mode: lite validator (no app, Cirrus, API or JSON-RPC)"
 
     -- Validate SSL directory contents before doing any setup
     when (not $ null flags_sslDir) $ do

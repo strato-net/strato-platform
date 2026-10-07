@@ -13,6 +13,7 @@ FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
+VALIDATOR="false"
 SETUP_ARGS=()
 for arg in "$@"; do
     case "$arg" in
@@ -35,6 +36,12 @@ for arg in "$@"; do
             ;;
         --network=*)
             NETWORK="${arg#*=}"
+            SETUP_ARGS+=("$arg")
+            ;;
+        # A lite validator (strato-setup --validator) runs no slipstream and no
+        # API, so a snapshot restore leaves the eth and cirrus dumps out.
+        --validator|--validator=true)
+            VALIDATOR="true"
             SETUP_ARGS+=("$arg")
             ;;
         *)
@@ -67,7 +74,11 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force; then
+    RESTORE_ARGS=()
+    if [[ "$VALIDATOR" == "true" ]]; then
+        RESTORE_ARGS+=(--skip-databases)
+    fi
+    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
         exit 1
     fi

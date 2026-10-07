@@ -27,6 +27,7 @@ library
       Blockchain.Init.Monad
       Blockchain.Init.Options
       Blockchain.Init.RtsFlags
+      Blockchain.Init.Validator
   other-modules:
       Paths_strato_init
   hs-source-dirs:

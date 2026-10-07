@@ -10,6 +10,7 @@
 module Blockchain.Strato.Indexer.ApiIndexer
   ( apiIndexerMainLoop,
     indexerMainLoop,
+    p2pIndexerLoop,
     indexAPI,
     indexP2P,
     kafkaClientIds,
@@ -56,6 +57,19 @@ indexerMainLoop =
   consume "strato-indexer" targetTopicName $ \idxEvents -> do
     indexAPI idxEvents
     indexP2P idxEvents
+
+-- | The Redis side alone, under the combined loop's consumer group so a node
+-- can switch between the two without replaying the topic: blocks and the best
+-- block for strato-p2p, nothing in SQL. For a node with no API to serve
+-- (strato-indexer --sql=false, which strato-setup --validator writes).
+p2pIndexerLoop :: ( MonadLogger m,
+                    HasStreaming m,
+                    (Keccak256 `A.Alters` P2P OutputBlock) m,
+                    Mod.Modifiable (P2P BestBlock) m
+                  ) =>
+                  m ()
+p2pIndexerLoop =
+  consume "strato-indexer" targetTopicName indexP2P
 
 -- | Legacy entry point for API-only indexing
 apiIndexerMainLoop :: ( MonadLogger m,

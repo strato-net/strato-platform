@@ -8,10 +8,12 @@ import Blockchain.EthConf (ethConf)
 import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig, httpPort)
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
-import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir, flags_validator)
+import Blockchain.Init.Validator (validatorPrometheusSkipJobs, validatorServices)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
@@ -321,6 +323,12 @@ generateDockerCompose = do
         { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
         , user = Just userGid
         , extra_hosts = hostGateway
+        -- A validator runs no strato-api, slipstream, apex or nginx: drop
+        -- their scrape jobs rather than report them down forever.
+        , environment =
+            if flags_validator
+              then Just $ Map.fromList [("PROMETHEUS_SKIP_JOBS", intercalate "," validatorPrometheusSkipJobs)]
+              else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./prometheus:/prometheus"
@@ -381,9 +389,15 @@ generateDockerCompose = do
         then ("local-auth", localAuth) : baseServices
         else baseServices
 
+  -- A validator keeps the stores and Prometheus only (Blockchain.Init.Validator).
+  let services' =
+        if flags_validator
+          then filter ((`elem` validatorServices) . fst) allServices
+          else allServices
+
   let composeFile = ComposeFile
         { namedVolumes = Nothing
-        , services = Map.fromList allServices
+        , services = Map.fromList services'
         }
 
   Yaml.encodeFile "docker-compose.yml" composeFile

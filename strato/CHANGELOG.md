@@ -16,6 +16,7 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unrealeased]
 ### Added
+- `strato-up --validator`: a lite validator that runs only the chain processes (ethereum-discover, strato-p2p, strato-sequencer, vm-runner, the Redis block index) with Postgres, Redis and Prometheus. No app, SMD, apex, nginx, PostgREST, Cirrus (slipstream), strato-api or JSON-RPC; no SQL state mirror and no `vmevents` stream. Built from `strato-indexer --sql=false`, the `publishVmEvents` VM setting and `strato-snapshot restore --skip-databases`, each usable on its own.
 - Partial support for ipv6
 - `Blockchain.Forks.isOperatorPrecedenceForkActive`: the SolidVM parser's operator table is now a fork-gated choice. Live networks (helium, upquark, forktest) keep the legacy table until a height is scheduled; every other network gets Solidity's precedence from genesis. The code-collection cache is keyed by the choice.
 

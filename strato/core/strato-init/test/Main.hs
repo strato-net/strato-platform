@@ -7,6 +7,7 @@
 module Main (main) where
 
 import Blockchain.Init.RtsFlags
+import Blockchain.Init.Validator
 import Control.Monad (forM_)
 import Data.List (isPrefixOf)
 import Test.Hspec
@@ -82,3 +83,38 @@ main = hspec $ do
         `shouldBe` Just 16000
     it "garbage" $
       parseMemInfoMB "no meminfo here" `shouldBe` Nothing
+
+  describe "validatorCommands" $ do
+    let fullNode =
+          [ "ethereum-discover +RTS -T -RTS"
+          , "strato-p2p +RTS -T -RTS"
+          , "strato-sequencer +RTS -T -N2 -A64m -I2 -RTS"
+          , "vm-runner +RTS -T -N4 -A64m -I2 -F1.5 -c -RTS"
+          , "strato-indexer"
+          , "slipstream +RTS -T -RTS"
+          , "strato-api +RTS -T -N -maxN4 -RTS"
+          , "strato-network-monitor"
+          , "strato-logrotate"
+          , "ethereum-jsonrpc +RTS -T -N -maxN4 -RTS"
+          ]
+    it "keeps the chain processes, in order, and runs the indexer without SQL" $
+      validatorCommands fullNode
+        `shouldBe` [ "ethereum-discover +RTS -T -RTS"
+                   , "strato-p2p +RTS -T -RTS"
+                   , "strato-sequencer +RTS -T -N2 -A64m -I2 -RTS"
+                   , "vm-runner +RTS -T -N4 -A64m -I2 -F1.5 -c -RTS"
+                   , "strato-indexer --sql=false"
+                   , "strato-network-monitor"
+                   , "strato-logrotate"
+                   ]
+    it "runs no slipstream, strato-api or ethereum-jsonrpc" $
+      forM_ ["slipstream", "strato-api", "ethereum-jsonrpc"] $ \p ->
+        p `shouldNotSatisfy` (`elem` validatorProcesses)
+    it "drops a local-auth vault wrapper too" $
+      validatorCommands ["blockapps-vault-wrapper-server --port 8093"] `shouldBe` []
+
+  describe "validatorServices" $
+    it "keeps the stores and Prometheus out of a full node's containers" $
+      filter (`elem` validatorServices)
+        ["app-backend", "app-ui", "smd", "apex", "redis", "postgrest", "postgres", "nginx", "docs", "prometheus", "local-auth"]
+        `shouldBe` ["redis", "postgres", "prometheus"]
