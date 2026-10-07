@@ -39,7 +39,6 @@ import Instrumentation
 import Network.Wai.Handler.Warp (run)
 import Network.Wai.Middleware.Prometheus (metricsApp)
 import Prometheus
-import System.Process (readProcess)
 import UnliftIO (liftIO)
 
 {-# NOINLINE forwardedCounter #-}
@@ -60,8 +59,8 @@ main = do
   bus <- case busConfig ethConf of
     Nothing -> error "strato-ingest: ethconf.yaml has no busConfig; this core has no message bus to read"
     Just b -> pure b
-  hostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
-  let groupId = T.pack $ "strato-ingest-" ++ hostname
+  cell <- currentCellId
+  let groupId = T.pack $ "strato-ingest-" ++ cell
       ingestTopic = fromString (busIngestTopic bus)
   runEff . runLogging $ do
     $logInfoS "strato-ingest" . T.pack $

@@ -29,8 +29,11 @@ import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming.Bus
 import qualified Control.Monad.Composable.Streaming.Kafka as Bus
 import Data.Aeson (ToJSON (..), object, (.=))
+import Data.Foldable (for_)
+import Data.IORef
 import Data.String (fromString)
 import qualified Data.Text as T
+import Data.Time.Clock (diffUTCTime, getCurrentTime)
 import UnliftIO (MonadUnliftIO, SomeException, liftIO, try)
 
 data BusPublisher = BusPublisher
@@ -50,25 +53,52 @@ newtype EventMessage = EventMessage AggregateEvent
 instance ToJSON EventMessage where
   toJSON (EventMessage e) = object ["version" .= (1 :: Int), "event" .= e]
 
--- | A publisher for the configured bus. Publishing failures are logged and
--- swallowed: the bus is a projection of Postgres, which stays the source of
--- truth, and a subscriber that missed a message falls back to it.
+-- | A publisher for the configured bus. Connecting and publishing failures
+-- are logged and swallowed: the bus is a projection of Postgres, which stays
+-- the source of truth, and a subscriber that missed a message falls back to
+-- it. The connection (and the topics) are set up on first use and retried,
+-- at most every 30s, so a bus outage never stops Cirrus indexing.
 newBusPublisher :: (MonadUnliftIO m, MonadLogger m) => BusConf -> m BusPublisher
 newBusPublisher conf = do
-  env <- createBusEnv "slipstream" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
-  let results = fromString (busResultsTopic conf)
+  envRef <- liftIO $ newIORef Nothing
+  lastFailure <- liftIO $ newIORef Nothing
+  let settings = BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf)
+      results = fromString (busResultsTopic conf)
       events = fromString (busEventsTopic conf)
-  liftIO . runEff . Bus.runStreamMUsingEnv env $ do
-    Bus.createTopicAndWait results
-    Bus.createTopicAndWait events
-  $logInfoS "slipstream/bus" . T.pack $
-    "publishing " ++ busResultsTopic conf ++ " and " ++ busEventsTopic conf ++ " to " ++ busHost conf ++ ":" ++ show (busPort conf)
-  let publish :: (MonadUnliftIO m', MonadLogger m', ToJSON a) => Bus.TopicName -> [a] -> m' ()
+      connect :: (MonadUnliftIO m', MonadLogger m') => m' (Maybe Bus.StreamEnv)
+      connect = do
+        connected <- liftIO $ readIORef envRef
+        now <- liftIO getCurrentTime
+        failed <- liftIO $ readIORef lastFailure
+        case connected of
+          Just env -> pure (Just env)
+          Nothing | maybe False (\t -> now `diffUTCTime` t < 30) failed -> pure Nothing
+          Nothing -> do
+            r <- try . liftIO $ do
+              env <- createBusEnv "slipstream" settings
+              runEff . Bus.runStreamMUsingEnv env $ do
+                Bus.createTopicAndWait results
+                Bus.createTopicAndWait events
+              pure env
+            case r of
+              Right env -> do
+                $logInfoS "slipstream/bus" . T.pack $
+                  "publishing " ++ busResultsTopic conf ++ " and " ++ busEventsTopic conf ++ " to " ++ busHost conf ++ ":" ++ show (busPort conf)
+                liftIO $ writeIORef envRef (Just env)
+                pure (Just env)
+              Left (e :: SomeException) -> do
+                $logWarnS "slipstream/bus" . T.pack $ "bus unavailable, Cirrus indexing continues without it (retry in 30s): " ++ show e
+                liftIO $ writeIORef lastFailure (Just now)
+                pure Nothing
+      publish :: (MonadUnliftIO m', MonadLogger m', ToJSON a) => Bus.TopicName -> [a] -> m' ()
       publish topic items = unless (null items) $ do
-        r <- try . liftIO . runEff . Bus.runStreamMUsingEnv env $ Bus.produceItemsAsJSON topic items
-        case r of
-          Right _ -> pure ()
-          Left (e :: SomeException) -> $logWarnS "slipstream/bus" . T.pack $ "publish to " ++ show topic ++ " failed: " ++ show e
+        mEnv <- connect
+        for_ mEnv $ \env -> do
+          r <- try . liftIO . runEff . Bus.runStreamMUsingEnv env $ Bus.produceItemsAsJSON topic items
+          case r of
+            Right _ -> pure ()
+            Left (e :: SomeException) -> $logWarnS "slipstream/bus" . T.pack $ "publish to " ++ show topic ++ " failed: " ++ show e
+  _ <- connect
   pure BusPublisher
     { publishResults = publish results . map ResultMessage,
       publishEvents = publish events . map EventMessage

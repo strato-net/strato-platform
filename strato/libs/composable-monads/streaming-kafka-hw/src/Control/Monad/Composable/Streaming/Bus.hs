@@ -29,7 +29,13 @@ data BusSettings = BusSettings
 
 busClientProps :: BusSettings -> Map.Map Text Text
 busClientProps bs = Map.fromList $
-  [("security.protocol", protocol (bsSecurity bs))]
+  [ ("security.protocol", protocol (bsSecurity bs)),
+    -- A message the cluster has not acknowledged within this long is
+    -- reported as a delivery failure (librdkafka's default is 5 minutes,
+    -- which is how long an API submit would otherwise block during an
+    -- outage before being told nothing was delivered).
+    ("message.timeout.ms", "30000")
+  ]
     ++ case (bsSecurity bs, bsSaslUsername bs, bsSaslPassword bs) of
       ("sasl_ssl", Just u, Just p) ->
         [("sasl.mechanisms", "SCRAM-SHA-512"), ("sasl.username", T.pack u), ("sasl.password", T.pack p)]

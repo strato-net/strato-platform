@@ -310,18 +310,25 @@ runConsume consumerGroup topicName f = consumeOnce
       items <- case mBytes of
         Just bytes -> return $ map (decode . BL.fromStrict) bytes
         Nothing -> do
-          -- The committed offset fell out of the topic's retention: the
-          -- group waited longer than the broker keeps data (a standby that
-          -- was never promoted, a consumer down for a week). Resume from
-          -- the oldest retained message instead of crash-looping, and say
-          -- so loudly: whatever this group writes now has a gap before it.
+          -- The committed offset is outside the topic. Either it fell out
+          -- of retention (the group waited longer than the broker keeps
+          -- data: a standby never promoted, a consumer down for a week), so
+          -- resume from the oldest retained message instead of
+          -- crash-looping and say so loudly, since whatever this group
+          -- writes now has a gap before it; or it is past the tip (the
+          -- topic was recreated or trimmed), where replaying everything
+          -- from the start would be wrong: resume at the tip instead.
           earliest <- execKafka $ getLastOffset EarliestTime 0 topicName
+          latest <- execKafka $ getLastOffset LatestTime 0 topicName
+          let (resume, why) =
+                if offset > latest
+                  then (latest, "past the tip; resuming at the latest offset " ++ show latest)
+                  else (earliest, "out of range; resuming from the earliest retained offset " ++ show earliest ++ ". Messages in between are lost to this consumer.")
           liftIO . putStrLn $
             "consume " ++ show consumerGroup ++ ": committed offset " ++ show offset
-              ++ " on " ++ show topicName ++ " is out of range; resuming from the earliest retained offset "
-              ++ show earliest ++ ". Messages in between are lost to this consumer."
-          setKafkaCheckpoint consumerGroup topicName earliest
-          fetchItems topicName earliest
+              ++ " on " ++ show topicName ++ " is " ++ why
+          setKafkaCheckpoint consumerGroup topicName resume
+          fetchItems topicName resume
       mReturnVal <- f items
       base <- getKafkaCheckpoint consumerGroup topicName
       let nextOffset' = base + fromIntegral (length items)

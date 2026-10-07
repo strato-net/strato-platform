@@ -63,7 +63,7 @@ module Control.Monad.Composable.Streaming.Kafka (
 import Conduit
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
-import Control.Monad (forM_, void)
+import Control.Monad (forM_, void, when)
 import Control.Monad.Composable.Base
 import qualified Data.Aeson as JSON
 import Data.Binary
@@ -129,6 +129,11 @@ data StreamEnv = StreamEnv
     -- | librdkafka properties applied to every producer and consumer made
     -- from this environment: security.protocol, sasl.* for a cluster.
   , seExtraProps  :: Map.Map Text Text
+    -- | Delivery failures reported by librdkafka for this producer, counted
+    -- by the delivery callback. 'flushProducer' only waits for the queue to
+    -- drain; a message that timed out or was rejected is reported here, and
+    -- the produce functions compare the count around their flush.
+  , seFailures    :: IORef Int
   }
 
 createStreamEnv :: MonadIO m => ClientId -> StreamAddress -> m StreamEnv
@@ -140,14 +145,23 @@ createStreamEnv clientId addr = createStreamEnvWith clientId addr Map.empty
 -- "sasl.username", "sasl.password"). The map is passed through to librdkafka.
 createStreamEnvWith :: MonadIO m => ClientId -> StreamAddress -> Map.Map Text Text -> m StreamEnv
 createStreamEnvWith clientId (host, port) extra = do
+  failures <- liftIO $ newIORef 0
   let broker = T.pack host <> ":" <> T.pack (show port)
+      onReport = \case
+        KP.DeliverySuccess _ _ -> pure ()
+        KP.DeliveryFailure _ err -> failed err
+        KP.NoMessageError err -> failed err
+      failed err = do
+        atomicModifyIORef' failures (\n -> (n + 1, ()))
+        putStrLn $ "Kafka delivery failure (" ++ T.unpack clientId ++ "): " ++ show err
       props = KP.brokersList [BrokerAddress broker]
            <> KP.logLevel KafkaLogErr
+           <> KP.setCallback (KP.deliveryCallback onReport)
            <> KP.extraProps (Map.insert "client.id" clientId extra)
   result <- liftIO $ KP.newProducer props
   case result of
     Left err -> error $ "Failed to create Kafka producer: " ++ show err
-    Right prod -> return $ StreamEnv prod broker clientId extra
+    Right prod -> return $ StreamEnv prod broker clientId extra failures
 
 -- Deprecated alias
 createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
@@ -191,16 +205,27 @@ mkRecord topic val = KP.ProducerRecord
   , KP.prHeaders = mempty
   }
 
-produceItems :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
-produceItems topicName events = do
-  env <- getStreamEnv
+-- | Enqueue the records, flush, and fail if librdkafka reported a delivery
+-- failure meanwhile (the producer is shared, so a concurrent caller's
+-- failure can surface here too; either way the broker is not accepting).
+produceRecords :: StreamEnv -> [KP.ProducerRecord] -> IO ()
+produceRecords env records = do
   let producer = seProducer env
-  forM_ events $ \e -> do
-    mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just . BL.toStrict $ encode e))
+  before <- readIORef (seFailures env)
+  forM_ records $ \r -> do
+    mErr <- KP.produceMessage producer r
     case mErr of
       Just err -> error $ "Kafka produce error: " ++ show err
       Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  KP.flushProducer producer
+  after <- readIORef (seFailures env)
+  when (after /= before) $
+    error $ "Kafka delivery failed for " ++ show (after - before) ++ " message(s) on " ++ T.unpack (seBroker env)
+
+produceItems :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
+produceItems topicName events = do
+  env <- getStreamEnv
+  liftIO $ produceRecords env [mkRecord topicName (Just . BL.toStrict $ encode e) | e <- events]
   return [ProduceResponse]
 
 -- | Produce already-encoded payloads to several topics, flushing once.
@@ -214,26 +239,13 @@ produceItems topicName events = do
 produceToTopics :: HasStreaming m => [(TopicName, [B.ByteString])] -> m [ProduceResponse]
 produceToTopics groups = do
   env <- getStreamEnv
-  let producer = seProducer env
-  forM_ groups $ \(topicName, raws) ->
-    forM_ raws $ \raw -> do
-      mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just raw))
-      case mErr of
-        Just err -> error $ "Kafka produce error: " ++ show err
-        Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName (Just raw) | (topicName, raws) <- groups, raw <- raws]
   return [ProduceResponse]
 
 produceItemsAsJSON :: (JSON.ToJSON a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItemsAsJSON topicName events = do
   env <- getStreamEnv
-  let producer = seProducer env
-  forM_ events $ \e -> do
-    mErr <- liftIO $ KP.produceMessage producer (mkRecord topicName (Just . BL.toStrict $ JSON.encode e))
-    case mErr of
-      Just err -> error $ "Kafka produce error: " ++ show err
-      Nothing -> return ()
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName (Just . BL.toStrict $ JSON.encode e) | e <- events]
   return [ProduceResponse]
 
 ----------------------
@@ -261,6 +273,11 @@ uniqueGroupId prefix = do
 mkConsumerSub :: TopicName -> KC.Subscription
 mkConsumerSub topic = KC.topics [topic] <> KC.offsetReset KC.Earliest
 
+-- | Every consumer here is assigned partition 0 only (as the node's own
+-- broker client always was), so a topic this backend reads must have a
+-- single partition: on a managed cluster that auto-creates topics with
+-- several, create the bus topics by hand with one partition, or the other
+-- partitions' messages are never read.
 newConsumerAt :: StreamEnv -> Text -> TopicName -> Offset -> IO KC.KafkaConsumer
 newConsumerAt env grpId topicName (Offset ofs) = do
   result <- KC.newConsumer (mkConsumerProps env grpId) (mkConsumerSub topicName)

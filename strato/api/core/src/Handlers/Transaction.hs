@@ -50,7 +50,8 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
 import qualified Control.Exception as E
-import Control.Monad (unless, when)
+import Control.Concurrent (forkIO, threadDelay)
+import Control.Monad (unless, void, when)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Control.Monad.Composable.Base as Base
@@ -237,6 +238,10 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
     case (mode, mBus) of
       ("bus", Just (env, topic)) -> submitToBus env topic
       ("shadow", Just (env, topic)) -> submitToBus env topic >> submitToCore
+      (m, Nothing) | m /= "core" -> do
+        $logWarnS "writeIngestTx" . T.pack $
+          "bus submit path not connected (see initBusSubmit); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
+        submitToCore
       _ -> submitToCore
     liftIO $ recordSubmitSpans started mode
     where
@@ -273,13 +278,24 @@ busSubmitEnv :: IORef (Maybe (Bus.StreamEnv, Bus.TopicName))
 busSubmitEnv = unsafePerformIO $ newIORef Nothing
 
 -- | Connect the submit path to the configured bus and make sure its ingest
--- topic exists. A no-op without a bus config.
+-- topic exists, in the background: the API serves (and submits to the
+-- local broker) whether or not the bus is reachable, and keeps retrying
+-- until it is. A no-op without a bus config.
 initBusSubmit :: IO ()
-initBusSubmit = for_ (busConfig ethConf) $ \conf -> do
-  env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
-  let topic = fromString (busIngestTopic conf)
-  Base.runEff . Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
-  writeIORef busSubmitEnv (Just (env, topic))
+initBusSubmit = for_ (busConfig ethConf) $ \conf -> void . forkIO $ connectBus conf
+  where
+    connectBus conf = do
+      r <- try $ do
+        env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
+        let topic = fromString (busIngestTopic conf)
+        Base.runEff . Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
+        writeIORef busSubmitEnv (Just (env, topic))
+      case r of
+        Right () -> putStrLn $ "strato-api: bus submit path connected to " ++ busHost conf ++ ":" ++ show (busPort conf)
+        Left (e :: SomeException) -> do
+          putStrLn $ "strato-api: bus submit path unavailable, retrying in 5s: " ++ show e
+          threadDelay 5000000
+          connectBus conf
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw) = do
