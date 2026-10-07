@@ -133,7 +133,14 @@ putBlocksSql blockList makeHashOne = do
   newKeys <- SQL.insertMany newTxs
   let txKey = M.union known $ M.fromList (zip (map rawTransactionTxHash newTxs) newKeys)
 
-  let newBlocks = [ (b, hash', blk2BlkDataRef b hash' makeHashOne) | (b, hash') <- blocksWithHashes, M.notMember hash' existing ]
+  -- A block can occur more than once in a batch: vm-runner emits the
+  -- genesis block twice at startup (its own bootstrap, then the copy the
+  -- sequencer hands it), and a replayed batch can repeat a block. The
+  -- existing-rows check above only sees the database, so the batch is
+  -- deduplicated by hash here too, or block 0 lands twice and every peer
+  -- handshake fails on "multiple genesis blocks".
+  let newBlocks = M.elems $ M.fromList
+        [ (hash', (b, hash', blk2BlkDataRef b hash' makeHashOne)) | (b, hash') <- blocksWithHashes, M.notMember hash' existing ]
   blkKeys <- SQL.insertMany [ toInsert | (_, _, (toInsert, _, _, _, _, _, _)) <- newBlocks ]
   let withKeys = zip blkKeys newBlocks
       sigParts sig = ( bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
