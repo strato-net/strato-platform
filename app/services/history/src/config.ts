@@ -34,8 +34,20 @@ if (!["plaintext", "ssl", "sasl_ssl"].includes(busSecurity)) {
   process.exit(2);
 }
 
+// Price series are keyed by asset alone, so only these contracts may write
+// them: the system price oracle by default. Lowercase hex, comma separated.
+const priceOracles = (process.env.HISTORY_PRICE_ORACLES || "0000000000000000000000000000000000001002")
+  .split(",")
+  .map((a) => a.trim().toLowerCase().replace(/^0x/, ""))
+  .filter((a) => a);
+if (!priceOracles.every((a) => /^[0-9a-f]{40}$/.test(a))) {
+  console.error(`Invalid HISTORY_PRICE_ORACLES "${process.env.HISTORY_PRICE_ORACLES}" - comma-separated 20-byte hex addresses`);
+  process.exit(2);
+}
+
 export const config = {
   port: Number(process.env.PORT || 3030),
+  priceOracles: new Set(priceOracles),
   db: {
     host: process.env.postgres_host || "postgres",
     port: Number(process.env.postgres_port || 5432),

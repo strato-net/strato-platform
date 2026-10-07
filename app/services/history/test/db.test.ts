@@ -1,6 +1,12 @@
 // End-to-end check of the apply step against a real Postgres: partitions,
 // idempotent replay, and order independence between the two feeds. Needs
-// postgres_host/postgres_password etc. in the environment.
+// postgres_host/postgres_password etc. in the environment; without a
+// postgres_host it reports itself skipped so `npm test` still runs the
+// feed-independent suite anywhere.
+if (!process.env.postgres_host) {
+  console.log("db.test: SKIPPED (set postgres_host/postgres_password to run the Postgres suite)");
+  process.exit(0);
+}
 import assert from "assert";
 import { bootstrapDb } from "../src/db/bootstrap";
 import { pool, query } from "../src/db/pool";

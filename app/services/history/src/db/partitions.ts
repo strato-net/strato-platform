@@ -11,13 +11,19 @@ const suffix = (d: Date): string => `y${d.getUTCFullYear()}m${String(d.getUTCMon
  * Create the month partitions the timestamps in a batch need, once per
  * process. CREATE TABLE IF NOT EXISTS ... PARTITION OF is transactional and
  * idempotent; the indexer serialises batches, so two creators never race.
+ *
+ * The DDL runs inside the batch's transaction, so a partition only exists
+ * once that transaction commits: the returned function records the new
+ * partitions as known and must be called after COMMIT (a rolled-back batch
+ * leaves nothing behind, and the next attempt issues the DDL again).
  */
-export const ensurePartitions = async (client: PoolClient, timestamps: Date[]): Promise<void> => {
+export const ensurePartitions = async (client: PoolClient, timestamps: Date[]): Promise<() => void> => {
   const months = new Map<string, Date>();
   for (const ts of timestamps) {
     const m = monthStart(ts);
     months.set(suffix(m), m);
   }
+  const created: string[] = [];
   for (const [name, m] of months) {
     for (const table of PARTITIONED) {
       const key = `${table}_${name}`;
@@ -28,7 +34,8 @@ export const ensurePartitions = async (client: PoolClient, timestamps: Date[]): 
           `FOR VALUES FROM ('${m.toISOString()}') TO ('${nextMonth(m).toISOString()}')`
         )
       );
-      known.add(key);
+      created.push(key);
     }
   }
+  return () => created.forEach((key) => known.add(key));
 };

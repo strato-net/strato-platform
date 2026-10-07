@@ -54,7 +54,8 @@ assert.strictEqual(cev.blockTs.toISOString(), "2026-09-04T12:00:00.000Z");
 assert.deepStrictEqual(cev.args.assets, [addr]);
 assert.deepStrictEqual(cev.args.priceValues, ["100010000000000000000000"]);
 
-assert.strictEqual(ord(512345, 3, 7), "512345003007");
+assert.strictEqual(ord(512345, 3, 7), ((512345n << 64n) | (3n << 32n) | 7n).toString());
+assert.throws(() => ord(1, 2 ** 32, 0));
 assert.strictEqual(ratio18(3n, 2n), "1.500000000000000000");
 assert.strictEqual(ratio18(1n, 3n), "0.333333333333333333");
 assert.strictEqual(ratio18(1n, 0n), null);

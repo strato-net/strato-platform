@@ -20,9 +20,20 @@ export interface NormalizedEvent {
   cursor?: number;
 }
 
-/** Chain order of an event (and of an element inside a batch event). */
-export const ord = (blockNumber: number, eventIndex: number, sub = 0): string =>
-  (BigInt(blockNumber) * 1000000n + BigInt(eventIndex) * 1000n + BigInt(sub)).toString();
+/**
+ * Chain order of an event (and of an element inside a batch event), as one
+ * NUMERIC: block << 64 | eventIndex << 32 | sub. The two low fields are
+ * 32-bit, the width of an event index on the chain, so no block or batch
+ * event can wrap into its neighbour; a value outside that range is refused
+ * rather than silently colliding.
+ */
+export const ord = (blockNumber: number, eventIndex: number, sub = 0): string => {
+  const field = (v: number, what: string): bigint => {
+    if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new Error(`${what} ${v} is outside the 32-bit ordering field`);
+    return BigInt(v);
+  };
+  return ((BigInt(blockNumber) << 64n) | (field(eventIndex, "eventIndex") << 32n) | field(sub, "sub")).toString();
+};
 
 // --- bus: {"version":1,"event":<AggregateEvent>} from slipstream's egress ---
 

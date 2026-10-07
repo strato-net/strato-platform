@@ -1,4 +1,5 @@
 import { PoolClient } from "pg";
+import { config } from "../config";
 import { withTransaction } from "../db/pool";
 import { ensurePartitions } from "../db/partitions";
 import { ratio18, toAddress, toBigInt } from "../utils/num";
@@ -37,14 +38,16 @@ export const applyEvents = async (
 ): Promise<ApplyStats> => {
   const stats: ApplyStats = { events: events.length, transfers: 0, prices: 0, swaps: 0, duplicates: 0, ignored: 0, malformed: 0 };
   if (events.length === 0 && !progress) return stats;
-  await withTransaction(async (client) => {
-    await ensurePartitions(client, events.map((e) => e.blockTs));
+  const committedPartitions = await withTransaction(async (client) => {
+    const remember = await ensurePartitions(client, events.map((e) => e.blockTs));
     // (token, account) -> earliest day touched, for the snapshot refresh
     const touched = new Map<string, { token: string; account: string; day: string }>();
     for (const e of events) await applyOne(client, e, stats, touched);
     for (const t of touched.values()) await refreshDailySnapshots(client, t.token, t.account, t.day);
     if (progress) await advanceProgress(client, progress.name, progress.blockNumber, progress.cursor);
+    return remember;
   });
+  committedPartitions();
   return stats;
 };
 
@@ -61,6 +64,10 @@ export const applySerialized = (
   return next;
 };
 
+// Transfers and swaps are keyed by the emitting contract, so a contract can
+// only ever write its own series. Price series are keyed by asset alone, so
+// price events are accepted from the configured oracles only: any contract
+// may emit a PriceUpdated, and an unchecked one could forge an asset's price.
 const applyOne = async (
   client: PoolClient,
   e: NormalizedEvent,
@@ -70,6 +77,17 @@ const applyOne = async (
   switch (e.name) {
     case "Transfer":
       return applyTransfer(client, e, stats, touched);
+    case "PriceUpdated":
+    case "BatchPricesUpdated":
+      if (!config.priceOracles.has(e.address)) {
+        stats.ignored++;
+        return;
+      }
+      break;
+    default:
+      break;
+  }
+  switch (e.name) {
     case "PriceUpdated":
       return applyPrices(client, e, stats, [[e.args.asset, e.args.price]]);
     case "BatchPricesUpdated": {

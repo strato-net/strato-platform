@@ -136,7 +136,9 @@ router.get(
     const pool = address(req.params.pool, "pool");
     const to = time(req.query.to, new Date());
     const from = time(req.query.from, new Date(to.getTime() - 24 * 3600 * 1000));
-    const limit = Math.min(Math.max(Number(req.query.limit || 200), 1), 1000);
+    const requested = req.query.limit === undefined || req.query.limit === "" ? 200 : Number(req.query.limit);
+    if (!Number.isInteger(requested)) throw new BadRequest("limit must be an integer");
+    const limit = Math.min(Math.max(requested, 1), 1000);
     const r = await query(
       `SELECT block_number, block_ts, tx_hash, sender, token_in, token_out, amount_in, amount_out
          FROM swaps WHERE pool = $1 AND block_ts >= $2 AND block_ts < $3 ORDER BY ord DESC LIMIT $4`,

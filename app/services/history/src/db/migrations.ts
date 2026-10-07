@@ -6,7 +6,11 @@ export interface Migration {
   sql: string;
 }
 
-// Amounts are NUMERIC(78,0): a uint256 has at most 78 decimal digits.
+// Single-event amounts are NUMERIC(78,0): a uint256 has at most 78 decimal
+// digits. Sums over events (balances, candle volume) are unbounded NUMERIC,
+// and candle prices NUMERIC(96,18) so a raw uint256 price keeps its 18
+// decimals without overflowing. ord columns are NUMERIC(40,0): the packed
+// chain position from normalize.ts (block << 64 | event << 32 | element).
 // The raw-event tables are partitioned by month on block_ts (which therefore
 // belongs to every primary key); partitions are created on demand by the
 // indexer (see partitions.ts). Plain Postgres partitioning: TimescaleDB is
@@ -30,7 +34,7 @@ CREATE TABLE price_observations (
   asset        TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          BIGINT NOT NULL,
+  ord          NUMERIC(40,0) NOT NULL,
   tx_hash      TEXT,
   price        NUMERIC(78,0) NOT NULL,
   PRIMARY KEY (oracle, asset, ord, block_ts)
@@ -41,7 +45,7 @@ CREATE TABLE swaps (
   pool         TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          BIGINT NOT NULL,
+  ord          NUMERIC(40,0) NOT NULL,
   tx_hash      TEXT,
   sender       TEXT,
   token_in     TEXT NOT NULL,
@@ -60,7 +64,7 @@ CREATE TABLE balance_changes (
   account      TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          BIGINT NOT NULL,
+  ord          NUMERIC(40,0) NOT NULL,
   leg          SMALLINT NOT NULL,
   tx_hash      TEXT,
   delta        NUMERIC(78,0) NOT NULL,
@@ -71,7 +75,7 @@ CREATE INDEX balance_changes_account_ts ON balance_changes (token, account, bloc
 CREATE TABLE balances_current (
   token   TEXT NOT NULL,
   account TEXT NOT NULL,
-  balance NUMERIC(78,0) NOT NULL,
+  balance NUMERIC NOT NULL,
   PRIMARY KEY (token, account)
 );
 
@@ -81,7 +85,7 @@ CREATE TABLE balance_snapshots_daily (
   token   TEXT NOT NULL,
   account TEXT NOT NULL,
   day     DATE NOT NULL,
-  balance NUMERIC(78,0) NOT NULL,
+  balance NUMERIC NOT NULL,
   PRIMARY KEY (token, account, day)
 );
 
@@ -92,14 +96,14 @@ CREATE TABLE ohlc (
   series     TEXT NOT NULL,
   resolution TEXT NOT NULL,
   bucket     TIMESTAMPTZ NOT NULL,
-  open       NUMERIC(78,18) NOT NULL,
-  high       NUMERIC(78,18) NOT NULL,
-  low        NUMERIC(78,18) NOT NULL,
-  close      NUMERIC(78,18) NOT NULL,
-  volume     NUMERIC(78,0) NOT NULL DEFAULT 0,
+  open       NUMERIC(96,18) NOT NULL,
+  high       NUMERIC(96,18) NOT NULL,
+  low        NUMERIC(96,18) NOT NULL,
+  close      NUMERIC(96,18) NOT NULL,
+  volume     NUMERIC NOT NULL DEFAULT 0,
   count      INTEGER NOT NULL DEFAULT 0,
-  first_ord  BIGINT NOT NULL,
-  last_ord   BIGINT NOT NULL,
+  first_ord  NUMERIC(40,0) NOT NULL,
+  last_ord   NUMERIC(40,0) NOT NULL,
   PRIMARY KEY (series, resolution, bucket)
 );
 `,

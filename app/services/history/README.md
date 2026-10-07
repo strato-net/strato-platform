@@ -15,6 +15,12 @@ replicas, and served as compact, cacheable JSON.
   afterwards it trails the bus by one poll and fills anything the bus feed
   missed (a broker outage, a message older than retention).
 
+Price events (`PriceUpdated`, `BatchPricesUpdated`) are taken from the
+contracts in `HISTORY_PRICE_ORACLES` only (comma-separated addresses; default
+the system price oracle `0000…1002`): price series are keyed by asset, so any
+other contract emitting them is ignored. Transfers and swaps are keyed by
+the emitting contract and need no such list.
+
 Both feeds write through one serialised apply step. Every row is keyed by
 chain position and inserted with `ON CONFLICT DO NOTHING`; current balances,
 daily snapshots and candles advance only from rows that were new. So the two
@@ -63,4 +69,7 @@ postgres_host=... postgres_password=... NODE_URL=https://app.example \
 BUS_HOST=... BUS_SASL_USERNAME=... BUS_SASL_PASSWORD=... npm start
 ```
 
-`npm test` runs the feed-independent checks (no database needed).
+`npm test` runs the feed-independent checks, then the Postgres suite
+(`test/db.test.ts`: partitions, idempotent replay, feed ordering) when
+`postgres_host`/`postgres_password` point at a database; without them that
+suite reports itself skipped.
