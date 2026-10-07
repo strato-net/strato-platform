@@ -60,6 +60,7 @@ library:
     - unliftio
     - resourcet
     - persistent
+    - postgresql-simple
     - strato-auth
     - vault-monad
     - vector

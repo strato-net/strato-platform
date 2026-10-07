@@ -23,6 +23,7 @@ module Blockchain.Data.WriterLease
     fenceWriterLeaseSql,
     holdsWriterLease,
     heartbeatWriterLease,
+    claimWriterLeaseUntilHeld,
     describeLease,
   )
 where
@@ -123,6 +124,25 @@ heartbeatWriterLease cell = forever $ do
       $logWarnS "writerLease" . T.pack $ "heartbeat failed, will retry: " ++ show e
     Right _ -> return ()
   liftIO $ threadDelay 10000000
+
+-- | Runs until this cell holds the lease: an unforced claim every 10s. For
+-- a configured writer that found a fresh lease at startup, typically its
+-- own previous container (the default cell id is the hostname, which a
+-- recreated container changes), so it takes over once that heartbeat goes
+-- stale instead of standing by forever.
+claimWriterLeaseUntilHeld :: (MonadLogger m, HasSQLDB m) => Text -> m ()
+claimWriterLeaseUntilHeld cell = do
+  now <- liftIO getCurrentTime
+  r <- try . sqlQueryWriter $ claimWriterLeaseSql cell False now
+  case r of
+    Right Claimed ->
+      $logInfoS "writerLease" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now"
+    Right (HeldBy _ _) -> again
+    Left (e :: SomeException) -> do
+      $logWarnS "writerLease" . T.pack $ "claim failed, will retry: " ++ show e
+      again
+  where
+    again = liftIO (threadDelay 10000000) >> claimWriterLeaseUntilHeld cell
 
 describeLease :: UTCTime -> Maybe WriterLease -> String
 describeLease _ Nothing = "writer lease: unheld (no core has claimed it yet)"

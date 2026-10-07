@@ -32,6 +32,8 @@ import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import Database.Persist.Sql (PersistValue (..), Single (..), SqlPersistT, rawExecute, rawSql, runSqlPool)
+import Database.PostgreSQL.Simple (SqlError (..))
+import UnliftIO (throwIO, try)
 
 -- | Reserve @count@ fresh nonces for @addr@.
 --
@@ -86,10 +88,21 @@ selectCounter key =
     [key]
 
 -- | Create the counter table on the writer if it is missing (API startup).
+-- Instances starting together can both pass the IF NOT EXISTS check and
+-- one then fails on the type or relation it races to create; that loser
+-- finds the table there, which is all it wanted.
 ensureNonceCounterTable :: SQLDB -> IO ()
-ensureNonceCounterTable db =
-  runResourceT $
-    flip runSqlPool (sqlWriterPool db) $
-      rawExecute
-        "CREATE TABLE IF NOT EXISTS nonce_counter (address text PRIMARY KEY, next_nonce numeric NOT NULL, expires_at timestamptz NOT NULL)"
-        []
+ensureNonceCounterTable db = do
+  r <- try create
+  case r of
+    Right () -> pure ()
+    Left (e :: SqlError)
+      | sqlState e `elem` ["23505", "42P07"] -> create
+      | otherwise -> throwIO e
+  where
+    create =
+      runResourceT $
+        flip runSqlPool (sqlWriterPool db) $
+          rawExecute
+            "CREATE TABLE IF NOT EXISTS nonce_counter (address text PRIMARY KEY, next_nonce numeric NOT NULL, expires_at timestamptz NOT NULL)"
+            []

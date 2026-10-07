@@ -57,6 +57,7 @@ import qualified Handlers.Block as Blocks
 import qualified Handlers.Receipts as Receipts
 import qualified Handlers.TransactionResult as TxResults
 import System.Random (randomRIO)
+import GHC.Clock (getMonotonicTimeNSec)
 import System.Timeout (timeout)
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -288,18 +289,25 @@ callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
   case EthConf.vmQueryUrl (EthConf.vmConfig ethConf) of
     Just url | routableToVmQuery c -> do
+      started <- getMonotonicTimeNSec
       viaQuery <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      -- The fallback gets what is left of the deadline, so a slow mirror
+      -- plus the consensus VM cannot take twice the wait (and outlive the
+      -- HTTP server's own timeout).
+      let remaining = do
+            now <- getMonotonicTimeNSec
+            pure $ max 0 (waitMicros - fromIntegral ((now - started) `div` 1000))
       case viaQuery of
         -- vm-query answers what the mirror holds and declines the rest
         -- (historical blocks, trie-bound reads) with a "vm-query:" error,
         -- which means: ask the consensus VM.
         Right (Error _ msg) | "vm-query:" `isPrefixOf` msg -> do
           putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
-          callVmRunner waitMicros c
+          remaining >>= \left -> callVmRunner left c
         Right resp -> pure resp
         Left e -> do
           putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ show e ++ "), using vm-runner"
-          callVmRunner waitMicros c
+          remaining >>= \left -> callVmRunner left c
     _ -> callVmRunner waitMicros c
 
 -- | The read commands the mirror can serve; the rest never leave the queue path.

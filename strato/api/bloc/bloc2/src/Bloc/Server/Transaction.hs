@@ -65,7 +65,8 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.DB.SQLDB (HasSQLDB)
+import Blockchain.DB.SQLDB (HasSQLDB, sqlQueryWriter)
+import qualified Database.Persist as SQL (Entity (..), getBy)
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.EthConf (ethConf)
@@ -1258,7 +1259,6 @@ getAccountTxParams ::
   ( MonadLogger m
   , HasBlocEnv m
   , HasSQLDB m
-  , A.Selectable AccountsFilterParams [AddressStateRef] m
   ) =>
   Should CacheNonce ->
   Address ->
@@ -1288,7 +1288,6 @@ genNonces :: forall a m.
   ( MonadLogger m
   , HasBlocEnv m
   , HasSQLDB m
-  , A.Selectable AccountsFilterParams [AddressStateRef] m
   , Show a
   ) =>
   Should CacheNonce ->
@@ -1317,22 +1316,22 @@ genNonces cacheNonce fromAddr l items = do
       fill [] _ = []
   pure $ fill items assigned
 
+-- | The account's nonce as the writer has it. Reads otherwise go to the
+-- reader endpoint, which can trail the writer by a block: a transaction
+-- resolved a moment ago (resolve polls the writer) would not be counted
+-- there yet, and the next one would be given its nonce again.
 getAccountNonce ::
-  ( MonadIO m
-  , MonadLogger m
-  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  ( MonadLogger m
+  , HasSQLDB m
   )
   => Address -> m Nonce
 getAccountNonce addr = do
-  mAccts <- getAccount' accountsFilterParams{_qaAddress = Just addr}
+  mAcct <- sqlQueryWriter $ SQL.getBy (UniqueAddress addr)
   $logInfoLS "getAccountNonce lookup" addr
-  $logInfoLS "getAccountNonce results" mAccts
-  case mAccts of
-    [] -> return $ Nonce $ fromInteger 0
-    [act] -> do
-      let mkNonce (AddressStateRef' AddressStateRef{..}) = Nonce $ fromInteger addressStateRefNonce
-      return $ mkNonce act
-    _ -> error "returned more than one account with a single address in getAccountNonce"
+  $logInfoLS "getAccountNonce results" (SQL.entityVal <$> mAcct)
+  case mAcct of
+    Nothing -> return $ Nonce $ fromInteger 0
+    Just (SQL.Entity _ AddressStateRef {..}) -> return . Nonce $ fromInteger addressStateRefNonce
 {-
 constructArgValues ::
   (MonadIO m, MonadLogger m) =>

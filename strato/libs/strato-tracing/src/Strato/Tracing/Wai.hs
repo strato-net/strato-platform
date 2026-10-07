@@ -15,6 +15,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Encoding.Error as TEE
 import Network.HTTP.Types (statusCode)
 import Network.Wai
 import Strato.Tracing
@@ -38,11 +39,11 @@ tracingMiddleware service app req respond = do
     then app req respond
     else do
       let parent = requestTraceContext req
-          name = TE.decodeUtf8 (requestMethod req) <> " " <> TE.decodeUtf8 (rawPathInfo req)
+          name = TE.decodeUtf8With TEE.lenientDecode (requestMethod req) <> " " <> TE.decodeUtf8With TEE.lenientDecode (rawPathInfo req)
       statusRef <- newIORef Nothing
       let attrs =
-            [ attrText "http.method" (TE.decodeUtf8 (requestMethod req)),
-              attrText "http.target" (TE.decodeUtf8 (rawPathInfo req <> rawQueryString req)),
+            [ attrText "http.method" (TE.decodeUtf8With TEE.lenientDecode (requestMethod req)),
+              attrText "http.target" (TE.decodeUtf8With TEE.lenientDecode (rawPathInfo req <> rawQueryString req)),
               attrText "service.instance" service,
               attrText "net.peer" (T.pack (show (remoteHost req)))
             ]

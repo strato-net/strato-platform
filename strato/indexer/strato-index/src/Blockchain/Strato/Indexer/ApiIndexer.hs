@@ -21,7 +21,7 @@ where
 
 import BlockApps.Logging
 import Blockchain.Data.AddressStateDB (AddressState(..))
-import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
+import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonceSql)
 import Blockchain.Data.DataDefs (ReceiptRef (..))
 import Blockchain.Data.BlockDB (putBlocksSql)
 import Blockchain.Data.IndexerProgress (getIndexerProgress, setIndexerProgressSql)
@@ -29,6 +29,8 @@ import Blockchain.Data.WriterLease (LostWriterLease (..), fenceWriterLeaseSql, h
 import qualified Blockchain.Data.BlockHeader as BH
 import Blockchain.ChainMetrics (setBestBlockTimestamp)
 import Blockchain.Data.ReceiptRef (putReceiptRefsSql)
+import Blockchain.Data.Transaction (insertTX')
+import Blockchain.DBM (DebugMode (..))
 import Blockchain.DB.MemAddressStateDB (AddressStateModification(..))
 import Blockchain.DB.SQLDB
 import Blockchain.Model.SyncState
@@ -42,7 +44,6 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff (StateDiff)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffsSql)
-import Control.Arrow ((&&&))
 import Control.Concurrent (threadDelay)
 import Control.Monad
 import Data.Foldable (for_)
@@ -83,8 +84,7 @@ p2pIndexerLoop = consume p2pConsumerGroup targetTopicName indexP2P
 -- picks up within seconds of where the writer stopped.
 sqlIndexerLoop :: ( MonadLogger m,
                     HasStreaming m,
-                    HasSQLDB m,
-                    (Keccak256 `A.Alters` API OutputTx) m
+                    HasSQLDB m
                   ) =>
                   Text ->
                   m ()
@@ -110,8 +110,7 @@ batchTip idxEvents =
 
 indexAPIGated ::
   ( MonadLogger m,
-    HasSQLDB m,
-    (Keccak256 `A.Alters` API OutputTx) m
+    HasSQLDB m
   ) =>
   Text ->
   [IndexEvent] ->
@@ -148,9 +147,14 @@ indexAPIGated cell idxEvents = do
                   "no writer lease yet: holding a batch without blocks until this cell holds the lease or indexer_progress moves past " ++ maybe "unset" show seen
               liftIO $ threadDelay 1000000
               awaitWriter seen True
+    -- The batch may end with events of block tip+1 that precede its RanBlock
+    -- (vm-runner emits a block's transactions and results before the block
+    -- itself), so the writer has provably consumed every event in it only
+    -- once its progress is past the tip; committing the offset earlier could
+    -- skip those events for good if this cell were promoted right then.
     follow tip logged = do
       progress <- getIndexerProgress
-      if maybe False (>= tip) progress
+      if maybe False (> tip) progress
         then return ()
         else do
           holds <- holdsWriterLease cell
@@ -168,8 +172,7 @@ indexAPIGated cell idxEvents = do
 
 indexAPI ::
   ( MonadLogger m,
-    HasSQLDB m,
-    (Keccak256 `A.Alters` API OutputTx) m
+    HasSQLDB m
   ) =>
   Text ->
   [IndexEvent] ->
@@ -200,8 +203,6 @@ indexAPI cell allEvents = do
         [] -> Nothing
         ns -> Just $ maximum ns
 
-  A.insertMany (A.Proxy @(API OutputTx)) . M.fromList $ (otHash &&& API) <$> txs
-
   $logInfoS "apiIndexer" . T.pack $ show insertCount ++ " of them are blocks"
   when (insertCount > 0) $
     $logInfoS "apiIndexer" . T.pack $ "  (inserting " ++ show insertCount ++ " output blocks)"
@@ -210,26 +211,35 @@ indexAPI cell allEvents = do
   when (not $ null stateDiffs) $
     $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length stateDiffs) ++ " state diffs"
 
-  -- One transaction per batch: blocks, receipts, state diffs and the progress
-  -- marker commit together, so indexer_progress never names a block whose
-  -- rows are missing and a crash mid-batch leaves nothing half-applied. Every
-  -- write inside is idempotent, so the at-least-once redelivery after a crash
-  -- (offsets commit only after this handler returns) is safe.
-  when (not (null blocks) || not (null receiptRefs) || not (null stateDiffs) || isJust mProgress) $
+  when (not $ null asmUpdates) $
+    $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length asmUpdates) ++ " address state updates"
+
+  -- One transaction per batch: transactions, blocks, receipts, state diffs,
+  -- balance updates and the progress marker commit together, so
+  -- indexer_progress never names a block whose rows are missing and a crash
+  -- mid-batch leaves nothing half-applied. Every write inside is idempotent,
+  -- so the at-least-once redelivery after a crash (offsets commit only after
+  -- this handler returns) is safe.
+  when (not (null txs) || not (null blocks) || not (null receiptRefs) || not (null stateDiffs) || not (null asmUpdates) || isJust mProgress) $
     sqlQueryWriter $ do
       -- Fence: the lease row is re-asserted (and row-locked) inside this
       -- transaction, so a cell that was demoted cannot commit a late batch.
       now <- liftIO getCurrentTime
       fenced <- fenceWriterLeaseSql cell now
       unless fenced $ throwIO (LostWriterLease cell)
+      -- API-submitted transactions already have a row (block_number -1,
+      -- written by strato-api); insertTX' skips those by hash.
+      forM_ txs $ \OutputTx {..} -> insertTX' Fail otOrigin Nothing now [otBaseTx]
       unless (null blocks) . void $ putBlocksSql (outputBlockToBlockRetainPayloads <$> blocks) False
       putReceiptRefsSql receiptRefs
       mapM_ commitSqlDiffsSql stateDiffs
+      mapM_ (updateSQLBalanceAndNonceSql . addressStateUpdates) asmUpdates
       for_ mProgress setIndexerProgressSql
-
-  when (not $ null asmUpdates) $ do
-    $logInfoS "apiIndexer" . T.pack $ "Processing " ++ show (length asmUpdates) ++ " address state updates"
-    mapM_ handleAddressStateUpdates asmUpdates
+      -- The row lock above holds the heartbeat thread off until this commits,
+      -- so stamp the heartbeat again now: a long catch-up batch must not
+      -- leave a live writer looking stale (and so claimable) at its end.
+      end <- liftIO getCurrentTime
+      void $ fenceWriterLeaseSql cell end
   where
     filterHelper ::
       [IndexEvent] ->
@@ -256,12 +266,11 @@ indexAPI cell allEvents = do
           _ -> (indexTransactions, ranBlocksLs, recRefs, diffs, asms)
     filterHelper [] = ([], [], [], [], [])
 
-    handleAddressStateUpdates :: HasSQLDB m => M.Map Address AddressStateModification -> m ()
-    handleAddressStateUpdates asmMap =
-      updateSQLBalanceAndNonce
-        [ (addr, (addressStateBalance as, addressStateNonce as))
-        | (addr, ASModification as) <- M.toList asmMap
-        ]
+    addressStateUpdates :: M.Map Address AddressStateModification -> [(Address, (Integer, Integer))]
+    addressStateUpdates asmMap =
+      [ (addr, (addressStateBalance as, addressStateNonce as))
+      | (addr, ASModification as) <- M.toList asmMap
+      ]
 
 kafkaClientIds :: (ClientId, ConsumerGroup)
 kafkaClientIds = ("strato-api-indexer", "strato-api-indexer")

@@ -124,8 +124,10 @@ withContext db (ContextPool ref) best act = bracket acquire release act
 data Snapshot = Snapshot
   { snapHeader :: Maybe BlockHeader,
     snapConn :: MVar SqlBackend,
-    snapUsers :: IORef Int,
-    snapRetired :: IORef Bool,
+    -- | (requests holding the epoch, retired). One value, modified
+    -- atomically, so exactly one party (the retiring refresh, or the last
+    -- release) sees "retired with no users" and closes the connection.
+    snapState :: IORef (Int, Bool),
     -- | Set when a query on the pinned connection failed (a reader endpoint
     -- cancels transactions that conflict with replay, or drops them on a
     -- failover): the next refresh replaces the epoch whatever the block.
@@ -155,8 +157,7 @@ openSnapshot db = do
     Right header -> do
       now <- getCurrentTime
       conn <- newMVar backend
-      users <- newIORef 0
-      retired <- newIORef False
+      state <- newIORef (0, False)
       broken <- newIORef False
       let close = do
             wasBroken <- readIORef broken
@@ -166,20 +167,24 @@ openSnapshot db = do
               -- A connection whose transaction failed is not returned to
               -- the pool: the failure may have been the connection itself.
               _ -> destroyResource (sqlReaderPool db) local backend
-      pure Snapshot {snapHeader = header, snapConn = conn, snapUsers = users, snapRetired = retired, snapBroken = broken, snapOpened = now, snapClose = close}
+      pure Snapshot {snapHeader = header, snapConn = conn, snapState = state, snapBroken = broken, snapOpened = now, snapClose = close}
 
 -- | Take a reference to the current epoch for the duration of a request.
 withSnapshot :: IORef Snapshot -> (Snapshot -> IO a) -> IO a
 withSnapshot ref act = bracket acquire release act
   where
+    -- The epoch read from the ref may have been retired (and, with no
+    -- users, closed) between the read and the increment; the increment
+    -- refuses a retired epoch, and the current one is read again.
     acquire = do
       snap <- readIORef ref
-      atomicModifyIORef' (snapUsers snap) (\n -> (n + 1, ()))
-      pure snap
+      held <- atomicModifyIORef' (snapState snap) $ \(n, retired) ->
+        if retired then ((n, retired), False) else ((n + 1, retired), True)
+      if held then pure snap else acquire
     release snap = do
-      left <- atomicModifyIORef' (snapUsers snap) (\n -> (n - 1, n - 1))
-      retired <- readIORef (snapRetired snap)
-      when (retired && left == 0) $ snapClose snap
+      closeNow <- atomicModifyIORef' (snapState snap) $ \(n, retired) ->
+        ((n - 1, retired), retired && n - 1 == 0)
+      when closeNow $ snapClose snap
 
 -- | Every header refresh interval, look at the mirror through a fresh
 -- transaction. If the best block is unchanged and the epoch's transaction
@@ -211,9 +216,8 @@ refreshSnapshot db cfg lock lastCheck ref = do
             else do
               putStrLn $ "vm-query: epoch now block " ++ maybe "none" (show . number) (snapHeader candidate) ++ (if broken then " after a mirror failure" else "") ++ "; previous epoch was " ++ show (round epochAge :: Int) ++ " s old"
               writeIORef ref candidate
-              writeIORef (snapRetired current) True
-              users <- readIORef (snapUsers current)
-              when (users == 0) $ snapClose current
+              closeNow <- atomicModifyIORef' (snapState current) $ \(n, _) -> ((n, True), n == 0)
+              when closeNow $ snapClose current
               pure candidate
 
 -- | Which eth endpoint the epochs read: "reader" when 'sqlReaderConfig'

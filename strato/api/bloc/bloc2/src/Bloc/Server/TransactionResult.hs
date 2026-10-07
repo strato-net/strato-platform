@@ -62,7 +62,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Set (isSubsetOf)
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, getCurrentTime)
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -212,7 +212,9 @@ recurseTRDs resolve hashes = do
         Nothing -> (100, 100000)
       waitRound pendingHashes = case mFeed of
         Nothing -> liftIO $ threadDelay waitMicros
-        Just feed -> liftIO $ waitForAnnouncement feed pendingHashes waitMicros
+        Just feed -> liftIO $ do
+          since <- getCurrentTime
+          waitForAnnouncement feed pendingHashes since waitMicros
   go maxRounds waitRound (0 :: Integer) (toPending hashes)
   where
     go maxRounds waitRound num list = do
@@ -252,14 +254,18 @@ recurseTRDs resolve hashes = do
         else (p : merge (d : ds) ps c)
 
 -- | Block until the feed announces a result for one of the hashes, or the
--- timeout passes.
-waitForAnnouncement :: TVar (Map Keccak256 UTCTime) -> [Keccak256] -> Int -> IO ()
-waitForAnnouncement feed pendingHashes micros = do
+-- timeout passes. Only announcements made after @since@ count: a hash stays
+-- in the feed for minutes, and a result announced before this round began
+-- was already looked up (and found still pending, the raw transaction
+-- trailing on a replica), so it must not cut the round short again.
+waitForAnnouncement :: TVar (Map Keccak256 UTCTime) -> [Keccak256] -> UTCTime -> Int -> IO ()
+waitForAnnouncement feed pendingHashes since micros = do
   timedOut <- registerDelay micros
   atomically $ do
     seen <- readTVar feed
     expired <- readTVar timedOut
-    unless (expired || any (`Map.member` seen) pendingHashes) retrySTM
+    let announced h = maybe False (> since) (Map.lookup h seen)
+    unless (expired || any announced pendingHashes) retrySTM
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as

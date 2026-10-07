@@ -10,6 +10,7 @@ import Blockchain.Strato.Indexer.ApiIndexer (p2pIndexerLoop, seedSqlConsumerGrou
 import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
+import Control.Monad (void)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.SQL
@@ -55,10 +56,11 @@ main = do
           claimed <- sqlQueryWriter $ claimWriterLeaseSql cell False now
           case claimed of
             Claimed -> $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease"
-            HeldBy holder _ ->
+            HeldBy holder _ -> do
               $logWarnS "main" . T.pack $
                 "cell " ++ T.unpack cell ++ " is configured as writer but " ++ T.unpack holder
-                  ++ " holds a fresh lease; running as a standby until promoted (strato-promote)"
+                  ++ " holds a fresh lease; running as a standby until that lease goes stale or this cell is promoted (strato-promote)"
+              void . liftIO . forkIO . runEff . runLogging $ runSQLMWith leaseDb (claimWriterLeaseUntilHeld cell)
         else $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ " is a standby: it follows the chain and writes nothing until promoted"
     _ <- liftIO . forkIO . runEff . runLogging $ runSQLMWith leaseDb (heartbeatWriterLease cell)
 
