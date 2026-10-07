@@ -339,7 +339,9 @@ app db cfg (rotateLock, lastCheck, snapRef) sem waiting pool req respond = case 
                       pure $ either (\why' -> Error (jrcId cmd) ("vm-query: mirror connection failed twice: " ++ why')) id second
                     Right r -> pure r
                 count cmd (case resp of
-                  Error _ msg | "vm-query:" `isPrefixOf` msg -> "declined"
+                  -- the mirror declining a command it cannot serve (see
+                  -- execute); connection failures and internal errors are errors
+                  Error _ msg | "vm-query: trie access" `isPrefixOf` msg -> "declined"
                   Error {} -> "error"
                   _ -> "ok")
                 reply resp

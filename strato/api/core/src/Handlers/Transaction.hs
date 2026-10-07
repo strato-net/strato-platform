@@ -262,7 +262,10 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
             case r of
               Right () -> when (mode == "shadow") submitToCore
               Left (e :: SomeException) -> do
-                liftIO $ writeIORef busSubmitFailedAt (Just now)
+                -- Now, not the attempt's start: a failed attempt has just
+                -- spent the delivery timeout, which would eat the window.
+                failedNow <- liftIO getCurrentTime
+                liftIO $ writeIORef busSubmitFailedAt (Just failedNow)
                 $logWarnS "writeIngestTx" . T.pack $ "bus submit failed (" ++ show e ++ "); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
                 submitToCore
       -- One "tx.submit" span per transaction, in the transaction's own trace

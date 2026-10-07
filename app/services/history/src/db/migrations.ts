@@ -111,7 +111,10 @@ CREATE TABLE ohlc (
     // (balances, candle volume) can exceed one uint256 and candle prices
     // need 78 integer digits plus 18 decimals. Rows written before this
     // migration keep their old (smaller) ord values, which still sort before
-    // every new one.
+    // every new one; but an event from before the upgrade that a feed
+    // replays afterwards gets a new key and is counted again, so a database
+    // that was indexing under the old key is better dropped and reindexed
+    // than migrated.
     name: "002_wide_numerics",
     sql: `
 ALTER TABLE price_observations ALTER COLUMN ord TYPE NUMERIC(40,0);

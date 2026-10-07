@@ -38,7 +38,7 @@ import Data.String (fromString)
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
 import Numeric.Natural (Natural)
-import UnliftIO (MonadUnliftIO, SomeException, liftIO, try)
+import UnliftIO (MonadUnliftIO, SomeException, liftIO, throwIO, try)
 import UnliftIO.STM
 
 data BusPublisher = BusPublisher
@@ -113,19 +113,25 @@ drain conf queue = loop Nothing Nothing
               case connected of
                 Nothing -> pure (Nothing, False)
                 Just env -> publishBatch env batch
-          loop mEnv' (if ok then Nothing else Just now)
+          -- The window starts when the failure is observed: the attempt
+          -- itself may have spent the delivery timeout.
+          failedAt' <- if ok then pure Nothing else Just <$> liftIO getCurrentTime
+          loop mEnv' failedAt'
     connect = do
-      env <- createBusEnv "slipstream" settings
-      r <- try . liftIO . runEff . Bus.runStreamMUsingEnv env $ do
-        Bus.createTopicAndWait (fromString (busResultsTopic conf))
-        Bus.createTopicAndWait (fromString (busEventsTopic conf))
+      r <- try . liftIO $ do
+        env <- createBusEnv "slipstream" settings
+        topics <- try . runEff . Bus.runStreamMUsingEnv env $ do
+          Bus.createTopicAndWait (fromString (busResultsTopic conf))
+          Bus.createTopicAndWait (fromString (busEventsTopic conf))
+        case topics of
+          Right () -> pure env
+          Left (e :: SomeException) -> Bus.closeStreamEnv env >> throwIO e
       case r of
-        Right () -> do
+        Right env -> do
           $logInfoS "slipstream/bus" . T.pack $
             "publishing " ++ busResultsTopic conf ++ " and " ++ busEventsTopic conf ++ " to " ++ busHost conf ++ ":" ++ show (busPort conf)
           pure (Just env)
         Left (e :: SomeException) -> do
-          Bus.closeStreamEnv env
           $logWarnS "slipstream/bus" . T.pack $ "bus unavailable, Cirrus indexing continues without it (retry in 30s): " ++ show e
           pure Nothing
     publishBatch env (topic, payloads) = do
