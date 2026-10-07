@@ -204,11 +204,11 @@ CLIENT_JSON="{
 }"
 CLIENT_EXISTS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}")
 if [ "$CLIENT_EXISTS" != "200" ]; then
-    curl -s -X POST "http://localhost:4445/admin/clients" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null
-    echo "OAuth client '${OAUTH_CLIENT_ID}' created."
+    curl -sf -X POST "http://localhost:4445/admin/clients" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null \
+        && echo "OAuth client '${OAUTH_CLIENT_ID}' created." || echo "FAILED to create OAuth client '${OAUTH_CLIENT_ID}'"
 else
-    curl -s -X PUT "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null
-    echo "OAuth client '${OAUTH_CLIENT_ID}' updated."
+    curl -sf -X PUT "http://localhost:4445/admin/clients/${OAUTH_CLIENT_ID}" -H "Content-Type: application/json" -d "$CLIENT_JSON" > /dev/null \
+        && echo "OAuth client '${OAUTH_CLIENT_ID}' updated." || echo "FAILED to update OAuth client '${OAUTH_CLIENT_ID}'"
 fi
 
 echo "Local auth admin user is created with strato-user-add."

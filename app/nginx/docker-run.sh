@@ -48,7 +48,10 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i 's/[[:space:]]*#TEMPLATE_MARK_SESSION_SECRET//g' /tmp/nginx.conf
   fi
   sed -i "s|__HISTORY_HOST__|${HISTORY_HOST:-}|g" /tmp/nginx.conf
-  sed -i "s|__SESSION_SECRET__|$SESSION_SECRET|g" /tmp/nginx.conf
+  # sed replacement: escape the characters that would otherwise be read as
+  # syntax (backreference, delimiter, escape) in a generated secret
+  SESSION_SECRET_SED=$(printf '%s' "$SESSION_SECRET" | sed -e 's/[\\&|]/\\&/g')
+  sed -i "s|__SESSION_SECRET__|$SESSION_SECRET_SED|g" /tmp/nginx.conf
   # Behind CloudFront or a TLS-terminating load balancer nginx itself sees
   # plain HTTP, so the session cookie's Secure flag follows PUBLIC_SCHEME
   # (ssl=true already implies it through $https); otherwise the library's

@@ -34,7 +34,7 @@ import Control.Concurrent (forkIO, runInBoundThread, threadDelay)
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Concurrent.STM
-import Control.Exception (IOException, SomeException, bracket, bracket_, displayException, fromException, throwIO, try)
+import Control.Exception (IOException, SomeException, bracket, bracket_, displayException, fromException, mask, mask_, throwIO, try)
 import Control.Monad (forever, void, when)
 import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
@@ -48,6 +48,7 @@ import qualified Data.ByteString.Char8 as B8
 import qualified Data.Binary as Bin
 import Data.Default (def)
 import Data.IORef
+import Data.List (isPrefixOf)
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime, addUTCTime, diffUTCTime, getCurrentTime)
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
@@ -142,11 +143,13 @@ data Snapshot = Snapshot
 -- the epoch are as fresh as that endpoint, and the header is read on the
 -- same connection so a call's rows always match the block it runs against.
 openSnapshot :: SQLDB -> IO Snapshot
-openSnapshot db = do
+openSnapshot db = mask $ \restore -> do
+  -- Masked until the connection is owned by a Snapshot (or destroyed), so
+  -- an asynchronous exception cannot leave it checked out of the pool.
   (backend, local) <- takeResource (sqlReaderPool db)
   let onConn :: SqlPersistT (ResourceT IO) a -> IO a
       onConn q = runResourceT (runReaderT q backend)
-  r <- try $ do
+  r <- try . restore $ do
     onConn $ rawExecute "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY" []
     fmap (bdrToHeader . entityVal) <$> onConn (selectFirst [] [Desc BlockDataRefNumber])
   case r of
@@ -204,7 +207,9 @@ refreshSnapshot db cfg lock lastCheck ref = do
       checked' <- readIORef lastCheck
       if realToFrac (now `diffUTCTime` checked') < scHeaderMaxAgeSeconds cfg
         then readIORef ref
-        else do
+        else mask_ $ do
+          -- Masked: the candidate is owned by nothing until it is either
+          -- the epoch or closed below.
           current <- readIORef ref
           candidate <- openSnapshot db
           writeIORef lastCheck now
@@ -333,7 +338,10 @@ app db cfg (rotateLock, lastCheck, snapRef) sem waiting pool req respond = case 
                       second <- withSnapshot snapRef $ \snap -> execute db cfg pool snap cmd
                       pure $ either (\why' -> Error (jrcId cmd) ("vm-query: mirror connection failed twice: " ++ why')) id second
                     Right r -> pure r
-                count cmd (case resp of Error {} -> "error"; _ -> "ok")
+                count cmd (case resp of
+                  Error _ msg | "vm-query:" `isPrefixOf` msg -> "declined"
+                  Error {} -> "error"
+                  _ -> "ok")
                 reply resp
   _ -> respond $ responseLBS (if pathInfo req `elem` [["command"], ["health"]] then status405 else status404) [] ""
   where

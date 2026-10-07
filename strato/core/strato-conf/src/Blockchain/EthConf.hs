@@ -132,7 +132,7 @@ streamEnvPool name = modifyMVar streamEnvPools $ \pools ->
           addr = (fromString $ streamingHost k, fromIntegral $ streamingPort k)
       pool <- Pool.newPool $ Pool.defaultPoolConfig
         (createStreamEnv name addr)
-        (const $ return ())
+        closeStreamEnv
         streamEnvIdleSeconds
         streamEnvPoolSize
       return (Map.insert name pool pools, pool)

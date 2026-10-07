@@ -14,7 +14,8 @@ import { applyEvents } from "../src/indexer/apply";
 import { NormalizedEvent } from "../src/indexer/normalize";
 
 const token = "aa".repeat(20);
-const oracle = "bb".repeat(20);
+// the default HISTORY_PRICE_ORACLES entry: price events from any other address are ignored
+const oracle = "0000000000000000000000000000000000001002";
 const asset = "cc".repeat(20);
 const poolAddr = "dd".repeat(20);
 const alice = "11".repeat(20);

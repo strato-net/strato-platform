@@ -6,11 +6,8 @@ export interface Migration {
   sql: string;
 }
 
-// Single-event amounts are NUMERIC(78,0): a uint256 has at most 78 decimal
-// digits. Sums over events (balances, candle volume) are unbounded NUMERIC,
-// and candle prices NUMERIC(96,18) so a raw uint256 price keeps its 18
-// decimals without overflowing. ord columns are NUMERIC(40,0): the packed
-// chain position from normalize.ts (block << 64 | event << 32 | element).
+// Amounts are NUMERIC(78,0): a uint256 has at most 78 decimal digits.
+// (002 widens the derived columns and the ordering key; see there.)
 // The raw-event tables are partitioned by month on block_ts (which therefore
 // belongs to every primary key); partitions are created on demand by the
 // indexer (see partitions.ts). Plain Postgres partitioning: TimescaleDB is
@@ -34,7 +31,7 @@ CREATE TABLE price_observations (
   asset        TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          NUMERIC(40,0) NOT NULL,
+  ord          BIGINT NOT NULL,
   tx_hash      TEXT,
   price        NUMERIC(78,0) NOT NULL,
   PRIMARY KEY (oracle, asset, ord, block_ts)
@@ -45,7 +42,7 @@ CREATE TABLE swaps (
   pool         TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          NUMERIC(40,0) NOT NULL,
+  ord          BIGINT NOT NULL,
   tx_hash      TEXT,
   sender       TEXT,
   token_in     TEXT NOT NULL,
@@ -64,7 +61,7 @@ CREATE TABLE balance_changes (
   account      TEXT NOT NULL,
   block_number BIGINT NOT NULL,
   block_ts     TIMESTAMPTZ NOT NULL,
-  ord          NUMERIC(40,0) NOT NULL,
+  ord          BIGINT NOT NULL,
   leg          SMALLINT NOT NULL,
   tx_hash      TEXT,
   delta        NUMERIC(78,0) NOT NULL,
@@ -75,7 +72,7 @@ CREATE INDEX balance_changes_account_ts ON balance_changes (token, account, bloc
 CREATE TABLE balances_current (
   token   TEXT NOT NULL,
   account TEXT NOT NULL,
-  balance NUMERIC NOT NULL,
+  balance NUMERIC(78,0) NOT NULL,
   PRIMARY KEY (token, account)
 );
 
@@ -85,7 +82,7 @@ CREATE TABLE balance_snapshots_daily (
   token   TEXT NOT NULL,
   account TEXT NOT NULL,
   day     DATE NOT NULL,
-  balance NUMERIC NOT NULL,
+  balance NUMERIC(78,0) NOT NULL,
   PRIMARY KEY (token, account, day)
 );
 
@@ -96,16 +93,40 @@ CREATE TABLE ohlc (
   series     TEXT NOT NULL,
   resolution TEXT NOT NULL,
   bucket     TIMESTAMPTZ NOT NULL,
-  open       NUMERIC(96,18) NOT NULL,
-  high       NUMERIC(96,18) NOT NULL,
-  low        NUMERIC(96,18) NOT NULL,
-  close      NUMERIC(96,18) NOT NULL,
-  volume     NUMERIC NOT NULL DEFAULT 0,
+  open       NUMERIC(78,18) NOT NULL,
+  high       NUMERIC(78,18) NOT NULL,
+  low        NUMERIC(78,18) NOT NULL,
+  close      NUMERIC(78,18) NOT NULL,
+  volume     NUMERIC(78,0) NOT NULL DEFAULT 0,
   count      INTEGER NOT NULL DEFAULT 0,
-  first_ord  NUMERIC(40,0) NOT NULL,
-  last_ord   NUMERIC(40,0) NOT NULL,
+  first_ord  BIGINT NOT NULL,
+  last_ord   BIGINT NOT NULL,
   PRIMARY KEY (series, resolution, bucket)
 );
+`,
+  },
+  {
+    // The ordering key became block << 64 | event << 32 | element (see
+    // normalize.ts), which needs more than a BIGINT; sums over events
+    // (balances, candle volume) can exceed one uint256 and candle prices
+    // need 78 integer digits plus 18 decimals. Rows written before this
+    // migration keep their old (smaller) ord values, which still sort before
+    // every new one.
+    name: "002_wide_numerics",
+    sql: `
+ALTER TABLE price_observations ALTER COLUMN ord TYPE NUMERIC(40,0);
+ALTER TABLE swaps ALTER COLUMN ord TYPE NUMERIC(40,0);
+ALTER TABLE balance_changes ALTER COLUMN ord TYPE NUMERIC(40,0);
+ALTER TABLE balances_current ALTER COLUMN balance TYPE NUMERIC;
+ALTER TABLE balance_snapshots_daily ALTER COLUMN balance TYPE NUMERIC;
+ALTER TABLE ohlc
+  ALTER COLUMN open TYPE NUMERIC(96,18),
+  ALTER COLUMN high TYPE NUMERIC(96,18),
+  ALTER COLUMN low TYPE NUMERIC(96,18),
+  ALTER COLUMN close TYPE NUMERIC(96,18),
+  ALTER COLUMN volume TYPE NUMERIC,
+  ALTER COLUMN first_ord TYPE NUMERIC(40,0),
+  ALTER COLUMN last_ord TYPE NUMERIC(40,0);
 `,
   },
 ];

@@ -71,7 +71,8 @@ mkdir -p pg-migration
 # hydra, on whichever cluster the node is pointed at.
 DBS=()
 for db in eth cirrus oauth kratos hydra; do
-  if [[ "$(pg postgres "$LOCAL_PASSWORD" postgres -c "select 1 from pg_database where datname='$db'")" == "1" ]]; then
+  present=$(pg postgres "$LOCAL_PASSWORD" postgres -c "select 1 from pg_database where datname='$db'") || die "cannot query the node's postgres container for database $db"
+  if [[ "$present" == "1" ]]; then
     DBS+=("$db")
   elif [[ "$db" == eth || "$db" == cirrus ]]; then
     die "database $db is missing from the node's postgres container"
@@ -122,8 +123,8 @@ docker compose -p strato stop postgres
 echo "== re-pointing the node"
 # --regenerate --password overwrites secrets/postgres_password; keep the
 # container's so the rollback in the header stays possible.
-cp -n secrets/postgres_password pg-migration/postgres_password.local
+[[ -f pg-migration/postgres_password.local ]] || cp secrets/postgres_password pg-migration/postgres_password.local
 strato-setup "$(pwd)" --regenerate --pghost="$WRITER" --pgReaderHost="$READER" --password="$PASSWORD" "${SETUP_FLAGS[@]}"
 echo
 echo "Done. Start the node with strato-up; it now writes $WRITER and PostgREST reads $READER."
-echo "Rollback: strato-down, then strato-setup $(pwd) --regenerate --pghost=localhost --password=<old> <original flags>, then strato-up."
+echo "Rollback: strato-down, then strato-setup $(pwd) --regenerate --pghost=localhost --password=\$(cat pg-migration/postgres_password.local) <original flags>, then strato-up."

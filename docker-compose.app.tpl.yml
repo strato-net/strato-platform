@@ -79,6 +79,8 @@ services:
       - ssl=${ssl:-false}
       # Several copies behind one load balancer share no memory, so CSRF
       # tokens are derived from the session (HMAC) instead of kept per process.
+      # When this tier and a node's nginx share one hostname they also share
+      # the CSRF-TOKEN cookie, so both must use the same secrets/session_secret.
       - CSRF_STATELESS=${CSRF_STATELESS:-true}
       # Scheme browsers use to reach this tier; https marks cookies Secure
       # when TLS terminates at the load balancer.

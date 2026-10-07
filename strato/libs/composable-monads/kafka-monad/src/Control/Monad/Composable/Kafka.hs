@@ -27,6 +27,7 @@ module Control.Monad.Composable.Kafka (
   runStreamMUsingEnv,
   createStreamEnv,
   unconnectedStreamEnv,
+  closeStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
@@ -78,6 +79,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Pool as Pool
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
@@ -113,6 +115,14 @@ type KafkaEnv = StreamEnv
 
 kafkaStateIORef :: StreamEnv -> IORef KafkaState
 kafkaStateIORef = streamStateIORef
+
+-- | Close the broker connections an environment holds (milena keeps a
+-- handle pool per address). For an environment being discarded, such as
+-- one reaped from 'runStreamMPooled''s pool after idling.
+closeStreamEnv :: MonadIO m => StreamEnv -> m ()
+closeStreamEnv env = liftIO $ do
+  st <- readIORef (streamStateIORef env)
+  mapM_ Pool.destroyAllResources (M.elems (st ^. stateConnections))
 
 createStreamEnv ::
   MonadIO m =>
@@ -312,23 +322,22 @@ runConsume consumerGroup topicName f = consumeOnce
         Nothing -> do
           -- The committed offset is outside the topic. Either it fell out
           -- of retention (the group waited longer than the broker keeps
-          -- data: a standby never promoted, a consumer down for a week), so
-          -- resume from the oldest retained message instead of
-          -- crash-looping and say so loudly, since whatever this group
-          -- writes now has a gap before it; or it is past the tip (the
-          -- topic was recreated or trimmed), where replaying everything
-          -- from the start would be wrong: resume at the tip instead.
+          -- data: a standby never promoted, a consumer down for a week), or
+          -- it is past the tip because the topic was recreated (the broker
+          -- volume wiped while this checkpoint survived in Postgres), in
+          -- which case everything in the topic is new. Both resume from the
+          -- oldest retained message instead of crash-looping, and say so
+          -- loudly: in the first case whatever this group writes now has a
+          -- gap before it.
           earliest <- execKafka $ getLastOffset EarliestTime 0 topicName
           latest <- execKafka $ getLastOffset LatestTime 0 topicName
-          let (resume, why) =
-                if offset > latest
-                  then (latest, "past the tip; resuming at the latest offset " ++ show latest)
-                  else (earliest, "out of range; resuming from the earliest retained offset " ++ show earliest ++ ". Messages in between are lost to this consumer.")
           liftIO . putStrLn $
             "consume " ++ show consumerGroup ++ ": committed offset " ++ show offset
-              ++ " on " ++ show topicName ++ " is " ++ why
-          setKafkaCheckpoint consumerGroup topicName resume
-          fetchItems topicName resume
+              ++ " on " ++ show topicName ++ (if offset > latest then " is past the tip " ++ show latest ++ " (topic recreated?)" else " fell out of retention")
+              ++ "; resuming from the earliest retained offset " ++ show earliest
+              ++ (if offset > latest then ", everything in the topic is new to this consumer." else ". Messages in between are lost to this consumer.")
+          setKafkaCheckpoint consumerGroup topicName earliest
+          fetchItems topicName earliest
       mReturnVal <- f items
       base <- getKafkaCheckpoint consumerGroup topicName
       let nextOffset' = base + fromIntegral (length items)

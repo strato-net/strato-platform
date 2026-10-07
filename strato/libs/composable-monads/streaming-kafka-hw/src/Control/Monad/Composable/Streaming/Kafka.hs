@@ -29,6 +29,7 @@ module Control.Monad.Composable.Streaming.Kafka (
   runStreamMUsingEnv,
   createStreamEnv,
   createStreamEnvWith,
+  closeStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
@@ -77,6 +78,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import System.Random (randomRIO)
 import qualified Kafka.Consumer as KC
+import qualified Kafka.Metadata as KM
 import qualified Kafka.Producer as KP
 import Kafka.Types (BrokerAddress(..), TopicName(..), KafkaLogLevel(..))
 
@@ -129,11 +131,6 @@ data StreamEnv = StreamEnv
     -- | librdkafka properties applied to every producer and consumer made
     -- from this environment: security.protocol, sasl.* for a cluster.
   , seExtraProps  :: Map.Map Text Text
-    -- | Delivery failures reported by librdkafka for this producer, counted
-    -- by the delivery callback. 'flushProducer' only waits for the queue to
-    -- drain; a message that timed out or was rejected is reported here, and
-    -- the produce functions compare the count around their flush.
-  , seFailures    :: IORef Int
   }
 
 createStreamEnv :: MonadIO m => ClientId -> StreamAddress -> m StreamEnv
@@ -145,23 +142,20 @@ createStreamEnv clientId addr = createStreamEnvWith clientId addr Map.empty
 -- "sasl.username", "sasl.password"). The map is passed through to librdkafka.
 createStreamEnvWith :: MonadIO m => ClientId -> StreamAddress -> Map.Map Text Text -> m StreamEnv
 createStreamEnvWith clientId (host, port) extra = do
-  failures <- liftIO $ newIORef 0
   let broker = T.pack host <> ":" <> T.pack (show port)
-      onReport = \case
-        KP.DeliverySuccess _ _ -> pure ()
-        KP.DeliveryFailure _ err -> failed err
-        KP.NoMessageError err -> failed err
-      failed err = do
-        atomicModifyIORef' failures (\n -> (n + 1, ()))
-        putStrLn $ "Kafka delivery failure (" ++ T.unpack clientId ++ "): " ++ show err
       props = KP.brokersList [BrokerAddress broker]
            <> KP.logLevel KafkaLogErr
-           <> KP.setCallback (KP.deliveryCallback onReport)
            <> KP.extraProps (Map.insert "client.id" clientId extra)
   result <- liftIO $ KP.newProducer props
   case result of
     Left err -> error $ "Failed to create Kafka producer: " ++ show err
-    Right prod -> return $ StreamEnv prod broker clientId extra failures
+    Right prod -> return $ StreamEnv prod broker clientId extra
+
+-- | Release the environment's librdkafka producer. For an environment a
+-- caller gives up on (a connection attempt that failed its topic check and
+-- will be retried with a fresh one); the long-lived ones are never closed.
+closeStreamEnv :: MonadIO m => StreamEnv -> m ()
+closeStreamEnv = KP.closeProducer . seProducer
 
 -- Deprecated alias
 createKafkaEnv :: MonadIO m => KafkaClientId -> KafkaAddress -> m StreamEnv
@@ -205,22 +199,30 @@ mkRecord topic val = KP.ProducerRecord
   , KP.prHeaders = mempty
   }
 
--- | Enqueue the records, flush, and fail if librdkafka reported a delivery
--- failure meanwhile (the producer is shared, so a concurrent caller's
--- failure can surface here too; either way the broker is not accepting).
+-- | Enqueue the records, flush, and fail if any of them was not delivered.
+-- 'flushProducer' only waits for the queue to drain; each record carries
+-- its own delivery callback, so this call sees exactly its own failures
+-- (the producer is shared by every caller in the process).
 produceRecords :: StreamEnv -> [KP.ProducerRecord] -> IO ()
 produceRecords env records = do
   let producer = seProducer env
-  before <- readIORef (seFailures env)
+  failures <- newIORef (0 :: Int)
+  let onReport = \case
+        KP.DeliverySuccess _ _ -> pure ()
+        KP.DeliveryFailure _ err -> failed err
+        KP.NoMessageError err -> failed err
+      failed err = do
+        atomicModifyIORef' failures (\n -> (n + 1, ()))
+        putStrLn $ "Kafka delivery failure (" ++ T.unpack (seClientId env) ++ "): " ++ show err
   forM_ records $ \r -> do
-    mErr <- KP.produceMessage producer r
-    case mErr of
-      Just err -> error $ "Kafka produce error: " ++ show err
-      Nothing -> return ()
+    res <- KP.produceMessage' producer r onReport
+    case res of
+      Left err -> error $ "Kafka produce error: " ++ show err
+      Right () -> return ()
   KP.flushProducer producer
-  after <- readIORef (seFailures env)
-  when (after /= before) $
-    error $ "Kafka delivery failed for " ++ show (after - before) ++ " message(s) on " ++ T.unpack (seBroker env)
+  n <- readIORef failures
+  when (n > 0) $
+    error $ "Kafka delivery failed for " ++ show n ++ " of " ++ show (length records) ++ " message(s) on " ++ T.unpack (seBroker env)
 
 produceItems :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [ProduceResponse]
 produceItems topicName events = do
@@ -459,12 +461,13 @@ conduitBatchSource clientId streamAddress topicName = do
 --  Topic creation  --
 ----------------------
 
+-- | Auto-create the topic by producing a null record to it. Delivery is
+-- checked like any other produce, so an unreachable cluster fails here
+-- instead of after a flush that merely waited out the message timeout.
 createTopic :: HasStreaming m => TopicName -> m ()
 createTopic topicName = do
   env <- getStreamEnv
-  let producer = seProducer env
-  _ <- liftIO $ KP.produceMessage producer (mkRecord topicName Nothing)
-  liftIO $ KP.flushProducer producer
+  liftIO $ produceRecords env [mkRecord topicName Nothing]
 
 createTopicAndWait :: HasStreaming m => TopicName -> m ()
 createTopicAndWait topicName = do
@@ -485,14 +488,14 @@ createTopicAndWait topicName = do
 createBroadcastTopic :: HasStreaming m => TopicName -> m ()
 createBroadcastTopic = createTopicAndWait
 
+-- | Whether the broker serves the topic: a watermark query, which goes to
+-- the broker with a timeout (an assignment would be a local operation in
+-- librdkafka and succeed with the cluster down).
 checkTopicReady :: StreamEnv -> TopicName -> IO Bool
 checkTopicReady env topicName =
   bracket mkC (void . KC.closeConsumer) $ \kc -> do
-    let tp = KC.TopicPartition topicName (KC.PartitionId 0) KC.PartitionOffsetEnd
-    mErr <- KC.assign kc [tp]
-    case mErr of
-      Nothing -> return True
-      Just _ -> return False
+    marks <- KM.watermarkOffsets kc (KC.Timeout 5000) topicName
+    return $ not (null marks) && all (either (const False) (const True)) marks
   where
     mkC = do
       gid <- uniqueGroupId (seClientId env <> "-topic-check")

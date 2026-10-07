@@ -65,7 +65,7 @@ import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
-import Data.Time.Clock (UTCTime)
+import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
@@ -236,8 +236,8 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
     mBus <- liftIO $ readIORef busSubmitEnv
     started <- liftIO Tr.nowNanos
     case (mode, mBus) of
-      ("bus", Just (env, topic)) -> submitToBus env topic
-      ("shadow", Just (env, topic)) -> submitToBus env topic >> submitToCore
+      ("bus", Just (env, topic)) -> submitToBusOrCore env topic
+      ("shadow", Just (env, topic)) -> submitToBusOrCore env topic
       (m, Nothing) | m /= "core" -> do
         $logWarnS "writeIngestTx" . T.pack $
           "bus submit path not connected (see initBusSubmit); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
@@ -245,6 +245,26 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
       _ -> submitToCore
     liftIO $ recordSubmitSpans started mode
     where
+      -- The bus is one way into a core, the local broker another; a
+      -- transaction the bus does not take is written to the core instead
+      -- (in shadow mode it goes there anyway). After a failure the bus is
+      -- skipped for 30s rather than paying the delivery timeout per submit.
+      submitToBusOrCore env topic = do
+        now <- liftIO getCurrentTime
+        failedAt <- liftIO $ readIORef busSubmitFailedAt
+        let mode = maybe "core" busSubmitMode (busConfig ethConf)
+        if maybe False (\t -> now `diffUTCTime` t < 30) failedAt
+          then do
+            $logWarnS "writeIngestTx" . T.pack $ "bus failed within the last 30s; writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
+            submitToCore
+          else do
+            r <- try $ submitToBus env topic
+            case r of
+              Right () -> when (mode == "shadow") submitToCore
+              Left (e :: SomeException) -> do
+                liftIO $ writeIORef busSubmitFailedAt (Just now)
+                $logWarnS "writeIngestTx" . T.pack $ "bus submit failed (" ++ show e ++ "); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
+                submitToCore
       -- One "tx.submit" span per transaction, in the transaction's own trace
       -- (its id derives from the hash), linked to the request trace it
       -- arrived in. strato-ingest and slipstream add the later stages.
@@ -277,6 +297,11 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
 busSubmitEnv :: IORef (Maybe (Bus.StreamEnv, Bus.TopicName))
 busSubmitEnv = unsafePerformIO $ newIORef Nothing
 
+-- | When a submit to the bus last failed, if recently (see submitToBusOrCore).
+{-# NOINLINE busSubmitFailedAt #-}
+busSubmitFailedAt :: IORef (Maybe UTCTime)
+busSubmitFailedAt = unsafePerformIO $ newIORef Nothing
+
 -- | Connect the submit path to the configured bus and make sure its ingest
 -- topic exists, in the background: the API serves (and submits to the
 -- local broker) whether or not the bus is reachable, and keeps retrying
@@ -285,14 +310,15 @@ initBusSubmit :: IO ()
 initBusSubmit = for_ (busConfig ethConf) $ \conf -> void . forkIO $ connectBus conf
   where
     connectBus conf = do
-      r <- try $ do
-        env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
-        let topic = fromString (busIngestTopic conf)
-        Base.runEff . Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
-        writeIORef busSubmitEnv (Just (env, topic))
+      env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
+      let topic = fromString (busIngestTopic conf)
+      r <- try . Base.runEff . Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
       case r of
-        Right () -> putStrLn $ "strato-api: bus submit path connected to " ++ busHost conf ++ ":" ++ show (busPort conf)
+        Right () -> do
+          writeIORef busSubmitEnv (Just (env, topic))
+          putStrLn $ "strato-api: bus submit path connected to " ++ busHost conf ++ ":" ++ show (busPort conf)
         Left (e :: SomeException) -> do
+          Bus.closeStreamEnv env
           putStrLn $ "strato-api: bus submit path unavailable, retrying in 5s: " ++ show e
           threadDelay 5000000
           connectBus conf

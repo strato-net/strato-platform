@@ -210,15 +210,16 @@ recurseTRDs resolve hashes = do
   let (maxRounds, waitMicros) = case mFeed of
         Just _ -> (10 :: Integer, 1000000)
         Nothing -> (100, 100000)
-      waitRound pendingHashes = case mFeed of
+      -- since: taken before the round's lookup, so an announcement that
+      -- lands during the lookup still ends the wait that follows it.
+      waitRound since pendingHashes = case mFeed of
         Nothing -> liftIO $ threadDelay waitMicros
-        Just feed -> liftIO $ do
-          since <- getCurrentTime
-          waitForAnnouncement feed pendingHashes since waitMicros
+        Just feed -> liftIO $ waitForAnnouncement feed pendingHashes since waitMicros
   go maxRounds waitRound (0 :: Integer) (toPending hashes)
   where
     go maxRounds waitRound num list = do
       let his = map (trdHash &&& trdIndex) list
+      since <- liftIO getCurrentTime
       statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
       let (pending', done) =
             partitionEithers $
@@ -238,7 +239,7 @@ recurseTRDs resolve hashes = do
               then return pending'
               else do
                 $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
-                waitRound (map trdHash pending')
+                waitRound since (map trdHash pending')
                 go maxRounds waitRound (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
 
