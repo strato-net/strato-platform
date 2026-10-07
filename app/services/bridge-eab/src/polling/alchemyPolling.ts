@@ -7,6 +7,7 @@ import {
   DEPOSIT_WS_RECONNECT_BASE_MS,
   DEPOSIT_WS_RECONNECT_MAX_MS,
   getDepositReconciliationDepth,
+  getDepositConfirmationPolicy,
   getChainWsRpcUrl,
   getMissingReceiptGraceMs,
   getReviewRecordRetryMs,
@@ -30,6 +31,7 @@ import {
   confirmReviewedDeposit,
 } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
+import { depositAuditCursor, planDepositAuditRanges } from "../services/depositAuditCursor";
 import {
   ActionDepositArgs,
   ChainInfo,
@@ -41,6 +43,7 @@ import {
   getCurrentBlockNumber,
   getBlockTimestamp,
   getChainLogs,
+  getDepositAuditLogs,
   isChainConfigured,
 } from "../services/rpcService";
 import { logError, logInfo } from "../utils/logger";
@@ -154,6 +157,53 @@ export const attemptRoutedSettlementWithFallback = async (
   };
 };
 
+const ingestDiscoveredDeposits = async (
+  externalChainId: number,
+  logs: RawDepositLog[],
+  reviewRetryMs: number,
+) => {
+  const seen = new Set<string>();
+  const unique = logs.filter((log) => {
+    const key = `${log.transactionHash}:${log.logIndex}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const classified = classifyDepositLogs(unique, externalChainId);
+  for (const quarantined of classified.quarantinedLogs) {
+    await quarantineDepositLog(externalChainId, quarantined.log, quarantined.error);
+  }
+  for (const deposit of [...classified.standardDeposits, ...classified.actionDeposits]) {
+    try {
+      deposit.externalBlockTimestamp = await getBlockTimestamp(externalChainId, deposit.externalBlockNumber);
+    } catch {
+      deposit.externalBlockTimestamp = deposit.detectedAt;
+    }
+    const pending = await depositStateService.upsert(deposit);
+    if (shouldRecordReview(pending, reviewRetryMs)) await recordReviewOnce(pending.deposit);
+  }
+};
+
+const auditDepositDiscovery = async (
+  externalChainId: number,
+  depositRouters: string[],
+  currentBlock: number,
+  reviewRetryMs: number,
+) => {
+  const head = Math.max(0, currentBlock - getDepositConfirmationPolicy(externalChainId));
+  const { ranges, nextReconciliation } = planDepositAuditRanges(
+    head,
+    await depositAuditCursor.get(externalChainId),
+    getLogsSpan(externalChainId),
+  );
+  const logs: RawDepositLog[] = [];
+  for (const [from, to] of ranges) {
+    logs.push(...await getDepositAuditLogs(externalChainId, from, to, depositRouters, [...DEPOSIT_EVENT_SIGNATURES]) as RawDepositLog[]);
+  }
+  await ingestDiscoveredDeposits(externalChainId, logs, reviewRetryMs);
+  await depositAuditCursor.set(externalChainId, nextReconciliation);
+};
+
 const recordReviewOnce = async (
   deposit: DepositArgs | ActionDepositArgs,
 ): Promise<void> => {
@@ -214,6 +264,11 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
   if (!isChainConfigured(externalChainId)) return;
 
   const currentBlock = await getCurrentBlockNumber(externalChainId);
+  try {
+    await auditDepositDiscovery(externalChainId, depositRouters, currentBlock, reviewRetryMs);
+  } catch (error) {
+    logError("DepositRecovery", error as Error, { operation: "auditDepositDiscovery", externalChainId });
+  }
   const windows =
     currentBlock > scanCursor
       ? planLogWindows(

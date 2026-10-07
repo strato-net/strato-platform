@@ -37,6 +37,8 @@ import { retry } from "../utils/api";
 import { DigestKmsSigner } from "../utils/kmsSigner";
 import { NATIVE_MINT_EVENT_ABI } from "../config/bridgeAbi";
 
+export const NATIVE_INSTANT_POLICY_REJECTION = "Native verifier policy rejects instant execution";
+
 export interface NativeMintAttestation {
   sourceChainId: string;
   sourceBridge: string;
@@ -125,7 +127,7 @@ const normalizeAttestation = (
     signerSetVersion: attestation.signerSetVersion.toString(),
   });
 
-const getAttestationConfiguration = async (
+export const getAttestationConfiguration = async (
   destinationChainId: bigint,
   destinationBridgeAddress: string,
 ): Promise<{ validitySeconds: bigint; signerSetVersion: bigint }> => {
@@ -235,8 +237,16 @@ export const signNativeMintAttestation = async (
     signature: string;
   }> = [];
   const seen = new Set<string>();
+  let instantPolicyRejections = 0;
   for (const response of responses) {
-    if (response.status !== "fulfilled") continue;
+    if (response.status !== "fulfilled") {
+      const rejection = (response.reason as { response?: { data?: { code?: unknown; error?: unknown } } })?.response?.data;
+      if (normalized.useInstantPath &&
+          (rejection?.code === "POLICY_RESTRICTED" || rejection?.error === NATIVE_INSTANT_POLICY_REJECTION)) {
+        instantPolicyRejections += 1;
+      }
+      continue;
+    }
     try {
       const signature = String(response.value.data?.signature || "");
       const claimed = safeChecksum(response.value.data?.attestationSigner);
@@ -260,6 +270,15 @@ export const signNativeMintAttestation = async (
     }
   }
   if (signatures.length < threshold) {
+    if (normalized.useInstantPath && urls.length - instantPolicyRejections < threshold) {
+      throw Object.assign(
+        new Error(`Native withdrawal ${normalized.sourceWithdrawalId} instant execution was rejected by verifiers; governance cancellation is required`),
+        { issues: [processingIssue("MANUAL_REVIEW", {
+          operation: "requestWithdrawalCancellation",
+          reason: NATIVE_INSTANT_POLICY_REJECTION,
+        })] },
+      );
+    }
     throw new Error(
       `Native verifier quorum unavailable: received ${signatures.length}, require ${threshold}`,
     );

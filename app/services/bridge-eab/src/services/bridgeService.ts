@@ -1,10 +1,11 @@
 import { processingIssueService, withdrawalProcessingContext } from "./processingIssueService";
-import { processingIssue, classifyProcessingError } from "../utils/processingIssues";
+import { processingIssue, processingKey, classifyProcessingError } from "../utils/processingIssues";
 import { recoverReviewedDeposit } from "./depositRecoveryService";
 import { verifyNativeMint } from "./nativeVerificationService";
 import {
   config,
   getChainRpcUrl,
+  getNativeRepresentationBridgeAddress,
 } from "../config";
 import { JsonRpcProvider, MaxUint256 } from "ethers";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
@@ -17,8 +18,10 @@ import { buildBridgeDigestRequest, parseBridgeDigest } from "../signer/authoriza
 import {
   buildNativeMintRequest,
   executeNativeMint,
+  getAttestationConfiguration,
   getExistingNativeMintTxHash,
   getNativeMintProposalExecution,
+  NATIVE_INSTANT_POLICY_REJECTION,
   proposeNativeMint,
   processNativeMintCancellation,
 } from "./nativeMintService";
@@ -107,6 +110,33 @@ const submitNativeMint = async (
   return executeNativeMint(payload);
 };
 
+const nativeAttestationExpired = async (withdrawal: NativeWithdrawalInfo): Promise<boolean> => {
+  const notBefore = BigInt(withdrawal.nativeMintNotBefore || 0);
+  if (notBefore <= 0n) return false;
+  const destination = getNativeRepresentationBridgeAddress(Number(withdrawal.externalChainId));
+  if (!destination) throw new Error(`Native representation bridge is not configured for chain ${withdrawal.externalChainId}`);
+  const { validitySeconds } = await getAttestationConfiguration(BigInt(withdrawal.externalChainId), destination);
+  const latest = await getDestinationChainLatestTimestamp(withdrawal.externalChainId);
+  if (latest == null) throw new Error("Native destination RPC unavailable: latest block is missing");
+  return latest > notBefore + validitySeconds;
+};
+
+const cancellationRequired = (withdrawal: NativeWithdrawalInfo, clearSafeNonce: boolean) => Object.assign(
+  new Error(`Native withdrawal ${withdrawal.withdrawalId} attestation expired; governance cancellation is required${clearSafeNonce ? " and the Safe nonce must be cleared by owners" : ""}`),
+  { issues: [processingIssue("MANUAL_REVIEW", { operation: "requestWithdrawalCancellation" })] },
+);
+
+const instantPolicyCancellationRequired = (withdrawal: NativeWithdrawalInfo) => Object.assign(
+  new Error(`Native withdrawal ${withdrawal.withdrawalId} instant execution was rejected by verifiers; governance cancellation is required`),
+  { issues: [processingIssue("MANUAL_REVIEW", { operation: "requestWithdrawalCancellation", reason: NATIVE_INSTANT_POLICY_REJECTION })] },
+);
+
+const instantPolicyAlreadyRejected = async (withdrawal: NativeWithdrawalInfo): Promise<boolean> => {
+  const record = (await processingIssueService.snapshot()).records[processingKey(withdrawalProcessingContext("native", withdrawal))];
+  return !!record && !record.resolvedAt && record.issues.some((issue) =>
+    issue.code === "MANUAL_REVIEW" && issue.details.reason === NATIVE_INSTANT_POLICY_REJECTION);
+};
+
 const getDestinationChainLatestTimestamp = async (
   externalChainId: string | number,
 ): Promise<bigint | null> => {
@@ -181,9 +211,9 @@ const finalizeVerifiedNativeWithdrawal = async (
 const syncManualNativeMintProposal = async (
   withdrawal: NativeWithdrawalInfo,
   proposalReference: string | null,
-): Promise<boolean> => {
+): Promise<"pending" | "executed"> => {
   if (!proposalReference) {
-    return false;
+    return "pending";
   }
 
   const result = await getNativeMintProposalExecution(
@@ -192,7 +222,7 @@ const syncManualNativeMintProposal = async (
   );
 
   if (result.status === "pending") {
-    return true;
+    return "pending";
   }
 
   if (result.status === "rejected") {
@@ -203,13 +233,13 @@ const syncManualNativeMintProposal = async (
   }
 
   if (!result.txHash) {
-    return true;
+    return "pending";
   }
 
   await verifyNativeMint(withdrawal, await getStratoNetworkId(), config.nativeBridge.address!, result.txHash);
   await finalizeVerifiedNativeWithdrawal(withdrawal, result.txHash, proposalReference);
   announcedManualNativeWithdrawals.delete(withdrawal.withdrawalId);
-  return true;
+  return "executed";
 };
 
 const recordNativeWithdrawalProposal = async (
@@ -1049,8 +1079,11 @@ export const finalizeNativeWithdrawalBatch = async (
     }
 
     try {
-      const alreadyPending = await ensureNativeWithdrawalPending(withdrawal);
-      if (!alreadyPending) {
+      const alreadyPending = String(withdrawal.bridgeStatus) === "2";
+      if (!alreadyPending && await nativeAttestationExpired(withdrawal)) {
+        throw cancellationRequired(withdrawal, false);
+      }
+      if (!await ensureNativeWithdrawalPending(withdrawal)) {
         logInfo(
           "BridgeService",
           `Native instant withdrawal ${withdrawal.withdrawalId} moved to pending review`,
@@ -1074,6 +1107,12 @@ export const finalizeNativeWithdrawalBatch = async (
       let externalTxHash =
         pendingNativeInstantWithdrawalTxHashes.get(withdrawal.withdrawalId) ||
         await findExistingNativeMint(withdrawal, sourceChainId);
+      if (!externalTxHash && await nativeAttestationExpired(withdrawal)) {
+        throw cancellationRequired(withdrawal, false);
+      }
+      if (!externalTxHash && await instantPolicyAlreadyRejected(withdrawal)) {
+        throw instantPolicyCancellationRequired(withdrawal);
+      }
       if (!externalTxHash) {
         externalTxHash = await submitNativeMint(withdrawal, sourceChainId);
         if (!externalTxHash) continue;
@@ -1147,14 +1186,25 @@ export const queueManualNativeWithdrawalBatch = async (
             existingProposalReference,
           );
         }
-        await syncManualNativeMintProposal(
+        const proposalStatus = await syncManualNativeMintProposal(
           withdrawal,
           existingProposalReference,
         );
+        if (proposalStatus === "pending" && await nativeAttestationExpired(withdrawal)) {
+          throw cancellationRequired(withdrawal, true);
+        }
         await processingIssueService.resolve(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"));
       } catch (error) {
         await processingIssueService.record(withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"), error);
       }
+      continue;
+    }
+
+    if (await nativeAttestationExpired(withdrawal)) {
+      await processingIssueService.record(
+        withdrawalProcessingContext("native", withdrawal, "withdrawal-proposal"),
+        cancellationRequired(withdrawal, false),
+      );
       continue;
     }
 

@@ -180,6 +180,8 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
     return { idempotencyKey: withdrawal.withdrawalId } as any;
   });
   t.mock.method(mint, "getExistingNativeMintTxHash", async () => null);
+  let validitySeconds = 10n ** 9n;
+  t.mock.method(mint, "getAttestationConfiguration", async () => ({ validitySeconds, signerSetVersion: 1n }));
   const submitted = t.mock.method(mint, "executeNativeMint", async () => "mint-hash");
   let confirmed = false;
   const verified: string[] = [];
@@ -241,6 +243,45 @@ test("native instant retries reuse submitted mints and Safe execution cannot byp
   assert.equal((failures[1] as any).issues[0].code, "MANUAL_REVIEW");
   assert.equal((failures[1] as any).issues[0].details.operation, "requestWithdrawalCancellation");
   assert.equal(operatorCalls.length, 0, "rejected Safe mints must not directly unlock STRATO escrow");
+  validitySeconds = 10n;
+  t.mock.method(mint, "getExistingNativeMintTxHash", async () => null);
+  const mintedBeforeExpiry = submitted.mock.callCount();
+  const pendingCallsBeforeExpiry = operatorCalls.length;
+  await assert.rejects(
+    bridge.finalizeNativeWithdrawalBatch([{ ...record, withdrawalId: "508", bridgeStatus: "1" }]),
+    /cancellation is required/,
+  );
+  assert.equal(operatorCalls.length, pendingCallsBeforeExpiry, "an expired initiated withdrawal must remain user-cancelable");
+  await assert.rejects(
+    bridge.finalizeNativeWithdrawalBatch([{ ...record, withdrawalId: "509" }]),
+    /governance cancellation is required/,
+  );
+  assert.equal(submitted.mock.callCount(), mintedBeforeExpiry, "an expired attestation must not submit another mint");
+  proposalExecution = { status: "pending" };
+  current = { bridgeStatus: "2" };
+  await bridge.queueManualNativeWithdrawalBatch([{ ...manual, withdrawalId: "510", nativeMintProposalHash: "b".repeat(64) }]);
+  assert.equal((failures.at(-1) as any).issues[0].code, "MANUAL_REVIEW");
+  assert.match((failures.at(-1) as any).message, /Safe nonce must be cleared by owners/);
+  assert.equal(operatorCalls.length, 0, "an expired manual proposal must not be replaced");
+  proposalExecution = { status: "executed", txHash: "safe-hash" };
+  confirmed = true;
+  t.mock.method(strato, "executeAsRelayer", async () => ({} as any));
+  const failuresBeforeExecuted = failures.length;
+  await bridge.queueManualNativeWithdrawalBatch([{ ...manual, withdrawalId: "512", nativeMintProposalHash: "c".repeat(64) }]);
+  assert.equal(failures.length, failuresBeforeExecuted, "an executed mint must finalize even when Cirrus still shows the old status");
+  validitySeconds = 10n ** 9n;
+  const { processingKey } = await import("../utils/processingIssues");
+  const rejected = { ...record, withdrawalId: "511" };
+  t.mock.method(processing.processingIssueService, "snapshot", async () => ({
+    records: {
+      [processingKey(processing.withdrawalProcessingContext("native", rejected))]: {
+        issues: [{ code: "MANUAL_REVIEW", details: { operation: "requestWithdrawalCancellation", reason: "Native verifier policy rejects instant execution" } }],
+      },
+    },
+  }) as any);
+  const callsBeforePolicy = submitted.mock.callCount();
+  await assert.rejects(bridge.finalizeNativeWithdrawalBatch([rejected]), /rejected by verifiers/);
+  assert.equal(submitted.mock.callCount(), callsBeforePolicy, "a recorded verifier rejection must not mint again");
 
 });
 

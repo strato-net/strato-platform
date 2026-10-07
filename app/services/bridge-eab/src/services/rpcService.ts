@@ -311,3 +311,45 @@ export const getVerifiedNativeLogs = async (chainId: number, from: number, to: n
   if (!responses.length || responses.some(logs => fingerprint(logs) !== fingerprint(responses[0]))) throw new Error("Native scan RPC log disagreement");
   return responses[0];
 };
+
+export const getDepositAuditLogs = async (
+  chainId: number,
+  from: number,
+  to: number,
+  addresses: string[],
+  topics: string[],
+): Promise<any[]> => {
+  const allowed = new Set(addresses.map((address) => ensureHexPrefix(address).toLowerCase()));
+  const topicSet = new Set(topics.map((topic) => topic.toLowerCase()));
+  const responses = await Promise.all([...new Set(getChainRpcUrls(chainId))].map(async (url) => {
+    const logs = unwrapRpcResult(await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{
+      fromBlock: decimalToHex(String(from)), toBlock: decimalToHex(String(to)),
+      address: addresses.map(ensureHexPrefix), topics: [topics],
+    }] }), "eth_getLogs", chainId);
+    if (!Array.isArray(logs)) throw new Error("Invalid deposit audit logs");
+    for (const log of logs) {
+      if (log.removed || !allowed.has(String(log.address || "").toLowerCase()) ||
+          !topicSet.has(String(log.topics?.[0] || "").toLowerCase()) ||
+          !/^0x[0-9a-f]+$/i.test(log.blockNumber || "") || BigInt(log.blockNumber) < BigInt(from) || BigInt(log.blockNumber) > BigInt(to) ||
+          !/^0x[0-9a-f]{64}$/i.test(log.blockHash || "") || !/^0x[0-9a-f]{64}$/i.test(log.transactionHash || "") ||
+          !/^0x[0-9a-f]+$/i.test(log.logIndex || "")) throw new Error("Invalid deposit audit log evidence");
+    }
+    return logs;
+  }));
+  const logsById = new Map<string, any>();
+  const fingerprint = (log: any) => JSON.stringify([
+    log.address.toLowerCase(), BigInt(log.blockNumber).toString(), log.blockHash.toLowerCase(), log.transactionHash.toLowerCase(),
+    BigInt(log.logIndex).toString(), log.topics.map((topic: string) => topic.toLowerCase()), log.data.toLowerCase(),
+  ]);
+  for (const logs of responses) {
+    for (const log of logs) {
+      const id = `${log.transactionHash}:${BigInt(log.logIndex)}`.toLowerCase();
+      const existing = logsById.get(id);
+      if (existing && fingerprint(existing) !== fingerprint(log)) {
+        throw new Error("Deposit audit RPC log disagreement");
+      }
+      logsById.set(id, log);
+    }
+  }
+  return [...logsById.values()];
+};

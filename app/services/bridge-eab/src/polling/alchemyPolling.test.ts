@@ -17,6 +17,7 @@ import {
   resetPendingForRetry,
   shouldRecordReview,
 } from "../services/depositStateService";
+import { planDepositAuditRanges } from "../services/depositAuditCursor";
 import { getExecutableRouteSteps } from "../utils/routeQuoteUtils";
 import { RouteAction, RouteQuoteResponse } from "@strato/shared-types";
 
@@ -64,6 +65,7 @@ process.env[`CHAIN_${CHAIN_ID}_RPC_URL`] = "http://localhost:1/unused";
 import { fetch as httpClient } from "../utils/api";
 import {
   getChainLogs,
+  getDepositAuditLogs,
   getTransactionReceiptsBatch,
 } from "../services/rpcService";
 import { planLogWindows } from "./alchemyPolling";
@@ -498,6 +500,24 @@ test("splits a catch-up range into windows below the getLogs cap", () => {
   assert.deepEqual(capped[29], [23_201, 24_000]);
 });
 
+test("deposit audit discovers a log returned by either configured RPC", async () => {
+  const original = process.env[`CHAIN_${CHAIN_ID}_VERIFICATION_RPC_URLS`];
+  process.env[`CHAIN_${CHAIN_ID}_VERIFICATION_RPC_URLS`] = "http://localhost:2/unused";
+  let calls = 0;
+  try {
+    const log = makeLog("DepositRouted", `0x${"ab".repeat(32)}`);
+    const result = await stubPost(
+      () => ({ jsonrpc: "2.0", id: 1, result: calls++ === 0 ? [] : [log] }),
+      () => getDepositAuditLogs(CHAIN_ID, 1, 20, [log.address], [log.topics[0]]),
+    );
+    assert.equal(result.length, 1);
+    assert.equal(result[0].transactionHash, log.transactionHash);
+  } finally {
+    if (original === undefined) delete process.env[`CHAIN_${CHAIN_ID}_VERIFICATION_RPC_URLS`];
+    else process.env[`CHAIN_${CHAIN_ID}_VERIFICATION_RPC_URLS`] = original;
+  }
+});
+
 test("keeps JSON-RPC batches within the 20-call submission limit", async () => {
   const txHashes = Array.from({ length: 21 }, (_, i) => `0x${String(i).padStart(64, "0")}`);
   const batchSizes: number[] = [];
@@ -759,4 +779,19 @@ test.beforeEach(async (t: any) => {
     t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
   }
   t.after(() => removeIssueDir(directory, { recursive: true, force: true }));
+});
+
+test("deposit audit walks a head window and one older window the main cursor has passed", () => {
+  assert.deepEqual(planDepositAuditRanges(5000, 100, 800), {
+    ranges: [[4201, 5000], [100, 899]],
+    nextReconciliation: 900,
+  });
+  assert.deepEqual(planDepositAuditRanges(5000, 4900, 800), {
+    ranges: [[4201, 5000]],
+    nextReconciliation: 0,
+  });
+  assert.deepEqual(planDepositAuditRanges(5000, 9000, 800), {
+    ranges: [[4201, 5000], [0, 799]],
+    nextReconciliation: 800,
+  });
 });
