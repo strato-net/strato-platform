@@ -15,9 +15,7 @@ export const withSafeProposalQueue = <T>(chainId: number, operation: string,
   const previous = queues.get(directory) || Promise.resolve();
   const pending = previous.catch(() => undefined).then(async () => {
     await fs.mkdir(directory, { recursive: true });
-    // Shared volumes fail closed for competing processes; never steal an uncertain lock.
-    const lock = await fs.open(path.join(directory, "writer.lock"), "wx", 0o600);
-    try {
+      // The runtime is a singleton; multi-runtime deployments require an external writer lock.
       const kits = await initializeSafeForChain(chainId, safe);
       const proposals: ProposeTransactionProps[] = [];
       let saved: ProposeTransactionProps | undefined;
@@ -70,10 +68,6 @@ export const withSafeProposalQueue = <T>(chainId: number, operation: string,
         return publish(proposal);
       };
       return await work(kits, saved);
-    } finally {
-      await lock.close();
-      await fs.unlink(path.join(directory, "writer.lock"));
-    }
   }).finally(() => { if (queues.get(directory) === pending) queues.delete(directory); });
   queues.set(directory, pending);
   return pending;

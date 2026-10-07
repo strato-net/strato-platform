@@ -67,8 +67,8 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
   await Promise.all([
     enrichDepositApprovals(accessToken, depositReviews, depositDigest),
     enrichRefundReadiness(accessToken, refunds),
+    userAddress ? enrichReviewGovernance(accessToken, items, userAddress, depositDigest) : Promise.resolve(),
   ]);
-  if (userAddress) await enrichReviewGovernance(accessToken, items, userAddress, depositDigest);
   return items;
 };
 
@@ -152,7 +152,8 @@ const enrichReviewGovernance = async (
     const ids = [...new Set(active.filter(row => row.value === true || row.value === "true").map(row => row.key))];
     if (ids.some(id => !/^(0x)?[a-f0-9]{64}$/i.test(id))) throw new Error("Invalid governance issue identifier");
     const byId = new Map(reviews.map(item => [item.id, item]));
-    for (let offset = 0; offset < ids.length; offset += BRIDGE_REVIEW_ID_BATCH_SIZE) {
+    await Promise.all(Array.from({ length: Math.ceil(ids.length / BRIDGE_REVIEW_ID_BATCH_SIZE) }, async (_, batchIndex) => {
+      const offset = batchIndex * BRIDGE_REVIEW_ID_BATCH_SIZE;
       const batch = ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
       const events = await readReviewRows(accessToken, AdminRegistry, adminRegistry, "IssueCreated", {
         issueId: `in.(${batch.join(",")})`, target: `in.(${[externalAssetBridge, stratoNativeBridge].filter(Boolean).join(",")})`,
@@ -169,7 +170,7 @@ const enrichReviewGovernance = async (
         return { event, item, action: match.action };
       }));
       const matchedIds = [...new Set(matched.flatMap(match => match ? [match.event.issueId] : []))];
-      if (!matchedIds.length) continue;
+      if (!matchedIds.length) return;
       const votes = await readReviewRows<BridgeReviewRow<unknown>>(accessToken, AdminRegistry, adminRegistry, "votes", { key: `in.(${matchedIds.join(",")})`, select: "key,key2,value", order: "key.asc,key2.asc" });
       for (const match of matched) {
         if (!match) continue;
@@ -177,7 +178,7 @@ const enrichReviewGovernance = async (
         match.item.governance![match.action] = { ...match.item.governance![match.action]!, issueId: match.event.issueId,
           votesCast: voters.size, hasVoted: voters.has(normalize(userAddress)) };
       }
-    }
+    }));
     for (const item of reviews) item.governanceStatus = "available";
   } catch {
     for (const item of reviews) { item.governanceStatus = "unavailable"; delete item.governance; }

@@ -76,9 +76,12 @@ export const classifyProcessingError = (error: any, depth = 0): ProcessingIssue[
   else if (/paused/i.test(message)) code = "PAUSED";
   else if (/policy rejects|token is disabled|route.*disabled|exceeds destination vault maximum/i.test(message)) code = "POLICY_RESTRICTED";
   else if (/mismatched reservation|not configured|signer.*(?:mismatch|version)|configuration/i.test(message)) code = "CONFIGURATION";
-  else if (/ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timeout|network|socket|Cloudflare|rate limit|verifier unavailable|RPC unavailable/i.test(`${error?.code} ${message}`) ||
+  else if (/ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|timeout|network|socket|Cloudflare|rate limit|verifier(?: quorum)? unavailable|RPC unavailable/i.test(`${error?.code} ${message}`) ||
       [401, 403, 429].includes(error?.response?.status) || error?.response?.status >= 500) code = "DEPENDENCY_UNAVAILABLE";
   const details: Record<string, string> = {};
+  if (code === "DEPENDENCY_UNAVAILABLE" && /native verifier quorum unavailable: received \d+, require \d+/i.test(message)) {
+    details.reason = message;
+  }
   if (code === "UNKNOWN") {
     Object.assign(details, safeIssueDetails(body?.details), safeIssueDetails({ policyVersion: body?.policyVersion, policyDigest: body?.policyDigest }));
     if (message) details.reason = message;

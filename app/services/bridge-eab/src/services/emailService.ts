@@ -23,7 +23,25 @@ const tokenAmount = (amount: string, asset?: BridgeEmailToken) => {
   } catch { /* Unsupported metadata must not prevent delivery. */ }
   return `${amount} (raw token units; decimals unavailable)`;
 };
-const processingContent = (code: keyof typeof PROCESSING_EMAIL_CONTENT) => PROCESSING_EMAIL_CONTENT[code] || PROCESSING_EMAIL_CONTENT.UNKNOWN;
+const processingContent = (issue: ProcessingRecord["issues"][number]) => {
+  const reason = issue.details.reason;
+  const verifierQuorum = reason?.match(/native verifier quorum unavailable: received (\d+), require (\d+)/i);
+  if (verifierQuorum) {
+    return {
+      title: "Native verifier quorum unavailable",
+      observation: `The bridge received ${verifierQuorum[1]} of ${verifierQuorum[2]} required native-verifier signatures. No Safe mint proposal has been created yet.`,
+      action: "Check native-verifier health, signer authorization, and native token policies for this chain. After quorum is restored, scheduled processing will create the Safe proposal and send a separate review notification.",
+    };
+  }
+  if (issue.code === "UNKNOWN" && reason && /nonce=\d+.*safe=.*already executed/i.test(reason)) {
+    return {
+      title: "Safe proposal nonce was already used",
+      observation: `The saved Safe proposal cannot execute because ${reason}.`,
+      action: "Confirm the bridge runtime replaced the saved proposal at the Safe's current nonce. If no replacement proposal appears, inspect the bridge runtime and Safe service logs.",
+    };
+  }
+  return PROCESSING_EMAIL_CONTENT[issue.code] || PROCESSING_EMAIL_CONTENT.UNKNOWN;
+};
 const detailLines = (details: Record<string, string>) => Object.entries(details).map(([key, value]) =>
   `${key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, c => c.toUpperCase())}: ${value}`);
 
@@ -66,7 +84,10 @@ export const sendProcessingIssueEmail = async (
   const record = records[0];
   const displayed = records.slice(0, 20);
   const tokens = await tokenMetadata(displayed.flatMap(r => r.context.token ? [r.context.token] : []));
-  const contents = [...new Set(records.flatMap(r => r.issues.map(i => i.code)))].map(processingContent);
+  const contents = [...new Map(records.flatMap(r => r.issues.map(issue => {
+    const content = processingContent(issue);
+    return [content.title, content] as const;
+  }))).values()];
   const titles = [...new Set(contents.map(content => content.title))];
   const event = resolved ? "Previously reported issue resolved" : "Operations check needed";
   await sgMail.send({

@@ -266,6 +266,9 @@ test("verifier diagnostics are sanitized, backward compatible, and do not trust 
   assert.equal(classifyProcessingError(Object.assign(new Error("EAB: mint limit exceeded"), {
     shortMessage: "execution reverted",
   }))[0].code, "MINT_CAPACITY");
+  const quorum = classifyProcessingError(new Error("Native verifier quorum unavailable: received 0, require 2"))[0];
+  assert.equal(quorum.code, "DEPENDENCY_UNAVAILABLE");
+  assert.equal(quorum.details.reason, "Native verifier quorum unavailable: received 0, require 2");
   assert.equal(classifyProcessingError(new Error("Deposit block hash changed"))[0].retryable, false);
   assert.equal(classifyProcessingError({ response: { status: 503 } })[0].code, "DEPENDENCY_UNAVAILABLE");
   assert.equal(classifyProcessingError({ response: { data: { code: "future-code", retryable: true } } })[0].retryable, false);
@@ -384,6 +387,20 @@ test("processing emails use existing recipients and distinguish recovery from co
   await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("2"))]], true);
   assert.match(sent[2].text, /Previous issue code: UNKNOWN/);
   assert.doesNotMatch(sent[2].text, /needs operator investigation|\{\}/);
+  await f.service.record(context("3"), issue("UNKNOWN", {
+    reason: `Tx with nonce=113 for safe=0x${"a".repeat(40)} already executed in tx-hash=0x${"b".repeat(64)}`,
+  }));
+  await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("3"))]], false);
+  assert.match(sent[3].subject, /Safe proposal nonce was already used/);
+  assert.match(sent[3].text, /saved Safe proposal cannot execute/);
+  assert.match(sent[3].text, /replaced the saved proposal at the Safe's current nonce/);
+  assert.doesNotMatch(sent[3].text, /cause has not yet been identified/);
+  await f.service.record(context("4"), new Error("Native verifier quorum unavailable: received 0, require 2"));
+  await sendProcessingIssueEmail([(await f.service.snapshot()).records[processingKey(context("4"))]], false);
+  assert.match(sent[4].subject, /Native verifier quorum unavailable/);
+  assert.match(sent[4].text, /received 0 of 2 required native-verifier signatures/);
+  assert.match(sent[4].text, /No Safe mint proposal has been created yet/);
+  assert.doesNotMatch(sent[4].text, /cause has not yet been identified/);
   assert.doesNotMatch(sent[0].text + sent[1].text, /https?:\/\//);
   assert.doesNotMatch(sent[0].text + sent[1].text, /\{"|\{\}/);
 });

@@ -389,12 +389,23 @@ export const proposeNativeMint = async (
   const relayer = config.safe.safeProposerAddress || "";
   return withSafeProposalQueue(chainId, `mint:${request.idempotencyKey}`, async ({ protocolKit, apiKit }, saved) => {
   if (saved) {
-    try { await apiKit.getTransaction(saved.safeTxHash); }
+    try {
+      await apiKit.getTransaction(saved.safeTxHash);
+      return saved.safeTxHash;
+    }
     catch (error: any) {
       if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
-      await apiKit.proposeTransaction(saved);
+      const savedNonce = Number(saved.safeTransactionData?.nonce);
+      const currentNonce = Number(await protocolKit.getNonce());
+      if (!Number.isSafeInteger(savedNonce) || savedNonce < 0 ||
+          !Number.isSafeInteger(currentNonce) || currentNonce < 0) {
+        throw new Error("Invalid persisted or current Safe nonce");
+      }
+      if (currentNonce <= savedNonce) {
+        await apiKit.proposeTransaction(saved);
+        return saved.safeTxHash;
+      }
     }
-    return saved.safeTxHash;
   }
   const nonce = Number(await retry(
     () => apiKit.getNextNonce(safeAddress),

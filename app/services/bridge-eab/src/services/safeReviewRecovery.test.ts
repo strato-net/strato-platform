@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -32,12 +32,17 @@ async function worker() {
   const { config } = await import("../config");
   config.safe.address = `0x${"1".repeat(40)}`;
   config.safe.safeProposerAddress = `0x${"2".repeat(40)}`;
+  if (phase === "stale-lock") {
+    const directory = join(process.cwd(), "data", "safe-proposals", `1-${config.safe.address.toLowerCase()}`);
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "writer.lock"), "");
+  }
   const rpc = await import("./rpcService");
   (rpc as any).getChainProvider = () => ({ getBlock: async () => ({ timestamp: phase === "expired" ? 10 ** 12 : 1000 }) });
   const safe = await import("../utils/safeHelper");
   (safe as any).initializeSafeForChain = async () => ({
     protocolKit: {
-      getNonce: async () => 0,
+      getNonce: async () => phase === "stale" ? 2 : 0,
       createTransaction: async (input: any) => ({ data: { ...input.transactions[0], nonce: input.options.nonce } }),
       getTransactionHash: async (tx: any) => `0x${String(tx.data.nonce).padStart(64, "0")}`,
       signHash: async () => ({ data: "0xsigned" }),
@@ -45,7 +50,7 @@ async function worker() {
     apiKit: {
       getNextNonce: async () => { state.nonces++; persist(); return phase === "concurrent" || phase === "queued-failure" || phase === "mixed" ? 1 : state.nonces; },
       getTransaction: async () => {
-        if (phase === "missing") throw Object.assign(Error("Not Found"), { statusCode: 404 });
+        if (phase === "missing" || phase === "stale") throw Object.assign(Error("Not Found"), { statusCode: 404 });
         if (phase === "outage") throw Object.assign(Error("Unavailable"), { statusCode: 503 });
         return {};
       },
@@ -103,6 +108,17 @@ if (process.argv[2] === "worker") {
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 
+  test("a stale writer lock cannot block Safe proposals after a runtime crash", () => {
+    const directory = mkdtempSync(join(tmpdir(), "safe-stale-lock-"));
+    writeFileSync(join(directory, "remote.json"), JSON.stringify({ nonces: 0, hashes: [] }));
+    try {
+      const child = spawnSync(process.execPath, [__filename, "worker", "stale-lock"], { cwd: directory, encoding: "utf8" });
+      assert.equal(child.status, 0, child.stderr + child.stdout);
+      const state = JSON.parse(readFileSync(join(directory, "remote.json"), "utf8"));
+      assert.equal(state.hashes.length, 1);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   test("Safe reviews reuse persisted transactions after ambiguous submission and restart", () => {
     const directory = mkdtempSync(join(tmpdir(), "safe-review-"));
     const statePath = join(directory, "remote.json");
@@ -119,7 +135,10 @@ if (process.argv[2] === "worker") {
       assert.equal(run("outage").nonces, 1);
       const beforeExpiry = JSON.parse(readFileSync(statePath, "utf8"));
       assert.equal(new Set(beforeExpiry.hashes).size, 1);
-      assert.equal(run("expired").nonces, 2);
+      const afterStaleNonce = run("stale");
+      assert.equal(afterStaleNonce.nonces, 2);
+      assert.equal(new Set(afterStaleNonce.hashes).size, 2, "a consumed Safe nonce must produce one replacement proposal");
+      assert.equal(run("expired").nonces, 3);
       const journals = join(directory, "data", "safe-reviews");
       const journal = readdirSync(journals).find((file) => file.endsWith(".json"))!;
       const beforeCorruption = JSON.parse(readFileSync(statePath, "utf8"));

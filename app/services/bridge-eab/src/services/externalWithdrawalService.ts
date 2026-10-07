@@ -203,11 +203,20 @@ const createWithdrawalReviewProposal = async (
     if (BigInt(saved.approvalDeadline) > BigInt(latestBlock.timestamp)) {
       try {
         await apiKit.getTransaction(saved.proposal.safeTxHash);
+        return { reviewDigest, approvalDeadline: saved.approvalDeadline, proposalHash: saved.proposal.safeTxHash };
       } catch (error: any) {
         if (error.statusCode !== 404 && error.status !== 404 && error.response?.status !== 404) throw error;
-        await apiKit.proposeTransaction(saved.proposal);
+        const savedNonce = Number(saved.proposal.safeTransactionData?.nonce);
+        const currentNonce = Number(await protocolKit.getNonce());
+        if (!Number.isSafeInteger(savedNonce) || savedNonce < 0 ||
+            !Number.isSafeInteger(currentNonce) || currentNonce < 0) {
+          throw new Error("Invalid persisted or current Safe nonce");
+        }
+        if (currentNonce <= savedNonce) {
+          await apiKit.proposeTransaction(saved.proposal);
+          return { reviewDigest, approvalDeadline: saved.approvalDeadline, proposalHash: saved.proposal.safeTxHash };
+        }
       }
-      return { reviewDigest, approvalDeadline: saved.approvalDeadline, proposalHash: saved.proposal.safeTxHash };
     }
   }
   let nonce = Number(

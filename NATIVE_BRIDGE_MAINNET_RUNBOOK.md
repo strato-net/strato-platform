@@ -217,14 +217,48 @@ ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY=<printed bridge proxy>
 ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL=<printed bridge implementation>
 ```
 
-Verify implementations and proxies on Etherscan before Safe administration:
+Contract publication and Safe decoding are production deployment checks. Use the
+exact reviewed source commit and the compiler settings used for deployment.
+Record the commit, compiler version/settings, proxy addresses, implementation
+addresses, and deployment transaction hashes before verification.
+
+Set `ETHERSCAN_API_KEY` and run from `app/ethereum`. Hardhat is configured to
+publish to both Etherscan and Sourcify:
+
+```bash
+npm run verify:mainnet -- <ETHEREUM_REPRESENTATION_TOKEN_IMPL>
+npm run verify:mainnet -- <ETHEREUM_REPRESENTATION_TOKEN_PROXY>
+npm run verify:mainnet -- <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL>
+npm run verify:mainnet -- <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+```
+
+Preserve the OpenZeppelin deployment manifest used to deploy the UUPS proxies;
+the proxy verification task uses it to identify the implementations and
+constructor data. If Etherscan does not associate a proxy automatically, use
+Etherscan's **Is this a proxy?** check for that proxy and confirm that it points
+to the recorded implementation.
+
+Check and record all of the following during deployment:
 
 ```text
-ETHEREUM_REPRESENTATION_TOKEN_PROXY verified
-ETHEREUM_REPRESENTATION_TOKEN_IMPL verified
-ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY verified
-ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL verified
+Etherscan shows verified source for both implementations and both proxies.
+Etherscan Read/Write as Proxy points each proxy to the recorded implementation.
+Sourcify reports the implementations and proxies as verified.
+Safe Contract interaction loads the ABI automatically for both proxy addresses.
+Safe displays named methods and parameters, including
+mintRepresentationWithAttestationV2 on the bridge proxy.
 ```
+
+Create and discard an unsigned Safe draft to confirm decoding; do not execute a
+test administration or mint transaction. Record the Etherscan and Sourcify
+links and the Safe decoding evidence in the deployment record. Do not proceed
+silently if a verification or decoding check is missing; record the failed
+check, owner, and follow-up action. These checks do not block the initial Safe
+batch or bridge activation.
+
+After every implementation upgrade, record the new implementation and source
+commit, verify the new implementation on Etherscan and Sourcify, reconfirm the
+proxy association, and repeat the Safe decoding check.
 
 ## 5. Ethereum Safe Initial Admin Batch
 
