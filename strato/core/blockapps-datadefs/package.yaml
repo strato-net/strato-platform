@@ -20,6 +20,8 @@ dependencies:
   - solid-vm-model
   - strato-model
   - text
+  - postgresql-simple
+  - unliftio
   - time
   - transformers
 

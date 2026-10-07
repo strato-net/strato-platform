@@ -25,25 +25,31 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
   if (!res.headersSent) res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(config.port, async () => {
-  logInfo("HistoryService", `Listening on port ${config.port}`);
+// The database (and its migrations) comes first: the socket only opens once
+// the schema is in place, so a load balancer's health check cannot route
+// requests here while migrations run, and a failed migration exits before
+// anything was served.
+(async () => {
   try {
     await bootstrapDb();
   } catch (error) {
     logError("HistoryService", error, { operation: "bootstrapDb" });
     process.exit(1);
   }
-  // The two feeds run side by side and write through one serialised apply
-  // step. The bus is the low-latency path; the poller is the backfill from
-  // genesis and the completeness guarantee behind it.
-  if (config.bus.host) {
-    runBusConsumerForever().catch((error) => logError("HistoryService", error, { operation: "bus" }));
-  } else {
-    logInfo("HistoryService", "BUS_HOST not set: live feed disabled");
-  }
-  if (config.cirrus.enabled && config.cirrus.nodeUrl) {
-    runCirrusPoller().catch((error) => logError("HistoryService", error, { operation: "cirrus" }));
-  } else {
-    logInfo("HistoryService", "Cirrus poller disabled");
-  }
-});
+  app.listen(config.port, () => {
+    logInfo("HistoryService", `Listening on port ${config.port}`);
+    // The two feeds run side by side and write through one serialised apply
+    // step. The bus is the low-latency path; the poller is the backfill from
+    // genesis and the completeness guarantee behind it.
+    if (config.bus.host) {
+      runBusConsumerForever().catch((error) => logError("HistoryService", error, { operation: "bus" }));
+    } else {
+      logInfo("HistoryService", "BUS_HOST not set: live feed disabled");
+    }
+    if (config.cirrus.enabled && config.cirrus.nodeUrl) {
+      runCirrusPoller().catch((error) => logError("HistoryService", error, { operation: "cirrus" }));
+    } else {
+      logInfo("HistoryService", "Cirrus poller disabled");
+    }
+  });
+})();
