@@ -27,6 +27,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import qualified Data.ByteString.Short as BSS
+import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
@@ -138,9 +139,10 @@ putBlocksSql blockList makeHashOne = do
   -- sequencer hands it), and a replayed batch can repeat a block. The
   -- existing-rows check above only sees the database, so the batch is
   -- deduplicated by hash here too, or block 0 lands twice and every peer
-  -- handshake fails on "multiple genesis blocks".
-  let newBlocks = M.elems $ M.fromList
-        [ (hash', (b, hash', blk2BlkDataRef b hash' makeHashOne)) | (b, hash') <- blocksWithHashes, M.notMember hash' existing ]
+  -- handshake fails on "multiple genesis blocks". First occurrences are
+  -- kept in batch order, so row ids keep following block order (TxLast
+  -- orders by them).
+  let newBlocks = [ (b, hash', blk2BlkDataRef b hash' makeHashOne) | (b, hash') <- nubOrdOn snd blocksWithHashes, M.notMember hash' existing ]
   blkKeys <- SQL.insertMany [ toInsert | (_, _, (toInsert, _, _, _, _, _, _)) <- newBlocks ]
   let withKeys = zip blkKeys newBlocks
       sigParts sig = ( bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
