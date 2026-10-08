@@ -1,6 +1,6 @@
 const { NETWORKS, getExternalBridgeNetwork } = require("./externalBridgeNetworks");
 
-const DEPLOYMENT_PROFILES = Object.fromEntries(NETWORKS.map(({ chainId, name, production }) =>
+const DEPLOYMENT_PROFILES = Object.fromEntries(NETWORKS.filter(({ externalBridgeDeployment }) => externalBridgeDeployment).map(({ chainId, name, production }) =>
   [chainId, { network: name, production }]));
 
 function parseDeployArgs(argv) {
@@ -41,6 +41,9 @@ function getDeploymentProfile(
   let network;
   try { network = getExternalBridgeNetwork(normalizedChainId); } catch {
     throw new Error(`Unsupported External Bridge deployment chain ${chainId}`);
+  }
+  if (!network.externalBridgeDeployment) {
+    throw new Error(`External Bridge deployment is not enabled for chain ${chainId}`);
   }
   const profile = { network: network.name, production: network.production };
   if (

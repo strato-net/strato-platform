@@ -387,11 +387,11 @@ For each pending deposit requiring review: inspect the recorded deposit, read `g
 
 - Use exactly one selected chain in each rollout template. Edit the Sepolia example chain in place; never append a target chain while retaining the example. Inventory bootstrap refuses to overwrite an existing policy; resume with the completed policy.
 - Keep every fresh-deployment route autoRouteEnabled=false. Activation mode permits both withdrawals and AUTO_ROUTE; it does not override the reviewed flags. The policy mintPolicies map is converted into the generated bridge config array; never paste the map into the bridge template.
-- Install three distinct vault KMS signers at threshold 2. The generic vault plan also accepts two signers; that is not the three-verifier deployment topology.
+- Install three distinct vault KMS signers at threshold 2 on testnet and five at threshold 3 in production.
 - The current external verification expects all seven roles on one Safe. This means shared pause/unpause authority, not independent role control; record governance acceptance of that model. A separate-role deployment requires corresponding verification changes.
 - Set the verified source-network USDST_ADDRESS for operator fee-balance checks; Compose forwards it. Keep STRATO_NATIVE_BRIDGE_ADDRESS empty for an EAB-only host. A combined native host needs its native representation addresses, RPCs and private-key secrets independently of EAB KMS configuration.
-- The EAB deploy targets are 1, 11155111, 8453, 84532, 59144 and 59141. Compose also forwards experimental Robinhood 46630 settings; that does not make it an EAB deploy target. Adding an environment variable for another chain does not forward it automatically.
-- CONFIRM_EXTERNAL_BRIDGE_DEPLOY is enforced for mainnet/base/linea execution. Import vault Transaction Builder JSON manually in this procedure; --apply instead proposes through the Safe API.
+- The EAB deploy targets are 1, 11155111, 8453, 84532, 59144, 59141, 4663, 46630 and 999. HyperEVM testnet is intentionally unsupported. Adding an environment variable for another chain does not forward it automatically.
+- `DEPLOY_ENV` plus `NETWORK` selects the generic deployment target. `CONFIRM_EXTERNAL_BRIDGE_DEPLOY` is enforced for every production execution. Import vault Transaction Builder JSON manually in this procedure; --apply instead proposes through the Safe API.
 
 ### Deployment environment files
 

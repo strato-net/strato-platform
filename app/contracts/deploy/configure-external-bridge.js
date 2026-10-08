@@ -180,11 +180,11 @@ function loadConfig(configPath) {
     ),
   };
   if (
-    BigInt(bridge.settlementVerifierThreshold) !== 2n ||
-    bridge.settlementVerifiers.length !== 3
+    BigInt(bridge.settlementVerifierThreshold) < 2n ||
+    BigInt(bridge.settlementVerifierThreshold) > BigInt(bridge.settlementVerifiers.length)
   ) {
     throw new Error(
-      "externalAssetBridge requires exactly three settlement verifiers with threshold 2",
+      "externalAssetBridge settlement verifier threshold must be at least 2 and no greater than the verifier count",
     );
   }
   if (new Set(bridge.settlementVerifiers).size !== bridge.settlementVerifiers.length) {

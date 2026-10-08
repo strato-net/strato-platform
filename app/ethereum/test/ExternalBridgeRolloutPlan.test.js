@@ -61,6 +61,7 @@ const bridgeTemplate = {
   externalAssetBridge: {
     address: bridge,
     settlementVerifiers: [safe.slice(2), vault.slice(2), router.slice(2)],
+    settlementVerifierThreshold: "2",
   },
   chains: [{
     chainName: "sepolia",
@@ -302,6 +303,25 @@ test("derives synchronized templates from deployment output and settings", () =>
     bridgeDefaults: bridgeTemplate,
   });
   assert.equal(existingDeployment.lastProcessedBlock, "11634261");
+});
+
+test("derives five production verifiers with a three-signature threshold", () => {
+  const productionVerifiers = [
+    safe,
+    vault,
+    router,
+    "0x9999999999999999999999999999999999999999",
+    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  ];
+  const generated = buildRolloutTemplates({
+    settings: { ...settings, settlementVerifiers: productionVerifiers },
+    deployment: { ...deployment, network: "mainnet", chainId: "1" },
+    bridgeDefaults: bridgeTemplate,
+  });
+  assert.equal(generated.chainId, 1);
+  assert.equal(generated.bridgeTemplate.externalAssetBridge.settlementVerifierThreshold, "3");
+  assert.equal(generated.bridgeTemplate.externalAssetBridge.settlementVerifiers.length, 5);
+  assert.equal(generated.vaultTemplate.chains[0].attestationThreshold, 3);
 });
 
 test("rejects withdrawals, AUTO_ROUTE, and migration during finalization", () => {

@@ -158,7 +158,7 @@ test("embedded deployment inputs make the manifest portable and revision-bound",
 test("bundle creation rejects incomplete service ownership inputs", (t) => {
   const f = fixture(t);
   assert.throws(() => createPortableBundle(f.manifestPath,
-    path.join(f.directory, "deployment-bundle.json")), /Bundle requires three verifiers/);
+    path.join(f.directory, "deployment-bundle.json")), /Bundle requires 3 verifiers/);
 });
 
 test("coordinator bundle loads without the original deployment files", (t) => {
@@ -482,6 +482,7 @@ test("setup supports each deployment persona", () => {
 
 test("Safe proposer remains a delegate while testnet may retain threshold one", () => {
   const context = {
+    rollout: { chainId: 11155111 },
     deployment: { production: false },
     manifest: {
       authorizationSigners: [addr("3"), addr("4"), addr("5")],
@@ -490,7 +491,9 @@ test("Safe proposer remains a delegate while testnet may retain threshold one", 
   };
   assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 1n).threshold, "1");
   assert.throws(() => validateSafeRuntimeIdentities(context, [addr("1")], 1n), /exclude the proposer/);
+  context.rollout.chainId = 1;
   context.deployment.production = true;
+  context.manifest.authorizationSigners.push(addr("7"), addr("8"));
   assert.throws(() => validateSafeRuntimeIdentities(context, [addr("6")], 1n), /at least 2/);
   assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 2n).threshold, "2");
 });

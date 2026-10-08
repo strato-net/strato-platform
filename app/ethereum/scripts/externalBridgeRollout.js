@@ -16,6 +16,7 @@ const { buildTransactionBuilderBatch } = require("./lib/depositRouterSafeOps");
 const { readState } = require("./externalBridgeVaultOps");
 const { verifyFromManifest } = require("./scanTokenConfig");
 const { buildDepositRouterControl } = require("./lib/externalBridgeArtifacts");
+const { getExternalBridgeNetwork } = require("./lib/externalBridgeNetworks");
 
 const TIMEOUT_MS = 30_000;
 const ROLES = ["coordinator", "admin-1", "admin-2", "infra"];
@@ -97,9 +98,10 @@ const redactFor = (context, message) => redact(message, process.env, [
 function validateSafeRuntimeIdentities(context, owners, threshold) {
   const { safeProposerAddress, executorAddress } = context.manifest.services;
   const identities = [safeProposerAddress, executorAddress, ...context.manifest.authorizationSigners];
-  if (identities.length !== 5 || identities.some((value) => !ethers.isAddress(value)) ||
-      new Set(identities.map(address)).size !== 5) {
-    throw new Error("Configure five distinct proposer, executor and verifier KMS addresses");
+  const expectedIdentities = getExternalBridgeNetwork(context.rollout.chainId).verifierCount + 2;
+  if (identities.length !== expectedIdentities || identities.some((value) => !ethers.isAddress(value)) ||
+      new Set(identities.map(address)).size !== expectedIdentities) {
+    throw new Error(`Configure ${expectedIdentities} distinct proposer, executor and verifier KMS addresses`);
   }
   const normalizedOwners = owners.map(address);
   const minimumThreshold = context.deployment.production === false ? 1n : 2n;
@@ -464,8 +466,11 @@ async function inspect(context, artifacts, options = {}) {
   const activationChecksRequired = context.stage === "activation" && !!source && !preActivationGovernancePending;
   const checkVerifiers = async () => {
     const services = context.manifest.services;
+    const verifierCount = getExternalBridgeNetwork(context.rollout.chainId).verifierCount;
     if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) throw new Error("Approve services.confirmations as a positive integer");
-    if (services.verifiers.length !== 3 || context.manifest.authorizationSigners.length !== 3) throw new Error("Configure three verifier endpoints and KMS addresses in the manifest");
+    if (services.verifiers.length !== verifierCount || context.manifest.authorizationSigners.length !== verifierCount) {
+      throw new Error(`Configure ${verifierCount} verifier endpoints and KMS addresses in the manifest`);
+    }
     const urls = new Set();
     for (const verifier of services.verifiers) {
       const url = new URL(verifier.url);

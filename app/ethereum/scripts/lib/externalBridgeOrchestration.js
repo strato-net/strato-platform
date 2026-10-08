@@ -9,6 +9,7 @@ const {
 const { buildDepositRouterBatches, buildDepositRouterControl } = require("./externalBridgeArtifacts");
 const { normalizeConfig, buildOperations } = require("./externalBridgeVaultPlan");
 const { buildTransactionBuilderBatch } = require("./depositRouterSafeOps");
+const { getExternalBridgeNetwork } = require("./externalBridgeNetworks");
 const { loadConfig, buildPlan } = require("../../../contracts/deploy/configure-external-bridge");
 
 const CONTRACTS = path.resolve(__dirname, "../../../contracts/deploy");
@@ -121,16 +122,18 @@ function createPortableBundle(manifestPath, bundlePath) {
   const context = loadManifest(manifestPath, "activation");
   const manifest = context.manifest;
   const services = manifest.services;
+  const network = getExternalBridgeNetwork(context.rollout.chainId);
   const identities = [
     services.safeProposerAddress,
     services.executorAddress,
     ...manifest.authorizationSigners,
   ];
-  if (services.verifiers.length !== 3 || manifest.authorizationSigners.length !== 3 ||
+  if (services.verifiers.length !== network.verifierCount ||
+      manifest.authorizationSigners.length !== network.verifierCount ||
       identities.some((value) => !ethers.isAddress(value)) ||
       new Set(identities.map(address)).size !== identities.length ||
       !services.bridgeHealthUrlEnv) {
-    throw new Error("Bundle requires three verifiers, five distinct KMS identities, and bridgeHealthUrlEnv");
+    throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 2} distinct KMS identities, and bridgeHealthUrlEnv`);
   }
   const directory = path.dirname(manifestPath);
   const externalDeployment = manifest.inputs?.externalDeployment ||
@@ -196,8 +199,11 @@ function loadManifest(file, stage = "initial") {
   const defaults = loadBridgeDefaults(settings, path.dirname(file));
   const templates = buildRolloutTemplates({ settings, deployment, bridgeDefaults: defaults });
   const signers = manifest.authorizationSigners || [];
-  if (signers.length !== 0 && (signers.length !== 3 || new Set(signers.map(address)).size !== 3 || signers.some((signer) => !ethers.isAddress(signer)))) {
-    throw new Error("Provide either no authorizationSigners before KMS provisioning, or exactly three distinct addresses");
+  const network = getExternalBridgeNetwork(templates.chainId);
+  if (signers.length !== 0 && (signers.length !== network.verifierCount ||
+      new Set(signers.map(address)).size !== network.verifierCount ||
+      signers.some((signer) => !ethers.isAddress(signer)))) {
+    throw new Error(`Provide either no authorizationSigners before KMS provisioning, or exactly ${network.verifierCount} distinct addresses`);
   }
   templates.vaultTemplate.chains[0].attestationSigners = signers;
   const rollout = buildSynchronizedRollout({ depositPlan, ...templates, policy: manifest.policy, chainId: templates.chainId });
@@ -253,7 +259,7 @@ function generate(context, outputDirectory, options = {}) {
   const chain = rollout.vaultConfig.chains[0];
   const vaultPausePath = save("vault-pause.json", buildTransactionBuilderBatch(rollout.chainId, chain.safeAddress,
     [{ to: chain.vaultAddress, value: "0", data: vaultInterface.encodeFunctionData("pause"), operation: 0 }], { name: "Pause external vault" }));
-  if (chain.attestationSigners.length === 3) {
+  if (chain.attestationSigners.length === getExternalBridgeNetwork(rollout.chainId).verifierCount) {
     const config = normalizeConfig(rollout.vaultConfig);
     const transactions = buildOperations(config, config.chains[0]).configure.map((operation) => ({
       to: operation.target, value: "0", operation: 0, data: vaultInterface.encodeFunctionData(operation.method, operation.args),

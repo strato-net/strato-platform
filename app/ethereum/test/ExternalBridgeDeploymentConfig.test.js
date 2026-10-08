@@ -20,7 +20,26 @@ test("defaults to preflight and accepts only execute", () => {
 test("uses one network registry for names, aliases and chain IDs", () => {
   assert.equal(getExternalBridgeNetwork("base-sepolia").chainId, 84532);
   assert.equal(getExternalBridgeNetwork(59141).name, "lineaSepolia");
-  assert.equal(NETWORKS.length, 6);
+  assert.equal(getExternalBridgeNetwork("robinhood-testnet").chainId, 46630);
+  assert.equal(getExternalBridgeNetwork("hyperevm").chainId, 999);
+  assert.equal(NETWORKS.length, 9);
+  assert.deepEqual(
+    NETWORKS.filter(({ production }) => production).map(({ verifierCount, verifierThreshold }) => [verifierCount, verifierThreshold]),
+    Array(5).fill([5, 3]),
+  );
+  assert.deepEqual(
+    NETWORKS.filter(({ production }) => !production).map(({ verifierCount, verifierThreshold }) => [verifierCount, verifierThreshold]),
+    Array(4).fill([3, 2]),
+  );
+  assert.throws(() => getExternalBridgeNetwork(998), /Unsupported External Bridge network/);
+});
+
+test("enables the added deployment profiles with production confirmation gates", () => {
+  assert.equal(getDeploymentProfile(46630, {}).network, "robinhoodTestnet");
+  assert.equal(getDeploymentProfile(4663, {}).network, "robinhood");
+  assert.equal(getDeploymentProfile(999, {}).network, "hyperEvm");
+  assert.throws(() => getDeploymentProfile(4663, {}, { execute: true }), /CONFIRM_EXTERNAL_BRIDGE_DEPLOY=4663/);
+  assert.throws(() => getDeploymentProfile(999, {}, { execute: true }), /CONFIRM_EXTERNAL_BRIDGE_DEPLOY=999/);
 });
 
 test("builds chain-prefixed deployment variable names", () => {

@@ -28,6 +28,7 @@ import { ensureHexPrefix } from "./utils";
 
 const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
+  "function attestationSignerCount() view returns (uint8)",
   "function attestationThreshold() view returns (uint8)",
   "function maxAttestationValiditySeconds() view returns (uint256)",
   "function hasRole(bytes32,address) view returns (bool)",
@@ -139,6 +140,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
   const warnings: string[] = [];
   let settlementVerifierAddresses: string[] = [];
+  let settlementVerifierThreshold = 0;
   let operatorAddress = "";
   let relayerAddress = "";
 
@@ -292,14 +294,15 @@ export async function validateBridgeConfig(): Promise<boolean> {
     try {
       const verifierConfig = await getSettlementVerifierConfig();
       settlementVerifierAddresses = verifierConfig.verifiers;
-      if (verifierConfig.threshold !== 2) {
+      settlementVerifierThreshold = verifierConfig.threshold;
+      if (verifierConfig.count !== verifierConfig.verifiers.length) {
         errors.push(
-          "ExternalAssetBridge settlement verifier threshold must be 2",
+          "ExternalAssetBridge settlement verifier count does not match its enabled verifier records",
         );
       }
-      if (verifierConfig.count < 3) {
+      if (verifierConfig.threshold < 2 || verifierConfig.threshold > verifierConfig.count) {
         errors.push(
-          "ExternalAssetBridge must have at least 3 settlement verifiers",
+          "ExternalAssetBridge settlement verifier threshold must be at least 2 and no greater than its verifier count",
         );
       }
       if (
@@ -483,9 +486,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
         errors.push(...executorValidation.errors);
         warnings.push(...executorValidation.warnings);
         const executorAddress = executorValidation.executorAddress;
-        if (signerUrls.length < 3) {
+        if (signerUrls.length !== settlementVerifierAddresses.length) {
           errors.push(
-            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain 3 independent verifier services`,
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain ${settlementVerifierAddresses.length} independent verifier services`,
           );
         }
         if (new Set(signerUrls).size !== signerUrls.length) {
@@ -656,9 +659,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
             );
           }
           const enabledSignerCount = signerStatuses.filter(Boolean).length;
-          if (Number(threshold) < 2 || Number(threshold) > enabledSignerCount) {
+          if (Number(threshold) !== settlementVerifierThreshold ||
+              enabledSignerCount !== settlementVerifierAddresses.length) {
             errors.push(
-              `External vault on chain ${chainId} requires ${String(threshold)} signatures; ${enabledSignerCount} independent signer(s) are enabled`,
+              `External vault on chain ${chainId} requires ${String(threshold)} of ${enabledSignerCount} configured signer(s); STRATO requires ${settlementVerifierThreshold} of ${settlementVerifierAddresses.length}`,
             );
           }
           if (BigInt(validitySeconds.toString()) <= 0n) {
@@ -729,11 +733,13 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 ensureHexPrefix(config.safe.address!), representationTokens);
               const [
                 threshold,
+                signerCount,
                 maxAttestationValiditySeconds,
                 executorIsSigner,
                 executorIsAuthorized,
               ] = await Promise.all([
                 nativeBridge.attestationThreshold(),
+                nativeBridge.attestationSignerCount(),
                 nativeBridge.maxAttestationValiditySeconds(),
                 nativeBridge.attestationSigners(
                   ensureHexPrefix(executorKms.address),
@@ -744,13 +750,13 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 ),
               ]);
 
-              if (Number(threshold) < 2) {
+              if (Number(threshold) < 2 || Number(threshold) > Number(signerCount)) {
                 errors.push(
-                  `${representationBridgeEnv} attestationThreshold must be at least two`,
+                  `${representationBridgeEnv} attestationThreshold must be at least two and no greater than its signer count`,
                 );
-              } else if (Number(threshold) > verifierUrls.length) {
+              } else if (Number(signerCount) !== verifierUrls.length) {
                 errors.push(
-                  `${representationBridgeEnv} attestationThreshold is ${String(threshold)}; bridge service has ${verifierUrls.length} configured native verifier(s)`,
+                  `${representationBridgeEnv} has ${String(signerCount)} attestation signer(s); bridge service has ${verifierUrls.length} configured native verifier(s)`,
                 );
               }
               if (executorIsSigner) {

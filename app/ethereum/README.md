@@ -28,6 +28,47 @@ Modular Hardhat setup for deploying STRATO contracts to Ethereum networks with U
    CONTRACT_NAME=DepositRouter INIT_PARAMS='["0xYOUR_PERMIT2", "0xYOUR_GNOSIS_SAFE", "0xYOUR_OWNER"]' npm run deployWithProxy:sepolia
    ```
 
+## Network-driven deployment
+
+Set `DEPLOY_ENV` to `testnet` or `prod` and `NETWORK` to `ethereum`, `base`,
+`linea`, `robinhood`, or `hyperevm`. HyperEVM has no supported testnet target,
+so `DEPLOY_ENV=testnet NETWORK=hyperevm` fails before invoking Hardhat.
+
+```bash
+export DEPLOY_ENV=testnet NETWORK=base
+```
+
+Deploy or preview the EAB vault/router pair:
+
+```bash
+npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR"
+```
+
+```bash
+npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR" --execute
+```
+
+Deploy a native representation proxy or implementation using the existing
+`CONTRACT_NAME`, `INIT_PARAMS`, and `PRIVATE_KEY` environment variables:
+
+```bash
+CONTRACT_NAME=StratoNativeRepresentationBridge INIT_PARAMS='["0xSAFE_ADDRESS"]' npm run network:deploy-proxy
+```
+
+```bash
+CONTRACT_NAME=DepositRouter npm run network:deploy-implementation
+```
+
+Verify a deployment on the selected network:
+
+```bash
+npm run network:verify -- <DEPLOYED_CONTRACT_ADDRESS>
+```
+
+Production EAB execution still requires
+`CONFIRM_EXTERNAL_BRIDGE_DEPLOY=<TARGET_CHAIN_ID>`. Legacy network-specific
+scripts remain available for compatibility.
+
 ## Available Scripts
 
 | Script                            | Description                                    |

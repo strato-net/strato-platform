@@ -5,6 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 const {
   parseArgs,
+  loadConfig,
   buildPlan,
   selectPlanCalls,
   writeOutput,
@@ -71,6 +72,35 @@ const settings = {
     }],
   }],
 };
+
+test("loads configurable verifier counts and valid quorums", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-verifiers-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const configPath = path.join(directory, "config.json");
+  const input = {
+    ...settings,
+    externalAssetBridge: {
+      ...settings.bridge,
+      settlementVerifiers: [
+        ...settings.bridge.settlementVerifiers,
+        "d".repeat(40),
+        "e".repeat(40),
+      ],
+      settlementVerifierThreshold: "3",
+    },
+  };
+  fs.writeFileSync(configPath, JSON.stringify(input));
+  assert.equal(loadConfig(configPath).bridge.settlementVerifiers.length, 5);
+  assert.equal(loadConfig(configPath).bridge.settlementVerifierThreshold, "3");
+  fs.writeFileSync(configPath, JSON.stringify({
+    ...input,
+    externalAssetBridge: {
+      ...input.externalAssetBridge,
+      settlementVerifierThreshold: "6",
+    },
+  }));
+  assert.throws(() => loadConfig(configPath), /no greater than the verifier count/);
+});
 
 test("parses an explicit dry-run step", () => {
   assert.deepEqual(

@@ -1,15 +1,8 @@
 const { ethers } = require("ethers");
 const { createHash } = require("node:crypto");
+const { getExternalBridgeNetwork } = require("./externalBridgeNetworks");
 
 const ZERO_ADDRESS = ethers.ZeroAddress;
-const CHAIN_NAMES = {
-  1: "mainnet",
-  8453: "base",
-  59144: "linea",
-  59141: "lineaSepolia",
-  84532: "baseSepolia",
-  11155111: "sepolia",
-};
 
 const address = (value, label) => {
   try {
@@ -137,11 +130,8 @@ function buildRolloutTemplates({
       "External deployment chainId must be a positive safe integer",
     );
   }
-  const chainName =
-    CHAIN_NAMES[chainId] || String(deployment.network || "").trim();
-  if (!chainName) {
-    throw new Error(`No chain name configured for ${chainId}`);
-  }
+  const network = getExternalBridgeNetwork(chainId);
+  const chainName = network.name;
   const sourceChainId = uint(settings.sourceChainId, "sourceChainId");
   if (BigInt(sourceChainId) === 0n) {
     throw new Error("sourceChainId must be positive");
@@ -158,10 +148,10 @@ function buildRolloutTemplates({
       address(verifier, `settlementVerifiers[${index}]`),
   );
   if (
-    settlementVerifiers.length !== 3 ||
-    new Set(settlementVerifiers.map(keyAddress)).size !== 3
+    settlementVerifiers.length !== network.verifierCount ||
+    new Set(settlementVerifiers.map(keyAddress)).size !== network.verifierCount
   ) {
-    throw new Error("Exactly three distinct settlementVerifiers are required");
+    throw new Error(`Exactly ${network.verifierCount} distinct settlementVerifiers are required for ${network.name}`);
   }
   const safeAddress = address(deployment.safeAddress, "deployment.safeAddress");
   const vaultAddress = address(
@@ -204,7 +194,7 @@ function buildRolloutTemplates({
         settlementVerifiers: settlementVerifiers.map((value) =>
           value.slice(2),
         ),
-        settlementVerifierThreshold: "2",
+        settlementVerifierThreshold: String(network.verifierThreshold),
       },
       chains: [{
         chainName,
@@ -227,7 +217,7 @@ function buildRolloutTemplates({
         depositRouterAddress,
         attestationSigners: [],
         disabledAttestationSigners: [],
-        attestationThreshold: 2,
+        attestationThreshold: network.verifierThreshold,
         maxAuthorizationValiditySeconds,
         tokens: [],
       }],
@@ -375,13 +365,17 @@ function buildSynchronizedRollout({
   }
   const settlementAttestors =
     bridgeTemplate.externalAssetBridge?.settlementVerifiers || [];
+  const network = getExternalBridgeNetwork(bridgeChain.externalChainId);
   if (
-    settlementAttestors.length !== 3 ||
-    new Set(settlementAttestors.map(keyAddress)).size !== 3
+    settlementAttestors.length !== network.verifierCount ||
+    new Set(settlementAttestors.map(keyAddress)).size !== network.verifierCount
   ) {
     throw new Error(
-      "ExternalAssetBridge template requires three distinct settlement verifiers",
+      `ExternalAssetBridge template requires ${network.verifierCount} distinct settlement verifiers`,
     );
+  }
+  if (Number(bridgeTemplate.externalAssetBridge.settlementVerifierThreshold) !== network.verifierThreshold) {
+    throw new Error(`ExternalAssetBridge template requires verifier threshold ${network.verifierThreshold}`);
   }
 
   for (const route of inventory) {

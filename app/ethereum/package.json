@@ -4,6 +4,10 @@
   "description": "Ethereum deployment for STRATO contracts with UUPS proxy support",
   "scripts": {
     "compile": "hardhat compile",
+    "network:deploy-external": "node scripts/networkDeployment.js deploy-external",
+    "network:deploy-proxy": "node scripts/networkDeployment.js deploy-proxy",
+    "network:deploy-implementation": "node scripts/networkDeployment.js deploy-implementation",
+    "network:verify": "node scripts/networkDeployment.js verify",
     "deployWithProxy:sepolia": "npx hardhat run scripts/deployWithProxy.js --network sepolia",
     "deployWithProxy:robinhoodTestnet": "npx hardhat run scripts/deployWithProxy.js --network robinhoodTestnet",
     "deployWithProxy:robinhood": "npx hardhat run scripts/deployWithProxy.js --network robinhood",
