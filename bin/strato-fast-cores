@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Restrict Intel hybrid CPUs to performance cores before launching the command.
+# Other platforms retain their existing scheduling policy.
+set -e
+
+expand_cpus() {
+    local part first last cpu
+    local -a parts
+    IFS=, read -ra parts <<< "$1"
+    for part in "${parts[@]}"; do
+        IFS=- read -r first last <<< "$part"
+        for ((cpu=first; cpu<=${last:-first}; cpu++)); do
+            printf '%s\n' "$cpu"
+        done
+    done
+}
+
+if [[ "$(uname -s)" == Linux &&
+      -r /sys/devices/cpu_core/cpus &&
+      -r /sys/devices/cpu_atom/cpus ]] &&
+   command -v taskset >/dev/null 2>&1 &&
+   [[ -n "$(< /sys/devices/cpu_atom/cpus)" ]] &&
+   allowed=$(LC_ALL=C taskset -pc "$$"); then
+    allowed=" $(expand_cpus "${allowed##*: }" | tr '\n' ' ') "
+    selected=()
+    while read -r cpu; do
+        if [[ $allowed == *" $cpu "* ]]; then
+            selected+=("$cpu")
+        fi
+    done < <(expand_cpus "$(< /sys/devices/cpu_core/cpus)")
+
+    if ((${#selected[@]})); then
+        cpus=$(IFS=,; echo "${selected[*]}")
+        echo "Performance CPUs: $cpus" >&2
+        exec taskset -c "$cpus" "$@"
+    fi
+fi
+
+exec "$@"

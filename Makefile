@@ -265,6 +265,7 @@ build_common: generate-version-file
 	@mkdir -p $(HOME)/.local/bin
 	@install -m 755 bin/strato-login $(HOME)/.local/bin/
 	@install -m 755 bin/strato-up $(HOME)/.local/bin/
+	@install -m 755 bin/strato-fast-cores $(HOME)/.local/bin/
 	@install -m 755 bin/strato-down $(HOME)/.local/bin/
 	@install -m 755 bin/strato-ps $(HOME)/.local/bin/
 	@install -m 755 bin/strato-patch-app $(HOME)/.local/bin/
@@ -483,6 +484,7 @@ uninstall:
 	@echo "Removing strato tools from ~/.local/bin..."
 	@rm -f $(HOME)/.local/bin/strato-login
 	@rm -f $(HOME)/.local/bin/strato-up
+	@rm -f $(HOME)/.local/bin/strato-fast-cores
 	@rm -f $(HOME)/.local/bin/strato-down
 	@rm -f $(HOME)/.local/bin/strato-ps
 	@rm -f $(HOME)/.local/bin/strato-patch-app

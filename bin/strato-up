@@ -99,7 +99,7 @@ export MALLOC_ARENA_MAX=2
 # file's end position and can't overwrite each other's bytes. Truncate first,
 # since the append redirects no longer reset the log on restart.
 : > logs/convoke.log
-nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
+nohup strato-fast-cores convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
 
