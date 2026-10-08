@@ -9,13 +9,22 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import CopyButton from '@/components/ui/copy';
 import { getBridgeReviewNextStep, getChainName } from '@/lib/bridge/utils';
-import { truncateAddress } from '@/utils/numberUtils';
+import { formatUnits, truncateAddress } from '@/utils/numberUtils';
 import { AlertCircle, ChevronDown, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 
 const actionLabels = { approve: 'Approve deposit / vote', reject: 'Reject — no funds received / vote', refund: 'Refund / vote', confirm_refund: 'Confirm refund / vote', cancel_withdrawal: 'Request cancellation / vote', confirm_cancellation: 'Verify cancellation and refund / vote' };
 const reviewActionLabel = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction) =>
   action === 'refund' && item.kind !== 'withdrawal_refund' ? 'Reject and refund / vote'
     : action === 'approve' && item.kind === 'deposit_recovery' ? 'Complete delivery / vote' : actionLabels[action];
+
+const displayAmount = (value?: string, decimals?: number, symbol?: string) => {
+  if (!value) return '';
+  if (decimals !== undefined) {
+    try { return `${formatUnits(value, decimals)}${symbol ? ` ${symbol}` : ''}`; }
+    catch { /* fall back to the exact raw value */ }
+  }
+  return `${value} raw units`;
+};
 
 const DetailRow = ({ label, value, shorten = false, copy = false }: { label: string; value: string; shorten?: boolean; copy?: boolean }) =>
   <div className="flex min-w-0 items-center justify-between gap-3 text-sm">
@@ -95,6 +104,10 @@ const BridgeReviewQueue = () => {
         {item.approvalStatus === 'unavailable' && <p role="alert" className="text-sm text-destructive">Deposit approval status is unavailable.</p>}
         {item.actions.some(action => Object.prototype.hasOwnProperty.call(actionLabels, action)) && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
         <p role={unavailable ? 'alert' : 'status'} className={`text-sm font-medium${unavailable ? ' text-destructive' : ''}`}>Next step: {reviews.isError ? 'Admin — refresh the queue. Displayed transaction and voting status may be stale.' : nextStepFor(item)}</p>
+        <p className="text-sm text-muted-foreground">
+          External: {displayAmount(item.externalAmount, item.externalDecimals, item.externalSymbol)}
+          {' · '}STRATO: {displayAmount(item.amount, item.tokenDecimals, item.tokenSymbol)}
+        </p>
         <details className="rounded-md border bg-muted/20 p-3">
           <summary className="cursor-pointer text-sm font-medium">Evidence and transaction details</summary>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -106,12 +119,14 @@ const BridgeReviewQueue = () => {
               {item.externalBridge && <DetailRow label="Bridge" value={item.externalBridge} shorten copy />}
               {item.externalAccount && <DetailRow label={deposit ? 'Sender' : 'Recipient'} value={item.externalAccount} shorten copy />}
               {item.externalToken && <DetailRow label="Token" value={item.externalToken} shorten copy />}
+              {item.externalAmount && item.externalDecimals !== undefined && <DetailRow label="Amount" value={displayAmount(item.externalAmount, item.externalDecimals, item.externalSymbol)} />}
               {item.externalAmount && <DetailRow label="Amount (raw)" value={item.externalAmount} />}
             </div>
             <div className="space-y-2">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{deposit ? 'STRATO delivery' : 'STRATO escrow'}</p>
               <DetailRow label={deposit ? 'Recipient' : 'Sender'} value={item.account} shorten copy />
               <DetailRow label="Token" value={item.token} shorten copy />
+              {item.tokenDecimals !== undefined && <DetailRow label="Amount" value={displayAmount(item.amount, item.tokenDecimals, item.tokenSymbol)} />}
               <DetailRow label="Amount (raw)" value={item.amount} />
             </div>
           </div>

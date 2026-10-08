@@ -69,11 +69,61 @@ export const getAdminBridgeReviews = async (accessToken: string, userAddress?: s
   const depositReviews = items.filter(item => item.source === "eab" && item.kind === "deposit_review");
   const refunds = items.filter(item => item.kind === "withdrawal_refund");
   await Promise.all([
+    enrichReviewAmounts(accessToken, items),
     enrichDepositApprovals(accessToken, depositReviews, depositDigest),
     enrichRefundReadiness(accessToken, refunds),
     userAddress ? enrichReviewGovernance(accessToken, items, userAddress, depositDigest) : Promise.resolve(),
   ]);
   return items;
+};
+
+const enrichReviewAmounts = async (accessToken: string, items: BridgeReviewItem[]): Promise<void> => {
+  const normalize = (address?: string) => (address || "").toLowerCase().replace(/^0x/, "");
+  const stratoTokens = [...new Set(items.map(item => normalize(item.token)).filter(Boolean))];
+  const externalTokens = [...new Set(items.map(item => normalize(item.externalToken)).filter(Boolean))];
+  try {
+    const [tokenBatches, routes, nativeAssets] = await Promise.all([
+      Promise.all(reviewBatches(stratoTokens).map(batch =>
+        readReviewRows<{ address: string; _symbol?: string; customDecimals?: string | number }>(
+          accessToken, constants.Token, batch[0], "", {
+            address: `in.(${batch.join(",")})`, select: "address,_symbol,customDecimals", order: "address.asc",
+          }))),
+      externalTokens.length ? readReviewRows(accessToken, constants.ExternalAssetBridge, constants.externalAssetBridge, "routes", {
+        key: `in.(${externalTokens.join(",")})`, select: "key,key2,value", order: "key.asc,key2.asc",
+      }) : Promise.resolve([]),
+      stratoTokens.length ? readReviewRows(accessToken, constants.StratoNativeBridge, constants.stratoNativeBridge, "assets", {
+        key: `in.(${stratoTokens.join(",")})`, select: "key,key2,value", order: "key.asc,key2.asc",
+      }) : Promise.resolve([]),
+    ]);
+    const tokens = new Map(tokenBatches.flat().map(row => [normalize(row.address), row]));
+    const external = new Map<string, { symbol?: string; decimals?: number }>();
+    for (const row of routes) {
+      const decimals = Number(row.value.externalDecimals);
+      external.set(`${normalize(row.key)}:${String(row.key2)}`, {
+        symbol: typeof row.value.externalSymbol === "string" ? row.value.externalSymbol : undefined,
+        decimals: Number.isSafeInteger(decimals) && decimals >= 0 && decimals <= 255 ? decimals : undefined,
+      });
+    }
+    for (const row of nativeAssets) {
+      const representationToken = normalize(row.value.representationToken);
+      if (!representationToken) continue;
+      external.set(`${representationToken}:${String(row.key2)}`, {
+        symbol: typeof row.value.externalSymbol === "string" ? row.value.externalSymbol : undefined,
+        decimals: 18,
+      });
+    }
+    for (const item of items) {
+      const token = tokens.get(normalize(item.token));
+      const tokenDecimals = Number(token?.customDecimals);
+      if (typeof token?._symbol === "string") item.tokenSymbol = token._symbol;
+      if (Number.isSafeInteger(tokenDecimals) && tokenDecimals >= 0 && tokenDecimals <= 255) item.tokenDecimals = tokenDecimals;
+      const metadata = external.get(`${normalize(item.externalToken)}:${item.chainId}`);
+      if (metadata?.symbol) item.externalSymbol = metadata.symbol;
+      if (metadata?.decimals !== undefined) item.externalDecimals = metadata.decimals;
+    }
+  } catch {
+    // Amount metadata is display-only; raw values remain available for review.
+  }
 };
 
 const enrichDepositApprovals = async (

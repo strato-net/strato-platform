@@ -10,7 +10,8 @@ import { parseBridgePolicyJson, buildBridgePolicyRows, buildBridgeDigestCall, pa
 const address = "1".repeat(40), hash = "0x" + "a".repeat(64), digest = "0x" + "b".repeat(64);
 const depositId = "9007199254740993123456789";
 const depositKey = `eab:deposit:11155111:${address}:${depositId}`;
-const deposit = { key: "11155111", key2: address, key3: depositId, value: { status: "2", stratoToken: address, stratoTokenAmount: depositId, stratoRecipient: address } };
+const deposit = { key: "11155111", key2: address, key3: depositId, value: { status: "2", stratoToken: address, stratoTokenAmount: "2000000000000000000", stratoRecipient: address,
+  externalToken: address, externalTokenAmount: "2000000" } };
 const withdrawal = (key: string, status = "3") => ({ key, value: { status, externalChainId: "11155111", stratoToken: address, stratoSender: address, stratoTokenAmount: "100", authorizationDeadline: "1", externalTxHash: "0".repeat(64) } });
 
 function setup(t: any) {
@@ -23,8 +24,10 @@ function setup(t: any) {
     tables: {
       "/BlockApps-ExternalAssetBridge-deposits": [deposit],
       "/BlockApps-ExternalAssetBridge-chains": [{ key: "11155111", value: { vault: address } }],
+      "/BlockApps-ExternalAssetBridge-routes": [{ key: address, key2: "11155111", value: { externalSymbol: "USDT", externalDecimals: "6" } }],
       "/BlockApps-ExternalAssetBridge-withdrawals": [withdrawal("1", "2"), withdrawal("2")],
       "/BlockApps-ExternalAssetBridge-withdrawalManualReviews": [{ key: "1", value: { proposalHash: hash } }],
+      "/BlockApps-Token": [{ address, _symbol: "USDT", customDecimals: "18" }],
     } as Record<string, any[]> };
   t.mock.method(cirrus, "get", async (_token: string, table: string, { params }: any) => {
     state.reads.push({ table, params });
@@ -84,6 +87,11 @@ test("on-chain reviews and pending Safe approvals remain visible with bridge ope
   assert.equal(operations.mock.callCount(), 0);
   assert.equal(state.rpcCalls, 1, "only the refund needs a digest read");
   assert.ok(items.filter(item => item.kind === "deposit_review").every(item => item.actions.every(action => action === "approve" || action === "refund" || action === "reject")));
+  const amountMetadata = items.find(item => item.kind === "deposit_review")!;
+  assert.equal(amountMetadata.tokenSymbol, "USDT");
+  assert.equal(amountMetadata.tokenDecimals, 18);
+  assert.equal(amountMetadata.externalSymbol, "USDT");
+  assert.equal(amountMetadata.externalDecimals, 6);
 });
 
 test("rejected and reopened deposits remain visible until recovery completes", async t => {

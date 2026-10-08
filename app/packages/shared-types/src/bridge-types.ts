@@ -227,12 +227,16 @@ export interface BridgeReviewItem {
   chainId: string;
   reference: string;
   token: string;
+  tokenSymbol?: string;
+  tokenDecimals?: number;
   amount: string;
   account: string;
   externalBridge?: string;
   externalTxHash?: string;
   externalAccount?: string;
   externalToken?: string;
+  externalSymbol?: string;
+  externalDecimals?: number;
   externalAmount?: string;
   scenario?: string;
   reason: string;
