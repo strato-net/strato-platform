@@ -42,7 +42,7 @@ Native bridge flows use the same independent verifier services with separate nat
 Operational controls:
 - Deposit and withdrawal pause controls are independent.
 - Every mint path consumes a shared bucket for its STRATO representation token, including routed, reviewed and fallback settlement. Missing policies block minting. Governance configures `setMintPolicy(token, capacity, refillRate)` in raw STRATO-token units; refill rate is units per second. Policy updates preserve existing consumption.
-- Safe/AdminRegistry owns governance. The bridge operator coordinates detection, review and reservation state but cannot mint deposits or finalize withdrawal burns without the 2-of-3 verifier threshold.
+- Safe/AdminRegistry owns governance. The bridge operator coordinates detection, review and reservation state but cannot mint deposits or finalize withdrawal burns without the configured verifier threshold: 2-of-3 on testnet or 3-of-5 in production.
 - Every environment requires explicit positive confirmation counts, independent signer RPCs, and authenticated webhook and review-operation endpoints.
 - Router rotation preserves prior router identities. A governance-aborted deposit ID remains final until owner governance separately calls `authorizeDepositReuse`. Reuse increments a per-slot generation: old attestations and in-flight submissions for the old generation cannot authorize a new settlement.
 - Configure the bridge PriceOracle and mark the route rebase-required before enabling xStock. The flag is canonical for inbound division and outbound multiplication; required routes reject zero/missing factors.
@@ -169,7 +169,7 @@ handles the initialization, permissions, routes and action calls listed above.
 Each participating administrator runs it with their own token and a freshly
 reviewed report. Rerun `resume` after quorum executes a dependency to reveal the
 next READY calls. The required number of admin votes comes from the live
-AdminRegistry policy, not the bridge's two-of-three settlement verifier threshold.
+AdminRegistry policy, not the bridge's settlement verifier threshold.
 
 Before generating artifacts, set `sourceChainId` explicitly and put the reviewed
 STRATO dependencies directly in `settings.dependencies`. Do not create or edit a

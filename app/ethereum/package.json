@@ -4,6 +4,7 @@
   "description": "Ethereum deployment for STRATO contracts with UUPS proxy support",
   "scripts": {
     "compile": "hardhat compile",
+    "network:environment": "node scripts/networkDeployment.js environment",
     "network:deploy-external": "node scripts/networkDeployment.js deploy-external",
     "network:deploy-proxy": "node scripts/networkDeployment.js deploy-proxy",
     "network:deploy-implementation": "node scripts/networkDeployment.js deploy-implementation",

@@ -1,9 +1,8 @@
 # EAB and native bridge rollout
 
 This is the operator runbook for adding an external EVM chain to an existing
-STRATO EAB/native deployment. Commands below target Base Sepolia (`84532`).
-Use the same sequence for another supported chain by changing the network
-variables in [Adaptation and production](#adaptation-and-production).
+STRATO EAB/native deployment. Set `DEPLOY_ENV` and `NETWORK` once; the tooling
+derives the chain, Hardhat network, RPC variable, verifier count and quorum.
 
 Use a rollout directory outside the repository. Never reuse a rollout directory,
 generated Safe JSON, approval hash, or credentials between environments.
@@ -23,6 +22,29 @@ Detailed references:
 - **Infra:** provisions identities and policies, deploys `bridge-eab`, verifiers,
   backend/UI, and funds runtime accounts.
 
+## Deployment phases
+
+### Once per STRATO environment
+
+1. Select one reviewed commit and immutable service images.
+2. Inventory and, only when required, deploy or upgrade the shared STRATO
+   `TokenRouter`, `ExternalAssetBridge`, `StratoNativeBridge` and custody vault.
+3. Provision the environment's verifier operators: three on testnet or five in
+   production, plus one multi-network runtime.
+4. Provision coordinator, administrator, Safe and runtime identities. Fund the
+   operator, relayer and verifier attestors.
+5. Deploy backend/UI only after their STRATO proxy addresses are known.
+
+Do not repeat shared STRATO deployments, runtime base infrastructure or
+administrator setup for each external network.
+
+### Once per external network
+
+Run sections 0–8 in order. Each network has its own external contracts,
+policies, verifier workloads, rollout directory, Safe transactions, readiness
+evidence and canary evidence. Never activate a second network by copying the
+first network's artifacts.
+
 ## 0. Set the environment
 
 Use the same reviewed commit on every machine. Node.js v22.12.x (`<23`) is
@@ -34,10 +56,11 @@ export REPO_ROOT="$PWD"
 git rev-parse HEAD
 git status --short
 
-export TARGET_NETWORK=baseSepolia
-export TARGET_CHAIN_ID=84532
+export DEPLOY_ENV=testnet
+export NETWORK=base
+eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
 export STRATO_NODE_URL=https://<STRATO_TESTNET_HOST>
-export ROLLOUT_DIR="$HOME/bridge-rollouts/base-sepolia-$(date -u +%Y%m%dT%H%M%SZ)"
+export ROLLOUT_DIR="$HOME/bridge-rollouts/${TARGET_NETWORK}-$(date -u +%Y%m%dT%H%M%SZ)"
 export PREPARED_DIR="$ROLLOUT_DIR/prepared-v1"
 
 test ! -e "$ROLLOUT_DIR"
@@ -60,14 +83,14 @@ before `app/contracts/.env`. Configure the external deployer and RPC in
 `app/ethereum/.env`, or export them:
 
 ```bash
-export BASE_SEPOLIA_RPC_URL=https://<BASE_SEPOLIA_RPC>
-export CHAIN_84532_RPC_URL="$BASE_SEPOLIA_RPC_URL"
+export "$TARGET_RPC_ENV=https://<TARGET_NETWORK_RPC>"
+export "CHAIN_${TARGET_CHAIN_ID}_RPC_URL=${!TARGET_RPC_ENV}"
 export CHAIN_11155111_RPC_URL=https://<SEPOLIA_RPC> # if copying Sepolia routes
 export PRIVATE_KEY=<FUNDED_EXTERNAL_DEPLOYER_KEY>
 ```
 
 `CHAIN_<ID>_RPC_URL` is used by preparation and EAB rollout. The named network
-RPC (`BASE_SEPOLIA_RPC_URL` here) is used by Hardhat and native Safe generation.
+RPC named by `TARGET_RPC_ENV` is used by Hardhat and native Safe generation.
 Set both for every target. Also set `CHAIN_<SOURCE_CHAIN_ID>_RPC_URL` for every
 source route selected during discovery.
 
@@ -107,12 +130,12 @@ async function readJson(name, url, options) {
   if (!oauth.token_endpoint) throw new Error("OAuth discovery has no token_endpoint");
   const metadata = await readJson("STRATO metadata", `${process.env.STRATO_NODE_URL.replace(/\/$/, "")}/strato-api/eth/v1.2/metadata`);
   if (!metadata.networkID) throw new Error("STRATO metadata has no networkID");
-  const rpc = await readJson("Target RPC", process.env.CHAIN_84532_RPC_URL, {
+  const rpc = await readJson("Target RPC", process.env[`CHAIN_${process.env.TARGET_CHAIN_ID}_RPC_URL`], {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] }),
   });
-  if (BigInt(rpc.result) !== 84532n) throw new Error(`Target RPC returned chain ${BigInt(rpc.result)}`);
+  if (BigInt(rpc.result) !== BigInt(process.env.TARGET_CHAIN_ID)) throw new Error(`Target RPC returned chain ${BigInt(rpc.result)}`);
   console.log(`Endpoint check passed: STRATO ${metadata.networkID}, target ${BigInt(rpc.result)}`);
 })().catch(error => { console.error(error.message); process.exitCode = 1; });
 NODE
@@ -208,24 +231,27 @@ them individually:
 ```bash
 cd "$REPO_ROOT/app/ethereum"
 export SAFE_ADDRESS=0x<SAFE>
-export CHAIN_84532_DEPLOYMENT_CONFIRMATIONS=<COUNT>
-export CHAIN_84532_SAFE_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_VAULT_DEFAULT_ADMIN_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_VAULT_UPGRADER_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_VAULT_POLICY_ADMIN_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_GUARDIAN_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_VAULT_UNPAUSER_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_VAULT_ATTESTATION_ADMIN_ADDRESS="$SAFE_ADDRESS"
-export CHAIN_84532_LARGE_WITHDRAWAL_APPROVER_ADDRESS="$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_DEPLOYMENT_CONFIRMATIONS=<COUNT>"
+export "CHAIN_${TARGET_CHAIN_ID}_SAFE_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_DEFAULT_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_UPGRADER_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_POLICY_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_GUARDIAN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_UNPAUSER_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_ATTESTATION_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_LARGE_WITHDRAWAL_APPROVER_ADDRESS=$SAFE_ADDRESS"
 ```
 
 Run the non-mutating preflight, review it, then execute:
 
 ```bash
-npm run deployExternalBridge:baseSepolia -- \
+npm run network:deploy-external -- \
   --rollout-dir "$ROLLOUT_DIR"
 
-npm run deployExternalBridge:baseSepolia -- \
+# Production only:
+export CONFIRM_EXTERNAL_BRIDGE_DEPLOY="$TARGET_CHAIN_ID"
+
+npm run network:deploy-external -- \
   --rollout-dir "$ROLLOUT_DIR" --execute
 ```
 
@@ -234,8 +260,8 @@ This writes `$ROLLOUT_DIR/external-deployment.json`. Verify the vault and
 release:
 
 ```bash
-npm run verify:baseSepolia -- <VAULT_IMPLEMENTATION>
-npm run verify:baseSepolia -- <ROUTER_IMPLEMENTATION>
+npm run network:verify -- <VAULT_IMPLEMENTATION>
+npm run network:verify -- <ROUTER_IMPLEMENTATION>
 ```
 
 ### 3.2 Native representation bridge and tokens
@@ -246,7 +272,7 @@ Deploy one representation bridge for the target chain:
 cd "$REPO_ROOT/app/ethereum"
 CONTRACT_NAME=StratoNativeRepresentationBridge \
 INIT_PARAMS='["0x<SAFE_ADDRESS>"]' \
-npm run deployWithProxy:baseSepolia
+npm run network:deploy-proxy
 
 cp "deployments/StratoNativeRepresentationBridge_${TARGET_NETWORK}_latest.json" \
   "$ROLLOUT_DIR/native-bridge.json"
@@ -258,7 +284,7 @@ immediately so the next token does not overwrite `_latest.json`:
 ```bash
 CONTRACT_NAME=StratoNativeRepresentationToken \
 INIT_PARAMS='["<TOKEN_NAME>","<TOKEN_SYMBOL>","0x<SAFE_ADDRESS>"]' \
-npm run deployWithProxy:baseSepolia
+npm run network:deploy-proxy
 
 cp "deployments/StratoNativeRepresentationToken_${TARGET_NETWORK}_latest.json" \
   "$ROLLOUT_DIR/native-<TOKEN_SYMBOL>.json"
@@ -336,9 +362,10 @@ npm run external:rollout -- init \
   --manifest "$ROLLOUT_DIR/deployment-manifest.json"
 ```
 
-Resolve every review field in `deployment-manifest.json`, including three
-verifier URLs/token variable names, authorization signers, confirmations,
-runtime identities and `bridgeHealthUrlEnv`. Keep secrets out of the manifest.
+Resolve every review field in `deployment-manifest.json`, including
+`VERIFIER_COUNT` verifier URLs/token variable names and authorization signers,
+confirmations, runtime identities and `bridgeHealthUrlEnv`. Keep secrets out of
+the manifest.
 
 Validate the offline plan and freeze the bundle:
 
@@ -377,7 +404,7 @@ profile label. Infra uses `--role infra` without an env file. See
 [EAB_DEPLOYMENT.md](EAB_DEPLOYMENT.md#4-each-persona-sets-up-locally).
 
 Each coordinator/admin env file contains the matching STRATO OAuth credentials
-and `CHAIN_84532_RPC_URL`. The coordinator adds `BRIDGE_HEALTH_URL` after Infra
+and `CHAIN_<TARGET_CHAIN_ID>_RPC_URL`. The coordinator adds `BRIDGE_HEALTH_URL` after Infra
 deploys the runtime.
 
 ## 6. Configure while disabled
@@ -487,8 +514,8 @@ npm run native:configure -- \
   --output "$ROLLOUT_DIR/native-readiness.safe.json"
 ```
 
-Require three healthy verifiers with matching policy/baseline hashes, healthy
-runtime, correct contract identities, funded transaction senders and zero
+Require `VERIFIER_COUNT` healthy verifiers with matching policy/baseline hashes,
+healthy runtime, correct contract identities, funded transaction senders and zero
 pending native configuration calls.
 
 ## 8. Activate in a controlled window
@@ -538,8 +565,8 @@ npm run external:rollout -- verify
 
 Run small, pre-approved live tests before wider use:
 
-- EAB: ERC-20 and native ETH deposit; direct route; routed success and fallback;
-  withdrawal; review/reject/refund.
+- EAB: ERC-20 and native-gas-token deposit where those routes are enabled;
+  direct route; routed success and fallback; withdrawal; review/reject/refund.
 - Native: plain and routed redemption; fallback; manual and instant withdrawal;
   cancellation and refund.
 - Reconcile source, custody, STRATO and destination balances; confirm final
@@ -549,20 +576,58 @@ Store the commit, bundle hash, policy hashes, contract/proxy/implementation
 addresses, Safe transactions, governance issue IDs, service image digests and
 test evidence with the rollout directory.
 
-## Adaptation and production
+## Supported network matrix
 
-Supported network aliases and RPC variables:
+Set only `DEPLOY_ENV` and `NETWORK`, then rerun
+`npm run --silent network:environment` as shown in section 0.
 
-- Base Sepolia: `baseSepolia`, `84532`, `BASE_SEPOLIA_RPC_URL`
-- Sepolia: `sepolia`, `11155111`, `SEPOLIA_RPC_URL`
-- Linea Sepolia: `lineaSepolia`, `59141`, `LINEA_SEPOLIA_RPC_URL`
-- Base: `base`, `8453`, `BASE_RPC_URL`
-- Ethereum: `mainnet`, `1`, `MAINNET_RPC_URL`
-- Linea: `linea`, `59144`, `LINEA_RPC_URL`
+| `DEPLOY_ENV` | `NETWORK` | Derived target | Verifiers |
+|---|---|---|---|
+| `testnet` | `ethereum` | Sepolia `11155111` | 2-of-3 |
+| `testnet` | `base` | Base Sepolia `84532` | 2-of-3 |
+| `testnet` | `linea` | Linea Sepolia `59141` | 2-of-3 |
+| `testnet` | `robinhood` | Robinhood Testnet `46630` | 2-of-3 |
+| `prod` | `ethereum` | Ethereum `1` | 3-of-5 |
+| `prod` | `base` | Base `8453` | 3-of-5 |
+| `prod` | `linea` | Linea `59144` | 3-of-5 |
+| `prod` | `robinhood` | Robinhood `4663` | 3-of-5 |
+| `prod` | `hyperevm` | HyperEVM `999` | 3-of-5 |
 
-For another chain, change `TARGET_NETWORK`, `TARGET_CHAIN_ID`, the named RPC
-variable, `CHAIN_<TARGET_CHAIN_ID>_RPC_URL`, role variables and deployment
-artifacts. The scripts reject unsupported chains.
+HyperEVM testnet is intentionally unsupported because the required Safe
+workflow is unavailable. The selector rejects it before deployment.
+
+## Per-network acceptance tests
+
+Complete and retain evidence for every row deployed from the matrix. Passing a
+test on one chain does not qualify another chain.
+
+1. **Readiness:** `external:rollout verify` passes contract identity, bytecode,
+   STRATO configuration, vault/router state, all verifier identities and
+   policies, runtime health, funding and cursor preservation.
+2. **Safe:** proposer is a delegate rather than an owner; proposer and
+   executors are absent from owners; the live threshold meets policy; every
+   configuration and activation transaction is decoded and independently
+   approved.
+3. **RPC evidence:** both RPC providers accept batches. If any enabled EAB route
+   uses the zero external-token address, every runtime and verifier provider
+   must return usable `trace_transaction` or `debug_traceTransaction` with
+   `callTracer`. Confirm normalized evidence agrees across providers. ERC-20-only
+   routes do not require tracing.
+4. **Activation:** verify both systems while disabled, execute only the freshly
+   generated activation transactions, then verify the intended router/vault and
+   native-route state. Keep intake closed on any mismatch.
+5. **Canary:** execute the applicable EAB and native cases listed in section 8.
+   Record before/after user, escrow, custody, supply and destination balances,
+   transaction hashes, final events and retry/idempotency results. Begin with
+   the smallest approved amount and stop before wider use if reconciliation
+   fails.
+
+Testnet must complete all supported route and recovery scenarios before the
+corresponding production network is activated. HyperEVM production requires a
+production Safe and provider validation even though there is no HyperEVM
+testnet rollout.
+
+## Production additions
 
 Production adds these mandatory gates:
 

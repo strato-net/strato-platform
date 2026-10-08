@@ -79,8 +79,8 @@ truth. If coordinator `status` prints `ADDITIONAL_ADMIN_VOTE`, another distinct
 admin identity votes with a separate `admin-2` profile. Do not assume Admin 2 is
 last.
 
-**Infra deployer** owns AWS/IAM/KMS, DNS/TLS, images, secrets, three verifiers,
-Runtime, and executor gas. Procedure:
+**Infra deployer** owns AWS/IAM/KMS, DNS/TLS, images, secrets, the configured
+verifier set, Runtime, and executor gas. Procedure:
 [eab-infra](https://github.com/strato-net/eab-infra).
 
 Safe owners are not a persona. Anyone with a Safe owner key signs independently
@@ -116,7 +116,7 @@ Amounts are raw token units. Verifier confirmations ≥ Runtime confirmations.
 - Safe
 - STRATO guardian (EAB; a STRATO address)
 - Vault pauser (Ethereum `PAUSER_ROLE`; default the Safe, not the STRATO guardian)
-- Bridge operator and three settlement attestors (operator is not an attestor)
+- Bridge operator and the network's settlement attestors (operator is not an attestor)
 - STRATO dependencies and, after step 2, TokenRouter and EAB proxy addresses
 - Routes, deposit/withdrawal/rebase flags (`autoRouteEnabled=false`)
 - If native routing is included: existing native bridge/custody and external
@@ -169,8 +169,9 @@ explorer verification.
 Testnet and production use separate accounts, keys, Safe, contracts, services,
 and data directories.
 
-Infra provisions five `ECC_SECG_P256K1` / `SIGN_VERIFY` keys (proposer,
-executor, three verifiers) per eab-infra. Runtime uses workload identity.
+Infra provisions one `ECC_SECG_P256K1` / `SIGN_VERIFY` key for the proposer, one
+for the executor and one per verifier: five keys on testnet or seven in
+production. Runtime uses workload identity.
 Each verifier has its own role, key, RPCs, and STRATO attestor.
 
 Before submitting STRATO deployment or governance transactions, fund each
@@ -437,7 +438,8 @@ vouchers or USDST; Coordinator records the balance checks.
    canary. Confirm the network's current fee schedule; at 0.01 USDST per contract
    call, 1 USDST covers 100 calls. Check voucher coverage using the network's
    voucher fee rate separately.
-5. Assign an owner to monitor and replenish **all five** STRATO accounts. Fund
+5. Assign an owner to monitor and replenish the operator, relayer and every
+   verifier attestor: five STRATO accounts on testnet or seven in production. Fund
    the external executor with external-chain native gas separately. KMS keys
    and AWS permissions do not provide STRATO transaction fees.
 
@@ -461,9 +463,9 @@ Coordinator never receives verifier tokens.
 
 Return only `BRIDGE_HEALTH_URL`. Coordinator adds it to `coordinator.env`.
 
-Gate: three `/health` responses with matching chain/vault/index/signer/attestor,
-policy digest, shared baseline hash, `verificationRpcHostCount >= 2`; Runtime
-`status: true`.
+Gate: every configured verifier `/health` response has the matching
+chain/vault/index/signer/attestor, policy digest, shared baseline hash and
+`verificationRpcHostCount >= 2`; Runtime `status: true`.
 
 For a runtime also processing native traffic, preserve its native configuration
 and persistent cursor when rendering the EAB templates. Add the native settings
@@ -494,9 +496,10 @@ an EAB `DONE` status does not prove native routing is configured.
 
 ## 8. Activate and canary
 
-Confirm the five STRATO fee-balance checks from step 6 are recorded and still
-sufficient before executing activation. Do not activate with an unfunded
-relayer or verifier attestor, even if every `/health` response passes.
+Confirm the operator, relayer and every verifier attestor fee-balance check from
+step 6 is recorded and still sufficient before executing activation. Do not
+activate with an unfunded relayer or verifier attestor, even if every `/health`
+response passes.
 
 ### Backend configuration gate
 
@@ -799,7 +802,7 @@ enforced. Disabling deposits for the route still blocks both outcomes.
 2. Upgrade the existing STRATO EAB proxy with the usual AdminRegistry approvals.
    Verify `attestDepositFallback` and `getDepositFallbackDigest` are present.
    Existing full-settlement digests are unchanged; fallback uses a separate domain.
-3. Deploy the matching image to all three verifiers, one at a time, checking health
+3. Deploy the matching image to every verifier, one at a time, checking health
    after each. Then deploy and start the matching bridge runtime. Do not resume
    intake with mixed service versions: older runtimes do not understand fallback-only
    responses, and older contracts cannot consume fallback attestations.

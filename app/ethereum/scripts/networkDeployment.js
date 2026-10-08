@@ -57,9 +57,24 @@ function buildCommand(action, network, args = []) {
   throw new Error("Use deploy-external|deploy-proxy|deploy-implementation|verify");
 }
 
+function environmentExports(network) {
+  return [
+    `export TARGET_NETWORK=${network.name}`,
+    `export TARGET_CHAIN_ID=${network.chainId}`,
+    `export TARGET_RPC_ENV=${network.rpcEnv}`,
+    `export VERIFIER_COUNT=${network.verifierCount}`,
+    `export VERIFIER_THRESHOLD=${network.verifierThreshold}`,
+  ].join("\n");
+}
+
 function main() {
   const [action, ...args] = process.argv.slice(2);
   const network = selectNetwork();
+  if (action === "environment") {
+    if (args.length) throw new Error("environment does not accept command arguments");
+    console.log(environmentExports(network));
+    return;
+  }
   const invocation = buildCommand(action, network, args);
   console.log(`network=${network.name} chainId=${network.chainId} environment=${network.production ? "prod" : "testnet"}`);
   const result = spawnSync(invocation.command, invocation.args, {
@@ -80,4 +95,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { selectNetwork, buildCommand };
+module.exports = { selectNetwork, buildCommand, environmentExports };

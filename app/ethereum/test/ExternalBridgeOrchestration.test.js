@@ -13,6 +13,7 @@ const {
   normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, fetchLiveAdminVoteCounts,
   vote, activate, inspect, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary,
 } = require("../scripts/externalBridgeRollout");
+const { NETWORKS } = require("../scripts/lib/externalBridgeNetworks");
 const { verifyUninitializedProxy } = require("../../contracts/deploy/external-bridge-verification");
 
 const addr = (digit) => `0x${digit.repeat(40)}`;
@@ -480,22 +481,31 @@ test("setup supports each deployment persona", () => {
     "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]), /setup requires --role/);
 });
 
-test("Safe proposer remains a delegate while testnet may retain threshold one", () => {
-  const context = {
-    rollout: { chainId: 11155111 },
-    deployment: { production: false },
-    manifest: {
-      authorizationSigners: [addr("3"), addr("4"), addr("5")],
-      services: { safeProposerAddress: addr("1"), executorAddress: addr("2") },
-    },
-  };
-  assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 1n).threshold, "1");
-  assert.throws(() => validateSafeRuntimeIdentities(context, [addr("1")], 1n), /exclude the proposer/);
-  context.rollout.chainId = 1;
-  context.deployment.production = true;
-  context.manifest.authorizationSigners.push(addr("7"), addr("8"));
-  assert.throws(() => validateSafeRuntimeIdentities(context, [addr("6")], 1n), /at least 2/);
-  assert.equal(validateSafeRuntimeIdentities(context, [addr("6")], 2n).threshold, "2");
+test("every supported network enforces its Safe and KMS identity gate", () => {
+  for (const network of NETWORKS) {
+    const context = {
+      rollout: { chainId: network.chainId },
+      deployment: { production: network.production },
+      manifest: {
+        authorizationSigners: Array.from({ length: network.verifierCount }, (_, index) => addr(String(index + 3))),
+        services: { safeProposerAddress: addr("1"), executorAddress: addr("2") },
+      },
+    };
+    const threshold = network.production ? 2n : 1n;
+    assert.equal(validateSafeRuntimeIdentities(context, [addr("9")], threshold).threshold, String(threshold));
+    assert.throws(() => validateSafeRuntimeIdentities(context, [addr("1")], threshold), /exclude the proposer/);
+    context.manifest.authorizationSigners.pop();
+    assert.throws(() => validateSafeRuntimeIdentities(context, [addr("9")], threshold), /distinct proposer, executor and verifier/);
+    if (network.production) {
+      assert.throws(() => validateSafeRuntimeIdentities({
+        ...context,
+        manifest: {
+          ...context.manifest,
+          authorizationSigners: Array.from({ length: network.verifierCount }, (_, index) => addr(String(index + 3))),
+        },
+      }, [addr("9")], 1n), /at least 2/);
+    }
+  }
 });
 
 test("STRATO OAuth credentials resolve a transient access token", async (t) => {
