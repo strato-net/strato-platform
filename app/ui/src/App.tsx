@@ -167,7 +167,7 @@ const App = () => {
       const isProduction = networkName === "upquark";
       const baseChains = isProduction
         ? [mainnet, polygon, base, linea, robinhood, hyperEvm]
-        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet, hyperEvm];
+        : [sepolia, baseSepolia, lineaSepolia, robinhoodTestnet];
       const proxiedChainIds: Set<number> = new Set(baseChains.filter(c => c.id !== polygon.id).map(c => c.id));
       const chains = stratoChain ? [...baseChains, stratoChain] : baseChains;
       const transports: Record<number, Transport> = Object.fromEntries(

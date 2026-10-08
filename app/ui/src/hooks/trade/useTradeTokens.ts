@@ -9,7 +9,7 @@ import { getTokenConfig } from "@/lib/bridge/contractService";
 import { metalForgeService } from "@/services/metalForgeService";
 import type { NetworkSummary, TradeBridgeCatalog } from "@/lib/bridge/types";
 export type { TradeBridgeCatalog } from "@/lib/bridge/types";
-import { BRIDGE_SCOPES } from "@/lib/bridge/constants";
+import { BRIDGE_NETWORK_NAMES, BRIDGE_SCOPES } from "@/lib/bridge/constants";
 import { USDST_BALANCE_REFRESH_MS } from "@/lib/constants";
 
 /**
@@ -37,15 +37,6 @@ export function useFeeBalancesReady(): boolean {
   const feeBalancesReady = !!userAddress && feeBalanceOwner === userAddress && !usdstBalanceError;
   return feeBalancesReady;
 }
-
-const TRADE_NETWORK_NAMES: Record<string, string> = {
-  "1": "Ethereum Mainnet",
-  "11155111": "Ethereum Sepolia",
-  "8453": "Base",
-  "84532": "Base Sepolia",
-  "59144": "Linea",
-  "59141": "Linea Sepolia",
-};
 
 /** All tokens tradable on any pool (V2, stable, or V3). */
 export function useTradeTokens() {
@@ -102,7 +93,7 @@ export function useTradeBridgeCatalog(): TradeBridgeCatalog {
         .map((config): NetworkSummary => ({
           chainId: config.externalChainId.toString(),
           chainName:
-            TRADE_NETWORK_NAMES[config.externalChainId.toString()] ||
+            BRIDGE_NETWORK_NAMES[Number(config.externalChainId)] ||
             config.chainInfo.chainName,
           enabled: config.chainInfo.enabled,
           depositRouter: config.chainInfo.depositRouter,

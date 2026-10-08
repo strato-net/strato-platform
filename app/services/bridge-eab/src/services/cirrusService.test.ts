@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 for (const name of [
   "BA_USERNAME", "BA_PASSWORD", "CLIENT_SECRET", "CLIENT_ID", "OPENID_DISCOVERY_URL",
@@ -70,6 +72,51 @@ async function mockCirrus(t: any, tables: Record<string, any[]>, cap = 3) {
   });
   return calls;
 }
+
+test("loads enabled native-gas deposit chains from the zero-address route", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getNativeGasDepositChainIds } = await import("./cirrusService");
+  t.mock.method(cirrus, "get", async (url: string, { params }: any) => {
+    assert.equal(url, `${external}-routes`);
+    assert.equal(params.key, `eq.${"0".repeat(40)}`);
+    assert.equal(params["value->>depositsEnabled"], "eq.true");
+    assert.equal(params.select, "key2");
+    return [{ key2: "1" }, { key2: "8453" }];
+  });
+  assert.deepEqual(
+    [...await getNativeGasDepositChainIds()],
+    [1, 8453],
+  );
+});
+
+test("runtime compose exposes complete EAB and native settings for every supported chain", () => {
+  const compose = readFileSync(
+    resolve(process.cwd(), "../../../docker-compose.bridge-eab.tpl.yml"),
+    "utf8",
+  );
+  const suffixes = [
+    "RPC_URL",
+    "WS_RPC_URL",
+    "VERIFICATION_RPC_URLS",
+    "DEPOSIT_CONFIRMATIONS",
+    "EXTERNAL_BRIDGE_EXECUTOR_ADDRESS",
+    "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID",
+    "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION",
+    "EXTERNAL_BRIDGE_VERIFIER_URLS",
+    "EXTERNAL_BRIDGE_VERIFIER_API_TOKENS",
+    "NATIVE_REPRESENTATION_BRIDGE_ADDRESS",
+    "NATIVE_MINT_EXECUTOR_ADDRESS",
+    "NATIVE_MINT_EXECUTOR_KMS_KEY_ID",
+    "NATIVE_MINT_EXECUTOR_KMS_REGION",
+    "NATIVE_VERIFIER_URLS",
+    "NATIVE_VERIFIER_API_TOKENS",
+  ];
+  for (const chainId of [1, 11155111, 59141, 59144, 8453, 84532, 4663, 46630, 999]) {
+    for (const suffix of suffixes) {
+      assert.match(compose, new RegExp(`CHAIN_${chainId}_${suffix}=\\$\\{CHAIN_${chainId}_${suffix}\\}`));
+    }
+  }
+});
 
 test("email token metadata batches and paginates, retaining precision without guessing malformed decimals", async t => {
   const { cirrus } = await import("../utils/api");

@@ -113,12 +113,14 @@ const ethTracePair = (
   {
     type: "call",
     traceAddress: [traceIndex],
-    action: { from: depositSender, to: depositRouter, value: ethers.toBeHex(value) },
+    action: { callType: "call", from: depositSender, to: depositRouter, value: ethers.toBeHex(value) },
+    result: {},
   },
   {
     type: "call",
     traceAddress: [traceIndex, 0],
-    action: { from: depositRouter, to: custodyAddress, value: ethers.toBeHex(value) },
+    action: { callType: "call", from: depositRouter, to: custodyAddress, value: ethers.toBeHex(value) },
+    result: {},
   },
 ];
 
@@ -882,6 +884,49 @@ test("bounds trace batches and continues after a batch transport failure", async
   assert.deepEqual(results.get(hashes.at(-1)!), ethTracePair(0));
 });
 
+test("normalizes callTracer fallback before comparing trace providers", async (t) => {
+  process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  const rpcKey = `CHAIN_${chainId}_VERIFICATION_RPC_URLS`;
+  const old = process.env[rpcKey];
+  process.env[rpcKey] = "https://secondary-rpc";
+  t.after(() => { if (old === undefined) delete process.env[rpcKey]; else process.env[rpcKey] = old; });
+  const hash = ethers.toBeHex(42, 32);
+  const call = {
+    type: "CALL",
+    from: sender,
+    to: depositRouter,
+    value: "0x1",
+    input: "0x",
+    output: "0x",
+  };
+  const { fetch } = await import("../utils/api");
+  t.mock.method(fetch, "post", async (url: string, requests: any[]) =>
+    requests.map((request) => {
+      if (request.method === "debug_traceTransaction") {
+        return { id: request.id, result: call };
+      }
+      if (url.includes("secondary")) {
+        return { id: request.id, error: { code: -32601, message: "method not found" } };
+      }
+      return { id: request.id, result: [{
+        type: "call",
+        traceAddress: [],
+        action: {
+          callType: "call",
+          from: call.from,
+          to: call.to,
+          value: call.value,
+          input: call.input,
+        },
+        result: { output: call.output },
+      }] };
+    }));
+  const { getInternalTransactionsBatch } = await import("./rpcService");
+  const result = (await getInternalTransactionsBatch(chainId, [hash])).get(hash);
+  assert.ok(Array.isArray(result));
+  assert.equal(result[0].traceAddress.length, 0);
+});
+
 test("startup checks real mined transaction traces on every RPC and skips empty blocks", async (t) => {
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const rpcKey = `CHAIN_${chainId}_VERIFICATION_RPC_URLS`;
@@ -907,6 +952,41 @@ test("startup checks real mined transaction traces on every RPC and skips empty 
   });
   await validateVerificationRpcEndpoints(chainId);
   assert.deepEqual(traced.sort(), ["https://primary-rpc", "https://secondary-rpc"]);
+});
+
+test("startup accepts callTracer fallback and can skip trace probing", async (t) => {
+  process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  const rpcKey = `CHAIN_${chainId}_VERIFICATION_RPC_URLS`;
+  const old = process.env[rpcKey];
+  process.env[rpcKey] = "https://secondary-rpc";
+  t.after(() => { if (old === undefined) delete process.env[rpcKey]; else process.env[rpcKey] = old; });
+  const { fetch } = await import("../utils/api");
+  let blocks = 0;
+  t.mock.method(fetch, "post", async (_url: string, request: any) => {
+    if (request.method === "eth_chainId") return { result: ethers.toBeHex(chainId) };
+    if (request.method === "eth_getBlockByNumber") {
+      blocks++;
+      return { result: { transactions: [ethers.toBeHex(1, 32)] } };
+    }
+    if (request.method === "trace_transaction") {
+      return { error: { code: -32601, message: "method not found" } };
+    }
+    assert.equal(request.method, "debug_traceTransaction");
+    return { result: {
+      type: "CALL",
+      from: sender,
+      to: depositRouter,
+      value: "0x1",
+      input: "0x",
+      output: "0x",
+    } };
+  });
+  const { validateVerificationRpcEndpoints } = await import("./rpcService");
+  await validateVerificationRpcEndpoints(chainId);
+  assert.equal(blocks, 2);
+  blocks = 0;
+  await validateVerificationRpcEndpoints(chainId, false);
+  assert.equal(blocks, 0);
 });
 
 for (const failure of ["unsupported", "empty", "malformed", "transport", "no-transactions"]) {

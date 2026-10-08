@@ -1,4 +1,10 @@
-import { receiptFingerprint, traceFingerprint, sanitizeRpcError } from "../utils/rpcEvidence";
+import {
+  normalizeCallTracerResult,
+  normalizeParityTraces,
+  receiptFingerprint,
+  traceFingerprint,
+  sanitizeRpcError,
+} from "../utils/rpcEvidence";
 export { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
 import { JsonRpcProvider } from "ethers";
 import { fetch } from "../utils/api";
@@ -180,28 +186,73 @@ export const getInternalTransactionsBatch = async (
         params: [ensureHexPrefix(hash)],
       }));
       try {
-        const response: any = await fetch.post(url, requests);
+        let response: any = await fetch.post(url, requests);
+        const fallbackIds = new Set<number>();
         if (!Array.isArray(response)) {
-          throw new Error(`Invalid trace RPC response${response?.error ? ` code=${Number(response.error.code)} message=${sanitizeRpcError(response.error.message, url)}` : ""}`);
+          if (Number(response?.error?.code) === -32601) {
+            fallbackIds.clear();
+            batch.forEach((_hash, index) => fallbackIds.add(index + 1));
+            response = [];
+          } else {
+            throw new Error(`Invalid trace RPC response${response?.error ? ` code=${Number(response.error.code)} message=${sanitizeRpcError(response.error.message, url)}` : ""}`);
+          }
         }
+        const seenIds = new Set<number>();
         for (const item of response) {
           const index = Number(item?.id) - 1;
           if (!Number.isInteger(index) || index < 0 || index >= batch.length) continue;
           const hash = batch[index];
           const txContext = `${context} tx=${hash}`;
-          if (results.has(hash)) {
+          if (seenIds.has(index + 1)) {
+            fallbackIds.delete(index + 1);
             results.set(hash, new Error(`${txContext}: Duplicate trace RPC response`));
+          } else if (Number(item?.error?.code) === -32601) {
+            fallbackIds.add(index + 1);
           } else if (item.error) {
             results.set(hash, new Error(`${txContext}: Trace RPC failed code=${Number(item.error.code)} message=${sanitizeRpcError(item.error.message, url)}`));
-          } else if (!Array.isArray(item.result) || item.result.length === 0) {
-            results.set(hash, new Error(`${txContext}: Missing or invalid trace RPC result`));
           } else {
             try {
-              traceFingerprint(item.result);
-              results.set(hash, item.result);
+              const traces = normalizeParityTraces(item.result);
+              if (!traces.length) throw new Error("Empty trace");
+              results.set(hash, traces);
             } catch {
               results.set(hash, new Error(`${txContext}: Invalid trace RPC evidence`));
             }
+          }
+          seenIds.add(index + 1);
+        }
+        if (fallbackIds.size) {
+          const fallbackRequests = requests
+            .filter((request) => fallbackIds.has(request.id))
+            .map((request) => ({
+              ...request,
+              method: "debug_traceTransaction",
+              params: [request.params[0], { tracer: "callTracer" }],
+            }));
+          const fallbackResponse: any = await fetch.post(url, fallbackRequests);
+          if (!Array.isArray(fallbackResponse)) {
+            throw new Error(`Invalid callTracer RPC response${fallbackResponse?.error ? ` code=${Number(fallbackResponse.error.code)} message=${sanitizeRpcError(fallbackResponse.error.message, url)}` : ""}`);
+          }
+          const fallbackSeen = new Set<number>();
+          for (const item of fallbackResponse) {
+            const index = Number(item?.id) - 1;
+            if (!fallbackIds.has(index + 1)) continue;
+            const hash = batch[index];
+            const txContext = `${context} tx=${hash}`;
+            if (fallbackSeen.has(index + 1)) {
+              results.set(hash, new Error(`${txContext}: Duplicate callTracer RPC response`));
+            } else if (item.error) {
+              results.set(hash, new Error(`${txContext}: callTracer RPC failed code=${Number(item.error.code)} message=${sanitizeRpcError(item.error.message, url)}`));
+            } else {
+              try {
+                const traces = normalizeCallTracerResult(item.result);
+                if (!traces.length) throw new Error("Empty trace");
+                results.set(hash, traces);
+              } catch {
+                results.set(hash, new Error(`${txContext}: Invalid callTracer RPC evidence`));
+              }
+            }
+            fallbackSeen.add(index + 1);
           }
         }
         for (const hash of batch) {
@@ -240,7 +291,10 @@ export const isChainConfigured = (chainId: number): boolean => {
   }
 };
 
-export const validateVerificationRpcEndpoints = async (chainId: number): Promise<void> => {
+export const validateVerificationRpcEndpoints = async (
+  chainId: number,
+  requireTrace = true,
+): Promise<void> => {
   const urls = getChainRpcUrls(chainId);
   if (new Set(urls.map((url) => new URL(url).hostname)).size < 2) {
     throw new Error("At least two distinct verification RPC hosts are required");
@@ -250,6 +304,7 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
     try {
       const result: any = await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] });
       if (result.error || BigInt(result.result) !== BigInt(chainId)) throw new Error("Verification RPC chain ID mismatch");
+      if (!requireTrace) return;
       let block = unwrapRpcResult(await fetch.post(url, {
         jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false],
       }), "eth_getBlockByNumber", chainId);
@@ -260,11 +315,20 @@ export const validateVerificationRpcEndpoints = async (chainId: number): Promise
             ).slice(0, TRACE_RPC_PROBE_TRANSACTIONS_PER_BLOCK)
           : [];
         for (const hash of hashes) {
-          const traces = unwrapRpcResult(await fetch.post(url, {
+          const parityResponse: any = await fetch.post(url, {
             jsonrpc: "2.0", id: 1, method: "trace_transaction", params: [hash],
-          }), "trace_transaction", chainId);
-          if (traces == null) continue;
-          if (!Array.isArray(traces)) throw new Error("Invalid trace_transaction response");
+          });
+          if (parityResponse?.result == null && !parityResponse?.error) continue;
+          const traces = Number(parityResponse?.error?.code) === -32601
+            ? normalizeCallTracerResult(unwrapRpcResult(await fetch.post(url, {
+                jsonrpc: "2.0", id: 1, method: "debug_traceTransaction",
+                params: [hash, { tracer: "callTracer" }],
+              }), "debug_traceTransaction", chainId))
+            : normalizeParityTraces(unwrapRpcResult(
+                parityResponse,
+                "trace_transaction",
+                chainId,
+              ));
           if (traces.length === 0) continue;
           traceFingerprint(traces);
           return;

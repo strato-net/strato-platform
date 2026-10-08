@@ -1,7 +1,7 @@
 import { decodeErrorResult } from "viem";
 import { message } from "antd";
 import { WAD } from "@/lib/constants";
-import { ExternalBridgeStatus, BRIDGE_SCOPES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
+import { ExternalBridgeStatus, BRIDGE_SCOPES, BRIDGE_NETWORK_NAMES, DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS, EXTERNAL_BRIDGE_STATUS_LABELS, EXTERNAL_DEPOSIT_REVIEW_STATUS_LABELS, LEGACY_BRIDGE_STATUS_LABELS, UNKNOWN_BRIDGE_STATUS, LEGACY_DEPOSIT_ON_HOLD } from "./constants";
 import type { BridgeToken, CompositeRouteQuoteResponse, BridgeTransaction, BridgeReviewItem } from "@strato/shared-types";
 import { AutoRouteQuoteBinding, BridgeError, WithdrawalPreview } from "./types";
 
@@ -280,6 +280,10 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://basescan.org/tx/${txHash}`;
     case 84532: // Base Sepolia
       return `https://sepolia.basescan.org/tx/${txHash}`;
+    case 59144: // Linea
+      return `https://lineascan.build/tx/${txHash}`;
+    case 59141: // Linea Sepolia
+      return `https://sepolia.lineascan.build/tx/${txHash}`;
     case 42161: // Arbitrum
       return `https://arbiscan.io/tx/${txHash}`;
     case 56: // BSC
@@ -301,9 +305,10 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
  * Gets chain name from chain ID (supports both number and string)
  */
 export function getChainName(chainId: number | string): string {
-  const chainEntries = Object.entries(SUPPORTED_CHAINS);
-  const chainEntry = chainEntries.find(([_, id]) => String(id) === String(chainId));
-  return chainEntry ? chainEntry[0] : "Unknown Chain";
+  const id = Number(chainId);
+  return BRIDGE_NETWORK_NAMES[id] ||
+    Object.entries(SUPPORTED_CHAINS).find(([, value]) => value === id)?.[0] ||
+    "Unknown Chain";
 }
 
 /**
@@ -357,7 +362,7 @@ export const CHAIN_OPTIONS = [
   { value: null, label: "All Chains" },
   ...Object.entries(SUPPORTED_CHAINS).map(([name, id]) => ({
     value: id,
-    label: name,
+    label: BRIDGE_NETWORK_NAMES[id] || name,
   })),
 ];
 

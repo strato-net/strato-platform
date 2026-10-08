@@ -315,6 +315,18 @@ export const SUPPORTED_CHAINS = {
   HYPEREVM: 999,
 } as const;
 
+export const BRIDGE_NETWORK_NAMES: Record<number, string> = {
+  [SUPPORTED_CHAINS.MAINNET]: "Ethereum Mainnet",
+  [SUPPORTED_CHAINS.SEPOLIA]: "Ethereum Sepolia",
+  [SUPPORTED_CHAINS.BASE]: "Base",
+  [SUPPORTED_CHAINS.BASE_SEPOLIA]: "Base Sepolia",
+  [SUPPORTED_CHAINS.LINEA]: "Linea",
+  [SUPPORTED_CHAINS.LINEA_SEPOLIA]: "Linea Sepolia",
+  [SUPPORTED_CHAINS.ROBINHOOD]: "Robinhood Chain",
+  [SUPPORTED_CHAINS.ROBINHOOD_TESTNET]: "Robinhood Chain Testnet",
+  [SUPPORTED_CHAINS.HYPEREVM]: "HyperEVM",
+};
+
 /** Robinhood Chain mainnet — not in viem/chains; used by wagmi + resolveViemChain */
 export const robinhood = defineChain({
   id: SUPPORTED_CHAINS.ROBINHOOD,

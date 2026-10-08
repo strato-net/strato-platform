@@ -8,6 +8,7 @@ import { Contract, id, JsonRpcProvider, ZeroHash } from "ethers";
 import {
   getEnabledChains,
   getEnabledNativeChainIds,
+  getNativeGasDepositChainIds,
   getNativeRepresentationTokens,
   getSettlementVerifierConfig,
   getTokenRouterWiring,
@@ -425,6 +426,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
   if (oauthInitialized) {
     try {
       const enabledChainsArr = Array.from((await getEnabledChains()).values());
+      const nativeGasDepositChainIds = await getNativeGasDepositChainIds();
       const missingChainRpcUrls: string[] = [];
 
       for (const chainInfo of enabledChainsArr) {
@@ -440,7 +442,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
         } else {
           // Test RPC URL accessibility
           try {
-            await validateVerificationRpcEndpoints(externalChainId);
+            await validateVerificationRpcEndpoints(
+              externalChainId,
+              nativeGasDepositChainIds.has(externalChainId),
+            );
           } catch (error) {
             errors.push(
               `RPC URL for chain ${externalChainId} is not accessible: ${(error as Error).message}`,

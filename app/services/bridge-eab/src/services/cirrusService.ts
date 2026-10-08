@@ -140,6 +140,21 @@ export const getEnabledChains = async (): Promise<Map<number, ChainInfo>> => {
   );
 };
 
+export const getNativeGasDepositChainIds = async (): Promise<Set<number>> => {
+  const data = await cirrus.get(`/${EXTERNAL_ASSET_BRIDGE_URL}-routes`, {
+    params: {
+      key: `eq.${"0".repeat(40)}`,
+      "value->>depositsEnabled": "eq.true",
+      address: `eq.${externalAssetBridgeAddress}`,
+      select: "key2",
+    },
+  });
+  if (!Array.isArray(data)) {
+    throw new Error("Invalid native-gas route response");
+  }
+  return new Set(data.map(({ key2 }) => Number(key2)).filter(Number.isSafeInteger));
+};
+
 // Get asset info by external token addresses
 export const getAssetInfo = async (
   externalTokenAddress: NonEmptyArray<string>,

@@ -1,5 +1,10 @@
 import { JsonRpcProvider, Network } from "ethers";
-import { receiptFingerprint, traceFingerprint } from "../utils/rpcEvidence";
+import {
+  normalizeCallTracerResult,
+  normalizeParityTraces,
+  receiptFingerprint,
+  traceFingerprint,
+} from "../utils/rpcEvidence";
 
 const canonical = (value: any): string => JSON.stringify(value, (_key, item) => {
   if (typeof item === "string" && item.startsWith("0x")) return item.toLowerCase();
@@ -50,7 +55,23 @@ export class ConsensusProvider extends JsonRpcProvider {
       params = [...params];
       params[method === "eth_call" ? 1 : 0] = head;
     }
-    const results = await Promise.all(this.peers.map((peer) => peer.send(method, params)));
+    const results = await Promise.all(this.peers.map(async (peer) => {
+      if (method !== "trace_transaction" || !Array.isArray(params)) {
+        return peer.send(method, params);
+      }
+      try {
+        return normalizeParityTraces(await peer.send(method, params));
+      } catch (traceError) {
+        try {
+          return normalizeCallTracerResult(await peer.send(
+            "debug_traceTransaction",
+            [params[0], { tracer: "callTracer" }],
+          ));
+        } catch {
+          throw traceError;
+        }
+      }
+    }));
     // Use the slowest head for confirmation counts; receipts and block hashes still require agreement.
     if (method === "eth_blockNumber") {
       return `0x${results.map(BigInt).reduce((a, b) => a < b ? a : b).toString(16)}`;
