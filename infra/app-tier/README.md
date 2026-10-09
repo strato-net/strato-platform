@@ -61,9 +61,7 @@ is set (with `historyDatabasePort`, `historyDatabaseUser`,
 cluster to the service); that is one cluster to run and the history writes
 are small. Without it the stack creates an Aurora Serverless v2 cluster of
 its own (0.5 to 8 ACU), which is the place to move to if chart queries show
-in the chain replicas' metrics. The service feeds from the Cirrus poller;
-add `-c busBootstrap=host:port -c busSecretName=...` to also consume
-`chain_events` from the message bus.
+in the chain replicas' metrics. The service feeds from the Cirrus poller.
 
 Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens them to its task security group at deploy time; otherwise allow the output `TaskSecurityGroupId` by hand.
 

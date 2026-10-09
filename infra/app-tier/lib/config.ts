@@ -72,17 +72,11 @@ export interface AppTierConfig {
    * a `history` database on an existing Postgres cluster when
    * `historyDatabaseHost` is given (the chain's Aurora cluster: one cluster
    * to run, and the writes are small), else in an Aurora Serverless cluster
-   * of its own. `busBootstrap` is host:port of the message bus (omit it to
-   * feed from the Cirrus poller only); `busSecretName` a Secrets Manager JSON
-   * {username, password} SCRAM credential (the data-plane bus stack's
-   * AmazonMSK_ app secret).
+   * of its own. It feeds from the Cirrus poller.
    */
   history?: {
     image: string;
     desiredCount: number;
-    busBootstrap?: string;
-    busSecurity: string;
-    busSecretName?: string;
     /** An existing cluster to hold the history database; the secret is JSON with a "password" field. */
     database?: {
       host: string;
@@ -152,9 +146,6 @@ export function loadConfig(app: App): AppTierConfig {
       ? {
           image: ctx(app, "historyImage"),
           desiredCount: Number(ctx(app, "historyDesiredCount", "1")),
-          busBootstrap: optional(app, "busBootstrap"),
-          busSecurity: ctx(app, "busSecurity", "sasl_ssl"),
-          busSecretName: optional(app, "busSecretName"),
           database: optional(app, "historyDatabaseHost")
             ? {
                 host: ctx(app, "historyDatabaseHost"),

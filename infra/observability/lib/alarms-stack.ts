@@ -13,8 +13,8 @@ export interface AlarmsStackProps extends StackProps {
 
 /**
  * CloudWatch alarms on the managed services, which do not go through
- * Prometheus: Aurora, the load balancers, MSK consumer lag, and the core
- * cell hosts (EC2 status checks plus the CloudWatch agent's disk and memory).
+ * Prometheus: Aurora, the load balancers, and the core cell hosts (EC2
+ * status checks plus the CloudWatch agent's disk and memory).
  * Each group is created only when its identifier is configured.
  */
 export class AlarmsStack extends Stack {
@@ -93,42 +93,6 @@ export class AlarmsStack extends Stack {
         pages
       );
     });
-
-    // --- MSK: consumer lag on the ingest and egress groups ---
-    // Needs enhanced monitoring PER_TOPIC_PER_PARTITION on the cluster.
-    if (config.mskClusterName) {
-      config.mskConsumerGroups.forEach((group, i) => {
-        route(
-          new cloudwatch.Alarm(this, `MskLag${i}`, {
-            alarmName: `${name}-bus-lag-${group}`,
-            alarmDescription: `Consumer group ${group} is falling behind on the bus: transactions or events are not being consumed`,
-            metric: new cloudwatch.Metric({
-              namespace: "AWS/Kafka",
-              metricName: "SumOffsetLag",
-              dimensionsMap: { "Cluster Name": config.mskClusterName!, "Consumer Group": group },
-              statistic: "Maximum",
-              period: Duration.minutes(1),
-            }),
-            threshold: 1000,
-            comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-            evaluationPeriods: 5,
-            datapointsToAlarm: 5,
-          }),
-          pages
-        );
-      });
-      route(
-        new cloudwatch.Alarm(this, "MskUnderReplicated", {
-          alarmName: `${name}-bus-under-replicated`,
-          alarmDescription: "Under-replicated partitions on the bus: a broker is down or behind",
-          metric: new cloudwatch.Metric({ namespace: "AWS/Kafka", metricName: "UnderReplicatedPartitions", dimensionsMap: { "Cluster Name": config.mskClusterName }, statistic: "Maximum", period: Duration.minutes(1) }),
-          threshold: 0,
-          comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
-          evaluationPeriods: 5,
-        }),
-        warnings
-      );
-    }
 
     // --- Core cell hosts ---
     config.cellInstanceIds.forEach((instanceId) => {

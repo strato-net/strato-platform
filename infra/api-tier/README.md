@@ -9,17 +9,22 @@ session stickiness, and bloc's nonce counters are rows in the eth database's
 writer (`nonce_counter`), which every copy already shares.
 
 Data paths: eth reads go to the Aurora reader endpoint, writes and the
-resolve poll to the writer, Cirrus to the reader, and transactions and VM
-calls to the core node's VPC-facing Kafka listener (port 9094, enabled with
-`strato-setup --kafkaExternalHost=<private host>`).
+resolve poll to the writer, Cirrus to the reader, transactions to every core
+cell's ingress (`strato-ingest`, port 8600: a batch is posted to all of the
+cells so each one's mempool holds it, and succeeds once one accepts), and VM
+calls to vm-query. Every task runs a vm-query over the SQL mirror and
+publishes it to the other copies through ECS Service Connect
+(`vm-query:8546`), so a copy whose own instance is down or shedding uses
+another's. Nothing here calls a core cell's VM: what the mirror cannot
+answer (a non-latest block tag, `eth_getProof`, a block replay) is an error.
 
 ## Before deploying
 
 1. Images in ECR: `strato`, `nginx`, `postgrest`, and optionally `smd` and
    `apex` (`make docker`).
-2. The Aurora cluster (`data-plane`) and a core node with
-   `--kafkaExternalHost`, both allowing this stack's task security group
-   (output `TaskSecurityGroupId`) on 5432 and 9094 respectively.
+2. The Aurora cluster (`data-plane`) and the core cells, each admitting this
+   stack's task security group (output `TaskSecurityGroupId`): the cluster on
+   5432, the cells on 8600 (the core-cell app's `clientSecurityGroupIds`).
 3. Secrets Manager: the Aurora master secret (from the data-plane stack), the
    node's `secrets/oauth_credentials.yaml` contents as a plain-string secret,
    and a 64-character session secret. SSM Parameter Store: the node's
@@ -40,7 +45,7 @@ npx cdk deploy --all \
   -c stratoImage=<ecr>/strato:<tag> -c nginxImage=<ecr>/nginx:<tag> -c postgrestImage=<ecr>/postgrest:<tag> \
   -c smdImage=<ecr>/smd:<tag> -c apexImage=<ecr>/apex:<tag> \
   -c postgresWriterHost=<writer> -c postgresReaderHost=<reader> \
-  -c kafkaHost=<core private host> \
+  -c ingressUrls=http://<cell-a private DNS name>:8600,http://<cell-b private DNS name>:8600 \
   -c albCertificateArn=<cert> \
   -c hostedZoneId=Z123 -c domainName=node.testnet.example -c nodeIpAddresses=1.2.3.4 \
   -c apiTierWeight=10
@@ -60,7 +65,7 @@ Rolling back is the same weight going down. The node keeps serving until
 the weight is 100 and has been for a while; then re-set-up the node with
 `--role=core` at the next window.
 
-Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and `-c coreSecurityGroupId=<core cell SG>` and the stack opens them to its task security group at deploy time; otherwise allow the output `TaskSecurityGroupId` by hand.
+Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens it to its task security group at deploy time; `-c coreSecurityGroupId=<a core cell SG>` is for that cell's Prometheus (`prometheusHost`) and Grafana (`grafanaInstanceId`) ports. The cells' ingress is opened on the cell side (`clientSecurityGroupIds` in the core-cell app, the output `TaskSecurityGroupId`); otherwise allow it by hand.
 
 ## Hostname and certificate
 

@@ -13,7 +13,7 @@ export interface CoreCellConfig {
   availabilityZone?: string;
   instanceType: string;
   rootVolumeGiB: number;
-  /** Separate gp3 volume for the node directory: LevelDB, Kafka and Redis state, logs. */
+  /** Separate gp3 volume for the node directory: LevelDB, the JLog, Redis state, logs. */
   dataVolumeGiB: number;
   /** SSM public parameter naming the AMI. Default: Canonical's Ubuntu 24.04, the strato image's base. */
   amiParameter: string;
@@ -104,7 +104,7 @@ export interface CoreCellConfig {
   frontendLabels?: string;
   /** Who may reach the p2p port (30303 tcp/udp). */
   p2pCidrs: string[];
-  /** Security groups allowed on the cell's Kafka listener (9094) and its API ports: the API tier's task SG. */
+  /** Security groups allowed on the cell's transaction ingress (strato-ingest, 8600): the API tier's task SG. */
   clientSecurityGroupIds: string[];
   /** SSH from a bastion's security group, or nothing (SSM Session Manager always works). */
   sshSourceSecurityGroupId?: string;
@@ -115,13 +115,6 @@ export interface CoreCellConfig {
   /** Secrets Manager names the host may create or update (to publish the node's OAuth client credentials for the API and app tiers). */
   publishSecretNames: string[];
   terminationProtection: boolean;
-  /**
-   * The name this cell's broker advertises on its VPC-facing listener (9094). Default: the host's
-   * private DNS name, for clients that reach the cell directly. Behind the environment's load
-   * balancer (-c frontend=true) it must be the load balancer's name, or clients leave it after
-   * their first connection.
-   */
-  kafkaExternalHost?: string;
   /**
    * Watch the writer lease and take it when its holder stops heartbeating (`strato-lease-watch` on
    * the host), after `autoPromoteAfter` consecutive stale observations ten seconds apart. Off by
@@ -230,7 +223,6 @@ export function loadConfig(app: App): CoreCellConfig {
     prometheusWorkspaceArn: optional(app, "prometheusWorkspaceArn"),
     publishSecretNames: list(app, "publishSecretNames", ""),
     terminationProtection: bool(app, "terminationProtection", "true"),
-    kafkaExternalHost: optional(app, "kafkaExternalHost"),
     autoPromote: bool(app, "autoPromote", "false"),
     autoPromoteAfter: Number(ctx(app, "autoPromoteAfter", "3")),
     legacyLaunchTemplateName: bool(app, "legacyLaunchTemplateName", "false"),

@@ -387,7 +387,7 @@
     {
       "id": 1,
       "type": "nodeGraph",
-      "title": "Traffic flow (X-Ray service map): CloudFront / ALB, nginx, strato-api, bus, core, Aurora",
+      "title": "Traffic flow (X-Ray service map): CloudFront / ALB, nginx, strato-api, core, Aurora",
       "datasource": {
         "type": "grafana-x-ray-datasource",
         "uid": "${DS_XRAY}"
@@ -448,7 +448,7 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Transactions: submitted at the edge, forwarded by ingest, executed by the VM (per minute)",
+      "title": "Transactions: submitted at the edge, accepted by the cells' ingress, executed by the VM (per minute)",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -477,7 +477,7 @@
         },
         {
           "refId": "B",
-          "expr": "sum(rate(strato_ingest_forwarded_total{env=\"$env\"}[5m]))*60",
+          "expr": "sum(rate(strato_ingest_accepted_total{env=\"$env\"}[5m]))*60",
           "legendFormat": "{{__name__}}",
           "datasource": {
             "type": "prometheus",
