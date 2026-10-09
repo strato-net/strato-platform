@@ -521,7 +521,13 @@ runConsensus sb = do
     then emitOrCacheHistoricBlock sb
     -- Blockstanbul will check that the seals and validators match up before
     -- announcing it to the network or forwarding to the EVM.
-    else void . blockstanbulSend' $ UnannouncedBlock blk
+    else case sbOrigin sb of
+      TO.Quarry -> void . blockstanbulSend' $ UnannouncedBlock blk
+      -- Only this node's own VM builds candidates. An unsealed block from anywhere
+      -- else would be stamped, sealed and proposed as ours.
+      origin ->
+        $logWarnS "runConsensus" . T.pack $
+          "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
   ( MonadLogger m,

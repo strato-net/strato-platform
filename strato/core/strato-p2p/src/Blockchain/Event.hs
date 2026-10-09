@@ -50,7 +50,7 @@ import           Control.Monad
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify           hiding (awaitForever,
                                                         get, put, yield)
-import qualified Control.Monad.Change.Modify           as Mod (get, put)
+import qualified Control.Monad.Change.Modify           as Mod (get)
 import           Control.Monad.IO.Class
 import           Control.Monad.State
 import qualified Data.ByteString.Base16                as BC16
@@ -102,7 +102,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt Ping -> yieldR Pong
   MsgEvt (Transactions txs) -> do
     lift stampActionTimestamp
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    worldNumber <- lift worldBestNumber
     BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
     if worldNumber - myNumber > txGossipCatchupWindow
       then
@@ -122,8 +122,8 @@ handleEvents peer = awaitForever $ \case
     let header = blockHeader block'
     let num = blockHeaderBlockNumber header
     let parentHash' = blockHeaderParentHash header
-    lift . Mod.put (Proxy @WorldBestBlock) . WorldBestBlock $
-      BestBlock sha num
+    claimed <- lift peerBestNumber
+    when (num > claimed) . lift . claimPeerBest (pPeerHost peer) $ BestBlock sha num
     parentHeader <- lift $ lookup (Proxy @BlockHeader) parentHash'
     case parentHeader of
       Nothing -> do
@@ -189,6 +189,13 @@ handleEvents peer = awaitForever $ \case
 
     let headers = morphBlockHeader <$> bHeaders
 
+    -- Asked for headers and sent none: whatever height this peer claimed, it has
+    -- nothing for us, so stop treating it as ahead until it announces a block.
+    when (null headers) $ do
+      BestSequencedBlock myHash myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+      claimed <- lift peerBestNumber
+      when (claimed > myNumber) . lift . claimPeerBest (pPeerHost peer) $ BestBlock myHash myNumber
+
     bodyRequestAlreadyActive <- lift isBodyRequestActive
 
     lift $ addToHeaderCache headers
@@ -252,7 +259,7 @@ handleEvents peer = awaitForever $ \case
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    peerNumber <- lift peerBestNumber
 
     maybeFetchNumber <-
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
@@ -260,9 +267,9 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             lift $ setSyncTaskFinished (pPeerHost peer)
 
-            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show peerNumber
 
-            syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+            syncTask <- lift $ getNewSyncTask (pPeerHost peer) peerNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
             return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
           else do
@@ -278,7 +285,7 @@ handleEvents peer = awaitForever $ \case
       case maybeFetchNumber of
         Nothing ->
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
-        Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
+        Just fetchNumber | fetchNumber <= peerNumber -> syncFetch Forward fetchNumber
         _ -> do
           currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
@@ -329,7 +336,7 @@ handleEvents peer = awaitForever $ \case
   NewSeqEvent oe -> case oe of
     P2pBlock b -> do
       when (shouldSend peer $ obOrigin b) $ do
-        WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+        worldNumber <- lift worldBestNumber
         -- Debug: this fires once per (committed block x peer connection); a
         -- from-genesis sync logged 594k of these lines.
         $logDebugS "handleEvents/P2pBlock" . T.pack $ "World Number: " ++ show worldNumber
@@ -418,16 +425,16 @@ handleEvents peer = awaitForever $ \case
     P2pGetMPNodes srs -> yieldR $ GetMPNodes srs
     P2pMPNodesResponse o nds -> when (shouldRespond peer o) . yieldR $ MPNodes nds
   TimerEvt -> do
-    WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
+    peerNumber <- lift peerBestNumber
     BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let syncDone = if worldNumber >= 0 then Just (myNumber >= worldNumber) else Nothing
+    let syncDone = if peerNumber >= 0 then Just (myNumber >= peerNumber) else Nothing
     unless (syncDone == Just True) $ do
       maybeSyncTask <- lift $ getCurrentSyncTask $ pPeerHost peer
       case maybeSyncTask of
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do
-          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
-          maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show peerNumber
+          maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) peerNumber
           $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
           case maybeNewSyncTask of
             Nothing -> return ()

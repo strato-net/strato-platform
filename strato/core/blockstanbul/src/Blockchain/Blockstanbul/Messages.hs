@@ -237,15 +237,55 @@ outShortLog loc eoev = do
 
 instance NFData OutEvent
 
-getHash :: TrustedMessage -> B.ByteString
--- This is wrong, because this means that the prepare and commits
--- will have the same signature despite being different messages.
--- It also needs a code for the message type.
-getHash = \case
+messageView :: TrustedMessage -> View
+messageView = \case
+  Preprepare v _ -> v
+  Prepare v _ -> v
+  Commit v _ _ -> v
+  RoundChange v _ -> v
+
+-- | What a validator signs to authenticate a consensus message on the given
+-- network: a digest of the network, the message type, the view and the payload,
+-- so a signature is good for one message in one view on one network.
+--
+-- A PREPREPARE's payload is the block hash, which covers the header and through
+-- it the proposer seal. The body is tied to that header when the message is
+-- authorized (bodyMatchesHeader in Authentication). A COMMIT's seal is left out
+-- because it is checked on its own against the same sender.
+getHash :: Integer -> TrustedMessage -> B.ByteString
+getHash chainId tm
+  | toInteger (_sequence $ messageView tm) + 1 >= wholeMessageSigningBlock chainId =
+      keccak256ToByteString . hash . rlpSerialize . RLPArray $
+        RLPString "blockstanbul" : rlpEncode chainId : case tm of
+          Preprepare v blk -> [rlpEncode preprepareCode, rlpEncode v, rlpEncode (blockHash blk)]
+          Prepare v di -> [rlpEncode prepareCode, rlpEncode v, rlpEncode di]
+          Commit v di _ -> [rlpEncode commitCode, rlpEncode v, rlpEncode di]
+          RoundChange v n -> [rlpEncode roundchangeCode, rlpEncode v, rlpEncode n]
+  | otherwise = legacyHash tm
+
+-- | What was signed before 'wholeMessageSigningBlock': the block hash alone for
+-- PREPREPARE, PREPARE and COMMIT, and one constant for every ROUNDCHANGE. Neither
+-- covers the view or the message type, so a signature seen once could be attached
+-- to other messages: any validator's ROUNDCHANGE to a vote for any round, a
+-- PREPARE to a PREPREPARE or to another round's PREPARE.
+legacyHash :: TrustedMessage -> B.ByteString
+legacyHash = \case
   (Preprepare _ blk) -> keccak256ToByteString . blockHash $ blk
   (Prepare _ di) -> keccak256ToByteString di
   (Commit _ di _) -> keccak256ToByteString di
   (RoundChange _ _) -> keccak256ToByteString $ hash "TODO(tim): this signature is predictable"
+
+-- | First block whose consensus messages are signed with 'getHash''s digest rather
+-- than 'legacyHash'. Message signatures are not kept in blocks, so nothing is ever
+-- replayed against this, but validators that sign differently cannot authenticate
+-- each other: a network whose nodes are upgraded one by one needs a height by
+-- which every validator runs the new scheme. Keyed by network id; any other
+-- network signs whole messages from genesis.
+wholeMessageSigningBlock :: Integer -> Integer
+wholeMessageSigningBlock chainId
+  | chainId == 33056204878082667 = 1000000 -- upquark
+  | chainId == 114784819836269 = 1000000 -- helium
+  | otherwise = 0
 
 instance RLPSerializable View where
   rlpEncode (View r s) = RLPArray [rlpEncode r, rlpEncode s]

@@ -39,10 +39,10 @@ import Blockchain.Wiring ()
 import Blockchain.VMMetrics
 import Blockchain.EthConf (ethConf, networkConfig, quarryConfig)
 import qualified Blockchain.EthConf.Model as Conf
-import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs)
+import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs, prependConsensusDeltas)
 import Blockchain.Data.LogsBloom (bloomFromItems, emptyLogsBloom)
 import SolidVM.Model.Event (evContractAddress, evTopics)
-import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isFeeConsensusDeltaForkActive, isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
@@ -119,9 +119,13 @@ attachBlockRewards' ::
 attachBlockRewards' bd (Just rewardResult) (trr : rest)
   | isBlockRewardReceiptForkActive (number bd),
     Right er <- trrResult trr =
-      let merged = er { erEvents = erEvents rewardResult ++ erEvents er,
-                        erLogs = erLogs rewardResult ++ erLogs er
-                      }
+      let withEvents = er { erEvents = erEvents rewardResult ++ erEvents er,
+                            erLogs = erLogs rewardResult ++ erLogs er
+                          }
+          -- the reward call's validator and stake changes travel with its events
+          merged
+            | isFeeConsensusDeltaForkActive (number bd) = prependConsensusDeltas rewardResult withEvents
+            | otherwise = withEvents
        in (trr {trrResult = Right merged} : rest, Nothing)
 -- A run that produced transactions owns the block's first receipt, so nothing is
 -- owed onward: either the merge above happened, or this is a pre-fork block (or

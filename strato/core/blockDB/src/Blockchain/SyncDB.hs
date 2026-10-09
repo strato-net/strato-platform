@@ -18,7 +18,7 @@ module Blockchain.SyncDB
     forceBestBlockInfo,
     commonAncestorHelper,
     getWorldBestBlockInfo,
-    updateWorldBestBlockInfo,
+    putWorldBestBlockInfo,
     getSyncStatus,
     getSyncStatusNow,
     getCirrusBestBlockNumber,
@@ -46,7 +46,6 @@ import           Database.Esqueleto.Legacy
 import qualified Database.Persist.Sql                  as SQL
 import           Database.Redis                        (Redis, RedisCtx)
 import qualified Database.Redis                        as REDIS
-import           System.Random                         (randomIO)
 import qualified Text.Colors                           as CL
 import           Text.Format
 import           Text.RawString.QQ
@@ -174,49 +173,6 @@ getBestBlockInfo' key =
         where
           BestBlock sha num = fromValue bs
 
-releaseRedlockScript :: S8.ByteString
-releaseRedlockScript =
-  S8.pack . unlines $
-    [ "if redis.call(\"get\",KEYS[1]) == ARGV[1] then",
-      "    return redis.call(\"del\",KEYS[1])",
-      "else",
-      "    return 0",
-      "end "
-    ]
-
-worldBestBlockRedlockKey :: S8.ByteString
-worldBestBlockRedlockKey = "<worldbest_redlock>"
-{-# INLINE worldBestBlockRedlockKey #-}
-
-defaultRedlockTTL :: Int -- in milliseconds
-defaultRedlockTTL = 3000
-
-defaultRedlockBackoff :: Int -- in microseconds
-defaultRedlockBackoff = 100 {- ms -} * 1000 {- us/ms -}
-
-redisSetNXPX :: (RedisCtx m f) => S8.ByteString -> S8.ByteString -> Int -> m (f REDIS.Status)
-redisSetNXPX key value lockTTL = REDIS.sendRequest ["SET", key, value, "NX", "PX", S8.pack (show lockTTL)]
-
-acquireRedlock :: S8.ByteString -> Int -> Redis (Either REDIS.Reply S8.ByteString)
-acquireRedlock key lockTTL = do
-  random <- S8.pack . (show :: Integer -> String) <$> liftIO randomIO
-  reply <- redisSetNXPX key random lockTTL
-  return $ case reply of
-    Right REDIS.Ok -> Right random
-    Right (REDIS.Status "") -> Left $ REDIS.SingleLine "could not acquire the lock due to NX condition unmet"
-    Right (REDIS.Status s) -> Left . REDIS.SingleLine $ "Somehow got a nonempty status, which makes no fucking sense: " `S8.append` s
-    Right REDIS.Pong -> Left $ REDIS.SingleLine "Somehow got a \"PONG\", which makes no fucking sense."
-    Left err -> Left err
-
-releaseRedlock :: S8.ByteString -> S8.ByteString -> Redis (Either REDIS.Reply Bool)
-releaseRedlock key lock = REDIS.eval releaseRedlockScript [key] [lock]
-
-acquireWorldBestBlockRedlock :: Int -> Redis (Either REDIS.Reply S8.ByteString)
-acquireWorldBestBlockRedlock = acquireRedlock worldBestBlockRedlockKey
-
-releaseWorldBestBlockRedlock :: S8.ByteString -> Redis (Either REDIS.Reply Bool)
-releaseWorldBestBlockRedlock = releaseRedlock worldBestBlockRedlockKey
-
 worldBestBlockKey :: S8.ByteString
 worldBestBlockKey = "<worldbest>"
 {-# INLINE worldBestBlockKey #-}
@@ -224,48 +180,16 @@ worldBestBlockKey = "<worldbest>"
 getWorldBestBlockInfo :: Redis (Maybe BestBlock)
 getWorldBestBlockInfo = getBestBlockInfo' worldBestBlockKey
 
-updateWorldBestBlockInfo :: Keccak256 -> Integer -> Redis (Either REDIS.Reply Bool)
-updateWorldBestBlockInfo sha num = withRetryCount 0
-  where
-    withRetryCount :: Int -> Redis (Either REDIS.Reply Bool)
-    withRetryCount theRetryCount = do
-      maybeLockID <- acquireWorldBestBlockRedlock defaultRedlockTTL
-      case maybeLockID of
-        Left err -> do
-          when (theRetryCount /= 0 && theRetryCount `mod` 5 == 0) $ do
-            liftLog $ $logWarnS "updateWorldBestBlockInfo" . T.pack $ "Could not acquire redlock after " ++ show theRetryCount ++ " attempts, will retry; " ++ show err
-            liftIO $ threadDelay defaultRedlockBackoff -- todo make backoff a factor instead of a fixed backoff
-          withRetryCount $ theRetryCount + 1
-        Right lockID -> do
-          liftLog $ $logDebugS "updateWorldBestBlockInfo" "Acquired lock"
-          maybeExistingWBBI <- getWorldBestBlockInfo
-          case maybeExistingWBBI of
-            Nothing -> do
-              liftLog $ $logWarnS "updateWorldBestBlockInfo" "No WorldBestBlock in Redis, will force"
-              forceBestBlockInfo' worldBestBlockKey (BestBlock sha num) >>= \case
-                Right _ -> pure ()
-                Left err -> error $ "Failed to force world best block in Redis: " ++ show err
-              checkAndUpdateSyncStatus
-              releaseAndFinalize lockID True
-            Just (BestBlock _ oldNumber) -> do
-              liftLog $ $logDebugS "updateWorldBestBlockInfo" $ T.pack ("oldNumber = " ++ show oldNumber ++ "; newNumber = " ++ show num)
-              let willUpdate = oldNumber <= num
-              if willUpdate
-                then do
-                  liftLog $ $logDebugS "updateWorldBestBlockInfo" . T.pack $ "Updating best block: " ++ show num
-                  forceBestBlockInfo' worldBestBlockKey (BestBlock sha num) >>= \case
-                    Right _ -> pure ()
-                    Left err -> error $ "Failed to update world best block in Redis: " ++ show err
-                  checkAndUpdateSyncStatus
-                else liftLog $ $logDebugS "updateWorldBestBlockInfo" "Not updating"
-              releaseAndFinalize lockID willUpdate
-      where
-        releaseAndFinalize lockID didUpdate = do
-          didRelease <- releaseWorldBestBlockRedlock lockID
-          return $ case didRelease of
-            Right True -> Right didUpdate
-            Right False -> Left $ REDIS.SingleLine "Couldn't release redlock, it either expired or we had the wrong key"
-            err -> err
+-- | Record the best block the connected peers agree on. Unlike the node's own best
+-- block this is not a high-water mark: p2p recomputes it from the peers' current
+-- claims, so it also comes down when a peer that overstated its height is outvoted
+-- or disconnects.
+putWorldBestBlockInfo :: BestBlock -> Redis ()
+putWorldBestBlockInfo best = do
+  forceBestBlockInfo' worldBestBlockKey best >>= \case
+    Right _ -> pure ()
+    Left err -> error $ "Failed to update world best block in Redis: " ++ show err
+  checkAndUpdateSyncStatus
 
 -- Put this after any "best block" or "world best block" update.
 -- We can't put this in the update functions themselves since multiExec fudges things up

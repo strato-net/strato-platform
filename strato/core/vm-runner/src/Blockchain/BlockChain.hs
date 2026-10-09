@@ -51,7 +51,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive)
+import Blockchain.Forks (isFeeConsensusDeltaForkActive, isReceiptsRootForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -445,7 +445,11 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       Left failure -> pure (Left failure)
       Right feeResult -> do
         let combineA f x y = liftA2 f x y <|> x <|> y
-            attachFeeResult er = er
+            -- the fee payment's validator and stake changes are this transaction's too
+            attachFeeDeltas
+              | isFeeConsensusDeltaForkActive (number b) = prependConsensusDeltas feeResult
+              | otherwise = id
+            attachFeeResult er = attachFeeDeltas er
               { erAction = combineA (\era ->
                     (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
                   . (events %~ (_events era Seq.><))
