@@ -235,7 +235,11 @@ generateDockerCompose role = do
             , interval = Just "2s"
             , timeout = Just "2s"
             , retries = Just 10
-            , start_period = Nothing
+            -- A first boot runs initdb, which takes over a minute on a slow
+            -- bind mount (Docker Desktop); without a start_period the retry
+            -- budget is spent before it finishes, compose marks the container
+            -- unhealthy, `up` aborts and convoke exits with no process started.
+            , start_period = Just "90s"
             }
         , logging = noLogging
         , ports = Just ["127.0.0.1:5432:5432"]
