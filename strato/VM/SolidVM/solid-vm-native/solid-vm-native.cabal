@@ -12,14 +12,16 @@ extra-source-files:
     src/SolidVM/Compiler.inc
     src/SolidVM/BuiltinActions.inc
     src/SolidVM/HelperActions.inc
+    src/SolidVM/ActionCode.inc
+    src/SolidVM/IntegerActions.inc
 
 library
   exposed-modules:
       SolidVM.Core
+      SolidVM.Code
       SolidVM.Compile
       SolidVM.Source
       SolidVM.SourceCode
-      SolidVM.Quotation
       SolidVM.Gas
       SolidVM.Values
       SolidVM.Events
@@ -32,8 +34,7 @@ library
   other-modules:
       SolidVM.BuiltinQuotation
       SolidVM.BuiltinSource
-      SolidVM.Quotation.Execution
-      SolidVM.Quotation.Inspection
+      SolidVM.SourceTemplate
       Paths_solid_vm_native
   reexported-modules:
       solid-vm:Blockchain.SolidVM.SM

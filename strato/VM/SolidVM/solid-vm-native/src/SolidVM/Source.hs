@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -O0 #-}
+-- Optimizing embedded inspection syntax trees is costly and does not improve
+-- native execution. SolidVM.Compile retains the package's optimization level.
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, RankNTypes, ScopedTypeVariables,
              LambdaCase, OverloadedStrings, ExistentialQuantification, TupleSections, NamedFieldPuns, CPP, TemplateHaskell, TypeApplications #-}
 -- SolidVM source -> typed Haskell actions.  Typecheck and compile in one pass over the
@@ -11,6 +14,7 @@ import Control.Lens ((^.), (&), (.~))
 import Control.Monad
 import Control.Monad.Reader
 import Data.Bifunctor (first)
+import Data.Graph (SCC(..), stronglyConnComp)
 import Data.Decimal
 import Data.Bits
 import qualified Data.ByteString as B
@@ -33,7 +37,7 @@ import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StorageP
 import qualified SolidVM.Model.Type as Ty
 import SolidVM.Core hiding (Fun(..))
 import SolidVM.SourceCode
-import qualified SolidVM.Quotation.Inspection as Quotation
+import qualified SolidVM.SourceTemplate as SourceTemplate
 import qualified SolidVM.Builtins as Builtins
 import qualified Language.Haskell.TH as TH
 import qualified Language.Haskell.Exts as Haskell
@@ -41,12 +45,19 @@ import qualified Language.Haskell.TH.Syntax as TH (NameSpace(..))
 import qualified Control.Monad.State.Strict as State
 import Data.Data (Data, gmapT, gmapQ, gmapM)
 import qualified Data.Data as Data
-import Data.List (nub, sort)
+import Data.List (foldl', nub, sort)
 import Data.Char (isAlphaNum, toLower)
 import System.Mem.StableName
 import Control.Exception (evaluate)
 
 
+#define EMIT_BEGIN $(SourceTemplate.describe [|
+#define EMIT_END |])
+#define CAPTURE captureCode
+#define CAPTURE2 captureCode2
+#define CAPTURE3 captureCode3
+#define CAPTURE4 captureCode4
+#define CAPTURES captureCodes
 #include "Compiler.inc"
 
 instance ToSource ErrKind where
@@ -119,13 +130,60 @@ renderAccepted selection cc collection = do
       _ -> concat (gmapQ referencedNames x)
 renderDeclarations :: [TH.Dec] -> String
 renderDeclarations declarations =
-  let source = TH.pprint declarations
+  let source = TH.pprint (map equation declarations)
       mode = Haskell.defaultParseMode { Haskell.fixities = Nothing, Haskell.extensions = map Haskell.EnableExtension
         [Haskell.DataKinds, Haskell.GADTs, Haskell.LambdaCase, Haskell.OverloadedStrings,
          Haskell.TypeOperators, Haskell.TupleSections, Haskell.ExplicitNamespaces, Haskell.PatternSynonyms] }
   in case Haskell.parseModuleWithMode mode source of
     Haskell.ParseOk parsed -> Haskell.prettyPrintWithMode Haskell.defaultMode { Haskell.spacing = False } parsed
     Haskell.ParseFailed _ _ -> source
+  where
+    equation (TH.ValD (TH.VarP name) (TH.NormalB expression) declarations')
+      | (patterns@(_ : _), body) <- arguments expression =
+          TH.FunD name [TH.Clause patterns (TH.NormalB body) declarations']
+    equation declaration = declaration
+    arguments (TH.LamE patterns body) =
+      let (following, result) = arguments body in (patterns ++ following, result)
+    arguments body = ([], body)
+
+nameParameters :: [String] -> TH.Exp -> IO TH.Exp
+nameParameters [] expression = pure expression
+nameParameters names (TH.SigE expression annotation) =
+  (`TH.SigE` annotation) <$> nameParameters names expression
+nameParameters names (TH.LetE declarations body) =
+  TH.LetE declarations <$> nameParameters names body
+nameParameters (name : names) (TH.LamE (pattern : patterns) body) = do
+  let remainder = if null patterns then body else TH.LamE patterns body
+  case pattern of
+    TH.VarP original | not (null name) -> do
+      renamed <- TH.runQ (TH.newName (parameterName name))
+      body' <- nameParameters names (replaceFree [(original, TH.VarE renamed)] remainder)
+      pure $ TH.LamE [TH.VarP renamed] body'
+    _ -> TH.LamE [pattern] <$> nameParameters names remainder
+  where
+    parameterName original =
+      let base = map (\c -> if isAlphaNum c || c == '_' then c else '_') original
+          candidate = case base of initial : rest -> toLower initial : rest; [] -> "argument"
+       in case Haskell.parseExp candidate of
+            Haskell.ParseOk Haskell.Var{} | candidate /= "_" -> candidate
+            _ -> candidate ++ "_"
+nameParameters names (TH.AppE (TH.LamE [pattern] body) argument) = do
+  body' <- nameParameters names body
+  pure $ TH.AppE (TH.LamE [pattern] body') argument
+nameParameters _ expression = pure expression
+
+trimAnnotations :: TH.Exp -> TH.Exp
+trimAnnotations = transform $ \case
+  TH.SigE (TH.AppE (TH.VarE name) (TH.SigE action actionType)) functionType
+    | name == 'runAction
+    , TH.AppT (TH.AppT (TH.AppT (TH.ConT actionName) environment) monad) result <- actionType
+    , actionName == ''Action
+    , functionType == TH.AppT (TH.AppT TH.ArrowT environment) (TH.AppT monad result) ->
+        TH.AppE (TH.VarE name) (TH.SigE action actionType)
+  TH.SigE (TH.AppE (TH.AppE (TH.VarE name) gas) (TH.SigE action inner)) outer
+    | name == 'chargeAfter, inner == outer ->
+        TH.SigE (TH.AppE (TH.AppE (TH.VarE name) gas) action) outer
+  expression -> expression
 
 -- Fingerprints remain internal link identities. Printed names retain the original
 -- contract/function spelling, with numeric suffixes only for conflicting variants.
@@ -226,12 +284,152 @@ publicModule modul name = case modul of
   _ | modul `elem` ["GHC.Base", "GHC.Classes", "GHC.Types", "GHC.Maybe", "GHC.Num", "GHC.Num.Integer", "GHC.Real", "GHC.Show", "GHC.List", "GHC.IO"] -> "Prelude"
   _ -> modul
 
+
+-- Fresh lexical binders before joining action spines. Reused quotation templates
+-- may have the same binder names in otherwise separate scopes.
+freshActionBinders :: TH.Exp -> IO TH.Exp
+freshActionBinders = walk
+  where
+    walk :: Data a => a -> IO a
+    walk value
+      | Just expression <- Data.cast value = recast value <$> expressionWith expression
+      | Just (TH.Clause patterns body declarations) <- Data.cast value = do
+          (patterns', replacements) <- freshPatterns patterns
+          (declarations', body') <- group (replaceFree replacements declarations) (replaceFree replacements body)
+          pure $ recast value (TH.Clause patterns' body' declarations')
+      | Just (TH.Match pattern body declarations) <- Data.cast value = do
+          ([pattern'], replacements) <- freshPatterns [pattern]
+          (declarations', body') <- group (replaceFree replacements declarations) (replaceFree replacements body)
+          pure $ recast value (TH.Match pattern' body' declarations')
+      | Just (TH.ValD pattern body declarations) <- Data.cast value = do
+          (declarations', body') <- group declarations body
+          pure $ recast value (TH.ValD pattern body' declarations')
+      | otherwise = gmapM walk value
+    recast :: (Data a, Data b) => a -> b -> a
+    recast fallback value = fromMaybe fallback (Data.cast value)
+    expressionWith = \case
+      TH.InfixE (Just initial) (TH.VarE op) (Just (TH.LamE [pattern] body))
+        | op == '(>>=), irrefutable pattern -> expressionWith
+            (TH.DoE Nothing [TH.BindS pattern initial, TH.NoBindS body])
+      TH.InfixE (Just initial) (TH.VarE op) (Just (TH.LamCaseE matches))
+        | op == '(>>=) -> do
+            value <- TH.runQ (TH.newName "flow")
+            expressionWith (TH.DoE Nothing
+              [TH.BindS (TH.VarP value) initial, TH.NoBindS (TH.CaseE (TH.VarE value) matches)])
+      TH.LamE patterns body -> do
+        (patterns', replacements) <- freshPatterns patterns
+        TH.LamE patterns' <$> walk (replaceFree replacements body)
+      TH.LetE declarations body -> do
+        (declarations', body') <- group declarations body
+        pure $ TH.LetE declarations' body'
+      TH.DoE qualifier statements -> TH.DoE qualifier <$> statementsWith statements
+      expression -> gmapM walk expression
+    irrefutable TH.VarP{} = True
+    irrefutable TH.WildP = True
+    irrefutable _ = False
+    group :: Data a => [TH.Dec] -> a -> IO ([TH.Dec], a)
+    group declarations body = do
+      replacements <- freshNames (nub (concatMap declarationNames declarations))
+      let rename name = case lookup name replacements of Just (TH.VarE renamed) -> renamed; _ -> name
+          headWith = \case
+            TH.ValD pattern rhs nested -> TH.ValD (patternWith rename pattern) rhs nested
+            TH.FunD name clauses -> TH.FunD (rename name) clauses
+            TH.SigD name annotation -> TH.SigD (rename name) annotation
+            declaration -> declaration
+      declarations' <- walk (replaceFree replacements (map headWith declarations))
+      body' <- walk (replaceFree replacements body)
+      pure (declarations', body')
+    statementsWith [] = pure []
+    statementsWith (TH.BindS pattern action : rest) = do
+      action' <- walk action
+      ([pattern'], replacements) <- freshPatterns [pattern]
+      TH.DoE _ rest' <- walk (replaceFree replacements (TH.DoE Nothing rest))
+      pure (TH.BindS pattern' action' : rest')
+    statementsWith (TH.LetS declarations : rest) = do
+      (declarations', TH.DoE _ rest') <- group declarations (TH.DoE Nothing rest)
+      pure (TH.LetS declarations' : rest')
+    statementsWith (statement : rest) = (:) <$> walk statement <*> statementsWith rest
+    freshPatterns patterns = do
+      replacements <- freshNames (nub (patternNames patterns))
+      let rename name = case lookup name replacements of Just (TH.VarE renamed) -> renamed; _ -> name
+      pure (map (patternWith rename) patterns, replacements)
+    freshNames names = forM names $ \name -> do
+      renamed <- if renderedName name then pure name else TH.runQ (TH.newName (TH.nameBase name))
+      pure (name, TH.VarE renamed)
+    renderedName name = name == TH.mkName (TH.nameBase name) &&
+      (take 7 (TH.nameBase name) == "action_" || take 8 (TH.nameBase name) == "capture_")
+    declarationNames = \case
+      TH.ValD pattern _ _ -> patternNames pattern
+      TH.FunD name _ -> [name]
+      _ -> []
+    patternNames :: Data a => a -> [TH.Name]
+    patternNames value = case Data.cast value of
+      Just (TH.VarP name) -> [name]
+      Just (TH.AsP name pattern) -> name : patternNames pattern
+      _ -> concat (gmapQ patternNames value)
+    patternWith rename = descend
+      where
+        descend :: Data a => a -> a
+        descend value = case Data.cast value of
+          Just (TH.VarP name) -> recast value (TH.VarP (rename name))
+          Just (TH.AsP name pattern) -> recast value (TH.AsP (rename name) (descend pattern))
+          _ -> gmapT descend value
+
+-- Anonymous action values stay anonymous when used once. Their expression is
+-- retained verbatim: this does not beta-reduce a captured function application.
+-- Repeated uses keep the binding and therefore keep the original sharing.
+inlineActionNames :: [TH.Name] -> TH.Exp -> TH.Exp
+inlineActionNames marked = tidy . transform inline
+  where
+    inline (TH.LetE declarations body) = TH.LetE remaining (replaceFree replacements body)
+      where
+        counts = M.fromListWith (+) [(name, 1 :: Int) | name <- references (declarations, body)]
+        definitions = [(name, annotated name rhs) |
+          TH.ValD (TH.VarP name) (TH.NormalB rhs) [] <- declarations]
+        candidates = [(entry, name, references rhs) | entry@(name, rhs) <- definitions,
+          name `elem` marked || generated name,
+          M.lookup name counts == Just 1]
+        ordered = [entry | AcyclicSCC entry <- stronglyConnComp candidates]
+        replacements = foldl' (\previous (name, rhs) ->
+          (name, replaceFree previous rhs) : previous) [] ordered
+        removed = map fst replacements
+        remaining = replaceFree replacements (filter (\case
+          TH.ValD (TH.VarP name) _ _ -> name `notElem` removed
+          TH.SigD name _ -> name `notElem` removed
+          _ -> True) declarations)
+        annotated name rhs = case [annotation | TH.SigD bound annotation <- declarations, bound == name] of
+          [annotation] -> TH.SigE rhs annotation
+          _ -> rhs
+    inline expression = expression
+    generated name = take 7 base == "action_" || take 8 base == "capture_"
+      where base = TH.nameBase name
+    references :: Data a => a -> [TH.Name]
+    references value = case Data.cast value of
+      Just (TH.VarE name) -> [name]
+      _ -> concat (gmapQ references value)
+    tidy = transform $ \case
+      TH.LetE [] body -> body
+      TH.DoE Nothing statements -> TH.DoE Nothing (bindSpine statements)
+      expression -> expression
+    bindSpine (TH.BindS pattern (TH.DoE Nothing nested) : rest)
+      | TH.NoBindS final : preceding <- reverse nested =
+          bindSpine (reverse preceding ++ TH.BindS pattern final : rest)
+    bindSpine (TH.NoBindS (TH.DoE Nothing nested) : rest) = bindSpine (nested ++ rest)
+    bindSpine (TH.BindS pattern action : rest) = TH.BindS pattern action : bindSpine rest
+    bindSpine (statement : rest) = statement : bindSpine rest
+    bindSpine [] = []
+
 -- Captures are compile-time values and closed action expressions. Float their
 -- bindings into one let per function; retaining their dependency names avoids
 -- duplicating closures whenever the original compiler reused one.
 flattenDeclaration :: TH.Dec -> IO TH.Dec
 flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = do
-  (body, (_, bindings, _)) <- State.runStateT (lower rootExpression) (0 :: Int, [], M.empty)
+  let (parameters, root) = case rootExpression of
+        TH.LetE [TH.PragmaD (TH.LineP 0 marker)] expression
+          | take (length parameterMarker) marker == parameterMarker
+          , [(names, "")] <- reads (drop (length parameterMarker) marker) -> (names, expression)
+        _ -> ([], rootExpression)
+  (body, (_, bindings, _)) <- State.runStateT (lower root) (0 :: Int, [], M.empty)
   let (body', bindings') = case body of
         TH.VarE name
           | take 7 (TH.nameBase name) == "action_"
@@ -245,11 +443,34 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
                  [annotation] -> TH.SigE rhs annotation
                  _ -> rhs, remaining)
         _ -> (body, bindings)
-  pure $ TH.ValD pattern (TH.NormalB (if null bindings' then body' else TH.LetE (reverse bindings') body')) declarations
+  let marked = [TH.mkName (drop (length actionMarker) value) |
+        TH.PragmaD (TH.LineP 0 value) <- bindings', take (length actionMarker) value == actionMarker]
+      ordinary = filter (\case
+        TH.PragmaD (TH.LineP 0 value) -> take (length actionMarker) value /= actionMarker
+        _ -> True) bindings'
+      expression = if null ordinary then body' else TH.LetE (reverse ordinary) body'
+  hygienic <- freshActionBinders expression
+  named <- nameParameters parameters (inlineActionNames marked hygienic)
+  pure $ TH.ValD pattern (TH.NormalB (trimAnnotations named)) declarations
   where
+    parameterMarker = "solidvm-parameters:"
+    actionMarker = "solidvm-inline-action:"
     references :: Data a => TH.Name -> a -> Bool
     references name x = maybe False (\case TH.VarE n -> n == name; _ -> False) (Data.cast x)
       || or (gmapQ (references name) x)
+    -- Literal data have no callable action to name. Keep action/function
+    -- captures explicit; this only extends the existing literal spelling rule.
+    literalData (TH.VarE _) = True
+    literalData (TH.ConE _) = True
+    literalData (TH.LitE _) = True
+    literalData (TH.ListE values) = all literalData values
+    literalData (TH.TupE values) = all (maybe False literalData) values
+    literalData (TH.SigE value _) = literalData value
+    literalData (TH.AppE tag value) = constructorData tag && literalData value
+    literalData _ = False
+    constructorData (TH.ConE _) = True
+    constructorData (TH.AppE tag value) = constructorData tag && literalData value
+    constructorData _ = False
     -- Preserve sharing in the compiler's closure graph rather than expanding
     -- the same captured action once for every use. Stable names are inspection
     -- bookkeeping only; they do not enter the executable compiler.
@@ -267,6 +488,18 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
               M.insertWith (++) (hashStableName key) [(key, body)] memo))
             pure $ fromMaybe x (Data.cast body)
       Nothing -> gmapM lower x
+    lowerExpression (TH.LetE [TH.PragmaD (TH.LineP 0 "solidvm-action")] body) = do
+      lowered <- lower body
+      name <- case lowered of
+        TH.VarE existing -> pure existing
+        _ -> do
+          (index, accumulated, cache) <- State.get
+          let created = TH.mkName ("action_" ++ show index)
+          State.put (index + 1, TH.ValD (TH.VarP created) (TH.NormalB lowered) [] : accumulated, cache)
+          pure created
+      State.modify (\(index, accumulated, cache) ->
+        (index, TH.PragmaD (TH.LineP 0 (actionMarker ++ TH.nameBase name)) : accumulated, cache))
+      pure (TH.VarE name)
     lowerExpression (TH.LetE (TH.PragmaD (TH.LineP 0 "solidvm-captures") : bindings) body) = do
       captures <- forM bindings $ \case
         TH.ValD (TH.VarP name) (TH.NormalB rhs) [] -> do
@@ -274,6 +507,9 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
           case rhs' of
             TH.VarE _ -> pure ((name, rhs'), Nothing)
             TH.LitE _ -> pure ((name, rhs'), Nothing)
+            TH.ConE _ -> pure ((name, rhs'), Nothing)
+            TH.TupE [] -> pure ((name, rhs'), Nothing)
+            _ | literalData rhs' -> pure ((name, rhs'), Nothing)
             _ -> do
               (index, accumulated, cache) <- State.get
               let capture = TH.mkName ("capture_" ++ TH.nameBase name ++ "_" ++ show index)
@@ -283,13 +519,13 @@ flattenDeclaration (TH.ValD pattern (TH.NormalB rootExpression) declarations) = 
       let names = map fst captures
           renamed = mapMaybe snd captures
       State.modify (\(index, accumulated, cache) -> (index, reverse renamed ++ accumulated, cache))
-      lowered <- lower $ transform (\case
-        TH.VarE name -> fromMaybe (TH.VarE name) (lookup name names)
-        expression -> expression) body
-      (index, accumulated, cache) <- State.get
-      let name = TH.mkName ("action_" ++ show index)
-      State.put (index + 1, TH.ValD (TH.VarP name) (TH.NormalB lowered) [] : accumulated, cache)
-      pure (TH.VarE name)
+      lowered <- lower $ replaceFree names body
+      if literalData lowered then pure lowered else do
+        (index, accumulated, cache) <- State.get
+        let name = TH.mkName ("action_" ++ show index)
+        State.put (index + 1, TH.ValD (TH.VarP name) (TH.NormalB lowered) [] : accumulated, cache)
+        pure (TH.VarE name)
+    lowerExpression (TH.DoE Nothing [TH.NoBindS body]) = lower body
     lowerExpression (TH.LetE localDeclarations body) = do
       declarations' <- lower localDeclarations
       body' <- lower body

@@ -6,14 +6,12 @@ import Language.Haskell.TH.Syntax (liftData)
 
 -- Derive inspection expressions from the exact builtin selection declaration.
 -- Adding a builtin therefore cannot leave a second selection table behind.
-builtinActions :: Q [Dec] -> Q [Dec]
+builtinActions :: Q Exp -> Q Exp
 builtinActions declaration = do
-  declarations <- declaration
-  case declarations of
-    [SigD _ (AppT (AppT ArrowT input) _), ValD (VarP _) (NormalB (LamCaseE matches)) []] -> do
-      rendered <- traverse render matches
-      pure $ [SigD (mkName "lookupActionSource") (AppT (AppT ArrowT input) (AppT (ConT ''Maybe) (ConT ''Exp))), FunD (mkName "lookupActionSource") [Clause [] (NormalB (LamCaseE rendered)) []]]
-    _ -> fail "builtin selection must be a single lambda-case declaration"
+  expression <- declaration
+  case expression of
+    LamCaseE matches -> LamCaseE <$> traverse render matches
+    _ -> fail "builtin selection must be a lambda-case expression"
   where
     render (Match pattern (NormalB (AppE (ConE just) action)) []) | nameBase just == "Just" = do
       expression <- liftData action

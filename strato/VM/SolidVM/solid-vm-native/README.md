@@ -112,20 +112,20 @@ module imports the existing SolidVM action helpers and can be compiled against
 `solid-vm-native` in a development environment. STRATO does not invoke GHC to
 compile contracts or produce this dump.
 
-`Compile.hs` and `Source.hs` instantiate the same `Compiler.inc`. Action
-expressions are Haskell quotations interpreted at the time GHC builds the
-package: execution emits the original expression; inspection retains that
-expression and substitutes its captured values. Builtin selection likewise
-shares `BuiltinActions.inc`. Runtime helpers share `HelperActions.inc` and
-are inserted as local definitions in both interpretations, preserving the
-execution optimizer's scope. There is one typechecker and one set of compiler
-cases to maintain.
+`Compile.hs` and `Source.hs` instantiate the same `Compiler.inc`. Typechecking,
+control flow, gas placement, and simplification rules live in that shared
+compiler. The execution builders construct ordinary Haskell actions. Source
+builders describe the same operations using syntax trees; their quotation
+helper only substitutes captured values, without optimizing or rewriting them.
+Builtin selection shares `BuiltinActions.inc`, and ordinary runtime helpers
+share `HelperActions.inc` and `IntegerActions.inc`.
 
-The executable instantiation uses `type Code a = a`. It allocates ordinary
-closures, with no attached source, inspection tuples, or runtime backend
-dictionaries. Source annotations are inline identities in that instantiation.
-Inspection builds its expression graph only on request, preserving shared
-captures and giving GADT closures explicit types for the emitted module.
+Both instantiations keep typed compiler facts while assembling actions. The
+execution builders extract their payloads before constructing closures, and
+these facts are discarded when the executable function is extracted. Executable
+functions carry no source trees or runtime backend dictionaries. Inspection
+builds source trees only on request and supplies explicit types where the
+emitted GADT expressions need them.
 
 ### Execution modules
 

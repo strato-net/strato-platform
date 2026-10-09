@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase, CPP, TemplateHaskell #-}
+{-# LANGUAGE GADTs, OverloadedStrings, LambdaCase, CPP #-}
 -- Builtins are ordinary actions. Selection happens while compiling the call.
 module SolidVM.Builtins where
 
@@ -190,6 +190,6 @@ encodeValue (Dyn ty v) = case ty of
     fields FNil HNil = []
     fields (FCons n t rest) (x :* xs) = (n, Dyn t x) : fields rest xs
 
-$( [d|
+lookupAction :: T.Text -> Maybe ([Dyn] -> M Dyn)
+lookupAction =
 #include "BuiltinActions.inc"
-  |])

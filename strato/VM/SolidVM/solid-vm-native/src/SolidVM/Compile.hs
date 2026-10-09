@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, RankNTypes, ScopedTypeVariables,
-             LambdaCase, OverloadedStrings, ExistentialQuantification, TupleSections, NamedFieldPuns, CPP, TemplateHaskell, TypeApplications #-}
+             LambdaCase, OverloadedStrings, ExistentialQuantification, TupleSections, NamedFieldPuns, CPP, TypeApplications #-}
 -- SolidVM source -> typed Haskell actions.  Typecheck and compile in one pass over the
 -- existing parser's CodeCollection.  Strict: no implicit coercions; anything the typed
 -- model cannot express is reported as an Err, never approximated.
@@ -32,29 +32,30 @@ import qualified SolidVM.Model.CodeCollection.Statement as S
 import SolidVM.Model.Storable (BasicValue (BDefault), StoragePath (..), StoragePathPiece (..))
 import qualified SolidVM.Model.Type as Ty
 import SolidVM.Core
-import qualified SolidVM.Quotation.Execution as Quotation
+import SolidVM.Code
 import qualified SolidVM.Builtins as Builtins
 
-type Code a = a
-runCode :: a -> a
-runCode = id
-{-# INLINE runCode #-}
+makeFun :: T.Text -> Sig args r -> Code (Fn args r) -> Fun
+makeFun name sig action = withCode action (Fun name sig)
 
-bindCodeChain :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
-bindCodeChain _ = bindActionChain
-{-# INLINE bindCodeChain #-}
+linkedAction :: a -> a
+linkedAction = id
+{-# INLINE linkedAction #-}
 
 constantCode :: Ty a -> a -> Code (b -> M a)
-constantCode _ v = \_ -> pure v
+constantCode _ v = constantFunction (pureAction (plainCode v))
 {-# INLINE constantCode #-}
+valueCode :: Ty a -> a -> Code a
+valueCode _ value = plainCode value
+{-# INLINE valueCode #-}
 namedCode :: T.Text -> a -> a
 namedCode _ a = a
 {-# INLINE namedCode #-}
 namedFunction :: T.Text -> Func -> a -> a
 namedFunction _ _ a = a
 {-# INLINE namedFunction #-}
-builtinCode :: T.Text -> a -> a
-builtinCode _ a = a
+builtinCode :: T.Text -> a -> Code a
+builtinCode _ a = plainCode a
 {-# INLINE builtinCode #-}
 
 typedCode :: [EnvTy] -> Ty r -> a -> a
@@ -72,9 +73,15 @@ typedPath _ a = a
 typedDestination :: [EnvTy] -> Ty r -> a -> a
 typedDestination _ _ a = a
 {-# INLINE typedDestination #-}
+typedCall :: Sig args r -> a -> a
+typedCall _ a = a
+
 typedGetter :: Sig args r -> a -> a
 typedGetter _ a = a
 {-# INLINE typedGetter #-}
+typedSnapshot :: Sig args r -> a -> a
+typedSnapshot _ a = a
+{-# INLINE typedSnapshot #-}
 
 typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> a -> a
 typedDestructure _ _ _ a = a
@@ -83,4 +90,11 @@ typedTupleSetters :: [EnvTy] -> Fields ts -> a -> a
 typedTupleSetters _ _ a = a
 {-# INLINE typedTupleSetters #-}
 
+#define EMIT_BEGIN plainCode (
+#define EMIT_END )
+#define CAPTURE withCode
+#define CAPTURE2 withCode2
+#define CAPTURE3 withCode3
+#define CAPTURE4 withCode4
+#define CAPTURES withCodes
 #include "Compiler.inc"

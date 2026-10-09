@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, OverloadedStrings, FlexibleInstances, TemplateHaskell, ExistentialQuantification, LambdaCase, ScopedTypeVariables #-}
+{-# LANGUAGE GADTs, OverloadedStrings, FlexibleInstances, TemplateHaskell, ExistentialQuantification, LambdaCase, ScopedTypeVariables, CPP, DataKinds, TypeOperators #-}
 -- Inspection representations are never used by the executable compiler.
 module SolidVM.SourceCode where
 
@@ -8,27 +8,196 @@ import qualified SolidVM.BuiltinSource as BuiltinSource
 import Data.Char (ord, isAscii, isAlphaNum)
 import Numeric (showHex)
 import Language.Haskell.TH hiding (Code)
-import Data.Data (Data, cast, gmapT)
+import Data.Data (Data, cast, gmapT, gmapQ)
 import qualified Data.Text as T
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.Text.Encoding as TE
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
-import SolidVM.Model.CodeCollection (Func)
+import SolidVM.Model.CodeCollection (Func, funcArgs)
+import Control.Lens ((^.))
 import qualified Data.Sequence
+import qualified Data.Foldable as Foldable
 import Data.Decimal
 import Data.IORef (IORef)
+import Control.Monad (void)
 import Blockchain.Strato.Model.Address (Address(..))
 import SolidVM.Model.Storable (StoragePath(..), StoragePathPiece(..))
 
 -- The executable field lets the shared compiler retain its existing Haskell
 -- types. Inspection only demands the expression field, never executes it.
-data Code a = Code { runCode :: a, sourceExpression :: Exp, codeName :: Maybe T.Text, codeType :: Maybe Type }
+data Code a = Code { runCode :: a, sourceExpression :: Exp, codeName :: Maybe T.Text, codeType :: Maybe Type, codeForm :: Form a }
+
+-- Check the executable template's type without compiling a second executable.
+-- Inspection uses its expression and compiler facts, never this field.
+inspectionOnly :: a -> a
+inspectionOnly _ = error "inspection code cannot be executed"
+{-# INLINE inspectionOnly #-}
+
+#include "ActionCode.inc"
+
+captureCode :: Code a -> (Code a -> Code b) -> Code b
+captureCode code continuation = continuation code
+
+captureCode2 :: Code a -> Code b -> (Code a -> Code b -> Code result) -> Code result
+captureCode2 a b continuation = continuation a b
+
+captureCode3 :: Code a -> Code b -> Code c -> (Code a -> Code b -> Code c -> Code result) -> Code result
+captureCode3 a b c continuation = continuation a b c
+
+captureCode4 :: Code a -> Code b -> Code c -> Code d -> (Code a -> Code b -> Code c -> Code d -> Code result) -> Code result
+captureCode4 a b c d continuation = continuation a b c d
+
+captureCodes :: [Code a] -> (Code [a] -> Code b) -> Code b
+captureCodes codes continuation = continuation (listCode codes)
+
+constantFunction :: Code b -> Code (a -> b)
+constantFunction code = Code (const (runCode code)) (LamE [WildP] (toSource code)) Nothing Nothing (ConstantFunction code)
+
+pureAction :: Applicative m => Code a -> Code (m a)
+pureAction code = Code (pure (runCode code)) (AppE (VarE 'pure) (toSource code)) Nothing Nothing (PureAction code)
+
+withForm :: Form a -> Code a -> Code a
+withForm form code = code { codeForm = form }
+
+actionFunction :: Monad m => Code (Action env m a) -> Code (env -> m a)
+actionFunction code = Code (runAction (runCode code))
+  (AppE (VarE 'runAction) (toSource (actionProgram code))) Nothing Nothing (ActionFunction (actionProgram code))
+
+actionResidual :: Code (env -> m a) -> Code (Action env m a)
+actionResidual code = Code (contextAction (runCode code))
+  (AppE (VarE 'contextAction) (toSource code)) Nothing Nothing Ordinary
+
+actionLiftResidual :: Code (m a) -> Code (Action env m a)
+actionLiftResidual code = Code (liftAction (runCode code))
+  (AppE (VarE 'liftAction) (toSource code)) Nothing Nothing (LiftedComputation code)
+
+actionProgram :: Code (Action env m a) -> Code (Action env m a)
+actionProgram code = code { sourceExpression = LetE [PragmaD (LineP 0 "solidvm-action")] (sourceExpression code) }
+
+actionReturn :: Monad m => Code a -> Code (Action env m a)
+actionReturn code = Code (pure (runCode code)) (AppE (VarE 'pure) (toSource code)) Nothing Nothing (PureComputation code)
+
+actionCharge :: Integer -> Code (Action env M ())
+actionCharge gas = Code (inspectionOnly undefined) (AppE (VarE 'chargeAction) (toSource gas)) Nothing Nothing Ordinary
+
+actionStore :: Ty a -> Code StoragePath -> Code a -> Code (Action env M ())
+actionStore ty path value = Code (inspectionOnly undefined)
+  (AppE (AppE (AppE (VarE 'storeAction) (toSource ty)) (toSource path)) (toSource value)) Nothing Nothing Ordinary
+
+referenceAction :: Ix ls (IORef a) -> Code (Action (Env ls) M a)
+referenceAction index = Code (inspectionOnly undefined) (AppE (VarE 'readReference) (toSource index)) Nothing Nothing Ordinary
+
+valueAction :: Ix ls a -> Code (Action (Env ls) M a)
+valueAction index = Code (inspectionOnly undefined) (AppE (VarE 'valueAt) (toSource index)) Nothing Nothing Ordinary
+
+actionAfter :: Integer -> Code (Action env M a) -> Code (Action env M a)
+actionAfter gas code = Code (inspectionOnly undefined)
+  (AppE (AppE (VarE 'chargeActionAfter) (toSource gas)) (toSource code)) Nothing Nothing Ordinary
+
+actionThenResidual :: Code (Action env M a) -> Code (Action env M b) -> Code (Action env M b)
+actionThenResidual first second = Code (inspectionOnly undefined)
+  (DoE Nothing [NoBindS (toSource first), NoBindS (toSource second)]) Nothing Nothing Ordinary
+
+actionPureResidual :: Code (env -> a) -> Code (Action env M a)
+actionPureResidual code = Code (inspectionOnly undefined)
+  (AppE (AppE (VarE 'fmap) (toSource code)) (VarE 'askEnvironment)) Nothing Nothing Ordinary
+
+actionWritePath :: Ty a -> Code StoragePath -> Code (env -> a) -> Code (Action env M ())
+actionWritePath ty path value = emitContextWrite ty (toSource path) (AppE (toSource value) (VarE (mkName "frame")))
+
+actionWriteValue :: Ty a -> Code (env -> StoragePath) -> Code a -> Code (Action env M ())
+actionWriteValue ty path value = emitContextWrite ty (AppE (toSource path) (VarE (mkName "frame"))) (toSource value)
+
+actionWriteResidual :: Ty a -> Code (env -> StoragePath) -> Code (env -> a) -> Code (Action env M ())
+actionWriteResidual ty path value = emitContextWrite ty
+  (AppE (toSource path) (VarE (mkName "frame"))) (AppE (toSource value) (VarE (mkName "frame")))
+
+emitContextWrite :: Ty a -> Exp -> Exp -> Code (Action env M ())
+emitContextWrite ty path value = Code (inspectionOnly undefined)
+  (AppE (VarE 'contextAction) (LamE [VarP (mkName "frame")]
+    (AppE (AppE (AppE (VarE 'writeVal) (toSource ty)) path) value))) Nothing Nothing Ordinary
+
+applyResidual :: Code (a -> b) -> Code a -> Code b
+applyResidual function argument = Code (runCode function (runCode argument))
+  (AppE (toSource function) (toSource argument)) Nothing Nothing Ordinary
+
+bindResidual :: Code (M a) -> Code (a -> M b) -> Code (M b)
+bindResidual first continuation = Code (inspectionOnly undefined)
+  (InfixE (Just (toSource first)) (VarE '(>>=)) (Just (toSource continuation))) Nothing Nothing Ordinary
+
+mapResidual :: Code (a -> b) -> Code (M a) -> Code (M b)
+mapResidual function action = Code (inspectionOnly undefined)
+  (AppE (AppE (VarE 'fmap) (toSource function)) (toSource action)) Nothing Nothing Ordinary
+
+applyActionResidual :: Code (M (a -> b)) -> Code (M a) -> Code (M b)
+applyActionResidual function action = Code (inspectionOnly undefined)
+  (InfixE (Just (toSource function)) (VarE '(<*>)) (Just (toSource action))) Nothing Nothing Ordinary
+
+integerCode :: Integer -> Code Integer
+integerCode value = withForm (IntegerValue value) (valueCode TInt value)
+
+listCode :: [Code a] -> Code [a]
+listCode codes = Code (map runCode codes) (ListE (map toSource codes)) Nothing Nothing Ordinary
+
+sequenceResidual :: [Code (M a)] -> Code (M [a])
+sequenceResidual codes = Code (inspectionOnly undefined)
+  (AppE (VarE 'sequence) (ListE (map toSource codes))) Nothing Nothing Ordinary
+
+unitCode :: Code ()
+unitCode = Code () (TupE []) Nothing Nothing UnitValue
+
+emitUnitSteps :: [ActionStep] -> Code (M ())
+emitUnitSteps steps = Code (inspectionOnly undefined) expression Nothing Nothing Ordinary
+  where
+    expression = case statements steps of
+      [NoBindS single] -> single
+      result -> DoE Nothing result
+    statements [EffectStep action] = [NoBindS (AppE (VarE 'void) (toSource action))]
+    statements (step : rest@(_ : _)) = actionStatement step : statements rest
+    statements remaining = map actionStatement remaining
+
+emitResultSteps :: [ActionStep] -> Code a -> Code (M a)
+emitResultSteps steps value = emitSteps steps (AppE (VarE 'pure) (toSource value))
+
+emitResidualSteps :: [ActionStep] -> Code (M a) -> Code (M a)
+emitResidualSteps steps final = emitSteps steps (toSource final)
+
+emitSteps :: [ActionStep] -> Exp -> Code (M a)
+emitSteps steps final = Code (inspectionOnly undefined)
+  (DoE Nothing (map actionStatement steps ++ [NoBindS final])) Nothing Nothing Ordinary
+
+actionStatement :: ActionStep -> Stmt
+actionStatement (GasStep gas) = NoBindS (AppE (VarE 'chargeGas) (toSource gas))
+actionStatement (EffectStep action) = NoBindS (toSource action)
+actionStatement (WriteStep ty path value) = NoBindS
+  (AppE (AppE (AppE (VarE 'writeVal) (toSource ty)) (toSource path)) (toSource value))
+
+emptyEnvironment :: Code (Env '[])
+emptyEnvironment = Code ENil (ConE 'ENil) Nothing Nothing EmptyEnvironment
+
+valueEnvironment :: Code a -> Code (Env ls) -> Code (Env (a ': ls))
+valueEnvironment value rest = Code (runCode value :& runCode rest)
+  (app '(:&) [toSource value, toSource rest]) Nothing Nothing (ValueEnvironment value rest)
+
+localResidual :: Ix ls a -> Code (Env ls) -> Code a
+localResidual index code = Code (localValue index (runCode code))
+  (AppE (AppE (VarE 'localValue) (toSource index)) (toSource code)) Nothing Nothing Ordinary
+
+afterResidual :: Integer -> Code (M a) -> Code (M a)
+afterResidual gas code = Code (inspectionOnly undefined) expression Nothing Nothing Ordinary
+  where
+    action = mkName "residual_action"
+    expression = substitute [(action, toSource code)]
+      (AppE (AppE (VarE 'chargeAfter) (toSource gas)) (VarE action))
+
+optionalCode :: Maybe (Code a) -> Code (Maybe a)
+optionalCode codes = Code (runCode <$> codes) (toSource codes) Nothing Nothing Ordinary
 
 -- A do block is the syntax for this same right-associated chain of binds.
 -- Command expressions remain separate: only bind continuations are expanded.
-bindCodeChain :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
-bindCodeChain name initial commands final = Code executable expression Nothing Nothing
+bindChainResidual :: T.Text -> Code (M a) -> [Code (a -> M a)] -> Code (a -> M b) -> Code (M b)
+bindChainResidual name initial commands final = Code executable expression Nothing Nothing Ordinary
   where
     executable = bindActionChain (runCode initial) (map runCode commands) (runCode final)
     variable index = mkName (T.unpack (T.toLower (T.take 1 name) <> T.drop 1 name) ++ "_" ++ show (index :: Int))
@@ -39,6 +208,12 @@ bindCodeChain name initial commands final = Code executable expression Nothing N
       [NoBindS (AppE (toSource final) (VarE (variable (length commands))))]
 
 data Fun = forall args r. Fun T.Text (Sig args r) (Code (Fn args r))
+
+makeFun :: T.Text -> Sig args r -> Code (Fn args r) -> Fun
+makeFun = Fun
+
+linkedAction :: Code a -> a
+linkedAction = runCode
 
 class ToSource a where
   toSource :: a -> Exp
@@ -113,6 +288,69 @@ transform f = go
       Just expression -> maybe x id $ cast $ f $ gmapT go (expression :: Exp)
       Nothing -> gmapT go x
 
+replaceFree :: Data a => [(Name, Exp)] -> a -> a
+replaceFree = walk
+  where
+    walk :: Data a => [(Name, Exp)] -> a -> a
+    walk values x
+      | Just expression <- cast x = maybe x id (cast (expressionWith values expression))
+      | Just (Clause patterns body declarations) <- cast x =
+          let scoped = without (bound patterns ++ declared declarations) values
+           in maybe x id (cast (Clause patterns (walk scoped body) (walk scoped declarations)))
+      | Just (Match pattern body declarations) <- cast x =
+          let scoped = without (bound pattern ++ declared declarations) values
+           in maybe x id (cast (Match pattern (walk scoped body) (walk scoped declarations)))
+      | Just (ValD pattern body declarations) <- cast x =
+          let scoped = without (bound pattern ++ declared declarations) values
+           in maybe x id (cast (ValD pattern (walk scoped body) (walk scoped declarations)))
+      | Just (GuardedB branches) <- cast x = maybe x id (cast (GuardedB (map (guardedWith values) branches)))
+      | otherwise = gmapT (walk values) x
+    guardedWith values (NormalG guard, body) = (NormalG (walk values guard), walk values body)
+    guardedWith values (PatG statements, body) =
+      let (statements', scoped) = statementsWith values statements
+       in (PatG statements', walk scoped body)
+    expressionWith values = \case
+      VarE name -> maybe (VarE name) id (lookup name values)
+      LamE patterns body -> LamE patterns (walk (without (bound patterns) values) body)
+      LetE declarations body ->
+        let scoped = without (declared declarations) values
+         in LetE (walk scoped declarations) (walk scoped body)
+      DoE qualifier statements -> DoE qualifier (fst (statementsWith values statements))
+      MDoE qualifier statements ->
+        MDoE qualifier (fst (statementsWith (without (statementNames statements) values) statements))
+      CompE statements -> CompE (fst (statementsWith values statements))
+      expression -> gmapT (walk values) expression
+    statementsWith values [] = ([], values)
+    statementsWith values (statement : rest) =
+      let (statement', scoped) = case statement of
+            BindS pattern action -> (BindS pattern (walk values action), without (bound pattern) values)
+            LetS declarations ->
+              let inner = without (declared declarations) values
+               in (LetS (walk inner declarations), inner)
+            RecS statements ->
+              let inner = without (statementNames statements) values
+               in (RecS (fst (statementsWith inner statements)), inner)
+            ParS groups -> (ParS (map (fst . statementsWith values) groups), without (statementNames (concat groups)) values)
+            _ -> (walk values statement, values)
+          (rest', final) = statementsWith scoped rest
+       in (statement' : rest', final)
+    statementNames = concatMap $ \case
+      BindS pattern _ -> bound pattern
+      LetS declarations -> declared declarations
+      RecS statements -> statementNames statements
+      ParS groups -> statementNames (concat groups)
+      _ -> []
+    declared = concatMap $ \case
+      ValD pattern _ _ -> bound pattern
+      FunD name _ -> [name]
+      _ -> []
+    without names = filter ((`notElem` names) . fst)
+    bound :: Data a => a -> [Name]
+    bound x = case cast x of
+      Just (VarP name) -> [name]
+      Just (AsP name pattern) -> name : bound pattern
+      _ -> concat (gmapQ bound x)
+
 literal :: Ty a -> a -> Exp
 literal TInt = toSource
 literal TDecimal = toSource
@@ -121,11 +359,31 @@ literal TAddr = toSource
 literal (TContract _) = toSource
 literal TStr = toSource
 literal TBytes = toSource
+literal TUnit = const (TupE [])
 literal (TEnum _ _) = \v -> app 'EnumValue [toSource (enumNumber v),toSource (enumIsNumber v)]
-literal _ = error "compiler literal is not a scalar"
+literal TVariadic = toSource
+literal TRaw = toSource
+literal TWireArray = toSource
+literal (TWireEnum _ _) = toSource
+literal (TArr t) = AppE (VarE 'Data.Sequence.fromList) . ListE . map (literal t) . Foldable.toList
+literal (TStruct _ fs) = literalFields fs
+literal (TTuple fs) = literalFields fs
+literal (TMaybe t) = maybe (ConE 'Nothing) (AppE (ConE 'Just) . literal t)
+literal (TRef _) = toSource
+literal (TAlias t _) = either (AppE (ConE 'Left) . toSource) (AppE (ConE 'Right) . literal t)
+
+literalFields :: Fields ts -> HL ts -> Exp
+literalFields FNil HNil = ConE 'HNil
+literalFields (FCons _ t rest) (value :* values) = app '(:*) [literal t value, literalFields rest values]
+
+instance ToSource Dyn where
+  toSource (Dyn t value) = app 'Dyn [toSource t, literal t value]
+
+valueCode :: Ty a -> a -> Code a
+valueCode t value = Code value (literal t value) Nothing Nothing Ordinary
 
 constantCode :: Ty a -> a -> Code (b -> M a)
-constantCode t v = Code (\_ -> pure v) (LamE [WildP] (AppE (VarE 'pure) (literal t v))) Nothing Nothing
+constantCode t v = constantFunction (pureAction (valueCode t v))
 
 namedCode :: T.Text -> Code a -> Code a
 namedCode n code = code { codeName = Just n }
@@ -133,8 +391,10 @@ namedCode n code = code { codeName = Just n }
 -- Distinguish overloads and constructor variants with the same display name.
 -- Execution erases this operation; only inspection hashes the declaration.
 namedFunction :: T.Text -> Func -> Code a -> Code a
-namedFunction name declaration = namedCode (name <> "#" <> fingerprint)
+namedFunction name declaration code = namedCode (name <> "#" <> fingerprint) code
+  { sourceExpression = LetE [PragmaD (LineP 0 ("solidvm-parameters:" ++ show parameters))] (sourceExpression code) }
   where
+    parameters = [maybe "" T.unpack parameter | (parameter, _) <- declaration ^. funcArgs]
     fingerprint = TE.decodeUtf8 $ B16.encode $ keccak256ToByteString $ hash $ TE.encodeUtf8 $ T.pack (show declaration)
 
 functionName :: T.Text -> Name
@@ -150,7 +410,7 @@ instance (ToSource a, ToSource b) => ToSource (Either a b) where
   toSource (Right b) = app 'Right [toSource b]
 
 builtinCode :: T.Text -> ([Dyn] -> M Dyn) -> Code ([Dyn] -> M Dyn)
-builtinCode n f = Code f expression Nothing Nothing
+builtinCode n f = Code f expression Nothing Nothing Ordinary
   where
     expression = case BuiltinSource.lookupActionSource n of
       Just action -> action
@@ -204,7 +464,34 @@ monadType :: Type -> Type
 monadType = AppT (ConT ''M)
 
 annotate :: Type -> Code a -> Code a
-annotate t code = code { codeType = Just t }
+annotate t code = code { codeType = Just t, codeForm = form, sourceExpression = expression }
+  where
+    expression = case t of
+      AppT (ConT monad) _ | monad == ''M || monad == ''IO ->
+        LetE [PragmaD (LineP 0 "solidvm-action")] residual
+      _ -> residual
+    residual = annotateFunctionExpression t form (sourceExpression code)
+    form = annotateForm t (codeForm code)
+
+annotateForm :: Type -> Form a -> Form a
+annotateForm t form = case (t, form) of
+  (AppT (AppT ArrowT _) result, ConstantFunction body) -> ConstantFunction (annotate result body)
+  (AppT (AppT ArrowT argument) result, StaticFunction previous specialize) ->
+    StaticFunction (annotateForm t previous) (annotate result . specialize . annotate argument)
+  (AppT (AppT ArrowT argument) (AppT _ result), FunctionSequence steps (PureFunction function))
+    | nestedMonad result -> FunctionSequence steps (PureFunction (annotate (arrow argument result) function))
+  (AppT _ result, PureAction value) | nestedMonad result -> PureAction (annotate result value)
+  _ -> form
+  where
+    nestedMonad (AppT (ConT monad) _) | monad == ''M || monad == ''IO = True
+    nestedMonad (AppT function argument) = nestedMonad function || nestedMonad argument
+    nestedMonad _ = False
+
+annotateFunctionExpression :: Type -> Form a -> Exp -> Exp
+annotateFunctionExpression t (StaticFunction previous _) expression = annotateFunctionExpression t previous expression
+annotateFunctionExpression t (FunctionSequence steps end) _ = actionFunctionExpression (Just t) (functionAction steps end)
+annotateFunctionExpression t (ActionFunction action) _ = actionFunctionExpression (Just t) action
+annotateFunctionExpression _ _ expression = expression
 
 typedCode :: [EnvTy] -> Ty r -> Code (Env ls -> M r) -> Code (Env ls -> M r)
 typedCode env r = annotate (arrow (environmentType env) (monadType (haskellType r)))
@@ -223,14 +510,26 @@ typedDestination env t = annotate (arrow (environmentType env) (monadType
   (AppT (AppT (AppT (TupleT 3) (AppT (ConT ''Maybe) (ConT ''StoragePath))) (monadType (haskellType t)))
     (arrow (haskellType t) (monadType (TupleT 0))))))
 
-typedGetter :: Sig args r -> Code (StoragePath -> Env (RefTypes args) -> M r) -> Code (StoragePath -> Env (RefTypes args) -> M r)
-typedGetter sig = annotate (arrow (ConT ''StoragePath) (arrow (arguments sig) (monadType (haskellType (sigRet sig)))))
+typedCall :: Sig args r -> Code (Fn args r -> HL args -> M r) -> Code (Fn args r -> HL args -> M r)
+typedCall sig code = code { codeType = Just (arrow (signatureType sig)
+  (arrow (AppT (ConT ''HL) (arguments sig)) (monadType (haskellType (sigRet sig))))) }
   where
-    arguments :: Sig args r -> Type
-    arguments = environmentType . types
+    arguments :: Sig as result -> Type
+    arguments (SigNil _) = PromotedNilT
+    arguments (SigCons t rest) = AppT (AppT PromotedConsT (haskellType t)) (arguments rest)
+
+typedGetter :: Sig args r -> Code (StoragePath -> Env (RefTypes args) -> M r) -> Code (StoragePath -> Env (RefTypes args) -> M r)
+typedGetter sig = annotate (arrow (ConT ''StoragePath) (arrow (signatureEnvironment sig) (monadType (haskellType (sigRet sig)))))
+
+signatureEnvironment :: Sig args r -> Type
+signatureEnvironment = environmentType . types
+  where
     types :: Sig args r -> [EnvTy]
     types (SigNil _) = []
     types (SigCons t rest) = RefSlot t : types rest
+
+typedSnapshot :: Sig args r -> Code (Env (RefTypes args) -> M [Dyn]) -> Code (Env (RefTypes args) -> M [Dyn])
+typedSnapshot sig = annotate (arrow (signatureEnvironment sig) (monadType (AppT ListT (ConT ''Dyn))))
 
 typedDestructure :: [EnvTy] -> Fields ts -> Ty r -> Code (Env ls -> HL ts -> M (Flow r)) -> Code (Env ls -> HL ts -> M (Flow r))
 typedDestructure env fs r = annotate (arrow (environmentType env)
@@ -239,3 +538,106 @@ typedDestructure env fs r = annotate (arrow (environmentType env)
 typedTupleSetters :: [EnvTy] -> Fields ts -> Code (Env ls -> M (HL ts -> M ())) -> Code (Env ls -> M (HL ts -> M ()))
 typedTupleSetters env fs = annotate (arrow (environmentType env)
   (monadType (arrow (haskellType (TTuple fs)) (monadType (TupleT 0)))))
+
+emitFunction :: [FunctionStep env] -> FunctionEnd env a -> Code (env -> M a)
+emitFunction [] (ResidualFunction code) = code
+emitFunction steps end = Code (inspectionOnly undefined) (actionFunctionExpression Nothing (functionAction steps end)) Nothing Nothing (FunctionSequence steps end)
+
+actionFunctionExpression :: Maybe Type -> Code (Action env m a) -> Exp
+actionFunctionExpression annotation action = AppE (VarE 'runAction) expression
+  where
+    expression = case annotation of
+      Just (AppT (AppT ArrowT env) (AppT monad result)) ->
+        SigE (toSource (actionProgram action)) (AppT (AppT (AppT (ConT ''Action) env) monad) result)
+      _ -> toSource (actionProgram action)
+
+hlistCode :: Code a -> Code (HL ls) -> Code (HL (a ': ls))
+hlistCode a b = Code (runCode a :* runCode b) (app '(:*) [toSource a, toSource b]) Nothing Nothing (HListValue a b)
+
+hlistConstructor :: Code (a -> HL ls -> HL (a ': ls))
+hlistConstructor = Code (:*) (ConE '(:*)) Nothing Nothing Ordinary
+
+writePrimitiveResidual :: Ty a -> Code (StoragePath -> a -> M ())
+writePrimitiveResidual ty = Code (inspectionOnly undefined)
+  (AppE (VarE 'writeVal) (toSource ty)) Nothing Nothing Ordinary
+
+writeFunctionResidual :: Ty a -> Code StoragePath -> Code (a -> M ())
+writeFunctionResidual ty code = Code (inspectionOnly undefined)
+  (AppE (AppE (VarE 'writeVal) (toSource ty)) (toSource code)) Nothing Nothing Ordinary
+
+replaceResidual :: Ix ls a -> Code a -> Code (Env ls) -> Code (Env ls)
+replaceResidual index value code = Code (replaceValue index (runCode value) (runCode code))
+  (AppE (AppE (AppE (VarE 'replaceValue) (toSource index)) (toSource value)) (toSource code)) Nothing Nothing Ordinary
+
+primitiveCode :: Primitive a -> Code a
+primitiveCode primitive = Code (inspectionOnly undefined) expression Nothing Nothing Ordinary
+  where
+    expression = case primitive of
+      IdentityPrimitive -> VarE 'id
+      ReturnPrimitive -> ConE 'Core.Ret
+      DynamicReturnPrimitive -> ConE 'Core.RetDynamic
+      NotPrimitive -> VarE 'not
+      EqualPrimitive -> VarE '(==)
+      LessPrimitive -> VarE '(<)
+      GreaterPrimitive -> VarE '(>)
+      LessEqualPrimitive -> VarE '(<=)
+      GreaterEqualPrimitive -> VarE '(>=)
+      HNilPrimitive -> ConE 'HNil
+      NextPrimitive -> ConE 'Next
+      BreakPrimitive -> ConE 'Brk
+      ContinuePrimitive -> ConE 'Cnt
+      EmptyListPrimitive -> ListE []
+      FromIntegerPrimitive -> VarE 'fromInteger
+      FromListPrimitive -> VarE 'Data.Sequence.fromList
+      DynPrimitive ty -> AppE (ConE 'Dyn) (toSource ty)
+      RetDynPrimitive ty -> AppE (VarE 'retDyn) (toSource ty)
+      ApplyLastPrimitive -> VarE 'applyLast
+
+mapComputation :: Code (a -> b) -> Code (Action env M a) -> Code (Action env M b)
+mapComputation function action = Code (inspectionOnly undefined)
+  (AppE (AppE (VarE 'fmap) (toSource function)) (toSource action)) Nothing Nothing Ordinary
+
+applyComputation :: Code (Action env M (a -> b)) -> Code (Action env M a) -> Code (Action env M b)
+applyComputation function action = Code (inspectionOnly undefined)
+  (InfixE (Just (toSource function)) (VarE '(<*>)) (Just (toSource action))) Nothing Nothing Ordinary
+
+traverseFunctionResidual :: [Code (env -> M a)] -> Code (env -> M [a])
+traverseFunctionResidual functions = Code (inspectionOnly undefined)
+  (LamE [VarP environment] (AppE (AppE (VarE 'mapM)
+    (InfixE Nothing (VarE '($)) (Just (VarE environment)))) (ListE (map toSource functions))))
+  Nothing Nothing Ordinary
+  where environment = mkName "environment"
+
+extendValueResidual :: Code (Env (a ': ls) -> b) -> Code (Env ls -> a -> b)
+extendValueResidual function = Code (inspectionOnly undefined)
+  (LamE [VarP environment] (LamE [VarP value]
+    (AppE (toSource function) (app '(:&) [VarE value, VarE environment])))) Nothing Nothing Ordinary
+  where environment = mkName "environment"; value = mkName "value"
+
+dropEnvironmentResidual :: Code (Env ls -> b) -> Code (Env (a ': ls) -> b)
+dropEnvironmentResidual function = Code (inspectionOnly undefined)
+  (LamE [ConP '(:&) [] [WildP, VarP environment]]
+    (AppE (toSource function) (VarE environment))) Nothing Nothing Ordinary
+  where environment = mkName "environment"
+
+bindEnvironmentResidual :: Code (Env ls -> M a) -> Code (Env (a ': ls) -> M b) -> Code (Env ls -> M b)
+bindEnvironmentResidual initial next = Code (inspectionOnly undefined)
+  (LamE [VarP environment] (DoE Nothing
+    [BindS (VarP value) (AppE (toSource initial) (VarE environment)),
+     NoBindS (AppE (toSource next) (app '(:&) [VarE value, VarE environment]))])) Nothing Nothing Ordinary
+  where environment = mkName "environment"; value = mkName "value"
+
+functionBindResidual :: Code (env -> M a) -> Code (env -> a -> M b) -> Code (env -> M b)
+functionBindResidual first next = Code (inspectionOnly undefined)
+  (LamE [VarP environment] (InfixE (Just (AppE (toSource first) (VarE environment)))
+    (VarE '(>>=)) (Just (AppE (toSource next) (VarE environment))))) Nothing Nothing Ordinary
+  where environment = mkName "environment"
+
+extendValueAt :: Code (Env ls) -> Code (Env (a ': ls) -> b) -> Code (a -> b)
+extendValueAt environment function = Code (inspectionOnly undefined)
+  (LamE [VarP value] (AppE (toSource function) (app '(:&) [VarE value, toSource environment])))
+  Nothing Nothing Ordinary
+  where value = mkName "value"
+
+emitGasResult :: Integer -> Code a -> Code (M a)
+emitGasResult gas = emitResultSteps [GasStep gas]

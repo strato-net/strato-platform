@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, TypeFamilies, RankNTypes,
-             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification #-}
+             ScopedTypeVariables, LambdaCase, OverloadedStrings, ExistentialQuantification, CPP #-}
 -- Typed core for the SolidVM -> Haskell-action compiler.
 -- No `Value` sum type at runtime: every compiled closure has an exact Haskell type.
 module SolidVM.Core where
@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Type.Equality
 import Blockchain.SolidVM.Exception (SolidException (TooMuchGas))
-import Data.Bits (shiftR)
+import Data.Bits ((.|.), (.&.), xor, shiftL, shiftR)
 import Blockchain.Strato.Model.Address (Address (..))
 import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 
@@ -286,6 +286,56 @@ data RT = RT
 
 type M = ReaderT (RT, Frame) IO
 
+-- An action executes in a typed local environment. Composition uses the
+-- underlying monad's ordinary sequencing.
+newtype Action env m a = Action (env -> m a)
+instance Functor m => Functor (Action env m) where
+  fmap f (Action action) = Action (fmap f . action)
+
+instance Applicative m => Applicative (Action env m) where
+  pure value = Action (const (pure value))
+  Action function <*> Action argument = Action (\env -> function env <*> argument env)
+
+instance Monad m => Monad (Action env m) where
+  Action first >>= continuation = Action $ \env ->
+    first env >>= \value -> case continuation value of Action rest -> rest env
+
+runAction :: Action env m a -> env -> m a
+runAction (Action action) = action
+
+liftAction :: m a -> Action env m a
+liftAction action = Action (const action)
+
+askEnvironment :: Applicative m => Action env m env
+askEnvironment = Action pure
+
+contextAction :: (env -> m a) -> Action env m a
+contextAction = Action
+
+withEnvironment :: (outer -> inner) -> Action inner m a -> Action outer m a
+withEnvironment project (Action action) = Action (action . project)
+
+chargeAction :: Integer -> Action env M ()
+chargeAction = liftAction . chargeGas
+
+-- Keep the reader argument explicit to avoid an intermediate action for each
+-- environment application.
+chargeActionAfter :: Integer -> Action env M a -> Action env M a
+chargeActionAfter gas (Action action) = Action $ \env -> ReaderT $ \runtime -> do
+  value <- runReaderT (action env) runtime
+  runReaderT (chargeGas gas) runtime
+  pure value
+{-# INLINE chargeActionAfter #-}
+
+storeAction :: Ty a -> StoragePath -> a -> Action env M ()
+storeAction ty path value = liftAction (writeVal ty path value)
+
+readReference :: Ix ls (IORef a) -> Action (Env ls) M a
+readReference index = Action (\env -> liftIO (readIORef (ref index env)))
+
+valueAt :: Applicative m => Ix ls a -> Action (Env ls) m a
+valueAt index = Action (pure . localValue index)
+
 bindActionChain :: M a -> [a -> M a] -> (a -> M b) -> M b
 bindActionChain initial commands final = continuation `seq` (initial >>= continuation)
   where
@@ -305,7 +355,10 @@ chargeAfter amount action = do
   pure value
 
 chargeOp :: Integer -> M ()
-chargeOp bytes = chargeGas (1 + (bytes `shiftR` 5))
+chargeOp bytes = chargeGas (operationGas bytes)
+
+operationGas :: Integer -> Integer
+operationGas bytes = 1 + (bytes `shiftR` 5)
 
 -- SolidVM charges by 256-bit limbs, including a full limb for small integers.
 byteWidth :: Integer -> Integer
@@ -393,6 +446,14 @@ data Sig (args :: [Type]) r where
 type family Fn (args :: [Type]) r where
   Fn '[] r = M r
   Fn (a ': as) r = a -> Fn as r
+
+-- A checked call is assembled from these typed applications at compilation.
+-- Execution applies argument values without walking a signature.
+applyLast :: M r -> HL '[] -> M r
+applyLast action HNil = action
+
+applyNext :: (Fn args r -> HL args -> M r) -> (a -> Fn args r) -> HL (a ': args) -> M r
+applyNext next f (value :* values) = next (f value) values
 
 -- A compiled function: its exact signature and the Haskell action of exactly that type.
 data Fun = forall args r. Fun T.Text (Sig args r) (Fn args r)
@@ -534,3 +595,5 @@ dynFromText t s = case t of
 -- ---------------------------------------------------------------- control flow
 
 data Flow r = Next | Brk | Cnt | Ret r | RetDynamic [Dyn]
+
+#include "IntegerActions.inc"

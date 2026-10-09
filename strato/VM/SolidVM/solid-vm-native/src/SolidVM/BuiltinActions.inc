@@ -1,5 +1,4 @@
-  lookupAction :: T.Text -> Maybe ([Dyn] -> M Dyn)
-  lookupAction = \case
+  \case
     "keccak256" -> Just keccak
     "ecrecover" -> Just recover
     "addmod" -> Just (modular (+))

@@ -3,9 +3,10 @@ module SolidVM.BuiltinSource (lookupActionSource) where
 
 import SolidVM.Builtins hiding (lookupAction)
 import SolidVM.BuiltinQuotation (builtinActions)
-import SolidVM.Core
 import qualified Data.Text as T
+import Language.Haskell.TH (Exp)
 
-$(builtinActions [d|
+lookupActionSource :: T.Text -> Maybe Exp
+lookupActionSource = $(builtinActions [|
 #include "BuiltinActions.inc"
   |])
