@@ -16,7 +16,6 @@ build-type:     Simple
 
 library
   exposed-modules:
-      Blockchain.Slipstream.Bus
       Blockchain.Slipstream.Data.Action
       Blockchain.Slipstream.Data.CirrusTables
       Blockchain.Slipstream.Events
@@ -69,7 +68,6 @@ library
     , strato-redis-blockdb
     , strato-tracing
     , streaming
-    , streaming-kafka-hw
     , text
     , time
     , transformers
@@ -97,7 +95,6 @@ executable slipstream
     , sql-monad
     , strato-conf
     , streaming
-    , streaming-kafka-hw
     , text
     , transformers
     , unliftio

@@ -5,15 +5,12 @@ Phase 7 of the tiered deployment. Time-series data the app's charts want
 service's own Postgres so heavy chart queries never touch the node's
 replicas, and served as compact, cacheable JSON.
 
-## Feeds
+## Feed
 
-- **Bus** (`BUS_HOST`): consumes `chain_events` from the shared message bus
-  (phase 4), one event per message, seconds after the block. Group
-  `HISTORY_CONSUMER_GROUP` (default `history`) shared by all copies.
 - **Cirrus poller** (`NODE_URL`): pages the node's global `event` table by id
   from where it left off. On first start that is the backfill from genesis;
-  afterwards it trails the bus by one poll and fills anything the bus feed
-  missed (a broker outage, a message older than retention).
+  afterwards one page per `HISTORY_CIRRUS_INTERVAL_MS`, so a chart trails
+  the chain by about that interval.
 
 Price events (`PriceUpdated`, `BatchPricesUpdated`) are taken from the
 contracts in `HISTORY_PRICE_ORACLES` only (comma-separated addresses; default
@@ -21,10 +18,10 @@ the system price oracle `0000…1002`): price series are keyed by asset, so any
 other contract emitting them is ignored. Transfers and swaps are keyed by
 the emitting contract and need no such list.
 
-Both feeds write through one serialised apply step. Every row is keyed by
+Batches write through one serialised apply step. Every row is keyed by
 chain position and inserted with `ON CONFLICT DO NOTHING`; current balances,
-daily snapshots and candles advance only from rows that were new. So the two
-feeds overlap freely, arrive in any order, and a replay changes nothing.
+daily snapshots and candles advance only from rows that were new. So pages
+can arrive in any order, and a replay changes nothing.
 
 Events handled, keyed by name and argument shape (never by contract name,
 which collides across code collections):
@@ -66,7 +63,7 @@ on block time; the indexer creates partitions as it goes.
 
 ```
 postgres_host=... postgres_password=... NODE_URL=https://app.example \
-BUS_HOST=... BUS_SASL_USERNAME=... BUS_SASL_PASSWORD=... npm start
+npm start
 ```
 
 `npm test` runs the feed-independent checks, then the Postgres suite

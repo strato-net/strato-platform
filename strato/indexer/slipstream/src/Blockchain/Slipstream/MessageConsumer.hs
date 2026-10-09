@@ -23,7 +23,6 @@ import Blockchain.Data.WriterLease (LostWriterLease (..), holdsWriterLease)
 import Blockchain.Slipstream.Data.CirrusTables
 -- import Blockchain.EthConf  -- UNUSED: was for solidvmevents
 -- import Blockchain.Slipstream.Data.Action (AggregateEvent)  -- UNUSED: was for solidvmevents
-import Blockchain.Slipstream.Bus (BusPublisher (..))
 import Blockchain.Slipstream.Metrics
 import Blockchain.Slipstream.Processor
 import Blockchain.Slipstream.OutputData
@@ -48,7 +47,7 @@ import Prelude hiding (lookup)
 import UnliftIO (throwIO)
 
 -- | Consumes @vmevents@ forever. Only the cell holding the writer lease
--- writes Cirrus, transaction results and the bus; a standby follows the
+-- writes Cirrus and transaction results; a standby follows the
 -- writer through @cirrus_progress@, committing each batch's offset once the
 -- writer has that batch's blocks, so a promoted cell resumes within a batch
 -- of where the writer stopped.
@@ -59,15 +58,14 @@ getAndProcessMessages ::
   ) =>
   Text ->
   PGConnection ->
-  Maybe BusPublisher ->
   m ()
-getAndProcessMessages cell conn mBus = do
+getAndProcessMessages cell conn = do
   -- createTopicAndWait solidVmEventsTopicName  -- UNUSED: no consumer
 
   consume "slipstream" "vmevents" $ \messages -> do
     holds <- holdsWriterLease cell
     if holds
-      then processBatch cell conn mBus messages
+      then processBatch cell conn messages
       else case cirrusTip messages of
         -- No block in the batch (code collections, results). Returning
         -- would commit the offset past them, which is only right when some
@@ -87,7 +85,7 @@ getAndProcessMessages cell conn mBus = do
       if holds
         then do
           $logInfoS "slipstream" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now; applying a batch without blocks"
-          processBatch cell conn mBus messages
+          processBatch cell conn messages
         else do
           progress <- liftIO $ getCirrusProgress conn
           if progress > seen
@@ -112,7 +110,7 @@ getAndProcessMessages cell conn mBus = do
           if holds
             then do
               $logInfoS "slipstream" . T.pack $ "cell " ++ T.unpack cell ++ " holds the writer lease now; resuming Cirrus indexing at block " ++ show tip
-              processBatch cell conn mBus messages
+              processBatch cell conn messages
             else do
               unless logged $
                 $logInfoS "slipstream" . T.pack $
@@ -137,10 +135,9 @@ processBatch ::
   ) =>
   Text ->
   PGConnection ->
-  Maybe BusPublisher ->
   [VMEvent] ->
   m ()
-processBatch cell conn mBus allMessages = timeSlipstreamPhase "batch" $ do
+processBatch cell conn allMessages = timeSlipstreamPhase "batch" $ do
     recordKafkaMessages allMessages
     progress <- liftIO $ getCirrusProgress conn
     let committed n = maybe False (>= n) progress
@@ -166,12 +163,10 @@ processBatch cell conn mBus allMessages = timeSlipstreamPhase "batch" $ do
     -- lands in the last chunk and commits in the same transaction as the
     -- batch's final Cirrus writes: the marker never claims a block whose
     -- rows are still uncommitted.
-    (emittedEvents, ()) <- runConduit $
+    (_, ()) <- runConduit $
       ((processTheMessages messages <* for_ mProgressTip (yield . Right . cirrusProgressQuery)) `fuseUpstream` dedupC) `fuseBoth`
-        sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk cell conn mBus)
+        sinkSlipstreamOutputChunks slipstreamOutputChunkSize (writeOutputChunk cell conn)
     recordProcessedKafkaMessages messages
-    -- Egress: the batch's events go out after everything above committed.
-    for_ mBus $ \bus -> publishEvents bus emittedEvents
     -- Publish the high-water mark only after the conduit above has committed
     -- the batch's rows, so it never claims blocks Cirrus hasn't indexed yet.
     for_ mTip publishCirrusHighWaterMark
@@ -186,11 +181,10 @@ writeOutputChunk ::
   (MonadLogger m, HasSQL m) =>
   Text ->
   PGConnection ->
-  Maybe BusPublisher ->
   [SlipstreamQuery] ->
   [TransactionResult] ->
   m ()
-writeOutputChunk cell conn mBus slipstreamQueries transactionResults = do
+writeOutputChunk cell conn slipstreamQueries transactionResults = do
   holds <- holdsWriterLease cell
   unless holds $ throwIO (LostWriterLease cell)
   recordOutputBatch slipstreamQueries transactionResults
@@ -198,8 +192,6 @@ writeOutputChunk cell conn mBus slipstreamQueries transactionResults = do
   unless (null transactionResults) $ do
     started <- liftIO Tr.nowNanos
     timeSlipstreamPhase "transaction_results" . void $ putTransactionResults transactionResults
-    -- Results reach the bus only once Postgres has them.
-    for_ mBus $ \bus -> publishResults bus transactionResults
     liftIO $ recordResultSpans started transactionResults
 
 -- | One "tx.result" span per result in the transaction's trace (its id

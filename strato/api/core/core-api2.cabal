@@ -75,7 +75,6 @@ library
     , strato-model
     , strato-redis-blockdb
     , strato-tracing
-    , streaming-kafka-hw
     , template-haskell
     , text
     , time

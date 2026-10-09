@@ -29,8 +29,8 @@ services:
         max-size: "100m"
         max-file: "3"
   # App history service (phase 7): prices, swaps and balances over time in
-  # its own database, fed by the bus when BUS_HOST is set and by polling the
-  # node's Cirrus otherwise. Served by nginx under /history-api. There is no
+  # its own database, fed by polling the node's Cirrus. Served by nginx under
+  # /history-api. There is no
   # postgres service in this file, so it only starts under the "history"
   # profile (docker compose --profile history up) with postgres_host set.
   history:
@@ -44,11 +44,6 @@ services:
       - postgres_user=${postgres_user:-postgres}
       - postgres_password=${postgres_password}
       - HISTORY_DB_NAME=${HISTORY_DB_NAME:-history}
-      - BUS_HOST=${BUS_HOST:-}
-      - BUS_PORT=${BUS_PORT:-9096}
-      - BUS_SECURITY=${BUS_SECURITY:-sasl_ssl}
-      - BUS_SASL_USERNAME=${BUS_SASL_USERNAME:-}
-      - BUS_SASL_PASSWORD=${BUS_SASL_PASSWORD:-}
     restart: unless-stopped
     logging:
       driver: "json-file"

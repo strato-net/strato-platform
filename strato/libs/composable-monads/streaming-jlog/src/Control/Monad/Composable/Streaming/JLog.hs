@@ -44,6 +44,7 @@ module Control.Monad.Composable.Streaming.JLog (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  seedConsumerGroupFrom,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -78,7 +79,7 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 
 import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
-                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
+                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber, jlog_ctx_add_subscriber_copy_checkpoint,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
@@ -385,6 +386,34 @@ runConsume consumerGroup topicName f = do
                 poke idPtr lastId
                 void $ jlog_ctx_read_checkpoint ctx idPtr
             jlog_ctx_close ctx
+
+-- | Give a consumer group that does not exist yet the checkpoint of another
+-- one on the same topic, so a group split off an existing consumer resumes
+-- where that consumer was instead of replaying the whole log. A group that
+-- already has a checkpoint is left alone; nothing happens when the old one
+-- has none either. True when a checkpoint was copied.
+seedConsumerGroupFrom :: HasStreaming m => ConsumerGroup -> ConsumerGroup -> TopicName -> m Bool
+seedConsumerGroupFrom new old topicName = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+  liftIO $ do
+    createDirectoryIfMissing True (seBasePath env)
+    withCString topicPath $ \cpath -> withCString (T.unpack new) $ \cnew -> withCString (T.unpack old) $ \cold -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return False
+        else do
+          _ <- jlog_ctx_init ctx
+          -- A reader opens only for a subscriber that exists.
+          exists <- (== 0) <$> jlog_ctx_open_reader ctx cnew
+          jlog_ctx_close ctx
+          if exists
+            then return False
+            else do
+              ctx' <- jlog_new cpath
+              rc <- jlog_ctx_add_subscriber_copy_checkpoint ctx' cnew cold
+              jlog_ctx_close ctx'
+              return (rc == 0)
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b

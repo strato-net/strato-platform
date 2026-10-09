@@ -1,5 +1,4 @@
 import fs from "fs";
-import os from "os";
 
 const DB_NAME_RE = /^[a-z_][a-z0-9_]*$/;
 
@@ -28,12 +27,6 @@ const parseDbSsl = (): DbSsl => {
   process.exit(2);
 };
 
-const busSecurity = (process.env.BUS_SECURITY || "sasl_ssl").toLowerCase();
-if (!["plaintext", "ssl", "sasl_ssl"].includes(busSecurity)) {
-  console.error(`Invalid BUS_SECURITY "${busSecurity}" - use plaintext, ssl or sasl_ssl`);
-  process.exit(2);
-}
-
 // Price series are keyed by asset alone, so only these contracts may write
 // them: the system price oracle by default. Lowercase hex, comma separated.
 const priceOracles = (process.env.HISTORY_PRICE_ORACLES || "0000000000000000000000000000000000001002")
@@ -60,23 +53,8 @@ export const config = {
     maintenanceDb: process.env.POSTGRES_MAINTENANCE_DB || "postgres",
     createDatabase: process.env.HISTORY_DB_CREATE !== "false",
   },
-  // Live feed: the shared message bus (phase 4), topic chain_events. Empty
-  // BUS_HOST disables it; the Cirrus poller alone then keeps the history
-  // complete, at its polling latency.
-  bus: {
-    host: process.env.BUS_HOST || "",
-    port: Number(process.env.BUS_PORT || 9096),
-    security: busSecurity as "plaintext" | "ssl" | "sasl_ssl",
-    saslUsername: process.env.BUS_SASL_USERNAME || "",
-    saslPassword: process.env.BUS_SASL_PASSWORD || "",
-    eventsTopic: process.env.BUS_EVENTS_TOPIC || "chain_events",
-    // One group shared by every copy of this service: the topic has one
-    // partition, so one copy consumes and the others stand by.
-    consumerGroup: process.env.HISTORY_CONSUMER_GROUP || "history",
-    clientId: `history-${os.hostname()}`,
-  },
-  // Backfill and completeness: Cirrus's global event table, paged by id
-  // (block_number sorts as text there, so never page by it).
+  // The feed: Cirrus's global event table, paged by id (block_number sorts
+  // as text there, so never page by it).
   cirrus: {
     nodeUrl: (process.env.NODE_URL || "").replace(/\/$/, ""),
     enabled: process.env.HISTORY_CIRRUS_POLL !== "false",
@@ -97,6 +75,6 @@ export const config = {
   },
 };
 
-if (!config.bus.host && !config.cirrus.nodeUrl) {
-  console.warn("[Config] neither BUS_HOST nor NODE_URL is set: the service will serve what it has and index nothing");
+if (!config.cirrus.nodeUrl) {
+  console.warn("[Config] NODE_URL is not set: the service will serve what it has and index nothing");
 }

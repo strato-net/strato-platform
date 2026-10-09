@@ -54,8 +54,8 @@ CREATE TABLE swaps (
 CREATE INDEX swaps_pool_ts ON swaps (pool, block_ts);
 
 -- Change log: two rows per Transfer (the sender's debit, the receiver's
--- credit). Sums are order independent, which is what lets the bus feed and
--- the Cirrus poller both write without coordinating.
+-- credit). Sums are order independent, so pages may be applied in any
+-- order.
 CREATE TABLE balance_changes (
   token        TEXT NOT NULL,
   account      TEXT NOT NULL,

@@ -18,7 +18,6 @@ import Strato.Auth.Client (AuthEnv, newAuthEnv, runWithAuth)
 import qualified Strato.Strato23.API.Types as VC
 import Strato.Strato23.Client
 import System.Info (os)
-import System.Environment (lookupEnv)
 import System.Process (readProcess)
 import Text.ShortDescription
 
@@ -159,25 +158,15 @@ genEthConf role = do
         , password = pgPass
         }
 
-  envSaslPassword <- lookupEnv "bus_sasl_password"
-  let saslPassword = case (flags_busSaslPassword, envSaslPassword) of
-        (p, _) | not (null p) -> Just p
-        (_, Just p) | not (null p) -> Just p
-        _ -> Nothing
-      busConf
-        | null flags_busHost = Nothing
-        | otherwise = Just def
-            { busHost = flags_busHost
-            , busPort = flags_busPort
-            , busSecurity = flags_busSecurity
-            , busSaslUsername = if null flags_busSaslUsername then Nothing else Just flags_busSaslUsername
-            , busSaslPassword = saslPassword
-            , busSubmitMode = flags_busSubmitMode
-            }
+  let commaList = words . map (\c -> if c == ',' then ' ' else c)
 
   return runtimeConfig
-    { busConfig = busConf
-    , vmConfig = (vmConfig runtimeConfig) { vmQueryUrl = if flags_vmQuery then Just "http://127.0.0.1:8546" else Nothing }
+    { ingressUrls = commaList flags_ingressUrls
+    , vmConfig = (vmConfig runtimeConfig)
+        { vmQueryUrls = ["http://127.0.0.1:8546" | flags_vmQuery] ++ commaList flags_vmQueryUrls
+        -- An API directory runs no vm-runner: the mirror answers or nobody does.
+        , vmQueryOnly = role == RoleApi
+        }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
     , peerSqlitePath = case flags_peerStore of

@@ -54,7 +54,6 @@ executable strato-api
     , strato-model
     , strato-redis-blockdb
     , strato-tracing
-    , streaming-kafka-hw
     , text
     , time
     , transformers

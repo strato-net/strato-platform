@@ -27,9 +27,8 @@ the cores sharing the cluster: `--cellId` at setup, default the hostname.
   the lease before each batch (its Cirrus writes cross a database boundary,
   so they are idempotent rather than fenced).
 - **Gated writers.** The lease gates strato-indexer's SQL side, the
-  `node_status` mirror, and slipstream (Cirrus, `transaction_result`, and
-  the bus egress). vm-runner, the sequencer and p2p never write the shared
-  cluster.
+  `node_status` mirror, and slipstream (Cirrus and `transaction_result`).
+  vm-runner, the sequencer and p2p never write the shared cluster.
 
 ## How a standby follows
 
@@ -124,10 +123,9 @@ identity guard.
    `strato-setup --regenerate --validatorBehavior=true` and restart, with
    the validator set updated through governance as the network requires.
    Never run two cores with the same validator key.
-5. **Re-point the edge.** With the message bus, nothing changes: the
-   standby's strato-ingest already consumed `ingest_tx` under its own
-   group, and its slipstream now publishes `tx_results` and `chain_events`.
-   Without the bus, point the API tier's broker host at the new writer.
+5. **Re-point the edge.** Nothing to do: the API tier posts every batch to
+   every cell's ingress (see core-ingress.md), so the standby's `ingest_tx`
+   log already holds what the writer's did.
 6. **The old writer, when it comes back**, starts as a standby: its claim
    finds a fresh heartbeat. Re-seed it from a snapshot if it was down
    longer than retention.

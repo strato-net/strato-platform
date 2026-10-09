@@ -16,7 +16,7 @@ Cirrus lag.
 
 **Process metrics** every Haskell process already exposed, plus the three
 that had no endpoint: strato-indexer (10779), ethereum-discover (10780,
-peer counts) and strato-ingest (10781, forwarded and dropped counters). The
+peer counts) and strato-ingest (10781, accepted and dropped counters). The
 node's own Prometheus scrape config gained those jobs and lost the dead
 process-monitor one.
 
@@ -46,8 +46,8 @@ is a no-op):
   (`Strato.Tracing.traceIdFromHash`, the hash's first 16 bytes). Every stage
   that knows the hash records its span into that trace without
   coordination: `tx.submit` in strato-api (linked to the request trace it
-  arrived in), `tx.forward` in strato-ingest when the bus hands the
-  transaction to the core, `tx.received` in the sequencer (whose length is
+  arrived in), `tx.ingress` in strato-ingest when the API tier hands the
+  transaction to the cell, `tx.received` in the sequencer (whose length is
   the submit-to-sequencer latency, since it starts at the API's submit
   timestamp carried on the ingest event), `tx.sequenced` when a committed
   block carrying it leaves the sequencer, `tx.execute` in vm-runner with
@@ -96,12 +96,11 @@ and routes by severity through its alertmanager to two SNS topics.
 | sequencer more than 50 blocks ahead of execution | Cirrus more than 20 blocks behind |
 | eth tables more than 20 blocks behind | invalid (rejected) blocks being seen |
 | Cirrus more than 200 blocks behind | fewer than 2 peers |
-| writer lease held by zero or two cells | ingest dropping bus events |
+| writer lease held by zero or two cells | ingest dropping non-transaction events |
 | a process's metrics endpoint down 2 min | vm-runner live heap over 12 GB |
 | edge 5xx over 1 percent | sustained 403s on the edge, p95 over 2 s |
 | synthetic check failing 3 min | Aurora connections or CPU high |
-| Aurora replica lag over 5 s | bus under-replicated partitions |
-| bus consumer group lag growing | cell memory over 90 percent |
+| Aurora replica lag over 5 s | cell memory over 90 percent |
 | cell unreachable, cell disk under 15 percent free | |
 
 PagerDuty subscribes to the pages topic and Slack to the warnings topic.
@@ -116,8 +115,8 @@ Four Grafana boards in `observability/dashboards/` in the ha-infra repo, pushed 
   requests entering each tier, transactions submitted versus forwarded
   versus executed, and the chain tip versus the two indexer tips.
 - **Per tier**: edge request rate by status, latency percentiles, 5xx ratio
-  and connections; Aurora lag, connections and CPU; bus consumer lag and
-  broker throughput; ECS task CPU and memory.
+  and connections; Aurora lag, connections and CPU; ECS task CPU and
+  memory.
 - **Per machine**: host CPU, memory, disk, IOPS, throughput and network
   from the CloudWatch agent, and the RTS live heap and GC share of every
   Haskell process, one variable per host.

@@ -1,10 +1,13 @@
 #api-version:<VERSION>
-# STRATO API tier: strato-api + ethereum-jsonrpc behind an nginx sidecar, with
-# PostgREST for Cirrus. Stateless; run as many copies as needed behind a load
-# balancer. Everything it needs is reached over the network:
+# STRATO API tier: strato-api + ethereum-jsonrpc (+ vm-query) behind an nginx
+# sidecar, with PostgREST for Cirrus. Stateless; run as many copies as needed
+# behind a load balancer. Everything it needs is reached over the network:
 #   Postgres (eth + cirrus)   postgres_host / postgres_password
-#   Kafka (tx submission)     kafkaHost / kafkaPort
+#   core cells (tx submission) INGRESS_URLS: every cell's strato-ingest
 #   vault                     VAULT_URL
+# Reads are served from the SQL mirror by vm-query: this copy's own
+# (VM_QUERY=true) and, when that is unreachable, the other copies' at
+# VM_QUERY_URLS. Nothing here ever reaches a core's consensus VM.
 # Mount a node's ethconf.yaml at ./config/ethconf.yaml for the network
 # parameters, and the node's secrets/ (postgres_password, session_secret,
 # oauth_credentials.yaml) at ./secrets/.
@@ -17,16 +20,10 @@ services:
       - postgres_port=${postgres_port:-5432}
       - postgres_user=${postgres_user:-postgres}
       - postgres_password=${postgres_password:-}
-      - kafkaHost=${kafkaHost:?kafkaHost is required}
-      - kafkaPort=${kafkaPort:-9092}
-      # Shared message bus (optional): submits go there per BUS_SUBMIT_MODE
-      # and resolve=true wakes on its tx_results stream.
-      - BUS_HOST=${BUS_HOST:-}
-      - BUS_PORT=${BUS_PORT:-9096}
-      - BUS_SECURITY=${BUS_SECURITY:-sasl_ssl}
-      - BUS_SASL_USERNAME=${BUS_SASL_USERNAME:-}
-      - BUS_SASL_PASSWORD=${BUS_SASL_PASSWORD:-}
-      - BUS_SUBMIT_MODE=${BUS_SUBMIT_MODE:-shadow}
+      # Comma-separated; a submitted batch is posted to every cell.
+      - INGRESS_URLS=${INGRESS_URLS:?INGRESS_URLS is required (http://<cell>:8600, comma-separated)}
+      - VM_QUERY=${VM_QUERY:-true}
+      - VM_QUERY_URLS=${VM_QUERY_URLS:-}
       - VAULT_URL=${VAULT_URL:-}
       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-}
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-}

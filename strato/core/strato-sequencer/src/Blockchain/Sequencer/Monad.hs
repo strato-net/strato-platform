@@ -436,11 +436,11 @@ fuseChannels = do
   debugLog
     <$> mergeSources
       [ conduitBatchSource "sequencer" streamingAddress unseqEventsTopicName .| mapC UnseqEvents,
-        -- API transactions forwarded from the message bus: consumed with a
-        -- committed offset, so a sequencer restart resumes where it stopped
-        -- instead of skipping what arrived meanwhile (transactions dedup by
-        -- hash, so the at-least-once redelivery is safe).
-        conduitGroupBatchSource "sequencer-ingest" streamingAddress "sequencer-ingest" ingestTxTopicName .| mapC UnseqEvents,
+        -- API transactions handed in through strato-ingest: its own durable
+        -- subscriber, so a sequencer restart resumes where it stopped instead
+        -- of skipping what arrived meanwhile (transactions dedup by hash, so
+        -- the at-least-once redelivery is safe).
+        conduitBatchSource "sequencer-ingest" streamingAddress ingestTxTopicName .| mapC UnseqEvents,
         sourceTMChan timers .| mapC TimerFire
       ]
       1 -- Keep decoded Kafka batches from piling up ahead of eventHandler.

@@ -42,8 +42,8 @@ import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
 import Blockchain.Strato.Model.StateRoot (StateRoot (..), unboxStateRoot)
 import Text.Format (format)
-import Control.Exception (SomeException, evaluate, try)
-import Control.Monad (void, when, zipWithM)
+import Control.Exception (SomeException, evaluate, throwIO, try)
+import Control.Monad (unless, void, when, zipWithM)
 import Control.Monad.IO.Class
 import Control.Concurrent.MVar (takeMVar)
 import Control.Monad.Except
@@ -69,7 +69,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find, findIndex, isPrefixOf)
+import Data.List (find, findIndex, intercalate, isPrefixOf)
 import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -80,7 +80,8 @@ import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
 import LocalApi (formatClientError, runLocal, sharedManager)
-import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseTimeout, responseTimeoutMicro)
+import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
+import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
 import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
@@ -287,28 +288,50 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  case EthConf.vmQueryUrl (EthConf.vmConfig ethConf) of
-    Just url | routableToVmQuery c -> do
+  let vmc = EthConf.vmConfig ethConf
+      urls = EthConf.vmQueryUrls vmc
+      -- A tier without a consensus VM: the mirror answers or nobody does.
+      only = EthConf.vmQueryOnly vmc
+  if null urls || not (routableToVmQuery c)
+    then
+      if only
+        then pure $ Error (jrcId c) "vm-query: this command needs the consensus VM's own state (a trie proof or a block replay), which this tier does not serve"
+        else callVmRunner waitMicros c
+    else do
       started <- getMonotonicTimeNSec
-      viaQuery <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      -- The instances are tried in order; one that cannot be reached (or
+      -- fails outright) hands the command to the next. A decline is final:
+      -- every instance holds the same mirror and would decline too.
+      answer <- tryInstances urls []
       -- The fallback gets what is left of the deadline, so a slow mirror
       -- plus the consensus VM cannot take twice the wait (and outlive the
       -- HTTP server's own timeout).
       let remaining = do
             now <- getMonotonicTimeNSec
             pure $ max 0 (waitMicros - fromIntegral ((now - started) `div` 1000))
-      case viaQuery of
-        -- vm-query answers what the mirror holds and declines the rest
-        -- (historical blocks, trie-bound reads) with a "vm-query:" error,
-        -- which means: ask the consensus VM.
-        Right (Error _ msg) | "vm-query:" `isPrefixOf` msg -> do
-          putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
-          remaining >>= \left -> callVmRunner left c
+      case answer of
+        Right (Error _ msg) | "vm-query:" `isPrefixOf` msg ->
+          if only
+            then pure $ Error (jrcId c) msg
+            else do
+              putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
+              remaining >>= \left -> callVmRunner left c
         Right resp -> pure resp
+        Left failures ->
+          if only
+            then pure $ Error (jrcId c) ("vm-query: no instance reachable (" ++ intercalate "; " failures ++ ")")
+            else do
+              putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ intercalate "; " failures ++ "), using vm-runner"
+              remaining >>= \left -> callVmRunner left c
+  where
+    tryInstances [] failures = pure (Left (reverse failures))
+    tryInstances (url : rest) failures = do
+      r <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      case r of
+        Right resp -> pure (Right resp)
         Left e -> do
-          putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ show e ++ "), using vm-runner"
-          remaining >>= \left -> callVmRunner left c
-    _ -> callVmRunner waitMicros c
+          putStrLn $ "callVM: vm-query at " ++ url ++ " unreachable for " ++ show (jrcId c) ++ ": " ++ show e
+          tryInstances rest ((url ++ ": " ++ show e) : failures)
 
 -- | The read commands the mirror can serve; the rest never leave the queue path.
 routableToVmQuery :: JsonRpcCommand -> Bool
@@ -333,6 +356,10 @@ callVmQuery url waitMicros c = do
             responseTimeout = responseTimeoutMicro waitMicros
           }
   resp <- httpLbs req sharedManager
+  -- An instance that sheds (503) or fails is unreachable for this command,
+  -- so the caller moves on to the next one; only a 200 carries an answer.
+  let code = statusCode (responseStatus resp)
+  unless (code >= 200 && code < 300) . throwIO . userError $ "vm-query at " ++ url ++ " answered HTTP " ++ show code
   case Bin.decodeOrFail (responseBody resp) of
     Right (_, _, r) -> pure r
     Left (_, _, err) -> pure $ Error (jrcId c) ("vm-query: undecodable response: " ++ err)

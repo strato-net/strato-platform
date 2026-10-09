@@ -1493,8 +1493,7 @@ getResultAndRespond ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->

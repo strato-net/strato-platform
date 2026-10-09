@@ -25,7 +25,6 @@ library:
     - common-log
     - composable-monads-base
     - conduit
-    - streaming-kafka-hw
     - containers
     - deepseq
     - directory

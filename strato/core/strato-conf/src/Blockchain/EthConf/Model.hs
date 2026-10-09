@@ -50,7 +50,11 @@ data EthConf = EthConf
     -- must see the latest commit.
     sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
-    busConfig :: Maybe BusConf,
+    -- | The core cells' transaction ingress endpoints (strato-ingest), for
+    -- an API tier that runs no sequencer of its own: a submitted batch is
+    -- posted to every one of them. Empty on a node, which writes its own
+    -- stream directly.
+    ingressUrls :: [String],
     -- | This core's name among the cores that share one Postgres cluster:
     -- the writer lease is held by a cell, and cell-local consumer groups
     -- carry the name. Missing means the hostname.
@@ -92,7 +96,7 @@ instance FromJSON EthConf where
     <$> v .: "sqlConfig"
     <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
-    <*> v .:? "busConfig"
+    <*> v .:? "ingressUrls" .!= []
     <*> v .:? "cellId"
     <*> v .:? "peerDbConfig"
     <*> v .:? "peerSqlitePath"
@@ -179,43 +183,6 @@ kafkaHost = streamingHost
 kafkaPort :: StreamingConf -> Int
 kafkaPort = streamingPort
 {-# DEPRECATED kafkaPort "Use streamingPort instead" #-}
-
--- | The shared message bus (Phase 4 of the tiered deployment): an external
--- Kafka-compatible cluster carrying transactions inbound to the core
--- (@ingest_tx@) and results and events outbound (@tx_results@,
--- @chain_events@). Absent (Nothing) on a node that still submits straight
--- into its own broker.
-data BusConf = BusConf
-  { busHost :: String,
-    busPort :: Int,
-    -- | "plaintext", "ssl" or "sasl_ssl" (librdkafka's security.protocol)
-    busSecurity :: String,
-    -- | SCRAM-SHA-512 credentials for "sasl_ssl"
-    busSaslUsername :: Maybe String,
-    busSaslPassword :: Maybe String,
-    busIngestTopic :: String,
-    busResultsTopic :: String,
-    busEventsTopic :: String,
-    -- | Where the API tier sends submitted transactions: "core" (the node's
-    -- own broker, as before), "bus", or "shadow" (both, while validating).
-    busSubmitMode :: String
-  }
-  deriving (Show, Eq, Generic, ToJSON)
-
-instance FromJSON BusConf where
-  parseJSON = withObject "BusConf" $ \v -> BusConf
-    <$> v .: "busHost"
-    <*> v .:? "busPort" .!= 9092
-    <*> v .:? "busSecurity" .!= "plaintext"
-    <*> v .:? "busSaslUsername"
-    <*> v .:? "busSaslPassword"
-    <*> v .:? "busIngestTopic" .!= "ingest_tx"
-    <*> v .:? "busResultsTopic" .!= "tx_results"
-    <*> v .:? "busEventsTopic" .!= "chain_events"
-    <*> v .:? "busSubmitMode" .!= "core"
-
-instance Default BusConf where
-  def = BusConf "" 9092 "plaintext" Nothing Nothing "ingest_tx" "tx_results" "chain_events" "core"
 
 data RedisBlockDBConf = RedisBlockDBConf
   { redisHost :: String,
@@ -390,11 +357,15 @@ data VmConf = VmConf
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
-  -- | Base URL of a vm-query service (phase 5). Set, ethereum-jsonrpc sends
-  -- latest-state calls, simulations and call traces there, against the SQL
-  -- state mirror, and falls back to the consensus VM only for what it
-  -- declines. Unset, everything goes to vm-runner as before.
-  , vmQueryUrl :: Maybe String
+  -- | Base URLs of vm-query services (phase 5), tried in order. Set,
+  -- ethereum-jsonrpc sends latest-state calls, simulations and call traces
+  -- there, against the SQL state mirror. Empty, everything goes to
+  -- vm-runner as before.
+  , vmQueryUrls :: [String]
+  -- | True on a tier with no consensus VM of its own (the API tier): what
+  -- vm-query cannot serve, or cannot be reached for, is answered with an
+  -- error instead of being sent to vm-runner.
+  , vmQueryOnly :: Bool
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -405,7 +376,8 @@ instance FromJSON VmConf where
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
     <*> v .:? "simMaxConcurrent" .!= 8
-    <*> v .:? "vmQueryUrl"
+    <*> ((\single many -> maybe [] pure single ++ many) <$> v .:? "vmQueryUrl" <*> v .:? "vmQueryUrls" .!= [])
+    <*> v .:? "vmQueryOnly" .!= False
 
 -- Default instances
 
@@ -481,7 +453,8 @@ instance Default VmConf where
     { sqlDiff = True
     , diffPublish = True
     , simMaxConcurrent = 8
-    , vmQueryUrl = Nothing
+    , vmQueryUrls = []
+    , vmQueryOnly = False
     }
 
 instance Default ContractsConf where
@@ -522,7 +495,7 @@ instance Default EthConf where
     { sqlConfig = def
     , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
-    , busConfig = Nothing
+    , ingressUrls = []
     , cellId = Nothing
     , peerDbConfig = Nothing
     , peerSqlitePath = Nothing

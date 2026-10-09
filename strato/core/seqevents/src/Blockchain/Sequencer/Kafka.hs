@@ -34,7 +34,7 @@ import Control.Monad.IO.Class (MonadIO)
 unseqEventsTopicName :: TopicName
 unseqEventsTopicName = "unseqevents"
 
--- | Transactions forwarded from the message bus by strato-ingest. Kept
+-- | Transactions the API tier handed to strato-ingest, this cell's ingress. Kept
 -- apart from @unseqevents@ (gossip and consensus traffic, read from the
 -- latest offset) because this one is consumed durably and may be replayed:
 -- replaying transactions is harmless, replaying consensus messages is not.

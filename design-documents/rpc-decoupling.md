@@ -204,14 +204,17 @@ block and its age; `/metrics` has request counts by command and outcome, a
 latency histogram and the in-flight gauge. Request spans continue the
 caller's trace (`traceparent`).
 
-**Routing.** With `vmConfig.vmQueryUrl` set, ethereum-jsonrpc sends
+**Routing.** With `vmConfig.vmQueryUrls` set, ethereum-jsonrpc sends
 `eth_call`, `eth_call` v2, `strato_traceCall` and `strato_simulateV1` to the
-service and everything else to the queue as before. The service answers
-what the mirror holds and declines the rest with an error whose message
-starts with `vm-query:` (a historical block, a trace-bound read, a block
-replay), and ethereum-jsonrpc then falls back to the consensus VM for that
-command, as it does when the service is unreachable. Nothing is lost by
-turning it on; what is gained is that the read traffic leaves vm-runner.
+instances in order (the next one when one cannot be reached) and everything
+else to the queue as before. The service answers what the mirror holds and
+declines the rest with an error whose message starts with `vm-query:` (a
+historical block, a trace-bound read, a block replay). On a node,
+ethereum-jsonrpc then falls back to the consensus VM for that command, as it
+does when no instance is reachable; nothing is lost by turning it on, and
+the read traffic leaves vm-runner. On the API tier (`vmQueryOnly`) there is
+no consensus VM to fall back to and the decline is the answer; see
+core-ingress.md.
 
 **Turning it on.** `strato-setup --vmQuery` adds the process to
 `commands.txt` and sets the URL in ethconf; the API container takes

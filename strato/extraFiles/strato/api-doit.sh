@@ -12,10 +12,12 @@
 #   postgres_host, postgres_port, postgres_user   writer endpoint (host required)
 #   postgres_reader_host                          replica endpoint for reads
 #   ETHCONF_BASE64                                the node config, when not mounted
-#   BUS_HOST, BUS_PORT, BUS_SECURITY, BUS_SASL_USERNAME, BUS_SASL_PASSWORD,
-#   BUS_SUBMIT_MODE (core|bus|shadow)             the shared message bus
+#   INGRESS_URLS (required)                       the core cells' transaction ingress
+#                                                 (strato-ingest), comma-separated;
+#                                                 a batch is posted to every one
+#   VM_QUERY (default true), VM_QUERY_URLS        this copy's vm-query, and other
+#                                                 copies' to try when it is down
 #   postgres_password | /run/secrets/postgres_password
-#   kafkaHost, kafkaPort                          broker for tx submission
 #   VAULT_URL                                     vault-wrapper base URL
 #   OAUTH_CREDENTIALS_YAML | /run/secrets/oauth_credentials.yaml
 #     | OAUTH_DISCOVERY_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET
@@ -74,20 +76,14 @@ override     '.sqlConfig.user'                 "${postgres_user:-}"
 override     '.cirrusConfig.user'              "${postgres_user:-}"
 override     '.sqlConfig.password'             "${postgres_password:-}"
 override     '.cirrusConfig.password'          "${postgres_password:-}"
-override     '.streamingConfig.streamingHost'  "${kafkaHost:-}"
-override_num '.streamingConfig.streamingPort'  "${kafkaPort:-}"
 override     '.urlConfig.vaultUrl'             "${VAULT_URL:-}"
-# The shared message bus (Phase 4). BUS_HOST empty means no bus: the API
-# submits to the core's broker (kafkaHost) as before.
-if [[ -n "${BUS_HOST:-}" ]]; then
-  yq -i '.busConfig = {}' "$CONF"
-  override     '.busConfig.busHost'            "$BUS_HOST"
-  override_num '.busConfig.busPort'            "${BUS_PORT:-9096}"
-  override     '.busConfig.busSecurity'        "${BUS_SECURITY:-sasl_ssl}"
-  override     '.busConfig.busSaslUsername'    "${BUS_SASL_USERNAME:-}"
-  override     '.busConfig.busSaslPassword'    "${BUS_SASL_PASSWORD:-}"
-  override     '.busConfig.busSubmitMode'      "${BUS_SUBMIT_MODE:-shadow}"
+# Submitted transactions go to every core cell's ingress (strato-ingest);
+# this tier runs no sequencer and never writes a stream of its own.
+if [[ -z "${INGRESS_URLS:-}" ]]; then
+  echo "api-doit.sh: INGRESS_URLS is required (comma-separated http://<cell>:8600 of every core cell)" >&2
+  exit 8
 fi
+INGRESS_LIST="$INGRESS_URLS" yq -i '.ingressUrls = (strenv(INGRESS_LIST) | split(",") | map(trim) | map(select(. != "")))' "$CONF"
 # General eth reads go to the replica endpoint; writes and the resolve poll
 # stay on the writer (see Blockchain.DB.SQLDB).
 if [[ -n "${postgres_reader_host:-}" ]]; then
@@ -97,12 +93,25 @@ fi
 override     '.apiConfig.apiListenAddress'     "$API_LISTEN_ADDRESS"
 # ethereum-jsonrpc binds apiListenAddress as well, and bloc reaches it in this
 # same container on loopback for simulations (strato-api derives the URL).
-# vm-query (phase 5): latest-state calls served from the mirror in this
-# same container when VM_QUERY=true. It reads through sqlReaderConfig, so
-# with postgres_reader_host set its snapshots run on the replica.
-if [[ "${VM_QUERY:-false}" == "true" ]]; then
-  override   '.vmConfig.vmQueryUrl'            "http://127.0.0.1:8546"
+# vm-query (phase 5): calls, simulations and call traces are served from
+# the SQL mirror by this container's own instance (VM_QUERY=true, the
+# default) and, when it cannot be reached, by the other copies' instances at
+# VM_QUERY_URLS. This tier has no consensus VM: what the mirror cannot serve
+# is answered with an error, never forwarded to a core (vmQueryOnly).
+VM_QUERY_LIST=""
+if [[ "${VM_QUERY:-true}" == "true" ]]; then
+  VM_QUERY_LIST="http://127.0.0.1:8546"
 fi
+if [[ -n "${VM_QUERY_URLS:-}" ]]; then
+  VM_QUERY_LIST="${VM_QUERY_LIST:+$VM_QUERY_LIST,}$VM_QUERY_URLS"
+fi
+if [[ -z "$VM_QUERY_LIST" ]]; then
+  echo "api-doit.sh: no vm-query instance (VM_QUERY=false and VM_QUERY_URLS empty); the API tier cannot serve eth_call without one" >&2
+  exit 9
+fi
+yq -i '.vmConfig.vmQueryUrl = null' "$CONF"
+VM_QUERY_LIST="$VM_QUERY_LIST" yq -i '.vmConfig.vmQueryUrls = (strenv(VM_QUERY_LIST) | split(",") | map(trim) | map(select(. != "")))' "$CONF"
+yq -i '.vmConfig.vmQueryOnly = true' "$CONF"
 export STRATO_CONF="$CONF"
 
 # OAuth client credentials for strato-api's service-to-service calls: a
@@ -137,7 +146,7 @@ cat > commands.txt << EOC
 strato-api +RTS -T -N -maxN4 -RTS
 ethereum-jsonrpc +RTS -T -N -maxN4 -RTS
 EOC
-if [[ "${VM_QUERY:-false}" == "true" ]]; then
+if [[ "${VM_QUERY:-true}" == "true" ]]; then
   echo "@restart vm-query serve +RTS -T -N -maxN4 -RTS" >> commands.txt
 fi
 

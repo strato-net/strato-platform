@@ -31,7 +31,6 @@ import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.Database.Queries (getContractByAddress, withCodeCollectionCache)
-import Bloc.Monad (HasBlocEnv, getBlocEnv, BlocEnv (..))
 import Bloc.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
@@ -62,7 +61,6 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.Set (isSubsetOf)
-import Data.Time (UTCTime, getCurrentTime)
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -106,8 +104,7 @@ getBlocTransactionResult' ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -133,8 +130,7 @@ getBlocTransactionResult ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   Keccak256 ->
   Bool ->
@@ -149,8 +145,7 @@ getBatchBlocTransactionResult' ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -169,8 +164,7 @@ postBlocTransactionResults ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   Bool ->
   [Keccak256] ->
@@ -185,8 +179,7 @@ postBlocTransactionResults' ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
-    MonadLogger m,
-    HasBlocEnv m
+    MonadLogger m
   ) =>
   Bool ->
   [Keccak256] ->
@@ -196,30 +189,19 @@ postBlocTransactionResults' resolve hashes = recurseTRDs resolve hashes >>= eval
 recurseTRDs ::
   ( MonadLogger m
   , HasSQLDB m
-  , HasBlocEnv m
   , A.Selectable TxsFilterParams [RawTransaction] m
   ) =>
   Bool ->
   [Keccak256] ->
   m [TRD]
 recurseTRDs resolve hashes = do
-  mFeed <- resultsFeed <$> getBlocEnv
-  -- Ten seconds either way. With the bus feed each wait lasts up to a second
-  -- but ends the moment a result for one of the hashes is announced, so a
-  -- resolving transaction costs a couple of queries instead of a hundred.
-  let (maxRounds, waitMicros) = case mFeed of
-        Just _ -> (10 :: Integer, 1000000)
-        Nothing -> (100, 100000)
-      -- since: taken before the round's lookup, so an announcement that
-      -- lands during the lookup still ends the wait that follows it.
-      waitRound since pendingHashes = case mFeed of
-        Nothing -> liftIO $ threadDelay waitMicros
-        Just feed -> liftIO $ waitForAnnouncement feed pendingHashes since waitMicros
+  -- Ten seconds in all: a hundred rounds of a hundred milliseconds.
+  let maxRounds = 100 :: Integer
+      waitRound = liftIO $ threadDelay 100000
   go maxRounds waitRound (0 :: Integer) (toPending hashes)
   where
     go maxRounds waitRound num list = do
       let his = map (trdHash &&& trdIndex) list
-      since <- liftIO getCurrentTime
       statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
       let (pending', done) =
             partitionEithers $
@@ -239,7 +221,7 @@ recurseTRDs resolve hashes = do
               then return pending'
               else do
                 $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
-                waitRound since (map trdHash pending')
+                waitRound
                 go maxRounds waitRound (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
 
@@ -253,20 +235,6 @@ recurseTRDs resolve hashes = do
       if c d p
         then (d : merge ds (p : ps) c)
         else (p : merge (d : ds) ps c)
-
--- | Block until the feed announces a result for one of the hashes, or the
--- timeout passes. Only announcements made after @since@ count: a hash stays
--- in the feed for minutes, and a result announced before this round began
--- was already looked up (and found still pending, the raw transaction
--- trailing on a replica), so it must not cut the round short again.
-waitForAnnouncement :: TVar (Map Keccak256 UTCTime) -> [Keccak256] -> UTCTime -> Int -> IO ()
-waitForAnnouncement feed pendingHashes since micros = do
-  timedOut <- registerDelay micros
-  atomically $ do
-    seen <- readTVar feed
-    expired <- readTVar timedOut
-    let announced h = maybe False (> since) (Map.lookup h seen)
-    unless (expired || any announced pendingHashes) retrySTM
 
 forStateT :: Monad m => s -> [a] -> (a -> StateT s m b) -> m [b]
 forStateT s as = flip evalStateT s . for as

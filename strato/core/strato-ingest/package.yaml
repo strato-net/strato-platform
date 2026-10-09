@@ -1,7 +1,7 @@
 name:                strato-ingest
 version:             0.1.0.0
 license:             Apache-2.0
-synopsis:            Forwards transactions from the shared message bus into this core's broker
+synopsis:            "This core cell's transaction ingress: appends batches posted by the API tier to the local ingest log"
 
 dependencies:
 - base
@@ -12,6 +12,8 @@ executables:
     source-dirs: exec_src
     ghc-options: -Wall -Werror -threaded -rtsopts
     dependencies:
+    - aeson
+    - binary
     - blockapps-init
     - blockapps-data
     - blockDB
@@ -19,7 +21,7 @@ executables:
     - composable-monads-base
     - containers
     - hflags
-    - process
+    - http-types
     - process-monitor
     - prometheus-client
     - seqevents
@@ -27,8 +29,8 @@ executables:
     - strato-model
     - strato-tracing
     - streaming
-    - streaming-kafka-hw
     - text
     - unliftio
+    - wai
     - wai-middleware-prometheus
     - warp

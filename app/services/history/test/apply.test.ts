@@ -1,45 +1,11 @@
-// Feed-independent checks that need no database: envelope and Cirrus row
+// Checks that need no database: Cirrus row
 // normalisation and the number helpers. Run with `npm test`.
 import assert from "assert";
-import { fromBusEnvelope, fromCirrusRow, ord } from "../src/indexer/normalize";
+import { fromCirrusRow, ord } from "../src/indexer/normalize";
 import { parseJsonPreservingBigInts, ratio18, toAddress, toBigInt } from "../src/utils/num";
 
 const addr = "d3b4b0e2b2c3d4e5f60718293a4b5c6d7e8f9a0b";
-const envelope = JSON.stringify({
-  version: 1,
-  event: {
-    eventBlockHash: "aa".repeat(32),
-    eventBlockTimestamp: "2026-09-10T21:17:54.454261Z",
-    eventBlockNumber: 512345,
-    eventTxSender: addr,
-    eventIndex: 3,
-    eventEvent: {
-      eventBlockHash: "aa".repeat(32),
-      eventTxHash: "bb".repeat(32),
-      eventTxSender: addr,
-      eventContractName: "Token",
-      eventContractAddress: "ABCDEF0123456789ABCDEF0123456789ABCDEF01",
-      eventName: "Transfer",
-      eventArgs: [
-        ["from", { t: "addr", v: addr, p: false }, "", {}],
-        ["to", { t: "addr", v: "00".repeat(20), p: false }, "", {}],
-        ["value", { t: "int", v: "100000000000000000000000" }, "", {}],
-      ],
-      eventTopics: [],
-    },
-  },
-});
 
-const ev = fromBusEnvelope(envelope);
-assert(ev, "envelope parses");
-assert.strictEqual(ev.address, "abcdef0123456789abcdef0123456789abcdef01");
-assert.strictEqual(ev.name, "Transfer");
-assert.strictEqual(ev.blockNumber, 512345);
-assert.strictEqual(ev.args.from, addr);
-assert.strictEqual(toBigInt(ev.args.value), 100000000000000000000000n);
-assert.strictEqual(ev.txHash, "bb".repeat(32));
-assert.strictEqual(fromBusEnvelope('{"version":2}'), null);
-assert.strictEqual(fromBusEnvelope("not json"), null);
 
 // Cirrus renders uint256 attributes as bare numbers: the raw text must be
 // parsed with the big-int guard, and arrays arrive as JSON text.

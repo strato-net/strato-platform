@@ -25,12 +25,11 @@ const RESOLUTIONS: [string, string][] = [
 const dayOf = (ts: Date): string => ts.toISOString().slice(0, 10);
 
 /**
- * Both feeds call this; one batch at a time per process (see applySerialized)
- * so partition creation never races. Every write is keyed by chain position,
- * inserted with ON CONFLICT DO NOTHING, and the derived tables (current
- * balances, daily snapshots, candles) are only advanced by rows that were
- * actually new. The bus feed and the Cirrus poller can therefore overlap
- * and arrive in any order without coordinating.
+ * One batch at a time per process (see applySerialized), so partition
+ * creation never races. Every write is keyed by chain position, inserted
+ * with ON CONFLICT DO NOTHING, and the derived tables (current balances,
+ * daily snapshots, candles) are only advanced by rows that were actually
+ * new, so a replayed page changes nothing.
  */
 export const applyEvents = async (
   events: NormalizedEvent[],
@@ -53,7 +52,7 @@ export const applyEvents = async (
 
 let chain: Promise<unknown> = Promise.resolve();
 
-/** applyEvents, one batch at a time across the two feeds. */
+/** applyEvents, one batch at a time. */
 export const applySerialized = (
   events: NormalizedEvent[],
   progress?: { name: string; blockNumber: number; cursor: number }

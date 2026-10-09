@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_busHost, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -140,8 +140,9 @@ createCommandsFile role = do
       , restartable "slipstream +RTS -T -RTS"
       , restartable "strato-network-monitor"
       ]
-      -- With a message bus, the pre-sequencer forwards its transactions here.
-      ++ [restartable "strato-ingest +RTS -T -RTS" | not (null flags_busHost)]
+      -- A core cell takes the API tier's transactions through its ingress;
+      -- a monolith's strato-api writes its own stream directly.
+      ++ [restartable ("strato-ingest --port=" ++ show flags_ingressPort ++ " +RTS -T -RTS") | role == RoleCore]
 
   let apiCommands
         | roleRunsApi role =

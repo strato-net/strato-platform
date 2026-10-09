@@ -14,7 +14,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Handlers.Transaction
-  ( initBusSubmit,
+  (
     TxsFilterParams (..),
     txsFilterParams,
     API,
@@ -34,11 +34,10 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction, rawTX2TX, transactionHash)
 import Blockchain.EthConf (ethConf, runStreamMPooled)
-import Blockchain.EthConf.Model (BusConf (..), busConfig)
-import Control.Monad.Composable.Streaming.Bus (BusSettings (..), createBusEnv)
-import qualified Control.Monad.Composable.Streaming.Kafka as Bus
+import Blockchain.EthConf.Model (ingressUrls)
 import Data.Foldable (for_)
-import Data.String (fromString)
+import Network.HTTP.Client (Manager, RequestBody (..), defaultManagerSettings, httpLbs, method, newManager, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
+import Network.HTTP.Types (statusCode)
 import System.IO.Unsafe (unsafePerformIO)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.WrappedBlock
@@ -50,8 +49,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
 import qualified Control.Exception as E
-import Control.Concurrent (forkIO, threadDelay)
-import Control.Monad (unless, void, when)
+import Control.Monad (forM_, unless, when)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import qualified Control.Monad.Composable.Base as Base
@@ -61,12 +59,13 @@ import Data.Aeson
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as BL8
 import Data.Conduit
 import Data.Conduit.Combinators (yieldMany)
 import Data.List
 import Data.Maybe
-import Data.Time.Clock (UTCTime, diffUTCTime, getCurrentTime)
 import qualified Data.Text as T
+import Data.Time.Clock (UTCTime)
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
@@ -225,49 +224,20 @@ instance (SQLDB Base.:> es) => Selectable TxsFilterParams [RawTransaction] (Base
 
       return . Just $ nub txs
 
--- | Where submitted transactions go. Without a message bus, straight into
--- the node's own broker (the historical path). With one, per the config's
--- submit mode: "bus" (the ingest topic, which strato-ingest forwards into a
--- core), "core", or "shadow" (both, while validating the bus path: the
--- duplicate is dropped by the mempool's hash dedup).
+-- | Where submitted transactions go. On a node, straight into its own
+-- stream (the historical path). On the API tier, 'ingressUrls' names the
+-- core cells' strato-ingest endpoints and the batch is posted to every one
+-- of them, so each cell's sequencer holds it in its mempool and a standby
+-- promoted later already has it (the copies dedup by hash). The submit
+-- succeeds once at least one cell has accepted it.
 instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] where
   output txs = do
-    let mode = maybe "core" busSubmitMode (busConfig ethConf)
-    mBus <- liftIO $ readIORef busSubmitEnv
     started <- liftIO Tr.nowNanos
-    case (mode, mBus) of
-      ("bus", Just (env, topic)) -> submitToBusOrCore env topic
-      ("shadow", Just (env, topic)) -> submitToBusOrCore env topic
-      (m, Nothing) | m /= "core" -> do
-        $logWarnS "writeIngestTx" . T.pack $
-          "bus submit path not connected (see initBusSubmit); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
-        submitToCore
-      _ -> submitToCore
+    let urls = ingressUrls ethConf
+        mode = if null urls then "local" else "ingress"
+    if null urls then submitLocally else submitToIngress urls
     liftIO $ recordSubmitSpans started mode
     where
-      -- The bus is one way into a core, the local broker another; a
-      -- transaction the bus does not take is written to the core instead
-      -- (in shadow mode it goes there anyway). After a failure the bus is
-      -- skipped for 30s rather than paying the delivery timeout per submit.
-      submitToBusOrCore env topic = do
-        now <- liftIO getCurrentTime
-        failedAt <- liftIO $ readIORef busSubmitFailedAt
-        let mode = maybe "core" busSubmitMode (busConfig ethConf)
-        if maybe False (\t -> now `diffUTCTime` t < 30) failedAt
-          then do
-            $logWarnS "writeIngestTx" . T.pack $ "bus failed within the last 30s; writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
-            submitToCore
-          else do
-            r <- try $ submitToBus env topic
-            case r of
-              Right () -> when (mode == "shadow") submitToCore
-              Left (e :: SomeException) -> do
-                -- Now, not the attempt's start: a failed attempt has just
-                -- spent the delivery timeout, which would eat the window.
-                failedNow <- liftIO getCurrentTime
-                liftIO $ writeIORef busSubmitFailedAt (Just failedNow)
-                $logWarnS "writeIngestTx" . T.pack $ "bus submit failed (" ++ show e ++ "); writing " ++ show (length txs) ++ " tx(s) to the local broker instead"
-                submitToCore
       -- One "tx.submit" span per transaction, in the transaction's own trace
       -- (its id derives from the hash), linked to the request trace it
       -- arrived in. strato-ingest and slipstream add the later stages.
@@ -285,46 +255,40 @@ instance (Base.Logger Base.:> es) => (Base.Eff es) `Mod.Outputs` [IngestEvent] w
               ]
               (maybe [] pure request)
               Nothing
-      submitToCore = do
+      submitLocally = do
         $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to unseqevents"
         resps <- runStreamMPooled "strato-api" $ writeUnseqEvents txs
-        $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
-      submitToBus env topic = do
-        $logDebugS "writeIngestTxBegin" . T.pack $ "Writing " ++ show (length txs) ++ " tx(s) to the bus"
-        _ <- Bus.runStreamMUsingEnv env $ Bus.produceItems topic txs
-        pure ()
+        $logDebug $ T.pack $ "writeUnseqEventsEnd commit: " ++ show resps
+      submitToIngress urls = do
+        $logDebugS "writeIngestTxBegin" . T.pack $ "Posting " ++ show (length txs) ++ " tx(s) to " ++ show (length urls) ++ " core cell(s)"
+        ctx <- liftIO Tr.currentRequestContext
+        results <- liftIO $ mapConcurrently (\u -> (,) u <$> try (postIngest ctx u txs)) urls
+        let failures = [(u, e) | (u, Left (e :: SomeException)) <- results]
+            accepted = length results - length failures
+        forM_ failures $ \(u, e) ->
+          $logWarnS "writeIngestTx" . T.pack $ "core cell " ++ u ++ " did not accept the batch: " ++ show e
+        when (accepted == 0) . liftIO . throwIO . userError $
+          "no core cell accepted the transaction batch (" ++ show (length urls) ++ " tried)"
 
--- | The bus producer used for submits, set once at startup by 'initBusSubmit'
--- (the 'Outputs' instance above has no environment to carry it).
-{-# NOINLINE busSubmitEnv #-}
-busSubmitEnv :: IORef (Maybe (Bus.StreamEnv, Bus.TopicName))
-busSubmitEnv = unsafePerformIO $ newIORef Nothing
+-- | POST a batch to one cell's ingress, as the bytes the stream carries.
+postIngest :: Maybe Tr.TraceContext -> String -> [IngestEvent] -> IO ()
+postIngest ctx url txs = do
+  initial <- parseRequest (url ++ "/ingest")
+  let req =
+        initial
+          { method = "POST",
+            requestHeaders = [("Content-Type", "application/octet-stream")] ++ maybe [] (\t -> [("traceparent", Tr.renderTraceparent t)]) ctx,
+            requestBody = RequestBodyLBS (Bin.encode txs),
+            responseTimeout = responseTimeoutMicro 10000000
+          }
+  resp <- httpLbs req ingressManager
+  let code = statusCode (responseStatus resp)
+  unless (code >= 200 && code < 300) . throwIO . userError $
+    "HTTP " ++ show code ++ " from " ++ url ++ ": " ++ take 200 (BL8.unpack (responseBody resp))
 
--- | When a submit to the bus last failed, if recently (see submitToBusOrCore).
-{-# NOINLINE busSubmitFailedAt #-}
-busSubmitFailedAt :: IORef (Maybe UTCTime)
-busSubmitFailedAt = unsafePerformIO $ newIORef Nothing
-
--- | Connect the submit path to the configured bus and make sure its ingest
--- topic exists, in the background: the API serves (and submits to the
--- local broker) whether or not the bus is reachable, and keeps retrying
--- until it is. A no-op without a bus config.
-initBusSubmit :: IO ()
-initBusSubmit = for_ (busConfig ethConf) $ \conf -> void . forkIO $ connectBus conf
-  where
-    connectBus conf = do
-      env <- createBusEnv "strato-api" (BusSettings (busHost conf) (busPort conf) (busSecurity conf) (busSaslUsername conf) (busSaslPassword conf))
-      let topic = fromString (busIngestTopic conf)
-      r <- try . Base.runEff . Bus.runStreamMUsingEnv env $ Bus.createTopicAndWait topic
-      case r of
-        Right () -> do
-          writeIORef busSubmitEnv (Just (env, topic))
-          putStrLn $ "strato-api: bus submit path connected to " ++ busHost conf ++ ":" ++ show (busPort conf)
-        Left (e :: SomeException) -> do
-          Bus.closeStreamEnv env
-          putStrLn $ "strato-api: bus submit path unavailable, retrying in 5s: " ++ show e
-          threadDelay 5000000
-          connectBus conf
+{-# NOINLINE ingressManager #-}
+ingressManager :: Manager
+ingressManager = unsafePerformIO $ newManager defaultManagerSettings
 
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw) = do

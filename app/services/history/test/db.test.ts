@@ -22,7 +22,7 @@ const alice = "11".repeat(20);
 const bob = "22".repeat(20);
 
 const ev = (name: string, blockNumber: number, ts: string, eventIndex: number, address: string, args: Record<string, unknown>): NormalizedEvent => ({
-  source: "bus", contractName: "", address, name, blockNumber, blockTs: new Date(ts), eventIndex, txHash: null, sender: null, args,
+  source: "cirrus", contractName: "", address, name, blockNumber, blockTs: new Date(ts), eventIndex, txHash: null, sender: null, args,
 });
 
 const events: NormalizedEvent[] = [
@@ -49,7 +49,7 @@ const snapshot = async () => ({
   await query("TRUNCATE balance_changes, balances_current, balance_snapshots_daily, price_observations, swaps, ohlc, history_progress");
 
   // Chain order first
-  const s1 = await applyEvents(events, { name: "bus", blockNumber: 300, cursor: 1 });
+  const s1 = await applyEvents(events, { name: "cirrus", blockNumber: 300, cursor: 1 });
   assert.strictEqual(s1.transfers, 3);
   assert.strictEqual(s1.prices, 4);
   assert.strictEqual(s1.swaps, 1);

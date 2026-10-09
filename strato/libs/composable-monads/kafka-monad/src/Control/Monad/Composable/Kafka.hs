@@ -41,6 +41,7 @@ module Control.Monad.Composable.Kafka (
   consumeFromLatest,
   lookupKafkaCheckpoint,
   setKafkaCheckpoint,
+  seedConsumerGroupFrom,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -207,6 +208,19 @@ lookupKafkaCheckpoint consumerGroup topicName =
     Left UnknownTopicOrPartition -> return Nothing
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
     Right (o, _) -> return $ Just o
+
+-- | Give a consumer group with no committed offset the offset of another one
+-- on the same topic (see the JLog backend's version); True when copied.
+seedConsumerGroupFrom :: HasStreaming m => ConsumerGroup -> ConsumerGroup -> TopicName -> m Bool
+seedConsumerGroupFrom new old topicName = do
+  existing <- lookupKafkaCheckpoint new topicName
+  case existing of
+    Just _ -> return False
+    Nothing -> do
+      legacy <- lookupKafkaCheckpoint old topicName
+      case legacy of
+        Nothing -> return False
+        Just ofs -> True <$ setKafkaCheckpoint new topicName ofs
 
 getKafkaCheckpoint :: HasStreaming m =>
                       ConsumerGroup -> TopicName -> m Offset

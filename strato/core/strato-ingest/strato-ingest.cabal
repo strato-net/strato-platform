@@ -6,7 +6,7 @@ cabal-version: 1.12
 
 name:           strato-ingest
 version:        0.1.0.0
-synopsis:       Forwards transactions from the shared message bus into this core's broker
+synopsis:       This core cell's transaction ingress: appends batches posted by the API tier to the local ingest log
 license:        Apache-2.0
 build-type:     Simple
 
@@ -18,7 +18,9 @@ executable strato-ingest
       exec_src
   ghc-options: -Wall -Werror -threaded -rtsopts
   build-depends:
-      base
+      aeson
+    , base
+    , binary
     , blockDB
     , blockapps-data
     , blockapps-init
@@ -26,7 +28,7 @@ executable strato-ingest
     , composable-monads-base
     , containers
     , hflags
-    , process
+    , http-types
     , process-monitor
     , prometheus-client
     , seqevents
@@ -34,9 +36,9 @@ executable strato-ingest
     , strato-model
     , strato-tracing
     , streaming
-    , streaming-kafka-hw
     , text
     , unliftio
+    , wai
     , wai-middleware-prometheus
     , warp
   default-language: Haskell2010

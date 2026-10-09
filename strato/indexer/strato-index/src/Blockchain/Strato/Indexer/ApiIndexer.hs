@@ -47,7 +47,7 @@ import Blockchain.Strato.StateDiff.Database (commitSqlDiffsSql)
 import Control.Concurrent (threadDelay)
 import Control.Monad
 import Data.Foldable (for_)
-import Data.Maybe (isJust, isNothing)
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import Data.Time.Clock (getCurrentTime)
 import UnliftIO (MonadIO, liftIO, throwIO)
@@ -93,11 +93,7 @@ sqlIndexerLoop cell = consume sqlConsumerGroup targetTopicName (indexAPIGated ce
 -- | On the first run after the SQL side got its own group, start it from the
 -- combined group's offset rather than from the beginning of retention.
 seedSqlConsumerGroup :: HasStreaming m => m ()
-seedSqlConsumerGroup = do
-  existing <- lookupKafkaCheckpoint sqlConsumerGroup targetTopicName
-  when (isNothing existing) $ do
-    legacy <- lookupKafkaCheckpoint p2pConsumerGroup targetTopicName
-    for_ legacy $ setKafkaCheckpoint sqlConsumerGroup targetTopicName
+seedSqlConsumerGroup = void $ seedConsumerGroupFrom sqlConsumerGroup p2pConsumerGroup targetTopicName
 
 -- | The highest block number a batch carries, if it carries any.
 batchTip :: [IndexEvent] -> Maybe Integer

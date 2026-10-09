@@ -6,7 +6,6 @@ import { config } from "./config";
 import { bootstrapDb } from "./db/bootstrap";
 import { pool } from "./db/pool";
 import { router } from "./api/routes";
-import { runBusConsumerForever } from "./indexer/bus";
 import { runCirrusPoller } from "./indexer/cirrus";
 import { logError, logInfo } from "./utils/logger";
 
@@ -38,14 +37,8 @@ app.use((error: any, req: express.Request, res: express.Response, _next: express
   }
   app.listen(config.port, () => {
     logInfo("HistoryService", `Listening on port ${config.port}`);
-    // The two feeds run side by side and write through one serialised apply
-    // step. The bus is the low-latency path; the poller is the backfill from
-    // genesis and the completeness guarantee behind it.
-    if (config.bus.host) {
-      runBusConsumerForever().catch((error) => logError("HistoryService", error, { operation: "bus" }));
-    } else {
-      logInfo("HistoryService", "BUS_HOST not set: live feed disabled");
-    }
+    // The Cirrus poller is the feed: the backfill from genesis on first
+    // start, then one page per interval.
     if (config.cirrus.enabled && config.cirrus.nodeUrl) {
       runCirrusPoller().catch((error) => logError("HistoryService", error, { operation: "cirrus" }));
     } else {

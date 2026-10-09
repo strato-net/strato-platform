@@ -35,7 +35,6 @@ library:
     - format
     - lens
     - streaming
-    - streaming-kafka-hw
     - network
     - persistent
     - persistent-postgresql
@@ -67,7 +66,6 @@ executables:
       - composable-monads-base
       - hflags
       - streaming
-      - streaming-kafka-hw
       - persistent-postgresql
       - process-monitor
       - resourcet

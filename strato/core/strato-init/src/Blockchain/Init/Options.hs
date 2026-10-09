@@ -16,14 +16,10 @@ defineFlag "pgReaderHost" ("" :: String) "Read-only Postgres endpoint (e.g. the 
 defineFlag "regenerate" (False :: Bool) "Re-generate ethconf.yaml, docker-compose.yml and commands.txt for an EXISTING directory from the flags given (state, secrets and genesis are kept). Pass the same flags as the original setup plus the changes; the network identity must not change"
 defineFlag "p:password" ("" :: String) "Postgres password"
 defineFlag "K:kafkahost" ("localhost" :: String) "Streaming broker hostname"
-defineFlag "kafkaport" (9092 :: Int) "Streaming broker port (9094 for a core's VPC-facing listener, see --kafkaExternalHost)"
-defineFlag "busHost" ("" :: String) "Shared message bus (Kafka-compatible cluster) bootstrap hostname; empty means no bus. A core runs strato-ingest against it; an API directory submits to it per --busSubmitMode"
-defineFlag "busPort" (9096 :: Int) "Message bus port (9096 is MSK's SASL_SSL port)"
-defineFlag "busSecurity" ("sasl_ssl" :: String) "Message bus security: plaintext, ssl or sasl_ssl"
-defineFlag "busSaslUsername" ("" :: String) "SCRAM username for the message bus"
-defineFlag "busSaslPassword" ("" :: String) "SCRAM password for the message bus (prefer the bus_sasl_password environment variable)"
-defineFlag "busSubmitMode" ("core" :: String) "Where the API sends submitted transactions: core (this node's broker), bus, or shadow (both, while validating)"
-defineFlag "kafkaExternalHost" ("" :: String) "Private hostname or IP at which other hosts (the API tier) reach this node's broker; adds a second, VPC-facing listener on port 9094. Keep it private: the listener is plaintext, so restrict it with a security group"
+defineFlag "kafkaport" (9092 :: Int) "Streaming broker port (unused by the embedded JLog backend)"
+defineFlag "ingressUrls" ("" :: String) "API role: comma-separated base URLs of the core cells' transaction ingress (strato-ingest, http://<cell>:8600). A submitted batch is posted to every one of them, so each cell's mempool holds it"
+defineFlag "vmQueryUrls" ("" :: String) "API role: comma-separated base URLs of further vm-query instances, tried in order when this directory's own (--vmQuery) cannot be reached"
+defineFlag "ingressPort" (8600 :: Int) "Core role: port strato-ingest listens on for the API tier's transaction batches"
 defineFlag "z:lazyblocks" (False :: Bool) "Don't mine empty blocks"
 defineFlag "addBootnodes" True "Adds bootnodes to the peer DB at setup time.  If set to false, the peer will not be able to initiate a connection to the network by itself (this option is useful if you want to set up a peer to itself be a bootnode in a private network)"
 defineCustomFlag
@@ -73,7 +69,7 @@ defineFlag "appUrl" ("" :: String) "Public URL of the app tier, used when --bund
 defineFlag "bundledSmd" (True :: Bool) "Run the SMD next to this node (default). False when the SMD is served from its own deployment (S3 behind CloudFront); pass --smdUrl so the node's /smd redirects there"
 defineFlag "smdUrl" ("" :: String) "Public URL of the SMD deployment, used when --bundledSmd=false"
 defineFlag "bundledPostgrest" (True :: Bool) "Run PostgREST (the Cirrus API at /cirrus) next to this node (default). False when the API tier serves Cirrus; the node's /cirrus then answers 502"
-defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost and --kafkahost at a core and pass its Postgres password with --password)"
+defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), or 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost at a core, --ingressUrls at the cells' ingress, and pass the core's Postgres password with --password)"
 
 defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g., 'registry.example.com/org/')"
 

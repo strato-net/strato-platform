@@ -8,7 +8,7 @@ where
 import Control.Monad.Composable.Base (runEff)
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
-import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, jsonRpcPort, runStreamMConfigured)
+import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, jsonRpcPort, runStreamMConfigured, vmConfig, vmQueryOnly)
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -28,10 +28,15 @@ startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
   let host = apiListenAddress $ apiConfig ethConf
-  runEff $ runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
-  -- One consumer of the response topic for the whole process; request
-  -- handlers register for their reply by id (see ResponseDispatcher).
-  startResponseDispatcher
+  -- The vm-runner reply path, unless this tier has no consensus VM to ask
+  -- (vmQueryOnly): one consumer of the response topic for the whole
+  -- process; request handlers register for their reply by id (see
+  -- ResponseDispatcher).
+  if vmQueryOnly (vmConfig ethConf)
+    then putStrLn "vm-query only: not opening the vm-runner reply path"
+    else do
+      runEff $ runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+      startResponseDispatcher
   putStrLn $ "Listening on " ++ host ++ ":" ++ show jsonRpcPort
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
   initTracing "ethereum-jsonrpc"
