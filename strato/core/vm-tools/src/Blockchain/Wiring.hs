@@ -28,6 +28,7 @@ where
 import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState)
+import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -56,6 +57,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.Streaming
 import Control.Applicative ((<|>))
+import Data.Default (def)
 import Data.Foldable (for_)
 import Control.Monad.IO.Class
 import qualified Data.Map as M
@@ -80,18 +82,21 @@ getDBs = getBackend >>= \case
   Persistent d -> pure d
   Sandbox _ d -> pure d
   Memory _ -> error "ContextM: no persistent stores in memory mode"
+  Mirror _ _ -> error "ContextM: no persistent stores over a state mirror"
 
--- | Overlay first, then the persistent store on a miss.
+-- | Overlay first, then the persistent store (or the mirror) on a miss.
 readStore ::
   Ord k =>
   Lens' MemContextDBs (M.Map k v) ->
   (ContextDBs -> ContextM (Maybe v)) ->
+  (StateMirror -> k -> IO (Maybe v)) ->
   k ->
   ContextM (Maybe v)
-readStore l disk k = getBackend >>= \case
+readStore l disk mirror k = getBackend >>= \case
   Persistent d -> disk d
   Memory o -> M.lookup k . view l <$> readIORef o
   Sandbox o d -> M.lookup k . view l <$> readIORef o >>= maybe (disk d) (pure . Just)
+  Mirror o m -> M.lookup k . view l <$> readIORef o >>= maybe (liftIO (mirror m k)) (pure . Just)
 {-# INLINE readStore #-}
 
 -- | Writes stay in the overlay when there is one.
@@ -106,6 +111,7 @@ writeStore l disk k mv = getBackend >>= \case
   Persistent d -> disk d
   Memory o -> modifyIORef' o $ l . at k .~ mv
   Sandbox o _ -> modifyIORef' o $ l . at k .~ mv
+  Mirror o _ -> modifyIORef' o $ l . at k .~ mv
 {-# INLINE writeStore #-}
 
 get :: HasContext m => m ContextState
@@ -218,11 +224,24 @@ fetchMPNode k = do
     Nothing -> error $ "While diagnosing the stateRoot mismatch above, asked peers for MP node " ++ format k
       ++ " to compare the block's state with ours; no reply reached the VM within 10s. Stopping here with what is known."
 
+-- | What answers an account read the block map does not: the trie, or the
+-- mirror when the context runs over one.
+accountMiss :: Address -> ContextM (Maybe AddressState)
+accountMiss a = stateMirror >>= \case
+  Nothing -> DB.getAddressStateMaybe a
+  Just m -> liftIO $ mirrorAccount m a
+
+-- | Likewise for a storage slot.
+storageMiss :: RawStorageKey -> ContextM (Maybe RawStorageValue)
+storageMiss k = stateMirror >>= \case
+  Nothing -> getRawStorageKeyValDBMaybe k
+  Just m -> liftIO $ mirrorStorage m k
+
 instance A.Selectable Address AddressState ContextM where
-  select _ = getAddressStateMaybe
+  select _ = getAddressStateMaybeWith accountMiss
 
 instance (Address `A.Alters` AddressState) ContextM where
-  lookup _ = getAddressStateMaybe
+  lookup _ = getAddressStateMaybeWith accountMiss
   insert _ = putAddressState
   delete _ = deleteAddressState
 
@@ -249,7 +268,7 @@ instance (Maybe Word256 `A.Alters` MP.StateRoot) ContextM where
         modify $ memDBs . stateRoots %~ M.delete (bh, chainId)
 
 instance (Keccak256 `A.Alters` DBCode) ContextM where
-  lookup _ k = readStore memCodeDB (\d -> genericLookupCodeDB (pure $ _codeDB d) k) k
+  lookup _ k = readStore memCodeDB (\d -> genericLookupCodeDB (pure $ _codeDB d) k) mirrorCode k
   insert _ k v = writeStore memCodeDB (\d -> genericInsertCodeDB (pure $ _codeDB d) k v) k (Just v)
   delete _ k = writeStore memCodeDB (\d -> genericDeleteCodeDB (pure $ _codeDB d) k) k Nothing
 
@@ -257,7 +276,7 @@ instance A.Selectable FilePath (Either String String) ContextM where
   select _ path = accessEnv >>= \ctx -> liftIO (_resolveFile ctx path)
 
 instance (N.NibbleString `A.Alters` N.NibbleString) ContextM where
-  lookup _ k = readStore memHashDB (\d -> genericLookupHashDB (pure $ _hashDB d) k) k
+  lookup _ k = readStore memHashDB (\d -> genericLookupHashDB (pure $ _hashDB d) k) (\_ k' -> throwIO (TrieAccess ("hash preimage " ++ show k'))) k
   insert _ k v = writeStore memHashDB (\d -> genericInsertHashDB (pure $ _hashDB d) k v) k (Just v)
   delete _ k = writeStore memHashDB (\d -> genericDeleteHashDB (pure $ _hashDB d) k) k Nothing
 
@@ -266,13 +285,13 @@ instance HasMemRawStorageDB ContextM where
   putMemRawStorageBlockMap theMap = modify $ memDBs . storageBlockMap .~ theMap
 
 instance (RawStorageKey `A.Alters` RawStorageValue) ContextM where
-  lookup _ = genericLookupRawStorageDB
+  lookup _ = genericLookupRawStorageDBWith storageMiss
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+  lookupWithDefault _ k = fromMaybe def <$> genericLookupRawStorageDBWith storageMiss k
 
 instance (Keccak256 `A.Alters` BlockSummary) ContextM where
-  lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) k
+  lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) mirrorBlockSummary k
   insert _ k v = writeStore memBlockSummaryDB (\d -> genericInsertBlockSummaryDB (pure $ _blockSummaryDB d) k v) k (Just v)
   delete _ k = writeStore memBlockSummaryDB (\d -> genericDeleteBlockSummaryDB (pure $ _blockSummaryDB d) k) k Nothing
 

@@ -1,10 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback) where
+module Blockchain.Init.EthConf (genEthConf, preferIPv4Loopback, runtimeConfig, flagsNetworkIdentity) where
 
 import Blockchain.EthConf
 import Blockchain.Init.Options hiding (flags_localAuth)
+import Blockchain.Init.Role
 import Control.Monad.Composable.Streaming.DockerConfig (brokerConfig, bcHost, bcPort)
 import qualified Blockchain.Init.Options as Opts
 import Blockchain.Strato.Model.Address
@@ -20,9 +21,12 @@ import System.Info (os)
 import System.Process (readProcess)
 import Text.ShortDescription
 
--- | Address strato-api binds its socket to
+-- | Address strato-api binds its socket to: @--apiIPAddress@ when given,
+-- otherwise the docker bridge on Linux (so the nginx container reaches the
+-- host process) and loopback elsewhere.
 getApiListenAddress :: String
 getApiListenAddress
+  | not (null flags_apiIPAddress) = flags_apiIPAddress
   | os == "linux" = "172.17.0.1"
   | otherwise = "127.0.0.1"
 
@@ -77,6 +81,7 @@ runtimeConfig = def
   , contractsConfig = ContractsConf
       { railgunProxy = getRailgunProxyForNetwork flags_network
       , nativeTokenAddress = getNativeTokenForNetwork flags_network
+      , nativeTokenBalancesField = Nothing
       }
   , debugConfig = def { svmTrace = flags_svmTrace }
   , vmConfig = def { sqlDiff = flags_sqlDiff, diffPublish = flags_diffPublish }
@@ -118,8 +123,13 @@ waitOnVault env request = do
       waitOnVault env request
     Right val -> return val
 
-genEthConf :: IO EthConf
-genEthConf = do
+-- | The network identity the current flags describe, exactly as 'genEthConf'
+-- writes it: (network name, network id, chain id).
+flagsNetworkIdentity :: (String, Integer, Integer)
+flagsNetworkIdentity = (flags_network, computeNetworkID, computeChainId flags_network)
+
+genEthConf :: Role -> IO EthConf
+genEthConf role = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
   localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
@@ -129,28 +139,54 @@ genEthConf = do
         ++ localHostname
         ++ if ssl then "" else ":" ++ show flags_httpPort
 
-  -- For local auth mode, skip vault during setup (vault-wrapper starts later)
+  -- For local auth mode, skip vault during setup (vault-wrapper starts later).
+  -- An API-only directory has no node identity: it signs nothing.
   if Opts.flags_localAuth
     then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
-    else do
-      (pub, _addr) <- getNodeKey
-      putStrLn $ "  ✓ Node key: " ++ shortDescription pub
+    else if not (roleRunsCore role)
+      then putStrLn "  ✓ API role: no node key needed"
+      else do
+        (pub, _addr) <- getNodeKey
+        putStrLn $ "  ✓ Node key: " ++ shortDescription pub
 
-  return runtimeConfig
-    { sqlConfig = (sqlConfig runtimeConfig)
+  -- An API-only directory reads through the replica endpoint when one is
+  -- given; its writes (and consistency-sensitive reads) stay on --pghost.
+  let readerHost = if null flags_pgReaderHost || role /= RoleApi then Nothing else Just flags_pgReaderHost
+      writerSql = (sqlConfig runtimeConfig)
         { user = flags_pguser
         , host = preferIPv4Loopback flags_pghost
         , password = pgPass
         }
+
+  let commaList = words . map (\c -> if c == ',' then ' ' else c)
+
+  return runtimeConfig
+    { ingressUrls = commaList flags_ingressUrls
+    , vmConfig = (vmConfig runtimeConfig)
+        { vmQueryUrls = ["http://127.0.0.1:8546" | flags_vmQuery] ++ commaList flags_vmQueryUrls
+        -- An API directory runs no vm-runner: the mirror answers or nobody does.
+        , vmQueryOnly = role == RoleApi
+        }
+    , cellId = if null flags_cellId then Nothing else Just flags_cellId
+    , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
+    , peerSqlitePath = case flags_peerStore of
+        "postgres" -> Nothing
+        "sqlite" -> Just "peers.sqlite"
+        other -> error $ "--peerStore must be 'postgres' or 'sqlite', not '" ++ other ++ "'"
+    , sqlConfig = writerSql
+    , sqlReaderConfig = (\h -> writerSql { host = h }) <$> readerHost
     , cirrusConfig = (cirrusConfig runtimeConfig)
         { user = flags_pguser
-        , host = preferIPv4Loopback flags_pghost
+        , host = maybe (preferIPv4Loopback flags_pghost) id readerHost
         , password = pgPass
         }
     , streamingConfig = (streamingConfig runtimeConfig)
         { streamingHost = if flags_kafkahost == "localhost"
                           then bcHost brokerConfig
                           else flags_kafkahost 
+        , streamingPort = if flags_kafkahost == "localhost"
+                          then bcPort brokerConfig
+                          else flags_kafkaport
         }
     , levelDBConfig = def
         { cacheSize = flags_ldbCacheSize

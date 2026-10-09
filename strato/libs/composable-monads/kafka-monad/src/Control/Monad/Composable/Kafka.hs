@@ -26,6 +26,8 @@ module Control.Monad.Composable.Kafka (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  unconnectedStreamEnv,
+  closeStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
@@ -37,11 +39,15 @@ module Control.Monad.Composable.Kafka (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  lookupKafkaCheckpoint,
+  setKafkaCheckpoint,
+  seedConsumerGroupFrom,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
   -- Conduit
   conduitBatchSource,
+  conduitGroupBatchSource,
   -- Deprecated/internal (for migration)
   KafkaM,
   HasKafka,
@@ -74,6 +80,7 @@ import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Pool as Pool
 import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
@@ -86,9 +93,11 @@ import Network.Kafka.Protocol hiding (ClientId)
 
 
 
--- Generic streaming type aliases
-type StreamM es = Eff (IORef KafkaState ': es)
-type HasStreaming m = (MonadIO m, AccessibleEnv (IORef KafkaState) m)
+-- Generic streaming type aliases. The environment a row carries is an
+-- 'IORef StreamEnv', the same shape every backend uses, so that code naming
+-- the row element (ContextRow, SequencerRow, ...) compiles against any of them.
+type StreamM es = Eff (IORef StreamEnv ': es)
+type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 type ClientId = Text
 type StreamAddress = (String, Int)
 
@@ -107,6 +116,14 @@ type KafkaEnv = StreamEnv
 
 kafkaStateIORef :: StreamEnv -> IORef KafkaState
 kafkaStateIORef = streamStateIORef
+
+-- | Close the broker connections an environment holds (milena keeps a
+-- handle pool per address). For an environment being discarded, such as
+-- one reaped from 'runStreamMPooled''s pool after idling.
+closeStreamEnv :: MonadIO m => StreamEnv -> m ()
+closeStreamEnv env = liftIO $ do
+  st <- readIORef (streamStateIORef env)
+  mapM_ Pool.destroyAllResources (M.elems (st ^. stateConnections))
 
 createStreamEnv ::
   MonadIO m =>
@@ -132,11 +149,19 @@ kafkaStateToStreamEnv kafkaState = do
   return $ StreamEnv ksIORef
 
 getStreamEnv :: HasStreaming m => m StreamEnv
-getStreamEnv = StreamEnv <$> accessEnv
+getStreamEnv = do
+  ref <- accessEnv
+  liftIO $ readIORef ref
 
 runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
-runStreamMUsingEnv env f =
-  provide (streamStateIORef env) f
+runStreamMUsingEnv env f = do
+  ref <- liftIO $ newIORef env
+  provide ref f
+
+-- | An environment for runs that never touch the stream (in-memory VM
+-- contexts): nothing is connected until a request is made.
+unconnectedStreamEnv :: MonadIO m => ClientId -> m StreamEnv
+unconnectedStreamEnv clientId = createStreamEnv clientId ("", 0)
 
 runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM x y f = flip runStreamMUsingEnv f =<< createStreamEnv x y
@@ -160,7 +185,7 @@ execKafka ::
   StateT KafkaState (ExceptT KafkaClientError IO) a ->
   m a
 execKafka f = do
-  ksIORef <- accessEnv
+  ksIORef <- streamStateIORef <$> getStreamEnv
   ks <- liftIO $ readIORef ksIORef
   result <- liftIO $ runExceptT $ runStateT f ks
   case result of
@@ -173,6 +198,29 @@ execKafka f = do
 ----------------------
 --   Checkpoints    --
 ----------------------
+
+-- | The group's committed offset, or 'Nothing' when the group has never
+-- committed one (unlike 'getKafkaCheckpoint', which then commits 0).
+lookupKafkaCheckpoint :: HasStreaming m =>
+                         ConsumerGroup -> TopicName -> m (Maybe Offset)
+lookupKafkaCheckpoint consumerGroup topicName =
+  execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
+    Left UnknownTopicOrPartition -> return Nothing
+    Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
+    Right (o, _) -> return $ Just o
+
+-- | Give a consumer group with no committed offset the offset of another one
+-- on the same topic (see the JLog backend's version); True when copied.
+seedConsumerGroupFrom :: HasStreaming m => ConsumerGroup -> ConsumerGroup -> TopicName -> m Bool
+seedConsumerGroupFrom new old topicName = do
+  existing <- lookupKafkaCheckpoint new topicName
+  case existing of
+    Just _ -> return False
+    Nothing -> do
+      legacy <- lookupKafkaCheckpoint old topicName
+      case legacy of
+        Nothing -> return False
+        Just ofs -> True <$ setKafkaCheckpoint new topicName ofs
 
 getKafkaCheckpoint :: HasStreaming m =>
                       ConsumerGroup -> TopicName -> m Offset
@@ -282,9 +330,31 @@ runConsume consumerGroup topicName f = consumeOnce
   where
     consumeOnce = do
       offset <- getKafkaCheckpoint consumerGroup topicName
-      items <- fetchItems topicName offset
+      mBytes <- fetchBytesMaybe topicName offset
+      items <- case mBytes of
+        Just bytes -> return $ map (decode . BL.fromStrict) bytes
+        Nothing -> do
+          -- The committed offset is outside the topic. Either it fell out
+          -- of retention (the group waited longer than the broker keeps
+          -- data: a standby never promoted, a consumer down for a week), or
+          -- it is past the tip because the topic was recreated (the broker
+          -- volume wiped while this checkpoint survived in Postgres), in
+          -- which case everything in the topic is new. Both resume from the
+          -- oldest retained message instead of crash-looping, and say so
+          -- loudly: in the first case whatever this group writes now has a
+          -- gap before it.
+          earliest <- execKafka $ getLastOffset EarliestTime 0 topicName
+          latest <- execKafka $ getLastOffset LatestTime 0 topicName
+          liftIO . putStrLn $
+            "consume " ++ show consumerGroup ++ ": committed offset " ++ show offset
+              ++ " on " ++ show topicName ++ (if offset > latest then " is past the tip " ++ show latest ++ " (topic recreated?)" else " fell out of retention")
+              ++ "; resuming from the earliest retained offset " ++ show earliest
+              ++ (if offset > latest then ", everything in the topic is new to this consumer." else ". Messages in between are lost to this consumer.")
+          setKafkaCheckpoint consumerGroup topicName earliest
+          fetchItems topicName earliest
       mReturnVal <- f items
-      let nextOffset' = offset + fromIntegral (length items)
+      base <- getKafkaCheckpoint consumerGroup topicName
+      let nextOffset' = base + fromIntegral (length items)
       setKafkaCheckpoint consumerGroup topicName nextOffset'
       case mReturnVal of
         Just returnVal -> pure returnVal
@@ -309,7 +379,14 @@ fetchItems :: (Binary a, HasStreaming m) =>
 fetchItems topicName offset = map (decode . BL.fromStrict) <$> fetchBytes topicName offset
 
 fetchBytes :: HasStreaming m => TopicName -> Offset -> m [B.ByteString]
-fetchBytes topic offset = do
+fetchBytes topic offset =
+  fetchBytesMaybe topic offset
+    >>= maybe (error $ "Kafka offset out of range: topic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset) return
+
+-- | 'Nothing' when the offset is outside the topic's retained range, which a
+-- durable consumer may want to recover from; every other fetch error is fatal.
+fetchBytesMaybe :: HasStreaming m => TopicName -> Offset -> m (Maybe [B.ByteString])
+fetchBytesMaybe topic offset = do
   fetched <- execKafka $ fetch offset 0 topic
 
   let errorStatuses = concat $ map (^.. _2 . folded . _2) (fetched ^. fetchResponseFields)
@@ -317,10 +394,9 @@ fetchBytes topic offset = do
   --Also, since the Kafka fetch is typically in a loop, by not halting, we will often create a
   --fast infinite loop that will eat 100% of the CPU and quickly fill up the logs.
   case find (/= NoError) errorStatuses of
+    Just OffsetOutOfRange -> return Nothing
     Just e -> error $ "There was a critical Kafka error while fetching messages: " ++ show e ++ "\ntopic = " ++ BC.unpack (topic ^. tName ^. kString) ++ ", offset = " ++ show offset
-    _ -> return ()
-
-  return $ fetchResponseToPayload [offset] fetched
+    _ -> return $ Just $ fetchResponseToPayload [offset] fetched
 
 conduitBatchSource :: (MonadIO m, Binary a) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
@@ -332,6 +408,28 @@ conduitBatchSource clientId streamAddress topicName = do
       items <- liftIO . runEff . runStreamMUsingEnv env $ fetchItems topicName offset
       yield items
       return $ offset + fromIntegral (length items)
+
+-- | Like 'conduitBatchSource' but durable: starts at the group's committed
+-- offset (the beginning for a new group) and commits after each batch has
+-- been handed downstream. At-least-once, with at most the batch in flight
+-- lost to a crash before its commit; consumers of this source must accept
+-- redelivery. Empty fetches (the long-poll timing out on an idle topic) are
+-- not yielded.
+conduitGroupBatchSource :: (MonadIO m, Binary a) =>
+                           ClientId -> StreamAddress -> ConsumerGroup -> TopicName -> ConduitT i [a] m b
+conduitGroupBatchSource clientId streamAddress consumerGroup topicName = do
+  env <- createStreamEnv clientId streamAddress
+  startingOffset <- liftIO . runEff . runStreamMUsingEnv env $ getKafkaCheckpoint consumerGroup topicName
+
+  flip iterateM_ startingOffset $ \offset -> do
+      items <- liftIO . runEff . runStreamMUsingEnv env $ fetchItems topicName offset
+      if null items
+        then return offset
+        else do
+          yield items
+          let next = offset + fromIntegral (length items)
+          liftIO . runEff . runStreamMUsingEnv env $ setKafkaCheckpoint consumerGroup topicName next
+          return next
 
 createTopic :: HasStreaming m =>
                TopicName -> m ()

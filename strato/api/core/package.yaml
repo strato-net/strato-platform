@@ -51,3 +51,4 @@ library:
     - unliftio
     - unordered-containers
     - strato-redis-blockdb
+    - strato-tracing

@@ -33,6 +33,7 @@ library
     , milena-tools
     , monad-loops
     , mtl
+    , resource-pool
     , text
     , transformers
   default-language: Haskell2010

@@ -72,6 +72,7 @@ where
 --import           Data.IORef
 
 import BlockApps.Logging
+import qualified Blockchain.DB.AddressStateDB as DB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
@@ -243,18 +244,20 @@ instance HasMemRawStorageDB SM where
   getMemRawStorageBlockDB = gets $ _storageBlockMap . _ssMemDBs
   putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
+-- Reads fall through the call frames, then this run's block map, then
+-- whatever holds the state behind it (see 'storageMiss').
 instance (RawStorageKey `A.Alters` RawStorageValue) SM
   where
   lookup _ k   = do
     cs <- gets callStack
     case lookupStorageFrames k cs of
       Just v -> pure $ Just v
-      Nothing -> genericLookupRawStorageDB k
+      Nothing -> genericLookupRawStorageDBWith storageMiss k
   lookupWithDefault _ k   = do
     cs <- gets callStack
     case lookupStorageFrames k cs of
       Just v -> pure v
-      Nothing -> genericLookupWithDefaultRawStorageDB k
+      Nothing -> fromMaybe MS.BDefault <$> genericLookupRawStorageDBWith storageMiss k
   insert _ k v = do
     cs <- gets callStack
     case cs of
@@ -289,6 +292,8 @@ instance (RawStorageKey `A.Alters` RawStorageValue) SM
           callStack = c':cs'
         }
 
+-- Same fall-through as storage: frames, this run's block map, then the
+-- trie or the mirror (see 'accountMiss').
 instance (Address `A.Alters` AddressState) SM
   where
   lookup _ a = do
@@ -296,7 +301,7 @@ instance (Address `A.Alters` AddressState) SM
     case lookupStateFrames a cs of
       Just (ASModification s) -> pure $ Just s
       Just ASDeleted -> pure $ Just blankAddressState
-      Nothing -> getAddressStateMaybe a
+      Nothing -> getAddressStateMaybeWith accountMiss a
   insert _ a s = do
     cs <- gets callStack
     case cs of
@@ -346,6 +351,21 @@ instance (Address `A.Alters` AddressState) SM
 instance A.Selectable Address AddressState SM
   where
   select = A.lookup
+
+-- | What answers a storage read the block map does not: the trie, as this
+-- run sees the owning account, or the SQL state mirror when the context runs
+-- over one (vm-query). Only a block-map miss gets here, so the check costs
+-- the node nothing on its hot path.
+storageMiss :: RawStorageKey -> SM (Maybe RawStorageValue)
+storageMiss k = host stateMirror >>= \case
+  Nothing -> getRawStorageKeyValDBMaybe k
+  Just m -> liftIO $ mirrorStorage m k
+
+-- | Likewise for an account.
+accountMiss :: Address -> SM (Maybe AddressState)
+accountMiss a = host stateMirror >>= \case
+  Nothing -> DB.getAddressStateMaybe a
+  Just m -> liftIO $ mirrorAccount m a
 
 lookupStorageFrames :: RawStorageKey -> [CallInfo] -> Maybe RawStorageValue
 lookupStorageFrames _ [] = Nothing

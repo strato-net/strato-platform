@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from "axios";
 import { nodeUrl, bridgeUrl } from "../config/config";
 import { requestContext } from "./requestContext";
+import { traceparentHeader } from "./tracing";
 
 const createApiClient = (baseURL: string): AxiosInstance =>
   axios.create({
@@ -18,6 +19,10 @@ const _bloc = createApiClient(`${nodeUrl}/bloc/v2.2`);
 const _eth = createApiClient(`${nodeUrl}/strato-api/eth/v1.2`);
 
 function unsignedTxInterceptor(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  // Calls to the node carry the request's trace, so strato-api's span nests
+  // under this service's in one trace.
+  const traceparent = traceparentHeader();
+  if (traceparent) config.headers.set("traceparent", traceparent);
   const store = requestContext.getStore();
   if (store?.externalSigning && config.url?.includes("/transaction/parallel")) {
     config.baseURL = `${nodeUrl}/bloc/v2.2`;
@@ -31,6 +36,18 @@ function unsignedTxInterceptor(config: InternalAxiosRequestConfig): InternalAxio
 
 _strato.interceptors.request.use(unsignedTxInterceptor);
 _bloc.interceptors.request.use(unsignedTxInterceptor);
+// Reads carry the trace too (the interceptor only rewrites signing calls).
+_cirrus.interceptors.request.use(unsignedTxInterceptor);
+_eth.interceptors.request.use(unsignedTxInterceptor);
+
+// An empty token is an anonymous call: no Authorization header at all (the
+// node's nginx rejects a present-but-empty bearer token).
+function authHeaders(token: string, config?: AxiosRequestConfig) {
+  return {
+    ...(config?.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 function makeTokenClient(client: AxiosInstance) {
   return {
@@ -41,10 +58,7 @@ function makeTokenClient(client: AxiosInstance) {
     ): Promise<AxiosResponse<T>> => {
       return client.get<T>(url, {
         ...config,
-        headers: {
-          ...(config?.headers || {}),
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token, config),
       });
     },
 
@@ -56,10 +70,7 @@ function makeTokenClient(client: AxiosInstance) {
     ): Promise<AxiosResponse<T>> => {
       return client.post<T>(url, data, {
         ...config,
-        headers: {
-          ...(config?.headers || {}),
-          Authorization: `Bearer ${token}`,
-        },
+        headers: authHeaders(token, config),
       });
     },
   };

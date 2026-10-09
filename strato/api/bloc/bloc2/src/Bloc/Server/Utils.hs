@@ -23,6 +23,7 @@ where
 
 import Bloc.API.Users
 import Bloc.API.Utils
+import Blockchain.DB.SQLDB (HasSQLDB)
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock (rtPrimeToRt)
 import Blockchain.Strato.Model.ExtendedWord
@@ -49,14 +50,17 @@ toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult ::
-  ( A.Selectable Keccak256 [TransactionResult] m
+  ( HasSQLDB m
   , A.Selectable TxsFilterParams [RawTransaction] m
   ) =>
   [Keccak256] ->
   m [Maybe (RawTransaction, TransactionResult)]
 maybeTxBatchResult hashes = do
   rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams {qtHash = Just h, qtMinGasLimit = Just 1}
-  mtxrs <- postBatchTransactionResult hashes
+  -- Results come from the writer so a just-committed result is seen at once;
+  -- the raw transaction may trail on a replica, in which case the pair is
+  -- simply not ready yet and the caller polls again.
+  mtxrs <- getTransactionResultsFromWriter hashes
   pure . map (maybeHeads mtxrs) $ (zip hashes rtxs :: [(Keccak256, [RawTransaction])])
   where
     maybeHeads :: M.Map Keccak256 [TransactionResult] -> (Keccak256, [RawTransaction]) -> Maybe (RawTransaction, TransactionResult)
@@ -65,7 +69,7 @@ maybeTxBatchResult hashes = do
       _ -> Nothing
 
 getBatchBlocTxStatus ::
-  ( A.Selectable Keccak256 [TransactionResult] m
+  ( HasSQLDB m
   , A.Selectable TxsFilterParams [RawTransaction] m
   ) =>
   [Keccak256] ->

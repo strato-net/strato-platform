@@ -31,7 +31,6 @@ import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
 import Bloc.Database.Queries (getContractByAddress, withCodeCollectionCache)
-import Bloc.Monad ()
 import Bloc.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
@@ -42,6 +41,7 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.SolidityVarReader (svmValueToSolidityValues)
 import qualified SolidVM.Model.Type as SVMType
 import Blockchain.Data.AddressStateDB (AddressState)
+import Blockchain.DB.SQLDB (HasSQLDB)
 import Blockchain.Data.DataDefs
 import Blockchain.DB.CodeDB
 import Blockchain.Strato.Model.Address
@@ -99,11 +99,10 @@ emptyBatchState = BatchState Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' ::
-  ( MonadUnliftIO m,
+  ( HasSQLDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
@@ -124,13 +123,12 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult ::
-  ( MonadIO m,
+  ( HasSQLDB m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
@@ -142,11 +140,10 @@ getBlocTransactionResult txHash resolve = withCodeCollectionCache $ unsafeHead =
         unsafeHead (x:_) = pure x
 
 getBatchBlocTransactionResult' ::
-  ( MonadIO m,
+  ( HasSQLDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
@@ -160,13 +157,12 @@ getBatchBlocTransactionResult' hashes resolve =
 
 -- | Outer wrapper that introduces the ReaderT IORef cache layer
 postBlocTransactionResults ::
-  ( MonadIO m,
+  ( HasSQLDB m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
@@ -178,11 +174,10 @@ postBlocTransactionResults resolve hashes = do
 
 -- | Inner function usable when already within a StateT cache layer
 postBlocTransactionResults' ::
-  ( MonadIO m,
+  ( HasSQLDB m,
     (Keccak256 `A.Selectable` CodeCollection) m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
-    A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     MonadLogger m
   ) =>
@@ -192,17 +187,20 @@ postBlocTransactionResults' ::
 postBlocTransactionResults' resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
-  ( MonadIO m
-  , MonadLogger m
-  , A.Selectable Keccak256 [TransactionResult] m
+  ( MonadLogger m
+  , HasSQLDB m
   , A.Selectable TxsFilterParams [RawTransaction] m
   ) =>
   Bool ->
   [Keccak256] ->
   m [TRD]
-recurseTRDs resolve hashes = go (0 :: Integer) (toPending hashes)
+recurseTRDs resolve hashes = do
+  -- Ten seconds in all: a hundred rounds of a hundred milliseconds.
+  let maxRounds = 100 :: Integer
+      waitRound = liftIO $ threadDelay 100000
+  go maxRounds waitRound (0 :: Integer) (toPending hashes)
   where
-    go num list = do
+    go maxRounds waitRound num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
       let (pending', done) =
@@ -219,12 +217,12 @@ recurseTRDs resolve hashes = go (0 :: Integer) (toPending hashes)
         if not resolve || null pending'
           then return pending'
           else
-            if num >= 100 -- poll for 10 seconds. With PBFT, a transaction that hasn't resolved by this point is almost certainly lost
+            if num >= maxRounds -- ten seconds in all. With PBFT, a transaction that hasn't resolved by this point is almost certainly lost
               then return pending'
               else do
                 $logDebugLS "recurseTRDs/pending'" $ map (format . trdHash) pending'
-                void . liftIO $ threadDelay 100000
-                go (num + 1) pending'
+                waitRound
+                go maxRounds waitRound (num + 1) pending'
       return $ merge pending done (\(TRD _ _ i _) (TRD _ _ j _) -> i < j)
 
     toPending :: [Keccak256] -> [TRD]
