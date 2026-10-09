@@ -64,9 +64,9 @@ export const getActivityLink = (activityName: string): string | null => {
     return '/dashboard/earn-yield-vault?vault=silvst-yield';
   }
 
-  // Diversified Vault activities - goes to the Advanced page, Vault tab
+  // Retired Diversified Vault activities - the product page is gone, send to Earn
   if (lowerName.includes('vault')) {
-    return '/dashboard/advanced?tab=vault';
+    return '/dashboard/earn';
   }
   
   // Swap LP activities - goes to the Advanced page, Swap Pools tab

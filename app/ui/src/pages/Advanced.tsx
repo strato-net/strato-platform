@@ -9,7 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import BadDebtView from '@/components/cdp/BadDebtView';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
-import Vault from '@/pages/Vault';
 import { useUser } from '@/context/UserContext';
 import GuestSignInBanner from '@/components/ui/GuestSignInBanner';
 import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
@@ -35,7 +34,7 @@ import DirectMintPSMSection from '@/components/dashboard/DirectMintPSMSection';
 // import { useSmartPolling } from "@/hooks/useSmartPolling";
 // import LiquidationAlertBanner from '@/components/ui/LiquidationAlertBanner';
 
-type TopTab = "swap" | "vault" | "psm" | "bad-debt" | "liquidations";
+type TopTab = "swap" | "psm" | "bad-debt" | "liquidations";
 // Hidden type - temporarily disabled per issue #7228
 // type TopTab = "borrow" | "lending" | "swap" | "liquidations" | "safety" | "psm" | "vault";
 
@@ -43,7 +42,6 @@ type TopTab = "swap" | "vault" | "psm" | "bad-debt" | "liquidations";
 // names the page, not the generic "Advanced" shell around it.
 const TAB_TITLES: Record<TopTab, string> = {
   swap: "Swap Pools",
-  vault: "Diversified Vault",
   psm: "PSM",
   "bad-debt": "Bad Debt",
   liquidations: "Liquidations",
@@ -59,7 +57,7 @@ const Advanced = () => {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
 
-    if (tabParam && ['swap', 'vault', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
+    if (tabParam && ['swap', 'psm', 'bad-debt', 'liquidations'].includes(tabParam)) {
       setActiveTab(tabParam as TopTab);
     }
     // Hidden route validation - temporarily disabled per issue #7228
@@ -225,12 +223,9 @@ const Advanced = () => {
             <CardContent className="p-0 md:pt-4">
               <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TopTab)} className="w-full">
                 <div className="w-full overflow-x-auto mb-3 md:mb-4">
-                  <TabsList className="grid w-full grid-cols-5 min-w-[470px] md:min-w-0 h-auto gap-0.5 md:gap-1">
+                  <TabsList className="grid w-full grid-cols-4 min-w-[380px] md:min-w-0 h-auto gap-0.5 md:gap-1">
                     <TabsTrigger value="swap" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                       Swap Pools
-                    </TabsTrigger>
-                    <TabsTrigger value="vault" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
-                      Diversified Vault
                     </TabsTrigger>
                     <TabsTrigger value="psm" className="text-[10px] md:text-sm py-1.5 md:py-2 px-0.5 md:px-3">
                       PSM
@@ -249,10 +244,6 @@ const Advanced = () => {
                     <GuestSignInBanner message="Sign in to add liquidity to swap pools and earn rewards" />
                   )}
                   <SwapPoolsSection />
-                </TabsContent>
-
-                <TabsContent value="vault">
-                  <Vault />
                 </TabsContent>
 
                 <TabsContent value="psm">
