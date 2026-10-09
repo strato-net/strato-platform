@@ -84,6 +84,7 @@ defineFlag "mempoolLivenessCutoff" (60 :: Integer) "Max age of a transaction in 
 -- Consensus timing flags
 defineFlag "blockstanbul_block_period_ms" (1000 :: Int) "Minimum delay between block creations"
 defineFlag "blockstanbul_round_period_s" (3600 :: Int) "Seconds without progress before a forced PBFT round change (a missed proposal is detected within seconds regardless)"
+defineFlag "blockstanbul_max_timestamp_drift_s" (15 :: Int) "Seconds a proposed block's timestamp may run ahead of this node's clock before the node refuses to vote for it (local policy, not consensus)"
 defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which stake-weighted proposer selection is in force (-1 = network default: from genesis for new networks, unscheduled for existing ones)"
 
 -- VM config flags

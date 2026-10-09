@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Time.Clock (NominalDiffTime)
 import Text.Format
 import Text.ShortDescription
 import Prelude hiding (round, sequence)
@@ -70,6 +71,9 @@ data BlockstanbulContext = BlockstanbulContext
     -- PBFT round of the last committed block: rounds persist across heights,
     -- so this is the round the next height starts at
     _lastRound :: Integer,
+    -- How far ahead of our clock a proposal's header timestamp may be before
+    -- we refuse to vote for it (local policy; see checkProposalTimestamp)
+    _maxTimestampDrift :: NominalDiffTime,
     -- Validators who have sent us a prepare for this round
     _prepared :: M.Map Validator Keccak256,
     -- Validators who have sent us a commitment seal for this round
@@ -144,8 +148,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: String -> Integer -> Checkpoint -> Maybe Address -> Bool -> Maybe Integer -> BlockstanbulContext
-newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr valB activation =
+newContext :: String -> Integer -> Checkpoint -> Maybe Address -> Bool -> Maybe Integer -> NominalDiffTime -> BlockstanbulContext
+newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr valB activation maxDrift =
   let valSet = S.fromList as
       ctx = BlockstanbulContext
         { _view = v,
@@ -158,6 +162,7 @@ newContext network' chainId' (Checkpoint v as mParent stakes' lastRound') addr v
           _stakingActivation = activation,
           _chainId = chainId',
           _lastRound = lastRound',
+          _maxTimestampDrift = maxDrift,
           _prepared = M.empty,
           _committed = M.empty,
           _hasPreprepared = False,

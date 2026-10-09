@@ -181,6 +181,7 @@ genEthConf = do
         , gasLimit = flags_gasLimit
         , blockPeriodMs = flags_blockstanbul_block_period_ms
         , roundPeriodS = flags_blockstanbul_round_period_s
+        , maxTimestampDriftS = flags_blockstanbul_max_timestamp_drift_s
         , stakingActivationBlock =
             if flags_stakingActivationBlock < 0
               then defaultStakingActivationBlock flags_network
