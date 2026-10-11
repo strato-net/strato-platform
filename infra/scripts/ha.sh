@@ -76,7 +76,8 @@ alb_full_name() {
 }
 secret_exists() { aws secretsmanager describe-secret --secret-id "$1" >/dev/null 2>&1; }
 ssm_get() { aws ssm get-parameter --name "$1" --query Parameter.Value --output text 2>/dev/null || true; }
-ssm_put() { aws ssm put-parameter --name "$1" --type String --tier Intelligent-Tiering --overwrite --value "$2" >/dev/null; }
+# --value=: a value starting with "-" (a recorded cell context) would otherwise read as an option.
+ssm_put() { aws ssm put-parameter --name "$1" --type String --tier Intelligent-Tiering --overwrite --value="$2" >/dev/null; }
 
 cell_ids() { local c; for c in $CELLS; do echo "${c%%:*}"; done; }
 cell_zone() { local c; for c in $CELLS; do [[ ${c%%:*} == "$1" ]] && echo "${c#*:}"; done; return 0; }
