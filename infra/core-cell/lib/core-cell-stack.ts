@@ -46,7 +46,7 @@ export class CoreCellStack extends Stack {
     this.securityGroup = new ec2.SecurityGroup(this, "CellSg", {
       vpc,
       securityGroupName: name,
-      description: `${name} core cell: p2p from peers, Kafka and API from the API tier, SSH from the bastion`,
+      description: `${name} core cell: p2p from peers, transaction ingress from the API tier, SSH from the bastion`,
       allowAllOutbound: true,
     });
     for (const cidr of config.p2pCidrs) {
@@ -76,9 +76,7 @@ export class CoreCellStack extends Stack {
     }
     config.clientSecurityGroupIds.forEach((sgId, i) => {
       const client = ec2.SecurityGroup.fromSecurityGroupId(this, `ClientSg${i}`, sgId, { mutable: false });
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(9094), "Kafka external listener (API tier submits here)");
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(3000), "strato-api");
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(8545), "ethereum-jsonrpc");
+      this.securityGroup.addIngressRule(client, ec2.Port.tcp(8600), "transaction ingress (strato-ingest; the API tier posts here)");
     });
     if (config.postgresSecurityGroupId) {
       // The cluster's group is imported mutable: the rule lives in this stack and goes with it.
@@ -216,7 +214,6 @@ export class CoreCellStack extends Stack {
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
       SNAPSHOT_BUCKET: config.snapshotBucket ?? "",
       SNAPSHOT_SKIP_DATABASES: String(config.snapshotSkipDatabases),
-      KAFKA_EXTERNAL_HOST: config.kafkaExternalHost ?? "",
       AUTO_PROMOTE: String(config.autoPromote),
       AUTO_PROMOTE_AFTER: String(config.autoPromoteAfter),
       EXTRA_SETUP_FLAGS: config.extraSetupFlags,
@@ -295,7 +292,7 @@ export class CoreCellStack extends Stack {
     // --- Outputs ---
     new CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
     new CfnOutput(this, "PrivateIp", { value: this.instance.instancePrivateIp });
-    new CfnOutput(this, "PrivateDnsName", { value: this.instance.instancePrivateDnsName, description: "The cell's Kafka external listener host (port 9094): pass as -c kafkaHost to the api-tier app" });
+    new CfnOutput(this, "PrivateDnsName", { value: this.instance.instancePrivateDnsName, description: "The cell's transaction ingress host: add http://<name>:8600 to the api-tier app's ingressUrls" });
     if (publicAddress) new CfnOutput(this, "PublicIp", { value: publicAddress, description: "Elastic IP; the address peers dial" });
     if (publicAddress && config.role === "node") new CfnOutput(this, "AppUrl", { value: config.tlsHostname ? `https://${config.tlsHostname}/` : Fn.join("", ["http://", publicAddress, `:${config.httpPort}/`]) });
     if (publicAddress && config.grafana) new CfnOutput(this, "GrafanaUrl", { value: Fn.join("", ["http://", publicAddress, ":3001/"]) });

@@ -8,7 +8,6 @@ npm install
 npx cdk synth -c envName=testnet -c edgeUrl=https://app.testnet.example \
   -c auroraClusterIdentifier=strato-testnet \
   -c albFullNames=app/ha-testnet-api/abc,app/ha-testnet-app/def \
-  -c mskClusterName=ha-testnet-bus -c mskConsumerGroups=strato-ingest-core-a,history \
   -c cellInstanceIds=i-0123,i-0456
 npx cdk deploy --all
 ```

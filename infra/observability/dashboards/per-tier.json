@@ -52,12 +52,6 @@
         "type": "textbox",
         "label": "Aurora cluster id",
         "query": "ha-testnet-app-postgres"
-      },
-      {
-        "name": "bus",
-        "type": "textbox",
-        "label": "MSK cluster name",
-        "query": "ha-testnet-app-bus"
       }
     ]
   },
@@ -303,103 +297,6 @@
       ]
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Bus consumer lag by group",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "${DS_CLOUDWATCH}"
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "${DS_CLOUDWATCH}"
-          },
-          "namespace": "AWS/Kafka",
-          "metricName": "SumOffsetLag",
-          "statistic": "Maximum",
-          "period": "60",
-          "dimensions": {
-            "Cluster Name": "$bus",
-            "Consumer Group": "*"
-          },
-          "region": "default",
-          "label": "SumOffsetLag"
-        }
-      ]
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "Bus bytes in / out per broker",
-      "datasource": {
-        "type": "cloudwatch",
-        "uid": "${DS_CLOUDWATCH}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 24,
-        "w": 12,
-        "h": 8
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "${DS_CLOUDWATCH}"
-          },
-          "namespace": "AWS/Kafka",
-          "metricName": "BytesInPerSec",
-          "statistic": "Average",
-          "period": "60",
-          "dimensions": {
-            "Cluster Name": "$bus",
-            "Broker ID": "*"
-          },
-          "region": "default",
-          "label": "BytesInPerSec"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "cloudwatch",
-            "uid": "${DS_CLOUDWATCH}"
-          },
-          "namespace": "AWS/Kafka",
-          "metricName": "BytesOutPerSec",
-          "statistic": "Average",
-          "period": "60",
-          "dimensions": {
-            "Cluster Name": "$bus",
-            "Broker ID": "*"
-          },
-          "region": "default",
-          "label": "BytesOutPerSec"
-        }
-      ]
-    },
-    {
       "id": 9,
       "type": "timeseries",
       "title": "ECS task CPU / memory utilised (sidecar)",
@@ -409,7 +306,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 24,
         "w": 24,
         "h": 8
       },

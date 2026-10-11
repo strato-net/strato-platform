@@ -96,7 +96,7 @@ groups:
         for: 5m
         labels: { severity: warning, env: __ENV__ }
         annotations:
-          summary: "strato-ingest on {{ $labels.instance }} is dropping non-transaction events from the bus"
+          summary: "strato-ingest on {{ $labels.instance }} is dropping non-transaction events from the API tier's batches"
 
       - alert: VmRunnerHeapHigh
         expr: strato_rts_live_bytes{name="vm-runner"} > 12e9

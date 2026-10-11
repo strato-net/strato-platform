@@ -40,9 +40,6 @@ export interface ObservabilityConfig {
   auroraClusterIdentifier?: string;
   /** ALB full names (the `LoadBalancer` dimension, app/<name>/<id>) for 5xx ratio alarms. */
   albFullNames: string[];
-  /** MSK cluster name plus the consumer groups whose lag pages. */
-  mskClusterName?: string;
-  mskConsumerGroups: string[];
   /** EC2 instance ids of the core cells for host alarms. */
   cellInstanceIds: string[];
 }
@@ -95,8 +92,6 @@ export function loadConfig(app: App): ObservabilityConfig {
     grafanaVersion: ctx(app, "grafanaVersion", "10.4"),
     auroraClusterIdentifier: optional(app, "auroraClusterIdentifier"),
     albFullNames: list(app, "albFullNames"),
-    mskClusterName: optional(app, "mskClusterName"),
-    mskConsumerGroups: list(app, "mskConsumerGroups"),
     cellInstanceIds: list(app, "cellInstanceIds"),
   };
 }

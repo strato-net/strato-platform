@@ -9,8 +9,8 @@ independent CDK app with its own `package.json`, context contract and README.
 
 | App | Stacks | What it owns |
 | --- | --- | --- |
-| `data-plane` | `ha-<env>-data-{postgres,bus}` | VPC, Aurora Postgres cluster, message bus |
-| `core-cell` | `ha-<env>-cell-<cell>-{network,host}`, `ha-<env>-core-frontend` | One EC2 core node (consensus, VM, indexer) |
+| `data-plane` | `ha-<env>-data-postgres` | VPC, Aurora Postgres cluster |
+| `core-cell` | `ha-<env>-cell-<cell>-{network,host}` | One EC2 core node (consensus, VM, indexer) |
 | `api-tier` | `ha-<env>-api-{network,tier,frontdoor}` | ECS API tier and the CloudFront front door |
 | `app-tier` | `ha-<env>-app-{network,tier,ui,history}` | ECS app tier |
 | `observability` | `ha-<env>-obs-{core,alarms,grafana}` | Dashboards, alarms, canaries, collector configs |
@@ -23,11 +23,10 @@ its README lists.
 Every AWS name a deployment creates starts with `ha-<envName>`: the stacks,
 and through them the names CloudFormation generates (roles, security groups,
 buckets, ECS services), plus every explicitly named resource (load balancers,
-target groups, ECS clusters and task families, Aurora and MSK clusters,
+target groups, ECS clusters and task families, the Aurora cluster,
 CloudFront functions and origin access controls, the cell's launch template)
-and the secrets, SSM parameters and log groups under `ha-<envName>/...`
-(MSK's SCRAM secrets must start with `AmazonMSK_`, so they are
-`AmazonMSK_ha-<envName>-bus-<role>`). Every taggable resource also carries
+and the secrets, SSM parameters and log groups under `ha-<envName>/...`.
+Every taggable resource also carries
 the tags `Deployment=ha-<envName>` and `ManagedBy=ha-infra`, which reach what
 has no name (subnets, EBS volumes, KMS keys) and filter cost reports.
 `lib/naming.ts` in each app holds the rule; `envName` is 2 to 16 lowercase
@@ -66,7 +65,8 @@ environments/tiered.sh front-door diff --no-change-set StratoApi-tiered-FrontDoo
 
 The environment runs two core cells so that either can be lost or rebuilt
 without an outage: `cell-a` (us-east-1a) and `cell-b` (us-east-1b), each a
-full follower of the chain with its own Kafka, sharing the Aurora cluster.
+full follower of the chain with its own embedded event log (JLog), sharing
+the Aurora cluster.
 
 - **Writes to Aurora** belong to whichever cell holds the writer lease. Both
   run `strato-lease-watch` (`autoPromote`), which takes the lease after about
@@ -77,28 +77,38 @@ full follower of the chain with its own Kafka, sharing the Aurora cluster.
   `environments/tiered.sh` only says which cell claims the lease when both
   start cold; the lease has moved between the cells since, and either may
   hold it.
-- **Transactions from the API tier** go to `StratoCell-tiered-Frontend`, an
-  internal load balancer on the cells' Kafka port, sticky by source address
-  and health-checked on each cell's sequencer. The API tier only produces,
-  so it does not matter which cell a task lands on. Every cell must advertise
-  the load balancer's name (`kafkaExternalHost`): the API's Kafka client
-  reconnects to the advertised address, so a cell advertising itself would
-  keep being chosen after it died. The client does not retry: when a cell
-  fails, submits from the tasks pinned to it return 500 until the health
-  check ejects it (10 s interval, 2 failures, so about 20 s), then succeed.
-  The client also connects lazily, on the first submit, so on a quiet
-  deployment the load balancer's flow metrics are zero: that is idleness,
-  not a broken path. To test the path, make a Kafka metadata request through
-  the load balancer from inside the VPC and check that the broker it names
-  is the load balancer.
+- **Transactions from the API tier** are posted to every cell's ingress
+  (`strato-ingest` on port 8600; the cells are listed in the API tier's
+  `ingressUrls`), so both mempools hold every batch and a standby promoted
+  later already has what the writer had. A submit succeeds once one cell has
+  accepted it: a cell that is down costs nothing but its own timeout, and
+  when it returns its sequencer catches up from the other cell's gossip.
+  Each cell admits the tier's task security group on 8600
+  (`clientSecurityGroupIds`); there is no load balancer in between.
+- **Reads that need a VM** never reach a cell. Each API task runs vm-query
+  over the SQL mirror and the copies share theirs through ECS Service Connect
+  (`vm-query:8546`); what the mirror cannot answer (a non-latest block tag,
+  `eth_getProof`, a block replay) is an error from the tier.
 
-Rolling the load balancer out, or adding a cell to it: deploy `core-frontend`;
-record its `DnsName` as `CORE_NLB` in `environments/tiered.sh`; on each cell,
-standby first, apply the new advertised name (`strato-setup --regenerate
---kafkaExternalHost=<name>` and a restart, since cloud-init does not run
-again); then deploy `api-tier`. A cell that already advertises the name sends
-even clients that dial it directly through the load balancer, so the API tier
-can be switched last.
+Adding a cell: deploy it with `clientSecurityGroupIds` naming the API tier's
+task security group, add `http://<PrivateDnsName>:8600` to `INGRESS_URLS` in
+`environments/tiered.sh`, then deploy `api-tier`. Removing one is the same in
+reverse.
+
+The live environment is behind this code (the JLog and ingress change of
+2026-10-09), and is deployed from the `tiered` branch (see Naming), which
+needs this change merged for the rollout: its cells run a Kafka build and its API tier submits through
+`StratoCell-tiered-Frontend`, the load balancer on the cells' Kafka port,
+which is no longer in the `core-cell` app. The order that keeps submits
+flowing: both cells take `clientSecurityGroupIds` (a security group change
+only); each cell in turn, standby first, is rebuilt on a `scaling` image with
+JLog and `strato-ingest` from a v2 snapshot, since the Kafka topics in the
+node directory do not carry over; `CELL_B_PRIVATE_DNS` is recorded and
+`api-tier` deployed, which moves submits to the ingress and adds Service
+Connect (new resources, the service updates in place); then the load balancer
+goes, by hand: `aws cloudformation delete-stack --stack-name
+StratoCell-tiered-Frontend`, which also removes the rules it added to the
+cells' security groups.
 
 `tiered` is account 406773134706, us-east-1, serving
 https://app2.testnet.example.invalid. As of 2026-09-18 every stack diffs clean

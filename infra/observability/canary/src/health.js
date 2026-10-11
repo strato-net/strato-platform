@@ -71,7 +71,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Submit a no-op transaction (one unit of the native token to itself) and
 // time it to inclusion. That single number is the user's experience of the
-// whole system: edge, API, bus, sequencer, VM, indexers.
+// whole system: edge, API, ingress, sequencer, VM, indexers.
 const transactionStep = async () => {
   const { addressFromPrivateKey, buildSignedTransaction } = require("./strato-tx");
   const sm = new SecretsManagerClient({});
