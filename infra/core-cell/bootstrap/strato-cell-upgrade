@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Upgrades a running core cell in place, as root (scripts/ha.sh cells upgrade
+# runs it through SSM):
+#
+#   strato-cell-upgrade <strato image>   new binaries and node scripts, node restarted, waits until it follows the chain
+#   strato-cell-upgrade --check          exit 0 when the node follows the chain, with a one-line status
+#
+# The node directory, its data and its docker-compose.yml stay as they are:
+# this replaces what cell-bootstrap.sh installed from the image (step 3) and
+# the node scripts from the cell's EXTRA_BINARIES_S3 prefix. Stopping the node
+# is strato-down through the systemd unit; on the writer, a standby's
+# strato-lease-watch takes the lease about a minute later.
+set -euo pipefail
+export AWS_PAGER=""
+source /etc/strato/cell.env
+export AWS_DEFAULT_REGION="$AWS_REGION"
+NODE_DIR=/var/lib/strato/node
+NODE_USER=strato
+CURRENT=/etc/strato/current-image
+log() { echo "[cell-upgrade $(date -u +%FT%TZ)] $*"; }
+
+# Following the chain: the node has executed up to within a few blocks of the
+# best block its peers report (strato-indexer's chain gauges).
+check() {
+  local metrics best world
+  metrics=$(curl -fsS -m 5 http://localhost:10779/metrics 2>/dev/null) || { echo "strato-indexer is not answering"; return 1; }
+  best=$(awk '$1 == "strato_best_block_number" {printf "%d", $2}' <<<"$metrics")
+  world=$(awk '$1 == "strato_world_best_block_number" {printf "%d", $2}' <<<"$metrics")
+  echo "cell $CELL_ID: block ${best:-?} of ${world:-?}"
+  [[ -n $best && -n $world ]] && (( world > 0 && best >= world - 5 ))
+}
+
+if [[ ${1:-} == --check ]]; then
+  check
+  exit
+fi
+image=${1:?usage: strato-cell-upgrade <strato image> | --check}
+
+# --- New binaries from the image, new node scripts from S3 ---
+registry=${image%%/*}
+aws ecr get-login-password | docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
+aws ecr get-login-password | sudo -u $NODE_USER -H docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
+docker pull -q "$image" >/dev/null
+cid=$(docker create "$image")
+trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+rm -rf /tmp/strato-bin && docker cp "$cid:/usr/local/bin" /tmp/strato-bin
+docker rm -f "$cid" >/dev/null; trap - EXIT
+rm -rf /tmp/node-scripts && mkdir /tmp/node-scripts
+aws s3 cp --recursive "$EXTRA_BINARIES_S3" /tmp/node-scripts --only-show-errors
+
+if [[ $(cat "$CURRENT" 2>/dev/null || echo "$STRATO_IMAGE") == "$image" ]]; then
+  find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+  log "already on $image; node scripts refreshed, node left running"
+  check
+  exit
+fi
+
+# --- Swap them in with the node stopped ---
+log "stopping the node"
+systemctl stop strato-cell.service
+# Regular files only: the image's bin directory also holds a directory entry (queryStrato).
+find /tmp/strato-bin -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+echo "$image" > "$CURRENT"
+log "starting the node on $image"
+systemctl start strato-cell.service
+
+# --- Until it follows the chain again (the caller's SSM timeout bounds this) ---
+until status=$(check); do
+  log "$status"
+  sleep 30
+done
+log "$status: upgraded to $image"

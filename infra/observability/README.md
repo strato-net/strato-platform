@@ -6,7 +6,7 @@ CDK app for one environment's observability plane. See
 ```
 npm install
 npx cdk synth -c envName=testnet -c edgeUrl=https://app.testnet.example \
-  -c auroraClusterIdentifier=strato-testnet \
+  -c auroraClusterIdentifier=ha-testnet-postgres \
   -c albFullNames=app/ha-testnet-api/abc,app/ha-testnet-app/def \
   -c cellInstanceIds=i-0123,i-0456
 npx cdk deploy --all
@@ -17,7 +17,7 @@ routing, Managed Grafana, collector configs in SSM, collector IAM, the
 synthetic edge check) and `ha-<env>-obs-alarms` (CloudWatch alarms on the
 managed services; each group appears only when its identifier is passed).
 
-With `-c canaryKeySecretName=strato/testnet/canary-key` the canary also
+With `-c canaryKeySecretName=ha-testnet/canary-key` the canary also
 submits a no-op transaction every five minutes and records its time to inclusion.
 Run `npm run canary` first (installs the signing libraries and copies the
 handler from canary/src next to them; synth refuses otherwise), create the secret as JSON

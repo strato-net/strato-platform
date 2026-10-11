@@ -52,6 +52,66 @@ create a second set of resources beside it.
 - An app tier stack that rolls back takes its ALB with it. Re-point the front
   door's `appOriginDomainName` at the new ALB from the stack output afterwards.
 
+## testnet-app: built and updated nightly
+
+`testnet-app` (`ha-testnet-app-*`, the replacement for app.testnet.strato.nexus)
+is described by `environments/testnet-app.env` and deployed by
+`scripts/ha.sh`, which `Jenkinsfile.testnet` runs every night. The script
+reads whatever a target needs from the stacks already deployed (the VPC,
+Aurora endpoints, security groups, load balancer and instance names), so the
+same run builds the environment from nothing and updates it:
+
+1. strato-platform's images from `STRATO_BRANCH` (default `scaling`) are
+   built and pushed to ECR; its `bin/strato-*` and
+   `core-cell/bootstrap/strato-cell-upgrade` go to `NODE_SCRIPTS_S3`.
+2. `data-plane` and `obs-core`.
+3. Missing cells are created one at a time, each from the latest snapshot, the
+   first of them restoring eth and cirrus into the empty cluster; the run
+   waits until each follows the chain. A cell's context is recorded when it
+   is created (SSM `/ha-testnet-app/deploy/cell-<id>-context`) and replayed
+   afterwards: it is the instance's user data, which cloud-init reads once,
+   and a changed user data stops and starts the instance.
+4. Existing cells are upgraded in place through SSM (`cells upgrade`):
+   standbys first, then the lease holder, whose lease an upgraded standby
+   takes while it restarts. Each cell gets the new image's binaries and the
+   new node scripts and must follow the chain again before the next one is
+   touched. Its node directory and docker-compose.yml stay as they were set
+   up, so a change to the node's containers needs a rebuilt cell.
+5. `api-tier`, given every cell's ingress (`http://<cell>:8600`) and opening
+   that port on each cell's security group itself (`cellSecurityGroupIds`),
+   so no cell stack is redeployed for it; then `app-tier`, the front door
+   (with freshly built app UI and SMD) and `obs-alarms`, then smoke checks through CloudFront by name, and the
+   image set and both commits are recorded (`/ha-testnet-app/deploy/*`).
+   A run with neither repo changed since does nothing.
+
+By hand, from a workstation with AWS credentials:
+
+```sh
+scripts/ha.sh testnet-app context api-tier
+scripts/ha.sh testnet-app cdk api-tier diff
+scripts/ha.sh testnet-app cells lease
+```
+
+Before the first run:
+
+- Secrets Manager: `ha-testnet-app/oauth`, the node's Keycloak client as JSON
+  `{discoveryUrl, clientId, clientSecret}` with
+  `https://app.testnet.strato.nexus/*` among its redirect and post-logout
+  URIs; optionally `ha-testnet-app/app/backend`, the app backend's keys.
+- Jenkins: a username/password credential
+  `ha-deployer.example` holding the access key of an IAM
+  user of the same name with `environments/testnet-app-deployer-policy.json`:
+  the account's CDK bootstrap roles (`cdk-hnb659fds-*`), push to the
+  `strato/*` ECR repositories, `NODE_SCRIPTS_S3`, SSM parameters under
+  `/ha-testnet-app/`, `AWS-RunShellScript` on instances tagged
+  `Deployment=ha-testnet-app`, and describing the deployment's stacks,
+  secrets and load balancers. What CloudFormation may create is bounded by
+  the bootstrap's execution role, not by this policy.
+- After the first run, point `app.testnet.strato.nexus` (Cloudflare) at the
+  front door: a CNAME to the `ha-testnet-app-api-frontdoor` stack's
+  `DistributionDomainName`. Until then the app tier's backend talks to
+  whatever that name resolves to.
+
 ## Environments
 
 `environments/<env>.sh` records the context a live environment was deployed

@@ -35,9 +35,15 @@ export interface ApiTierConfig {
   createSessionSecret: boolean;
   /** An existing regional certificate for the ALB. Without it, and with `domainName` set, the app creates a DNS-validated one (see CertificateStack). */
   albCertificateArn?: string;
-  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Prometheus (prometheusHost, to the tasks) and Grafana (grafanaInstanceId, to the ALB). The cells admit the tasks on their ingress themselves (the core-cell app's clientSecurityGroupIds). Without these, allow the output TaskSecurityGroupId by hand. */
+  /** Security groups this stack opens at deploy time: the Aurora cluster's to the tasks (5432), and a core cell's for its Prometheus (prometheusHost, to the tasks) and Grafana (grafanaInstanceId, to the ALB). The cells' ingress (8600) is opened either here (cellSecurityGroupIds) or by each cell (the core-cell app's clientSecurityGroupIds). Without these, allow the output TaskSecurityGroupId by hand. */
   postgresSecurityGroupId?: string;
   coreSecurityGroupId?: string;
+  /**
+   * Every core cell's security group, opened to the tasks on the transaction ingress (8600) by this
+   * stack. The alternative to each cell admitting the tasks (the core-cell app's
+   * clientSecurityGroupIds) for cells whose stacks are not redeployed; use one or the other.
+   */
+  cellSecurityGroupIds: string[];
   /** The tier's public hostname. With `hostedZoneId` it is the node hostname being cut over (weighted records below); without one it is a CNAME to the ALB kept at the registrar. */
   domainName?: string;
   /** Weighted cutover: the node hostname's Route 53 zone and the current node addresses. */
@@ -153,6 +159,7 @@ export function loadConfig(app: App): ApiTierConfig {
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     coreSecurityGroupId: optional(app, "coreSecurityGroupId"),
+    cellSecurityGroupIds: String(ctx(app, "cellSecurityGroupIds", "")).split(",").map((s) => s.trim()).filter(Boolean),
     albCertificateArn: optional(app, "albCertificateArn"),
     hostedZoneId: optional(app, "hostedZoneId"),
     domainName: optional(app, "domainName"),

@@ -275,9 +275,8 @@ export class ApiTierStack extends Stack {
       : undefined;
     if (coreSg) {
       const core = coreSg;
-      // The cells' ingress (8600) is opened on the cell side, to this group
-      // (the core-cell app's clientSecurityGroupIds), since there are several
-      // cells and one coreSecurityGroupId here. Nothing else: a core cell runs
+      // The cells' ingress (8600) is opened by cellSecurityGroupIds below, or on
+      // the cell side (the core-cell app's clientSecurityGroupIds). Nothing else: a core cell runs
       // no strato-api, jsonrpc or vault wrapper (this tier runs its own, and
       // signs against the external vault), and its VM is never called.
       if (config.prometheusHost) {
@@ -285,6 +284,11 @@ export class ApiTierStack extends Stack {
         core.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
       }
     }
+
+    config.cellSecurityGroupIds.forEach((sgId, i) => {
+      ec2.SecurityGroup.fromSecurityGroupId(this, `CellSg${i}`, sgId)
+        .addIngressRule(taskSg, ec2.Port.tcp(8600), `${name} tasks: transaction ingress (strato-ingest)`);
+    });
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
