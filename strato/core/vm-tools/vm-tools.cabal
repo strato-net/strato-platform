@@ -103,6 +103,7 @@ test-suite contextm-test
       ActionEncodeSpec
       CrossLangFixtureSpec
       ReceiptSpec
+      ReplayProtectionSpec
       TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:

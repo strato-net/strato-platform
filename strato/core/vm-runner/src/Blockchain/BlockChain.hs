@@ -51,7 +51,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive)
+import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -431,7 +431,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
+      expectedChainId = Conf.chainId $ networkConfig ethConf
       precheck
+        | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
         | not nonceValid = Left $ TFNonceMismatch (TD.nonce bt) acctNonce t
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
