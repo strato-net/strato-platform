@@ -115,14 +115,17 @@ ethLogsBloom = bloomFromItems . concatMap logItems
     logItems l = addrBytes (address l) : topics l
     addrBytes t = either (const B.empty) id (B16.decode (BC.pack (T.unpack t)))
 
-matchesTopics :: [String] -> EthLog -> Bool
+matchesTopics :: [Maybe [String]] -> EthLog -> Bool
 matchesTopics [] _ = True
 matchesTopics filterTopics l =
-  and $ zipWith matchTopic filterTopics (topics l ++ repeat B.empty)
+  length filterTopics <= length (topics l) && and (zipWith matchTopic filterTopics (topics l))
   where
-    matchTopic "" _ = True
-    matchTopic ft logTopic =
-      let stripped = if take 2 ft == "0x" then drop 2 ft else ft
+    matchTopic Nothing _ = True
+    matchTopic (Just []) _ = True
+    matchTopic (Just alternatives) logTopic = any (`matches` logTopic) alternatives
+    matches "" _ = True
+    matches ft logTopic =
+      let stripped = if take 2 ft `elem` ["0x", "0X"] then drop 2 ft else ft
       in case B16.decode (BC.pack stripped) of
            Right decoded -> decoded == logTopic
            Left _        -> False
