@@ -231,8 +231,8 @@ net_peerCount = toMethod "net_peerCount" f ()
 net_listening :: Method Server
 net_listening = toMethod "net_listening" f ()
   where
-    f :: RpcResult Server String
-    f = return "true"
+    f :: RpcResult Server Bool
+    f = return True
 
 eth_protocolVersion :: Method Server
 eth_protocolVersion = toMethod "eth_protocolVersion" f ()
@@ -243,8 +243,8 @@ eth_protocolVersion = toMethod "eth_protocolVersion" f ()
 eth_syncing :: Method Server
 eth_syncing = toMethod "eth_syncing" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_coinbase :: Method Server
 eth_coinbase = toMethod "eth_coinbase" f ()
@@ -255,8 +255,8 @@ eth_coinbase = toMethod "eth_coinbase" f ()
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_hashrate :: Method Server
 eth_hashrate = toMethod "eth_hashrate" f ()
@@ -273,8 +273,8 @@ eth_gasPrice = toMethod "eth_gasPrice" f ()
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
   where
-    f :: RpcResult Server String
-    f = return "[]"
+    f :: RpcResult Server [Address]
+    f = return []
 
 ----------------
 
