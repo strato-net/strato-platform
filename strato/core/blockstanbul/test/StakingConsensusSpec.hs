@@ -31,6 +31,7 @@ import qualified Data.ByteString.Char8 as C8
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
+import Data.Time.Clock (addUTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import qualified LabeledError
 import Test.Hspec
@@ -59,7 +60,7 @@ instance {-# OVERLAPPING #-} Monad m => HasVault (StateT BlockstanbulContext m) 
 -- validators and no signature checks.
 mkContext :: Maybe Integer -> BlockstanbulContext
 mkContext activation =
-  (newContext "test" 1 ckpt (Just me) True activation) {_productionAuth = False}
+  (newContext "test" 1 ckpt (Just me) True activation 15) {_productionAuth = False}
   where
     ckpt = Checkpoint (View 0 10) [Validator me, Validator other] (Just zeroHash) [] 0
 
@@ -209,3 +210,30 @@ spec = describe "stake-weighted consensus" $ do
 
     it "does not apply the extra checks before activation" $
       checkProposalHeader legacyCtx vw (Block (v3 [] [] 5 [] []) [] []) `shouldBe` Right ()
+
+  describe "proposal timestamps" $ do
+    let now = posixSecondsToUTCTime 1700000000
+        stampedAt t = Block ((v3 [Validator me] [(Validator me, 7)] 0 [] []) {timestamp = t}) [] []
+        rejected = either (const True) (const False)
+
+    it "accepts stamps up to maxTimestampDrift ahead of the local clock, and any stamp behind it" $ do
+      checkProposalTimestamp 15 now (stampedAt now) `shouldBe` Right ()
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime 15 now) `shouldBe` Right ()
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime (-86400) now) `shouldBe` Right ()
+
+    it "rejects stamps further ahead than maxTimestampDrift" $ do
+      checkProposalTimestamp 15 now (stampedAt $ addUTCTime 16 now) `shouldSatisfy` rejected
+      checkProposalTimestamp 0 now (stampedAt $ addUTCTime 1 now) `shouldSatisfy` rejected
+
+    -- The check composes with checkProposalHeader from the outside, so unlike
+    -- the staking checks it must fire before activation too.
+    it "round-changes instead of running a far-future proposal, staking active or not" $
+      forM_ [activeCtx, legacyCtx] $ \base -> do
+        let ctx = base {_validators = S.singleton (Validator me), _stakes = M.fromList [(Validator me, 7)], _proposer = Validator me}
+            sealed blk = addProposerSeal (signMsg myPriv (proposalMessage blk)) blk
+            propose t = IMsg (MsgAuth me dummySig) (Preprepare (View 0 10) (sealed $ stampedAt t))
+        farFuture <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 4000000000]
+        [() | RunPreprepare _ <- farFuture] `shouldBe` []
+        [rn | OMsg _ (RoundChange (View rn _) _) <- farFuture] `shouldBe` [1]
+        past <- runWith ctx $ sendMessages [propose $ posixSecondsToUTCTime 0]
+        length [() | RunPreprepare _ <- past] `shouldBe` 1

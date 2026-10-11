@@ -37,6 +37,14 @@ Rounds persist across heights: committing a block advances the sequence number b
 
 `--blockstanbul_block_period_ms` (default 1000) is the minimum delay between block creations.
 
+### Block timestamps
+
+The proposer stamps a block with its own clock, and `block.timestamp` in contracts reads that header field. The stamp is checked in three places:
+
+- **Proposer.** A block is never stamped before its parent, even when the parent's proposer ran ahead of the local clock.
+- **Vote time.** A validator refuses to vote for a proposal stamped more than `maxTimestampDriftS` seconds (default 15) ahead of its own clock, and requests a round change instead. This is local policy: it never applies to committed blocks, so nodes with different values do not fork. Set it in `ethconf.yaml` or with `--blockstanbul_max_timestamp_drift_s` at setup.
+- **Verification.** A block whose timestamp precedes its parent's fails verification on every node, during the vote and during sync alike. Timestamps have one-second resolution, so consecutive blocks may share a second.
+
 ## Validator set
 
 The validator set lives in `MercataGovernance`. It is a proxy at `0x100`, and genesis seeds it with the network's initial validators.
