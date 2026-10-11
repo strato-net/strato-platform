@@ -284,15 +284,19 @@ lease_holder() {
   return 0
 }
 
-# Fetches the current upgrade script from the node scripts prefix and runs it with the given arguments.
+# Fetches the current upgrade script from the node scripts prefix and runs it
+# with the given arguments. SSM runs commands with /bin/sh (dash on Ubuntu),
+# so the script hands itself to bash.
 cell_script() {
   cat <<EOF
+exec bash -s <<'CELL_SCRIPT'
 set -euo pipefail
 source /etc/strato/cell.env
 export AWS_DEFAULT_REGION=\$AWS_REGION AWS_PAGER=""
 aws s3 cp "\${EXTRA_BINARIES_S3}strato-cell-upgrade" /usr/local/bin/strato-cell-upgrade --only-show-errors
 chmod 0755 /usr/local/bin/strato-cell-upgrade
 /usr/local/bin/strato-cell-upgrade $*
+CELL_SCRIPT
 EOF
 }
 
@@ -301,7 +305,8 @@ cells_wait_ready() {
   ids=${1:-$(existing_cells)}
   for id in $ids; do
     log "cell $id: waiting until it follows the chain (bootstrap and snapshot restore run first)"
-    until ssm_run "$(instance_of "$id")" 120 "$(cell_script --check)" 2>/dev/null | tail -1; do
+    # The last line the check printed; SSM's own "failed to run commands" line says nothing.
+    until ssm_run "$(instance_of "$id")" 120 "$(cell_script --check)" 2>/dev/null | grep -v '^failed to run commands' | grep . | tail -1; do
       (( $(date +%s) < deadline )) || die "cell $id is not following the chain after ${READY_TIMEOUT_MINUTES:-360} minutes; see /var/log/strato-cell-bootstrap.log on it"
       sleep 60
     done
@@ -313,20 +318,24 @@ cells_wait_ready() {
   done
 }
 
+# Creates the missing cells, one at a time: a cell joins a cluster the cells
+# before it have filled, so they must follow the chain first (also after a
+# run that stopped while one was still bootstrapping). Returns once every
+# cell follows the chain.
 cells_create() {
   local id first_of_cluster=true ctx dir stacks
   [[ -n $(existing_cells) ]] && first_of_cluster=false
   for id in $(cell_ids); do
     exists "$(host_stack "$id")" && continue
+    [[ -z $(existing_cells) ]] || cells_wait_ready
     secret_exists "$OAUTH_SECRET" || die "$OAUTH_SECRET does not exist: create it first (environments/$ENV_NAME.env)"
     ctx_cell_new "$id" "$first_of_cluster"
     ssm_put "$STATE/cell-$id-context" "$(printf '%s\n' "${ctx[@]}")"
     log "cell $id: creating $(host_stack "$id")"
     cdk_in core-cell deploy "$P-cell-$id-network" "$P-cell-$id-host" --require-approval never --progress events "${ctx[@]}"
     first_of_cluster=false
-    # One at a time: the next cell joins a cluster this one has filled.
-    cells_wait_ready "$id"
   done
+  cells_wait_ready
 }
 
 # Standbys first, then the lease holder: while it restarts a standby takes the lease.

@@ -169,12 +169,20 @@ if [[ ! -d $NODE_DIR ]]; then
   # 4b. A snapshot, when asked for (strato-up would skip it once the directory exists).
   if [[ -n "$SNAPSHOT_SOURCE" ]]; then
     [[ -n "$SNAPSHOT_BUCKET" ]] && export STRATO_SNAPSHOT_BUCKET="$SNAPSHOT_BUCKET"
-    if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then snap=(--source "$SNAPSHOT_SOURCE"); else snap=(--snapshot="$SNAPSHOT_SOURCE"); fi
+    # A bare --snapshot is the latest published one; strato-snapshot takes no "latest" timestamp.
+    if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then snap=(--source "$SNAPSHOT_SOURCE")
+    elif [[ "$SNAPSHOT_SOURCE" == latest ]]; then snap=(--snapshot)
+    else snap=(--snapshot="$SNAPSHOT_SOURCE"); fi
     # The cell's eth and cirrus are on a shared cluster that another cell may
     # be writing: take the chain state and leave them alone, unless told this
-    # is the first cell of an empty cluster. An unset value (a cell.env from
-    # before this flag) skips too.
-    [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]] || snap+=(--skip-databases)
+    # is the first cell of an empty cluster, which loads them into the cluster
+    # (there is no local postgres to load them into). An unset value (a
+    # cell.env from before this flag) skips too.
+    if [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]]; then
+      snap+=(--postgres-host "$PG_WRITER_HOST" --replace-databases)
+    else
+      snap+=(--skip-databases)
+    fi
     # The archive is unpacked in the work directory: on the data volume, which
     # has the room (the root volume does not) and which the node user can write
     # (this script's own directory, where strato-snapshot would default, it cannot).
