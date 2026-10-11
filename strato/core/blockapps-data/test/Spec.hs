@@ -2,13 +2,16 @@
 
 import Blockchain.Data.LogsBloom
 import Blockchain.Data.RLP
-import Blockchain.Data.TransactionDef
+import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Secp256k1
 import Control.Monad (forM_)
 import Data.Bits (testBit)
 import qualified Data.ByteString as B
 import Data.List (sort)
+import Data.Maybe (fromMaybe)
 import Test.Hspec
 
 -- | Bit indices set in a big-endian bloom (bit 0 = LSB of the last byte).
@@ -22,7 +25,7 @@ setBits bs =
     ]
 
 main :: IO ()
-main = hspec $ spec >> nativeRLPChainIds
+main = hspec $ spec >> nativeRLPChainIds >> nativeChainIdSigning
 
 spec :: Spec
 spec = describe "Blockchain.Data.LogsBloom" $ do
@@ -79,3 +82,35 @@ nativeRLPChainIds = describe "Native RLP chain IDs" $ do
            132, 112, 105, 110, 103, 193, 55, 135, 109, 101, 114, 99, 97, 116, 97, 27, 128, 128]
     rlpSerialize (rlpEncode $ message Nothing 0 B.empty) `shouldBe` legacy
     rlpEncode (message Nothing 1 B.empty) `shouldBe` RLPString (B.cons 1 legacy)
+
+nativeChainIdSigning :: Spec
+nativeChainIdSigning = describe "Native transaction chain IDs" $ do
+  let message cid ver attr = MessageTX 0 1000000 (Address 1) "ping" ["7"] "mercata" cid 0 0 27 ver attr
+      creation cid ver = ContractCreationTX 0 1000000 "Example" [] "mercata" (Code "contract Example {}") cid 0 0 27 ver
+      transactions cid = [message cid 0 attr | attr <- [B.empty, "attribution"]]
+        ++ [creation cid 0]
+      roundTrip tx = rlpDecode $ rlpDeserialize $ rlpSerialize $ rlpEncode tx
+      privateKey = fromMaybe (error "invalid test private key") $ importPrivateKey (B.replicate 31 0 <> B.singleton 1)
+      expectedSigner = Just $ fromPublicKey $ derivePublicKey privateKey
+      sign tx = let digest = keccak256ToByteString $ partialTransactionHash tx
+                    (sr, ss, sv) = getSigVals $ signMsg privateKey digest
+                in tx {r = toInteger sr, s = toInteger ss, v = sv}
+
+  it "preserves legacy encoding and signing without a chain ID" $
+    forM_ (transactions Nothing) $ \tx -> do
+      roundTrip tx `shouldBe` tx
+      whoSignedThisTransaction (roundTrip $ sign tx) `shouldBe` expectedSigner
+
+  it "recovers chain-bound signatures after transmission" $
+    forM_ (transactions $ Just 123354377739506) $ \tx ->
+      whoSignedThisTransaction (roundTrip $ sign tx) `shouldBe` expectedSigner
+
+  it "changing the signed chain ID changes the recovered signer" $
+    forM_ (transactions $ Just 123354377739506) $ \tx ->
+      whoSignedThisTransaction ((roundTrip $ sign tx) {chainId = Just 195049586845898}) `shouldNotBe` expectedSigner
+
+  it "matches independently generated legacy and chain-bound RLP hashes" $ do
+    partialTransactionHash (message Nothing 0 B.empty) `shouldBe`
+      unsafeCreateKeccak256FromWord256 0x52e62c42d126963bbe1c53ec7cea4c6b68eb6f3efcbfdb7c353d62daea9a9ed8
+    partialTransactionHash (message (Just 123354377739506) 0 B.empty) `shouldBe`
+      unsafeCreateKeccak256FromWord256 0xdb17c9e7289340ee1ad7335d63a1a3036e72b2c48b5fd2ae2337d93660a3acbe

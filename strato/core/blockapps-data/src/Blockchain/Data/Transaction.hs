@@ -69,7 +69,7 @@ import System.Clock
 
 instance TransactionLike Transaction where
   txHash = hash . rlpSerialize . rlpEncode
-  txPartialHash = hash . rlpSerialize . partialRLPEncode
+  txPartialHash = partialTransactionHash
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
   txNonce = nonce
@@ -262,7 +262,10 @@ transactionHash :: Transaction -> Keccak256
 transactionHash = hash . rlpSerialize . rlpEncode
 
 partialTransactionHash :: Transaction -> Keccak256
-partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+partialTransactionHash tx = hash $ rlpSerialize $ case (tx, chainId tx, partialRLPEncode tx) of
+  (EthereumTX {}, _, encoded) -> encoded
+  (_, Just cid, RLPArray items) -> RLPArray $ items ++ [rlpEncode cid, rlpEncode (0::Integer), rlpEncode (0::Integer)]
+  (_, _, encoded) -> encoded
 
 -- EIP-712 support for external wallet signing (MetaMask, etc.)
 
