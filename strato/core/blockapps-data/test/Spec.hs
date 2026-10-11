@@ -1,6 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import Blockchain.Data.LogsBloom
+import Blockchain.Data.RLP
+import Blockchain.Data.TransactionDef
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
+import Control.Monad (forM_)
 import Data.Bits (testBit)
 import qualified Data.ByteString as B
 import Data.List (sort)
@@ -17,7 +22,7 @@ setBits bs =
     ]
 
 main :: IO ()
-main = hspec spec
+main = hspec $ spec >> nativeRLPChainIds
 
 spec :: Spec
 spec = describe "Blockchain.Data.LogsBloom" $ do
@@ -42,3 +47,35 @@ spec = describe "Blockchain.Data.LogsBloom" $ do
         combined = setBits (bloomFromItems [a, b])
         union' = sort (setBits (bloomFromItems [a]) ++ setBits (bloomFromItems [b]))
     combined `shouldBe` sort (foldr (\x acc -> if x `elem` acc then acc else x : acc) [] union')
+
+nativeRLPChainIds :: Spec
+nativeRLPChainIds = describe "Native RLP chain IDs" $ do
+  let message cid ver attr = MessageTX 0 1000000 (Address 1) "ping" ["7"] "mercata" cid 0 0 27 ver attr
+      transactions cid = [message cid ver attr | ver <- [0, 1], attr <- [B.empty, "attribution"]]
+        ++ [ContractCreationTX 0 1000000 "Example" [] "mercata" (Code "contract Example {}") cid 0 0 27 ver | ver <- [0, 1]]
+      roundTrip tx = rlpDecode $ rlpDeserialize $ rlpSerialize $ rlpEncode tx
+
+  it "preserves chain IDs and recovery values in every native format" $
+    forM_ [Nothing, Just 123354377739506, Just 195049586845898] $ \cid ->
+      forM_ (transactions cid) $ \tx ->
+        forM_ [27, 28] $ \recoveryV -> do
+          let signed = tx {v = recoveryV}
+          roundTrip signed `shouldBe` signed
+
+  it "carries the chain ID in the existing signature v field" $
+    forM_ [123354377739506, 195049586845898] $ \cid ->
+      forM_ (transactions $ Just cid) $ \tx ->
+        forM_ [27, 28] $ \recoveryV -> do
+          let encoded = case rlpEncode tx {v = recoveryV} of
+                RLPString bytes -> rlpDeserialize $ B.tail bytes
+                payload -> payload
+          case encoded of
+            RLPArray items -> (rlpDecode (reverse items !! 2) :: Integer) `shouldBe` cid * 2 + 35 + toInteger (recoveryV - 27)
+            _ -> expectationFailure "expected a native RLP payload"
+
+  it "keeps legacy transaction bytes unchanged" $ do
+    let legacy = B.pack
+          [237, 2, 128, 131, 15, 66, 64, 148, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+           132, 112, 105, 110, 103, 193, 55, 135, 109, 101, 114, 99, 97, 116, 97, 27, 128, 128]
+    rlpSerialize (rlpEncode $ message Nothing 0 B.empty) `shouldBe` legacy
+    rlpEncode (message Nothing 1 B.empty) `shouldBe` RLPString (B.cons 1 legacy)
