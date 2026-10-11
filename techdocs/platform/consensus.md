@@ -37,6 +37,8 @@ Rounds persist across heights: committing a block advances the sequence number b
 
 `--blockstanbul_block_period_ms` (default 1000) is the minimum delay between block creations.
 
+This is a one-second minimum, not a guaranteed average block time. Consensus round changes and node load can increase the interval. Measure an average from consecutive block timestamps over a stated block range when reporting it to a wallet provider.
+
 ## Validator set
 
 The validator set lives in `MercataGovernance`. It is a proxy at `0x100`, and genesis seeds it with the network's initial validators.

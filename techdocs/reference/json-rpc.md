@@ -63,14 +63,23 @@ These methods exist for wallet compatibility and always return the same value:
 
 - `eth_gasPrice` returns `0x0`.
 - `eth_estimateGas` always returns `0x5208`.
-- `eth_syncing` and `eth_mining` return `"false"`.
-- `net_listening` returns `"true"`.
+- `eth_syncing` and `eth_mining` return the JSON boolean `false`.
+- `net_listening` returns the JSON boolean `true`.
 - `net_peerCount` and `eth_hashrate` return `0x0`.
 - `eth_coinbase` returns the zero address.
-- `eth_accounts` and `eth_getCompilers` return `"[]"`.
+- `eth_accounts` returns the JSON array `[]`; the node manages no wallet accounts.
+- `eth_getCompilers` returns the string `"[]"`.
 - The uncle methods return `0x0` or `null`.
 - `eth_protocolVersion` returns a constant.
 - `rpc_modules` returns a fixed list of module names that doesn't reflect which methods are implemented.
+
+These are fixed compatibility responses, not live node health checks. Older node builds may return strings for `eth_accounts`, `net_listening`, `eth_syncing` and `eth_mining`.
+
+### Gas API and fees
+
+**EIP-1559 support: No.** The API accepts legacy Ethereum transactions and does not implement `eth_feeHistory` or `eth_maxPriorityFeePerGas`.
+
+Use the [JSON-RPC endpoints](#endpoints) with `eth_gasPrice` for the legacy gas-price response. It currently returns `0x0`, not a `baseFee` / `priorityFee` pair. This does not report the actual transaction fee: the node charges fees separately through the Decider contract, using a voucher or USDST. See [Transactions and Fees](../platform/transactions-and-fees.md).
 
 ### Not supported
 
