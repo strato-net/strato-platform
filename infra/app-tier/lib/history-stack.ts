@@ -8,6 +8,7 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { AppTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface HistoryStackProps extends StackProps {
   vpc: ec2.IVpc;
@@ -34,7 +35,7 @@ export class HistoryStack extends Stack {
     super(scope, id, props);
     const { vpc, config, cluster, listener } = props;
     const history = config.history!;
-    const name = `strato-history-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-history`;
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
 
@@ -87,8 +88,9 @@ export class HistoryStack extends Stack {
     }
 
     // --- Service ---
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/history/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/history`, retention: logs.RetentionDays.ONE_MONTH });
     const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
       cpu: 512,
       memoryLimitMiB: 1024,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
@@ -145,6 +147,7 @@ export class HistoryStack extends Stack {
 
     // --- Routed by path on the app ALB, ahead of the default nginx target ---
     listener.addTargets("History", {
+      targetGroupName: elbName(`${name}-3030`),
       priority: 10,
       conditions: [elbv2.ListenerCondition.pathPatterns(["/history-api/*"])],
       port: 3030,

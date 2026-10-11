@@ -2,11 +2,11 @@
 
 CDK app for Phase 2 of the tiered deployment: the shared Postgres cluster.
 
-`StratoData-<env>-Postgres` is an Aurora PostgreSQL cluster (version 14 to
+`ha-<env>-data-postgres` is an Aurora PostgreSQL cluster (version 14 to
 match the node's container) with one writer and, by default, two readers.
 The core's indexer and slipstream write the writer endpoint; PostgREST, the
 app backend and later the API tier read the reader endpoint. Master
-credentials are generated into Secrets Manager under `strato/<env>/postgres`
+credentials are generated into Secrets Manager under `ha-<env>/postgres`
 (a JSON secret with `username` and `password`); nothing here prints them.
 
 ## Deploy

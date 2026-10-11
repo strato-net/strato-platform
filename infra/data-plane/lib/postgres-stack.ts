@@ -2,6 +2,7 @@ import { CfnOutput, Duration, RemovalPolicy, Stack, StackProps } from "aws-cdk-l
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as rds from "aws-cdk-lib/aws-rds";
 import { Construct } from "constructs";
+import { deploymentPrefix } from "./naming";
 
 export interface PostgresStackProps extends StackProps {
   envName: string;
@@ -32,7 +33,7 @@ export class PostgresStack extends Stack {
 
   constructor(scope: Construct, id: string, props: PostgresStackProps) {
     super(scope, id, props);
-    const name = `strato-${props.envName}`;
+    const name = `${deploymentPrefix(props.envName)}-postgres`;
 
     const vpc = props.vpcId
       ? ec2.Vpc.fromLookup(this, "Vpc", { vpcId: props.vpcId })

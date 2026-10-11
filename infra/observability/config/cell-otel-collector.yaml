@@ -1,6 +1,6 @@
 # ADOT collector on a core cell: scrapes every node process on localhost and
 # remote-writes to Managed Prometheus with SigV4 from the instance role.
-# Installed from SSM /strato/__ENV__/observability/otel-collector-cell.
+# Installed from SSM /ha-__ENV__/observability/otel-collector-cell.
 extensions:
   sigv4auth:
     region: __REGION__

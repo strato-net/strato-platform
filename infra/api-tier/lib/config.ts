@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { deploymentPrefix } from "./naming";
 
 /** Context contract for the API tier. Secrets are named, never valued. */
 export interface ApiTierConfig {
@@ -132,6 +133,7 @@ function optional(app: App, key: string): string | undefined {
 
 export function loadConfig(app: App): ApiTierConfig {
   const envName = ctx(app, "envName", "testnet");
+  const prefix = deploymentPrefix(envName);
   return {
     envName,
     vpcId: optional(app, "vpcId"),
@@ -151,13 +153,13 @@ export function loadConfig(app: App): ApiTierConfig {
     busHost: optional(app, "busHost"),
     busPort: Number(ctx(app, "busPort", "9096")),
     busSubmitMode: ctx(app, "busSubmitMode", "shadow"),
-    busSecretName: ctx(app, "busSecretName", `AmazonMSK_strato-${envName}-api`),
+    busSecretName: ctx(app, "busSecretName", `AmazonMSK_${prefix}-bus-api`),
     secrets: {
-      postgres: ctx(app, "postgresSecretName", `strato/${envName}/postgres`),
-      oauthCredentialsYaml: ctx(app, "oauthCredentialsSecretName", `strato/${envName}/api/oauth-credentials`),
-      session: ctx(app, "sessionSecretName", `strato/${envName}/api/session-secret`),
+      postgres: ctx(app, "postgresSecretName", `${prefix}/postgres`),
+      oauthCredentialsYaml: ctx(app, "oauthCredentialsSecretName", `${prefix}/api/oauth-credentials`),
+      session: ctx(app, "sessionSecretName", `${prefix}/api/session-secret`),
     },
-    ethconfParameterName: ctx(app, "ethconfParameterName", `/strato/${envName}/api/ethconf-base64`),
+    ethconfParameterName: ctx(app, "ethconfParameterName", `/${prefix}/api/ethconf-base64`),
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     coreSecurityGroupId: optional(app, "coreSecurityGroupId"),

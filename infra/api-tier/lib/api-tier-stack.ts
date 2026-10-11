@@ -13,6 +13,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { ApiTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface ApiTierStackProps extends StackProps {
   /** Certificate for the ALB's HTTPS listener (from CertificateStack); `config.albCertificateArn` otherwise. */
@@ -38,7 +39,7 @@ export class ApiTierStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiTierStackProps) {
     super(scope, id, props);
     const { vpc, config } = props;
-    const name = `strato-api-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-api`;
 
     // --- Secrets and the node config ---
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
@@ -88,8 +89,9 @@ export class ApiTierStack extends Stack {
     const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/api/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/api`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
     const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
       cpu: 2048,
       memoryLimitMiB: 4096,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
@@ -293,7 +295,7 @@ export class ApiTierStack extends Stack {
 
     // --- ALB ---
     const albSg = new ec2.SecurityGroup(this, "AlbSg", { vpc, description: `${name} alb` });
-    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: name });
+    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: elbName(name) });
     const albCertificate =
       props.albCertificate ?? (config.albCertificateArn ? acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn) : undefined);
     // The port-80 listener keeps one logical id whether it forwards (no
@@ -323,6 +325,9 @@ export class ApiTierStack extends Stack {
       listener.addCertificates("ExtraCertificates", extraCertificates);
     }
     listener.addTargets("Nginx", {
+      // The port is in the name so that a port change, which replaces the
+      // target group, does not collide with the old group's name.
+      targetGroupName: elbName(`${name}-${config.httpPort}`),
       port: config.httpPort,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
@@ -343,6 +348,7 @@ export class ApiTierStack extends Stack {
     // cell's 3001 stays shut to everything except this load balancer.
     if (config.grafanaInstanceId) {
       const grafanaTargets = new elbv2.ApplicationTargetGroup(this, "GrafanaTargets", {
+        targetGroupName: elbName(`${name}-grafana`),
         vpc,
         port: config.grafanaPort,
         protocol: elbv2.ApplicationProtocol.HTTP,

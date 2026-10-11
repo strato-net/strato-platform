@@ -4,6 +4,7 @@ import * as cwactions from "aws-cdk-lib/aws-cloudwatch-actions";
 import * as sns from "aws-cdk-lib/aws-sns";
 import { Construct } from "constructs";
 import { ObservabilityConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface AlarmsStackProps extends StackProps {
   config: ObservabilityConfig;
@@ -21,7 +22,7 @@ export class AlarmsStack extends Stack {
   constructor(scope: Construct, id: string, props: AlarmsStackProps) {
     super(scope, id, props);
     const { config, pages, warnings } = props;
-    const name = `strato-${config.envName}`;
+    const name = deploymentPrefix(config.envName);
     const route = (alarm: cloudwatch.Alarm, topic: sns.ITopic) => {
       alarm.addAlarmAction(new cwactions.SnsAction(topic));
       alarm.addOkAction(new cwactions.SnsAction(topic));

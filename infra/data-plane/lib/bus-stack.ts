@@ -5,6 +5,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as msk from "aws-cdk-lib/aws-msk";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
+import { deploymentPrefix } from "./naming";
 
 export interface BusStackProps extends StackProps {
   envName: string;
@@ -33,7 +34,7 @@ export class BusStack extends Stack {
 
   constructor(scope: Construct, id: string, props: BusStackProps) {
     super(scope, id, props);
-    const name = `strato-bus-${props.envName}`;
+    const name = `${deploymentPrefix(props.envName)}-bus`;
 
     const securityGroup = new ec2.SecurityGroup(this, "BusSg", { vpc: props.vpc, description: `${name} brokers`, allowAllOutbound: false });
     for (const sgId of props.clientSecurityGroupIds) {
@@ -43,7 +44,7 @@ export class BusStack extends Stack {
       securityGroup.addIngressRule(ec2.Peer.ipv4(cidr), ec2.Port.tcp(9096), `SASL_SSL from ${cidr}`);
     }
 
-    const logGroup = new logs.LogGroup(this, "BrokerLogs", { logGroupName: `/strato/bus/${props.envName}`, retention: logs.RetentionDays.TWO_WEEKS });
+    const logGroup = new logs.LogGroup(this, "BrokerLogs", { logGroupName: `/${deploymentPrefix(props.envName)}/bus`, retention: logs.RetentionDays.TWO_WEEKS });
 
     const configuration = new msk.CfnConfiguration(this, "Config", {
       name: `${name}-config`,

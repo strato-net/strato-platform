@@ -40,7 +40,7 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
    compose pulls them with `--repoUrl`).
 2. The Aurora cluster (`data-plane`), allowing this stack's security
    group (output `SecurityGroupId`) on 5432, and its master secret
-   `strato/<env>/postgres`.
+   `ha-<env>/postgres`.
 3. The network's VPC id when the cell must peer with existing validators
    over private addresses (`-c vpcId`); otherwise the app creates a VPC.
 4. Optionally the observability app's outputs: the cell collector and
@@ -85,7 +85,7 @@ submits transactions to this cell.
 | `extraBinariesS3` | none | `s3://bucket/prefix/` of extra binaries installed into `/usr/local/bin` (for an image that lacks one) |
 | `network` | `upquark` | `--network`; carries the bootnodes and chain id |
 | `postgresWriterHost` / `postgresReaderHost` / `postgresPort` / `postgresUser` | required / writer / 5432 / postgres | Aurora endpoints |
-| `postgresSecretName` | `strato/<env>/postgres` | master secret, JSON with a `password` field |
+| `postgresSecretName` | `ha-<env>/postgres` | master secret, JSON with a `password` field |
 | `postgresSecurityGroupId` | none | the cluster's security group; the stack opens it to the cell on the Postgres port |
 | `role` | `core` | `node` also runs the app on this host (nginx on httpPort/443, app UI and backend, SMD, apex, PostgREST); needs those images under `repoUrl` |
 | `bundledApp` | `true` | with role node: run app-ui and app-backend on this host; `false` when the app tier serves the app (the node's root redirects to `appUrl`) |
@@ -113,7 +113,6 @@ submits transactions to this cell.
 | `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
 | `kafkaExternalHost` | the host's private DNS name | the name the broker advertises on 9094; the environment load balancer's name when the cell is behind one (`-c frontend=true`) |
 | `autoPromote` | `false` | watch the writer lease and take it after `autoPromoteAfter` (3) consecutive stale observations, about a minute of silence; each claim is counted in CloudWatch (`STRATO/Cell` `WriterLeaseClaimed`). Not for a validator's standby |
-| `legacyLaunchTemplateName` | `false` | keep the launch template's old shared name; only for a cell created before the names were made unique, where renaming would replace the instance |
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
 | `p2pCidrs` | `0.0.0.0/0` | who may reach 30303 tcp/udp |

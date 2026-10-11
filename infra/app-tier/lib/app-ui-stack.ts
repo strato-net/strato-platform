@@ -9,6 +9,7 @@ import { Construct } from "constructs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { AppTierConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface AppUiStackProps extends StackProps {
   config: AppTierConfig;
@@ -64,10 +65,10 @@ export class AppUiStack extends Stack {
     const certificate =
       props.certificate ?? (config.cloudfrontCertificateArn ? acm.Certificate.fromCertificateArn(this, "CfCert", config.cloudfrontCertificateArn) : undefined);
     const distribution = new cloudfront.Distribution(this, "Distribution", {
-      comment: `strato app ${config.envName}`,
+      comment: `${deploymentPrefix(config.envName)} app`,
       defaultRootObject: "index.html",
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(bucket, { originAccessControl: new cloudfront.S3OriginAccessControl(this, "Oac", { originAccessControlName: `${deploymentPrefix(config.envName)}-app-ui` }) }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       },

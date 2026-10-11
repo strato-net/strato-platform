@@ -66,7 +66,7 @@ Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and `-c c
 
 Outside Route 53, `-c domainName=<host>` (with no `hostedZoneId`) names the
 tier's public hostname. Without `-c albCertificateArn`, the app adds
-`StratoApi-<env>-Certificate` holding a DNS-validated ACM certificate; that
+`ha-<env>-api-certificate` holding a DNS-validated ACM certificate; that
 stack stays in `CREATE_IN_PROGRESS` until the validation CNAME ACM asks for
 exists at the registrar (the record is in the stack's events and in `aws acm
 describe-certificate`). The Tier stack then serves HTTPS on 443 with it and
@@ -124,7 +124,7 @@ Two nginx tiers then answer one hostname, so they must agree on sessions:
 
 - **One session secret.** `-c nginxSessionSecretName=<the app tier's session
   secret>` makes this tier's nginx read it. Pass the complete ARN when the name
-  ends in a hyphen and six characters, like `strato/app/session-secret`: a
+  ends in a hyphen and six characters, like `ha-<env>/app/session-secret`: a
   name-only reference is misread as name plus random suffix and ECS fails with
   AccessDenied (a secret this stack created under
   `sessionSecretName` stays in place, unused; renaming it would collide).

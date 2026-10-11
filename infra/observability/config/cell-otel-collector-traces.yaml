@@ -1,7 +1,7 @@
 # ADOT collector on a core cell, traces-only variant (no Managed Prometheus
 # deployed): OTLP spans from the node's processes and containers, at
 # OTEL_EXPORTER_OTLP_ENDPOINT = http://127.0.0.1:4318, go to X-Ray with the
-# instance role. Installed from SSM /strato/__ENV__/observability/otel-collector-cell.
+# instance role. Installed from SSM /ha-__ENV__/observability/otel-collector-cell.
 receivers:
   otlp:
     protocols:

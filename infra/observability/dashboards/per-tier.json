@@ -51,13 +51,13 @@
         "name": "aurora",
         "type": "textbox",
         "label": "Aurora cluster id",
-        "query": "strato-testnet"
+        "query": "ha-testnet-app-postgres"
       },
       {
         "name": "bus",
         "type": "textbox",
         "label": "MSK cluster name",
-        "query": "strato-bus-testnet"
+        "query": "ha-testnet-app-bus"
       }
     ]
   },

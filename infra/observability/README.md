@@ -7,15 +7,15 @@ CDK app for one environment's observability plane. See
 npm install
 npx cdk synth -c envName=testnet -c edgeUrl=https://app.testnet.example \
   -c auroraClusterIdentifier=strato-testnet \
-  -c albFullNames=app/strato-api-testnet/abc,app/strato-app-testnet/def \
-  -c mskClusterName=strato-bus-testnet -c mskConsumerGroups=strato-ingest-core-a,history \
+  -c albFullNames=app/ha-testnet-api/abc,app/ha-testnet-app/def \
+  -c mskClusterName=ha-testnet-bus -c mskConsumerGroups=strato-ingest-core-a,history \
   -c cellInstanceIds=i-0123,i-0456
 npx cdk deploy --all
 ```
 
-Two stacks: `StratoObs-<env>-Core` (Managed Prometheus with rules and alert
+Two stacks: `ha-<env>-obs-core` (Managed Prometheus with rules and alert
 routing, Managed Grafana, collector configs in SSM, collector IAM, the
-synthetic edge check) and `StratoObs-<env>-Alarms` (CloudWatch alarms on the
+synthetic edge check) and `ha-<env>-obs-alarms` (CloudWatch alarms on the
 managed services; each group appears only when its identifier is passed).
 
 With `-c canaryKeySecretName=strato/testnet/canary-key` the canary also
@@ -30,7 +30,7 @@ After deploy:
 1. Subscribe PagerDuty to the `PagesTopicArn` output and Slack to
    `WarningsTopicArn`.
 2. Install the collectors: cells attach the `CellInstanceProfileName`
-   instance profile and fetch `/strato/<env>/observability/otel-collector-cell`
+   instance profile and fetch `/ha-<env>/observability/otel-collector-cell`
    and `.../cloudwatch-agent` from SSM; the api and app tier apps take
    `-c otelConfigParameterName=<EcsCollectorParameter> -c otelSidecarPolicyArn=<SidecarPolicyArn>`.
 3. Open Grafana (`GrafanaUrl`), add the Prometheus, CloudWatch and X-Ray
@@ -43,7 +43,7 @@ After deploy:
 collector configs (OTLP in, X-Ray out), the sidecar policy and the cell
 role. The api-tier and app-tier apps take the `EcsCollectorParameter` and
 `SidecarPolicyArn` outputs as before; a cell given
-`-c otelConfigParameterName=/strato/<env>/observability/otel-collector-cell`
+`-c otelConfigParameterName=/ha-<env>/observability/otel-collector-cell`
 runs the collector, exports its own processes' spans to it, and, with
 `-c grafana=true`, provisions an X-Ray data source in the host's Grafana so
 the infrastructure-map dashboard's service map reads straight from X-Ray.
@@ -66,7 +66,7 @@ its own, drawn with its arrow to the API tier. Once any distribution is named,
 unnamed ones are not drawn; with nothing named, every distribution is shown as
 the app UI. The CloudWatch queries are account-wide, so the map picks the
 deployment out by `$env`: load balancers and ECS clusters named
-`strato-<tier>-<env>` and the RDS instances of the `StratoData-<env>-Postgres`
+`ha-<env>-<tier>` and the RDS instances of the `ha-<env>-data-postgres`
 stack, which matters in an account that holds anything else. A distribution with no datapoints
 in the time range is not drawn, and one named `-` is hidden: CloudWatch keeps
 listing a deleted distribution's metrics for about two weeks. Its code lives in
@@ -75,7 +75,7 @@ and the panel's queries into `dashboards/infrastructure-map.json`.
 
 Without IAM Identity Center there is no Managed Grafana, and a core cell is
 not the place for a web application: `-c grafanaService=true` runs Grafana as
-a Fargate service (`StratoObs-<env>-Grafana`) from the image in `grafana/`,
+a Fargate service (`ha-<env>-obs-grafana`) from the image in `grafana/`,
 with the plugins and these dashboards inside it. It reads Managed Prometheus,
 CloudWatch and X-Ray with its task role, logs people in through Keycloak
 (`oauthSecretName`; the groups in `grafanaAdminGroups` and

@@ -7,6 +7,7 @@ import { Construct } from "constructs";
 import * as fs from "fs";
 import * as path from "path";
 import { CoreCellConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface CoreCellStackProps extends StackProps {
   vpc: ec2.IVpc;
@@ -39,7 +40,7 @@ export class CoreCellStack extends Stack {
   constructor(scope: Construct, id: string, props: CoreCellStackProps) {
     super(scope, id, { ...props, terminationProtection: props.config.terminationProtection });
     const { vpc, config } = props;
-    const name = `strato-${config.envName}-${config.cellId}`;
+    const name = `${deploymentPrefix(config.envName)}-cell-${config.cellId}`;
 
     // --- Network ---
     this.securityGroup = new ec2.SecurityGroup(this, "CellSg", {
@@ -91,7 +92,7 @@ export class CoreCellStack extends Stack {
 
     // --- Identity ---
     const role = new iam.Role(this, "CellRole", {
-      roleName: `${name}-cell`,
+      roleName: name,
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
       description: `${name} core cell host: pull the strato image, read the Aurora secret, SSM, observability`,
       managedPolicies: [
@@ -260,10 +261,8 @@ export class CoreCellStack extends Stack {
       keyPair: config.keyPairName ? ec2.KeyPair.fromKeyPairName(this, "KeyPair", config.keyPairName) : undefined,
       userData,
       userDataCausesReplacement: false,
-      // IMDSv2 is enforced through a launch template CDK adds, whose name must be
-      // unique in the account: bin/core-cell.ts turns on uniqueImdsv2TemplateName,
-      // without which every cell's is "CellLaunchTemplate" and a second cannot be created.
-      requireImdsv2: true,
+      // The Deployment tag reaches the root and data volumes too.
+      propagateTagsToVolumeOnCreation: true,
       detailedMonitoring: true,
       instanceName: name,
       blockDevices: [
@@ -271,6 +270,16 @@ export class CoreCellStack extends Stack {
         { deviceName: "/dev/sdf", volume: ec2.BlockDeviceVolume.ebs(config.dataVolumeGiB, { volumeType: ec2.EbsDeviceVolumeType.GP3, encrypted: true, deleteOnTermination: false }) },
       ],
     });
+    // IMDSv2 through a launch template of our own rather than requireImdsv2,
+    // whose launch template CDK names itself, without the deployment prefix.
+    const imdsv2 = new ec2.CfnLaunchTemplate(this, "Imdsv2", {
+      launchTemplateName: `${name}-imdsv2`,
+      launchTemplateData: { metadataOptions: { httpTokens: "required" } },
+    });
+    (this.instance.node.defaultChild as ec2.CfnInstance).launchTemplate = {
+      launchTemplateName: `${name}-imdsv2`,
+      version: imdsv2.attrLatestVersionNumber,
+    };
     this.instance.applyRemovalPolicy(config.terminationProtection ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY);
     Tags.of(this.instance).add("strato:cell", config.cellId);
     Tags.of(this.instance).add("strato:env", config.envName);

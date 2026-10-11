@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { deploymentPrefix } from "./naming";
 
 /**
  * Everything the app tier needs that differs between environments, read from
@@ -114,8 +115,10 @@ function optional(app: App, key: string): string | undefined {
 }
 
 export function loadConfig(app: App): AppTierConfig {
+  const envName = ctx(app, "envName", "testnet");
+  const prefix = deploymentPrefix(envName);
   return {
-    envName: ctx(app, "envName", "testnet"),
+    envName,
     vpcId: optional(app, "vpcId"),
     nginxImage: ctx(app, "nginxImage"),
     backendImage: ctx(app, "backendImage"),
@@ -132,10 +135,10 @@ export function loadConfig(app: App): AppTierConfig {
     domainName: optional(app, "domainName"),
     oauthDiscoveryUrl: optional(app, "oauthDiscoveryUrl"),
     secrets: {
-      oauth: ctx(app, "oauthSecretName", "strato/app/oauth"),
-      postgresPassword: ctx(app, "postgresPasswordSecretName", "strato/app/postgres-password"),
+      oauth: ctx(app, "oauthSecretName", `${prefix}/app/oauth`),
+      postgresPassword: ctx(app, "postgresPasswordSecretName", `${prefix}/app/postgres-password`),
       postgresPasswordJsonKey: optional(app, "postgresPasswordJsonKey"),
-      session: ctx(app, "sessionSecretName", "strato/app/session-secret"),
+      session: ctx(app, "sessionSecretName", `${prefix}/app/session-secret`),
       backend: optional(app, "backendSecretName"),
     },
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
@@ -160,7 +163,7 @@ export function loadConfig(app: App): AppTierConfig {
                 host: ctx(app, "historyDatabaseHost"),
                 port: Number(ctx(app, "historyDatabasePort", "5432")),
                 user: ctx(app, "historyDatabaseUser", "postgres"),
-                secretName: ctx(app, "historyDatabaseSecretName", `strato/${ctx(app, "envName", "testnet")}/postgres`),
+                secretName: ctx(app, "historyDatabaseSecretName", `${prefix}/postgres`),
                 securityGroupId: optional(app, "historyDatabaseSecurityGroupId"),
               }
             : undefined,

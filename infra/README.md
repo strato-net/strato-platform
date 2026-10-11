@@ -9,19 +9,40 @@ independent CDK app with its own `package.json`, context contract and README.
 
 | App | Stacks | What it owns |
 | --- | --- | --- |
-| `data-plane` | `StratoData-<env>-*` | VPC, Aurora Postgres cluster, message bus |
-| `core-cell` | `StratoCell-<env>-<cell>-{Network,Host}` | One EC2 core node (consensus, VM, indexer) |
-| `api-tier` | `StratoApi-<env>-{Network,Tier,FrontDoor}` | ECS API tier and the CloudFront front door |
-| `app-tier` | `StratoApp-<env>-{Network,Tier}` | ECS app tier |
-| `observability` | see its README | Dashboards, alarms, canaries, collector configs |
+| `data-plane` | `ha-<env>-data-{postgres,bus}` | VPC, Aurora Postgres cluster, message bus |
+| `core-cell` | `ha-<env>-cell-<cell>-{network,host}`, `ha-<env>-core-frontend` | One EC2 core node (consensus, VM, indexer) |
+| `api-tier` | `ha-<env>-api-{network,tier,frontdoor}` | ECS API tier and the CloudFront front door |
+| `app-tier` | `ha-<env>-app-{network,tier,ui,history}` | ECS app tier |
+| `observability` | `ha-<env>-obs-{core,alarms,grafana}` | Dashboards, alarms, canaries, collector configs |
 
 Each app: `cd <app> && npm ci`, then `npx cdk deploy` with the context values
 its README lists.
 
+## Naming
+
+Every AWS name a deployment creates starts with `ha-<envName>`: the stacks,
+and through them the names CloudFormation generates (roles, security groups,
+buckets, ECS services), plus every explicitly named resource (load balancers,
+target groups, ECS clusters and task families, Aurora and MSK clusters,
+CloudFront functions and origin access controls, the cell's launch template)
+and the secrets, SSM parameters and log groups under `ha-<envName>/...`
+(MSK's SCRAM secrets must start with `AmazonMSK_`, so they are
+`AmazonMSK_ha-<envName>-bus-<role>`). Every taggable resource also carries
+the tags `Deployment=ha-<envName>` and `ManagedBy=ha-infra`, which reach what
+has no name (subnets, EBS volumes, KMS keys) and filter cost reports.
+`lib/naming.ts` in each app holds the rule; `envName` is 2 to 16 lowercase
+letters, digits or hyphens, so load balancer and target group names stay
+within their 32 characters.
+
+The `tiered` environment predates this naming (`Strato*-tiered-*` stacks,
+`strato-*-tiered` resources) and is deployed only from the `tiered` branch,
+which keeps the code it was created with; deploying it from this branch would
+create a second set of resources beside it.
+
 ## Deploy order
 
 `data-plane`, `core-cell`, `api-tier` (Network and Tier), the front door
-(`StratoApi-<env>-FrontDoor`) **and its DNS record**, `app-tier`, then
+(`ha-<env>-api-frontdoor`) **and its DNS record**, `app-tier`, then
 `observability`.
 
 - The front door and its DNS record must exist before the app tier deploys.

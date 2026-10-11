@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { deploymentPrefix } from "./naming";
 
 /** Context contract for a core cell. Secrets are named, never valued. */
 export interface CoreCellConfig {
@@ -130,11 +131,6 @@ export interface CoreCellConfig {
    */
   autoPromote: boolean;
   autoPromoteAfter: number;
-  /**
-   * Keep the launch template's old, shared name ("CellLaunchTemplate"). Only for a cell created
-   * before the names were made unique: renaming replaces the template and then the instance.
-   */
-  legacyLaunchTemplateName: boolean;
 }
 
 function present(v: unknown): boolean {
@@ -164,6 +160,7 @@ function peerStore(app: App): "sqlite" | "postgres" {
 
 export function loadConfig(app: App): CoreCellConfig {
   const envName = ctx(app, "envName", "testnet");
+  const prefix = deploymentPrefix(envName);
   const cellId = ctx<string>(app, "cellId");
   if (!/^[a-z][a-z0-9-]{0,30}$/.test(cellId)) throw new Error(`cellId must be a short lowercase name, got ${cellId}`);
   const stratoImage = ctx<string>(app, "stratoImage");
@@ -191,7 +188,7 @@ export function loadConfig(app: App): CoreCellConfig {
     postgresReaderHost: ctx(app, "postgresReaderHost", writerHost),
     postgresPort: Number(ctx(app, "postgresPort", "5432")),
     postgresUser: ctx(app, "postgresUser", "postgres"),
-    postgresSecretName: ctx(app, "postgresSecretName", `strato/${envName}/postgres`),
+    postgresSecretName: ctx(app, "postgresSecretName", `${prefix}/postgres`),
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
     role,
     localAuth: bool(app, "localAuth", "false"),
@@ -233,6 +230,5 @@ export function loadConfig(app: App): CoreCellConfig {
     kafkaExternalHost: optional(app, "kafkaExternalHost"),
     autoPromote: bool(app, "autoPromote", "false"),
     autoPromoteAfter: Number(ctx(app, "autoPromoteAfter", "3")),
-    legacyLaunchTemplateName: bool(app, "legacyLaunchTemplateName", "false"),
   };
 }

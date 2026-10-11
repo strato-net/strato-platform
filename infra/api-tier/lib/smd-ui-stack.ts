@@ -8,6 +8,7 @@ import { Construct } from "constructs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiTierConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface SmdUiStackProps extends StackProps {
   config: ApiTierConfig;
@@ -77,15 +78,16 @@ export class SmdUiStack extends Stack {
     };
 
     const routes = new cloudfront.Function(this, "SmdRoutes", {
+      functionName: `${deploymentPrefix(config.envName)}-smd-SmdRoutes`,
       runtime: cloudfront.FunctionRuntime.JS_2_0,
-      comment: `strato smd ${config.envName}: base path and client-side routes`,
+      comment: `${deploymentPrefix(config.envName)} smd: base path and client-side routes`,
       code: cloudfront.FunctionCode.fromInline(ROUTES),
     });
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
-      comment: `strato smd ${config.envName}`,
+      comment: `${deploymentPrefix(config.envName)} smd`,
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(bucket),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(bucket, { originAccessControl: new cloudfront.S3OriginAccessControl(this, "Oac", { originAccessControlName: `${deploymentPrefix(config.envName)}-smd` }) }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
         functionAssociations: [{ function: routes, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],

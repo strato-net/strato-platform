@@ -3,6 +3,7 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { InstanceIdTarget } from "aws-cdk-lib/aws-elasticloadbalancingv2-targets";
 import { Construct } from "constructs";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface FrontendConfig {
   envName: string;
@@ -46,7 +47,7 @@ export class FrontendStack extends Stack {
   constructor(scope: Construct, id: string, props: FrontendStackProps) {
     super(scope, id, props);
     const { vpc, config } = props;
-    const name = `strato-core-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-core`;
 
     const lbSg = new ec2.SecurityGroup(this, "LbSg", { vpc, description: `${name} load balancer`, allowAllOutbound: false });
     config.clientSecurityGroupIds.forEach((id, i) => {
@@ -61,7 +62,7 @@ export class FrontendStack extends Stack {
     });
 
     const lb = new elbv2.NetworkLoadBalancer(this, "Lb", {
-      loadBalancerName: name,
+      loadBalancerName: elbName(name),
       vpc,
       internetFacing: false,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
@@ -70,6 +71,7 @@ export class FrontendStack extends Stack {
       crossZoneEnabled: true,
     });
     const targets = new elbv2.NetworkTargetGroup(this, "Kafka", {
+      targetGroupName: elbName(`${name}-${config.kafkaPort}`),
       vpc,
       port: config.kafkaPort,
       protocol: elbv2.Protocol.TCP,
