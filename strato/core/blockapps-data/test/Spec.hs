@@ -87,12 +87,14 @@ nativeChainIdSigning :: Spec
 nativeChainIdSigning = describe "Native transaction chain IDs" $ do
   let message cid ver attr = MessageTX 0 1000000 (Address 1) "ping" ["7"] "mercata" cid 0 0 27 ver attr
       creation cid ver = ContractCreationTX 0 1000000 "Example" [] "mercata" (Code "contract Example {}") cid 0 0 27 ver
-      transactions cid = [message cid 0 attr | attr <- [B.empty, "attribution"]]
-        ++ [creation cid 0]
+      transactions cid = [message cid ver attr | ver <- [0, 1], attr <- [B.empty, "attribution"]]
+        ++ [creation cid ver | ver <- [0, 1]]
       roundTrip tx = rlpDecode $ rlpDeserialize $ rlpSerialize $ rlpEncode tx
       privateKey = fromMaybe (error "invalid test private key") $ importPrivateKey (B.replicate 31 0 <> B.singleton 1)
       expectedSigner = Just $ fromPublicKey $ derivePublicKey privateKey
-      sign tx = let digest = keccak256ToByteString $ partialTransactionHash tx
+      sign tx = let digest = case tx of
+                      MessageTX {txVersion = 1} -> eip712SignHash tx
+                      _ -> keccak256ToByteString $ partialTransactionHash tx
                     (sr, ss, sv) = getSigVals $ signMsg privateKey digest
                 in tx {r = toInteger sr, s = toInteger ss, v = sv}
 
@@ -114,3 +116,15 @@ nativeChainIdSigning = describe "Native transaction chain IDs" $ do
       unsafeCreateKeccak256FromWord256 0x52e62c42d126963bbe1c53ec7cea4c6b68eb6f3efcbfdb7c353d62daea9a9ed8
     partialTransactionHash (message (Just 123354377739506) 0 B.empty) `shouldBe`
       unsafeCreateKeccak256FromWord256 0xdb17c9e7289340ee1ad7335d63a1a3036e72b2c48b5fd2ae2337d93660a3acbe
+
+  it "matches viem and ethers EIP-712 hashes" $
+    forM_ [(Nothing, 0xb01c19c56336e7ac57d2d75c72ff9609ab40fd668bfd061235da4d633aa4cfff),
+           (Just 123354377739506, 0xd1c164ef147e8d17add29485fbe962831bc9889c7a880720e3efdff0b482f8fa),
+           (Just 195049586845898, 0x0c36d5e55c2f23428d9f3348f75d032b9b0cb5e60a54485675e094b5b3b0af21)] $ \(cid, expected) ->
+      eip712SignHash (message cid 1 B.empty) `shouldBe` keccak256ToByteString (unsafeCreateKeccak256FromWord256 expected)
+
+  it "recovers an externally signed EIP-712 transaction after transmission" $ do
+    let tx = (message (Just 123354377739506) 1 B.empty)
+          { r = 0xf6476389d4c1ec6c07444d7cd4df64e2e57ccd96475e69f7b992c85a64a39401,
+            s = 0x754681fbed113aca85f4ec230310be76dc1f31067a849968d1341701cb9b2ce }
+    whoSignedThisTransaction (roundTrip tx) `shouldBe` expectedSigner
