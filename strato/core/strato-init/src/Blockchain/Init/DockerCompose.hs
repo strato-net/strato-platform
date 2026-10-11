@@ -128,6 +128,10 @@ generateDockerCompose = do
             , ("postgres_user", "postgres")
             , ("redis_host", "redis")
             , ("redis_port", "6379")
+            -- Lets the node-health-check daemon probe ethereum-jsonrpc and report
+            -- it in /health and /status. Same flag and port nginx gets for /rpc.
+            , ("JSONRPC_ENABLED", if flags_jsonrpc then "true" else "false")
+            , ("RPC_PORT", rpcPort)
             ]
         , volumes = Just
             [ "./logs:/logs"
