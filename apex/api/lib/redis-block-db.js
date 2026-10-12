@@ -43,9 +43,26 @@ function getClient() {
   return clientPromise;
 }
 
-// Returns the bestBlockNumber stored in Redis by strato (the same source that
-// `strato-barometer syncstats` reads via `getBestBlockInfo`).
-async function getBestBlockNumber() {
+// Matches `syncStatusKey = "<sync_status>"` in SyncDB.hs: the node's own
+// sync verdict (the one /eth/v1.2/metadata reports as isSynced), stored as an
+// RLP-encoded Bool.
+const SYNC_STATUS_KEY = "<sync_status>";
+
+// Matches the Parent namespace ("p:" ++ hex hash) in
+// strato/core/blockDB/src/Blockchain/BlockDB.hs: the parent hash of every
+// block strato-indexer put in Redis, RLP-encoded.
+const PARENT_KEY_PREFIX = "p:";
+
+function rlpNumber(bytes) {
+  const buf = Buffer.from(bytes);
+  return buf.length === 0 ? 0 : Number(BigInt("0x" + buf.toString("hex")));
+}
+
+// Returns the best block stored in Redis by strato (the same source that
+// `strato-barometer syncstats` reads via `getBestBlockInfo`) as
+// { number, hash }, the hash as 64 hex chars without a 0x prefix like the
+// block_data_ref.hash column, or null when Redis has no best block yet.
+async function getBestBlock() {
   const client = await getClient();
   const buf = await client.get(commandOptions({ returnBuffers: true }), BEST_BLOCK_KEY);
   if (!buf) return null;
@@ -55,8 +72,34 @@ async function getBestBlockNumber() {
     throw new Error("Unexpected RLP shape for BestBlock value in Redis");
   }
   // decoded[0] is the 32-byte hash, decoded[1] is the big-endian number bytes.
-  const numberBytes = Buffer.from(decoded[1]);
-  return numberBytes.length === 0 ? 0 : Number(BigInt("0x" + numberBytes.toString("hex")));
+  return {
+    number: rlpNumber(decoded[1]),
+    hash: Buffer.from(decoded[0]).toString("hex").padStart(64, "0"),
+  };
+}
+
+async function getBestBlockNumber() {
+  const best = await getBestBlock();
+  return best ? best.number : null;
+}
+
+// Returns the parent hash of the block with the given hex hash, or null when
+// Redis does not hold that block.
+async function getParentHash(hash) {
+  const client = await getClient();
+  const buf = await client.get(commandOptions({ returnBuffers: true }), PARENT_KEY_PREFIX + hash);
+  if (!buf) return null;
+  return Buffer.from(RLP.decode(buf)).toString("hex").padStart(64, "0");
+}
+
+// Returns the node's sync status from Redis (true, false), or null when the
+// node has not written one yet.
+async function getSyncStatus() {
+  const client = await getClient();
+  const buf = await client.get(commandOptions({ returnBuffers: true }), SYNC_STATUS_KEY);
+  if (!buf) return null;
+  // RLP of a Bool: a single 0x01 byte for True, the empty string for False.
+  return Buffer.from(RLP.decode(buf)).length > 0;
 }
 
 // Returns the current validator list stored in Redis by strato (the same
@@ -78,6 +121,9 @@ async function getValidators() {
 }
 
 module.exports = {
+  getBestBlock,
   getBestBlockNumber,
+  getParentHash,
+  getSyncStatus,
   getValidators,
 };

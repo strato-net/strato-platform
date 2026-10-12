@@ -11,6 +11,7 @@ module Blockchain.Init.Validator
     validatorCommands,
     validatorServices,
     validatorPrometheusSkipJobs,
+    apexPort,
   )
 where
 
@@ -38,13 +39,21 @@ validatorCommands = map indexerRedisOnly . filter (keep . words)
       ("strato-indexer" : _) -> line ++ " --sql=false"
       _ -> line
 
--- | The containers a validator keeps: the stores the chain processes use, and
--- Prometheus for the node's own metrics. "streaming" only exists on builds
--- with a broker container (the default JLog backend is embedded).
+-- | The containers a validator keeps: the stores the chain processes use,
+-- Prometheus for the node's own metrics, and apex, whose /health is what the
+-- network monitor polls (published on 'apexPort', plain HTTP: the node runs
+-- no nginx to terminate TLS, and /health is public data). "streaming" only
+-- exists on builds with a broker container (the default JLog backend is
+-- embedded).
 validatorServices :: [String]
-validatorServices = ["postgres", "redis", "prometheus", "streaming"]
+validatorServices = ["postgres", "redis", "prometheus", "apex", "streaming"]
+
+-- | Where a validator publishes apex (/health, /status) for the monitor.
+apexPort :: Int
+apexPort = 3009
 
 -- | Prometheus scrape jobs for processes a validator does not run, dropped so
--- their targets are not reported down forever (PROMETHEUS_SKIP_JOBS).
+-- their targets are not reported down forever (PROMETHEUS_SKIP_JOBS). apex
+-- reads the same list to know which jobs not to require for the node's health.
 validatorPrometheusSkipJobs :: [String]
-validatorPrometheusSkipJobs = ["core-api", "slipstream", "apex", "nginx"]
+validatorPrometheusSkipJobs = ["core-api", "slipstream", "nginx"]

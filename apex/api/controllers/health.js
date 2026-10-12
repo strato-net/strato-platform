@@ -19,28 +19,8 @@ module.exports = {
   nodeStatus: async function (req, res, next) {
     try {
       //get node's block number, best block hash, best block parent hash
-      const [lastBlock, bestBlockNumber, activePeerCount, validators] = await Promise.all([
-        BlockDataRef.findOne({
-          where: {
-            pow_verified: true,
-            is_confirmed: true,
-          },
-          order: [["number", "DESC"]],
-          attributes: [
-            "number",
-            "hash",
-            "parent_hash",
-            "nonce",
-          ],
-          raw: true,
-        }),
-        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
-        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
-        // BlockDataRef.number if Redis is unavailable.
-        redisBlockDB.getBestBlockNumber().catch((err) => {
-          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
-          return null;
-        }),
+      const [lastBlock, activePeerCount, validators] = await Promise.all([
+        getLastBlock(),
         // Peers the node is currently connected to: active (active_state=1)
         // and bonded (bond_state=2). Falls back to null so /status remains usable.
         Peer.count({
@@ -122,12 +102,7 @@ module.exports = {
         nodeAddress,
         activePeerCount,
         validators,
-        lastBlock: {
-          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
-          hash: lastBlock.hash,
-          parentHash: lastBlock.parent_hash,
-          nonce: lastBlock.nonce,
-        },
+        lastBlock,
         pbftData: findView(pbftData),
         ...healthBody,
       });
@@ -143,28 +118,12 @@ module.exports = {
       const [
         [healthInfo, stallInfo, systemInfo, syncInfo],
         lastBlock,
-        bestBlockNumber,
         pbftData,
         nodeAddress,
         activePeerCount,
       ] = await Promise.all([
         utils.getLatestHealth(),
-        BlockDataRef.findOne({
-          where: {
-            pow_verified: true,
-            is_confirmed: true,
-          },
-          order: [["number", "DESC"]],
-          attributes: ["number", "hash", "parent_hash", "nonce"],
-          raw: true,
-        }),
-        // Source `lastBlock.number` from the same place as `strato-barometer syncstats`
-        // (used by `bin/strato-ps`): the BestBlock entry in Redis. Falls back to
-        // BlockDataRef.number if Redis is unavailable.
-        redisBlockDB.getBestBlockNumber().catch((err) => {
-          winston.warn(`Falling back to BlockDataRef for lastBlock.number: ${err.message}`);
-          return null;
-        }),
+        getLastBlock(),
         getPbftData(),
         getNodeAddress(),
         // Peers the node is currently connected to: active (active_state=1)
@@ -199,12 +158,7 @@ module.exports = {
         timestamp: new Date().toISOString(),
         nodeAddress,
         activePeerCount,
-        lastBlock: {
-          number: bestBlockNumber !== null ? bestBlockNumber : lastBlock.number,
-          hash: lastBlock.hash,
-          parentHash: lastBlock.parent_hash,
-          nonce: lastBlock.nonce,
-        },
+        lastBlock,
         pbftData: findView(pbftData),
         health: health,
         healthStatus: healthStatus,
@@ -219,6 +173,43 @@ module.exports = {
     }
   },
 };
+
+// The last block, as { number, hash, parentHash, nonce }. Redis first: the
+// BestBlock entry strato-indexer writes, which is what `strato-barometer
+// syncstats` and `strato-ps` report, with the parent from the block's own
+// Redis entry. The block_data_ref table is the fallback: a node without the
+// SQL block index (a lite validator, strato-indexer --sql=false) does not have
+// it, and its absence must not take /health down.
+const noBlock = { number: null, hash: null, parentHash: null, nonce: null };
+
+async function getLastBlock() {
+  try {
+    const best = await redisBlockDB.getBestBlock();
+    if (best) {
+      const parentHash = await redisBlockDB.getParentHash(best.hash).catch(() => null);
+      return { number: best.number, hash: best.hash, parentHash, nonce: null };
+    }
+  } catch (err) {
+    winston.warn(`Falling back to block_data_ref for the last block: ${err.message}`);
+  }
+  try {
+    const row = await BlockDataRef.findOne({
+      where: {
+        pow_verified: true,
+        is_confirmed: true,
+      },
+      order: [["number", "DESC"]],
+      attributes: ["number", "hash", "parent_hash", "nonce"],
+      raw: true,
+    });
+    return row
+      ? { number: row.number, hash: row.hash, parentHash: row.parent_hash, nonce: row.nonce }
+      : noBlock;
+  } catch (err) {
+    winston.warn(`Unable to read the last block: ${err.message}`);
+    return noBlock;
+  }
+}
 
 // Fetches the node's own blockchain address from Prometheus.
 // The address is carried in the `address` label of the `pbft_node_identity`

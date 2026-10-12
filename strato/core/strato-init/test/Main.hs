@@ -113,8 +113,11 @@ main = hspec $ do
     it "drops a local-auth vault wrapper too" $
       validatorCommands ["blockapps-vault-wrapper-server --port 8093"] `shouldBe` []
 
-  describe "validatorServices" $
-    it "keeps the stores and Prometheus out of a full node's containers" $
+  describe "validatorServices" $ do
+    it "keeps the stores, Prometheus and apex out of a full node's containers" $
       filter (`elem` validatorServices)
         ["app-backend", "app-ui", "smd", "apex", "redis", "postgrest", "postgres", "nginx", "docs", "prometheus", "local-auth"]
-        `shouldBe` ["redis", "postgres", "prometheus"]
+        `shouldBe` ["apex", "redis", "postgres", "prometheus"]
+    it "keeps scraping what it runs: apex stays, core-api, slipstream and nginx go" $ do
+      validatorPrometheusSkipJobs `shouldBe` ["core-api", "slipstream", "nginx"]
+      "apex" `shouldNotSatisfy` (`elem` validatorPrometheusSkipJobs)

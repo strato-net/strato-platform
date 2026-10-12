@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig,
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Options (flags_jsonrpc, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir, flags_validator)
-import Blockchain.Init.Validator (validatorPrometheusSkipJobs, validatorServices)
+import Blockchain.Init.Validator (apexPort, validatorPrometheusSkipJobs, validatorServices)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -119,18 +119,23 @@ generateDockerCompose = do
         , logging = noLogging
         }
 
+  -- On a validator apex is what the network monitor polls, so it is published
+  -- directly (no nginx) and told which Prometheus jobs the node does not run.
+  let skipJobs = intercalate "," validatorPrometheusSkipJobs
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
         , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis"]
         , extra_hosts = hostGateway
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             , ("redis_host", "redis")
             , ("redis_port", "6379")
             ]
+            ++ [ ("PROMETHEUS_SKIP_JOBS", skipJobs) | flags_validator ]
+        , ports = if flags_validator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
@@ -323,11 +328,11 @@ generateDockerCompose = do
         { image = "prometheus:" ++ stratoVersionTag ++ "-" ++ hashPrometheus
         , user = Just userGid
         , extra_hosts = hostGateway
-        -- A validator runs no strato-api, slipstream, apex or nginx: drop
-        -- their scrape jobs rather than report them down forever.
+        -- A validator runs no strato-api, slipstream or nginx: drop their
+        -- scrape jobs rather than report them down forever.
         , environment =
             if flags_validator
-              then Just $ Map.fromList [("PROMETHEUS_SKIP_JOBS", intercalate "," validatorPrometheusSkipJobs)]
+              then Just $ Map.fromList [("PROMETHEUS_SKIP_JOBS", skipJobs)]
               else Nothing
         , volumes = Just
             [ "./logs:/logs"
