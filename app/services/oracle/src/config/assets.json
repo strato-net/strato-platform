@@ -549,7 +549,7 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair with at least DEXSCREENER_MIN_TXNS_24H trades in the last 24h (the deepest weETH pool is idle and reports a stale price). symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",
@@ -1195,7 +1195,7 @@
         "DexScreener": {
           "url": "https://api.dexscreener.com/latest/dex/tokens/${SYMBOLS}",
           "parse": "dexscreener",
-          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair with at least DEXSCREENER_MIN_TXNS_24H trades in the last 24h (the deepest weETH pool is idle and reports a stale price). symbolMapping is the ERC-20 contract address.",
+          "comment": "Free, no API key. Response is an array of pairs across DEXes; parser must filter chainId=='ethereum', 'base' or 'hyperevm' and baseToken.address==<mapped address>, then pick the highest-liquidity.usd pair's priceUsd. symbolMapping is the ERC-20 contract address.",
           "assets": [
             "SUSDS",
             "LIT",

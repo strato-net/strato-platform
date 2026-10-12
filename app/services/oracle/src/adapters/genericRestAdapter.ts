@@ -1,7 +1,6 @@
 import { apiRequest } from '../utils/apiClient';
 import { SourceConfig, BatchPriceResult, Asset, RebaseConfig, ExchangeRateConfig } from '../types';
-import { logError, logInfo, logWarning } from '../utils/logger';
-import { ORACLE_CONFIG } from '../utils/constants';
+import { logError, logInfo } from '../utils/logger';
 
 function extractNestedProperty(obj: any, path: string): any {
     if (!path) return undefined;
@@ -300,21 +299,16 @@ function parseResponse(data: any, sourceConfig: SourceConfig): BatchPriceResult 
             }
         });
 
-    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base/HyperEVM pair where baseToken matches the mapped contract address.
-    // An idle pool keeps reporting its last swap as priceUsd, so only pools with recent trades are eligible.
+    // DexScreener: data.pairs[] across DEXes/chains; pick highest-liquidity Ethereum/Base/HyperEVM pair where baseToken matches the mapped contract address
     } else if (parsePattern === 'dexscreener' && Array.isArray(data?.pairs)) {
         symbols.forEach(symbol => {
             const mappedAddress = (sourceConfig.symbolMapping?.[symbol] || symbol).toLowerCase();
-            const pools = data.pairs.filter((p: any) =>
+            const candidates = data.pairs.filter((p: any) =>
                 (p.chainId === 'ethereum' || p.chainId === 'base' || p.chainId === 'hyperevm') &&
                 p.baseToken?.address?.toLowerCase() === mappedAddress &&
                 p.priceUsd
             );
-            const candidates = pools.filter((p: any) => (p.txns?.h24?.buys || 0) + (p.txns?.h24?.sells || 0) >= ORACLE_CONFIG.DEXSCREENER_MIN_TXNS_24H);
-            if (candidates.length === 0) {
-                if (pools.length > 0) logWarning('GenericRestAdapter', `${symbol}: all ${pools.length} DexScreener pool(s) idle (< ${ORACLE_CONFIG.DEXSCREENER_MIN_TXNS_24H} trades in 24h), price skipped as stale`);
-                return;
-            }
+            if (candidates.length === 0) return;
             candidates.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
             const best = candidates[0];
             const priceUSD = parseFloat(best.priceUsd);
