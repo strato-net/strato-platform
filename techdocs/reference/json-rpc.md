@@ -29,7 +29,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | Testnet (helium) | `0xb165855668ca` | `195049586845898` | `114784819836269` |
 
 !!! warning "Use `eth_chainId`, not `net_version`"
-    `net_version` returns STRATO's network ID. That is a different number from the EIP-155 chain ID, and it is larger than JavaScript's `Number.MAX_SAFE_INTEGER`. Wallets and signing libraries need the chain ID.
+    `net_version` returns STRATO's network ID. That is a different number from the EIP-155 chain ID. Mainnet's network ID is larger than JavaScript's `Number.MAX_SAFE_INTEGER`. Wallets and signing libraries need the chain ID.
 
 ## Supported Methods
 
@@ -48,7 +48,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | `eth_getProof` | EIP-1186 account and storage proofs against a block's state root. Block tag: `latest`, a block number or a block hash. A storage key is the hex of the raw key bytes, which for SolidVM is the ASCII storage path (`0x` + hex of `balances[<address>]`), not a 32-byte slot. `value` is the leaf's RLP item as stored. See [State proofs](strato-node-api.md#state-proofs). |
 | `eth_getTransactionByHash`, `eth_getTransactionByBlockHashAndIndex`, `eth_getTransactionByBlockNumberAndIndex` | |
 | `eth_getTransactionReceipt`, `eth_getBlockReceipts` | Receipts include `status` and `logs` |
-| `eth_getLogs` | Filter by `address`, `topics`, `fromBlock` and `toBlock`. At most 10,000 blocks per query and at most 1,000 matching events. Narrow the range if you hit a limit. |
+| `eth_getLogs` | Filter by one or more contract addresses, positional topics (including `null` wildcards and arrays of alternatives), and `fromBlock`/`toBlock` or `blockHash`. `blockHash` cannot be combined with a block range. At most 10,000 blocks per query and 1,000 candidate events before topic filtering. Narrow the range or addresses if you hit a limit. |
 | `debug_traceBlockByHash` | Call frames read from stored results (no re-execution) |
 
 ### Writes
@@ -177,6 +177,7 @@ Both examples were checked against testnet.
 
 ## Related Docs
 
+- [STRATOscan API](https://stratoscan.strato.nexus/api-docs): Etherscan-compatible `balance`, `txlist`, `tokentx`, `tokenbalance` and `getabi` endpoints
 - [Core Platform API](strato-node-api.md): REST access to blocks, transactions and contract state
 - [Cirrus](cirrus.md): indexed contract data
 - [Transactions & Fees](../platform/transactions-and-fees.md)
