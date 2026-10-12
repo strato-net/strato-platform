@@ -86,13 +86,18 @@ test("native mint recovery shrinks capped log ranges without skipping matching m
 });
 
 test("native polling decoder distinguishes plain and routed events and rejects incomplete intent", async () => {
-  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  const { matchesNativeDeposit, parseNativeDepositLog } = await import("../utils/nativeRedemption");
   const routed = parseNativeDepositLog(1, log(true))!;
+  const plain = parseNativeDepositLog(1, log(false))!;
   assert.equal(routed.actionToken, address("4"));
   assert.equal(routed.minFinalOut, "95");
   assert.equal(routed.stratoTokenAmount, "100");
   assert.equal(routed.stratoRecipient, address("3"));
-  assert.equal(parseNativeDepositLog(1, log(false))!.minFinalOut, "0");
+  assert.equal(plain.minFinalOut, "0");
+  assert.equal(matchesNativeDeposit(plain, { ...plain, actionToken: "" }), true);
+  assert.equal(matchesNativeDeposit(plain, { ...plain, actionToken: undefined }), true);
+  assert.equal(matchesNativeDeposit(plain, { ...plain, actionToken: "", minFinalOut: "1" }), false);
+  assert.equal(matchesNativeDeposit(routed, { ...routed, actionToken: "" }), false);
   assert.throws(() => parseNativeDepositLog(1, { ...log(true), data: log(false).data }), /Invalid native/);
   assert.equal(parseNativeDepositLog(1, { ...log(true), topics: ["0xother"] }), null);
 });

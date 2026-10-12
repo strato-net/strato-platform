@@ -220,6 +220,10 @@ router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeControll
  * /bridge/transactions/{type}:
  *   get:
  *     summary: Retrieve bridge transaction history
+ *     description: >-
+ *       Available at /api/bridge/transactions/{type} and
+ *       /api/trade/bridge/transactions/{type}. External chain filters use
+ *       direction-specific storage fields with an eq. prefix.
  *     tags: [Bridge]
  *     parameters:
  *       - name: type
@@ -253,12 +257,20 @@ router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeControll
  *         description: Filter results by STRATO token address
  *         schema:
  *           type: string
- *       - name: externalChainId
+ *       - name: key
  *         in: query
  *         required: false
- *         description: Filter results by external chain identifier
+ *         description: Filter external deposit history by chain; use only when type is deposit (e.g. key=eq.84532)
  *         schema:
  *           type: string
+ *           example: eq.84532
+ *       - name: 'value->>externalChainId'
+ *         in: query
+ *         required: false
+ *         description: Filter external withdrawal history by chain; use only when type is withdrawal (e.g. value->>externalChainId=eq.84532)
+ *         schema:
+ *           type: string
+ *           example: eq.84532
  *     responses:
  *       200:
  *         description: Paginated transaction records
