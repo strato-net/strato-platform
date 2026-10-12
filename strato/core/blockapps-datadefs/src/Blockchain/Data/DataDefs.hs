@@ -78,6 +78,8 @@ indexAll = do
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS raw_transaction_tx_hash_idx ON raw_transaction (tx_hash);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_key_idx ON storage (key);"
+  -- State diffs look up and delete storage rows by account and key.
+  exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS storage_address_state_ref_id_key_idx ON storage (address_state_ref_id, key);"
 
   exec "CREATE INDEX CONCURRENTLY IF NOT EXISTS transaction_result_transaction_hash_idx ON transaction_result (transaction_hash);"
 

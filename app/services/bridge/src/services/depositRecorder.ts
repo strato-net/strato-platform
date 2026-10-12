@@ -11,7 +11,6 @@ import {
 import {
   buildActionDepositBatchArgs,
   buildDepositWindowArgs,
-  buildFeeDepositBatchArgs,
   canonicalDepositKey,
 } from "./depositEventService";
 
@@ -32,8 +31,6 @@ const PERMANENT_DEPOSIT_ERRORS = [
   "MB: deposit key id mismatch",
   "MB: deposit id mismatch",
   "MB: deposit id reused",
-  "MB: fee too large",
-  "MB: fee half-life not configured",
 ];
 
 const errorMessage = (error: unknown) => String((error as Error)?.message ?? error);
@@ -246,21 +243,7 @@ export const createDepositRecorder = (deps: DepositRecorderDeps) => {
         }),
     );
 
-    // Fee-bearing deposits go through the fee entry point so STRATO commits the
-    // origin chain's schedule; the legacy standard batch would silently drop it
-    const recordedFee = await recordLegacyBatch(
-      externalChainId,
-      eligible.filter((d) => d.kind === "fee"),
-      (batch) => bridgeCall("depositBatchWithFee", buildFeeDepositBatchArgs(batch)),
-      (d) =>
-        bridgeCall("depositWithFee", {
-          ...standardArgs(d),
-          maxFee: d.maxFee,
-          requestedAt: d.requestedAt,
-        }),
-    );
-
-    await verifyRecorded(externalChainId, [...recordedStandard, ...recordedAction, ...recordedFee]);
+    await verifyRecorded(externalChainId, [...recordedStandard, ...recordedAction]);
   };
 
   // Only an observed record lets the checkpoint pass a deposit

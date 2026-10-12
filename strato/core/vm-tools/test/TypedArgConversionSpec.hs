@@ -17,7 +17,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import SolidVM.Model.Event (Event (..))
-import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.TypedArg
 import SolidVM.Model.Value (Value (..), Variable (..))
 import Test.Hspec
@@ -140,15 +139,14 @@ spec = do
     it "emitted event becomes a ReceiptLog" $ do
       let ev =
             Event
-              { evBlockHash = zeroHash,
-                evTxHash = zeroHash,
+              { evTxHash = zeroHash,
                 evTxSender = testAddr,
                 evContractName = "MercataBridge",
                 evContractAddress = testAddr,
                 evName = "Withdrawal",
                 evArgs =
-                  [ ("nonce", SInteger 1, "1", SVMType.Int (Just False) Nothing),
-                    ("recipient", SAddress 0xdead False, "0xdead", SVMType.Address False)
+                  [ ("nonce", SInteger 1),
+                    ("recipient", SAddress 0xdead False)
                   ],
                 evTopics = []
               }
@@ -168,13 +166,12 @@ spec = do
       let arrVal = SArray (V.fromList [Variable ref1, Variable ref2])
           ev =
             Event
-              { evBlockHash = zeroHash,
-                evTxHash = zeroHash,
+              { evTxHash = zeroHash,
                 evTxSender = testAddr,
                 evContractName = "C",
                 evContractAddress = testAddr,
                 evName = "BatchSent",
-                evArgs = [("ids", arrVal, "[11,22]", SVMType.Array (SVMType.Int (Just False) Nothing) Nothing)],
+                evArgs = [("ids", arrVal)],
                 evTopics = []
               }
           trr = successTrr {trrResult = Right (successResults {erEvents = [ev]})}

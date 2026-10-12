@@ -40,7 +40,8 @@ import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
-import BlockApps.Solidity.ABI.Bridge (encodeEventToLog)
+import Blockchain.Forks (isEmitArgForkActive)
+import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -53,7 +54,6 @@ import Blockchain.SolidVM.SetGet
 import Blockchain.SolidVM.TraceTools
 import SolidVM.Solidity.StaticAnalysis.Typechecker (showType)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
@@ -1008,8 +1008,13 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
   -- emit MemberAdded(<address>, <enode>);
   solidVMBreakpoint pos
   exps <- mapM (expToVar . snd) exptups
-  expVals <- mapM getVar exps
-  expStrs <- mapM jsonSM expVals
+  -- Consensus-visible through the receipts root: see 'isEmitArgForkActive'.
+  -- Before it, args keep their storage references and unwritten values.
+  emitArgFork <- isEmitArgForkActive . BlockHeader.number . Env.blockHeader <$> getEnv
+  expVals <-
+    if emitArgFork
+      then mapM (forceValue <=< getVar) exps
+      else mapM (forceLoadVar . Constant <=< getVar) exps
 
   -- checks that the event is declared and that the number of args match
   --   DOES NOT check consistency of arg types
@@ -1028,26 +1033,27 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
-          let evArgs = zipWith3
-                        (\(CC.EventLog name _ (CC.IndexedType _ idxType _)) value valStr ->
-                          (name, value, valStr, idxType))
-                        (CC._eventLogs ev) expVals expStrs
+          -- An arg that was never written (unset storage slot, or SNULL) has no
+          -- shape of its own; give it the declared type's default so it leaves
+          -- the VM as a real value ([] / "" / 0 ...) like every other arg.
+          cc <- snd <$> getCurrentCodeCollection
+          evArgs <- forM (zip (CC._eventLogs ev) expVals) $
+            \(CC.EventLog name _ (CC.IndexedType _ idxType _), value) ->
+              (name,) <$> case value of
+                SReference _ | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
+                SNULL | emitArgFork -> forceValue =<< createDefaultValue cc curCnct idxType
+                _ -> pure value
 
-          bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           tHash <- Env.txHash <$> getEnv
           txSender <- Env.origin <$> getEnv
           let contractName' = labelToText $ CC._contractName curCnct
           -- Derive the Ethereum log topics (topic0 + indexed args) from the event
           -- ABI now, while the CodeCollection is in hand, so the block producer can
-          -- build a real logsBloom without re-deriving them. Uses the same encoder
-          -- and the same (name -> rendered value) attributes the JSON-RPC layer
-          -- reconstructs from Cirrus, so producer and RPC blooms agree.
-          let (evTopicBytes, _) =
-                encodeEventToLog
-                  eventName
-                  ev
-                  (M.fromList [(n, v) | (n, _, v, _) <- evArgs])
-          addEvent $ Event bHash tHash txSender contractName' address eventName evArgs evTopicBytes
+          -- build a real logsBloom without re-deriving them. Encodes straight from
+          -- the Values; gives the same bytes as the text-based encodeEventToLog the
+          -- JSON-RPC layer applies to Cirrus rows, so producer and RPC blooms agree.
+          let (evTopicBytes, _) = encodeEventToLogValues eventName ev evArgs
+          addEvent $ Event tHash txSender contractName' address eventName evArgs evTopicBytes
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos

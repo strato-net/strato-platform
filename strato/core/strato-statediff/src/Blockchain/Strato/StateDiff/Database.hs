@@ -36,9 +36,11 @@ import UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
 
-commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => StateDiff -> m ()
-commitSqlDiffs StateDiff {blockNumber, createdAccounts, deletedAccounts, updatedAccounts} = do
-  sqlQueryNoTransaction $ do
+-- | Commit a batch of state diffs in a single transaction (one commit per
+-- batch instead of one per statement).
+commitSqlDiffs :: (MonadLogger m, HasSQLDB m) => [StateDiff] -> m ()
+commitSqlDiffs diffs =
+  sqlQuery $ forM_ diffs $ \StateDiff {blockNumber, createdAccounts, deletedAccounts, updatedAccounts} -> do
     createAccount blockNumber $ Map.toList createdAccounts
     sequence_ $ Map.mapWithKey (const . deleteAccount) deletedAccounts
     sequence_ $ Map.mapWithKey (updateAccount blockNumber) updatedAccounts

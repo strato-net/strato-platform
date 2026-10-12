@@ -83,6 +83,7 @@ library
     , resourcet
     , seqevents
     , solid-vm-model
+    , store
     , strato-conf
     , strato-model
     , strato-redis-blockdb
@@ -99,6 +100,7 @@ test-suite contextm-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      ActionEncodeSpec
       CrossLangFixtureSpec
       ReceiptSpec
       TypedArgConversionSpec
@@ -107,9 +109,11 @@ test-suite contextm-test
       test/
   ghc-options: -Wall -O2 -dynamic
   build-depends:
-      QuickCheck
+      Decimal
+    , QuickCheck
     , base
     , base16-bytestring
+    , binary
     , blockDB
     , blockapps-data
     , blockapps-datadefs
@@ -119,8 +123,11 @@ test-suite contextm-test
     , hflags
     , hspec
     , merkle-patricia-db
+    , ordered-containers
+    , quickcheck-instances
     , solid-vm-model
     , strato-model
+    , text
     , vector
     , vm-tools
   default-language: Haskell2010

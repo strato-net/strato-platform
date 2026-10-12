@@ -229,9 +229,10 @@ processTheMessages messages = do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> labelToText (_contractName c) <> ": " <> T.pack (show err)
           pure []
         Right inheritedContracts -> pure $ map (labelToText . _contractName) inheritedContracts
-      indexFkeys <- createIndexTable c cc nameParts inherited
-      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts inherited
+      insertInheritance cr' n'' inherited
+      indexFkeys <- createIndexTable c cc nameParts
+      collectionFkeys <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do

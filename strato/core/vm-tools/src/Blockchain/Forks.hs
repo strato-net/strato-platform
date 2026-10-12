@@ -19,6 +19,7 @@
 module Blockchain.Forks
   ( isReceiptsRootForkActive,
     isBlockRewardReceiptForkActive,
+    isEmitArgForkActive,
     isOperatorPrecedenceForkActive,
     forkNotScheduled
   )
@@ -83,6 +84,24 @@ isBlockRewardReceiptForkActive blockNum =
         -- 'Nothing' means staking is live from genesis, so the fork is too.
         | otherwise = maybe 0 id (Conf.stakingActivationBlock conf)
    in blockNum >= switchAt
+
+-- | Block from which SolidVM emits fully evaluated event args, with an arg that
+-- was never written replaced by its declared type's default.
+--
+-- Before it, an emit kept each arg as read: storage references unresolved and
+-- unwritten args as SReference/SNULL. Those have no TypedArg, so the receipt
+-- log left them out; afterwards they are real values and appear in it. That
+-- moves the receipts root, so the change needs a height on any network that
+-- already checks receipts roots. Upquark switches with its staking fork.
+heliumEmitArgForkBlock :: Integer
+heliumEmitArgForkBlock = 750000
+
+isEmitArgForkActive :: Integer -> Bool
+isEmitArgForkActive blockNum =
+  let net = Conf.networkID $ networkConfig ethConf
+   in not $ (net == upquarkNetworkID  && blockNum < upquarkStakingForkBlock)
+         || (net == heliumNetworkID   && blockNum < heliumEmitArgForkBlock)
+         || (net == forktestNetworkID && blockNum < forktestForkBlock)
 
 -- | Sentinel height for a fork that a live network has not scheduled yet: the
 -- old behaviour holds for every block a node will actually see. Replace it with

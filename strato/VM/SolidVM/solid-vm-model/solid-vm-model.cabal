@@ -68,6 +68,7 @@ library
     , servant-server
     , source-tools
     , store
+    , store-core
     , strato-model
     , text
     , utf8-string
