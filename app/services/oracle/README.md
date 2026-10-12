@@ -70,7 +70,7 @@ COMMODITY_PRICE_API_KEY=your-commodity-price-api-key
 DEFILLAMA_API_KEY=your-defillama-api-key  # Pro/API plan: https://defillama.com/subscription
 TWELVEDATA_API_KEY=your-twelvedata-key
 OANDA_API_KEY=your-oanda-api-key
-OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxpractice.oanda.com/v3/accounts
+OANDA_ACCOUNT_ID=your-oanda-account-id  # Fetch via: curl -H "Authorization: Bearer API_KEY" https://api-fxtrade.oanda.com/v3/accounts
 
 # Oracle Configuration
 CRON_SCHEDULE="0 */15 * * * *"
