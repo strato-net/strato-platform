@@ -101,7 +101,7 @@ export class AppTierStack extends Stack {
       secrets: {
         ...backendDiscovery.secrets,
         postgres_password: ecs.Secret.fromSecretsManager(postgresPassword, config.secrets.postgresPasswordJsonKey),
-        ...(backendSecret ? backendSecretFields(backendSecret) : {}),
+        ...(backendSecret ? backendSecretFields(backendSecret, config.secrets.backendKeys) : {}),
       },
       healthCheck: {
         // /api/health is the backend's health route (/api/v1/metrics has no index route and answered 404).
@@ -257,9 +257,9 @@ function containerImage(scope: Construct, id: string, uri: string): ecs.Containe
     : ecs.ContainerImage.fromEcrRepository(repository, tag ?? "latest");
 }
 
-/** Optional backend API keys, each a field of one JSON secret. */
-function backendSecretFields(secret: secretsmanager.ISecret): Record<string, ecs.Secret> {
-  const fields = [
+/** Optional backend API keys, each a field of one JSON secret: those named, or all of them. */
+function backendSecretFields(secret: secretsmanager.ISecret, keys?: string[]): Record<string, ecs.Secret> {
+  const known = [
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
     "STRIPE_WEBHOOK_SECRET",
@@ -274,5 +274,7 @@ function backendSecretFields(secret: secretsmanager.ISecret): Record<string, ecs
     "RPC_URL_BASE_SEPOLIA",
     "RPC_URL_BASE_SEPOLIA_FALLBACK",
   ];
-  return Object.fromEntries(fields.map((f) => [f, ecs.Secret.fromSecretsManager(secret, f)]));
+  const unknown = (keys ?? []).filter((k) => !known.includes(k));
+  if (unknown.length) throw new Error(`backendSecretKeys: not backend settings: ${unknown.join(", ")}`);
+  return Object.fromEntries((keys ?? known).map((f) => [f, ecs.Secret.fromSecretsManager(secret, f)]));
 }

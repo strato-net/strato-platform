@@ -205,7 +205,9 @@ ctx_app() {
     -c oauthSecretName="$OAUTH_SECRET" -c csrfStateless=true -c createSessionSecret=false -c sessionSecretName="$session"
     -c ethconfParameterName="/$P/api/ethconf-base64" -c httpPort=80 -c ui=false -c deployUi=false
     -c albCertificateArn="$CERTIFICATE_ARN" -c desiredCount="$APP_DESIRED_COUNT")
-  if [[ -n ${BACKEND_SECRET:-} ]] && secret_exists "$BACKEND_SECRET"; then ctx+=(-c backendSecretName="$BACKEND_SECRET"); fi
+  if [[ -n ${BACKEND_SECRET:-} && -n ${BACKEND_SECRET_KEYS:-} ]] && secret_exists "$BACKEND_SECRET"; then
+    ctx+=(-c backendSecretName="$BACKEND_SECRET" -c backendSecretKeys="$(echo $BACKEND_SECRET_KEYS | tr ' ' ,)")
+  fi
   otel_ecs
 }
 

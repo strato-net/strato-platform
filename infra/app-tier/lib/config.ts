@@ -48,6 +48,11 @@ export interface AppTierConfig {
     postgresPasswordJsonKey?: string;
     session: string;
     backend?: string;
+    /**
+     * The keys `backend` holds. ECS refuses to start a task whose secret lacks a key it maps, and
+     * every key is optional to the backend, so name only those present; unset maps them all.
+     */
+    backendKeys?: string[];
   };
   /** Create the session secret (64 random characters) under `secrets.session` instead of importing one. */
   createSessionSecret: boolean;
@@ -134,6 +139,7 @@ export function loadConfig(app: App): AppTierConfig {
       postgresPasswordJsonKey: optional(app, "postgresPasswordJsonKey"),
       session: ctx(app, "sessionSecretName", `${prefix}/app/session-secret`),
       backend: optional(app, "backendSecretName"),
+      backendKeys: optional(app, "backendSecretKeys")?.split(",").map((s) => s.trim()).filter(Boolean),
     },
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
