@@ -67,3 +67,5 @@ tests:
       - blockapps-data
       - bytestring
       - hspec
+      - ethereum-rlp
+      - strato-model

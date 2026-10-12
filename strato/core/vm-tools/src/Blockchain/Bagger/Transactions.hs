@@ -54,6 +54,7 @@ data TransactionFailureCause
   | TFBlockGasLimitExceeded Integer Integer OutputTx -- neededGas, actualGas
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
+  | TFIncorrectChainId Integer OutputTx
   deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -80,6 +81,7 @@ data TxRejection
   | GasLimitTooLow BaggerStage BaggerTxQueue Integer Integer OutputTx -- queue should probably only be Validation, integer is intrinsic gas
   | LessLucrative BaggerStage BaggerTxQueue OutputTx OutputTx -- newTx, oldTx
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
+  | ChainIdMismatch BaggerStage BaggerTxQueue Integer OutputTx
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   deriving (Eq, Read, Show)
 
@@ -89,6 +91,7 @@ rejectedTx (BalanceTooLow _ _ _ _ t) = t
 rejectedTx (GasLimitTooLow _ _ _ _ t) = t
 rejectedTx (LessLucrative _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
+rejectedTx (ChainIdMismatch _ _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
@@ -140,6 +143,9 @@ instance Format TxRejection where
       ++ format hash
       ++ "\n"
       ++ format o
+  format (ChainIdMismatch stage queue expected tx) =
+    "Incorrect chain ID at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": expected " ++ show expected ++ ", actual " ++ show (TD.chainId $ otBaseTx tx)
   format (AdminFlushed stage queue scope o@OutputTx {otHash = hash}) =
     "AdminFlushed at stage " ++ show stage ++ " in queue " ++ show queue
       ++ " with scope " ++ show scope
@@ -159,6 +165,8 @@ txRejectionToAPIFailureCause (LessLucrative stage queue newTx _) =
   Failure (show stage) (Just $ show queue) TrumpedByMoreLucrative Nothing Nothing (Just $ "trumped by " ++ formatKeccak256WithoutColor (otHash newTx))
 txRejectionToAPIFailureCause (TXSizeLimitExceeded stage queue actual limit _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.TXSizeLimitError (Just limit) (Just actual) (Just $ "The TX size is " ++ show actual ++ " but the limit is " ++ show limit)
+txRejectionToAPIFailureCause (ChainIdMismatch stage queue expected tx) =
+  Failure (show stage) (Just $ show queue) IncorrectChainId (Just expected) (TD.chainId $ otBaseTx tx) (Just "A matching signed chain ID is required")
 txRejectionToAPIFailureCause (AdminFlushed stage queue scope t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.AdminFlushedError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " was administratively flushed from mempool with scope " ++ show scope)
 
@@ -168,6 +176,10 @@ tfToBaggerTxRejection (TFIntrinsicGasExceedsTxLimit ig txGL tx) = GasLimitTooLow
 tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (call tfToBaggerTxRejection on a TFBlockGasLimitExceeded)"
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
+tfToBaggerTxRejection (TFIncorrectChainId expected tx) = ChainIdMismatch Execution Queued expected tx
+
+transactionChainIdValid :: Integer -> TD.Transaction -> Bool
+transactionChainIdValid expected tx = TD.chainId tx == Just expected
 
 instance Format TransactionFailureCause where
   format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -175,6 +187,7 @@ instance Format TransactionFailureCause where
   format (TFBlockGasLimitExceeded txG blkG _) = "Block gas limit exceeded: needed " ++ show txG ++ " > available " ++ show blkG
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
+  format (TFIncorrectChainId expected tx) = "Incorrect chain ID: expected " ++ show expected ++ ", actual " ++ show (TD.chainId $ otBaseTx tx)
 
 getDeltasFromResults :: [TxRunResult] -> ValidatorDelta
 getDeltasFromResults = foldr go mempty

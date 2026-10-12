@@ -69,9 +69,11 @@ import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
 import Data.List (find, findIndex)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
+import Data.Source.Map (deserializeSourceMap, sourceBlob)
 import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
 import qualified Data.Aeson as Ae
 import GHC.Generics (Generic)
@@ -82,7 +84,7 @@ import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
+import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
@@ -231,8 +233,8 @@ net_peerCount = toMethod "net_peerCount" f ()
 net_listening :: Method Server
 net_listening = toMethod "net_listening" f ()
   where
-    f :: RpcResult Server String
-    f = return "true"
+    f :: RpcResult Server Bool
+    f = return True
 
 eth_protocolVersion :: Method Server
 eth_protocolVersion = toMethod "eth_protocolVersion" f ()
@@ -243,8 +245,8 @@ eth_protocolVersion = toMethod "eth_protocolVersion" f ()
 eth_syncing :: Method Server
 eth_syncing = toMethod "eth_syncing" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_coinbase :: Method Server
 eth_coinbase = toMethod "eth_coinbase" f ()
@@ -255,8 +257,8 @@ eth_coinbase = toMethod "eth_coinbase" f ()
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_hashrate :: Method Server
 eth_hashrate = toMethod "eth_hashrate" f ()
@@ -264,17 +266,21 @@ eth_hashrate = toMethod "eth_hashrate" f ()
     f :: RpcResult Server String
     f = return "0x0"
 
+walletGasEstimate :: Integer
+walletGasEstimate = 21000
+
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
     f :: RpcResult Server String
-    f = return "0x0"
+    -- Quote the fixed 0.01 USDST fee across the wallet's gas estimate, rounding up.
+    f = return $ "0x" ++ showHex ((10000000000000000 + walletGasEstimate - 1) `div` walletGasEstimate) ""
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
   where
-    f :: RpcResult Server String
-    f = return "[]"
+    f :: RpcResult Server [Address]
+    f = return []
 
 ----------------
 
@@ -367,9 +373,11 @@ eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" 
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
           Right (AddressStateRef' account : _) ->
-            case addressStateRefContractName account of
-              Just cn | not (null cn) -> return "0x01"
-              _ -> return "0x"
+            case addressStateRefCodeHash account of
+              Just codeHash -> do
+                source <- runCodeDBM $ lookupCode codeHash
+                return $ maybe "0x" (bytesToHex . encodeUtf8 . sourceBlob . deserializeSourceMap) source
+              Nothing -> return "0x"
           _ -> return "0x"
 
 eth_getTransactionCount :: Method Server
@@ -730,7 +738,7 @@ eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
   where
     f :: TxCallObject -> RpcResult Server String
-    f _ = return "0x5208"
+    f _ = return $ "0x" ++ showHex walletGasEstimate ""
 
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
@@ -986,29 +994,26 @@ eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
     f = throwError $ rpcError (-32601) "eth_getFilterLogs not yet implemented"
 
 data LogFilter = LogFilter
-  { lfFromBlock :: String
-  , lfToBlock   :: String
-  , lfAddress   :: Maybe String
-  , lfTopics    :: [String]
+  { lfFromBlock :: Maybe String
+  , lfToBlock   :: Maybe String
+  , lfBlockHash :: Maybe String
+  , lfAddress   :: Maybe [String]
+  , lfTopics    :: [Maybe [String]]
   } deriving (Show, Generic)
 
 maxLogBlockRange :: Integer
 maxLogBlockRange = 10000
 
-maxLogBlock :: Integer
-maxLogBlock = 999999999
-
 maxLogResults :: Int
 maxLogResults = 1000
 
-parseLogBlockNum :: String -> Maybe Integer
-parseLogBlockNum "latest" = Just maxLogBlock
-parseLogBlockNum "pending" = Just maxLogBlock
-parseLogBlockNum block = parseBlockNum block
+parseLogBlockNum :: Integer -> String -> Maybe Integer
+parseLogBlockNum latest "latest" = Just latest
+parseLogBlockNum latest "pending" = Just latest
+parseLogBlockNum _ block = parseBlockNum block
 
-topic0EventName :: [String] -> Maybe T.Text
-topic0EventName [] = Nothing
-topic0EventName (topic0 : _)
+topic0EventName :: [Maybe [String]] -> Maybe T.Text
+topic0EventName (Just [topic0] : _)
   | null normalized = Nothing
   | otherwise = T.pack <$> lookup normalized standardEventTopics
   where
@@ -1016,6 +1021,7 @@ topic0EventName (topic0 : _)
     strip0x ('0':'x':xs) = xs
     strip0x ('0':'X':xs) = xs
     strip0x xs = xs
+topic0EventName _ = Nothing
 
 standardEventTopics :: [(String, String)]
 standardEventTopics =
@@ -1027,27 +1033,55 @@ eventSignatureTopic :: String -> String
 eventSignatureTopic = keccak256ToHex . hash . BC.pack
 
 instance FromJSON LogFilter where
-  parseJSON = withObject "LogFilter" $ \o ->
-    LogFilter
-      <$> o .:? "fromBlock" .!= "latest"
-      <*> o .:? "toBlock"   .!= "latest"
-      <*> o .:? "address"
-      <*> o .:? "topics"    .!= []
+  parseJSON = withObject "LogFilter" $ \o -> do
+    fromBlock <- o .:? "fromBlock"
+    toBlock <- o .:? "toBlock"
+    blockHash <- o .:? "blockHash"
+    when (isJust blockHash && (isJust fromBlock || isJust toBlock)) $
+      fail "blockHash cannot be combined with fromBlock or toBlock"
+    mapM_ validateBlockHash blockHash
+    addresses <- o .:? "address" >>= traverse parseAddresses
+    filterTopics <- o .:? "topics" .!= [] >>= mapM parseTopic
+    pure $ LogFilter fromBlock toBlock blockHash addresses filterTopics
+    where
+      parseAddresses (String addr) = pure [T.unpack addr]
+      parseAddresses value = parseJSON value
+      parseTopic Null = pure Nothing
+      parseTopic (String topic) = pure $ Just [T.unpack topic]
+      parseTopic value = Just <$> parseJSON value
+      validateBlockHash value =
+        case B16.decode (BC.pack $ drop 2 value) of
+          Right bytes | take 2 value `elem` ["0x", "0X"] && B.length bytes == 32 -> pure ()
+          _ -> fail "blockHash must be a 32-byte hex hash"
 
 eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
     f filt = do
-      let fromBlock = maybe 0 id $ parseLogBlockNum (lfFromBlock filt)
-          toBlock   = maybe maxLogBlock id $ parseLogBlockNum (lfToBlock filt)
-          mAddr     = fmap T.pack (lfAddress filt)
+      let fromTag = fromMaybe "latest" $ lfFromBlock filt
+          toTag = fromMaybe "latest" $ lfToBlock filt
+          mAddr = fmap (map T.pack) (lfAddress filt)
+          mHash = fmap (T.pack . map toLower) (lfBlockHash filt)
           mEventName = topic0EventName (lfTopics filt)
+      latest <- if not (isJust mHash) && any (`elem` ["latest", "pending"]) [fromTag, toTag]
+        then do
+          response <- liftIO $ runLocal $ BlkLast.getBlkLastClient 1
+          case response of
+            Right (blk : _) -> pure $ getBlockNumber blk
+            Right [] -> throwError $ rpcError (-32603) "empty block list from server"
+            Left err -> throwError $ rpcError (-32603) $ formatClientError err
+        else pure 0
+      (fromBlock, toBlock) <- if isJust mHash
+        then pure (0, 0)
+        else case (parseLogBlockNum latest fromTag, parseLogBlockNum latest toTag) of
+          (Just start, Just end) | start >= 0 && end >= start -> pure (start, end)
+          _ -> throwError $ rpcError (-32602) "invalid log block range"
       when (toBlock >= fromBlock && toBlock - fromBlock > maxLogBlockRange) $
         throwError $ rpcError (-32602) $
           T.pack $
             "eth_getLogs block range exceeds " ++ show maxLogBlockRange ++ " blocks; use smaller ranges"
-      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock mEventName (maxLogResults + 1)
+      rows <- runCodeDBM $ queryEvents mAddr mHash fromBlock toBlock mEventName (maxLogResults + 1)
       when (length rows > maxLogResults) $
         throwError $ rpcError (-32602) $
           T.pack $

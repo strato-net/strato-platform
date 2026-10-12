@@ -103,5 +103,7 @@ test-suite blockapps-data-tests
       base
     , blockapps-data
     , bytestring
+    , ethereum-rlp
     , hspec
+    , strato-model
   default-language: Haskell2010
