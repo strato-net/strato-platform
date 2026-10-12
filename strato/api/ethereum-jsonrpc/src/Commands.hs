@@ -72,6 +72,8 @@ import Data.List (find, findIndex)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
+import Data.Source.Map (deserializeSourceMap, sourceBlob)
 import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
 import qualified Data.Aeson as Ae
 import GHC.Generics (Generic)
@@ -82,7 +84,7 @@ import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
 import Network.HTTP.Types.Status (statusCode, statusMessage)
 import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
+import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
@@ -367,9 +369,11 @@ eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" 
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
           Right (AddressStateRef' account : _) ->
-            case addressStateRefContractName account of
-              Just cn | not (null cn) -> return "0x01"
-              _ -> return "0x"
+            case addressStateRefCodeHash account of
+              Just codeHash -> do
+                source <- runCodeDBM $ lookupCode codeHash
+                return $ maybe "0x" (bytesToHex . encodeUtf8 . sourceBlob . deserializeSourceMap) source
+              Nothing -> return "0x"
           _ -> return "0x"
 
 eth_getTransactionCount :: Method Server

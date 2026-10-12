@@ -13,6 +13,7 @@ module Control.Monad.Composable.CodeDB
   ( CodeDBM,
     HasCodeDBAccess,
     runCodeDBM,
+    lookupCode,
     lookupCodeCollection,
     lookupCodeHash,
     lookupDelegatecallCodeHashes,

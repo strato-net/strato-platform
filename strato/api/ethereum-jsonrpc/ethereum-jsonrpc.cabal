@@ -55,6 +55,7 @@ executable ethereum-jsonrpc
     , seqevents
     , servant-client
     , solid-vm-model
+    , source-tools
     , strato-conf
     , strato-model
     , strato-p2p

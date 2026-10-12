@@ -43,7 +43,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 | `eth_getBlockTransactionCountByNumber`, `eth_getBlockTransactionCountByHash` | |
 | `eth_getBalance` | The account's **USDST** balance (the native token), read through the token contract. The block parameter is ignored. |
 | `eth_getTransactionCount` | The account's current nonce. The block parameter is ignored. |
-| `eth_getCode` | `0x01` if the address is a contract, otherwise `0x`. SolidVM contracts have no EVM bytecode to return. |
+| `eth_getCode` | The deployed SolidVM source as hex-encoded UTF-8, or `0x` when no code is stored. Sources deployed as multiple files are joined with newlines. This is source text, not EVM bytecode. The block parameter is ignored. |
 | `eth_call` | Runs a read-only call in the VM. Block tag: `latest`, `pending`, a block number or a block hash. Returns error code `3` if the VM doesn't answer within 30 s. |
 | `eth_getProof` | EIP-1186 account and storage proofs against a block's state root. Block tag: `latest`, a block number or a block hash. A storage key is the hex of the raw key bytes, which for SolidVM is the ASCII storage path (`0x` + hex of `balances[<address>]`), not a 32-byte slot. `value` is the leaf's RLP item as stored. See [State proofs](strato-node-api.md#state-proofs). |
 | `eth_getTransactionByHash`, `eth_getTransactionByBlockHashAndIndex`, `eth_getTransactionByBlockNumberAndIndex` | |
