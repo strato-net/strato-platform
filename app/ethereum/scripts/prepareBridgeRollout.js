@@ -3,9 +3,9 @@ const path = require("node:path");
 const { ethers } = require("ethers");
 const { buildPolicyTemplate } = require("./lib/externalBridgeRolloutPlan");
 const { writeJson } = require("./lib/externalBridgeOrchestration");
+const { DEFAULT_MERCATA_BRIDGE, STRATO_BRIDGES } = require("./lib/stratoBridgeNetworks");
 
 const REQUIRED = "REVIEW_REQUIRED";
-const DEFAULT_MERCATA_BRIDGE = "0x0000000000000000000000000000000000001008";
 const bare = value => String(value).replace(/^0x/i, "").toLowerCase();
 const address = value => {
   if (!/^(0x)?[a-f0-9]{40}$/i.test(String(value))) throw new Error("Invalid contract/token address");
@@ -61,16 +61,18 @@ async function discover(nodeUrl, chainId, token, fetchImpl = fetch, selections =
   const metadata = await request(`${source.nodeUrl}/strato-api/eth/v1.2/metadata`, token, fetchImpl);
   if (!/^\d+$/.test(String(metadata.networkID))) throw new Error("Node metadata has no valid networkID");
   source.stratoChainId = String(metadata.networkID);
+  const canonical = STRATO_BRIDGES[source.stratoChainId] || {};
   const candidates = {};
   const missing = [];
   for (const [name, contract] of [["eab", "ExternalAssetBridge"], ["native", "StratoNativeBridge"]]) {
     // Typed tables discover contract identities only; configuration comes from storage/mapping.
+    const selected = selections[name] || canonical[name];
     let rows;
     if (name === "eab") {
-      const selected = address(selections.eab || DEFAULT_MERCATA_BRIDGE);
+      const legacyBridge = address(selected || DEFAULT_MERCATA_BRIDGE);
       try {
         rows = await readRows(source, "BlockApps-MercataBridge", {
-          address: `eq.${bare(selected)}`, select: "address", order: "address.asc",
+          address: `eq.${bare(legacyBridge)}`, select: "address", order: "address.asc",
         }, token, fetchImpl);
       } catch (error) {
         if (!error.message.includes("(404)")) throw error;
@@ -79,7 +81,10 @@ async function discover(nodeUrl, chainId, token, fetchImpl = fetch, selections =
       source.legacy = true;
     } else {
       try {
-        rows = await readRows(source, `BlockApps-${contract}`, { select: "address", order: "address.asc" }, token, fetchImpl);
+        rows = await readRows(source, `BlockApps-${contract}`, {
+          ...(selected ? { address: `eq.${bare(address(selected))}` } : {}),
+          select: "address", order: "address.asc",
+        }, token, fetchImpl);
       } catch (error) {
         if (!error.message.includes("(404)")) throw error;
         rows = [];
@@ -98,10 +103,10 @@ async function discover(nodeUrl, chainId, token, fetchImpl = fetch, selections =
       if (selections.eab && candidates[name].length !== 1) throw new Error("Selected eab is not a discovered configured legacy MercataBridge");
       if (candidates[name].length === 1) source[name] = candidates[name][0];
       else missing.push("eab: configured legacy MercataBridge not found; provide --eab-address for a nonstandard deployment");
-    } else if (selections[name]) {
-      const selected = address(selections[name]);
-      if (!candidates[name].includes(selected)) throw new Error(`Selected ${name} is not a discovered configured contract`);
-      source[name] = selected;
+    } else if (selected) {
+      const selectedAddress = address(selected);
+      if (!candidates[name].includes(selectedAddress)) throw new Error(`${selections[name] ? "Selected" : "Canonical"} ${name} is not a discovered configured contract`);
+      source[name] = selectedAddress;
     } else if (candidates[name].length === 1) source[name] = candidates[name][0];
     else missing.push(`${name}: ${candidates[name].length ? "select a contract from candidates" : "no configured contract found; deploy or identify the current contract"}`);
   }
@@ -323,16 +328,17 @@ async function readExternal(input, state, env = process.env) {
 function rolloutSettings(input, state) {
   const a = v => /^(0x)?[a-f0-9]{40}$/i.test(String(v)) && bare(v) !== "0".repeat(40) ? address(v) : REQUIRED;
   const targetEab = state.targetEab;
+  const defaults = STRATO_BRIDGES[state.stratoChainId]?.dependencies || {};
   const bridge = targetEab?.storage || state.eab?.storage || {}, router = state.router?.storage || {};
   return {
     sourceChainId: state.stratoChainId, externalDeployment: input.target.externalDeployment || "../external-deployment.json", depositPlan: "./deposit-plan.json",
     tokenRouter: a(state.router?.address), externalAssetBridge: targetEab ? a(targetEab.address) : input.source.legacy ? REQUIRED : a(state.eab?.address),
     bridgeOperator: a(bridge.bridgeOperator), guardian: a(bridge.guardian),
     settlementVerifiers: (targetEab?.mappings || state.eab?.mappings || []).filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true).map(r => a(r.key?.key)),
-    dependencies: { adminRegistry: a(bridge._owner), poolFactory: a(router.poolFactory), poolV3Factory: a(router.poolV3Factory),
-      directMintPsm: a(router.directMintPsm), metalForge: a(router.metalForge), saveUsdstVault: a(router.saveUsdstVault),
+    dependencies: { adminRegistry: a(bridge._owner), poolFactory: a(router.poolFactory || defaults.poolFactory), poolV3Factory: a(router.poolV3Factory || defaults.poolV3Factory),
+      directMintPsm: a(router.directMintPsm || defaults.directMintPsm), metalForge: a(router.metalForge || defaults.metalForge), saveUsdstVault: a(router.saveUsdstVault || defaults.saveUsdstVault),
       yieldVaults: (state.router?.mappings || []).filter(r => r.collection_name === "approvedYieldVaults" && flag(value(r)) === true).map(r => a(r.key?.key)),
-      tokenFactory: a(bridge.tokenFactory), usdst: a(bridge.USDST_ADDRESS), priceOracle: a(bridge.priceOracle) },
+      tokenFactory: a(bridge.tokenFactory), usdst: a(bridge.USDST_ADDRESS), priceOracle: a(bridge.priceOracle || defaults.priceOracle) },
   };
 }
 
@@ -418,6 +424,12 @@ async function getReadToken(env = process.env, authenticate) {
   return token;
 }
 
+function writeNativeOutputs(directory, routes, baseline) {
+  if (!routes.length) return;
+  writeJson(path.join(directory, "native-routes.json"), routes);
+  writeJson(path.join(directory, "native.json"), baseline);
+}
+
 async function main(argv) {
   require("dotenv").config({ quiet: true });
   require("dotenv").config({ path: path.resolve(__dirname, "../../contracts/.env"), quiet: true, override: false });
@@ -448,23 +460,25 @@ async function main(argv) {
   await readTargetTokenMetadata(input);
   const external = await readExternal(input, state);
   const output = prepare(input, state, external);
-  const nativeBaseline = await readNativeBaseline(input, state);
+  const nativeBaseline = output.native.length ? await readNativeBaseline(input, state) : undefined;
   const settings = rolloutSettings(input, state);
   const findMissing = (v, name) => {
     if (v === REQUIRED) output.unresolved.push(name);
     else if (v && typeof v === "object") Object.entries(v).forEach(([key, child]) => findMissing(child, `${name}.${key}`));
   };
-  findMissing(nativeBaseline, "native"); findMissing(settings, "settings");
-  if (!nativeBaseline.attestationSigners.length) output.unresolved.push("native.attestationSigners");
+  if (nativeBaseline) {
+    findMissing(nativeBaseline, "native");
+    if (!nativeBaseline.attestationSigners.length) output.unresolved.push("native.attestationSigners");
+  }
+  findMissing(settings, "settings");
   if (!settings.settlementVerifiers.length) output.unresolved.push("settings.settlementVerifiers");
   writeJson(path.join(directory, "source-snapshot.json"), { ...state, external });
   writeJson(path.join(directory, "settings.json"), settings);
   writeJson(path.join(directory, "policy.json"), output.policy);
   writeJson(path.join(directory, "deposit-plan.json"), output.depositPlan);
-  writeJson(path.join(directory, "native-routes.json"), output.native);
-  writeJson(path.join(directory, "native.json"), nativeBaseline);
+  writeNativeOutputs(directory, output.native, nativeBaseline);
   writeJson(path.join(directory, "review-required.json"), output.unresolved);
   console.log(`Prepared current-network inputs. ${output.unresolved.length} unresolved fields; no transactions submitted.`);
 }
 if (require.main === module) main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken };
+module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken, writeNativeOutputs };

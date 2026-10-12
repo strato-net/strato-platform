@@ -396,6 +396,23 @@ test("combined rollout guidance emits ordered native and service steps", (t) => 
   assert.equal(steps[4].action, "DEPLOY_VERIFIERS_AND_RUNTIME");
 });
 
+test("EAB-only rollout guidance omits native configuration and retains service deployment", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-only-rollout-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const prepared = path.join(root, "prepared");
+  fs.mkdirSync(prepared);
+  const context = {
+    manifest: { settings: { depositPlan: path.join(prepared, "deposit-plan.json") } },
+  };
+  const args = { manifest: path.join(root, "deployment-manifest.json") };
+  assert.deepEqual(nativeDeploymentSteps(context, args).map(({ action }) => action),
+    ["DEPLOY_VERIFIERS_AND_RUNTIME"]);
+  writeJson(path.join(prepared, "native-routes.json"), []);
+  writeJson(path.join(prepared, "native.json"), {});
+  assert.deepEqual(nativeDeploymentSteps(context, args).map(({ action }) => action),
+    ["DEPLOY_VERIFIERS_AND_RUNTIME"]);
+});
+
 test("rollout automatically loads deployment.env beside the manifest", (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-environment-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

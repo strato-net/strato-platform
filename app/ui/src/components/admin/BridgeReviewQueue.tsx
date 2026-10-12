@@ -142,7 +142,7 @@ const BridgeReviewQueue = () => {
           </span>
         </div>}
         <div className="flex flex-wrap gap-2">
-          {!isSafeAttention(item) && actionsFor(item).map(action => {
+          {actionsFor(item).map(action => {
             const progress = item.governance?.[action];
             const quorum = progress && progress.votesCast >= progress.votesRequired;
             const pending = isVotePending(item, action);

@@ -694,16 +694,24 @@ function approvedCallsCompleted(artifacts, approval, currentCalls = []) {
 function nativeDeploymentSteps(context, args) {
   if (!context?.manifest?.settings?.depositPlan || !args?.manifest) return [];
   const manifestDirectory = path.dirname(path.resolve(args.manifest));
+  const serviceStep = {
+    step: "7",
+    action: "DEPLOY_VERIFIERS_AND_RUNTIME",
+    then: "Start all reviewed verifier stacks and Runtime, set BRIDGE_HEALTH_URL, then rerun EAB status.",
+  };
   const preparedDirectory = path.dirname(path.resolve(
     manifestDirectory,
     context.manifest.settings.depositPlan,
   ));
   const routesPath = path.join(preparedDirectory, "native-routes.json");
   const nativePath = path.join(preparedDirectory, "native.json");
-  if (!fs.existsSync(routesPath) || !fs.existsSync(nativePath)) return [];
+  if (!fs.existsSync(routesPath) || !fs.existsSync(nativePath)) return [serviceStep];
+  const routes = readJson(routesPath);
+  if (!Array.isArray(routes)) throw new Error("native-routes.json must contain an array");
+  if (!routes.length) return [serviceStep];
   const repoRoot = path.resolve(__dirname, "../../..");
   const rolloutDirectory = manifestDirectory;
-  const routeCount = readJson(routesPath).length;
+  const routeCount = routes.length;
   const steps = [];
   for (let route = 0; route < routeCount; route++) {
     const command = `cd ${repoRoot}/app/contracts && npm run configure:native-route -- --config ${routesPath} --route ${route} --enabled false --auto-route-enabled false`;
@@ -727,11 +735,7 @@ function nativeDeploymentSteps(context, args) {
     run: `cd ${repoRoot}/app/ethereum && npm run native:configure -- --config ${nativePath} --stage configure`,
     then: "Require 0 pending native configuration calls before service deployment.",
   });
-  steps.push({
-    step: "7",
-    action: "DEPLOY_VERIFIERS_AND_RUNTIME",
-    then: "Start all three reviewed verifier stacks and Runtime, set BRIDGE_HEALTH_URL, then rerun EAB status.",
-  });
+  steps.push(serviceStep);
   return steps;
 }
 

@@ -1,6 +1,9 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { parse, lookup, prepare, snapshot, readRows } = require('../scripts/prepareBridgeRollout');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { parse, lookup, prepare, snapshot, readRows, writeNativeOutputs } = require('../scripts/prepareBridgeRollout');
 const a = n => '0x' + String(n).padStart(40, '0');
 const row = (collection_name, keys, value) => ({ collection_name, key: Object.fromEntries(keys.map((k,i) => [i ? `key${i+1}` : 'key', k])), value });
 const input = { source: { nodeUrl: 'https://example.test', stratoChainId: '33056204878082667' },
@@ -66,18 +69,32 @@ test('native prefills keep token-wide settings separate from route calls', () =>
   assert.equal(result.native[0]['max-outstanding-withdrawal'],undefined);
   assert.equal(result.native[0]['representation-token'],'REVIEW_REQUIRED');
 });
+test('native output files are omitted when no native routes are selected', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(),'eab-only-preparation-'));
+  t.after(() => fs.rmSync(dir,{recursive:true,force:true}));
+  writeNativeOutputs(dir,[],undefined);
+  assert.equal(fs.existsSync(path.join(dir,'native-routes.json')),false);
+  assert.equal(fs.existsSync(path.join(dir,'native.json')),false);
+  writeNativeOutputs(dir,[{}],{ chainId:84532 });
+  assert.equal(fs.existsSync(path.join(dir,'native-routes.json')),true);
+  assert.equal(fs.existsSync(path.join(dir,'native.json')),true);
+});
 const { discover } = require('../scripts/prepareBridgeRollout');
-test('discovery derives network, contract addresses and routes without an address registry', async () => {
+test('discovery derives routes and selects canonical STRATO bridge addresses', async () => {
   const requests = [];
   const mercataBridge = '0x0000000000000000000000000000000000001008';
+  const nativeBridge = '0x49f69252b00235030a4dcd4c7ef17a64ef346258';
   const fetch = async raw => {
     const url = new URL(raw); requests.push(url);
     const offset = Number(url.searchParams.get('offset') || 0);
     let data = [];
-    if (url.pathname.endsWith('/metadata')) data = { networkID:'33056204878082667' };
+    if (url.pathname.endsWith('/metadata')) data = { networkID:'114784819836269' };
     else if (!offset && url.pathname.endsWith('/BlockApps-MercataBridge')) data = [{ address:mercataBridge }];
-    else if (!offset && url.pathname.endsWith('/storage')) data = [{ address:mercataBridge, data:{ tokenFactory:a(8) } }];
-    else if (!offset && url.pathname.endsWith('/mapping')) data = [
+    else if (!offset && url.pathname.endsWith('/BlockApps-StratoNativeBridge')) data = [{ address:nativeBridge }];
+    else if (!offset && url.pathname.endsWith('/storage')) data = url.searchParams.get('address') === `eq.${nativeBridge.slice(2)}`
+      ? [{ address:nativeBridge, data:{ custodyVault:a(9) } }]
+      : [{ address:mercataBridge, data:{ tokenFactory:a(8) } }];
+    else if (!offset && url.pathname.endsWith('/mapping') && url.searchParams.get('address') === `eq.${mercataBridge.slice(2)}`) data = [
       row('assets',[a(3),1], { enabled:true, stratoToken:a(1), externalDecimals:'6', externalName:'Token', externalSymbol:'TOK' }),
       row('assets',[a(4),1], { enabled:false, stratoToken:a(2), externalDecimals:'18', externalName:'Disabled', externalSymbol:'OFF' }),
       row('assets',[a(5),84532], { enabled:false, stratoToken:a(1), externalDecimals:'18', externalName:'Target Token', externalSymbol:'TT' }),
@@ -86,9 +103,10 @@ test('discovery derives network, contract addresses and routes without an addres
     return { ok:true, text:async () => JSON.stringify(data) };
   };
   const result = await discover('https://current.test',84532,'secret',fetch,{ sourceChainId:1 });
-  assert.equal(result.config.source.stratoChainId,'33056204878082667');
-  assert.equal(result.config.target.stratoChainId,'33056204878082667');
+  assert.equal(result.config.source.stratoChainId,'114784819836269');
+  assert.equal(result.config.target.stratoChainId,'114784819836269');
   assert.equal(result.config.source.eab,mercataBridge);
+  assert.equal(result.config.source.native,nativeBridge);
   assert.equal(result.config.source.legacy,true);
   assert.equal(result.config.eabRoutes.length,1);
   assert.equal(result.config.eabRoutes[0].stratoToken,a(1));
@@ -98,7 +116,7 @@ test('discovery derives network, contract addresses and routes without an addres
   assert.equal(result.config.eabRoutes[0].externalSymbol,'TT');
   assert.equal(result.config.eabRoutes[0].include,false);
   assert.ok(requests.every(url => url.hostname === 'current.test'));
-  assert.equal(result.missing.length,1);
+  assert.equal(result.missing.length,0);
 });
 test('discovery rejects an unconfigured custom legacy MercataBridge', async () => {
   const fetch = async raw => {
@@ -108,13 +126,17 @@ test('discovery rejects an unconfigured custom legacy MercataBridge', async () =
   };
   await assert.rejects(discover('https://current.test',84532,'secret',fetch,{eab:a(7)}),/not a discovered configured legacy MercataBridge/);
 });
-test('EAB settings use discovered storage and never a fixed address registry', () => {
+test('EAB settings use live storage over canonical dependency defaults', () => {
   const { rolloutSettings } = require('../scripts/prepareBridgeRollout');
   const settings = rolloutSettings(input, { ...state, eab:{address:a(9), storage:{_owner:a(8), bridgeOperator:a(7)}, mappings:[]},
     router:{address:a(6),storage:{poolFactory:a(5)},mappings:[]} });
   assert.equal(settings.dependencies.adminRegistry,a(8));
   assert.equal(settings.dependencies.poolFactory,a(5));
-  assert.equal(settings.dependencies.priceOracle,'REVIEW_REQUIRED');
+  assert.equal(settings.dependencies.poolV3Factory,'0x5d630126d908b46bcf8d00bc15e591a459375809');
+  assert.equal(settings.dependencies.directMintPsm,'0xb1efdc86eecfbedf83d0295671214fee451786f3');
+  assert.equal(settings.dependencies.metalForge,'0x1cc5bad32dc8667878fa7c53cc5cfd6e76fdb113');
+  assert.equal(settings.dependencies.saveUsdstVault,'0x22550671fcad04a213697ac7ae4f4366e96446ed');
+  assert.equal(settings.dependencies.priceOracle,'0x0000000000000000000000000000000000001002');
   assert.equal(settings.sourceChainId,state.stratoChainId);
   assert.equal(rolloutSettings({...input,source:{...input.source,legacy:true}},state).externalAssetBridge,'REVIEW_REQUIRED');
   const targetEab = { address:a(10), storage:{ _owner:a(8), bridgeOperator:a(7), guardian:a(6), priceOracle:a(4) },
@@ -125,8 +147,27 @@ test('EAB settings use discovered storage and never a fixed address registry', (
   assert.deepEqual(migrated.settlementVerifiers,[a(3)]);
   assert.equal(migrated.dependencies.priceOracle,a(4));
 });
+test('Helium EAB settings prefill canonical dependencies', () => {
+  const { rolloutSettings } = require('../scripts/prepareBridgeRollout');
+  const settings = rolloutSettings(input, { stratoChainId:'114784819836269',
+    eab:{address:a(9),storage:{_owner:a(8)},mappings:[]} });
+  assert.deepEqual({
+    poolFactory:settings.dependencies.poolFactory,
+    poolV3Factory:settings.dependencies.poolV3Factory,
+    directMintPsm:settings.dependencies.directMintPsm,
+    metalForge:settings.dependencies.metalForge,
+    saveUsdstVault:settings.dependencies.saveUsdstVault,
+    priceOracle:settings.dependencies.priceOracle,
+  },{
+    poolFactory:'0x000000000000000000000000000000000000100a',
+    poolV3Factory:'0xe6b6f05a88e649e4102a801aade9a6bae02f352d',
+    directMintPsm:'0x0b30adc5f2d90bada37afa699b75f485f04e7287',
+    metalForge:'0xc5ed981b816a626981a5747d125e0e7296b2c7c6',
+    saveUsdstVault:'0xceeb982f671b4ee2b4471e5b49f3126739537f15',
+    priceOracle:'0x0000000000000000000000000000000000001002',
+  });
+});
 test('deployment artifacts supply new addresses and reject a different chain', () => {
-  const fs=require('node:fs'), os=require('node:os'), path=require('node:path');
   const {applyDeploymentArtifacts}=require('../scripts/prepareBridgeRollout');
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'rollout-artifacts-'));
   try {

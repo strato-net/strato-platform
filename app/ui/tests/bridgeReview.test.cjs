@@ -139,6 +139,18 @@ test('STRATO shows withdrawals pending review with approval handled in Safe', ()
   assert.equal(h.votes.length, 0);
 });
 
+test('native withdrawals awaiting Safe action still offer governance cancellation', () => {
+  const h = harness({ kind: 'withdrawal_review', action: 'cancel_withdrawal', overrides: {
+    id: 'native:withdrawal:148', source: 'native', actions: ['cancel_withdrawal'],
+  } });
+  const text = h.text(h.render());
+  assert.match(text, /Safe signers — execute the mint proposal, or STRATO admins — request cancellation/);
+  assert.match(text, /Request cancellation \/ vote/);
+  assert.doesNotMatch(text, /Reject \/ vote|Refund \/ vote/);
+  h.select();
+  assert.match(h.text(h.render()), /requests permanent cancellation of its mint identity/);
+});
+
 test('deposit review never offers manual settlement, including stale API actions', () => {
   for (const approved of [false, true]) {
     const h = harness({ kind: 'deposit_review', action: 'settle', approved });

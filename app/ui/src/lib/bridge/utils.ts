@@ -36,7 +36,9 @@ export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = fa
     return "STRATO admins — vote to cancel this blocked instant withdrawal.";
   }
   if (item.kind === "withdrawal_review" && !item.governance?.cancel_withdrawal?.votesCast && !votePending) return item.safeProposalHash
-    ? "Safe signers — review and execute the mint proposal."
+    ? item.actions.includes("cancel_withdrawal")
+      ? "Safe signers — execute the mint proposal, or STRATO admins — request cancellation."
+      : "Safe signers — review and execute the mint proposal."
     : "Bridge service — prepare the Safe mint proposal.";
   if (item.recoveryStatus === "refund_pending" && !item.refundEvidenceHash) return item.safeProposalHash
     ? "Safe signers — execute the external refund proposal."
