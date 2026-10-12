@@ -61,7 +61,7 @@ curl -s -X POST https://noderpc.strato.nexus/rpc \
 
 These methods exist for wallet compatibility and always return the same value:
 
-- `eth_gasPrice` returns `0x0`.
+- `eth_gasPrice` returns `0x6edf2a079f` (476,190,476,191 base units per gas), quoting approximately 0.01 USDST at the fixed 21,000-gas estimate.
 - `eth_estimateGas` always returns `0x5208`.
 - `eth_syncing` and `eth_mining` return the JSON boolean `false`.
 - `net_listening` returns the JSON boolean `true`.
@@ -79,7 +79,7 @@ These are fixed compatibility responses, not live node health checks. Older node
 
 **EIP-1559 support: No.** The API accepts legacy Ethereum transactions and does not implement `eth_feeHistory` or `eth_maxPriorityFeePerGas`.
 
-Use the [JSON-RPC endpoints](#endpoints) with `eth_gasPrice` for the legacy gas-price response. It currently returns `0x0`, not a `baseFee` / `priorityFee` pair. This does not report the actual transaction fee: the node charges fees separately through the Decider contract, using a voucher or USDST. See [Transactions and Fees](../platform/transactions-and-fees.md).
+Use the [JSON-RPC endpoints](#endpoints) with `eth_gasPrice` for the fixed legacy gas-price quote, not a `baseFee` / `priorityFee` pair. Multiplied by the fixed 21,000-gas estimate, it quotes approximately 0.01 USDST. A wallet that increases the gas limit or changes the gas price will display a different estimate. The node still charges the actual fee separately through the Decider contract, using a voucher or USDST; the quote does not account for vouchers or fee exemptions. See [Transactions and Fees](../platform/transactions-and-fees.md).
 
 ### Not supported
 
@@ -126,7 +126,7 @@ To add STRATO to MetaMask or another EIP-1193 wallet, open **Add network → Add
 What to expect:
 
 - **Balance:** the wallet's native balance is your USDST balance.
-- **Gas:** the wallet shows a gas price of 0. The real fee is 0.01 USDST or one voucher per transaction, charged on-chain by the Decider contract, not through gas. See [Transactions & Fees](../platform/transactions-and-fees.md#fees).
+- **Gas:** the fixed gas estimate and gas-price quote give approximately 0.01 USDST. Wallet adjustments can change the displayed estimate. The real fee is 0.01 USDST or one voucher per transaction, charged on-chain by the Decider contract, not through gas. See [Transactions & Fees](../platform/transactions-and-fees.md#fees).
 - **Transactions:** the STRATO app has MetaMask sign transactions with EIP-712 through your on-chain User wallet. You don't have to send Ethereum-format transactions yourself.
 
 ## Library Examples

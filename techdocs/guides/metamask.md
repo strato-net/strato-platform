@@ -38,7 +38,7 @@ The currency symbol follows the node's current behavior: `eth_getBalance` reads 
 
 STRATO uses PBFT consensus (Blockstanbul). The default minimum block interval is one second; it is not a guaranteed average block time.
 
-The JSON-RPC API supports legacy Ethereum transactions, not EIP-1559 transactions. Gas estimation currently returns a fixed 21,000 and gas price returns zero. A zero wallet gas quote does not mean the transaction is free: fees are charged separately through the Decider contract, using one voucher or 0.01 USDST under the standard fee policy.
+The JSON-RPC API supports legacy Ethereum transactions, not EIP-1559 transactions. Gas estimation returns a fixed 21,000 and gas price quotes approximately 0.01 USDST at that estimate. Wallet adjustments to gas can change the displayed total. Fees are charged separately through the Decider contract, using one voucher or 0.01 USDST under the standard fee policy; the quote does not account for vouchers or fee exemptions.
 
 Adding the network does not establish that all MetaMask send flows work. End-to-end legacy-send verification remains outstanding. SolidVM contracts do not execute EVM bytecode.
 

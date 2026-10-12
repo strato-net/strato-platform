@@ -266,11 +266,15 @@ eth_hashrate = toMethod "eth_hashrate" f ()
     f :: RpcResult Server String
     f = return "0x0"
 
+walletGasEstimate :: Integer
+walletGasEstimate = 21000
+
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
     f :: RpcResult Server String
-    f = return "0x0"
+    -- Quote the fixed 0.01 USDST fee across the wallet's gas estimate, rounding up.
+    f = return $ "0x" ++ showHex ((10000000000000000 + walletGasEstimate - 1) `div` walletGasEstimate) ""
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
@@ -734,7 +738,7 @@ eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
   where
     f :: TxCallObject -> RpcResult Server String
-    f _ = return "0x5208"
+    f _ = return $ "0x" ++ showHex walletGasEstimate ""
 
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
