@@ -38,9 +38,13 @@ function executeCheck() {
                 order: [ [ 'createdAt', 'DESC' ]],
             })
 
-            // If executing for the very first time - no previous data exists in database, so using current values as previous.
+            // On the very first check there is no previous data to compare with.
+            // The valid count is taken as unchanged, and the pending count as 0:
+            // with the current count used as previous, a transaction that happened
+            // to be pending at that moment reported the node as stalled for the
+            // whole first interval after every apex start.
             const validBlocksCount_prev = (validBlocksCount_prev_fromDB) ? validBlocksCount_prev_fromDB.dataValues.blockCount : validBlocksCount_current;
-            const pendingTxsCount_prev = (pendingTxsCount_prev_fromDB) ? pendingTxsCount_prev_fromDB.dataValues.blockCount : pendingTxsCount_current;
+            const pendingTxsCount_prev = (pendingTxsCount_prev_fromDB) ? pendingTxsCount_prev_fromDB.dataValues.blockCount : 0;
             await createStallStats(validBlocksCount_current, pendingTxsCount_current);
             const currentStallHealthData = await getCurrentHealth(pendingTxsCount_prev, pendingTxsCount_current, validBlocksCount_prev, validBlocksCount_current);
             await updateCurrentStallStat(currentStallHealthData);
