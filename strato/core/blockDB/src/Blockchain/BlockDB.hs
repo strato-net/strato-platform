@@ -14,6 +14,7 @@ module Blockchain.BlockDB
     getBlocks,
     getTransactions,
     getParent,
+    getCanonical,
     getCanonicalHeader,
     putHeader,
     putHeaders,

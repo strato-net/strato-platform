@@ -8,11 +8,12 @@ const si = require("systeminformation");
 const config = require("../config/app.config");
 const getPbftData = require("../controllers/health")["getPbftData"];
 const findView = require("../controllers/health")["findView"];
+const redisBlockDB = require("../lib/redis-block-db");
 const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
-const neededJobs = {
+const allJobs = {
   slipstream_main: "slipstream",
   strato_p2p: "strato-p2p",
   vm_main: "vm-runner",
@@ -20,6 +21,17 @@ const neededJobs = {
   // TODO: add vault-proxy in prometheus
   "core-api": "core-api",
 };
+
+// Jobs this node's Prometheus does not scrape are not required: strato-setup
+// gives apex the same PROMETHEUS_SKIP_JOBS it gives Prometheus (on a lite
+// validator core-api and slipstream, which do not run there), and a required
+// job that never reports would keep the node unhealthy for good.
+const skippedJobs = new Set(
+  (process.env.PROMETHEUS_SKIP_JOBS || "").split(",").map((s) => s.trim()).filter(Boolean)
+);
+const neededJobs = Object.fromEntries(
+  Object.entries(allJobs).filter(([, job]) => !skippedJobs.has(job))
+);
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 
@@ -85,20 +97,12 @@ async function checkNodeSyncStallStatus(syncStat) {
 
   let isStalled = false;
 
-  const { number: currVmBlockNum = 0 } = await BlockDataRef.findOne({
-    where: {
-      pow_verified: true,
-      is_confirmed: true,
-    },
-    order: [["number", "DESC"]],
-    attributes: ["number"],
-    raw: true,
-  });
+  const currVmBlockNum = await getIndexedBlockNumber();
 
   const pbftInfo = await getPbftData();
   const { sequence_number: currSeqBlockNum = 0 } = findView(pbftInfo);
 
-  const { isSynced = false} = await getStratoMetadata();
+  const isSynced = await getIsSynced();
 
   try {
     if (isSynced) {
@@ -158,6 +162,48 @@ async function checkNodeSyncStallStatus(syncStat) {
   };
 
   return [isSynced, additionalSyncInfo];
+}
+
+// The last indexed block number: Redis first (the BestBlock entry, the same
+// source as /health), block_data_ref as the fallback for a node whose Redis is
+// unavailable. A lite validator (strato-indexer --sql=false) has no
+// block_data_ref at all.
+async function getIndexedBlockNumber() {
+  try {
+    const number = await redisBlockDB.getBestBlockNumber();
+    if (number !== null) return number;
+  } catch (err) {
+    winston.warn(`Falling back to block_data_ref for the indexed block number: ${err.message}`);
+  }
+  try {
+    const row = await BlockDataRef.findOne({
+      where: {
+        pow_verified: true,
+        is_confirmed: true,
+      },
+      order: [["number", "DESC"]],
+      attributes: ["number"],
+      raw: true,
+    });
+    return row ? row.number : 0;
+  } catch (err) {
+    winston.warn(`Unable to read the indexed block number: ${err.message}`);
+    return 0;
+  }
+}
+
+// Whether the node considers itself synced: the Redis flag strato writes (the
+// value /eth/v1.2/metadata reports as isSynced), or metadata itself when Redis
+// has no answer. A lite validator runs no strato-api, so Redis is what it has.
+async function getIsSynced() {
+  try {
+    const status = await redisBlockDB.getSyncStatus();
+    if (status !== null) return status;
+  } catch (err) {
+    winston.warn(`Falling back to metadata for the sync status: ${err.message}`);
+  }
+  const { isSynced = false } = await getStratoMetadata();
+  return isSynced;
 }
 
 async function getStratoMetadata() {

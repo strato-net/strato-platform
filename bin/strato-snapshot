@@ -96,6 +96,8 @@ Restore options:
   --start                    Start the node after restore.
   --include-prometheus       Restore prometheus/ if present.
   --allow-version-drift      Do not enforce major STRATO version compatibility.
+  --skip-databases           Leave the node's postgres alone: eth and cirrus are
+                             not loaded (a lite validator, strato-up --validator).
 
 Smoke-test options:
   --node-dir <dir>           Directory to restore into. Defaults to a temp dir.
@@ -1797,9 +1799,10 @@ restore_payload() {
   local extracted="$1"
   local node_dir="$2"
   local include_prometheus="$3"
+  local skip_databases="${4:-false}"
 
   [[ -d "$extracted/payload" ]] || die "payload missing from archive"
-  [[ -d "$extracted/payload/postgres-dumps" ]] || die "payload missing postgres-dumps/"
+  [[ "$skip_databases" == "true" || -d "$extracted/payload/postgres-dumps" ]] || die "payload missing postgres-dumps/"
   # A v1 (kafka-era) archive has kafka/ where this build expects jlog/. Without
   # this check the restore "succeeds" and leaves a node with restored chain and
   # database state but empty streaming state. --snapshot can't produce one (it
@@ -1838,11 +1841,18 @@ restore_payload() {
   # keeps its own postgres password and local-only `oauth` DB; no foreign
   # credentials are imported (A2), and no node/user-specific data from the
   # source rides along (B3).
-  info "[6/7] Loading the public databases (eth, cirrus) into the node's own postgres cluster"
-  info "      The node keeps its own postgres password and its local-only oauth database; only eth and cirrus are replaced"
-  local node_password
-  node_password="$(<"$node_dir/secrets/postgres_password")"
-  load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
+  if [[ "$skip_databases" == "true" ]]; then
+    # A validator's indexer writes no SQL and nothing reads eth or cirrus
+    # there; the node's own postgres starts empty and discovery and p2p create
+    # the peer tables they need.
+    info "[6/7] --skip-databases: leaving the node's postgres alone (eth and cirrus are not loaded)"
+  else
+    info "[6/7] Loading the public databases (eth, cirrus) into the node's own postgres cluster"
+    info "      The node keeps its own postgres password and its local-only oauth database; only eth and cirrus are replaced"
+    local node_password
+    node_password="$(<"$node_dir/secrets/postgres_password")"
+    load_databases "$node_dir/postgres" "$extracted/payload/postgres-dumps" "$node_password"
+  fi
 
   if [[ "$include_prometheus" == "true" && -d "$extracted/payload/prometheus" ]]; then
     info "      Replacing prometheus/ with the snapshot's ($(human_bytes "$(dir_size_bytes "$extracted/payload/prometheus")")) (--include-prometheus)"
@@ -2021,7 +2031,7 @@ cmd_restore() {
   need_cmd python3
 
   [[ $# -ge 1 ]] || die "restore requires <node-dir>"
-  local node_dir source use_snapshot timestamp bucket network force start include_prometheus allow_version_drift
+  local node_dir source use_snapshot timestamp bucket network force start include_prometheus allow_version_drift skip_databases
   node_dir="$1"
   shift
   source=""
@@ -2033,6 +2043,7 @@ cmd_restore() {
   start="false"
   include_prometheus="false"
   allow_version_drift="false"
+  skip_databases="false"
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -2045,6 +2056,7 @@ cmd_restore() {
       --start) start="true"; shift ;;
       --include-prometheus) include_prometheus="true"; shift ;;
       --allow-version-drift) allow_version_drift="true"; shift ;;
+      --skip-databases) skip_databases="true"; shift ;;
       *) die "unknown restore option: $1" ;;
     esac
   done
@@ -2125,7 +2137,7 @@ print(images.get("strato", ""))
     fi
   fi
 
-  restore_payload "$extracted" "$node_dir" "$include_prometheus"
+  restore_payload "$extracted" "$node_dir" "$include_prometheus" "$skip_databases"
   info "Snapshot restored into: $node_dir ($(elapsed_since "$t_start") in total)"
 
   if [[ "$start" == "true" ]]; then

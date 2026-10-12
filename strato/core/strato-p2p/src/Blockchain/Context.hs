@@ -334,8 +334,15 @@ instance ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) ContextM wh
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
+-- | The genesis hash for the handshake. Redis holds the canonical chain the
+-- indexer writes, block 0 included, so a node without the SQL block index
+-- (strato-indexer --sql=false, a lite validator) can answer from there; the
+-- SQL row remains the answer for a node whose Redis has not seen genesis yet.
 instance Mod.Accessible GenesisBlockHash ContextM where
-  access _ = GenesisBlockHash <$> getGenesisBlockHash
+  access _ =
+    RBDB.withRedisBlockDB (getCanonical 0) >>= \case
+      Just sha -> return $ GenesisBlockHash sha
+      Nothing -> GenesisBlockHash <$> getGenesisBlockHash
 
 instance Mod.Modifiable Context ContextM where
   get _ = readIORef =<< asks configContext
@@ -537,6 +544,25 @@ initConfig wireMessagesRef = do
   runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
+
+  -- Sync tasks are numbered by the chiliad sequence, which a full node carries
+  -- in its eth database. A node restored without that database (a lite
+  -- validator: strato-snapshot restore --skip-databases) would start at
+  -- chiliad 0 and download the whole chain again before reaching the blocks
+  -- it misses, and a node that kept up by gossip for a long time has a
+  -- sequence far behind its chain. Start the next task at the chiliad of the
+  -- best block Redis holds, and retire any unfinished task below it: those
+  -- blocks are already here.
+  bestBlock <- liftIO $ Redis.runRedis redisBDBPool getBestBlockInfo
+  case bestBlock of
+    Nothing -> return ()
+    Just (BestBlock _ n) -> do
+      let chiliad = SQL.PersistInt64 (fromIntegral (n `div` 1000))
+      runSqlPool (SQL.rawExecute "UPDATE sync_task SET status = 'Finished' WHERE chiliad < ? AND status != 'Finished'" [chiliad]) $ sqlDB' dbs
+      (_ :: [SQL.Single Int]) <-
+        runSqlPool (SQL.rawSql "SELECT setval('chiliad', GREATEST((SELECT COALESCE(MAX(chiliad), -1) + 1 FROM sync_task), ?), false)" [chiliad]) $ sqlDB' dbs
+      return ()
+
   initState <- initContext
   initStateF <- newIORef initState
   let k = Conf.streamingConfig ethConf
