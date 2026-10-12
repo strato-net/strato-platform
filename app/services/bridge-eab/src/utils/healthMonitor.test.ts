@@ -139,14 +139,16 @@ test("native redemption polling exposes query failure and recovers", async (t) =
   const cirrus = await import("../services/cirrusService");
   const logger = await import("./logger");
   const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  const { nativeBlockTrackingService } = await import("../services/nativeBlockTrackingService");
+  t.mock.method(nativeBlockTrackingService, "getChainIds", async () => []);
   const retries: (() => Promise<void>)[] = [];
   t.mock.method(global, "setTimeout", (callback) => { retries.push(callback); return {} as NodeJS.Timeout; });
   t.mock.method(logger, "logError", () => {});
   t.mock.method(logger, "logInfo", async () => {});
   let available = false;
-  t.mock.method(cirrus, "getEnabledChains", async () => {
+  t.mock.method(cirrus, "getNativeRedemptionChainIds", async () => {
     if (!available) throw new Error("Cirrus unavailable");
-    return new Map();
+    return [];
   });
   startNativeRedemptionPolling();
   await flush();
@@ -193,4 +195,72 @@ test("native deposit query errors caught inside a STRATO poll still affect healt
   available = true;
   await retries.shift()!();
   assert.equal(healthMonitor.snapshot().checks.startNativeDepositInitiatedPolling, "ok");
+});
+
+test("health exposes durable native backlog age and cursor stagnation, then recovers", async t => {
+  const { NativeBlockTrackingService } = await import("../services/nativeBlockTrackingService");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join, resolve } = await import("node:path");
+  const { readFileSync } = await import("node:fs");
+  const { runInNewContext } = await import("node:vm");
+  const ts = await import("typescript");
+  const directory = await mkdtemp(join(tmpdir(), "native-health-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const file = join(directory, "cursor.json");
+  const journal = new NativeBlockTrackingService(file);
+  let now = 1000;
+  t.mock.method(Date, "now", () => now);
+  const health = new HealthMonitor();
+  health.markReady();
+  const refreshPoll = () => { health.beginPoll("nativeRedemptions", 1000); health.finishPoll("nativeRedemptions"); };
+  refreshPoll();
+  t.mock.method(health, "errorFileExists", async () => false);
+  const deposit = { externalChainId: 1, externalBridge: "0x" + "1".repeat(40), externalRedemptionId: "7",
+    externalSender: "0x" + "2".repeat(40), representationToken: "0x" + "3".repeat(40),
+    externalTxHash: "0x" + "4".repeat(64), stratoRecipient: "0x" + "5".repeat(40), stratoTokenAmount: "100" };
+  const state = { block: 98, hash: "0x" + "a".repeat(64), reconciliationBlock: 10, confirmedHead: 100,
+    forwardProgressAt: now, auditProgressAt: now,
+    pendingRedemptions: [{ deposit, block: 90, blockHash: "0x" + "a".repeat(64), observedAt: 900 }] };
+  await journal.saveCheckpoint(1, state);
+  const source = ts.createSourceFile("index.ts", readFileSync(resolve(__dirname, "../../src/index.ts"), "utf8"), ts.ScriptTarget.Latest, true);
+  let handlerSource = "";
+  const visit = (node: import("typescript").Node) => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.getText(source) === "app.get" && node.arguments[0]?.getText(source) === '"/health"') {
+      handlerSource = node.arguments[1].getText(source);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  assert.ok(handlerSource, "exercise the actual HTTP health handler");
+  const handler = runInNewContext(ts.transpileModule(`(${handlerSource})`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+  }).outputText, { healthMonitor: health, nativeBlockTrackingService: journal });
+  let code = 0, body: any;
+  const response = { status(value: number) { code = value; return this; }, json(value: any) { body = value; } };
+  await handler({}, response);
+  assert.equal(code, 503);
+  assert.equal(body.status, false);
+  assert.equal(body.checks["nativeRedemptionBacklog:1"], "pending");
+  assert.equal(body.nativeRedemptions["1"].pendingCount, 1);
+  assert.equal(body.nativeRedemptions["1"].oldestPendingAgeMs, 100);
+  assert.equal(body.nativeRedemptions["1"].forwardLag, 2);
+  now += HEALTH_POLL_TIMEOUT_MS + 1;
+  refreshPoll();
+  await handler({}, response);
+  assert.equal(body.checks.nativeRedemptions, "ok", "a successful polling loop does not hide a stalled backlog");
+  assert.equal(body.checks["nativeRedemptionBacklog:1"], "stalled");
+  assert.equal(body.checks["nativeRedemptionForward:1"], "stalled");
+  assert.equal(body.checks["nativeRedemptionAudit:1"], "stalled");
+  assert.deepEqual(await new NativeBlockTrackingService(file).getHealth(), await journal.getHealth(), "backlog age survives restart");
+  await journal.saveCheckpoint(1, { ...state, block: 100, forwardProgressAt: now, auditProgressAt: now, pendingRedemptions: [] });
+  await handler({}, response);
+  assert.equal(code, 200);
+  assert.equal(body.status, true);
+  assert.equal(body.nativeRedemptions["1"].pendingCount, 0);
+  await writeFile(file, '{broken');
+  await handler({}, response);
+  assert.equal(code, 503);
+  assert.equal(body.checks.nativeRedemptionJournal, "failed");
 });

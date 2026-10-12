@@ -148,12 +148,28 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
             String(proposal.data.value) !== "0" || Number(proposal.data.operation) !== OperationType.Call ||
             Number(proposal.data.nonce) !== proposal.nonce) throw new Error("Invalid native refund proposal journal");
         const decoded = iface.decodeFunctionData("refundRedemption", proposal.data.data)[0];
-        for (const [field, value] of Object.entries({ ...a, deadline: proposal.deadline })) {
+        const immutable = {
+          sourceChainId: a.sourceChainId,
+          sourceBridge: a.sourceBridge,
+          destinationChainId: a.destinationChainId,
+          destinationBridge: a.destinationBridge,
+          redemptionId: a.redemptionId,
+          representationToken: a.representationToken,
+          recipient: a.recipient,
+          amount: a.amount,
+        };
+        for (const [field, value] of Object.entries(immutable)) {
           if (String(decoded[field]).toLowerCase() !== String(value).toLowerCase()) throw new Error("Native refund proposal does not match this deposit");
+        }
+        if (String(decoded.deadline) !== proposal.deadline || BigInt(decoded.signerSetVersion) <= 0n) {
+          throw new Error("Invalid native refund proposal journal");
         }
         if (await protocolKit.getTransactionHash({ data: proposal.data } as any) !== proposal.hash) throw new Error("Native refund proposal hash mismatch");
         const currentNonce = Number(await protocolKit.getNonce());
-        if (BigInt(proposal.deadline) <= BigInt(block.timestamp) || currentNonce > proposal.nonce) {
+        const authorizationStale =
+          BigInt(proposal.deadline) <= BigInt(block.timestamp) ||
+          BigInt(decoded.signerSetVersion) !== BigInt(a.signerSetVersion);
+        if (authorizationStale || currentNonce > proposal.nonce) {
           nonce = currentNonce > proposal.nonce ? undefined : proposal.nonce;
           proposal = undefined;
         }

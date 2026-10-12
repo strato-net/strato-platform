@@ -37,6 +37,7 @@
     "external:vault:ops": "node scripts/externalBridgeVaultOps.js",
     "external:vault:ops:test": "node --test test/ExternalBridgeVaultOps.test.js",
     "bridge:prepare": "node scripts/prepareBridgeRollout.js",
+    "bridge:reconcile-backing": "node scripts/reconcileLegacyBridgeBacking.js",
     "native:configure": "node scripts/nativeBridgeConfigure.js",
     "deployWithProxy:baseSepolia": "npx hardhat run scripts/deployWithProxy.js --network baseSepolia",
     "native:signers": "node scripts/nativeBridgeSignerOps.js",

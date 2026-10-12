@@ -127,6 +127,27 @@ external token balances against the backing for existing STRATO tokens. Record
 all custody locations, including any hot Safe. Separate unrelated assets and
 any explicitly retained recovery reserves from backing approved for transfer.
 
+Create a reviewed reconciliation input with explicit finalized cutoff blocks
+for every chain configured on MercataBridge, then run from
+`app/ethereum`:
+
+```bash
+npm run bridge:reconcile-backing -- --input <REVIEWED_INPUT_JSON> --output <NEW_BACKING_RECONCILIATION_JSON>
+```
+
+The command verifies completed deposit receipts and custody movements, completed
+withdrawal Safe executions and payouts, current Safe and hot-wallet balances,
+both service checkpoints, dead letters, withdrawal journals, open obligations
+and executable bridge-tagged Safe proposals. It calculates raw-token
+`expectedBacking`, `availableToMigrate`, `proposedMigrationAmount` and
+`unexplainedDelta` for every chain and token. It is read-only and does not
+generate a Safe transaction.
+
+Do not move custody unless the report is `PASSED`. A reported migration amount
+is evidence for owner review, not authorization: `REVIEW_REQUIRED` includes an
+unexplained excess, and `FAILED` includes deficits, open obligations or missing
+external evidence. Archive the reviewed input and output together.
+
 Prepare reviewed Safe transactions for each external chain and token, specifying
 the source Safe, new ExternalBridgeVault proxy, exact raw amount, and execution
 order. Safe owners verify and execute the transfers using the deployed token's

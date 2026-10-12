@@ -469,3 +469,27 @@ test("native role checks load all representation tokens for the chain, including
   assert.deepEqual(await getNativeRepresentationTokens(11155111), rows.map(row => row.value.representationToken));
   assert.ok(calls.length > 1);
 });
+
+test("native redemption chains paginate disabled routes independently of EAB", async t => {
+  const { getNativeRedemptionChainIds } = await import("./cirrusService");
+  const calls = await mockCirrus(t, {
+    [`${external}-chains`]: [],
+    [`${native}-assets`]: [1, 1, 8453, 10, 137, 10].map((chain, index) => ({
+      key: String(index), key2: String(chain), value: { enabled: index % 2 === 0 },
+    })),
+  }, 2);
+  assert.deepEqual(await getNativeRedemptionChainIds(), [1, 8453, 10, 137]);
+  assert.ok(calls.every(call => call.path === `${native}-assets`));
+  assert.ok(calls.every(call => call.params["value->>enabled"] === undefined));
+  assert.deepEqual(calls.map(call => call.params.offset), [0, 2, 4, 6]);
+});
+
+test("native redemption chain discovery rejects unsafe or malformed route chain IDs", async t => {
+  const { cirrus } = await import("../utils/api");
+  const { getNativeRedemptionChainIds } = await import("./cirrusService");
+  let chain: unknown;
+  t.mock.method(cirrus, "get", async (_path: string, { params }: any) => params.offset === 0 ? [{ key2: chain }] : []);
+  for (chain of ["0", "-1", "1.5", "9007199254740992", undefined]) {
+    await assert.rejects(getNativeRedemptionChainIds(), /Invalid native redemption route chain ID/);
+  }
+});

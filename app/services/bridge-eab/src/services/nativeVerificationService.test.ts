@@ -430,7 +430,7 @@ test("native discovery scans and advances only through the confirmed head", asyn
   const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
   process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
-  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[1, { externalChainId: 1 } as any]]));
+  t.mock.method(cirrus, "getNativeRedemptionChainIds", async () => [1]);
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
   t.mock.method(cursor, "getCheckpoint", async () => ({ block: 98, reconciliationBlock: 0 }));
@@ -438,11 +438,13 @@ test("native discovery scans and advances only through the confirmed head", asyn
   t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => []);
   const logs = t.mock.method(rpc, "getVerifiedNativeLogs", async (_chain, from, to) => { assert.ok(from === 35 || from === 0); assert.equal(to, 100); return []; });
   const updates = t.mock.method(cursor, "saveCheckpoint", async (_chain, state) => { assert.equal(state.block, 100); });
-  t.mock.method(globalThis, "setTimeout", (() => 0) as any);
+  const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", (() => {
+    resolve(); return 0;
+  }) as any));
   startNativeRedemptionPolling();
-  await new Promise<void>(resolve => setImmediate(resolve));
+  await finished;
   assert.equal(logs.mock.callCount(), 2);
-  assert.equal(updates.mock.callCount(), 1);
+  assert.equal(updates.mock.callCount(), 2, "forward and audit progress commit independently");
 });
 
 test("native discovery preserves a checkpoint ahead of the confirmed head", async t => {
@@ -461,28 +463,222 @@ test("native discovery preserves a checkpoint ahead of the confirmed head", asyn
   assert.equal(updates.mock.callCount(), 0);
 });
 
-test("native recording isolates blocked deposits without advancing the cursor past them", async t => {
+test("native discovery advances past blocked burns and retries them after restart", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const bridge = await import("./bridgeService");
+  const { NativeBlockTrackingService, nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { pollChainNativeRedemptions } = await import("../polling/nativeRedemptionPolling");
+  const dir = issueTempDir(issuePath(issueTmpdir(), "native-pending-"));
+  t.after(() => removeIssueDir(dir, { recursive: true, force: true }));
+  const file = issuePath(dir, "cursor.json");
+  let journal = new NativeBlockTrackingService(file);
+  t.mock.method(cursor, "getCheckpoint", chain => journal.getCheckpoint(chain));
+  t.mock.method(cursor, "saveCheckpoint", (chain, state) => journal.saveCheckpoint(chain, state));
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  const hash = "0x" + "a".repeat(64);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
+  const entries = [100, 200, 2500].map((block, index) => ({
+    ...log(index === 1, index + 1), blockNumber: `0x${block.toString(16)}`, blockHash: hash,
+  }));
+  t.mock.method(rpc, "getVerifiedNativeLogs", async (_chain, from, to) =>
+    entries.filter(entry => Number(BigInt(entry.blockNumber)) >= from && Number(BigInt(entry.blockNumber)) <= to));
+  const known: any[] = [];
+  t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => known);
+  const recorded: string[] = [];
+  let blocked = true;
+  t.mock.method(bridge, "recordNativeDepositBatch", async rows => {
+    const id = String(rows[0].externalRedemptionId);
+    recorded.push(id);
+    if (blocked && id === "1") throw new Error("SNB: asset disabled");
+    known.push(rows[0]);
+  });
+  await pollChainNativeRedemptions(1);
+  assert.deepEqual(recorded, ["1", "2"]);
+  assert.equal((await journal.getCheckpoint(1)).block, 1999);
+  assert.equal((await journal.getCheckpoint(1)).pendingRedemptions?.[0].deposit.externalRedemptionId, "1");
+  journal = new NativeBlockTrackingService(file);
+  await pollChainNativeRedemptions(1);
+  assert.deepEqual(recorded, ["1", "2", "3"], "a later-window burn records while the earlier one backs off");
+  assert.equal((await journal.getCheckpoint(1)).block, 3935);
+  assert.equal((await journal.getCheckpoint(1)).pendingRedemptions?.length, 1);
+  blocked = false;
+  const retryTime = Date.now() + 5 * 60_000;
+  t.mock.method(Date, "now", () => retryTime);
+  await pollChainNativeRedemptions(1);
+  assert.deepEqual(recorded, ["1", "2", "3", "1"], "the persisted old burn retries outside discovery windows");
+  assert.equal((await journal.getCheckpoint(1)).block, 5000);
+  assert.deepEqual((await journal.getCheckpoint(1)).pendingRedemptions, []);
+});
+
+test("a conflicting historical redemption stays pending without stopping later discovery", async t => {
   const rpc = await import("./rpcService");
   const cirrus = await import("./cirrusService");
   const bridge = await import("./bridgeService");
   const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
-  const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  const { pollChainNativeRedemptions } = await import("../polling/nativeRedemptionPolling");
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  const hash = "0x" + "a".repeat(64);
+  let state: import("../types").NativeScanCheckpoint = { block: 3000, hash, reconciliationBlock: 0 };
+  t.mock.method(cursor, "getCheckpoint", async () => state);
+  t.mock.method(cursor, "saveCheckpoint", async (_chain, next) => { state = next; });
   process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
-  t.mock.method(cirrus, "getEnabledChains", async () => new Map([[1, { externalChainId: 1 } as any]]));
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
+  const old = { ...log(false, 1), blockNumber: "0x64", blockHash: hash };
+  const later = { ...log(false, 2), blockNumber: "0xfa0", blockHash: hash };
+  t.mock.method(rpc, "getVerifiedNativeLogs", async (_chain, from, to) =>
+    [old, later].filter(entry => Number(BigInt(entry.blockNumber)) >= from && Number(BigInt(entry.blockNumber)) <= to));
+  t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => [{
+    ...parseNativeDepositLog(1, old), stratoRecipient: address("9"),
+  }] as any);
+  const recorded = t.mock.method(bridge, "recordNativeDepositBatch", async () => undefined);
+  await pollChainNativeRedemptions(1);
+  assert.equal(state.block, 4936);
+  assert.equal(state.reconciliationBlock, 2000);
+  assert.equal(recorded.mock.callCount(), 1);
+  assert.equal(String(recorded.mock.calls[0].arguments[0]![0].externalRedemptionId), "2");
+  assert.equal(state.pendingRedemptions?.[0].deposit.externalRedemptionId, "1");
+});
+
+test("pending native burns reject stale reorg evidence and survive a failed checkpoint write", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const bridge = await import("./bridgeService");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { pollChainNativeRedemptions } = await import("../polling/nativeRedemptionPolling");
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  const hash = "0x" + "a".repeat(64);
+  const deposit = parseNativeDepositLog(1, log(false))!;
+  let state: import("../types").NativeScanCheckpoint = { block: 3000, hash, reconciliationBlock: 0,
+    pendingRedemptions: [{ deposit, block: 100, blockHash: hash }] };
+  t.mock.method(cursor, "getCheckpoint", async () => state);
+  let writable = true;
+  t.mock.method(cursor, "saveCheckpoint", async (_chain, next) => {
+    if (!writable) throw new Error("journal write failed");
+    state = next;
+  });
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  t.mock.method(rpc, "isChainConfigured", () => true);
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  let canonical = false;
+  t.mock.method(rpc, "getVerifiedBlockHash", async (_chain, block) =>
+    block === 100 && !canonical ? "0x" + "b".repeat(64) : hash);
+  t.mock.method(rpc, "getVerifiedNativeLogs", async () => []);
+  t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => []);
+  const recorded = t.mock.method(bridge, "recordNativeDepositBatch", async () => undefined);
+  await pollChainNativeRedemptions(1);
+  assert.equal(recorded.mock.callCount(), 0, "stale pending evidence cannot record a redemption");
+  assert.equal(state.block, 4936, "a stale burn does not freeze other discovery");
+  assert.equal(state.pendingRedemptions?.length, 1);
+  canonical = true;
+  writable = false;
+  const saved = JSON.stringify(state);
+  const retryTime = Date.now() + 5 * 60_000;
+  t.mock.method(Date, "now", () => retryTime);
+  await assert.rejects(pollChainNativeRedemptions(1), /journal write failed/);
+  assert.equal(recorded.mock.callCount(), 1);
+  assert.equal(JSON.stringify(state), saved, "a failed write preserves the saved cursor and pending observation");
+});
+
+test("native forward and historical progress commit independently through scan and write failures", async t => {
+  for (const failure of ["malformed history", "audit disagreement", "audit write", "forward disagreement"]) {
+    await t.test(failure, async t => {
+      const rpc = await import("./rpcService");
+      const cirrus = await import("./cirrusService");
+      const bridge = await import("./bridgeService");
+      const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+      const { pollChainNativeRedemptions } = await import("../polling/nativeRedemptionPolling");
+      const { healthMonitor } = await import("../utils/healthMonitor");
+      const hash = "0x" + "a".repeat(64);
+      let state: import("../types").NativeScanCheckpoint = { block: 3000, hash, reconciliationBlock: 0 };
+      const commits: import("../types").NativeScanCheckpoint[] = [];
+      t.mock.method(cursor, "getCheckpoint", async () => state);
+      t.mock.method(cursor, "saveCheckpoint", async (_chain, next) => {
+        if (failure === "audit write" && next.reconciliationBlock === 2000) throw new Error("audit write failed");
+        commits.push(next); state = next;
+      });
+      process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+      process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+      t.mock.method(rpc, "isChainConfigured", () => true);
+      t.mock.method(rpc, "getVerificationBlockNumber", async () => 7012);
+      t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
+      const old = { ...log(false, 1), blockNumber: "0x64", blockHash: hash };
+      const fresh = [4000, 6000].map((block, index) => ({ ...log(false, index + 2),
+        blockNumber: `0x${block.toString(16)}`, blockHash: hash }));
+      t.mock.method(rpc, "getVerifiedNativeLogs", async (_chain, from, to) => {
+        if (from === 0 && failure === "audit disagreement") throw new Error("audit RPC disagreement");
+        if (from > 0 && failure === "forward disagreement") throw new Error("forward RPC disagreement");
+        if (from === 0 && failure === "malformed history") return [{ ...old, data: "0x" }];
+        return [old, ...fresh].filter(entry => Number(BigInt(entry.blockNumber)) >= from && Number(BigInt(entry.blockNumber)) <= to);
+      });
+      const known: any[] = [];
+      t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => known);
+      t.mock.method(bridge, "recordNativeDepositBatch", async entries => { known.push(entries[0]); });
+      await assert.rejects(pollChainNativeRedemptions(1), /redemption log|disagreement|audit write failed/);
+      if (failure === "forward disagreement") {
+        assert.equal(state.block, 3000);
+        assert.equal(state.reconciliationBlock, 2000);
+        assert.deepEqual(known.map(entry => entry.externalRedemptionId), ["1"]);
+        assert.equal(healthMonitor.snapshot().checks["nativeRedemptionForward:1"], "failed");
+        assert.equal(healthMonitor.snapshot().checks["nativeRedemptionAudit:1"], "ok");
+      } else {
+        assert.equal(commits[0].block, 4936, "forward discovery is durable before the audit fails");
+        assert.equal(commits[0].pendingRedemptions?.[0].deposit.externalRedemptionId, "2");
+        assert.equal(state.reconciliationBlock, 0);
+        assert.equal(healthMonitor.snapshot().checks["nativeRedemptionForward:1"], "ok");
+        assert.equal(healthMonitor.snapshot().checks["nativeRedemptionAudit:1"], "failed");
+        await assert.rejects(pollChainNativeRedemptions(1), /redemption log|disagreement|audit write failed/);
+        assert.equal(state.block, 6872, "persistent audit failure cannot pin subsequent forward windows");
+        assert.ok(known.some(entry => entry.externalRedemptionId === "3"));
+      }
+    });
+  }
+});
+
+test("native polling discovers native-only and disabled routes and drains retained journal chains", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const api = await import("../utils/api");
+  const config = await import("../config");
+  const bridge = await import("./bridgeService");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  const hash = "0x" + "a".repeat(64);
+  const retained = parseNativeDepositLog(10, { ...log(false, 10), address: address("7") })!;
+  await cursor.saveCheckpoint(10, { block: 100, hash, bridge: address("7"), reconciliationBlock: 0,
+    pendingRedemptions: [{ deposit: retained, block: 90, blockHash: hash }] });
+  let routes = [{ key: address("1"), key2: "1", value: { enabled: false } },
+    { key: address("2"), key2: "8453", value: { enabled: true } }];
+  t.mock.method(api.cirrus, "get", async (path: string, { params }: any) => {
+    assert.equal(path, "/BlockApps-StratoNativeBridge-assets");
+    assert.equal(params["value->>enabled"], undefined);
+    return params.offset === 0 ? routes : [];
+  });
+  const eab = t.mock.method(cirrus, "getEnabledChains", async () => { throw new Error("EAB must not control native discovery"); });
+  t.mock.method(config, "getNativeRepresentationBridgeAddress", chain => Number(chain) === 10 ? address("7") : address("5"));
+  t.mock.method(config, "getDepositConfirmationPolicy", () => 12);
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
-  t.mock.method(cursor, "getCheckpoint", async () => ({ block: 98, reconciliationBlock: 0 }));
-  t.mock.method(rpc, "getVerifiedBlockHash", async () => "0x" + "a".repeat(64));
-  t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => []);
-  t.mock.method(rpc, "getVerifiedNativeLogs", async () => [log(false, 1), log(true, 2)].map(l => ({ ...l, blockNumber: "0x64", blockHash: "0x" + "a".repeat(64) })));
-  const updates = t.mock.method(cursor, "saveCheckpoint", async () => undefined);
-  const recorded: string[] = [];
-  let blocked = true;
-  t.mock.method(bridge, "recordNativeDepositBatch", async rows => {
-    const id = rows[0].externalRedemptionId;
-    recorded.push(id);
-    if (blocked && id === "1") throw new Error("low account balance");
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
+  const scanned = new Set<number>();
+  t.mock.method(rpc, "getVerifiedNativeLogs", async (chain, from, to) => {
+    scanned.add(chain);
+    return chain === 1 && from <= 100 && to >= 100 ? [{ ...log(false, 1), blockNumber: "0x64", blockHash: hash }] : [];
+  });
+  const known: any[] = [];
+  t.mock.method(cirrus, "getRecordedNativeRedemptions", async (chain) => known.filter(entry => entry.externalChainId === chain));
+  let disabled = true;
+  t.mock.method(bridge, "recordNativeDepositBatch", async entries => {
+    if (entries[0].externalChainId === 1 && disabled) throw new Error("SNB: asset disabled");
+    known.push(entries[0]);
   });
   let rerun!: () => Promise<void>;
   const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", ((run: any) => {
@@ -490,17 +686,59 @@ test("native recording isolates blocked deposits without advancing the cursor pa
   }) as any));
   startNativeRedemptionPolling();
   await finished;
-  assert.deepEqual(recorded, ["1", "2"]);
-  assert.equal(updates.mock.callCount(), 0);
-  blocked = false;
-  await rerun();
-  assert.deepEqual(recorded, ["1", "2", "2"]);
-  assert.equal(updates.mock.callCount(), 0, "skipping a blocked deposit must hold the cursor");
+  assert.deepEqual([...scanned].sort((a, b) => a - b), [1, 10, 8453]);
+  assert.equal(eab.mock.callCount(), 0);
+  assert.equal((await cursor.getCheckpoint(1)).pendingRedemptions?.length, 1, "disabled-route burns remain durable");
+  assert.deepEqual((await cursor.getCheckpoint(10)).pendingRedemptions, [], "a journal-only chain continues recovery");
+  routes = [];
+  scanned.clear();
+  disabled = false;
   const retryTime = Date.now() + 5 * 60_000;
   t.mock.method(Date, "now", () => retryTime);
   await rerun();
-  assert.deepEqual(recorded, ["1", "2", "2", "1", "2", "1", "2"]);
-  assert.equal(updates.mock.callCount(), 1);
+  assert.deepEqual([...scanned].sort((a, b) => a - b), [1, 10, 8453], "route removal cannot abandon retained chain history");
+  assert.deepEqual((await cursor.getCheckpoint(1)).pendingRedemptions, []);
+  assert.equal(known.filter(entry => entry.externalChainId === 1).length, 1);
+});
+
+test("missing native recovery configuration fails polling health and recovers after restoration", async t => {
+  const rpc = await import("./rpcService");
+  const cirrus = await import("./cirrusService");
+  const config = await import("../config");
+  const { nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const { healthMonitor } = await import("../utils/healthMonitor");
+  const { startNativeRedemptionPolling } = await import("../polling/nativeRedemptionPolling");
+  t.mock.method(cirrus, "getNativeRedemptionChainIds", async () => []);
+  t.mock.method(cursor, "getChainIds", async () => [10]);
+  let representation: string | undefined;
+  let rpcConfigured = true;
+  t.mock.method(config, "getNativeRepresentationBridgeAddress", () => representation);
+  t.mock.method(config, "getDepositConfirmationPolicy", () => 12);
+  t.mock.method(rpc, "isChainConfigured", () => rpcConfigured);
+  const head = t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => "0x" + "a".repeat(64));
+  t.mock.method(rpc, "getVerifiedNativeLogs", async () => []);
+  let rerun!: () => Promise<void>;
+  const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", ((run: any) => {
+    rerun = run; resolve(); return 0;
+  }) as any));
+  startNativeRedemptionPolling();
+  await finished;
+  assert.equal(healthMonitor.snapshot().checks.nativeRedemptions, "failed");
+  assert.equal(head.mock.callCount(), 0);
+  representation = address("0");
+  await rerun();
+  assert.equal(healthMonitor.snapshot().checks.nativeRedemptions, "failed");
+  assert.equal(head.mock.callCount(), 0);
+  representation = address("5");
+  rpcConfigured = false;
+  await rerun();
+  assert.equal(healthMonitor.snapshot().checks.nativeRedemptions, "failed");
+  assert.equal(head.mock.callCount(), 0);
+  rpcConfigured = true;
+  await rerun();
+  assert.equal(healthMonitor.snapshot().checks.nativeRedemptions, "ok");
+  assert.equal(head.mock.callCount(), 1);
 });
 
 // Exercise real persistence with a fresh journal for each test.
@@ -511,6 +749,11 @@ test.beforeEach(async (t: any) => {
   for (const method of ["snapshot", "due", "record", "resolve"] as const) {
     t.mock.method(processingIssueService, method, isolated[method].bind(isolated) as any);
   }
+  const { NativeBlockTrackingService, nativeBlockTrackingService: cursor } = await import("./nativeBlockTrackingService");
+  const journal = new NativeBlockTrackingService(issuePath(directory, "cursor.json"));
+  t.mock.method(cursor, "getCheckpoint", journal.getCheckpoint.bind(journal));
+  t.mock.method(cursor, "getChainIds", journal.getChainIds.bind(journal));
+  t.mock.method(cursor, "saveCheckpoint", journal.saveCheckpoint.bind(journal));
   t.after(() => removeIssueDir(directory, { recursive: true, force: true }));
 });
 
@@ -528,7 +771,21 @@ test("native journal migrates numeric cursors, survives restart and rejects corr
   const restarted = new NativeBlockTrackingService(file);
   assert.deepEqual(await restarted.getCheckpoint(1), checkpoint);
   assert.equal((await restarted.getCheckpoint(2)).block, 200);
+  assert.deepEqual(await restarted.getChainIds(), [1, 2]);
   assert.equal(Object.keys(JSON.parse(await readFile(file, "utf8"))).length, 2);
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  const pending = { deposit: parseNativeDepositLog(1, log(false))!, block: 100, blockHash: checkpoint.hash };
+  await service.saveCheckpoint(1, { ...checkpoint, pendingRedemptions: [pending] });
+  assert.deepEqual((await new NativeBlockTrackingService(file).getCheckpoint(1)).pendingRedemptions, [pending]);
+  const invalid = { ...checkpoint, pendingRedemptions: [{ ...pending, deposit: { ...pending.deposit, externalChainId: 2 } }] };
+  await writeFile(file, JSON.stringify({ "1": invalid }));
+  await assert.rejects(new NativeBlockTrackingService(file).getCheckpoint(1), /Invalid native pending redemption/);
+  await writeFile(file, JSON.stringify({ "1": { ...checkpoint, pendingRedemptions: [pending, pending] } }));
+  await assert.rejects(new NativeBlockTrackingService(file).getCheckpoint(1), /Invalid native pending redemption/);
+  for (const chain of ["0", "01", "9007199254740992"]) {
+    await writeFile(file, JSON.stringify({ [chain]: 98 }));
+    await assert.rejects(new NativeBlockTrackingService(file).getChainIds(), /Invalid native journal chain ID/);
+  }
   await writeFile(file, '{broken');
   await assert.rejects(new NativeBlockTrackingService(file).getCheckpoint(1));
 });

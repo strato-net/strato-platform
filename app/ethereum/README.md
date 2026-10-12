@@ -100,6 +100,68 @@ mode; when supplied, it must match the manifest. Without
 `ROLLOUT_MANIFEST`, the command prints a non-validating token summary for the
 address in `DEPOSIT_ROUTER_ADDRESS`.
 
+### Legacy backing reconciliation
+
+Before moving legacy Safe custody to an ExternalBridgeVault, stop intake, drain
+all legacy activity and pause both sides of MercataBridge. The read-only command
+discovers every chain configured on that MercataBridge, so the reviewed input
+must include every discovered chain:
+
+```json
+{
+  "version": 1,
+  "stratoNodeUrl": "https://<STRATO_HOST>",
+  "mercataBridge": "0x0000000000000000000000000000000000001008",
+  "stratoCutoffBlock": "REVIEWED_STRATO_BLOCK",
+  "dataDirectory": "/secure/legacy-bridge-data",
+  "chains": {
+    "1": {
+      "cutoffBlock": "REVIEWED_FINAL_EXTERNAL_BLOCK",
+      "confirmations": 12,
+      "safeTransactionServiceUrl": "https://safe-transaction-mainnet.safe.global",
+      "approvedDepositRouters": ["0x..."],
+      "additionalCustodyAddresses": [],
+      "additionalHotWalletAddresses": [],
+      "retainedReserves": {
+        "0xEXTERNAL_TOKEN": "RAW_TOKEN_AMOUNT"
+      }
+    }
+  }
+}
+```
+
+Set `CHAIN_<CHAIN_ID>_RPC_URL` for every discovered chain and `SAFE_API_KEY` when
+the selected Safe Transaction Service requires it. STRATO authentication uses
+`ACCESS_TOKEN` when set, otherwise the deployment OAuth variables. Run:
+
+```bash
+npm run bridge:reconcile-backing -- --input /secure/legacy-backing-input.json --output /secure/backing-reconciliation.json
+```
+
+The JSON file supplies the reviewed cutoffs, confirmation decisions, Safe
+Transaction Service URLs, historical router/custody addresses, and retained
+reserves. RPC URLs and credentials come only from the environment. Contract
+chains, routes, current custody addresses, deposits, and withdrawals are
+discovered from MercataBridge/Cirrus. `dataDirectory` must be an archive of the
+stopped legacy service containing `lastProcessedBlocks.json`,
+`depositDeadLetters.json`, and `withdrawalProposals.json`; archive an empty
+object (`{}`) when either journal was never created. A missing source file makes
+the result `REVIEW_REQUIRED`.
+
+The output is created with mode `0600` and is never overwritten. `PASSED`
+requires both legacy bridge sides paused, drained queues, no executable
+bridge-tagged Safe proposals, complete external receipt evidence, caught-up
+local/on-chain checkpoints, and adjusted custody equal to verified completed
+deposit inflows minus verified completed withdrawal payouts. Every observed
+withdrawal payout must also exactly equal its recorded `externalTokenAmount`;
+underpayments, overpayments, and missing expected amounts fail the gate. Exit
+status `0` means `PASSED`, `2` means `REVIEW_REQUIRED`, and `1` means `FAILED`.
+
+The report always contains `proposedMigrationAmount`. An unexplained excess is
+`REVIEW_REQUIRED`; a deficit or missing evidence is `FAILED`. Do not use any
+proposed migration amount unless the overall report status is `PASSED`. The
+command never creates or submits a Safe transaction.
+
 ## Environment Setup
 
 **Required .env file:**

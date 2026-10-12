@@ -30,3 +30,12 @@ export const parseNativeDepositLog = (chainId: number, log: any): NativeDepositA
     minFinalOut,
   };
 };
+
+export const matchesNativeDeposit = (expected: NativeDepositArgs, actual: NativeDepositArgs): boolean => {
+  const hex = (value: unknown) => String(value ?? "").toLowerCase().replace(/^0x/, "");
+  const textFields = ["externalTxHash", "externalSender", "representationToken", "stratoRecipient", "actionToken"] as const;
+  const uintFields = ["stratoTokenAmount", "minFinalOut"] as const;
+  return textFields.every(key => hex(expected[key] ?? (key === "actionToken" ? "0".repeat(40) : "")) ===
+      hex(actual[key] ?? (key === "actionToken" ? "0".repeat(40) : ""))) &&
+    uintFields.every(key => BigInt(String(expected[key] || "0")) === BigInt(String(actual[key] || "0")));
+};

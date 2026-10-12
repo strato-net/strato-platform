@@ -326,6 +326,28 @@ export interface NativeScanCheckpoint {
   hash?: string;
   reconciliationBlock: number;
   bridge?: string;
+  pendingRedemptions?: NativePendingRedemption[];
+  confirmedHead?: number;
+  forwardProgressAt?: number;
+  auditProgressAt?: number;
+}
+
+export interface NativePendingRedemption {
+  deposit: NativeDepositArgs;
+  block: number;
+  blockHash: string;
+  observedAt?: number;
+}
+
+export interface NativeRedemptionHealth {
+  forwardBlock: number;
+  confirmedHead: number | null;
+  forwardLag: number | null;
+  forwardStalled: boolean;
+  auditCursor: number;
+  auditStalled: boolean;
+  pendingCount: number;
+  oldestPendingAgeMs: number | null;
 }
 
 export interface NativeVerificationRpc {

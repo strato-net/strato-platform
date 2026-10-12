@@ -1,7 +1,7 @@
 import { promises as fs, mkdirSync } from 'fs';
 import path from "path";
 import { ERROR_FILE_NAME, HEALTH_POLL_TIMEOUT_MS } from "../config";
-import { PollHealthState } from "../types";
+import { NativeRedemptionHealth, PollHealthState } from "../types";
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 mkdirSync(DATA_DIR, { recursive: true });
@@ -51,7 +51,7 @@ export class HealthMonitor {
     this.operations.delete(name);
   }
 
-  snapshot() {
+  snapshot(nativeRedemptions: Record<string, NativeRedemptionHealth> = {}) {
     const now = Date.now();
     const checks: Record<string, string> = {};
     for (const [name, poll] of this.polls) {
@@ -64,10 +64,17 @@ export class HealthMonitor {
     for (const [name, startedAt] of this.operations) {
       if (now - startedAt > HEALTH_POLL_TIMEOUT_MS) checks[name] = "stalled";
     }
+    for (const [chain, state] of Object.entries(nativeRedemptions)) {
+      checks[`nativeRedemptionBacklog:${chain}`] = state.pendingCount === 0 ? "ok"
+        : state.oldestPendingAgeMs !== null && state.oldestPendingAgeMs > HEALTH_POLL_TIMEOUT_MS ? "stalled" : "pending";
+      if (state.forwardStalled) checks[`nativeRedemptionForward:${chain}`] = "stalled";
+      if (state.auditStalled) checks[`nativeRedemptionAudit:${chain}`] = "stalled";
+    }
     return {
       status: this.ready && this.polls.size > 0 && Object.values(checks).every((state) => state === "ok"),
       ready: this.ready,
       checks,
+      nativeRedemptions,
     };
   }
 

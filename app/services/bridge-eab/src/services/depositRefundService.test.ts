@@ -105,7 +105,7 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
     externalRedemptionId: "7", representationToken: addr("3"), externalSender: addr("4"), stratoTokenAmount: "100" };
   t.mock.method(native, "verifyNativeRedemptionsBatch", async () => new Map([[d.depositId, originalVerified]]));
   const iface = new Interface(NATIVE_REFUND_ABI);
-  let refunded = false, timestamp = 1000, head = 111, currentNonce = 0, recorded: string | undefined;
+  let refunded = false, timestamp = 1000, signerSetVersion = 3, head = 111, currentNonce = 0, recorded: string | undefined;
   const provider = { getBlock: async () => ({ timestamp, number: 112 }), getLogs: async () => [{ transactionHash: hash }],
     call: async ({ data }: any) => {
       const parsed = iface.parseTransaction({ data })!;
@@ -113,7 +113,7 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
         : parsed.name === "refundedRedemptions" ? refunded
           : parsed.name === "attestationSigners" ? wallets.some((wallet) => parsed.args[0] === wallet.address)
             : parsed.name === "attestationThreshold" ? 2
-              : parsed.name === "signerSetVersion" ? 3 : 1800;
+              : parsed.name === "signerSetVersion" ? signerSetVersion : 1800;
       return iface.encodeFunctionResult(parsed.name, [value]);
     } };
   t.mock.method(rpc, "getChainProvider", () => provider as any);
@@ -152,10 +152,17 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   await recoverNativeDepositRefund(d);
   await recoverNativeDepositRefund(d);
   assert.equal(proposals, 1); assert.equal(records, 1); assert.equal(evidenceRecords, 0);
+  signerSetVersion = 4;
+  await recoverNativeDepositRefund(d);
+  await recoverNativeDepositRefund(d);
+  assert.equal(proposals, 2, "signer rotation replaces the queued proposal at the same nonce before expiry");
   currentNonce = 1;
-  await recoverNativeDepositRefund(d); assert.equal(proposals, 2);
-  timestamp = 3000;
   await recoverNativeDepositRefund(d); assert.equal(proposals, 3);
+  timestamp = 3000;
+  signerSetVersion = 5;
+  await recoverNativeDepositRefund(d);
+  await recoverNativeDepositRefund(d);
+  assert.equal(proposals, 4, "rotation after expiry renews once and reuses the unconsumed nonce");
   const journal = path.join(directory, "data/native-refunds", `1-${d.externalBridge}-7.json`);
   const saved = await readFile(journal, "utf8"), tampered = JSON.parse(saved);
   tampered.data.value = "1"; await writeFile(journal, JSON.stringify(tampered));
@@ -171,7 +178,7 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   await assert.rejects(recoverNativeDepositRefund(d), /does not match/);
   receipt = { ...receipt, logs: [refundEvent] };
   await recoverNativeDepositRefund(d);
-  assert.equal(evidenceRecords, 1); assert.equal(proposals, 3);
+  assert.equal(evidenceRecords, 1); assert.equal(proposals, 4);
   await recoverNativeDepositRefund(d);
   assert.equal(evidenceRecords, 1, "retries do not re-record evidence");
   assert.equal(finalized, 2);

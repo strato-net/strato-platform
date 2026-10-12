@@ -220,6 +220,20 @@ export const getEnabledNativeChainIds = async (): Promise<number[]> => {
   );
 };
 
+export const getNativeRedemptionChainIds = async (): Promise<number[]> => {
+  if (!nativeBridgeAddress) return [];
+  const rows = await getPaginatedRows(`/${NATIVE_BRIDGE_URL}-assets`, {
+    params: { address: `eq.${nativeBridgeAddress}`, select: "key,key2", order: "key.asc,key2.asc" },
+  });
+  return [...new Set(rows.map(row => {
+    const chainId = Number(row.key2);
+    if (!/^\d+$/.test(String(row.key2)) || !Number.isSafeInteger(chainId) || chainId <= 0) {
+      throw new Error("Invalid native redemption route chain ID");
+    }
+    return chainId;
+  }))];
+};
+
 export const getExternalWithdrawalsByStatus = async (
   status: string,
 ): Promise<WithdrawalInfo[]> => {

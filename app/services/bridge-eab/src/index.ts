@@ -21,6 +21,8 @@ import { depositStateService } from "./services/depositStateService";
 import { getDepositStatusByIdentity } from "./services/cirrusService";
 import { prepareBridgeOperation } from "./services/bridgeReviewService";
 import { processingIssueService } from "./services/processingIssueService";
+import { nativeBlockTrackingService } from "./services/nativeBlockTrackingService";
+import { NativeRedemptionHealth } from "./types";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -75,7 +77,15 @@ app.post("/operations/reviews/prepare", async (req, res) => {
 });
 
 app.get("/health", async (_, res) => {
-  const health = healthMonitor.snapshot();
+  let nativeRedemptions: Record<string, NativeRedemptionHealth>;
+  try { nativeRedemptions = await nativeBlockTrackingService.getHealth(); }
+  catch {
+    const health = healthMonitor.snapshot();
+    res.status(503).json({ ...health, status: false, message: 'pong',
+      checks: { ...health.checks, nativeRedemptionJournal: "failed" } });
+    return;
+  }
+  const health = healthMonitor.snapshot(nativeRedemptions);
   const errorLogPresent = await healthMonitor.errorFileExists();
   res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
 });

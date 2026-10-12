@@ -105,6 +105,185 @@ when a threshold is required.
 - `autoRouteEnabled` stays `false` on every route. `migrateAmount` stays `"0"`
   unless migration has a separate approval.
 
+## Production profile: EAB-only parallel with legacy
+
+Use this profile when production MercataBridge and native traffic must remain on
+the existing `app/services/bridge` deployment while the new
+`app/services/bridge-eab` deployment processes only EAB traffic. This is a
+controlled coexistence profile, not the final legacy cutover in
+`EAB_CUTOVER.md`.
+
+The two paths remain independent:
+
+- Existing Fund/legacy integrations continue to use MercataBridge, its deposit
+  routers, custody Safe, and the legacy Runtime.
+- Existing native deposits and withdrawals continue to use the current native
+  contracts and the legacy Runtime.
+- EAB canary traffic uses ExternalAssetBridge, the new
+  ExternalAssetDepositRouter, the new ExternalBridgeVault, EAB verifiers, and
+  the EAB Runtime.
+- Do not migrate legacy custody, change native ownership, upgrade native
+  contracts, or copy legacy cursors into the EAB data volume.
+
+### Parallel-safety decisions
+
+Approve these before step 0:
+
+1. **Safe isolation.** Prefer a separate EAB Safe for a full deposit and
+   withdrawal canary. If EAB and legacy use the same Safe, this profile is
+   deposit-only: every EAB route has `withdrawalsEnabled=false`, the vault stays
+   paused, and no EAB operation that creates a Safe proposal is exercised.
+   The two services have independent nonce journals and must not concurrently
+   allocate nonces on the same Safe. A shared Safe also requires a short,
+   explicit writer-handoff window for each EAB configuration or activation
+   transaction: stop the legacy proposal writer, reconcile pending Safe nonces,
+   execute and index the EAB transaction, then restart the legacy writer. If
+   that interruption is unacceptable, use a separate EAB Safe.
+2. **Asset isolation.** Prefer a canary token with no existing production
+   holders. Existing STRATO token balances are fungible: if an EAB withdrawal
+   route is open, any holder can consume liquidity placed in the EAB vault.
+   A hidden UI is not an access control.
+3. **Writer isolation.** Use distinct EAB operator, relayer, external executor,
+   KMS proposer, OAuth identities, data volume, and external gas funding. Do
+   not share an external transaction-signing key between Runtimes.
+4. **Deployment isolation.** Deploy EAB as a separate stack/Compose project or
+   host so its `bridge` service name and `bridgedata` volume cannot replace the
+   legacy containers or volume.
+
+### 1. Freeze the legacy baseline
+
+Before deploying EAB, record the running legacy image digest, MercataBridge and
+native proxy addresses, legacy Safe, enabled chains/routes, data-volume backup,
+polling checkpoints, pending operations, and outstanding Safe proposals.
+Confirm the legacy service remains healthy and continues to own native
+processing. Do not reconfigure its contracts for an EAB deposit-only canary;
+the only permitted interruption is a reviewed shared-Safe writer handoff.
+
+### 2. Select production EAB scope
+
+Run the normal step 0 environment selection once per external production
+network:
+
+```bash
+cd <STRATO_PLATFORM_REPOSITORY>
+export REPO_ROOT="$PWD"
+export DEPLOY_ENV=prod
+export NETWORK=<ethereum|base|linea|robinhood|hyperevm>
+eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
+export STRATO_NODE_URL=https://<PRODUCTION_STRATO_HOST>
+export ROLLOUT_DIR="$HOME/bridge-rollouts/${TARGET_NETWORK}-$(date -u +%Y%m%dT%H%M%SZ)"
+```
+
+Use the normal production verifier count and threshold derived by the command.
+Select only EAB routes. Do not select, prepare, configure, or activate native
+routes. Keep `autoRouteEnabled=false` and `migrateAmount="0"`.
+
+For a shared Safe, configure every route as deposit-only:
+
+```json
+{
+  "depositsEnabled": true,
+  "withdrawalsEnabled": false,
+  "autoRouteEnabled": false
+}
+```
+
+### 3. Deploy and configure EAB
+
+Complete steps 1–5 below for the selected network:
+
+1. Prepare and review EAB routes.
+2. Deploy or upgrade only TokenRouter and ExternalAssetBridge on STRATO as
+   required by the reviewed release.
+3. Deploy the new ExternalBridgeVault and ExternalAssetDepositRouter.
+4. Freeze the bundle and set up coordinator, administrators, and infra.
+5. Execute the generated pause and configuration Safe transactions.
+
+Do not run the native routing release gate. In particular, do not upgrade
+StratoNativeBridge or StratoNativeRepresentationBridge, call
+`setTokenRouter`/`setAutoRouteEnabled` on the native bridge, or generate native
+configuration/activation Safe JSON.
+
+When sharing the legacy Safe, use the writer-handoff procedure above before
+importing each generated Safe JSON. Do not merely choose a later nonce while
+the legacy service remains able to create another proposal.
+
+### 4. Deploy an external-only EAB Runtime
+
+Complete steps 6–7 with a new immutable `bridge-eab` image and separate durable
+data volume. Deploy the EAB verifier set and external executor normally.
+
+In the EAB Runtime environment:
+
+- Set `EXTERNAL_ASSET_BRIDGE_ADDRESS`, `TOKEN_ROUTER`, and all required
+  `CHAIN_<ID>_EXTERNAL_*`, RPC, verifier, operator, relayer, and KMS values.
+- Leave `STRATO_NATIVE_BRIDGE_ADDRESS` empty.
+- Leave every `CHAIN_<ID>_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`,
+  `CHAIN_<ID>_NATIVE_MINT_EXECUTOR_*`, `CHAIN_<ID>_NATIVE_VERIFIER_URLS`, and
+  `CHAIN_<ID>_NATIVE_VERIFIER_API_TOKENS` value empty.
+- Do not mount or copy the legacy Runtime data directory.
+
+Startup still creates native polling loops, but without a native bridge and
+per-chain representation addresses they must discover no native work. Verify
+logs and health contain no native processing attempts. Verify the legacy
+Runtime remains the only process changing native checkpoints or settlement
+state.
+
+For a shared Safe, also verify there are no EAB withdrawal/manual-review
+records capable of creating a proposal. Any unexpected EAB Safe proposal is a
+stop condition: pause EAB intake and reconcile Safe nonces before continuing.
+
+### 5. Stage backend without switching legacy users
+
+Populate and verify the production `defaultExternalAssetBridgeFor` and
+`defaultTokenRouterFor` entries, then deploy the matching backend. Confirm:
+
+- `/api/config` returns the reviewed EAB and TokenRouter proxies.
+- Fund and `/bridge/*` still use MercataBridge.
+- Existing native routes still use their current contracts and legacy Runtime.
+- Unified Trade/EAB entry points remain hidden from general users until the
+  canary gate is approved.
+
+Do not retire legacy pages, change old deposit instructions, redirect old links,
+or move legacy custody in this profile.
+
+### 6. Activate only the approved canary surface
+
+Run the normal step 8 `verify` and freshly printed activation command.
+
+- **Shared Safe:** use deposit-only activation. Unpause only the new deposit
+  router; keep the vault and every withdrawal route paused/disabled.
+- **Separate EAB Safe:** a withdrawal canary is permitted only for an isolated
+  canary asset with reviewed vault liquidity, limits, and rollback. Do not fund
+  it by moving legacy backing.
+
+Keep public UI intake closed. Send the canary to the new router explicitly and
+record the router, vault, chain, token, amount, external receipt, EAB deposit
+identity, verifier attestations, STRATO settlement, and before/after balances.
+Confirm the legacy Safe balance and legacy/native checkpoints did not change.
+
+For a permitted below-review-threshold withdrawal canary, verify the dedicated
+EAB executor—not the legacy Safe—released exactly the reviewed amount and that
+no Safe proposal was created. Stop if another holder or route can consume the
+canary liquidity.
+
+### 7. Observe and roll back independently
+
+After the canary, either re-pause EAB or keep only the explicitly approved
+surface enabled. Monitor both services with separate alerts and evidence.
+
+To roll back EAB, pause the new router first. Keep the EAB Runtime and verifiers
+running until every accepted EAB deposit reaches a terminal, reconciled state;
+then stop only the EAB stack. Do not stop, restart, or restore the legacy stack
+as part of an EAB-only rollback.
+
+Enabling native processing in `bridge-eab` is a later release. Before that
+switch, drain native in-flight operations and Safe proposals, remove native
+configuration from the legacy Runtime, prove it is idle, then configure and
+start native processing in EAB. Never run both native processors. If legacy and
+EAB still share a Safe, legacy Safe-proposal creation must also be drained or
+moved to a separate Safe before the native switch.
+
 ## 0. Approve numbers
 
 Amounts are raw token units. Verifier confirmations ≥ Runtime confirmations.
