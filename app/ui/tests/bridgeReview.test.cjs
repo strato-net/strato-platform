@@ -146,9 +146,11 @@ test('native withdrawals awaiting Safe action still offer governance cancellatio
   const text = h.text(h.render());
   assert.match(text, /Safe signers — execute the mint proposal, or STRATO admins — request cancellation/);
   assert.match(text, /Request cancellation \/ vote/);
+  assert.match(text, /open Safe and verify that the mint proposal was rejected, replaced, or must not be executed/);
   assert.doesNotMatch(text, /Reject \/ vote|Refund \/ vote/);
+  assert.equal(h.nodes(h.render()).find(node => node.type === 'Button' && h.text(node) === 'Request cancellation / vote').props.disabled, false);
   h.select();
-  assert.match(h.text(h.render()), /requests permanent cancellation of its mint identity/);
+  assert.match(h.text(h.render()), /open Safe and verify that the mint proposal was rejected, replaced, or must not be executed/);
 });
 
 test('deposit review never offers manual settlement, including stale API actions', () => {
@@ -156,6 +158,18 @@ test('deposit review never offers manual settlement, including stale API actions
     const h = harness({ kind: 'deposit_review', action: 'settle', approved });
     assert.doesNotMatch(h.text(h.render()), /Settle approved deposit|Confirm settlement/);
     assert.equal(h.requests.length, 0);
+  }
+});
+
+test('approved or reopened deposits do not offer competing governance actions', () => {
+  for (const options of [
+    { kind: 'deposit_review', action: 'refund', approvalStatus: 'approved' },
+    { kind: 'deposit_recovery', action: 'reject', overrides: { recoveryStatus: 'reopened' } },
+  ]) {
+    const h = harness(options);
+    const text = h.text(h.render());
+    assert.match(text, /Bridge service — retry verification and STRATO delivery/);
+    assert.doesNotMatch(text, /Reject — no funds received \/ vote|Reject and refund \/ vote|Refund \/ vote/);
   }
 });
 

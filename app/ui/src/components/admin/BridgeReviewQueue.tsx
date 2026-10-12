@@ -77,11 +77,14 @@ const BridgeReviewQueue = () => {
       setError(e instanceof Error ? e.message : extractApiErrorMessage(e));
     } finally { setSubmitting(false); }
   };
-  const actionsFor = (item: BridgeReviewItem) => item.actions.filter((action): action is BridgeReviewGovernanceAction =>
-    Object.prototype.hasOwnProperty.call(actionLabels, action) && (action !== 'approve' || item.approvalStatus !== 'approved'));
-  const isUnavailable = (item: BridgeReviewItem) => reviews.isError || item.approvalStatus === 'unavailable' ||
+  const actionsFor = (item: BridgeReviewItem) => item.approvalStatus === 'approved' || item.recoveryStatus === 'reopened' ? [] :
+    item.actions.filter((action): action is BridgeReviewGovernanceAction => Object.prototype.hasOwnProperty.call(actionLabels, action));
+  const isUnavailable = (item: BridgeReviewItem) => {
+    const actions = actionsFor(item);
+    return reviews.isError || item.approvalStatus === 'unavailable' ||
     (item.kind === 'withdrawal_refund' && !['pending', 'ready'].includes(item.refundStatus || '')) ||
-    (item.actions.length > 0 && (item.governanceStatus !== 'available' || item.actions.some(action => !item.governance?.[action])));
+    (actions.length > 0 && (item.governanceStatus !== 'available' || actions.some(action => !item.governance?.[action])));
+  };
   const nextStepFor = (item: BridgeReviewItem) =>
     getBridgeReviewNextStep(item, item.actions.some(action => isVotePending(item, action)));
   const isSafeAttention = (item: BridgeReviewItem) => nextStepFor(item).startsWith('Safe signers');
@@ -102,7 +105,7 @@ const BridgeReviewQueue = () => {
         {item.approvalStatus === 'approved' && <p role="status" className="text-sm font-medium text-green-700 dark:text-green-400">Approved · awaiting settlement</p>}
         {item.recoveryStatus === 'refund_pending' && <p role="status" className="text-sm font-medium">{item.refundEvidenceHash ? 'Refund confirmation requires governance approval' : `Refund processing${item.safeProposalHash ? ' · Safe approval required' : ''}`}</p>}
         {item.approvalStatus === 'unavailable' && <p role="alert" className="text-sm text-destructive">Deposit approval status is unavailable.</p>}
-        {item.actions.some(action => Object.prototype.hasOwnProperty.call(actionLabels, action)) && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
+        {actionsFor(item).length > 0 && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
         <p role={unavailable ? 'alert' : 'status'} className={`text-sm font-medium${unavailable ? ' text-destructive' : ''}`}>Next step: {reviews.isError ? 'Admin — refresh the queue. Displayed transaction and voting status may be stale.' : nextStepFor(item)}</p>
         <p className="text-sm text-muted-foreground">
           External: {displayAmount(item.externalAmount, item.externalDecimals, item.externalSymbol)}
@@ -141,6 +144,8 @@ const BridgeReviewQueue = () => {
             Proposal {truncateAddress(item.safeProposalHash)}<CopyButton address={item.safeProposalHash} />
           </span>
         </div>}
+        {item.source === 'native' && item.kind === 'withdrawal_review' && item.safeProposalHash && item.actions.includes('cancel_withdrawal') &&
+          <p className="text-sm text-muted-foreground">Before requesting cancellation, open Safe and verify that the mint proposal was rejected, replaced, or must not be executed. If it executed successfully, do not cancel. Escrow remains locked until the external mint cancellation is verified.</p>}
         <div className="flex flex-wrap gap-2">
           {actionsFor(item).map(action => {
             const progress = item.governance?.[action];
@@ -206,7 +211,7 @@ const BridgeReviewQueue = () => {
     <Dialog open={!!selected} onOpenChange={open => { if (!open && !submitting) setSelected(null); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{selected && reviewActionLabel(selected.item, selected.action)}</DialogTitle><DialogDescription>
-          {selected?.action === 'cancel_withdrawal' ? 'This stops normal withdrawal processing and requests permanent cancellation of its mint identity on the external bridge. Safe signers must execute the cancellation. Escrow remains locked until STRATO governance verifies the confirmed cancellation. If minting has already succeeded, the withdrawal will complete instead.'
+          {selected?.action === 'cancel_withdrawal' ? 'Before requesting cancellation, open Safe and verify that the mint proposal was rejected, replaced, or must not be executed. If it executed successfully, do not cancel. This stops normal withdrawal processing and requests permanent cancellation of its mint identity on the external bridge. Safe signers must execute the cancellation. Escrow remains locked until STRATO governance verifies the confirmed cancellation.'
             : selected?.action === 'confirm_cancellation' ? 'Independently verify the successful NativeMintCanceled transaction on the destination bridge, its source STRATO chain, source bridge, withdrawal ID and required confirmations. The operator report alone is not proof. This vote returns STRATO escrow; never approve it if the external mint occurred.'
             : selected?.action === 'confirm_refund' ? 'Independently verify this transaction on the source network: successful execution, sufficient confirmations, the original bridge and redemption ID, representation token, sender and exact amount. The hash is an operator report, not independent proof. This vote marks the refund completed; it does not send funds.'
             : selected?.action === 'reject' ? 'Use this only after verifying that no external funds were received for this deposit (or no valid external burn occurred for a native redemption). This closes the record without crediting STRATO assets or issuing a refund. An unavailable RPC or missing index entry is not evidence that no funds were received.'
