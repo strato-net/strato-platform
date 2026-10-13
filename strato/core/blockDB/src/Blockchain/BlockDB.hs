@@ -148,9 +148,9 @@ getHashesByNumber ::
 getHashesByNumber n =
   smembers (inNamespace Numbers n) >>= \case
     Left _ -> return []
-    Right members -> return $ map decode members
+    Right members -> return $ map decodeHash members
   where
-    decode m
+    decodeHash m
       | S8.length m == 64 && S8.all isHexDigit m = keccak256FromHex (S8.unpack m)
       | otherwise = fromValue m
 
