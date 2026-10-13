@@ -6,12 +6,12 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const {
   initializeManifest, createPortableBundle, loadManifest, generate, writeJson, readJson, digest,
-  governanceProgress, currentCursorSettings, loadConfig,
+  governanceProgress, currentCursorSettings, loadConfig, shellQuote,
 } = require("../scripts/lib/externalBridgeOrchestration");
 const {
   parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl,
   normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, fetchLiveAdminVoteCounts,
-  vote, activate, inspect, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary,
+  vote, activate, inspect, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary, main,
 } = require("../scripts/externalBridgeRollout");
 const { NETWORKS } = require("../scripts/lib/externalBridgeNetworks");
 const { verifyUninitializedProxy } = require("../../contracts/deploy/external-bridge-verification");
@@ -90,6 +90,154 @@ function configured(f) {
   }
 }
 
+function completeHandoff(f, native = false) {
+  f.manifest.authorizationSigners = [addr("d"), addr("e"), addr("f")];
+  Object.assign(f.manifest.services, {
+    confirmations: 12, safeProposerAddress: addr("b"), executorAddress: addr("c"),
+    verifiers: [1, 2, 3].map(index => ({ url: `https://verifier-${index}.example`, tokenEnv: `VERIFIER_${index}_API_TOKEN`, confirmations: 12 })),
+  });
+  if (native) {
+    f.manifest.inputs.nativeRoutes = [{ "bridge-address": addr("9").slice(2), "external-chain-id": "11155111",
+      "external-bridge": addr("7"), "strato-token": addr("c").slice(2), "representation-token": addr("a"),
+      "max-per-withdrawal": "100", "instant-withdrawal-threshold": "50", enabled: true }];
+    f.manifest.inputs.nativeConfig = { chainId: 11155111, bridgeAddress: addr("7"), safeAddress: addr("1"),
+      executor: addr("2"), eabExecutor: addr("c"), attestationSigners: [addr("d"), addr("e"), addr("f")],
+      disabledAttestationSigners: [], attestationThreshold: 2, maxAttestationValiditySeconds: "1800",
+      tokens: [{ stratoToken: addr("c"), representationToken: addr("a"), freezeRoute: false, transfersEnabled: true }] };
+  }
+  writeJson(f.manifestPath, f.manifest);
+}
+
+test("continue uses the same read-only reconciliation command and shell paths remain literal", () => {
+  assert.equal(parseArgs(["continue", "--manifest", "/secure/deployment.json"]).command, "continue");
+  const value = "/secure/a space/$(touch unwanted)'quoted`file`";
+  const output = spawnSync("bash", ["-c", `printf '%s' ${shellQuote(value)}`], { encoding: "utf8" });
+  assert.equal(output.status, 0);
+  assert.equal(output.stdout, value);
+  assert.throws(() => shellQuote("bad\npath"), /line breaks/);
+});
+
+test("discovery is edited in one deployment file and expanded without submitting transactions", async (t) => {
+  const f = fixture(t);
+  const discovery = path.join(f.directory, "prepare.json");
+  const deployment = path.join(f.directory, "deployment-input.json");
+  writeJson(discovery, { target: { chainId: "11155111" }, eabRoutes: [{ include: true }], nativeRoutes: [] });
+  const preparation = require("../scripts/prepareBridgeRollout");
+  const original = preparation.main;
+  const originalLog = console.log;
+  console.log = () => {};
+  t.after(() => { preparation.main = original; console.log = originalLog; });
+  await main(["init", "--discovery", discovery, "--manifest", deployment]);
+  assert.equal(readJson(deployment).schemaVersion, 0);
+  const draft = readJson(deployment);
+  draft.discovery.target.externalAssetBridge = addr("5");
+  writeJson(deployment, draft);
+  let calls = 0;
+  preparation.main = async ([flag, config, outputFlag, directory]) => {
+    calls++;
+    assert.equal(flag, "--config");
+    assert.equal(outputFlag, "--output-dir");
+    assert.equal(readJson(config).target.externalAssetBridge, addr("5"));
+    const settings = readJson(path.join(f.directory, "settings.json"));
+    settings.externalDeployment = path.join(f.directory, "deployment.json");
+    settings.depositPlan = path.join(f.directory, "discovery.json");
+    writeJson(path.join(directory, "settings.json"), settings);
+    writeJson(path.join(directory, "policy.json"), f.manifest.policy);
+  };
+  await main(["init", "--manifest", deployment]);
+  assert.equal(calls, 1);
+  assert.equal(readJson(deployment).schemaVersion, 1);
+  assert.equal(readJson(deployment).inputs.externalDeployment.depositRouterDeploymentBlock, "1234");
+  await assert.rejects(main(["init", "--manifest", deployment]), /already initialized/);
+});
+
+test("portable bundles embed legacy dependency templates instead of referencing local files", (t) => {
+  const f = fixture(t);
+  completeHandoff(f);
+  const template = path.join(f.directory, "legacy-template.json");
+  const d = f.manifest.settings.dependencies;
+  writeJson(template, { adminRegistry: d.adminRegistry,
+    tokenRouter: { poolFactory: d.poolFactory, poolV3Factory: d.poolV3Factory, directMintPsm: d.directMintPsm,
+      metalForge: d.metalForge, saveUsdstVault: d.saveUsdstVault, yieldVaults: d.yieldVaults },
+    externalAssetBridge: { tokenFactory: d.tokenFactory, usdst: d.usdst, priceOracle: d.priceOracle } });
+  delete f.manifest.settings.dependencies;
+  f.manifest.settings.bridgeTemplate = template;
+  writeJson(f.manifestPath, f.manifest);
+  const bundle = path.join(f.directory, "bundle.json");
+  createPortableBundle(f.manifestPath, bundle);
+  fs.unlinkSync(template);
+  assert.equal(readJson(bundle).settings.bridgeTemplate, undefined);
+  assert.equal(loadManifest(bundle, "activation").settings.dependencies.tokenFactory, d.tokenFactory);
+});
+
+test("a relocated single bundle recreates native inputs, policies and runtime bindings", (t) => {
+  const f = fixture(t);
+  completeHandoff(f, true);
+  const bundle = path.join(f.directory, "handoff", "deployment-bundle.json");
+  createPortableBundle(f.manifestPath, bundle);
+  fs.rmSync(path.join(f.directory, "deployment.json"));
+  fs.rmSync(path.join(f.directory, "discovery.json"));
+  const context = loadManifest(bundle, "activation");
+  const artifacts = generate(context, path.join(f.directory, "handoff", ".deployment"));
+  const routes = readJson(artifacts.nativeRoutesPath);
+  assert.equal(routes[0]["settlement-verifier-threshold"], "2");
+  assert.equal(routes[0]["settlement-verifiers"], f.manifest.settings.settlementVerifiers.join(","));
+  assert.equal(readJson(artifacts.nativeConfigPath).executor, addr("2"));
+  assert.equal(artifacts.nativeVerifierPolicyPaths.length, 3);
+  for (const [index, file] of artifacts.nativeVerifierPolicyPaths.entries()) {
+    const policy = readJson(file);
+    const { baselinePolicyHash, verifierIndex, ...baseline } = policy;
+    assert.equal(baselinePolicyHash, `sha256:${digest(baseline)}`);
+    assert.equal(verifierIndex, index + 1);
+    assert.equal(policy.sourceBridge, addr("9").slice(2));
+    assert.equal(policy.routes[0].maxInstantAmount, "50");
+  }
+  const runtime = fs.readFileSync(artifacts.serviceTemplates[0], "utf8");
+  assert.match(runtime, /STRATO_NATIVE_BRIDGE_ADDRESS=999/);
+  assert.match(runtime, /NATIVE_MINT_EXECUTOR_ADDRESS=0x222/);
+  const guidance = nativeDeploymentSteps(context, { manifest: bundle }, artifacts);
+  assert(guidance[0].run.includes(shellQuote(artifacts.nativeRoutesPath)));
+  assert(guidance[1].run.includes(shellQuote(artifacts.nativeConfigPath)));
+  assert.deepEqual(generate(context, path.join(f.directory, "handoff", ".deployment")).hashes, artifacts.hashes);
+});
+
+test("native bundle bindings fail closed and incomplete native source files are not silently skipped", (t) => {
+  const f = fixture(t);
+  completeHandoff(f, true);
+  f.manifest.inputs.nativeConfig.chainId = 1;
+  writeJson(f.manifestPath, f.manifest);
+  assert.throws(() => loadManifest(f.manifestPath), /external chain/);
+  f.manifest.inputs.nativeConfig.chainId = 11155111;
+  f.manifest.inputs.nativeConfig.tokens[0].representationToken = addr("b");
+  writeJson(f.manifestPath, f.manifest);
+  assert.throws(() => loadManifest(f.manifestPath), /bindings/);
+  delete f.manifest.inputs.nativeRoutes;
+  writeJson(f.manifestPath, f.manifest);
+  assert.throws(() => loadManifest(f.manifestPath), /both inputs/);
+  delete f.manifest.inputs.nativeConfig;
+  writeJson(f.manifestPath, f.manifest);
+  writeJson(path.join(f.directory, "native-routes.json"), []);
+  assert.throws(() => loadManifest(f.manifestPath), /native-routes.json and native.json/);
+});
+
+test("Infra regenerates provisioning files from one package but cannot use it for activation", (t) => {
+  const f = fixture(t);
+  const bundle = path.join(f.directory, "handoff", "deployment-bundle.json");
+  createPortableBundle(f.manifestPath, bundle, "initial");
+  assert.throws(() => loadManifest(bundle, "activation"), /Provisioning bundles/);
+  assert.throws(() => parseArgs(["join", "--role", "admin-1", "--bundle", bundle]), /Only Infra/);
+  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
+  const joined = spawnSync(process.execPath, [script, "join", "--role", "infra", "--bundle", bundle], { encoding: "utf8" });
+  assert.equal(joined.status, 0, joined.stderr);
+  const profile = readJson(path.join(f.directory, "handoff", ".deployment", "infra.json"));
+  assert.equal(profile.stage, "initial");
+  const services = readJson(path.join(profile.outputDir, "services.json"));
+  assert.equal(services.verifierPolicies.length, 3);
+  assert(fs.existsSync(services.runtimeTemplate));
+  assert.throws(() => parseArgs(["vote", "--config", path.join(f.directory, "handoff", ".deployment", "infra.json"), "--approve", "a".repeat(64)]), /Infra cannot/);
+  assert.equal(services.nativeConfig, undefined);
+});
+
 test("init imports existing settings without overwriting and plan never emits activation", (t) => {
   const f = fixture(t);
   assert.throws(() => initializeManifest(path.join(f.directory, "settings.json"), undefined, f.manifestPath), /already exists/);
@@ -160,6 +308,13 @@ test("bundle creation rejects incomplete service ownership inputs", (t) => {
   const f = fixture(t);
   assert.throws(() => createPortableBundle(f.manifestPath,
     path.join(f.directory, "deployment-bundle.json")), /Bundle requires 3 verifiers/);
+  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
+  const prepared = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath],
+    { encoding: "utf8" });
+  assert.notEqual(prepared.status, 0);
+  assert.match(prepared.stdout, /"status": "OFFLINE_PLAN_INCOMPLETE"/);
+  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), false);
 });
 
 test("coordinator bundle loads without the original deployment files", (t) => {
@@ -351,14 +506,14 @@ test("operator guidance identifies first and second administrator vote state", (
     safe: { executionOrder: [] },
   }, args, artifacts);
   assert.equal(guidance.activateCommand,
-    `npm run external:rollout -- activate --manifest /secure/manifest.json --output-dir /secure/output --stage activation --approve ${"b".repeat(64)}`);
+    `npm run external:rollout -- activate --manifest '/secure/manifest.json' --output-dir '/secure/output' --stage activation --approve ${"b".repeat(64)}`);
   assert.equal(terminalSummary({ operator: guidance }, "/secure/report.json").action,
     "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION");
   guidance = operatorGuidance({ operationError: "Approval is stale; review a fresh resume report" }, args, artifacts);
   assert.deepEqual(terminalSummary({ status: "APPROVAL_INVALIDATED", operator: guidance }, "/secure/report.json"), {
     status: "APPROVAL_INVALIDATED",
     action: "RERUN_STATUS",
-    run: "npm run external:rollout -- status --manifest /secure/manifest.json --output-dir /secure/output --stage activation",
+    run: "npm run external:rollout -- status --manifest '/secure/manifest.json' --output-dir '/secure/output' --stage activation",
     then: "Review live state before submitting any further transaction.",
     details: "/secure/report.json",
   });
@@ -496,6 +651,33 @@ test("setup supports each deployment persona", () => {
   }
   assert.throws(() => parseArgs(["setup", "--role", "unknown", "--config", "/secure/config.json",
     "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]), /setup requires --role/);
+  assert.deepEqual(parseArgs(["prepare", "--manifest", "/secure/manifest.json"]), {
+    command: "prepare",
+    manifest: "/secure/manifest.json",
+    stage: "activation",
+  });
+  assert.equal(parseArgs(["prepare", "--manifest", "/secure/manifest.json", "--stage", "initial"]).stage, "initial");
+  assert.deepEqual(parseArgs(["join", "--role", "admin-1",
+    "--bundle", "/secure/deployment-bundle.json"]), {
+    command: "join",
+    role: "admin-1",
+    bundle: "/secure/deployment-bundle.json",
+    manifest: "/secure/deployment-bundle.json",
+    config: "/secure/.deployment/admin-1.json",
+    "output-dir": "/secure/.deployment/admin-1",
+    stage: "activation",
+  });
+  assert.deepEqual(terminalSummary({
+    status: "OFFLINE_PLAN_INCOMPLETE",
+    next: "Resolve REVIEW_REQUIRED values.",
+    review: { mechanicalChecks: { unresolvedReviewValues: "FAILED" } },
+  }, "/secure/report.json"), {
+    status: "OFFLINE_PLAN_INCOMPLETE",
+    action: "RESOLVE_REVIEW_REQUIRED",
+    then: "Resolve REVIEW_REQUIRED values.",
+    review: { mechanicalChecks: { unresolvedReviewValues: "FAILED" } },
+    details: "/secure/report.json",
+  });
 });
 
 test("every supported network enforces its Safe and KMS identity gate", () => {
@@ -650,9 +832,76 @@ test("missing state is uninitialized only for a verified fresh proxy", () => {
 
 test("process CLI offline plan works and refuses a concurrent run", (t) => {
   const f = fixture(t);
+  const completedManifest = readJson(f.manifestPath);
+  completedManifest.authorizationSigners = [addr("b"), addr("c"), addr("d")];
+  completedManifest.services = {
+    ...completedManifest.services,
+    confirmations: 12,
+    verifiers: [1, 2, 3].map((index) => ({
+      url: `https://verifier-${index}.example`,
+      tokenEnv: `VERIFIER_${index}_TOKEN`,
+      confirmations: 12,
+    })),
+    safeProposerAddress: addr("e"),
+    executorAddress: addr("f"),
+  };
+  writeJson(f.manifestPath, completedManifest);
   const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
   const run = () => spawnSync(process.execPath, [script, "--manifest", f.manifestPath, "--output-dir", path.join(f.directory, "output")], { encoding: "utf8" });
-  assert.equal(run().status, 0);
+  const planned = run();
+  assert.equal(planned.status, 0);
+  assert.match(planned.stdout, /"status": "OFFLINE_PLAN_READY"/);
+  assert.match(planned.stdout, /"action": "REVIEW_POLICY_SUMMARY"/);
+  assert.doesNotMatch(planned.stdout, /OFFLINE_PLAN_NOT_VERIFIED|Run resume to reconcile/);
+  const latest = readJson(path.join(f.directory, "output/latest.json"));
+  const report = readJson(latest.reportFile);
+  assert.equal(report.status, "OFFLINE_PLAN_READY");
+  assert.equal(report.review.scope.externalChainId, 11155111);
+  assert.equal(report.review.scope.routeCount, 1);
+  assert.equal(report.review.contractBindings.vault, addr("2"));
+  assert.equal(report.review.routes[0].symbol, "TEST");
+  assert.equal(report.review.routes[0].permissions.depositsEnabled, true);
+  assert.equal(report.review.routes[0].limitsRaw.manualReviewThreshold, "50");
+  assert.deepEqual(report.review.routes[0].notes, []);
+  assert.equal(report.review.mechanicalChecks.unresolvedReviewValues, "PASSED");
+  assert.equal(report.review.mechanicalChecks.verifierPolicyHashes.length, 3);
+  assert.deepEqual(report.nextSteps.map(({ action }) => action), [
+    "REVIEW_POLICY_SUMMARY",
+    "CREATE_PORTABLE_BUNDLE",
+    "DISTRIBUTE_AND_VERIFY_BUNDLE",
+    "SETUP_COORDINATOR_PROFILE",
+    "RUN_LIVE_RECONCILIATION",
+  ]);
+  assert.match(report.nextSteps[1].run, /external:rollout -- bundle/);
+  assert.match(report.nextSteps[3].run, /external:rollout -- setup --role coordinator/);
+  assert.equal(report.nextSteps[4].run, "npm run external:rollout -- status");
+  assert.equal(report.operator.resumeCommand, undefined);
+  const setup = spawnSync(process.execPath, [script, "setup", "--role", "coordinator",
+    "--config", path.join(f.directory, ".deployment", "coordinator.json"), "--manifest", f.manifestPath,
+    "--output-dir", path.join(f.directory, "output"), "--stage", "initial"], { encoding: "utf8" });
+  assert.equal(setup.status, 0, setup.stderr);
+  assert.match(setup.stdout, /"action": "Export this persona's rollout profile."/);
+  assert.match(setup.stdout, /"nextRun": "npm run external:rollout -- continue"/);
+  const preparedOutput = path.join(f.directory, "prepared");
+  const prepared = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
+    "--output-dir", preparedOutput], { encoding: "utf8" });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  assert.match(prepared.stdout, /"status": "PREPARED_FOR_REVIEW"/);
+  assert.match(prepared.stdout, /"action": "APPROVE_POLICY_SUMMARY"/);
+  assert.match(prepared.stdout, /external:rollout -- join --role admin-1/);
+  const bundlePath = path.join(f.directory, "deployment-bundle.json");
+  assert.equal(fs.existsSync(bundlePath), true);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), true);
+  assert.equal(readJson(path.join(f.directory, ".deployment", "coordinator.json")).environmentFile, undefined);
+  const preparedAgain = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
+    "--output-dir", preparedOutput], { encoding: "utf8" });
+  assert.equal(preparedAgain.status, 0, preparedAgain.stderr);
+  const joined = spawnSync(process.execPath, [script, "join", "--role", "admin-1",
+    "--bundle", bundlePath], { encoding: "utf8" });
+  assert.equal(joined.status, 0, joined.stderr);
+  assert.match(joined.stdout, /"status": "ADMIN_1_CONFIGURED"/);
+  assert.doesNotMatch(joined.stdout, /nextRun/);
+  assert.equal(readJson(path.join(f.directory, ".deployment", "admin-1.json")).environmentFile, undefined);
   fs.writeFileSync(path.join(f.directory, "output/.lock"), "other process");
   const busy = run();
   assert.notEqual(busy.status, 0);

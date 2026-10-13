@@ -17,14 +17,21 @@ const digest = (value) => createHash("sha256").update(typeof value === "string" 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 const address = (value) => String(value || "").replace(/^0x/i, "").toLowerCase();
 const bool = (value) => value === true || value === "true";
+const shellQuote = (value) => {
+  if (/[\r\n]/.test(String(value))) throw new Error("Command paths must not contain line breaks");
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+};
 const key = (token, chain, stratoToken) => `${address(token)}:${chain}:${address(stratoToken)}`;
 const rolloutCodeFiles = () => [
   __filename, path.join(__dirname, "externalBridgeRolloutPlan.js"),
   path.join(__dirname, "externalBridgeVaultPlan.js"), path.join(__dirname, "depositRouterSafeOps.js"),
   path.join(__dirname, "externalBridgeArtifacts.js"), path.join(__dirname, "externalBridgeNetworks.js"),
   path.join(__dirname, "../externalBridgeRollout.js"),
+  path.join(__dirname, "../nativeBridgeConfigure.js"), path.join(__dirname, "../nativeBridgeSignerOps.js"),
+  path.join(__dirname, "../prepareBridgeRollout.js"),
   path.join(__dirname, "../scanTokenConfig.js"), path.join(__dirname, "../externalBridgeVaultOps.js"),
   path.join(CONTRACTS, "configure-external-bridge.js"), path.join(CONTRACTS, "external-bridge-verification.js"),
+  path.join(CONTRACTS, "configure-native-route.js"),
 ];
 const rolloutToolingRevision = () =>
   digest(rolloutCodeFiles().map((name) => digest(fs.readFileSync(name, "utf8"))));
@@ -113,13 +120,31 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
       executorAddress: "REVIEW_REQUIRED",
     },
   };
+  const nativeInputs = readNativeInputs(manifest, path.dirname(settingsPath));
+  Object.assign(manifest.inputs, nativeInputs);
   writeJson(manifestPath, manifest);
   return manifest;
 }
 
-function createPortableBundle(manifestPath, bundlePath) {
-  if (fs.existsSync(bundlePath)) throw new Error("Bundle already exists; it was not overwritten");
-  const context = loadManifest(manifestPath, "activation");
+function readNativeInputs(manifest, directory) {
+  if (manifest.inputs?.nativeRoutes !== undefined || manifest.inputs?.nativeConfig !== undefined) {
+    if (!Array.isArray(manifest.inputs.nativeRoutes) || !manifest.inputs.nativeConfig ||
+        typeof manifest.inputs.nativeConfig !== "object" || Array.isArray(manifest.inputs.nativeConfig)) {
+      throw new Error("Native deployment requires both inputs.nativeRoutes and inputs.nativeConfig");
+    }
+    return { nativeRoutes: manifest.inputs.nativeRoutes, nativeConfig: manifest.inputs.nativeConfig };
+  }
+  if (manifest.settings.depositPlan.startsWith("embedded:")) return {};
+  const prepared = path.dirname(path.resolve(directory, manifest.settings.depositPlan));
+  const routes = path.join(prepared, "native-routes.json");
+  const config = path.join(prepared, "native.json");
+  if (!fs.existsSync(routes) && !fs.existsSync(config)) return {};
+  if (!fs.existsSync(routes) || !fs.existsSync(config)) throw new Error("Native deployment requires native-routes.json and native.json");
+  return readNativeInputs({ inputs: { nativeRoutes: readJson(routes), nativeConfig: readJson(config) } }, directory);
+}
+
+function createPortableBundle(manifestPath, bundlePath, stage = "activation") {
+  const context = loadManifest(manifestPath, stage);
   const manifest = context.manifest;
   const services = manifest.services;
   const network = getExternalBridgeNetwork(context.rollout.chainId);
@@ -128,11 +153,11 @@ function createPortableBundle(manifestPath, bundlePath) {
     services.executorAddress,
     ...manifest.authorizationSigners,
   ];
-  if (services.verifiers.length !== network.verifierCount ||
+  if (stage === "activation" && (services.verifiers.length !== network.verifierCount ||
       manifest.authorizationSigners.length !== network.verifierCount ||
       identities.some((value) => !ethers.isAddress(value)) ||
       new Set(identities.map(address)).size !== identities.length ||
-      !services.bridgeHealthUrlEnv) {
+      !services.bridgeHealthUrlEnv || JSON.stringify(context.nativeInputs).includes("REVIEW_REQUIRED"))) {
     throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 2} distinct KMS identities, and bridgeHealthUrlEnv`);
   }
   const directory = path.dirname(manifestPath);
@@ -140,16 +165,31 @@ function createPortableBundle(manifestPath, bundlePath) {
     readJson(path.resolve(directory, manifest.settings.externalDeployment));
   const depositPlan = manifest.inputs?.depositPlan ||
     readJson(path.resolve(directory, manifest.settings.depositPlan));
+  const defaults = loadBridgeDefaults({ ...manifest.settings }, directory);
   const bundle = {
     ...manifest,
+    ...(stage === "initial" ? { bundlePurpose: "provisioning" } : {}),
     toolingRevision: rolloutToolingRevision(),
     settings: {
       ...manifest.settings,
+      dependencies: {
+        adminRegistry: defaults.adminRegistry, ...defaults.tokenRouter,
+        tokenFactory: defaults.externalAssetBridge.tokenFactory,
+        usdst: defaults.externalAssetBridge.usdst, priceOracle: defaults.externalAssetBridge.priceOracle,
+      },
       externalDeployment: "embedded:externalDeployment",
       depositPlan: "embedded:depositPlan",
     },
-    inputs: { externalDeployment, depositPlan },
+    inputs: { externalDeployment, depositPlan, ...readNativeInputs(manifest, directory) },
   };
+  delete bundle.settings.bridgeTemplate;
+  if (fs.existsSync(bundlePath)) {
+    const existing = readJson(bundlePath);
+    if (digest(existing) !== digest(bundle)) {
+      throw new Error("Existing deployment bundle differs from the current manifest; preserve it and choose a new rollout directory");
+    }
+    return existing;
+  }
   fs.mkdirSync(path.dirname(bundlePath), { recursive: true, mode: 0o700 });
   writeJson(bundlePath, bundle);
   return bundle;
@@ -159,6 +199,9 @@ function loadManifest(file, stage = "initial") {
   if (!["initial", "activation"].includes(stage)) throw new Error("--stage must be initial|activation");
   const manifest = readJson(file);
   if (manifest.schemaVersion !== 1) throw new Error("Unsupported manifest schemaVersion");
+  if (manifest.bundlePurpose === "provisioning" && stage !== "initial") {
+    throw new Error("Provisioning bundles cannot configure activation; join the final reviewed bundle");
+  }
   if (manifest.toolingRevision && manifest.toolingRevision !== rolloutToolingRevision()) {
     throw new Error("Deployment bundle requires a different reviewed rollout code revision");
   }
@@ -192,6 +235,11 @@ function loadManifest(file, stage = "initial") {
   }
   if (typeof manifest.settings?.sourceChainId !== "string") throw new Error("settings.sourceChainId must be a decimal string");
   const settings = { ...manifest.settings };
+  const nativeInputs = readNativeInputs(manifest, path.dirname(file));
+  if (nativeInputs.nativeRoutes?.length && String(nativeInputs.nativeConfig.chainId) !== String(
+      manifest.inputs?.externalDeployment?.chainId || readJson(path.resolve(path.dirname(file), settings.externalDeployment)).chainId)) {
+    throw new Error("Native configuration must use the rollout's external chain");
+  }
   const deployment = manifest.inputs?.externalDeployment ||
     readJson(path.resolve(path.dirname(file), settings.externalDeployment));
   const depositPlan = manifest.inputs?.depositPlan ||
@@ -208,14 +256,34 @@ function loadManifest(file, stage = "initial") {
   templates.vaultTemplate.chains[0].attestationSigners = signers;
   const rollout = buildSynchronizedRollout({ depositPlan, ...templates, policy: manifest.policy, chainId: templates.chainId });
   validateInitialRollout(rollout, { activation: stage === "activation" });
+  if (nativeInputs.nativeRoutes?.length && !JSON.stringify(nativeInputs).includes("REVIEW_REQUIRED")) {
+    const native = nativeInputs.nativeConfig;
+    require("../nativeBridgeSignerOps").normalizeConfig(native);
+    if (native.attestationSigners.length !== network.verifierCount || native.attestationThreshold !== network.verifierThreshold ||
+        !ethers.isAddress(native.executor) || address(native.eabExecutor) !== address(services.executorAddress) ||
+        [native.safeAddress, native.eabExecutor, ...native.attestationSigners].some(value => address(value) === address(native.executor))) {
+      throw new Error("Native signer threshold/count and distinct executor must match the reviewed rollout");
+    }
+    const sourceBridges = new Set(nativeInputs.nativeRoutes.map(route => address(route["bridge-address"])));
+    if (sourceBridges.size !== 1 || !ethers.isAddress(`0x${[...sourceBridges][0]}`) ||
+        [...sourceBridges][0] === address(ethers.ZeroAddress)) throw new Error("Native routes must share one STRATO bridge");
+    if (!Array.isArray(native.tokens) || native.tokens.length !== nativeInputs.nativeRoutes.length ||
+        nativeInputs.nativeRoutes.some(route => String(route["external-chain-id"]) !== String(native.chainId) ||
+          address(route["external-bridge"]) !== address(native.bridgeAddress) ||
+          !/^\d+$/.test(String(route["instant-withdrawal-threshold"])) ||
+          !native.tokens.some(token => address(token.stratoToken) === address(route["strato-token"]) &&
+            address(token.representationToken) === address(route["representation-token"])))) {
+      throw new Error("Native route token/bridge bindings must match inputs.nativeConfig");
+    }
+  }
   if (rollout.inventory.length === 0) throw new Error("Deployment inventory is empty");
   const operator = address(settings.bridgeOperator);
   if (settings.settlementVerifiers.some((verifier) => address(verifier) === operator)) throw new Error("Operator cannot be a settlement verifier");
   // Code changes invalidate approval and cached generation just like input changes.
   const codeFiles = rolloutCodeFiles();
-  const revision = digest({ stage, manifest, settings, deployment, depositPlan, defaults,
+  const revision = digest({ stage, manifest, settings, deployment, depositPlan, defaults, nativeInputs,
     code: codeFiles.map((name) => digest(fs.readFileSync(name, "utf8"))) });
-  return { stage, manifest, rollout, revision, settings, deployment };
+  return { stage, manifest, rollout, revision, settings, deployment, nativeInputs };
 }
 
 function generate(context, outputDirectory, options = {}) {
@@ -240,6 +308,34 @@ function generate(context, outputDirectory, options = {}) {
     return saveText(name, `${JSON.stringify(value, null, 2)}\n`);
   };
   const bridgeConfigPath = save("bridge.json", rollout.bridgeConfig);
+  const nativeRoutesPath = context.nativeInputs?.nativeRoutes?.length
+    ? save("native-routes.json", context.nativeInputs.nativeRoutes.map(route => ({
+      ...route,
+      "token-router": route["token-router"] || context.settings.tokenRouter,
+      "settlement-verifiers": route["settlement-verifiers"] || context.settings.settlementVerifiers.join(","),
+      "settlement-verifier-threshold": route["settlement-verifier-threshold"] ||
+        String(rollout.bridgeConfig.externalAssetBridge.settlementVerifierThreshold),
+    }))) : undefined;
+  const nativeConfigPath = nativeRoutesPath ? save("native.json", context.nativeInputs.nativeConfig) : undefined;
+  const nativeVerifierPolicyPaths = [];
+  if (nativeRoutesPath && !JSON.stringify({ routes: context.nativeInputs.nativeRoutes,
+      bridge: context.nativeInputs.nativeConfig.bridgeAddress }).includes("REVIEW_REQUIRED")) {
+    const baseline = {
+      version: "1", sourceChainId: context.settings.sourceChainId,
+      sourceBridge: address(context.nativeInputs.nativeRoutes[0]["bridge-address"]),
+      destinationChainId: String(rollout.chainId),
+      destinationBridge: ethers.getAddress(context.nativeInputs.nativeConfig.bridgeAddress),
+      routes: context.nativeInputs.nativeRoutes.map(route => ({
+        stratoToken: address(route["strato-token"]),
+        representationToken: ethers.getAddress(route["representation-token"]),
+        instantEnabled: bool(route.enabled) && BigInt(route["instant-withdrawal-threshold"]) > 0n,
+        maxInstantAmount: String(route["instant-withdrawal-threshold"]),
+      })),
+    };
+    rollout.verifierPolicies.forEach((_, index) => nativeVerifierPolicyPaths.push(save(`native-verifier-${index + 1}.json`, {
+      ...baseline, baselinePolicyHash: `sha256:${digest(baseline)}`, verifierIndex: index + 1,
+    })));
+  }
   const vaultConfigPath = save("vault.json", rollout.vaultConfig);
   const verifierPolicyPaths = rollout.verifierPolicies.map((policy, index) => save(`verifier-${index + 1}.json`, policy));
   const depositRouterBatchPaths = buildDepositRouterBatches(rollout).map(({ index, transactionBuilder }) => save(`router-tokens-${index}.json`, transactionBuilder));
@@ -288,6 +384,14 @@ function generate(context, outputDirectory, options = {}) {
       ...["WS_RPC_URL", "VERIFICATION_RPC_URLS", "EXTERNAL_BRIDGE_EXECUTOR_ADDRESS", "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID", "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION"].map((suffix) => `CHAIN_${rollout.chainId}_${suffix}`)]) bridgeEnvironment[name] = reference(name);
     bridgeEnvironment.SAFE_PROPOSER_ADDRESS = services.safeProposerAddress || "REVIEW_REQUIRED";
     bridgeEnvironment[`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS`] = services.executorAddress || "REVIEW_REQUIRED";
+    if (nativeVerifierPolicyPaths.length) {
+      bridgeEnvironment.STRATO_NATIVE_BRIDGE_ADDRESS = context.nativeInputs.nativeRoutes[0]["bridge-address"];
+      bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`] = context.nativeInputs.nativeConfig.bridgeAddress;
+      bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_VERIFIER_URLS`] = services.verifiers.map(({ url }) => url).join(",");
+      bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_VERIFIER_API_TOKENS`] = services.verifiers.map(({ tokenEnv }) => reference(tokenEnv)).join(",");
+      bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_ADDRESS`] = context.nativeInputs.nativeConfig.executor;
+      for (const suffix of ["KMS_KEY_ID", "KMS_REGION"]) bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_${suffix}`] = reference(`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_${suffix}`);
+    }
     saveEnv("bridge.env.template", bridgeEnvironment);
     rollout.verifierPolicies.forEach((policy, index) => {
       const prefix = `VERIFIER_${index + 1}`;
@@ -304,10 +408,19 @@ function generate(context, outputDirectory, options = {}) {
         SETTLEMENT_ATTESTOR_CLIENT_ID: reference(`${prefix}_CLIENT_ID`), SETTLEMENT_ATTESTOR_CLIENT_SECRET: reference(`${prefix}_CLIENT_SECRET`),
         SETTLEMENT_ATTESTOR_BA_USERNAME: reference(`${prefix}_BA_USERNAME`), SETTLEMENT_ATTESTOR_BA_PASSWORD: reference(`${prefix}_BA_PASSWORD`),
         EXTERNAL_BRIDGE_VERIFIER_API_TOKEN: reference(services.verifiers[index]?.tokenEnv || `${prefix}_API_TOKEN`),
+        ...(nativeVerifierPolicyPaths.length ? {
+          STRATO_NATIVE_BRIDGE_ADDRESS: context.nativeInputs.nativeRoutes[0]["bridge-address"],
+          NATIVE_REPRESENTATION_BRIDGE_ADDRESS: context.nativeInputs.nativeConfig.bridgeAddress,
+          NATIVE_ATTESTATION_SIGNER_ADDRESS: context.nativeInputs.nativeConfig.attestationSigners[index] || "REVIEW_REQUIRED",
+          NATIVE_KMS_KEY_ID: reference(`${prefix}_NATIVE_KMS_KEY_ID`),
+          NATIVE_KMS_REGION: reference(`${prefix}_NATIVE_KMS_REGION`),
+          NATIVE_VERIFIER_POLICY_PATH: "/run/secrets/native-verifier-policy.json",
+        } : {}),
       });
     });
   }
   const index = { serviceTemplates, revision: context.revision, hashes, bridgeConfigPath, vaultConfigPath, verifierPolicyPaths,
+    ...(nativeRoutesPath ? { nativeRoutesPath, nativeConfigPath, nativeVerifierPolicyPaths } : {}),
     depositRouterBatchPaths, depositRouterPausePath, vaultPausePath, vaultConfigurePath, manifestPath };
   writeJson(indexFile, index);
   return { directory, ...index };
@@ -436,4 +549,4 @@ function currentCursorSettings(settings, routes) {
 }
 
 module.exports = { CONTRACTS, digest, readJson, writeJson, address, bool, initializeManifest, createPortableBundle, loadManifest,
-  generate, governanceProgress, currentCursorSettings, loadConfig };
+  generate, governanceProgress, currentCursorSettings, loadConfig, shellQuote };

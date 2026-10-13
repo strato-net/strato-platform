@@ -1,5 +1,7 @@
 # Native Bridge Deployment
 
+For a combined EAB/native rollout, use the four-role, five-step process in `EAB_DEPLOYMENT.md`. Native routes/configuration travel inside the single deployment bundle and are regenerated under `.deployment/`; edit the coordinator's `deployment.json`, rather than separately editing generated native files. The guide below remains the native-only contract lifecycle reference.
+
 This is the canonical end-to-end install guide for a new non-production native bridge deployment. For production, use `NATIVE_BRIDGE_MAINNET_RUNBOOK.md`. For contract lifecycle and audit workflow details, use `NATIVE_BRIDGE_CONTRACT_WORKFLOWS.md`.
 
 Follow the numbered sections in order:
@@ -71,12 +73,7 @@ The point of this step is just to create the proxy address first.
 Run from `app/contracts`:
 
 ```bash
-npm run upgrade -- \
-  --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --contract-name StratoNativeBridge \
-  --contract-file BaseCodeCollection.sol \
-  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
-  +OVERRIDE-CHECKS
+npm run upgrade -- --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> --contract-name StratoNativeBridge --contract-file BaseCodeCollection.sol --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' +OVERRIDE-CHECKS
 ```
 
 ### Step 3: Deploy a `Proxy` for `StratoNativeCustodyVault`
@@ -92,12 +89,7 @@ Use:
 Run from `app/contracts`:
 
 ```bash
-npm run upgrade -- \
-  --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
-  --contract-name StratoNativeCustodyVault \
-  --contract-file BaseCodeCollection.sol \
-  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
-  +OVERRIDE-CHECKS
+npm run upgrade -- --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> --contract-name StratoNativeCustodyVault --contract-file BaseCodeCollection.sol --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' +OVERRIDE-CHECKS
 ```
 
 ### Step 5: Initialize bridge + vault
@@ -105,12 +97,7 @@ npm run upgrade -- \
 Run from `app/contracts`:
 
 ```bash
-npm run initialize:native-bridge -- \
-  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --vault-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
-  --token-factory <TOKEN_FACTORY> \
-  --bridge-operator <BRIDGE_OPERATOR> \
-  --guardian <GUARDIAN>
+npm run initialize:native-bridge -- --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> --vault-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> --token-factory <TOKEN_FACTORY> --bridge-operator <BRIDGE_OPERATOR> --guardian <GUARDIAN>
 ```
 
 For the simplest governance-driven STRATO setup, this is valid:
@@ -137,18 +124,7 @@ Run this after the Sepolia representation token and bridge proxies exist, becaus
 Run from `app/contracts`:
 
 ```bash
-npm run configure:native-route -- \
-  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --external-chain-id 11155111 \
-  --external-bridge <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY> \
-  --representation-token <SEPOLIA_REPRESENTATION_TOKEN_PROXY> \
-  --external-name "Wrapped Native STRATO" \
-  --external-symbol wSTRATO \
-  --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
-  --strato-token <STRATO_NATIVE_TOKEN> \
-  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
-  --settlement-verifier-threshold 2 \
-  --enabled true
+npm run configure:native-route -- --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> --external-chain-id 11155111 --external-bridge <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY> --representation-token <SEPOLIA_REPRESENTATION_TOKEN_PROXY> --external-name "Wrapped Native STRATO" --external-symbol wSTRATO --max-per-withdrawal <MAX_PER_WITHDRAWAL> --strato-token <STRATO_NATIVE_TOKEN> --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> --settlement-verifier-threshold 2 --enabled true
 ```
 
 Notes:
@@ -230,9 +206,7 @@ npm run compile
 Run from `app/ethereum`:
 
 ```bash
-CONTRACT_NAME=StratoNativeRepresentationToken \
-INIT_PARAMS='["Wrapped Native STRATO","wSTRATO","<SEPOLIA_ADMIN_SAFE>"]' \
-npm run deployWithProxy:sepolia
+CONTRACT_NAME=StratoNativeRepresentationToken INIT_PARAMS='["Wrapped Native STRATO","wSTRATO","<SEPOLIA_ADMIN_SAFE>"]' npm run deployWithProxy:sepolia
 ```
 
 Use:
@@ -248,9 +222,7 @@ Record:
 Run from `app/ethereum`:
 
 ```bash
-CONTRACT_NAME=StratoNativeRepresentationBridge \
-INIT_PARAMS='["<SEPOLIA_ADMIN_SAFE>"]' \
-npm run deployWithProxy:sepolia
+CONTRACT_NAME=StratoNativeRepresentationBridge INIT_PARAMS='["<SEPOLIA_ADMIN_SAFE>"]' npm run deployWithProxy:sepolia
 ```
 
 Use:
@@ -412,21 +384,11 @@ Run from `app/contracts`.
 If the native bridge and custody vault proxies already exist, upgrade them to the current implementations:
 
 ```bash
-npm run upgrade -- \
-  --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --contract-name StratoNativeBridge \
-  --contract-file BaseCodeCollection.sol \
-  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
-  +OVERRIDE-CHECKS
+npm run upgrade -- --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> --contract-name StratoNativeBridge --contract-file BaseCodeCollection.sol --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' +OVERRIDE-CHECKS
 ```
 
 ```bash
-npm run upgrade -- \
-  --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
-  --contract-name StratoNativeCustodyVault \
-  --contract-file BaseCodeCollection.sol \
-  --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' \
-  +OVERRIDE-CHECKS
+npm run upgrade -- --proxy-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> --contract-name StratoNativeCustodyVault --contract-file BaseCodeCollection.sol --constructor-args '{"initialOwner":"<ADMIN_REGISTRY_WITHOUT_0X>"}' +OVERRIDE-CHECKS
 ```
 
 For a fresh proxy deployment, deploy the proxies first, record their addresses, then run the same upgrade commands with the new proxy addresses.
@@ -436,12 +398,7 @@ For a fresh proxy deployment, deploy the proxies first, record their addresses, 
 Run once after fresh proxy deployment or after deploying replacement proxies:
 
 ```bash
-npm run initialize:native-bridge -- \
-  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --vault-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> \
-  --token-factory <TOKEN_FACTORY> \
-  --bridge-operator <BRIDGE_OPERATOR> \
-  --guardian <GUARDIAN>
+npm run initialize:native-bridge -- --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> --vault-address <STRATO_NATIVE_CUSTODY_VAULT_PROXY> --token-factory <TOKEN_FACTORY> --bridge-operator <BRIDGE_OPERATOR> --guardian <GUARDIAN>
 ```
 
 ### STRATO: Configure or Update Native Route
@@ -449,19 +406,7 @@ npm run initialize:native-bridge -- \
 Run this after the external-chain representation bridge and token proxies are known:
 
 ```bash
-npm run configure:native-route -- \
-  --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> \
-  --external-chain-id 11155111 \
-  --external-bridge <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY> \
-  --representation-token <SEPOLIA_REPRESENTATION_TOKEN_PROXY> \
-  --external-name "<EXTERNAL_NAME>" \
-  --external-symbol <EXTERNAL_SYMBOL> \
-  --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
-  --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> \
-  --strato-token <STRATO_NATIVE_TOKEN> \
-  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
-  --settlement-verifier-threshold 2 \
-  --enabled true
+npm run configure:native-route -- --bridge-address <STRATO_NATIVE_BRIDGE_PROXY> --external-chain-id 11155111 --external-bridge <SEPOLIA_NATIVE_REPRESENTATION_BRIDGE_PROXY> --representation-token <SEPOLIA_REPRESENTATION_TOKEN_PROXY> --external-name "<EXTERNAL_NAME>" --external-symbol <EXTERNAL_SYMBOL> --max-per-withdrawal <MAX_PER_WITHDRAWAL> --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> --strato-token <STRATO_NATIVE_TOKEN> --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> --settlement-verifier-threshold 2 --enabled true
 ```
 
 The command is a dry run unless `--execute` is supplied. Review the generated
@@ -524,17 +469,13 @@ Run from `app/ethereum`.
 Deploy the representation token proxy:
 
 ```bash
-CONTRACT_NAME=StratoNativeRepresentationToken \
-INIT_PARAMS='["<EXTERNAL_NAME>","<EXTERNAL_SYMBOL>","<SEPOLIA_ADMIN_SAFE>"]' \
-npm run deployWithProxy:sepolia
+CONTRACT_NAME=StratoNativeRepresentationToken INIT_PARAMS='["<EXTERNAL_NAME>","<EXTERNAL_SYMBOL>","<SEPOLIA_ADMIN_SAFE>"]' npm run deployWithProxy:sepolia
 ```
 
 Deploy the representation bridge proxy:
 
 ```bash
-CONTRACT_NAME=StratoNativeRepresentationBridge \
-INIT_PARAMS='["<SEPOLIA_ADMIN_SAFE>"]' \
-npm run deployWithProxy:sepolia
+CONTRACT_NAME=StratoNativeRepresentationBridge INIT_PARAMS='["<SEPOLIA_ADMIN_SAFE>"]' npm run deployWithProxy:sepolia
 ```
 
 Record both proxy and implementation addresses printed by the scripts.

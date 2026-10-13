@@ -1,1029 +1,1442 @@
-# External Asset Bridge Deployment
+# EAB and Native Bridge: Five-Step Deployment
 
-For a same-network rollout covering both EAB and native, start with
-[the streamlined workflow](BRIDGE_ROLLOUT.md). This document remains the detailed
-EAB execution reference.
+Use exactly four roles. **Coordinator** prepares the release, deploys external-chain contracts and tracks progress. **Admin 1** initiates STRATO deployments and votes. **Admin 2** supplies the second vote. Both administrators also review/sign Safe transactions. **Infra** provisions identities and deploys workloads. If the live governance threshold requires additional approvals, obtain them before continuing; do not change the threshold to fit this guide.
 
-One EAB between one STRATO network and one supported external EVM chain. Same
-reviewed commit on every machine. No liquidity migration. Do not upgrade an old
-vault.
+The coordinator edits **one file: `deployment.json`**. Distribute **one package at a time: `deployment-bundle.json`**. The provisioning package is replaced by the final reviewed package during Step 3. Its checksum changes; every recipient explicitly rejoins the final package. Generated policies, Safe JSON, snapshots, profiles and progress reports stay under `.deployment/`. Never edit them or delete that directory to reset progress. Each person keeps their own credentials locally; credentials are never part of either shared file.
 
-ExternalBridgeVault `1.0.0`. ExternalAssetDepositRouter `1.0.0`.
+For EAB-only, exclude every native route. For EAB plus native, include the approved native routes. Native-only installations retain their dedicated guide; do not invent an EAB token route just to use this tool. Existing native contracts are upgraded without reinitialization. Legacy backing migration remains a separate operation under `EAB_CUTOVER.md`.
 
-Deploy ExternalAssetDepositRouter behind a fresh proxy. Do not upgrade a
-Mercata DepositRouter or an earlier EAB router proxy to this contract. Keep
-prior EAB router addresses enabled for historical polling and settlement while
-the new proxy becomes the primary router for new deposits.
+Every command below is a single shell line. Replace every `<PLACEHOLDER>` before execution. **Set** means human input. **Derived** means a previous command supplies it. **Verify** is a mandatory check. No command in `continue` submits a transaction; it reads current state and prints the exact next action and approval hash.
 
-For an existing MercataBridge network, also follow [EAB_CUTOVER.md](EAB_CUTOVER.md)
-for intake cutoff, pending transactions, custody, application rollout, and rollback.
+## 1. Prepare the release and identities
 
-This branch also changes native bridge routing and the unified Trade page. If
-native routing is in scope, complete [Native routing release gate](#native-routing-release-gate)
-before exposing it to users. The EAB rollout CLI does **not** configure or verify
-StratoNativeBridge, its external representation bridges, or their route permissions.
-Complete [Application release and Fund/Trade cutover](#application-release-and-fundtrade-cutover)
-for the UI/backend release even when native routing is out of scope.
+**Coordinator — Set:** repository path, environment (`testnet` or `prod`), external network family, STRATO HTTPS host and a new rollout directory. HyperEVM is production-only.
 
-Wait for each AdminRegistry issue or Safe transaction to execute. Stop on
-failure. Run the command `status` prints; do not invent flags.
+```bash
+export REPO_ROOT=<ABSOLUTE_STRATO_PLATFORM_REPOSITORY> DEPLOY_ENV=<testnet-or-prod> NETWORK=<ethereum-or-base-or-linea-or-robinhood-or-hyperevm> STRATO_NODE_URL=https://<STRATO_HOST> ROLLOUT_DIR=<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>
+```
 
-## Deposit recovery upgrade gate
+**Coordinator — Verify:** reviewed commit, clean checkout and matching immutable contract/runtime/backend/UI image releases. Record the commit; never use a moving branch or image tag for deployment.
 
-Native refund completion now requires a separate governance vote on `finalizeDepositRefund(depositId, refundTxHash)` after the operator records confirmed external evidence. Verify the native bridge is owned by AdminRegistry (not the hot operator), its finalization voting threshold is correct, the operator has no whitelist bypass for `finalizeDepositRefund`, and `depositRefundEvidence` is indexed. Deploy backend/UI with the Confirm refund action; keep the item pending until that vote executes.
+```bash
+cd "$REPO_ROOT" && test -z "$(git status --porcelain)" && export RELEASE_COMMIT="$(git rev-parse HEAD)" && mkdir -p "$ROLLOUT_DIR/.deployment" && chmod 700 "$ROLLOUT_DIR" "$ROLLOUT_DIR/.deployment"
+```
 
-For rejected-deposit delivery/refunds, follow [Deposit delivery and source-network refunds](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds) before releasing the Admin actions. These changes require upgrades of the **EAB** vault, external native representation bridge, and both STRATO bridges, followed by verifiers, `bridge-eab`, and backend/UI. This is an upgrade of this branch's EAB contracts, not an upgrade of a legacy MercataBridge vault. Preserve addresses, signer configuration, and durable service data; do not migrate liquidity. Validate both decisions on testnet before production rollout.
+**Derived:** `TARGET_NETWORK`, `TARGET_CHAIN_ID`, `TARGET_RPC_ENV`, `VERIFIER_COUNT`, `VERIFIER_THRESHOLD`. Verify they describe the approved network.
 
-## Service build boundary
+```bash
+eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
+```
 
-EAB runtime and verifiers are built from `app/services/bridge-eab`, using its
-Dockerfile with `app` as the build context. Use `make bridge-eab bridge-eab-nginx`
-and `make docker-compose-bridge-eab` from the repository root. The existing
-`bridge` targets and `app/services/bridge` now build the legacy service from
-`develop`; do not use those artifacts for EAB. See the
-[service migration notes](app/services/bridge-eab/README.md#service-separation-and-deployment).
+**Every role — Set locally:** its own STRATO OAuth credentials in `app/contracts/.env` when needed. Coordinator sets its read credentials, deployer key and selected RPC in `app/ethereum/.env`. Set both the registry-named RPC variable and `CHAIN_<TARGET_CHAIN_ID>_RPC_URL` to the approved HTTPS RPC. Never distribute these files. Admin 1 and Admin 2 must use different signing accounts. Each account needs STRATO transaction fees.
 
-Keep the deployed EAB data mount, cursors, service names, and immutable-image
-workflow. Update infrastructure build and verifier provenance paths before the
-next release. No contract upgrade or runtime ownership change is part of the
-service package separation; native solver/routing compatibility remains a
-separate release gate.
+```bash
+cd "$REPO_ROOT/app/contracts" && npm ci
+```
 
-## Files
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm ci && npm run compile
+```
 
-After `bundle`, the only shared file is `deployment-bundle.json` plus its
-SHA-256. Do not copy `generated/`, `.env` files, vote journals, or private keys.
+**Infra — Set/Verify:** reviewed Infra release, AWS account/profile for each workload, DNS, two independent RPC providers per verifier, STRATO attestor identities, operator/relayer accounts, Safe proposer and executors. Return public addresses and endpoints only. Keep KMS ARNs, API tokens and credentials in Infra's private configuration. Native verification needs its native signer/executor configuration as well. Workloads remain stopped.
 
-| Who | Keep |
-| --- | --- |
-| Coordinator, before bundle | Editable `deployment-manifest.json`. Deploy and discovery write `external-deployment.json` and `deposit-plan.json` beside it. |
-| After bundle, every persona | `deployment-bundle.json`, `<role>.json`, and that persona’s `.env` |
-| Coordinator only | Safe Transaction Builder JSON under `generated/`. Import the paths printed in `safeChecklist` and the activation command. Other Safe owners sign in the Safe app. |
-| Infra only | The env/policy template paths printed by `plan`. Render them through the secret manager. |
+**Admins — Verify:** the selected Safe's owners and approval threshold. **Coordinator — Set:** the reviewed Safe address, AdminRegistry address and deployment confirmation count.
 
-Never edit `generated/`. Use `generated/latest.json` only to find the current
-report.
+```bash
+export SAFE_ADDRESS=<0x_SAFE_ADDRESS> ADMIN_REGISTRY=<STRATO_ADMIN_REGISTRY_WITHOUT_0X> DEPLOYMENT_CONFIRMATIONS=<POSITIVE_INTEGER>
+```
+
+## 2. Deploy contracts and build the deployment file
+
+**Admin 1 — Run:** deploy the fresh TokenRouter and EAB proxies if approved for this rollout. **Admin 2 — Act:** vote on each printed contract-creation issue; never rerun a deployment to cast a vote. After creation, Admin 1 runs the corresponding upgrade; Admin 2 votes on both printed implementation-creation and `setLogicContract` issues. Wait for execution before proceeding.
+
+```bash
+cd "$REPO_ROOT/app/contracts" && npm run deployProxy -- --empty --owner "$ADMIN_REGISTRY" --contract-file BaseCodeCollection.sol
+```
+
+**Set/Verify:** `<TOKEN_ROUTER_PROXY>` is the proxy returned by that deployment, rather than the implementation.
+
+```bash
+cd "$REPO_ROOT/app/contracts" && npm run upgrade -- --proxy-address <TOKEN_ROUTER_PROXY> --contract-name TokenRouter --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
+```
+
+```bash
+cd "$REPO_ROOT/app/contracts" && npm run deployProxy -- --empty --owner "$ADMIN_REGISTRY" --contract-file BaseCodeCollection.sol
+```
+
+**Set/Verify:** `<EAB_PROXY>` is the second deployed proxy.
+
+```bash
+cd "$REPO_ROOT/app/contracts" && npm run upgrade -- --proxy-address <EAB_PROXY> --contract-name ExternalAssetBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
+```
+
+**Native included:** use the reviewed upgrades in `NATIVE_BRIDGE_DEPLOYMENT.md` / the production native runbook. Preserve existing proxies, mappings and custody. Do not initialize existing proxies. Admins review every upgrade and keep native intake paused until the handoff and activation checks are complete.
+
+**Coordinator — Set:** chain-specific deployment roles to the approved Safe. Verify the role addresses and confirmation count in the preflight output before `--execute`.
+
+```bash
+export "CHAIN_${TARGET_CHAIN_ID}_DEPLOYMENT_CONFIRMATIONS=$DEPLOYMENT_CONFIRMATIONS" "CHAIN_${TARGET_CHAIN_ID}_SAFE_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_VAULT_DEFAULT_ADMIN_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_VAULT_UPGRADER_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_VAULT_POLICY_ADMIN_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_GUARDIAN_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_VAULT_UNPAUSER_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_VAULT_ATTESTATION_ADMIN_ADDRESS=$SAFE_ADDRESS" "CHAIN_${TARGET_CHAIN_ID}_LARGE_WITHDRAWAL_APPROVER_ADDRESS=$SAFE_ADDRESS"
+```
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR/.deployment/external"
+```
+
+**Production only — Set:** explicit authorization for the selected chain.
+
+```bash
+export CONFIRM_EXTERNAL_BRIDGE_DEPLOY="$TARGET_CHAIN_ID"
+```
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR/.deployment/external" --execute
+```
+
+**Verify:** the generated deployment record reports the approved chain, Safe, distinct proxies/implementations and successful checks. The tool records external addresses; do not retype them. Remove the deployer key from the shell and `.env` after deployment. Admins execute the printed Safe pause transactions before configuration; a fresh vault starts unpaused.
+
+```bash
+unset PRIVATE_KEY
+```
+
+**Coordinator — Set:** `<EXISTING_EXTERNAL_CHAIN_ID>` is the source of the approved mappings. Discovery is read-only; it does not approve importing every route.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run bridge:prepare -- --discover --node-url "$STRATO_NODE_URL" --chain-id "$TARGET_CHAIN_ID" --source-chain-id <EXISTING_EXTERNAL_CHAIN_ID> --output-dir "$ROLLOUT_DIR/.deployment/discovery"
+```
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- init --discovery "$ROLLOUT_DIR/.deployment/discovery/prepare.json" --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+**Edit only `deployment.json`:** set `discovery.target.externalAssetBridge` to the approved EAB proxy; correct the target native bridge/representation addresses when native is included; set `include=true` only on approved EAB/native routes. Verify source/target networks, original token and representation mappings. The external deployment record under `.deployment/external` is loaded automatically. Exclude all native routes for EAB-only.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- init --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+**Edit the same file after `MANIFEST_CREATED`:** verify/set `settings.tokenRouter`, `settings.externalAssetBridge`, dependencies, operator, guardian and STRATO attestors. Review `policy` permissions and every raw amount. Set Runtime confirmations. Keep liquidity migration zero. Keep withdrawals disabled for an initial deposit-only rollout. Native inputs are embedded under `inputs.nativeRoutes` and `inputs.nativeConfig`; review token pairs, limits, signer threshold, executor, transfer and freeze settings there. Do not edit separate generated files.
+
+For a fresh route with no discoverable mapping, use the detailed preparation reference below to populate that route; do not copy an unrelated token's decimals or limits.
+
+## 3. Provision, review and configure
+
+**Coordinator — Run:** create the single pre-Infra package. This package cannot authorize governance or activation.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- prepare --manifest "$ROLLOUT_DIR/deployment.json" --stage initial
+```
+
+**Verify:** `PROVISIONING_PACKAGE_READY`; routes, limits, dependency addresses, attestors and confirmations are decided. Only workload-generated signer/proposer/executor identities or endpoint bindings may remain outstanding. Send the printed bundle and SHA-256 to Infra. Infra saves its local copy as `deployment-bundle.json` in its secured rollout directory.
+
+**Infra — Set:** its own `ROLLOUT_DIR`, `REPO_ROOT`, `INFRA_ENV`, `INFRA_NETWORK` and selected AWS credentials. Verify the received bundle checksum against the coordinator's separately provided value.
+
+```bash
+shasum -a 256 "$ROLLOUT_DIR/deployment-bundle.json"
+```
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- join --role infra --bundle "$ROLLOUT_DIR/deployment-bundle.json"
+```
+
+**Infra — Use:** the printed managed policies/templates and `.deployment/infra/services.json`; no separate generated files need to be transferred. Fill the corresponding reviewed Infra network profiles, verify policy hashes and immutable image digests, and keep `Running=No`. Native policy paths are supplied only when native routes are selected. Return the actual public KMS signer/proposer/executor addresses and verifier endpoints.
+
+**Coordinator — Edit only `deployment.json`:** enter Infra's returned addresses, verifier URLs and token environment-variable names. For native, resolve `inputs.nativeConfig` signer/executor settings as well. Remove every `REVIEW_REQUIRED` value; never paste secret values into this file.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- prepare --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+**Verify:** `PREPARED_FOR_REVIEW`. Review the printed contract bindings, identities, thresholds, starting block, token pairs, permissions, raw limits and confirmations. This creates the final `deployment-bundle.json`. Distribute that one file and its SHA-256 to both admins and Infra; archive the provisioning copy. Everyone verifies the new checksum and explicitly joins the final package.
+
+**Admin 1 — Run with their own credentials:**
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- join --role admin-1 --bundle "$ROLLOUT_DIR/deployment-bundle.json"
+```
+
+**Admin 2 — Run with their own credentials:**
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- join --role admin-2 --bundle "$ROLLOUT_DIR/deployment-bundle.json"
+```
+
+**Infra — Rejoin the final package:**
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- join --role infra --bundle "$ROLLOUT_DIR/deployment-bundle.json"
+```
+
+**Coordinator — Use throughout the remaining steps:**
+
+```bash
+export EAB_ROLLOUT_CONFIG="$ROLLOUT_DIR/.deployment/coordinator.json"
+```
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- continue
+```
+
+Run only the next printed action. Coordinator imports the pending Safe JSON; admins review/sign/execute it. For STRATO actions, each required administrator uses their local profile and the fresh vote command/hash printed by the tool. After a vote, wait for the other administrator and execution/indexing; never rerun a deployment or reuse an old hash. Coordinator reruns `continue` after the action completes.
+
+**Native included:** follow the printed native route dry-runs, admin votes and external Safe configuration command. Require `0 pending calls` from native configuration before proceeding. Confirm native `bridgeOperator` equals the Runtime's actual STRATO service account; make any required operator/guardian changes through governance. Native attestors and limits must match the generated native verifier policies. EAB-only produces no native configuration steps.
+
+## 4. Start services and verify readiness
+
+**Infra — Verify the handoff first:** pause/drain old intake and account for pending withdrawals, deposits, refunds and Safe proposals. Stop the old native processor; prevent its scheduler from restarting it. Preserve journals/cursors. If sharing a Safe, stop the old proposal writer and reconcile all pending/future nonces before enabling the new writer. Never run both native processors. Do not copy a legacy cursor into a fresh EAB data volume.
+
+**Infra — Set/Verify:** correct AWS account, approved image digests, private RPCs/tokens/KMS settings, final package policy hashes and durable data volume. Use the final `services.json` paths. Preserve other chain bindings when adding a network to an existing Runtime; do not replace its complete template with a single-chain template. For each verifier, select that verifier's AWS credentials and set `VERIFIER_NUMBER` before running the reviewed Infra profile.
+
+```bash
+cd <ABSOLUTE_EAB_INFRA_REPOSITORY> && guides/tools/deploy.sh "deployments/$INFRA_ENV/verifier-$VERIFIER_NUMBER/$INFRA_NETWORK.conf" --preview
+```
+
+```bash
+cd <ABSOLUTE_EAB_INFRA_REPOSITORY> && guides/tools/deploy.sh "deployments/$INFRA_ENV/verifier-$VERIFIER_NUMBER/$INFRA_NETWORK.conf"
+```
+
+Repeat for the network-derived verifier count. Start verified workloads only after Step 3 and the handoff gate pass. Preview/apply the Runtime with the reviewed final configuration; increase `RestartRevision` once.
+
+```bash
+cd <ABSOLUTE_EAB_INFRA_REPOSITORY> && guides/tools/deploy.sh "deployments/$INFRA_ENV/runtime/runtime.conf" --preview
+```
+
+```bash
+cd <ABSOLUTE_EAB_INFRA_REPOSITORY> && guides/tools/deploy.sh "deployments/$INFRA_ENV/runtime/runtime.conf"
+```
+
+**Verify:** all verifiers and Runtime are healthy; chain, bridge/vault, signer, attestor, confirmations and policy hashes match the final package. Fund operator, relayer, attestors and executors. Register proposer as a Safe delegate, not an owner. Stage the matching backend/UI behind closed public intake and verify `/api/config` and route quotes on the actual public hostname.
+
+**Coordinator — Set locally:** `BRIDGE_HEALTH_URL` to the deployed Runtime's HTTPS health endpoint; RPC/auth/token variables named in the deployment file must be available to the current process or its private environment file. Require a successful readiness result before activation.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- verify
+```
+
+## 5. Activate and run canaries
+
+**Coordinator — Run:** obtain the current activation action. Review and execute only the exact printed `activate --approve <HASH>` command; do not construct or reuse the hash.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- continue
+```
+
+**Admins — Act:** independently review/sign/execute the generated activation Safe transaction. For native, separately approve the native route enablement votes and representation-bridge activation from the managed native configuration path printed in Step 3. Keep native inactive until both STRATO and external configuration and readiness checks pass. These approvals do not require another human role.
+
+```bash
+cd "$REPO_ROOT/app/ethereum" && npm run external:rollout -- continue
+```
+
+**Verify before public intake:** plain deposit/redemption; permitted routing success and fallback; below-threshold execution; manual Safe execution; rejection/refund/cancellation; retry after completion without another mint/release/burn. Reconcile user, custody, escrow, representation supply and recipient balances. Native canaries apply only when native is included. A pending Safe proposal is not a completed transfer.
+
+Record canary transaction IDs and results with the release and bundle checksum. Open public intake only after completion. To roll back, pause external intake first, retain workers until accepted operations are settled/reconciled, then stop the affected stack. Preserve journals and the `.deployment` evidence directory. For legacy custody movement, use the separate cutover reconciliation gate.
+
+
+# Detailed reference
+
+The five steps above are the execution checklist. The material below explains individual operations and legacy/manual invocation options; do not execute it as a second deployment sequence. Generated files in the five-step flow live under `.deployment/`; explicit output paths below remain supported for existing rollouts.
+
+
+Deploy one External Asset Bridge between one STRATO network and one supported
+external EVM chain.
+
+Use separate testnet and production accounts, keys, Safes, contracts, services,
+and data directories.
+
+For legacy custody migration, complete `EAB_CUTOVER.md`.
+
+For STRATO-native routing, complete `NATIVE_BRIDGE_DEPLOYMENT.md` after this
+EAB deployment.
 
 ## Roles
 
-**Coordinator** owns the manifest, bundle, Safe proposals, readiness, canary,
-and evidence. Read-only STRATO credentials, external deploy key, RPC, and Safe
-submit access. No administrator credentials, AWS credentials, verifier tokens,
-or KMS signing.
+- Coordinator: release, manifest, external deployment, Safe proposals,
+  readiness, activation, and canary.
+- STRATO administrators: STRATO proxy deployment and AdminRegistry votes.
+- Safe owners: external Safe review, signing, and execution.
+- Infra: AWS, IAM, KMS, DNS, RPCs, verifier services, Runtime, secrets, images,
+  and executor gas.
 
-**Administrator 1** is the first STRATO admin voter (`setup --role admin-1`).
-**Administrator 2 and every later administrator** each use `setup --role admin-2`
-with their own `--config` and `--env-file`. The CLI has no `admin-3` role; the
-profile only labels that machine. Live AdminRegistry threshold is the source of
-truth. If coordinator `status` prints `ADDITIONAL_ADMIN_VOTE`, another distinct
-admin identity votes with a separate `admin-2` profile. Do not assume Admin 2 is
-last.
+## Required contracts
 
-**Infra deployer** owns AWS/IAM/KMS, DNS/TLS, images, secrets, the configured
-verifier set, Runtime, and executor gas. Procedure:
-[eab-infra](https://github.com/strato-net/eab-infra).
+Deploy or explicitly approve the reuse of:
 
-Safe owners are not a persona. Anyone with a Safe owner key signs independently
-when a threshold is required.
+### STRATO
 
-## Rules
+- `TokenRouter` proxy and implementation.
+- `ExternalAssetBridge` proxy and implementation.
 
-- Production: clean working tree, immutable image digests.
-- Share only the bundle, its checksum, and printed commands.
-- Both contracts start **unpaused**. Pause them in step 5 and keep them paused
-  until the activation batch.
-- The KMS proposer is a Safe delegate, not a Safe owner. Do not
-  `addOwnerWithThreshold` for the proposer. The executor is not a Safe owner or
-  verifier.
-- AdminRegistry is the vote source of truth. Do not copy vote journals.
-  Coordinator `status` counts live `IssueCreated` / `IssueVoted` events.
-- The `--approve` hash binds the current rollout revision (manifest, policy,
-  embedded deployment/plan, and rollout code), each READY call id and status,
-  overall check readiness, and whether ExternalAssetDepositRouter is paused. It has no
-  wall-clock expiry. It does not by itself bind vault pause, verifier health,
-  or vote counts. Never reuse a hash from an older `status` report.
-- `autoRouteEnabled` stays `false` on every route. `migrateAmount` stays `"0"`
-  unless migration has a separate approval.
+### External EVM chain
 
-## Production profile: EAB-only parallel with legacy
+- Safe.
+- `ExternalBridgeVault` proxy and implementation.
+- `ExternalAssetDepositRouter` proxy and implementation.
 
-Use this profile when production MercataBridge and native traffic must remain on
-the existing `app/services/bridge` deployment while the new
-`app/services/bridge-eab` deployment processes only EAB traffic. This is a
-controlled coexistence profile, not the final legacy cutover in
-`EAB_CUTOVER.md`.
+### Existing dependencies
 
-The two paths remain independent:
+Record verified addresses for:
 
-- Existing Fund/legacy integrations continue to use MercataBridge, its deposit
-  routers, custody Safe, and the legacy Runtime.
-- Existing native deposits and withdrawals continue to use the current native
-  contracts and the legacy Runtime.
-- EAB canary traffic uses ExternalAssetBridge, the new
-  ExternalAssetDepositRouter, the new ExternalBridgeVault, EAB verifiers, and
-  the EAB Runtime.
-- Do not migrate legacy custody, change native ownership, upgrade native
-  contracts, or copy legacy cursors into the EAB data volume.
+- AdminRegistry.
+- TokenFactory.
+- USDST.
+- PriceOracle.
+- PoolFactory.
+- PoolV3Factory.
+- DirectMintPSM.
+- MetalForge.
+- SaveUSDSTVault.
+- Approved yield vaults.
+- Permit2.
+- External source tokens.
+- STRATO destination tokens.
 
-### Parallel-safety decisions
+## Stop rules
 
-Approve these before step 0:
+- Stop on any failed command or mismatched address.
+- Wait for each AdminRegistry issue and Safe transaction to execute.
+- Never start a second deployment command to vote on an existing issue.
+- Never reuse an old approval hash.
+- Never put private keys, OAuth secrets, RPC credentials, verifier tokens, or
+  KMS ARNs in the manifest or bundle.
+- Keep the vault and DepositRouter paused from configuration through readiness.
+- Do not activate before all readiness checks pass.
+- Do not use native deployment steps for an EAB-only rollout.
 
-1. **Safe isolation.** Prefer a separate EAB Safe for a full deposit and
-   withdrawal canary. If EAB and legacy use the same Safe, this profile is
-   deposit-only: every EAB route has `withdrawalsEnabled=false`, the vault stays
-   paused, and no EAB operation that creates a Safe proposal is exercised.
-   The two services have independent nonce journals and must not concurrently
-   allocate nonces on the same Safe. A shared Safe also requires a short,
-   explicit writer-handoff window for each EAB configuration or activation
-   transaction: stop the legacy proposal writer, reconcile pending Safe nonces,
-   execute and index the EAB transaction, then restart the legacy writer. If
-   that interruption is unacceptable, use a separate EAB Safe.
-2. **Asset isolation.** Prefer a canary token with no existing production
-   holders. Existing STRATO token balances are fungible: if an EAB withdrawal
-   route is open, any holder can consume liquidity placed in the EAB vault.
-   A hidden UI is not an access control.
-3. **Writer isolation.** Use distinct EAB operator, relayer, external executor,
-   KMS proposer, OAuth identities, data volume, and external gas funding. Do
-   not share an external transaction-signing key between Runtimes.
-4. **Deployment isolation.** Deploy EAB as a separate stack/Compose project or
-   host so its `bridge` service name and `bridgedata` volume cannot replace the
-   legacy containers or volume.
+## 1. Freeze the release
 
-### 1. Freeze the legacy baseline
-
-Before deploying EAB, record the running legacy image digest, MercataBridge and
-native proxy addresses, legacy Safe, enabled chains/routes, data-volume backup,
-polling checkpoints, pending operations, and outstanding Safe proposals.
-Confirm the legacy service remains healthy and continues to own native
-processing. Do not reconfigure its contracts for an EAB deposit-only canary;
-the only permitted interruption is a reviewed shared-Safe writer handoff.
-
-### 2. Select production EAB scope
-
-Run the normal step 0 environment selection once per external production
-network:
+Use Node.js 22.12 or later and one reviewed commit on every machine.
 
 ```bash
 cd <STRATO_PLATFORM_REPOSITORY>
+test -z "$(git status --porcelain)"
 export REPO_ROOT="$PWD"
-export DEPLOY_ENV=prod
-export NETWORK=<ethereum|base|linea|robinhood|hyperevm>
-eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
-export STRATO_NODE_URL=https://<PRODUCTION_STRATO_HOST>
-export ROLLOUT_DIR="$HOME/bridge-rollouts/${TARGET_NETWORK}-$(date -u +%Y%m%dT%H%M%SZ)"
+export RELEASE_COMMIT="$(git rev-parse HEAD)"
 ```
 
-Use the normal production verifier count and threshold derived by the command.
-Select only EAB routes. Do not select, prepare, configure, or activate native
-routes. Keep `autoRouteEnabled=false` and `migrateAmount="0"`.
+Record immutable image digests built from `RELEASE_COMMIT`:
 
-For a shared Safe, configure every route as deposit-only:
-
-```json
-{
-  "depositsEnabled": true,
-  "withdrawalsEnabled": false,
-  "autoRouteEnabled": false
-}
+```text
+BRIDGE_IMAGE_DIGEST=
+BRIDGE_NGINX_IMAGE_DIGEST=
+BACKEND_IMAGE_DIGEST=
+UI_IMAGE_DIGEST=
 ```
 
-### 3. Deploy and configure EAB
+Require successful contract, rollout, `bridge-eab`, backend, and UI builds.
 
-Complete steps 1–5 below for the selected network:
+## 2. Select the networks
 
-1. Prepare and review EAB routes.
-2. Deploy or upgrade only TokenRouter and ExternalAssetBridge on STRATO as
-   required by the reviewed release.
-3. Deploy the new ExternalBridgeVault and ExternalAssetDepositRouter.
-4. Freeze the bundle and set up coordinator, administrators, and infra.
-5. Execute the generated pause and configuration Safe transactions.
-
-Do not run the native routing release gate. In particular, do not upgrade
-StratoNativeBridge or StratoNativeRepresentationBridge, call
-`setTokenRouter`/`setAutoRouteEnabled` on the native bridge, or generate native
-configuration/activation Safe JSON.
-
-When sharing the legacy Safe, use the writer-handoff procedure above before
-importing each generated Safe JSON. Do not merely choose a later nonce while
-the legacy service remains able to create another proposal.
-
-### 4. Deploy an external-only EAB Runtime
-
-Complete steps 6–7 with a new immutable `bridge-eab` image and separate durable
-data volume. Deploy the EAB verifier set and external executor normally.
-
-In the EAB Runtime environment:
-
-- Set `EXTERNAL_ASSET_BRIDGE_ADDRESS`, `TOKEN_ROUTER`, and all required
-  `CHAIN_<ID>_EXTERNAL_*`, RPC, verifier, operator, relayer, and KMS values.
-- Leave `STRATO_NATIVE_BRIDGE_ADDRESS` empty.
-- Leave every `CHAIN_<ID>_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`,
-  `CHAIN_<ID>_NATIVE_MINT_EXECUTOR_*`, `CHAIN_<ID>_NATIVE_VERIFIER_URLS`, and
-  `CHAIN_<ID>_NATIVE_VERIFIER_API_TOKENS` value empty.
-- Do not mount or copy the legacy Runtime data directory.
-
-Startup still creates native polling loops, but without a native bridge and
-per-chain representation addresses they must discover no native work. Verify
-logs and health contain no native processing attempts. Verify the legacy
-Runtime remains the only process changing native checkpoints or settlement
-state.
-
-For a shared Safe, also verify there are no EAB withdrawal/manual-review
-records capable of creating a proposal. Any unexpected EAB Safe proposal is a
-stop condition: pause EAB intake and reconcile Safe nonces before continuing.
-
-### 5. Stage backend without switching legacy users
-
-Populate and verify the production `defaultExternalAssetBridgeFor` and
-`defaultTokenRouterFor` entries, then deploy the matching backend. Confirm:
-
-- `/api/config` returns the reviewed EAB and TokenRouter proxies.
-- Fund and `/bridge/*` still use MercataBridge.
-- Existing native routes still use their current contracts and legacy Runtime.
-- Unified Trade/EAB entry points remain hidden from general users until the
-  canary gate is approved.
-
-Do not retire legacy pages, change old deposit instructions, redirect old links,
-or move legacy custody in this profile.
-
-### 6. Activate only the approved canary surface
-
-Run the normal step 8 `verify` and freshly printed activation command.
-
-- **Shared Safe:** use deposit-only activation. Unpause only the new deposit
-  router; keep the vault and every withdrawal route paused/disabled.
-- **Separate EAB Safe:** a withdrawal canary is permitted only for an isolated
-  canary asset with reviewed vault liquidity, limits, and rollback. Do not fund
-  it by moving legacy backing.
-
-Keep public UI intake closed. Send the canary to the new router explicitly and
-record the router, vault, chain, token, amount, external receipt, EAB deposit
-identity, verifier attestations, STRATO settlement, and before/after balances.
-Confirm the legacy Safe balance and legacy/native checkpoints did not change.
-
-For a permitted below-review-threshold withdrawal canary, verify the dedicated
-EAB executor—not the legacy Safe—released exactly the reviewed amount and that
-no Safe proposal was created. Stop if another holder or route can consume the
-canary liquidity.
-
-### 7. Observe and roll back independently
-
-After the canary, either re-pause EAB or keep only the explicitly approved
-surface enabled. Monitor both services with separate alerts and evidence.
-
-To roll back EAB, pause the new router first. Keep the EAB Runtime and verifiers
-running until every accepted EAB deposit reaches a terminal, reconciled state;
-then stop only the EAB stack. Do not stop, restart, or restore the legacy stack
-as part of an EAB-only rollback.
-
-Enabling native processing in `bridge-eab` is a later release. Before that
-switch, drain native in-flight operations and Safe proposals, remove native
-configuration from the legacy Runtime, prove it is idle, then configure and
-start native processing in EAB. Never run both native processors. If legacy and
-EAB still share a Safe, legacy Safe-proposal creation must also be drained or
-moved to a separate Safe before the native switch.
-
-## 0. Approve numbers
-
-Amounts are raw token units. Verifier confirmations ≥ Runtime confirmations.
-`maxPerWithdrawal`, `maxAutoWithdrawalAmount`, and `refillRate` must not exceed
-`bucketCapacity`. `maxAutoWithdrawalAmount` must not exceed
-`manualReviewThreshold`.
-
-- STRATO network ID (decimal string) and external chain ID
-- Safe
-- STRATO guardian (EAB; a STRATO address)
-- Vault pauser (Ethereum `PAUSER_ROLE`; default the Safe, not the STRATO guardian)
-- Bridge operator and the network's settlement attestors (operator is not an attestor)
-- STRATO dependencies and, after step 2, TokenRouter and EAB proxy addresses
-- Routes, deposit/withdrawal/rebase flags (`autoRouteEnabled=false`)
-- If native routing is included: existing native bridge/custody and external
-  representation proxy addresses, current implementations, token/chain pairs to
-  opt in, native operator, polling checkpoints, and separate native canary amounts
-- Min deposit, max auto deposit, max withdrawal, auto withdrawal, manual-review
-  threshold, bucket capacity, refill, mint capacity/refill
-- Confirmations, verifier threshold, authorization validity (1–1800s, match
-  STRATO and vault)
-- Canary route, amounts, success criteria, and whether withdrawals are in scope
-
-Supported external networks:
-`app/ethereum/scripts/lib/externalBridgeNetworks.js`.
-
-## 1. Prepare
-
-Owner: Coordinator, Infra, each administrator on their own machine
-
-Node.js v22.12+. Same reviewed commit on every machine.
+Set the STRATO environment, external-chain family, and STRATO node:
 
 ```bash
-mkdir -p <ROLLOUT_DIRECTORY>
-chmod 700 <ROLLOUT_DIRECTORY>
-cd <STRATO_PLATFORM_REPOSITORY>
-git rev-parse HEAD
-git status --short
+cd "$REPO_ROOT"
+export DEPLOY_ENV=<testnet|prod>
+export NETWORK=<ethereum|base|linea|robinhood>
+export STRATO_NODE_URL=https://<STRATO_HOST>
+```
 
-cd app/contracts
+Production may also use:
+
+```bash
+export DEPLOY_ENV=prod
+export NETWORK=hyperevm
+```
+
+Do not select HyperEVM with `DEPLOY_ENV=testnet`.
+
+Derive the external network values:
+
+```bash
+eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
+```
+
+Record the output:
+
+```text
+TARGET_NETWORK=
+TARGET_CHAIN_ID=
+TARGET_RPC_ENV=
+VERIFIER_COUNT=
+VERIFIER_THRESHOLD=
+```
+
+Create the rollout directory:
+
+```bash
+export ROLLOUT_DIR="$HOME/bridge-rollouts/${TARGET_NETWORK}-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$ROLLOUT_DIR"
+chmod 700 "$ROLLOUT_DIR"
+```
+
+## 3. Prepare local environments
+
+### Every STRATO administrator
+
+```bash
+cd "$REPO_ROOT/app/contracts"
 [ -f .env ] || cp .env.sample .env
-# Fill NODE_URL, OAUTH_URL, OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET,
-# GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD for *this* identity.
 chmod 600 .env
 npm install
+```
 
-cd ../ethereum
+Set that administrator's own values in `app/contracts/.env`:
+
+```text
+NODE_URL=<same value as STRATO_NODE_URL>
+OAUTH_URL=
+OAUTH_CLIENT_ID=
+OAUTH_CLIENT_SECRET=
+GLOBAL_ADMIN_NAME=
+GLOBAL_ADMIN_PASSWORD=
+```
+
+Fund each administrator's STRATO address for deployment and governance fees.
+
+Install the rollout tooling and set the external read-only RPC on every
+administrator machine:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm install
+```
+
+Set `CHAIN_<TARGET_CHAIN_ID>_RPC_URL` in `app/ethereum/.env`. Do not set
+`PRIVATE_KEY`.
+
+### Coordinator
+
+Set the coordinator's read-only STRATO credentials in
+`app/contracts/.env`. Set `NODE_URL` to the same value as `STRATO_NODE_URL`.
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
 [ -f .env ] || cp env.example .env
-# Fill the Hardhat RPC for the selected network, ETHERSCAN_API_KEY,
-# ALCHEMY_API_KEY (only if using Mercata discovery), and the CHAIN_<ID>_*
-# deployment addresses. Leave PRIVATE_KEY empty until the external deploy,
-# then clear it.
 chmod 600 .env
 npm install
 npm run compile
 ```
 
-`app/contracts/.env` is required for `deployProxy`, `upgrade`, Cirrus inventory,
-and rollout votes. `app/ethereum/.env` is required for Hardhat deploy and
-explorer verification.
+Set the approved external RPC under both required names:
 
-Testnet and production use separate accounts, keys, Safe, contracts, services,
-and data directories.
+```bash
+export "$TARGET_RPC_ENV=https://<EXTERNAL_RPC>"
+export "CHAIN_${TARGET_CHAIN_ID}_RPC_URL=${!TARGET_RPC_ENV}"
+```
 
-Infra provisions one `ECC_SECG_P256K1` / `SIGN_VERIFY` key for the proposer, one
-for the executor and one per verifier: five keys on testnet or seven in
-production. Runtime uses workload identity.
-Each verifier has its own role, key, RPCs, and STRATO attestor.
+Persist the same two values in `app/ethereum/.env`.
 
-Before submitting STRATO deployment or governance transactions, fund each
-administrator's STRATO address with vouchers or USDST for transaction fees.
-External deployment gas is funded separately on the external chain.
+Use the same STRATO host for `STRATO_NODE_URL`, `app/contracts/.env` `NODE_URL`,
+and the manifest's `services.nodeUrl`.
 
-Infra returns only:
+Set explorer credentials in `app/ethereum/.env` when verification requires
+them.
+
+Keep `PRIVATE_KEY` unset until the external contract deployment.
+
+## 4. Provision base infrastructure and STRATO identities
+
+Coordinator:
+
+- Creates one STRATO/OAuth identity per verifier.
+- Creates distinct Runtime operator and relayer STRATO/OAuth identities.
+- Funds every identity.
+- Records `VERIFIER_COUNT` independent verifier regions and RPC-provider
+  allocations.
+- Grants each operator access to the reviewed `eab-infra` commit.
+
+Record:
 
 ```text
-SAFE_PROPOSER_ADDRESS
-EXTERNAL_EXECUTOR_ADDRESS
-VERIFIER_1_AUTHORIZATION_SIGNER_ADDRESS
-VERIFIER_2_AUTHORIZATION_SIGNER_ADDRESS
-VERIFIER_3_AUTHORIZATION_SIGNER_ADDRESS
-VERIFIER_1_BASE_URL
-VERIFIER_2_BASE_URL
-VERIFIER_3_BASE_URL
+BRIDGE_OPERATOR_STRATO_ADDRESS=
+RELAYER_STRATO_ADDRESS=
+VERIFIER_<N>_STRATO_ATTESTOR_ADDRESS=
 ```
 
-KMS ARNs, tokens, and AWS credentials stay with infra.
+Runtime operator deploys the Runtime account base stack and returns:
 
-## 2. Deploy contracts
+```text
+RUNTIME_ACCOUNT_ID=
+RUNTIME_EGRESS_IP=
+```
 
-Owners: Coordinator, Administrator 1, additional administrators as required
+Give `RUNTIME_EGRESS_IP/32` to every verifier operator as `AllowedIp1`.
 
-Skip STRATO proxies only if reviewed proxies and implementations already exist.
+Each verifier operator deploys only its base stack and returns:
 
-From `app/contracts`. Each `deployProxy` / `upgrade` has two AdminRegistry
-gates: contract creation, then (for `upgrade`) `Proxy.setLogicContract`. The
-first administrator starts the command and **leaves that process running**. It
-prints `Create-contract governance issue created: <issueId>` and waits for
-`IssueExecuted`. Additional administrators open the STRATO Admin tab and vote
-**that printed issue ID**. Same source and constructor arguments. Do not start a
-second `deployProxy` or `upgrade` to cast a vote. Do not rerun a completed
-creation or upgrade.
+```text
+ACCOUNT_ID=
+REGION=
+STRATO_ATTESTOR_ADDRESS=
+EGRESS_IP=
+RPC_PROVIDER_NAMES=
+```
+
+Coordinator grants:
+
+- Verifier accounts access to `strato/bridge-eab`.
+- Runtime account access to `strato/bridge-eab`.
+- Runtime account access to `strato/bridge-eab-nginx`.
+
+Keep verifier workloads stopped.
+
+Do not enable the new chain in a running Runtime.
+
+Require:
+
+- Exactly `VERIFIER_COUNT` base-stack outputs.
+- Unique verifier regions.
+- Unique attestor addresses.
+- Approved independent RPC-provider allocation.
+- Operator and relayer are distinct from every attestor.
+
+## 5. Deploy or approve the external Safe
+
+Deploy a new Safe for a fresh production EAB deployment.
+
+Record:
+
+```text
+SAFE_ADDRESS=
+SAFE_OWNERS=
+SAFE_THRESHOLD=
+SAFE_DEPLOYMENT_TRANSACTION=
+```
+
+Verify:
+
+- Safe has bytecode on `TARGET_CHAIN_ID`.
+- Safe owners match the approved owners.
+- Safe threshold matches the approved threshold.
+- Safe Transaction Service recognizes the Safe.
+- An executing Safe owner wallet has external-chain gas.
+
+## 6. Deploy the STRATO contracts
+
+Deploy TokenRouter and ExternalAssetBridge once per STRATO environment.
+
+For an additional external chain on the same STRATO environment, reuse the
+canonical initialized proxies only after verifying their live implementations,
+owners, chain configuration, and routes. Do not deploy duplicate STRATO
+proxies per external chain.
+
+For a fresh STRATO environment, complete both deployments below.
+
+### TokenRouter
+
+Admin 1 starts the proxy deployment and leaves it running:
+
+```bash
+cd "$REPO_ROOT/app/contracts"
+npm run deployProxy -- --empty --owner <ADMIN_REGISTRY_ADDRESS> --contract-file BaseCodeCollection.sol
+```
+
+Other administrators vote on the printed creation issue in the STRATO Admin
+UI.
+
+Record:
+
+```text
+TOKEN_ROUTER_PROXY=
+```
+
+Admin 1 starts the implementation upgrade:
+
+```bash
+npm run upgrade -- --proxy-address "$TOKEN_ROUTER_PROXY" --contract-name TokenRouter --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
+```
+
+Other administrators vote on the printed implementation and
+`setLogicContract` issues.
+
+Record:
+
+```text
+TOKEN_ROUTER_IMPLEMENTATION=
+```
+
+Verify the proxy's live `logicContract` equals
+`TOKEN_ROUTER_IMPLEMENTATION`.
+
+### ExternalAssetBridge
+
+Admin 1 starts the proxy deployment and leaves it running:
 
 ```bash
 npm run deployProxy -- --empty --owner <ADMIN_REGISTRY_ADDRESS> --contract-file BaseCodeCollection.sol
-npm run upgrade -- --proxy-address <TOKEN_ROUTER_PROXY> --contract-name TokenRouter --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
-
-npm run deployProxy -- --empty --owner <ADMIN_REGISTRY_ADDRESS> --contract-file BaseCodeCollection.sol
-npm run upgrade -- --proxy-address <EXTERNAL_ASSET_BRIDGE_PROXY> --contract-name ExternalAssetBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
 ```
 
-A successful `upgrade` submission is not a completed upgrade. After the
-implementation address is printed, `setLogicContract` is submitted and still
-needs quorum. Additional administrators vote that issue in the Admin tab for
-the **recorded** implementation. If the process times out after implementation
-creation, do not rerun `upgrade`; finish the create-implementation issue, then
-submit `Proxy.setLogicContract` for that implementation in the Admin tab.
+Other administrators vote on the printed creation issue.
 
-Before the next step, verify the live proxy `logicContract` equals the recorded
-implementation. Do not proceed while it still points at the previous logic.
+Record:
 
-Coordinator deploys the vault and router. Permit2 defaults to the canonical
-address if unset. Vault pauser is `CHAIN_<ID>_GUARDIAN_ADDRESS` (Ethereum
-`PAUSER_ROLE`).
+```text
+EXTERNAL_ASSET_BRIDGE_PROXY=
+```
 
-Hardhat RPC is the network’s `rpcEnv` from
-`app/ethereum/scripts/lib/externalBridgeNetworks.js` (`SEPOLIA_RPC_URL`,
-`MAINNET_RPC_URL`, `BASE_RPC_URL`, `LINEA_RPC_URL`, …).
+Admin 1 starts the implementation upgrade:
 
 ```bash
-<NETWORK_RPC_ENV>=<HTTPS_RPC>
-PRIVATE_KEY=<DEPLOYER_PRIVATE_KEY>
-CHAIN_<CHAIN_ID>_DEPLOYMENT_CONFIRMATIONS=<APPROVED_COUNT>
-CHAIN_<CHAIN_ID>_SAFE_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_VAULT_DEFAULT_ADMIN_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_VAULT_UPGRADER_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_VAULT_POLICY_ADMIN_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_GUARDIAN_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_VAULT_UNPAUSER_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_VAULT_ATTESTATION_ADMIN_ADDRESS=<SAFE>
-CHAIN_<CHAIN_ID>_LARGE_WITHDRAWAL_APPROVER_ADDRESS=<SAFE>
+npm run upgrade -- --proxy-address "$EXTERNAL_ASSET_BRIDGE_PROXY" --contract-name ExternalAssetBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
 ```
 
-From `app/ethereum`:
+Other administrators vote on the printed implementation and
+`setLogicContract` issues.
+
+Record:
+
+```text
+EXTERNAL_ASSET_BRIDGE_IMPLEMENTATION=
+```
+
+Verify the proxy's live `logicContract` equals
+`EXTERNAL_ASSET_BRIDGE_IMPLEMENTATION`.
+
+Keep both STRATO proxies uninitialized until the rollout configuration stage.
+
+## 7. Deploy the external vault and DepositRouter
+
+Set the deployment key only on the coordinator machine:
 
 ```bash
-npm run deployExternalBridge:<NETWORK> -- --rollout-dir <ROLLOUT_DIRECTORY>
-# Production: CONFIRM_EXTERNAL_BRIDGE_DEPLOY=<CHAIN_ID>
-npm run deployExternalBridge:<NETWORK> -- --rollout-dir <ROLLOUT_DIRECTORY> --execute
+cd "$REPO_ROOT/app/ethereum"
+export PRIVATE_KEY=<EXTERNAL_DEPLOYER_PRIVATE_KEY>
+export SAFE_ADDRESS=<EXTERNAL_SAFE_ADDRESS>
 ```
 
-Writes `external-deployment.json`. Check `version()` is `1.0.0` for both the
-vault and router. Clear `PRIVATE_KEY`. Both contracts are unpaused until step 5.
+Verify Permit2 has bytecode at the default address. If the target chain uses a
+different reviewed deployment, set
+`CHAIN_<TARGET_CHAIN_ID>_PERMIT2_ADDRESS`.
 
-Verify the **implementation** addresses from that JSON (`ETHERSCAN_API_KEY` in
-`app/ethereum/.env`):
+Set deployment confirmations and every external role:
 
 ```bash
-npm run verify:<NETWORK> -- <VAULT_IMPLEMENTATION>
-npm run verify:<NETWORK> -- <ROUTER_IMPLEMENTATION>
+export "CHAIN_${TARGET_CHAIN_ID}_DEPLOYMENT_CONFIRMATIONS=<APPROVED_COUNT>"
+export "CHAIN_${TARGET_CHAIN_ID}_SAFE_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_DEFAULT_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_UPGRADER_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_POLICY_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_GUARDIAN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_UNPAUSER_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_VAULT_ATTESTATION_ADMIN_ADDRESS=$SAFE_ADDRESS"
+export "CHAIN_${TARGET_CHAIN_ID}_LARGE_WITHDRAWAL_APPROVER_ADDRESS=$SAFE_ADDRESS"
 ```
 
-### Inventory
+`SAFE_ADDRESS` is only a shell helper. The deployment reads
+`CHAIN_<TARGET_CHAIN_ID>_SAFE_ADDRESS` and the chain-scoped role variables.
 
-Prefer a hand-written `deposit-plan.json` when there are no Mercata mappings, or
-when you must not use Alchemy / the discovery `NODE_URL` override. One enabled
-item per route. Status `2` is ACTIVE.
+Persist `DEPLOY_ENV`, `NETWORK`,
+`CHAIN_<TARGET_CHAIN_ID>_DEPLOYMENT_CONFIRMATIONS`, and all
+`CHAIN_<TARGET_CHAIN_ID>_*_ADDRESS` values in `app/ethereum/.env`. Keep
+`DEPLOY_ENV` and `NETWORK` exported for both deployment commands.
 
-```json
-{
-  "operations": [
-    {
-      "chainId": 11155111,
-      "transactions": [
-        {
-          "meta": {
-            "items": [
-              {
-                "token": "0x<EXTERNAL_TOKEN>",
-                "target": "0x<STRATO_TOKEN>",
-                "isPermitted": true,
-                "externalDecimals": "6",
-                "externalName": "USD Coin",
-                "externalSymbol": "USDC",
-                "stratoTokenStatus": 2
-              }
-            ]
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-Mercata discovery is optional. It **requires** `ALCHEMY_API_KEY` in
-`app/ethereum/.env` even if chain RPCs are already set. `--env testnet` forces
-`NODE_URL=https://node1.testnet.strato.nexus` (Helium). `--env prod` forces
-`NODE_URL=https://app.strato.nexus`. It also needs `app/contracts/.env` OAuth
-fields. You cannot point discovery at another STRATO host.
+Run the read-only preflight:
 
 ```bash
-npm run router:ops:<testnet-or-prod> -- --step setters --chains <CHAIN_ID> --router-address <DEPOSIT_ROUTER> --safe-address <SAFE> --rollout-dir <ROLLOUT_DIRECTORY>
+npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR"
 ```
 
-Ignore the script’s “re-run with `--apply`” line.
+For production:
 
-## 3. Freeze the bundle
+```bash
+export CONFIRM_EXTERNAL_BRIDGE_DEPLOY="$TARGET_CHAIN_ID"
+```
 
-Owner: Coordinator
+Deploy:
+
+```bash
+npm run network:deploy-external -- --rollout-dir "$ROLLOUT_DIR" --execute
+```
+
+Remove the deployment key:
+
+```bash
+unset PRIVATE_KEY
+```
+
+Remove `PRIVATE_KEY` from `app/ethereum/.env`.
+
+Review `$ROLLOUT_DIR/external-deployment.json`.
+
+Require:
+
+- Network equals `TARGET_NETWORK`.
+- Chain ID equals `TARGET_CHAIN_ID`.
+- Safe address matches `SAFE_ADDRESS`.
+- Every vault role matches `SAFE_ADDRESS`.
+- Vault proxy, vault implementation, router proxy, and router implementation
+  are nonzero and distinct where required.
+- DepositRouter points to the deployed vault proxy.
+- Deployment blocks are present.
+- Every boolean vault-role verification field is `true`.
+- DepositRouter version is `1.0.0`.
+
+Read `version()` from the vault proxy and require `1.0.0`.
+
+Verify implementations:
+
+```bash
+npm run network:verify -- <VAULT_IMPLEMENTATION>
+npm run network:verify -- <DEPOSIT_ROUTER_IMPLEMENTATION>
+```
+
+Treat successful explorer verification as sufficient when optional Sourcify
+verification fails independently.
+
+## 8. Discover and select routes
+
+Use discovery when migrating or extending existing bridge mappings.
+
+Set the existing source-chain ID:
+
+```bash
+export LEGACY_SOURCE_CHAIN_ID=<EXISTING_EXTERNAL_CHAIN_ID>
+export DISCOVERY_DIR="$ROLLOUT_DIR/discovery-v1"
+test ! -e "$DISCOVERY_DIR"
+export "CHAIN_${LEGACY_SOURCE_CHAIN_ID}_RPC_URL=https://<EXISTING_EXTERNAL_CHAIN_RPC>"
+```
+
+Generate candidates:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run bridge:prepare -- --discover --node-url "$STRATO_NODE_URL" --chain-id "$TARGET_CHAIN_ID" --source-chain-id "$LEGACY_SOURCE_CHAIN_ID" --output-dir "$DISCOVERY_DIR"
+```
+
+Review:
+
+```text
+$DISCOVERY_DIR/discovery.json
+$DISCOVERY_DIR/prepare.json
+```
+
+In `prepare.json`:
+
+- Set `include=true` only for approved routes.
+- Set `target.externalDeployment=../external-deployment.json`.
+- Resolve any explicitly reported contract selection.
+- Confirm every external-token/STRATO-token mapping.
+- Keep unapproved native routes excluded.
+
+Generate the route inventory, settings, and policy:
+
+```bash
+export PREPARED_DIR="$ROLLOUT_DIR/prepared-v1"
+test ! -e "$PREPARED_DIR"
+npm run bridge:prepare -- --config "$DISCOVERY_DIR/prepare.json" --output-dir "$PREPARED_DIR"
+```
+
+Use:
+
+```text
+$PREPARED_DIR/deposit-plan.json
+$PREPARED_DIR/settings.json
+$PREPARED_DIR/policy.json
+```
+
+Require:
+
+- Chain ID equals `TARGET_CHAIN_ID`.
+- DepositRouter and deployment block match `external-deployment.json`.
+- External token metadata matches the deployed token.
+- STRATO token status is ACTIVE (`2`).
+- No duplicate token pair exists.
+- Only approved routes are present.
+
+For a route with no discoverable source mapping, create
+`$ROLLOUT_DIR/deposit-plan.json` with the same schema as the discovered
+`deposit-plan.json`. Add only approved routes. Verify each external token
+address, STRATO token address, decimals, name, symbol, and ACTIVE status.
+
+## 9. Create and complete the rollout manifest
+
+Initialize from discovered files:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- init --settings "$PREPARED_DIR/settings.json" --policy "$PREPARED_DIR/policy.json" --manifest "$ROLLOUT_DIR/deployment-manifest.json"
+```
+
+For a fully fresh rollout with no discoverable settings, create the draft
+instead:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- init --manifest "$ROLLOUT_DIR/deployment-manifest.json"
+```
+
+Fill the draft settings:
+
+```text
+sourceChainId=<STRATO network ID as a decimal string>
+externalDeployment=./external-deployment.json
+depositPlan=./deposit-plan.json
+tokenRouter=
+externalAssetBridge=
+bridgeOperator=
+guardian=
+settlementVerifiers=
+dependencies.adminRegistry=
+dependencies.poolFactory=
+dependencies.poolV3Factory=
+dependencies.directMintPsm=
+dependencies.metalForge=
+dependencies.saveUsdstVault=
+dependencies.yieldVaults=
+dependencies.tokenFactory=
+dependencies.usdst=
+dependencies.priceOracle=
+```
+
+Copy the reviewed manual deposit plan to
+`$ROLLOUT_DIR/deposit-plan.json` before expanding the draft.
+
+For production, resize `settlementVerifiers` to five entries. For testnet,
+keep three entries. Put the STRATO attestor addresses returned by the
+verifier base stacks in verifier-number order.
+
+Expand only the fully fresh draft:
+
+```bash
+npm run external:rollout -- init --manifest "$ROLLOUT_DIR/deployment-manifest.json"
+```
+
+Do not run `init` again after `schemaVersion: 1` appears.
+
+Fill every `REVIEW_REQUIRED` value except
+`services.safeProposerAddress` and `services.executorAddress`.
+
+Set the values known before workload deployment:
+
+```text
+services.nodeUrl=<HTTPS STRATO node>
+services.rpcUrlEnv=CHAIN_<TARGET_CHAIN_ID>_RPC_URL
+services.sourceTokenEnv=ACCESS_TOKEN
+services.confirmations=<Runtime confirmations>
+services.bridgeHealthUrlEnv=BRIDGE_HEALTH_URL
+```
+
+Leave top-level `authorizationSigners` and `services.verifiers` empty. Leave
+`services.safeProposerAddress` and `services.executorAddress` as
+`REVIEW_REQUIRED` until the stopped workloads return those values.
+
+Set the final reviewed policy:
+
+- Deposit permission per route.
+- `withdrawalsEnabled=false` for every route in an initial rollout.
+- Rebase requirement per route.
+- Automatic-route permission per route.
+- Minimum deposit.
+- Maximum automatic deposit.
+- Maximum per withdrawal.
+- Maximum automatic withdrawal.
+- Manual-review threshold.
+- Withdrawal bucket capacity and refill rate.
+- Mint capacity and refill rate.
+- `migrateAmount="0"` unless migration has separate approval.
+- `lastProcessedBlock` equal to the DepositRouter deployment block.
+
+Require before generating the Infra package:
+
+- Runtime confirmations are positive.
+- Testnet uses the network-derived verifier count and threshold.
+- Production uses the network-derived verifier count and threshold.
+- Operator is not an attestor.
+
+## 10. Generate the Infra package and obtain workload identities
+
+Generate the pre-Infra artifacts:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- plan --manifest "$ROLLOUT_DIR/deployment-manifest.json" --output-dir "$ROLLOUT_DIR/generated-preinfra-v1" --stage activation
+```
+
+Required status:
+
+```text
+OFFLINE_PLAN_INCOMPLETE
+```
+
+Require that the only unresolved fields are workload identities, URLs,
+token-environment names, and the proposer/executor addresses. Stop for any
+unresolved route, limit, dependency, contract, attestor, threshold, or
+confirmation value.
+
+Record the exact printed paths for:
+
+```text
+bridgeConfigPath=
+bridge.env.template=
+verifier-1.json ... verifier-<VERIFIER_COUNT>.json
+verifier-1.env.template ... verifier-<VERIFIER_COUNT>.env.template
+```
+
+Review every verifier policy:
+
+- STRATO and external chain IDs.
+- EAB proxy, vault proxy, and starting block.
+- Verifier index and matching STRATO attestor.
+- Route token pairs.
+- Deposit, withdrawal, rebase, and automatic-route permissions.
+- Every raw limit.
+- Identical baseline policy hash.
+- No credential, RPC URL, API token, KMS ARN, or private key.
+
+Initialize TokenRouter and EAB, including the reviewed settlement attestors.
+Give every administrator the printed pre-Infra `bridge-config.json` and its
+SHA-256. Each administrator verifies the checksum and runs the same command
+with their own `app/contracts/.env`:
+
+```bash
+cd "$REPO_ROOT/app/contracts"
+npm run configure:external-bridge -- --config <LOCAL_REVIEWED_BRIDGE_CONFIG_PATH> --step initialize --execute
+```
+
+After the governance threshold executes:
+
+```bash
+npm run configure:external-bridge -- --config <LOCAL_REVIEWED_BRIDGE_CONFIG_PATH> --step verify-initialize
+```
+
+Require successful initialization verification before verifier-stack
+deployment.
+
+Give each verifier operator:
+
+- Its `verifier-<N>.json`, renamed
+  `external-bridge-verifier-policy-<TARGET_CHAIN_ID>-<N>.json`.
+- The file's SHA-256.
+- `INFRA_NETWORK`, external chain ID, verifier confirmation count, verifier
+  image digest, and `Running=No`.
+- Its generated `verifier-<N>.env.template`.
+
+Use the `INFRA_NETWORK` slug required by `eab-infra`, such as
+`base-sepolia`; do not substitute the Hardhat name such as `baseSepolia`.
+
+Each verifier operator:
+
+1. Checks both independent RPCs with `guides/tools/rpc-probe.sh`.
+2. Deploys the network verifier stack with `Running=No`.
+3. Returns the complete `ValuesForCoordinator` line.
+4. Sends the generated API token once through the secure runtime channel.
+
+Give the Runtime operator:
+
+- `RELEASE_COMMIT`.
+- Bridge and nginx image digests.
+- The generated `bridge.env.template`.
+- Runtime account image-access confirmation.
+
+For a fresh Runtime:
+
+1. Deploy the Runtime stack with `ProposerKeyArn` empty.
+2. Deploy the separate proposer account base stack with `CreateNetwork=No`.
+3. Deploy the proposer stack using the Runtime `InstanceRoleArn`.
+4. Set the returned `ProposerKeyArn` in the Runtime configuration and redeploy.
+
+For an existing multi-network Runtime, preserve the persistent volume,
+existing executor keys, proposer key, and every existing network row. Add the
+new network without adding a native cursor when no native bridge is enabled.
+
+Infra returns:
+
+```text
+VERIFIER_<N>_AUTHORIZATION_SIGNER_ADDRESS=
+VERIFIER_<N>_NATIVE_SIGNER_ADDRESS=
+VERIFIER_<N>_BASE_URL=
+SAFE_PROPOSER_ADDRESS=
+EXTERNAL_EXECUTOR_ADDRESS=
+RUNTIME_URL=
+```
+
+Require:
+
+- Exactly `VERIFIER_COUNT` complete verifier outputs.
+- Stack parameters match chain, verifier number, confirmations, image digest,
+  policy hash, and `Running=No`.
+- Attestors match the manifest order.
+- Authorization signers, native signers, URLs, and approved RPC hosts are
+  unique.
+- Proposer, executor, and authorization signers are distinct.
+- Safe owners do not include proposer or executor.
+- Verifier authorization signers are excluded from Safe ownership under the
+  reviewed ownership policy.
+
+Fill the completed manifest:
+
+```text
+authorizationSigners=<top-level array in verifier-number order>
+services.verifiers=<URL/tokenEnv/confirmation entries in verifier-number order>
+services.safeProposerAddress=<Safe proposer address>
+services.executorAddress=<external executor address>
+```
+
+Set each verifier `tokenEnv` to an environment-variable name, not a token.
+Require each verifier confirmation count to be at least the Runtime
+confirmation count.
+
+Run the consolidated preparation:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- prepare --manifest "$ROLLOUT_DIR/deployment-manifest.json"
+```
+
+Required status:
+
+```text
+PREPARED_FOR_REVIEW
+```
+
+Require every mechanical check to pass. Compare each final verifier policy
+byte-for-byte with its pre-Infra policy.
+
+Review the printed policy summary:
+
+- STRATO and external chain IDs and starting block.
+- TokenRouter, EAB, Safe, vault, and DepositRouter.
+- Operator, guardian, attestors, authorization signers, proposer, and executor.
+- Signer and attestor thresholds.
+- Route token pairs, permissions, and every raw limit.
+- Runtime and verifier confirmations.
+- Verifier policy hashes.
+
+Send administrators only:
+
+- `deployment-bundle.json`.
+- Printed bundle SHA-256.
+
+Do not send:
+
+- Editable manifest.
+- `generated/`.
+- `.env` files.
+- Vote journals.
+- Private keys.
+- OAuth secrets.
+- RPC credentials.
+- Verifier tokens.
+- KMS ARNs.
+
+## 11. Administrators join
+
+Each administrator verifies the received checksum:
+
+```bash
+shasum -a 256 ./deployment-bundle.json
+```
+
+Admin 1:
 
 ```bash
 cd <STRATO_PLATFORM_REPOSITORY>/app/ethereum
-npm run external:rollout -- init --manifest <ROLLOUT_DIRECTORY>/deployment-manifest.json
+npm run external:rollout -- join --role admin-1 --bundle ./deployment-bundle.json
 ```
 
-First `init` copies the settings example. Fill STRATO settings and point
-`externalDeployment` / `depositPlan` at the two files. Rerun the same `init`
-command to expand. After `schemaVersion: 1`, do not run `init` again.
-
-Then fill every `REVIEW_REQUIRED` value in the manifest: policy (including
-`autoRouteEnabled=false`), three authorization signers, confirmations, three
-verifier URLs and token **variable names**, proposer and executor addresses,
-`bridgeHealthUrlEnv: "BRIDGE_HEALTH_URL"`. Never put token values in the
-manifest. `BRIDGE_HEALTH_URL` itself is set later in `coordinator.env`.
+Admin 2:
 
 ```bash
-npm run external:rollout -- plan --manifest <ROLLOUT_DIRECTORY>/deployment-manifest.json --output-dir <ROLLOUT_DIRECTORY>/generated --stage activation
-npm run external:rollout -- bundle --manifest <ROLLOUT_DIRECTORY>/deployment-manifest.json --bundle <ROLLOUT_DIRECTORY>/deployment-bundle.json
+cd <STRATO_PLATFORM_REPOSITORY>/app/ethereum
+npm run external:rollout -- join --role admin-2 --bundle ./deployment-bundle.json
 ```
 
-Send the bundle and printed checksum to both administrators and infra. Keep the
-editable manifest on the coordinator machine only.
+Additional administrators join with `--role admin-2` using separate local
+directories.
 
-## 4. Each persona sets up locally
+Each administrator:
 
-Owner: Each persona
+- Runs `npm install` in `app/ethereum`.
+- Uses their own `app/contracts/.env`.
+- Sets `CHAIN_<TARGET_CHAIN_ID>_RPC_URL` in `app/ethereum/.env`.
+- Does not set or receive `PRIVATE_KEY`.
+- Runs the printed `export EAB_ROLLOUT_CONFIG=...` command.
+
+The coordinator runs the export command printed by `prepare`.
+
+Wait until Admin 1 and every required additional administrator have joined
+before the coordinator runs `status`.
+
+## 12. Configure the external contracts while paused
+
+Coordinator:
 
 ```bash
-shasum -a 256 <LOCAL>/deployment-bundle.json
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- status
 ```
 
-`setup` writes only the profile JSON. Create the env file **before** `chmod`.
-Coordinator and each administrator need:
+For `EXECUTE_SAFE_TRANSACTION`:
+
+1. Import only the printed Safe JSON.
+2. Verify Safe chain ID and Safe address.
+3. Verify transaction targets.
+4. Verify decoded methods and arguments.
+5. Collect the required Safe signatures.
+6. Execute.
+7. Rerun `status`.
+
+Execute pending Safe items only in printed order:
 
 ```text
-CHAIN_<ID>_RPC_URL=<HTTPS_RPC>
-OAUTH_URL=<DISCOVERY>
-OAUTH_CLIENT_ID=<ID>
-OAUTH_CLIENT_SECRET=<SECRET>
-GLOBAL_ADMIN_NAME=<THIS_IDENTITY>
-GLOBAL_ADMIN_PASSWORD=<PASSWORD>
+router-pause.json
+vault-pause.json
+router-tokens-<N>.json
+vault-configure.json
 ```
 
-Coordinator uses a read-only STRATO identity. After Runtime, add
-`BRIDGE_HEALTH_URL=https://<RUNTIME_HOST>/health`. Infra does not need a rollout
-`.env`.
+Require:
 
-From `app/ethereum`:
+- DepositRouter paused.
+- Vault paused.
+- DepositRouter token mappings match the inventory.
+- Vault token policies match the reviewed limits.
+- Vault authorization signers and threshold match the manifest.
 
-```bash
-npm run external:rollout -- setup --role coordinator --config <LOCAL>/coordinator.json --manifest <LOCAL>/deployment-bundle.json --output-dir <LOCAL>/generated --env-file <LOCAL>/coordinator.env
-npm run external:rollout -- setup --role admin-1 --config <LOCAL>/admin-1.json --manifest <LOCAL>/deployment-bundle.json --output-dir <LOCAL>/generated --env-file <LOCAL>/admin-1.env
-npm run external:rollout -- setup --role admin-2 --config <LOCAL>/admin-2.json --manifest <LOCAL>/deployment-bundle.json --output-dir <LOCAL>/generated --env-file <LOCAL>/admin-2.env
-# Each additional administrator:
-npm run external:rollout -- setup --role admin-2 --config <LOCAL>/admin-<N>.json --manifest <LOCAL>/deployment-bundle.json --output-dir <LOCAL>/generated --env-file <LOCAL>/admin-<N>.env
-npm run external:rollout -- setup --role infra --config <LOCAL>/infra.json --manifest <LOCAL>/deployment-bundle.json --output-dir <LOCAL>/generated
-```
+## 13. Configure STRATO through governance
 
-```bash
-chmod 600 <LOCAL>/<ROLE>.json
-# Skip if this persona has no env file (infra).
-chmod 600 <LOCAL>/<ROLE>.env
-export EAB_ROLLOUT_CONFIG=<LOCAL>/<ROLE>.json
-```
-
-Later printed commands run unchanged.
-
-## 5. Pause and configure (Safe JSON)
-
-Owners: Coordinator and required Safe owners
+Continue running:
 
 ```bash
 npm run external:rollout -- status
 ```
 
-Coordinator imports **only** `safeChecklist` items still `PENDING`, in printed
-order, into Safe Transaction Builder. Typical order:
+For `ADMIN_1_VOTE`:
 
-1. `router-pause.json`
-2. `vault-pause.json`
-3. `router-tokens-N.json` (numeric)
-4. `vault-configure.json`
+1. Send the exact printed command to Admin 1.
+2. Admin 1 runs it unchanged.
+3. Coordinator reruns `status`.
 
-Safe owners review and execute in the Safe app. They do not need the JSON
-files. Coordinator reruns `status` until every Safe configuration item is
-`DONE`. Keep both contracts paused.
+For `ADMIN_2_VOTE` or `ADDITIONAL_ADMIN_VOTE`:
 
-## 6. Start verifiers and Runtime
+1. Send the new exact printed command to a distinct administrator.
+2. That administrator runs it unchanged.
+3. Coordinator reruns `status`.
 
-Owner: Infra
+For `WAITING_FOR_EXECUTION`:
 
-### Fund STRATO transaction senders before starting services
+1. Do not vote again.
+2. Wait for execution and indexing.
+3. Rerun `status`.
 
-Owners: Infra supplies the addresses; the STRATO funding-account owner sends
-vouchers or USDST; Coordinator records the balance checks.
+Continue until all pre-activation governance stages are complete.
 
-1. Resolve the STRATO address of each configured OAuth identity. Check these
-   against the operator, relayer, and settlement-attestor addresses in the
-   deployment configuration. Do not use their external KMS signer addresses.
-2. Transfer vouchers or USDST on the **target STRATO network** to every address
-   below. Each account needs its own fee reserve; the operator does not pay fees
-   for the relayer or verifiers.
+Require:
 
-| STRATO account | Runtime credentials | Transactions requiring fees |
-| --- | --- | --- |
-| Operator | Bridge `BA_USERNAME` | Cursor updates and operator bridge operations |
-| Relayer | Bridge `RELAYER_BA_USERNAME` | Settlement and other relayed contract calls |
-| Verifier 1 attestor | Verifier 1 STRATO/OAuth identity | On-chain settlement attestations |
-| Verifier 2 attestor | Verifier 2 STRATO/OAuth identity | On-chain settlement attestations |
-| Verifier 3 attestor | Verifier 3 STRATO/OAuth identity | On-chain settlement attestations |
+- TokenRouter initialized with reviewed dependencies.
+- Approved yield vaults configured.
+- EAB initialized with TokenFactory, USDST, PriceOracle, TokenRouter, operator,
+  guardian, attestors, and threshold.
+- Mint policies configured.
+- External chain configured with vault, DepositRouter, and starting block.
+- Routes configured.
+- Rebase settings configured.
+- Automatic-route settings configured.
+- External vault and DepositRouter remain paused.
 
-3. Verify the credited balances in Cirrus on the target network. For each bare
-   STRATO address, query `BlockApps-Voucher-_balances` using the configured
-   `VOUCHER_CONTRACT_ADDRESS`, and `BlockApps-Token-_balances` using the configured
-   `USDST_ADDRESS`: filter `address=eq.<TOKEN_CONTRACT>` and
-   `key=eq.<STRATO_ACCOUNT>`, with `select=balance:value::text`. Confirm funding
-   is indexed before proceeding. Record each account, funding transaction,
-   balances, and the agreed refill threshold in the deployment evidence.
-4. Budget for repeated attestations, retries, and cursor updates, not just one
-   canary. Confirm the network's current fee schedule; at 0.01 USDST per contract
-   call, 1 USDST covers 100 calls. Check voucher coverage using the network's
-   voucher fee rate separately.
-5. Assign an owner to monitor and replenish the operator, relayer and every
-   verifier attestor: five STRATO accounts on testnet or seven in production. Fund
-   the external executor with external-chain native gas separately. KMS keys
-   and AWS permissions do not provide STRATO transaction fees.
+## 14. Fund operational identities
 
-This is a **manual activation gate**. Current health checks do not prove all
-five accounts are funded. The existing operator balance check does not cover
-the relayer or attestors and runs with legacy withdrawal polling; do not rely
-on it when that polling is disabled.
+Verify existing STRATO funding:
 
-### Start services
+- Every verifier STRATO attestor.
 
-```bash
-npm run external:rollout -- plan
+Fund on STRATO:
+
+- Runtime operator.
+- Runtime relayer.
+
+Fund on the external chain:
+
+- External executor.
+- Safe execution wallet.
+- Canary wallet.
+
+Verify indexed balances.
+
+Record:
+
+```text
+ACCOUNT=
+ADDRESS=
+ASSET=
+BALANCE=
+FUNDING_TRANSACTION=
+REFILL_THRESHOLD=
+REFILL_OWNER=
 ```
 
-Render the **printed** verifier policy/env templates and `bridge.env.template`.
-Each verifier: own KMS key, two distinct HTTPS RPCs, own STRATO attestor,
-confirmations ≥ Runtime, unique token ≥ 32 characters. No `NODE_ENV`. `/health`
-is public; signing requires the bearer token. Runtime: operator and relayer
-OAuth, proposer/executor KMS, RPC/WS, `USDST_ADDRESS`, persistent `/app/data`.
-Coordinator never receives verifier tokens.
+Do not treat service health as proof of funding.
 
-Return only `BRIDGE_HEALTH_URL`. Coordinator adds it to `coordinator.env`.
+## 15. Start verifiers
 
-Gate: every configured verifier `/health` response has the matching
-chain/vault/index/signer/attestor, policy digest, shared baseline hash and
-`verificationRpcHostCount >= 2`; Runtime `status: true`.
+Change only `Running=Yes` in one verifier configuration at a time:
 
-For a runtime also processing native traffic, preserve its native configuration
-and persistent cursor when rendering the EAB templates. Add the native settings
-listed in the native release gate through infra's secret-manager configuration;
-they are not supplied by the EAB bundle. Deploy the matching native-capable bridge
-image before upgrading external representation bridges to expose routed redemptions.
+```bash
+cd <EAB_INFRA_REPOSITORY>
+guides/tools/deploy.sh deployments/<ENV>/verifier-<N>/<NETWORK>.conf --preview
+guides/tools/deploy.sh deployments/<ENV>/verifier-<N>/<NETWORK>.conf
+```
 
-## 7. STRATO governance
+Require each verifier to become healthy before starting the next.
 
-Owners: Coordinator and administrators
+Verify each `/health` response:
+
+- Correct external chain ID.
+- Correct vault.
+- Correct verifier index.
+- Correct authorization signer.
+- Correct STRATO attestor.
+- Correct policy digest.
+- Shared baseline policy hash.
+- Correct confirmation count.
+- At least two verification RPC hosts.
+- `status="ok"`.
+
+## 16. Complete and start the Runtime
+
+For a fresh Runtime:
+
+- Use the final generated `bridge.env.template`.
+- Configure persistent `/app/data`.
+
+For an existing multi-network Runtime:
+
+- Preserve all current template entries.
+- Add only the new chain's generated `CHAIN_<ID>_*` bindings.
+- Preserve every existing network.
+- Preserve the existing data volume.
+- Do not add a native cursor for an EAB-only chain.
+
+Set the Runtime stack configuration:
+
+```text
+ReleaseCommit=<RELEASE_COMMIT>
+BridgeImageDigest=<BRIDGE_IMAGE_DIGEST>
+NginxImageDigest=<BRIDGE_NGINX_IMAGE_DIGEST>
+EnvTemplateFile=<final bridge.env.template filename>
+ProposerKeyArn=<separate proposer stack key ARN>
+```
+
+Set all referenced Runtime secret rows:
+
+```text
+NODE_URL
+EXTERNAL_ASSET_BRIDGE_ADDRESS
+TOKEN_ROUTER
+USDST_ADDRESS
+PRICE_ORACLE_ADDRESS
+SAFE_ADDRESS
+SAFE_PROPOSER_ADDRESS
+CHAIN_<ID>_RPC_URL
+CHAIN_<ID>_WS_RPC_URL
+CHAIN_<ID>_VERIFICATION_RPC_URLS
+CHAIN_<ID>_DEPOSIT_CONFIRMATIONS
+CHAIN_<ID>_EXTERNAL_BRIDGE_VERIFIER_URLS
+CHAIN_<ID>_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS
+CHAIN_<ID>_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS
+RELAYER_BA_USERNAME
+RELAYER_BA_PASSWORD
+RELAYER_CLIENT_ID
+RELAYER_CLIENT_SECRET
+RELAYER_OPENID_DISCOVERY_URL
+SAFE_API_KEY
+BRIDGE_ADDRESS
+STRATO_APP_API_URL
+```
+
+Before startup:
+
+- Record the service responsible for EAB deposits, EAB withdrawals, legacy
+  bridge processing, and native bridge processing.
+- Require exactly one active processor for each flow.
+- Keep the new Runtime's native configuration absent when the legacy service
+  remains the native processor.
+- Stop any old EAB proposal writer before enabling the new EAB writer.
+- Inventory every service that writes proposals to the shared Safe.
+- Reconcile pending Safe transactions and the current Safe nonce.
+- Assign one proposal writer per bridge flow and record the handoff.
+- Register proposer as a Safe delegate, not an owner.
+- Record the native-processor handoff as `NOT_APPLICABLE` for EAB-only or
+  name the retained native processor.
+
+Preview and deploy:
+
+```bash
+cd <EAB_INFRA_REPOSITORY>
+guides/tools/deploy.sh deployments/<ENV>/runtime/runtime.conf --preview
+guides/tools/deploy.sh deployments/<ENV>/runtime/runtime.conf
+```
+
+Increase `RestartRevision` exactly once for the reviewed configuration change.
+
+Remove plaintext secret rows after the secret-manager update.
+
+Require:
+
+- Runtime target healthy.
+- Runtime `LastStart` reports `started ..., ready`.
+- `/health` returns `status=true` and `ready=true`.
+- Configuration validation completed successfully.
+- No new error flag was created.
+
+Coordinator exports:
+
+```bash
+export BRIDGE_HEALTH_URL=https://<RUNTIME_HOST>/health
+```
+
+## 17. Deploy backend and UI
+
+Verify through Cirrus:
+
+- TokenRouter proxy is initialized.
+- EAB proxy is initialized.
+- EAB `tokenRouter` equals the reviewed TokenRouter proxy.
+
+Set the selected STRATO network's backend defaults:
+
+```text
+defaultExternalAssetBridgeFor["<STRATO_NETWORK_ID_DECIMAL>"]="<lowercase EAB proxy without 0x>"
+defaultTokenRouterFor["<STRATO_NETWORK_ID_DECIMAL>"]="<lowercase TokenRouter proxy without 0x>"
+defaultBridgeServiceFor["<STRATO_NETWORK_ID_DECIMAL>"]="<Runtime URL>"
+```
+
+Optional address overrides are `EXTERNAL_ASSET_BRIDGE_ADDRESS` and
+`TOKEN_ROUTER`.
+
+Build and deploy backend and UI from `RELEASE_COMMIT`.
+
+Pass optional runtime overrides into the actual backend container, not only a
+Compose `.env` file.
+
+Require:
+
+- `/api/config` returns HTTP 200.
+- Target network reports the reviewed EAB and TokenRouter proxies.
+- Only reviewed token routes are presented.
+- Quotes use the new DepositRouter.
+- Native routes remain unchanged unless separately approved.
+
+Keep public intake closed until activation and canary approval.
+
+## 18. Run readiness
+
+Coordinator:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- verify
+```
+
+Require exit code zero and status `READY_FOR_ACTIVATION_REVIEW`.
+
+Require every reported live check to pass. Successful external RPC
+reconciliation reports detailed external checks; the aggregate `external`
+check appears only when that RPC reconciliation fails. Stop on any failed,
+deferred, or pending check.
+
+## 19. Activate
+
+Request a fresh activation action:
 
 ```bash
 npm run external:rollout -- status
 ```
 
-Status prints the current stage (`N/12`) and the next vote command. Coordinator
-sends that command. The named administrator runs it unchanged. Coordinator
-reruns `status`. Coordinator `status` reads live AdminRegistry events; it does
-not need a copy of the voter’s `generated/` journal. When waiting for execution
-or indexing, nobody votes again.
+Run the exact full command printed by `status`:
 
-This path does not call `EAB.setPause`. Route flags come from the reviewed
-policy.
+```text
+npm run external:rollout -- activate --approve <CURRENT_HASH>
+```
 
-Native owner calls are separate AdminRegistry issues, outside the CLI's 12 stages.
-Complete their governance and record live execution evidence as described below;
-an EAB `DONE` status does not prove native routing is configured.
+Safe owners:
 
-## 8. Activate and canary
+1. Review the generated activation JSON.
+2. Verify vault unpause is included only when withdrawals are approved.
+3. Verify DepositRouter unpause is included.
+4. Sign.
+5. Execute.
 
-Confirm the operator, relayer and every verifier attestor fee-balance check from
-step 6 is recorded and still sufficient before executing activation. Do not
-activate with an unfunded relayer or verifier attestor, even if every `/health`
-response passes.
-
-### Backend configuration gate
-
-After STRATO governance completes, verify in Cirrus that the TokenRouter proxy
-is initialized and `ExternalAssetBridge.tokenRouter` matches that proxy. Record
-both verified **proxy** addresses under the target STRATO network ID in
-`app/backend/src/config/config.ts`: `defaultExternalAssetBridgeFor` and
-`defaultTokenRouterFor` (Helium `114784819836269`, Upquark `33056204878082667`).
-Do not copy addresses between networks or release with empty target entries.
-
-Build and deploy the backend image containing these defaults before the canary.
-`EXTERNAL_ASSET_BRIDGE_ADDRESS` and `TOKEN_ROUTER` remain optional backend
-overrides; if used, pass them into the backend container explicitly. A Compose
-`.env` entry alone does not inject them. Bridge-service env configuration is
-still required separately. Verify `/api/config` returns HTTP 200 on the app
-hostname; `/health` alone checks node health and does not prove backend readiness.
-
-Owners: Coordinator and required Safe owners
+Verify:
 
 ```bash
 npm run external:rollout -- verify
 ```
 
-Fix the named FAILED check. Live checks are `strato`, `external`,
-`external-identity`, `deposit-router`, `withdrawal-pause`,
-`safe-runtime-identities`, `vault-configuration`, `verifiers`, and
-`bridge-health`. `verifiers` and `bridge-health` stay `DEFERRED` until
-pre-activation governance completes; that is not a failure. When status prints
-`COORDINATOR_GENERATE_ACTIVATION_TRANSACTION`, run that command unchanged.
-Import the generated activation JSON.
-
-**Withdrawals in the reviewed policy:** one batch, vault unpause then router
-unpause. After execution, both external contracts are unpaused. Run the deposit
-canary, then the withdrawal canary.
-
-**Deposit-only:** router unpause only. The vault stays paused. Run the deposit
-canary only. Do not send a withdrawal.
-
-Representation tokens have 18 decimals. For a route with `externalDecimals` `D`
-and `rebaseRequired=false`:
-
-- STRATO amount `S = X * 10^(18-D)`
-- External amount `X = S / 10^(18-D)` (truncates toward zero)
-
-If `rebaseRequired=true`, stop and use a reviewed oracle conversion; do not
-improvise.
-
-Deposit of raw external `X`:
-
-1. Record external user, vault custody, and STRATO user balances.
-2. External user down by `X` plus gas; vault custody up by `X`.
-3. STRATO user up by `S`. Verifier threshold met; one mint; retries do not mint
-   again.
-
-EAB AUTO_ROUTE activation requires separate native-gas-token and ERC-20 canaries
-(ETH and USDC on Sepolia). Use the
-deployed app, bridge, and verifiers; retain the external and STRATO transaction
-hashes and balance changes for each test:
-
-Here “native-gas-token” means ETH through EAB/ExternalAssetDepositRouter. These tests do not
-cover STRATO-native representation redemptions, which have a separate gate below.
-
-| Test | Required result |
-|---|---|
-| Plain deposit | Recipient receives the bridged source token in amount `S`, exactly once. |
-| AUTO_ROUTE success | One `AutoRouted` event for the deposit identity; `finalToken` matches the requested token and `finalAmount >= minFinalOut`. Verify that token's recipient balance increase. |
-| AUTO_ROUTE fallback | In a controlled testnet test, use a minimum above the executable quote. One `DepositActionFallback` event; recipient receives `fallbackToken` and `fallbackAmount`, with no successful `AutoRouted` event. |
-| Reviewed recovery | After governance approval, confirm the existing deposit through the operations endpoint. Verify its routed or fallback outcome and recipient balance; retry must not mint twice. |
-
-`DepositCompleted`, status `4`, and a successful `settleDepositWithRoute` call
-also occur on fallback. They do not prove AUTO_ROUTE succeeded. Match
-`AutoRouted` / `DepositActionFallback` by chain, router, and deposit ID. Missing
-Cirrus metadata or unavailable quote dependencies must retry, then enter review
-after the settlement grace period; they must not immediately trigger fallback.
-
-Withdrawal of raw STRATO `S` under auto and bucket limits (withdrawals-on only):
-
-1. Record STRATO user, escrow, supply, vault custody, recipient, and the vault
-   reservation.
-2. STRATO escrow of `S` (or the truncated equivalent that maps to whole
-   external units). External recipient up by `X`. Vault custody down by `X`.
-3. One `WithdrawalReleased` of `X`. Reservation remains `RELEASED` (status `2`);
-   it is not deleted. `totalReserved` decreases by `X`. One STRATO burn. Retries
-   do not pay or burn twice.
-
-Unit tests and read-only quotes do not replace these deployed-API canaries.
-Do not mark an unexecuted or fallback-only AUTO_ROUTE test as passed.
-
-Pause on any mismatch.
-
-## Native routing release gate
-
-Owners: Coordinator, STRATO administrators, external Safe owners, Infra.
-
-Keep the existing EAB manifest/bundle workflow unchanged. Native actions below
-are **manual release requirements**, not generated rollout calls. Store their
-reviewed token/chain inventory, issue IDs, Safe transactions, implementation
-addresses, image digests, and canary evidence alongside the EAB release evidence.
-Do not edit the frozen bundle or interpret its approval hash as approving these
-additional native actions. The live AdminRegistry/Safe thresholds still apply.
-
-### 1. Upgrade and wire STRATO
-
-Inventory pending native withdrawals/redemptions and save polling checkpoints
-before changing implementations or services. Keep user intake closed for the
-upgrade window. Preserve the existing native bridge and custody proxies and
-locked balances; do not reinitialize them or migrate custody for this routing change.
-For a fresh native deployment, first complete the base setup in
-[NATIVE_BRIDGE_DEPLOYMENT.md](NATIVE_BRIDGE_DEPLOYMENT.md).
-
-From `app/contracts`, upgrade the native bridge using the same two AdminRegistry
-gates as step 2. Additional administrators vote the printed issues; do not launch
-another upgrade command to cast a vote.
-
-```bash
-npm run upgrade -- --proxy-address <STRATO_NATIVE_BRIDGE_PROXY> --contract-name StratoNativeBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
-```
-
-Verify the live proxy points to the recorded implementation. This change adds
-native routing and `autoRouteEnabled`; it does not require a custody-vault or
-representation-token upgrade by itself.
-
-Through the AdminRegistry governance flow, execute on the **native bridge proxy**:
+Required status:
 
 ```text
-setTokenRouter(newTokenRouter = <TOKEN_ROUTER_PROXY>)
+DEPOSITS_ACTIVE_CANARY_REQUIRED
 ```
 
-Use the same initialized TokenRouter as the backend/EAB. Confirm its pool factories,
-PSM, forge, savings vault, and any approved YieldVaults match the intended outputs.
-Keep native auto-routing disabled until the service and external upgrades below
-are ready. Permission defaults to false for every `(stratoToken, externalChainId)`.
-Existing deployments of an earlier routed implementation also need explicit opt-in.
+## 20. Run canaries
 
-### 2. Deploy the matching runtime and rewards poller
+Use small approved amounts.
 
-Infra deploys a bridge image that processes **both** `RedemptionRequested` and
-`RedemptionRequestedWithRoute`, verifies the pinned output/minimum, and calls
-`recordDepositWithRoute` / `confirmDepositWithRoute` for routed intents. Keep its
-existing native block cursor. If an older runtime missed routed events, reconcile
-and replay from before the first missed event; do not simply advance the cursor.
+For every test, record:
 
-| Component | Required native/routing configuration |
-| --- | --- |
-| Backend | Verified `STRATO_NATIVE_BRIDGE`, `STRATO_NATIVE_CUSTODY_VAULT`, and `TOKEN_ROUTER`, or the corresponding verified network defaults in `config.ts`. |
-| Bridge runtime | `STRATO_NATIVE_BRIDGE_ADDRESS`, `TOKEN_ROUTER`, reachable `STRATO_APP_API_URL`; preserve native operator credentials and per-chain RPC/verification/confirmation settings. |
-| Native external chain | Preserve `CHAIN_<ID>_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`, existing native signing keys/threshold and gas funding used by withdrawals. These are not new routed-deposit keys. |
-| Rewards poller | Nonzero `TOKEN_ROUTER`, `EXTERNAL_ASSET_BRIDGE_ADDRESS`, and `STRATO_NATIVE_BRIDGE`. Missing bridge identities suppress router attribution; missing router configuration blocks startup. |
+- External transaction hash.
+- STRATO transaction hash.
+- Deposit or withdrawal identity.
+- User balance before and after.
+- Vault custody before and after.
+- STRATO token supply before and after.
+- Safe balance before and after where applicable.
+- Relevant events.
+- Retry result.
 
-Deploy a rewards-poller image whose pool `Swap` mappings attribute `user` from
-the emitted `sender` before enabling EAB or native auto-routing. Before rollout,
-audit already-processed routed swaps for rewards credited to the submitting
-operator. Advancing poller cursors does not correct historical rewards; reconcile
-any incorrect operator rewards before controlled reprocessing.
+Run:
 
-Pass settings into the actual containers, not only Compose `.env`. Keep secrets
-with Infra. Native deposit verification runs in the bridge service; the three
-standalone EAB verifier health checks do not certify native receipt verification.
-No new EAB verifier policy entry or signer is required solely for native routing.
+1. Plain ERC-20 deposit.
+2. Native-gas EAB deposit when configured.
+3. Automatic-route success when configured.
+4. Automatic-route fallback when configured.
+5. Withdrawal when configured.
+6. Manual-review deposit.
+7. Rejection and refund.
+8. Retry of completed deposit.
+9. Retry of completed withdrawal.
 
-### 3. Upgrade the external representation bridge
+Require:
 
-Only after the matching runtime is running, upgrade each in-scope
-`StratoNativeRepresentationBridge` proxy to implementation version **1.2.0**.
-For supported Sepolia/mainnet deployment aliases, from `app/ethereum`:
+- Exactly one custody increase per deposit.
+- Exactly one STRATO mint or routed output per deposit.
+- Exactly one external release per withdrawal.
+- Exactly one STRATO burn per completed withdrawal.
+- No duplicate effect on retries.
+- Review and refund preserve user value.
+- Automatic-route outcome matches the emitted success or fallback event.
 
-```bash
-CONTRACT_NAME=StratoNativeRepresentationBridge npm run deployImpl:<sepolia-or-mainnet>
-```
+Stop intake on any mismatch.
 
-Record/verify the implementation, then have the external Safe execute
-`upgradeToAndCall(<NEW_IMPLEMENTATION_ADDRESS>, 0x)` on the existing bridge proxy.
-Version 1.1 → 1.2 adds no external storage or initializer. For an older baseline,
-first follow the mint-executor-role/domain requirements in
-[NATIVE_BRIDGE_DEPLOYMENT.md](NATIVE_BRIDGE_DEPLOYMENT.md#sepolia-deploy-new-implementations-for-upgrades).
-Verify proxy `version()` is `1.2.0`; preserve token mappings, route activation,
-roles, attestation policy, and redemption counter.
+## 21. Complete or roll back
 
-### 4. Enable reviewed native routes and verify the application
+Complete only after:
 
-Stage the matching backend/UI with public intake closed. For each approved native
-token/chain pair, execute this owner call through AdminRegistry governance:
+- All canaries pass.
+- No unresolved Safe transaction remains.
+- No unresolved AdminRegistry issue remains.
+- Operator, relayer, attestors, executor, and Safe execution wallets remain
+  funded.
+- Runtime and verifier alarms are clear.
+- Backend and UI expose only approved routes.
+- Deployment evidence is stored.
 
-```text
-setAutoRouteEnabled(stratoToken = <STRATO_NATIVE_TOKEN>, externalChainId = <CHAIN_ID>, enabled = true)
-```
+To stop new intake:
 
-The route must exist and be enabled, token deposits must not be disabled, and the
-router must be initialized. Confirm the resulting indexed
-`autoRouteEnabled[stratoToken][externalChainId] == true` and its
-`AutoRouteAvailabilityUpdated` event. Other token/chain pairs remain disabled.
+1. Pause DepositRouter through the Safe.
+2. Pause the vault when withdrawals must stop.
+3. Disable reviewed STRATO route permissions through AdminRegistry governance.
+4. Keep Runtime and verifiers available for in-flight recovery.
+5. Reconcile all pending deposits, withdrawals, reviews, and refunds.
 
-`configure-native-route.js` supports `--token-router <address>` and
-`--auto-route-enabled true|false` alongside its required route arguments. It
-directly calls owner methods and also rewrites route configuration; it is not a
-substitute for AdminRegistry quorum on a governance-owned proxy. Omitting the
-auto-route flag preserves the current permission. For an existing governed route,
-prefer the specific owner calls above over rewriting the whole route.
+Do not:
 
-Before public release verify:
+- Delete durable Runtime data.
+- Reset polling cursors.
+- Withdraw custody before reconciliation.
+- Reuse the EAB bundle to approve native changes.
+- Roll back to an image that cannot process already accepted events.
 
-- External mapping/route is active and redemptions are unpaused; STRATO asset is
-  enabled, deposits are unpaused, and token deposits are not disabled.
-- Native bridge `tokenRouter` equals backend `TOKEN_ROUTER`; the custody bridge
-  linkage and locked backing remain correct.
-- `/api/config` succeeds on the app hostname. `/api/trade/bridge/bridgeableTokens/<CHAIN_ID>`
-  returns the intended native route. The unified page can quote a reachable output
-  with a positive minimum through the real backend.
-- With auto-routing disabled, routed composite quotes are rejected but a plain
-  same-token redemption remains quotable. Withdrawals retain their own permissions.
+For legacy cutover and custody migration, continue with `EAB_CUTOVER.md`.
 
-### 5. Native canaries and rollback
-
-Use small approved amounts and real deployed services. Record external burn and
-STRATO settlement hashes, native deposit identity `(chain, external bridge,
-redemption ID)`, events, and recipient/custody balance changes.
-
-| Native test | Required result |
-| --- | --- |
-| Plain redemption, auto-routing disabled | Original native asset delivered once; custody reduced by the corresponding amount. |
-| Routed redemption, permission enabled | Pinned recipient receives the requested output at or above `minFinalOut`; one `AutoRouted` outcome. |
-| Disabled permission / revoke after recording | Controlled testnet case: original source token delivered through `DepositActionFailed` and `DepositActionFallback`; no routed output or stranded custody. |
-| Route cannot meet minimum | Controlled testnet case: same source-token fallback, with route effects rolled back. |
-| Retry / reviewed recovery | Same deposit settles once; no duplicate unlock. Review preserves output/minimum intent. |
-| Native bridge-out regression | Existing approved same-asset withdrawal reaches its external counterpart once. Auto-route permission does not enable withdrawals. |
-
-Completion alone does not prove routing succeeded. Inspect `AutoRouted` versus
-fallback events. Quote transport failures should retry; custody failures must
-leave settlement uncompleted. Do not open native routed intake on fallback-only
-evidence.
-
-To stop auto-routing, execute `setAutoRouteEnabled(token, chain, false)` through
-governance. New routed quotes stop; already-sent routed redemptions remain
-recordable and settle to their source-token fallback. Keep the matching runtime
-and routed-intent-capable contracts until all in-flight redemptions are reconciled.
-Do not roll back to an image that ignores routed events or reset the cursor to
-skip them. Disabling a whole deposit route can block recovery of already-burned
-representations; use the auto-route permission when only routing must stop.
-
-## Application release and Fund/Trade cutover
-
-This branch keeps the legacy pages isolated during acceptance:
-
-- Fund uses `/bridge/*` and MercataBridge for its standard bridge path.
-- Unified Trade uses `/trade/bridge/*` for EAB and native routes. Its three modes
-  are On STRATO, From another network, and To another network. Bridge-out is
-  same-asset for native and non-native routes.
-- Personal Recent Activity spans those three modes; the pair/network-wide swap
-  history section has been removed from the unified page.
-
-Deploy UI/backend together after contract/runtime readiness. Exercise all three
-modes with STRATO login and MetaMask-only login, confirmations/progress, balances,
-fees, history, and native/non-native assets. Include supported metals/yield outputs
-and disabled-permission behavior. Capture real transactions; unit tests are not
-acceptance evidence.
-
-Do **not** retire Fund/old Trade just because the new image is deployed. Their
-redirects, old-link parameter translation, internal-link retargeting, and navigation
-collapse remain a separate final cutover after acceptance. While legacy pages are
-reachable, they can still initiate legacy requests: gate that intake before the
-drain/custody steps in [EAB_CUTOVER.md](EAB_CUTOVER.md). A backend rollout alone
-does not redirect their requests to EAB. Preserve legacy history and the workers
-needed to reconcile pre-cutoff transactions.
-
-## Existing EAB: remove the unused settlement proof argument
-
-This interface update requires a matching EAB implementation and bridge image.
-Do not deploy only the service. Keep the existing EAB proxy and storage.
-
-1. Record pending deposit/withdrawal identities and the current implementation
-   and image digests. Have infra stop the EAB runtime for the interface update.
-2. From `app/contracts`, run the upgrade below. Complete both AdminRegistry
-   gates described in step 2; additional administrators vote the printed issues.
-
-```bash
-npm run upgrade -- --proxy-address <EXTERNAL_ASSET_BRIDGE_PROXY> --contract-name ExternalAssetBridge --contract-file BaseCodeCollection.sol +OVERRIDE-CHECKS
-```
-
-3. Verify the proxy points to the new implementation and its five settlement
-   entrypoints have no `attestationProof` parameter. Storage, attestation digests,
-   and verifier quorum must remain unchanged.
-4. Deploy the matching bridge image, then start the runtime. No Sepolia contract
-   or verifier-policy update is required for this interface change.
-5. Verify a pending plain deposit reaches STRATO settlement through the real API.
-   Deposits already in review require the reviewed-deposit recovery flow. Test
-   AUTO_ROUTE, reviewed settlement, and withdrawal finalization before declaring
-   the interface update complete. Do not re-deposit to recover a pending transfer.
-
-## Existing EAB: verifier-approved source-token fallback
-
-This update requires the STRATO EAB implementation, all verifier images, and the
-bridge runtime from the same reviewed commit. No Sepolia contract changes or
-policy-file edits are required. `autoRouteEnabled: false` continues to prohibit
-trading; a valid routed deposit can instead receive fallback-only attestations.
-Deposit limits, receipt/custody verification, and required governance review remain
-enforced. Disabling deposits for the route still blocks both outcomes.
-
-1. Gate new external intake and stop the runtime during the coordinated update.
-   Preserve pending-deposit files and cursors.
-2. Upgrade the existing STRATO EAB proxy with the usual AdminRegistry approvals.
-   Verify `attestDepositFallback` and `getDepositFallbackDigest` are present.
-   Existing full-settlement digests are unchanged; fallback uses a separate domain.
-3. Deploy the matching image to every verifier, one at a time, checking health
-   after each. Then deploy and start the matching bridge runtime. Do not resume
-   intake with mixed service versions: older runtimes do not understand fallback-only
-   responses, and older contracts cannot consume fallback attestations.
-4. Test a valid routed deposit whose local policy disables automatic routing:
-   verify source-token delivery and `DepositActionFallback`, with no `AutoRouted`.
-   Test an allowed route, an invalid deposit, and an above-limit deposit as well.
-   Invalid evidence must not mint; above-limit deposits must still require review.
-5. Recover already-reviewed deposits through governance approval and the existing
-   confirmation endpoint. This upgrade does not automatically release deposits
-   already in review. Capture the resulting transaction and recipient balance.
-
-## Failure handling
-
-- Stale approval: `status`, use the new command.
-- Waiting on another admin: the previous admin does not vote again.
-- Waiting for indexing: nobody votes.
-- Bundle checksum or tooling revision mismatch: stop; take the coordinator
-  bundle / reviewed commit.
-- Safe configuration `DONE` and services fail: fix services only.
-- Verifier attestation or relayer submission fails with HTTP 422: inspect the
-  downstream STRATO error and the submitting account's voucher/USDST balance.
-  Fund that specific account if insufficient and verify the existing operation
-  retries successfully. A generic 422 alone does not prove a funding failure;
-  do not submit a second deposit or bypass attestations.
-- Verifier token leak: rotate that verifier and Runtime secret; pause if more
-  than one token or unexpected signatures appear.
-- Identity mismatch: stop; do not override.
-- Hard crash leaves `generated/.lock`: confirm no rollout command is still
-  running, then `rm` that lock and rerun `status`.
-
-## Completion
-
-- Status shows governance complete and activation executed.
-- STRATO and external state match the bundle.
-- Verifier and Runtime health pass.
-- Operator, relayer, and all three STRATO attestors have verified fee reserves
-  and an assigned refill owner; successful canaries include on-chain attestation
-  and relayer transaction hashes.
-- Required canaries reconcile (deposit always; withdrawal only if enabled).
-- If native routing is in scope, its separate governance, configuration, and
-  canary evidence is complete; EAB CLI verification alone is insufficient.
-- Unified-page acceptance is recorded before any Fund/old Trade retirement.
-- Temporary credentials and allowlists removed.
-- Retain bundle hash, tooling revision, addresses, policy hashes, issue IDs,
-  transactions, image digests, and canary evidence.
+For optional STRATO-native routing, continue with
+`NATIVE_BRIDGE_DEPLOYMENT.md`.

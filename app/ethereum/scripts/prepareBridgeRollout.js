@@ -481,4 +481,4 @@ async function main(argv) {
   console.log(`Prepared current-network inputs. ${output.unresolved.length} unresolved fields; no transactions submitted.`);
 }
 if (require.main === module) main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken, writeNativeOutputs };
+module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken, writeNativeOutputs, main };
