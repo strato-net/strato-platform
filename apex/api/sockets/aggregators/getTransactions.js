@@ -3,10 +3,12 @@ const { GET_TRANSACTIONS } = require('../rooms')
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker')
 const config = require('../../config/app.config')
 const Transaction= require('../../models/strato/eth/transaction');
+const { hasBlockIndex } = require('../../lib/strato-db-data/block-index');
 
 let transactions
 
-function getTransactions() {
+async function getTransactions() {
+  if (!(await hasBlockIndex())) return;
   Transaction
     .findAll(
       {

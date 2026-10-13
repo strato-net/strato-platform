@@ -44,6 +44,11 @@ for arg in "$@"; do
             ROLE="${arg#*=}"
             SETUP_ARGS+=("$arg")
             ;;
+        # Shorthand for --role=validator, understood by strato-setup too.
+        --validator|--validator=true)
+            ROLE="validator"
+            SETUP_ARGS+=("$arg")
+            ;;
         *)
             SETUP_ARGS+=("$arg")
             ;;
@@ -79,7 +84,13 @@ if [[ "$FROM_SNAPSHOT" == "true" ]]; then
         SNAPSHOT_ARG=(--snapshot)
         echo "Restoring node from latest $NETWORK snapshot..."
     fi
-    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force; then
+    # A validator keeps no SQL block index and no Cirrus: restore the chain
+    # state only and leave the eth and cirrus dumps out.
+    RESTORE_ARGS=()
+    if [[ "$ROLE" == "validator" ]]; then
+        RESTORE_ARGS+=(--skip-databases)
+    fi
+    if ! strato-snapshot restore "$NODE_DIR" "${SNAPSHOT_ARG[@]}" --network "$NETWORK" --force "${RESTORE_ARGS[@]}"; then
         echo "Error: snapshot restore failed; not starting STRATO." >&2
         exit 1
     fi

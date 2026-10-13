@@ -9,6 +9,7 @@ module Blockchain.Stream.VMEvent
 where
 
 import Blockchain.Data.TransactionResult
+import Blockchain.EthConf (ethConf, publishVmEvents, vmConfig)
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import Control.Monad.Composable.Streaming
@@ -42,5 +43,10 @@ instance JSON.ToJSON VMEvent
 
 instance JSON.FromJSON VMEvent
 
+-- | Nothing is written on a node that runs no slipstream (publishVmEvents
+-- off): the stream would have no reader, and JLog only trims what a reader
+-- has passed.
 produceVMEvents :: HasStreaming k => [VMEvent] -> k [ProduceResponse]
-produceVMEvents = produceItems "vmevents"
+produceVMEvents vmes
+  | publishVmEvents (vmConfig ethConf) = produceItems "vmevents" vmes
+  | otherwise = return []

@@ -131,15 +131,22 @@ createCommandsFile role = do
     -- never votes, proposes or drives round changes, even if its key is in
     -- the validator set.
     let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
+        -- A validator's indexer keeps the Redis block index only: no SQL
+        -- side, so no writer lease either.
+        indexerFlags
+          | role == RoleValidator = " --sql=false"
+          | flags_writer = ""
+          | otherwise = " --writer=false"
     return $
       [ restartable "ethereum-discover +RTS -T -RTS"
       , restartable "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
-      , restartable ("strato-indexer" ++ (if flags_writer then "" else " --writer=false"))
-      , restartable "slipstream +RTS -T -RTS"
-      , restartable "strato-network-monitor"
+      , restartable ("strato-indexer" ++ indexerFlags)
       ]
+      -- Cirrus serves the API; a validator has none to serve.
+      ++ [restartable "slipstream +RTS -T -RTS" | roleIndexesSql role]
+      ++ [restartable "strato-network-monitor"]
       -- A core cell takes the API tier's transactions through its ingress;
       -- a monolith's strato-api writes its own stream directly.
       ++ [restartable ("strato-ingest --port=" ++ show flags_ingressPort ++ " +RTS -T -RTS") | role == RoleCore]
@@ -206,6 +213,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     let role = currentRole
     liftIO $ putStrLn $ "Setting up STRATO " ++ roleName role ++ ": " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
+
+    when (role == RoleValidator && flags_localAuth) $ liftIO $
+      error "--role=validator cannot be combined with --localAuth: a validator runs no identity provider; its node key comes from the shared Vault (run strato-login first)"
     when (role /= RoleNode && flags_localAuth) $
       liftIO $ error "--localAuth is only supported with --role=node"
     when (role /= RoleNode && flags_dockerMode == "allDocker") $
@@ -406,6 +416,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       RoleNode -> "Node ready"
       RoleCore -> "Core ready"
       RoleApi -> "API tier ready"
+      RoleValidator -> "Validator ready"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json

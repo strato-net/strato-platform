@@ -21,10 +21,17 @@ import System.Process (readProcess)
 
 -- | Which of the node's containers a role runs. A core keeps the stores the
 -- chain processes write; an API tier keeps what fronts strato-api.
+-- | Where a validator publishes apex (/health, /status) for the network monitor.
+apexPort :: Int
+apexPort = 3009
+
 roleHasService :: Role -> String -> Bool
 roleHasService RoleNode _ = True
 roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
 roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- A validator keeps its stores and Prometheus, plus apex: the network monitor
+-- polls its /health, published directly since there is no nginx.
+roleHasService RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -148,13 +155,19 @@ generateDockerCompose role = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"])
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | role == RoleValidator ])
         , extra_hosts = hostGateway
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
+            -- On a validator apex reads the chain's state from Redis (there is
+            -- no SQL block index or node_status mirror to read), requires only
+            -- the Prometheus jobs the node runs, and is published for the
+            -- network monitor on the port in roleServices below.
+            ++ [ ("HEALTH_CHECK_JOBS", "strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer") | role == RoleValidator ]
+        , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
@@ -360,7 +373,9 @@ generateDockerCompose role = do
   -- forever.
   let prometheusSkipJobs =
         [ "core-api" | not (roleRunsApi role) ]
-        ++ [ j | not (roleHasService role "nginx"), j <- ["nginx", "apex"] ]
+        ++ [ "nginx" | not (roleHasService role "nginx") ]
+        ++ [ "apex" | not (roleHasService role "apex") ]
+        ++ [ "slipstream" | not (roleIndexesSql role) ]
         ++ [ "strato-ingest" | role /= RoleCore ]
 
   let prometheus = def
