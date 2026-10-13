@@ -577,9 +577,9 @@ initConfig wireMessagesRef = do
           -- The SQLite insert numbers a new task from MAX(chiliad) + 1, so a
           -- finished placeholder one below the target makes the next task the target.
           now <- liftIO getCurrentTime
-          let below = SQL.PersistInt64 (fromIntegral (chiliad - 1))
+          let placeholder = SQL.PersistInt64 (fromIntegral (chiliad - 1))
           runSqlPool
-            (SQL.rawExecute "INSERT INTO sync_task (chiliad, assignment_time, host, status) SELECT ?, ?, '', 'Finished' WHERE (SELECT COALESCE(MAX(chiliad), -1) FROM sync_task) < ?" [below, SQL.toPersistValue now, below])
+            (SQL.rawExecute "INSERT INTO sync_task (chiliad, assignment_time, host, status) SELECT ?, ?, '', 'Finished' WHERE (SELECT COALESCE(MAX(chiliad), -1) FROM sync_task) < ?" [placeholder, SQL.toPersistValue now, placeholder])
             $ peerDB' dbs
         else do
           (_ :: [SQL.Single Int]) <-
