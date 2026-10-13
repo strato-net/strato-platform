@@ -148,11 +148,11 @@ ctx_cell_new() {
     -c peerStore=sqlite -c validatorBehavior=false -c autoPromote=true
     -c oauthSecretName="$OAUTH_SECRET" -c extraSetupFlags="--vaultUrl=$VAULT_URL"
     -c snapshotBucket="$SNAPSHOT_BUCKET" -c snapshotSource="$SNAPSHOT_SOURCE"
-    -c extraBinariesS3="$NODE_SCRIPTS_S3")
+    -c extraBinariesS3="$NODE_SCRIPTS_S3" -c exposePrometheus=true)
   # Only the first cell of an empty cluster restores eth and cirrus into it.
   [[ $first_of_cluster == true ]] && ctx+=(-c snapshotSkipDatabases=false)
   if [[ $id == "$FIRST_CELL" ]]; then
-    ctx+=(-c writer=true -c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true -c exposePrometheus=true
+    ctx+=(-c writer=true -c ethconfParameterName="/$P/api/ethconf-base64" -c grafana=true
       -c grafanaPublicUrl="https://$NODE_HOSTNAME/grafana/" -c grafanaAdminGroups="$GRAFANA_ADMIN_GROUPS" -c grafanaViewerGroups="$GRAFANA_VIEWER_GROUPS")
   else
     ctx+=(-c writer=false)

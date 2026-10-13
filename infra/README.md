@@ -112,6 +112,23 @@ Before the first run:
   `DistributionDomainName`. Until then the app tier's backend talks to
   whatever that name resolves to.
 
+## Known gaps (TODO)
+
+- **apex follows the writer** (raise with Dustin; strato-platform and the
+  api-tier app). The API tier's apex reads one Prometheus, `prometheusHost`,
+  which `scripts/ha.sh` sets to the first cell, so the node health and
+  "stalled" readings are that cell's view whoever holds the writer lease:
+  after a failover they describe a standby, and with the first cell down they
+  are unknown while the chain carries on. Every cell now publishes its
+  Prometheus on its private address (`exposePrometheus`); apex needs to read
+  the lease holder's (or all of them), and the API tier to open 9090 on every
+  cell (`cellSecurityGroupIds`), not only on `coreSecurityGroupId`.
+- **Managed Prometheus**, when there is a reason to pay for it. Without it
+  (`managedPrometheus=false`, as in `testnet-app`) the per-tier dashboard's
+  edge panels, its ECS sidecar panel and the infrastructure map's requests per
+  tier stay empty: the ECS tasks' nginx metrics only reach a workspace, and
+  Grafana on the first cell reads that cell's Prometheus alone.
+
 ## Environments
 
 `environments/<env>.sh` records the context a live environment was deployed

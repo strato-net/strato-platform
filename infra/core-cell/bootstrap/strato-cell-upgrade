@@ -19,6 +19,15 @@ NODE_USER=strato
 CURRENT=/etc/strato/current-image
 log() { echo "[cell-upgrade $(date -u +%FT%TZ)] $*"; }
 
+# The CloudWatch agent's config is published by the observability app and read
+# at first boot; fetching it again here carries a changed config to every cell.
+refresh_cloudwatch_agent() {
+  [[ -n ${CW_AGENT_PARAMETER:-} && -x /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl ]] || return 0
+  /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c "ssm:$CW_AGENT_PARAMETER" -s >/dev/null \
+    && log "cloudwatch agent config refreshed from $CW_AGENT_PARAMETER" \
+    || log "warning: could not refresh the cloudwatch agent config from $CW_AGENT_PARAMETER"
+}
+
 # Following the chain: the node has executed up to within a few blocks of the
 # best block its peers report (strato-indexer's chain gauges).
 check() {
@@ -50,6 +59,7 @@ aws s3 cp --recursive "$EXTRA_BINARIES_S3" /tmp/node-scripts --only-show-errors
 
 if [[ $(cat "$CURRENT" 2>/dev/null || echo "$STRATO_IMAGE") == "$image" ]]; then
   find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/bin/ \;
+  refresh_cloudwatch_agent
   log "already on $image; node scripts refreshed, node left running"
   check
   exit
@@ -64,6 +74,7 @@ find /tmp/node-scripts -maxdepth 1 -type f -exec install -m 0755 {} /usr/local/b
 echo "$image" > "$CURRENT"
 log "starting the node on $image"
 systemctl start strato-cell.service
+refresh_cloudwatch_agent
 
 # --- Until it follows the chain again (the caller's SSM timeout bounds this) ---
 until status=$(check); do

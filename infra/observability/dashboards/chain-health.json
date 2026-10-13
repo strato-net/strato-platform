@@ -604,7 +604,7 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Ingest: forwarded / dropped per minute",
+      "title": "Ingest: accepted / dropped per minute",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -624,7 +624,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(strato_ingest_forwarded_total{env=\"$env\",instance=~\"$instance\"}[5m])*60",
+          "expr": "rate(strato_ingest_accepted_total{env=\"$env\",instance=~\"$instance\"}[5m])*60",
           "legendFormat": "{{__name__}} {{instance}}",
           "datasource": {
             "type": "prometheus",
