@@ -334,15 +334,20 @@ instance ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) ContextM wh
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
--- | The genesis hash for the handshake. Redis holds the canonical chain the
--- indexer writes, block 0 included, so a node without the SQL block index
--- (strato-indexer --sql=false, a lite validator) can answer from there; the
--- SQL row remains the answer for a node whose Redis has not seen genesis yet.
+-- | The genesis hash for the handshake, from Redis so a node without the SQL
+-- block index (strato-indexer --sql=false, a lite validator) can answer: the
+-- canonical entry q:0 when the node has one, else the single hash recorded
+-- under block number 0. The second form is what a node syncing from genesis
+-- has: the canonical map is only written from the first NewBestBlock, and the
+-- genesis bootstrap emits none. The SQL row is the last resort.
 instance Mod.Accessible GenesisBlockHash ContextM where
   access _ =
     RBDB.withRedisBlockDB (getCanonical 0) >>= \case
       Just sha -> return $ GenesisBlockHash sha
-      Nothing -> GenesisBlockHash <$> getGenesisBlockHash
+      Nothing ->
+        RBDB.withRedisBlockDB (getHashesByNumber 0) >>= \case
+          [sha] -> return $ GenesisBlockHash sha
+          _ -> GenesisBlockHash <$> getGenesisBlockHash
 
 instance Mod.Modifiable Context ContextM where
   get _ = readIORef =<< asks configContext
