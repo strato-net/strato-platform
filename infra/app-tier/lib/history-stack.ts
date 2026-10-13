@@ -8,6 +8,7 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import { AppTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface HistoryStackProps extends StackProps {
   vpc: ec2.IVpc;
@@ -18,9 +19,8 @@ export interface HistoryStackProps extends StackProps {
 
 /**
  * The app history service (phase 7): prices, swaps and balances over time.
- * One Fargate service runs the feeds (the Cirrus poller, and the bus consumer
- * when a bus is configured) and the chart API, reached through the app ALB
- * under /history-api.
+ * One Fargate service runs the Cirrus poller feed and the chart API, reached
+ * through the app ALB under /history-api.
  *
  * Its tables live in a `history` database on an existing cluster when the
  * config names one (the chain's Aurora cluster: one cluster to run and back
@@ -34,7 +34,7 @@ export class HistoryStack extends Stack {
     super(scope, id, props);
     const { vpc, config, cluster, listener } = props;
     const history = config.history!;
-    const name = `strato-history-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-history`;
 
     const taskSg = new ec2.SecurityGroup(this, "TaskSg", { vpc, description: `${name} tasks` });
 
@@ -87,17 +87,13 @@ export class HistoryStack extends Stack {
     }
 
     // --- Service ---
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/history/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/history`, retention: logs.RetentionDays.ONE_MONTH });
     const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
       cpu: 512,
       memoryLimitMiB: 1024,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
     });
-
-    const busSecret = history.busSecretName
-      ? secretsmanager.Secret.fromSecretNameV2(this, "BusSecret", history.busSecretName)
-      : undefined;
-    const [busHost, busPort] = (history.busBootstrap || "").split(":");
 
     task.addContainer("history", {
       image: containerImage(this, "HistoryRepo", history.image),
@@ -112,18 +108,9 @@ export class HistoryStack extends Stack {
         postgres_ssl: "require",
         HISTORY_DB_NAME: "history",
         HISTORY_DB_CREATE: dbCreate,
-        BUS_HOST: busHost || "",
-        BUS_PORT: busPort || "9096",
-        BUS_SECURITY: history.busSecurity,
       },
       secrets: {
         postgres_password: ecs.Secret.fromSecretsManager(dbSecret, "password"),
-        ...(busSecret
-          ? {
-              BUS_SASL_USERNAME: ecs.Secret.fromSecretsManager(busSecret, "username"),
-              BUS_SASL_PASSWORD: ecs.Secret.fromSecretsManager(busSecret, "password"),
-            }
-          : {}),
       },
       healthCheck: {
         command: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3030/history-api/health > /dev/null || exit 1"],
@@ -145,6 +132,7 @@ export class HistoryStack extends Stack {
 
     // --- Routed by path on the app ALB, ahead of the default nginx target ---
     listener.addTargets("History", {
+      targetGroupName: elbName(`${name}-3030`),
       priority: 10,
       conditions: [elbv2.ListenerCondition.pathPatterns(["/history-api/*"])],
       port: 3030,
@@ -158,7 +146,7 @@ export class HistoryStack extends Stack {
     new CfnOutput(this, "DbSecretName", { value: dbSecret.secretName });
     new CfnOutput(this, "TaskSecurityGroupId", {
       value: taskSg.securityGroupId,
-      description: "Allow this group on the database cluster (when not done by the stack) and on the message bus (9096) if the live feed is used",
+      description: "Allow this group on the database cluster (when not done by the stack)",
     });
   }
 }

@@ -1,10 +1,12 @@
 # STRATO core cell on AWS
 
 CDK app for one core cell of the tiered deployment: an EC2 host running the
-node's consensus, VM and indexer processes under convoke, with Redis, the
-Kafka broker and Prometheus in containers beside them, against the shared
-Aurora cluster from `data-plane`. It is the same layout the testnet
-hosts run by hand today, built from nothing at boot and supervised by systemd.
+node's consensus, VM and indexer processes under convoke, with Redis and
+Prometheus in containers beside them (the event log, JLog, is embedded in the
+processes), against the shared Aurora cluster from `data-plane`. It is the
+same layout the testnet hosts run by hand today, built from nothing at boot
+and supervised by systemd. The API tier reaches a cell on one port: 8600,
+where `strato-ingest` takes its transaction batches.
 
 A cell is a **follower** by default: `--writer=false` (it indexes into the
 cluster only when it holds the writer lease) and `--validatorBehavior=false`
@@ -35,12 +37,12 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
 
 ## Before deploying
 
-1. The `strato` image in ECR (`make docker`), and the `prometheus` and
-   streaming images beside it under the same registry prefix (the generated
-   compose pulls them with `--repoUrl`).
+1. The `strato` image in ECR (`make docker`), and the `prometheus` image
+   beside it under the same registry prefix (the generated compose pulls it
+   with `--repoUrl`).
 2. The Aurora cluster (`data-plane`), allowing this stack's security
    group (output `SecurityGroupId`) on 5432, and its master secret
-   `strato/<env>/postgres`.
+   `ha-<env>/postgres`.
 3. The network's VPC id when the cell must peer with existing validators
    over private addresses (`-c vpcId`); otherwise the app creates a VPC.
 4. Optionally the observability app's outputs: the cell collector and
@@ -65,8 +67,10 @@ npx cdk deploy --all -c ...   # same context
 ```
 
 Then (unless `postgresSecurityGroupId` was given) allow the output
-`SecurityGroupId` on the Aurora security group, and pass the output `PrivateDnsName` as `-c kafkaHost` to the API tier so it
-submits transactions to this cell.
+`SecurityGroupId` on the Aurora security group, and add
+`http://<PrivateDnsName>:8600` to the API tier's `ingressUrls` so it submits
+transactions to this cell too (the cell admits the tier's tasks on that port
+through `clientSecurityGroupIds`).
 
 ## Context
 
@@ -85,7 +89,7 @@ submits transactions to this cell.
 | `extraBinariesS3` | none | `s3://bucket/prefix/` of extra binaries installed into `/usr/local/bin` (for an image that lacks one) |
 | `network` | `upquark` | `--network`; carries the bootnodes and chain id |
 | `postgresWriterHost` / `postgresReaderHost` / `postgresPort` / `postgresUser` | required / writer / 5432 / postgres | Aurora endpoints |
-| `postgresSecretName` | `strato/<env>/postgres` | master secret, JSON with a `password` field |
+| `postgresSecretName` | `ha-<env>/postgres` | master secret, JSON with a `password` field |
 | `postgresSecurityGroupId` | none | the cluster's security group; the stack opens it to the cell on the Postgres port |
 | `role` | `core` | `node` also runs the app on this host (nginx on httpPort/443, app UI and backend, SMD, apex, PostgREST); needs those images under `repoUrl` |
 | `bundledApp` | `true` | with role node: run app-ui and app-backend on this host; `false` when the app tier serves the app (the node's root redirects to `appUrl`) |
@@ -111,13 +115,11 @@ submits transactions to this cell.
 | `snapshotSource` | none | `s3://bucket/key.tar.zst`, or a published timestamp / `latest` |
 | `snapshotBucket` | `strato-snapshots` | bucket for published snapshots; granted read when set |
 | `snapshotSkipDatabases` | `true` | restore the chain state only (`--skip-databases`) and leave eth and cirrus on the shared cluster alone; `false` only for the first cell of an empty cluster |
-| `kafkaExternalHost` | the host's private DNS name | the name the broker advertises on 9094; the environment load balancer's name when the cell is behind one (`-c frontend=true`) |
 | `autoPromote` | `false` | watch the writer lease and take it after `autoPromoteAfter` (3) consecutive stale observations, about a minute of silence; each claim is counted in CloudWatch (`STRATO/Cell` `WriterLeaseClaimed`). Not for a validator's standby |
-| `legacyLaunchTemplateName` | `false` | keep the launch template's old shared name; only for a cell created before the names were made unique, where renaming would replace the instance |
 | `availabilityZone` | the VPC's first | pin the host to a zone, so two cells do not share one |
 | `extraSetupFlags` | empty | appended to strato-setup verbatim on first boot (`--vaultUrl=...`) |
 | `p2pCidrs` | `0.0.0.0/0` | who may reach 30303 tcp/udp |
-| `clientSecurityGroupIds` | none | allowed on 9094 (Kafka), 3000 and 8545: the API tier's task security group |
+| `clientSecurityGroupIds` | none | allowed on 8600 (the transaction ingress): the API tier's task security group |
 | `sshSourceSecurityGroupId` | none | allowed on 22 |
 | `otelConfigParameterName` / `cloudWatchAgentParameterName` / `prometheusWorkspaceArn` | none | from the observability app; with a collector config the host runs the ADOT collector, its processes export spans to it, the role may write X-Ray, and (with `grafana`) the host's Grafana gets an X-Ray data source so the infrastructure map dashboard reads the service graph |
 | `terminationProtection` | `true` | stack termination protection and instance retention |
@@ -170,6 +172,6 @@ The instance and its data volume are retained on delete; see the repo README.
   image (about ten minutes). Bake an AMI from a bootstrapped host when the
   fleet grows.
 - No automatic promotion; `strato-promote` is a human action.
-- Snapshots restore the node directory, Redis and the local Kafka; a
-  follower joining an existing cluster relies on the cluster already holding
-  the chain's SQL mirror.
+- Snapshots restore the node directory, its JLog and Redis; a follower
+  joining an existing cluster relies on the cluster already holding the
+  chain's SQL mirror.

@@ -28,8 +28,8 @@
 //
 // The CloudWatch queries are account-wide (a dimension takes "*" or one
 // value), so the deployment is picked out here by $env: load balancers and ECS
-// clusters named strato-<tier>-<env>, and the RDS instances of the data-plane
-// stack (stratodata-<env>-...).
+// clusters named ha-<env>-<tier>, and the RDS instances of the data-plane
+// stack (ha-<env>-data-...).
 //
 // Queries (refIds):
 //   tasks      Logs Insights over the Container Insights performance groups:
@@ -123,17 +123,17 @@ const variable = (name) => {
 const PINNED_ENV = "__ENV__";
 const ENV = (PINNED_ENV.startsWith("__") ? variable("env") : PINNED_ENV).toLowerCase();
 const pct = (x) => (numeric(x) ? `${Math.round(x)}%` : "");
-// "strato-app-testnet" -> app, "strato-api-testnet" -> api, and nothing else
+// "ha-testnet-app" -> app, "ha-testnet-api" -> api, and nothing else
 // in the account: another deployment's "...-node-app-lb" is not this app tier.
 // Takes the bare name, not the ALB dimension value, which starts with "app/"
 // (the load balancer type). With no environment known at all (the panel
-// pasted into another dashboard) any strato-<tier>-... name counts.
+// pasted into another dashboard) any ha-...-<tier> name counts.
 const tierOf = (name) => {
-  const m = /^strato-(app|api)-(.+)$/i.exec(name);
-  return m && (!ENV || m[2].toLowerCase() === ENV) ? m[1].toLowerCase() : null;
+  const m = /^ha-(.+)-(app|api)$/i.exec(name);
+  return m && (!ENV || m[1].toLowerCase() === ENV) ? m[2].toLowerCase() : null;
 };
-// RDS instance ids come from the data-plane stack's name (StratoData-<env>-Postgres).
-const ownDb = (id) => (ENV ? id.toLowerCase().startsWith(`stratodata-${ENV}-`) : /^stratodata-/i.test(id));
+// RDS instance ids come from the data-plane stack's name (ha-<env>-data-postgres).
+const ownDb = (id) => (ENV ? id.toLowerCase().startsWith(`ha-${ENV}-data-`) : /^ha-.+-data-/i.test(id));
 const rate = (bytesPerSecond) => {
   if (!numeric(bytesPerSecond)) return "?";
   const b = Number(bytesPerSecond);

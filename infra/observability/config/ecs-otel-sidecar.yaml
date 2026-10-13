@@ -1,7 +1,7 @@
 # ADOT sidecar on an API, app or history task: scrapes the task's own
 # containers over the shared network namespace, forwards OTLP traces to
 # X-Ray, and remote-writes metrics to Managed Prometheus with the task role.
-# Installed from SSM /strato/__ENV__/observability/otel-collector-ecs.
+# Installed from SSM /ha-__ENV__/observability/otel-collector-ecs.
 extensions:
   sigv4auth:
     region: __REGION__

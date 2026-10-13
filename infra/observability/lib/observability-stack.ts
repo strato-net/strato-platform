@@ -12,6 +12,7 @@ import { Construct } from "constructs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ObservabilityConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface ObservabilityStackProps extends StackProps {
   config: ObservabilityConfig;
@@ -43,7 +44,7 @@ export class ObservabilityStack extends Stack {
   constructor(scope: Construct, id: string, props: ObservabilityStackProps) {
     super(scope, id, props);
     const { config } = props;
-    const name = `strato-${config.envName}`;
+    const name = deploymentPrefix(config.envName);
     const read = (file: string) => fs.readFileSync(path.join(__dirname, "..", file), "utf8");
 
     // --- Alert routing ---
@@ -92,7 +93,7 @@ export class ObservabilityStack extends Stack {
     const cwAgent = read("config/cell-cloudwatch-agent.json").replaceAll("__ENV__", config.envName);
     const param = (id: string, suffix: string, value: string, description: string) =>
       new ssm.StringParameter(this, id, {
-        parameterName: `/strato/${config.envName}/observability/${suffix}`,
+        parameterName: `/${name}/observability/${suffix}`,
         stringValue: value,
         description,
         tier: ssm.ParameterTier.ADVANCED,

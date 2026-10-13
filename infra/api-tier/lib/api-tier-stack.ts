@@ -10,9 +10,11 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import * as servicediscovery from "aws-cdk-lib/aws-servicediscovery";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { ApiTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface ApiTierStackProps extends StackProps {
   /** Certificate for the ALB's HTTPS listener (from CertificateStack); `config.albCertificateArn` otherwise. */
@@ -29,8 +31,14 @@ export interface ApiTierStackProps extends StackProps {
  * api-doit.sh entrypoint), PostgREST for Cirrus, and the SMD and apex
  * containers the SMD needs, behind an ALB. There is no shared edge state:
  * sessions ride in the encrypted cookie, CSRF tokens stay per instance behind
- * ALB session stickiness, and nonce counters live in Aurora's writer. Until
- * the message bus exists, transactions go to the core's Kafka listener.
+ * ALB session stickiness, and nonce counters live in Aurora's writer.
+ *
+ * Transactions are posted to every core cell's ingress (ingressUrls). Reads
+ * that need a VM go to vm-query, which every task runs over the SQL mirror
+ * and publishes to the other copies through ECS Service Connect as
+ * vm-query:8546, so a copy whose own instance is down or shedding uses
+ * another's. Nothing here calls a core cell's VM: what the mirror cannot
+ * answer (a non-latest block tag, eth_getProof, a block replay) is an error.
  */
 export class ApiTierStack extends Stack {
   readonly loadBalancer: elbv2.ApplicationLoadBalancer;
@@ -38,7 +46,7 @@ export class ApiTierStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiTierStackProps) {
     super(scope, id, props);
     const { vpc, config } = props;
-    const name = `strato-api-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-api`;
 
     // --- Secrets and the node config ---
     const postgres = secretsmanager.Secret.fromSecretNameV2(this, "PostgresSecret", config.secrets.postgres);
@@ -74,8 +82,6 @@ export class ApiTierStack extends Stack {
         : secretsmanager.Secret.fromSecretNameV2(this, "NginxSessionSecret", config.nginxSessionSecretName);
     // nginx's login client, when it differs from the node's (front door: shared with the app tier).
     const nginxOauth = config.nginxOauthSecretName ? secretsmanager.Secret.fromSecretNameV2(this, "NginxOauthSecret", config.nginxOauthSecretName) : undefined;
-    // MSK SASL/SCRAM secret: JSON {username, password}, name prefixed AmazonMSK_.
-    const busSecret = config.busHost ? secretsmanager.Secret.fromSecretNameV2(this, "BusSecret", config.busSecretName) : undefined;
     const ethconf = ssm.StringParameter.fromStringParameterAttributes(this, "EthconfParam", {
       parameterName: config.ethconfParameterName,
       // Read at task start by ECS, not at synth: the value is the node's
@@ -86,10 +92,16 @@ export class ApiTierStack extends Stack {
 
     // --- ECS ---
     const cluster = new ecs.Cluster(this, "Cluster", { vpc, clusterName: name, containerInsightsV2: ecs.ContainerInsights.ENABLED });
+    // Service Connect: each task's vm-query is reachable from every task as
+    // vm-query:8546 through ECS's proxy, which sends only to healthy tasks
+    // and ejects one that keeps failing. No listener of its own is needed.
+    cluster.addDefaultCloudMapNamespace({ name, type: servicediscovery.NamespaceType.HTTP, useForServiceConnect: true });
+    const vmQueryPort = 8546;
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/api/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/api`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
     const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
       cpu: 2048,
       memoryLimitMiB: 4096,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
@@ -103,31 +115,25 @@ export class ApiTierStack extends Stack {
       image: image("StratoRepo", config.stratoImage),
       entryPoint: ["/strato/api-doit.sh"],
       logging: awsLogs("strato-api"),
-      portMappings: [{ containerPort: 3000 }, { containerPort: 8545 }],
+      portMappings: [{ containerPort: 3000 }, { containerPort: 8545 }, { containerPort: vmQueryPort, name: "vm-query", appProtocol: ecs.AppProtocol.http }],
       environment: {
         postgres_host: config.postgresWriterHost,
         postgres_reader_host: config.postgresReaderHost,
         postgres_port: String(config.postgresPort),
         postgres_user: config.postgresUser,
-        kafkaHost: config.kafkaHost,
-        kafkaPort: String(config.kafkaPort),
-        VM_QUERY: config.vmQuery ? "true" : "false",
-
+        INGRESS_URLS: config.ingressUrls.join(","),
+        // After this task's own vm-query (api-doit.sh lists it first): the other copies', through Service Connect.
+        VM_QUERY_URLS: `http://vm-query:${vmQueryPort}`,
         ...(config.vaultUrl ? { VAULT_URL: config.vaultUrl } : {}),
-        ...(config.busHost
-          ? { BUS_HOST: config.busHost, BUS_PORT: String(config.busPort), BUS_SECURITY: "sasl_ssl", BUS_SUBMIT_MODE: config.busSubmitMode }
-          : {}),
       },
       secrets: {
         ...ethconfEnv,
         postgres_password: ecs.Secret.fromSecretsManager(postgres, "password"),
         ...(oauthYaml ? { OAUTH_CREDENTIALS_YAML: ecs.Secret.fromSecretsManager(oauthYaml) } : oauthFields(oauthJson!)),
-        ...(busSecret
-          ? { BUS_SASL_USERNAME: ecs.Secret.fromSecretsManager(busSecret, "username"), BUS_SASL_PASSWORD: ecs.Secret.fromSecretsManager(busSecret, "password") }
-          : {}),
       },
       healthCheck: {
-        command: ["CMD-SHELL", "pgrep -f '^strato-api' && pgrep -f '^ethereum-jsonrpc' || exit 1"],
+        // vm-query is the tier's only VM, so a task without one is unhealthy.
+        command: ["CMD-SHELL", "pgrep -f '^strato-api' && pgrep -f '^ethereum-jsonrpc' && pgrep -f '^vm-query' || exit 1"],
         interval: Duration.seconds(15),
         startPeriod: Duration.seconds(90),
       },
@@ -269,14 +275,20 @@ export class ApiTierStack extends Stack {
       : undefined;
     if (coreSg) {
       const core = coreSg;
-      if (config.openCoreKafka) core.addIngressRule(taskSg, ec2.Port.tcp(config.kafkaPort), `${name} tasks: Kafka`);
-      // Nothing else: a core cell runs no strato-api, jsonrpc or vault wrapper
-      // (this tier runs its own, and signs against the external vault).
+      // The cells' ingress (8600) is opened by cellSecurityGroupIds below, or on
+      // the cell side (the core-cell app's clientSecurityGroupIds). Nothing else: a core cell runs
+      // no strato-api, jsonrpc or vault wrapper (this tier runs its own, and
+      // signs against the external vault), and its VM is never called.
       if (config.prometheusHost) {
         const port = Number(config.prometheusHost.split(":")[1] ?? "9090");
         core.addIngressRule(taskSg, ec2.Port.tcp(port), `${name} tasks: Prometheus (apex health)`);
       }
     }
+
+    config.cellSecurityGroupIds.forEach((sgId, i) => {
+      ec2.SecurityGroup.fromSecurityGroupId(this, `CellSg${i}`, sgId)
+        .addIngressRule(taskSg, ec2.Port.tcp(8600), `${name} tasks: transaction ingress (strato-ingest)`);
+    });
 
     const service = new ecs.FargateService(this, "Service", {
       cluster,
@@ -287,13 +299,17 @@ export class ApiTierStack extends Stack {
       circuitBreaker: { rollback: true },
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
+      serviceConnectConfiguration: {
+        services: [{ portMappingName: "vm-query", dnsName: "vm-query", port: vmQueryPort }],
+        logDriver: awsLogs("service-connect"),
+      },
     });
     service.autoScaleTaskCount({ minCapacity: config.desiredCount, maxCapacity: config.desiredCount * 4 })
       .scaleOnCpuUtilization("Cpu", { targetUtilizationPercent: 60 });
 
     // --- ALB ---
     const albSg = new ec2.SecurityGroup(this, "AlbSg", { vpc, description: `${name} alb` });
-    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: name });
+    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: elbName(name) });
     const albCertificate =
       props.albCertificate ?? (config.albCertificateArn ? acm.Certificate.fromCertificateArn(this, "AlbCert", config.albCertificateArn) : undefined);
     // The port-80 listener keeps one logical id whether it forwards (no
@@ -323,6 +339,9 @@ export class ApiTierStack extends Stack {
       listener.addCertificates("ExtraCertificates", extraCertificates);
     }
     listener.addTargets("Nginx", {
+      // The port is in the name so that a port change, which replaces the
+      // target group, does not collide with the old group's name.
+      targetGroupName: elbName(`${name}-${config.httpPort}`),
       port: config.httpPort,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
@@ -343,6 +362,7 @@ export class ApiTierStack extends Stack {
     // cell's 3001 stays shut to everything except this load balancer.
     if (config.grafanaInstanceId) {
       const grafanaTargets = new elbv2.ApplicationTargetGroup(this, "GrafanaTargets", {
+        targetGroupName: elbName(`${name}-grafana`),
         vpc,
         port: config.grafanaPort,
         protocol: elbv2.ApplicationProtocol.HTTP,
@@ -397,7 +417,7 @@ export class ApiTierStack extends Stack {
     }
     new CfnOutput(this, "TaskSecurityGroupId", {
       value: taskSg.securityGroupId,
-      description: "Allow on the Aurora cluster (5432) and the core host's Kafka external listener (9094)",
+      description: "Allow on the Aurora cluster (5432) and, as the core-cell app's clientSecurityGroupIds, on every cell's ingress (8600)",
     });
   }
 }

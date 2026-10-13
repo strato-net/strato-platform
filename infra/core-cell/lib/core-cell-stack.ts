@@ -7,6 +7,7 @@ import { Construct } from "constructs";
 import * as fs from "fs";
 import * as path from "path";
 import { CoreCellConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface CoreCellStackProps extends StackProps {
   vpc: ec2.IVpc;
@@ -39,13 +40,13 @@ export class CoreCellStack extends Stack {
   constructor(scope: Construct, id: string, props: CoreCellStackProps) {
     super(scope, id, { ...props, terminationProtection: props.config.terminationProtection });
     const { vpc, config } = props;
-    const name = `strato-${config.envName}-${config.cellId}`;
+    const name = `${deploymentPrefix(config.envName)}-cell-${config.cellId}`;
 
     // --- Network ---
     this.securityGroup = new ec2.SecurityGroup(this, "CellSg", {
       vpc,
       securityGroupName: name,
-      description: `${name} core cell: p2p from peers, Kafka and API from the API tier, SSH from the bastion`,
+      description: `${name} core cell: p2p from peers, transaction ingress from the API tier, SSH from the bastion`,
       allowAllOutbound: true,
     });
     for (const cidr of config.p2pCidrs) {
@@ -75,9 +76,7 @@ export class CoreCellStack extends Stack {
     }
     config.clientSecurityGroupIds.forEach((sgId, i) => {
       const client = ec2.SecurityGroup.fromSecurityGroupId(this, `ClientSg${i}`, sgId, { mutable: false });
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(9094), "Kafka external listener (API tier submits here)");
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(3000), "strato-api");
-      this.securityGroup.addIngressRule(client, ec2.Port.tcp(8545), "ethereum-jsonrpc");
+      this.securityGroup.addIngressRule(client, ec2.Port.tcp(8600), "transaction ingress (strato-ingest; the API tier posts here)");
     });
     if (config.postgresSecurityGroupId) {
       // The cluster's group is imported mutable: the rule lives in this stack and goes with it.
@@ -91,7 +90,7 @@ export class CoreCellStack extends Stack {
 
     // --- Identity ---
     const role = new iam.Role(this, "CellRole", {
-      roleName: `${name}-cell`,
+      roleName: name,
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
       description: `${name} core cell host: pull the strato image, read the Aurora secret, SSM, observability`,
       managedPolicies: [
@@ -215,7 +214,6 @@ export class CoreCellStack extends Stack {
       SNAPSHOT_SOURCE: config.snapshotSource ?? "",
       SNAPSHOT_BUCKET: config.snapshotBucket ?? "",
       SNAPSHOT_SKIP_DATABASES: String(config.snapshotSkipDatabases),
-      KAFKA_EXTERNAL_HOST: config.kafkaExternalHost ?? "",
       AUTO_PROMOTE: String(config.autoPromote),
       AUTO_PROMOTE_AFTER: String(config.autoPromoteAfter),
       EXTRA_SETUP_FLAGS: config.extraSetupFlags,
@@ -260,10 +258,8 @@ export class CoreCellStack extends Stack {
       keyPair: config.keyPairName ? ec2.KeyPair.fromKeyPairName(this, "KeyPair", config.keyPairName) : undefined,
       userData,
       userDataCausesReplacement: false,
-      // IMDSv2 is enforced through a launch template CDK adds, whose name must be
-      // unique in the account: bin/core-cell.ts turns on uniqueImdsv2TemplateName,
-      // without which every cell's is "CellLaunchTemplate" and a second cannot be created.
-      requireImdsv2: true,
+      // The Deployment tag reaches the root and data volumes too.
+      propagateTagsToVolumeOnCreation: true,
       detailedMonitoring: true,
       instanceName: name,
       blockDevices: [
@@ -271,6 +267,16 @@ export class CoreCellStack extends Stack {
         { deviceName: "/dev/sdf", volume: ec2.BlockDeviceVolume.ebs(config.dataVolumeGiB, { volumeType: ec2.EbsDeviceVolumeType.GP3, encrypted: true, deleteOnTermination: false }) },
       ],
     });
+    // IMDSv2 through a launch template of our own rather than requireImdsv2,
+    // whose launch template CDK names itself, without the deployment prefix.
+    const imdsv2 = new ec2.CfnLaunchTemplate(this, "Imdsv2", {
+      launchTemplateName: `${name}-imdsv2`,
+      launchTemplateData: { metadataOptions: { httpTokens: "required" } },
+    });
+    (this.instance.node.defaultChild as ec2.CfnInstance).launchTemplate = {
+      launchTemplateName: `${name}-imdsv2`,
+      version: imdsv2.attrLatestVersionNumber,
+    };
     this.instance.applyRemovalPolicy(config.terminationProtection ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY);
     Tags.of(this.instance).add("strato:cell", config.cellId);
     Tags.of(this.instance).add("strato:env", config.envName);
@@ -286,7 +292,7 @@ export class CoreCellStack extends Stack {
     // --- Outputs ---
     new CfnOutput(this, "InstanceId", { value: this.instance.instanceId });
     new CfnOutput(this, "PrivateIp", { value: this.instance.instancePrivateIp });
-    new CfnOutput(this, "PrivateDnsName", { value: this.instance.instancePrivateDnsName, description: "The cell's Kafka external listener host (port 9094): pass as -c kafkaHost to the api-tier app" });
+    new CfnOutput(this, "PrivateDnsName", { value: this.instance.instancePrivateDnsName, description: "The cell's transaction ingress host: add http://<name>:8600 to the api-tier app's ingressUrls" });
     if (publicAddress) new CfnOutput(this, "PublicIp", { value: publicAddress, description: "Elastic IP; the address peers dial" });
     if (publicAddress && config.role === "node") new CfnOutput(this, "AppUrl", { value: config.tlsHostname ? `https://${config.tlsHostname}/` : Fn.join("", ["http://", publicAddress, `:${config.httpPort}/`]) });
     if (publicAddress && config.grafana) new CfnOutput(this, "GrafanaUrl", { value: Fn.join("", ["http://", publicAddress, ":3001/"]) });

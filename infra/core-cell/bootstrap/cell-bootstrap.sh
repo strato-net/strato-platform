@@ -162,19 +162,27 @@ if [[ ! -d $NODE_DIR ]]; then
   sudo -u $NODE_USER -H env PATH="$PATH" \
     strato-setup "$NODE_DIR" --role="$ROLE" --network="$NETWORK" --nodeHost="$node_host" \
       --pghost="$PG_WRITER_HOST" --pgReaderHost="$PG_READER_HOST" --password="$pg_password" \
-      --kafkaExternalHost="${KAFKA_EXTERNAL_HOST:-$private_dns}" --cellId="$CELL_ID" "${peerdb[@]}" --peerStore="${PEER_STORE:-postgres}" \
+      --cellId="$CELL_ID" "${peerdb[@]}" --peerStore="${PEER_STORE:-postgres}" \
       --writer="$WRITER" --validatorBehavior="$VALIDATOR_BEHAVIOR" --repoUrl="$REPO_URL" \
       "${vmq[@]}" "${apps[@]}" "${auth[@]}" "${ssl[@]}" "${extra[@]}"
   unset pg_password
   # 4b. A snapshot, when asked for (strato-up would skip it once the directory exists).
   if [[ -n "$SNAPSHOT_SOURCE" ]]; then
     [[ -n "$SNAPSHOT_BUCKET" ]] && export STRATO_SNAPSHOT_BUCKET="$SNAPSHOT_BUCKET"
-    if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then snap=(--source "$SNAPSHOT_SOURCE"); else snap=(--snapshot="$SNAPSHOT_SOURCE"); fi
+    # A bare --snapshot is the latest published one; strato-snapshot takes no "latest" timestamp.
+    if [[ "$SNAPSHOT_SOURCE" == s3://* ]]; then snap=(--source "$SNAPSHOT_SOURCE")
+    elif [[ "$SNAPSHOT_SOURCE" == latest ]]; then snap=(--snapshot)
+    else snap=(--snapshot="$SNAPSHOT_SOURCE"); fi
     # The cell's eth and cirrus are on a shared cluster that another cell may
     # be writing: take the chain state and leave them alone, unless told this
-    # is the first cell of an empty cluster. An unset value (a cell.env from
-    # before this flag) skips too.
-    [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]] || snap+=(--skip-databases)
+    # is the first cell of an empty cluster, which loads them into the cluster
+    # (there is no local postgres to load them into). An unset value (a
+    # cell.env from before this flag) skips too.
+    if [[ "${SNAPSHOT_SKIP_DATABASES:-true}" == "false" ]]; then
+      snap+=(--postgres-host "$PG_WRITER_HOST" --replace-databases)
+    else
+      snap+=(--skip-databases)
+    fi
     # The archive is unpacked in the work directory: on the data volume, which
     # has the room (the root volume does not) and which the node user can write
     # (this script's own directory, where strato-snapshot would default, it cannot).
@@ -336,7 +344,7 @@ YAML
   # names; the node's Prometheus has no env label to fill $env from. The tier
   # map's code scopes the account-wide CloudWatch results by it (__ENV__).
   for f in /tmp/dashboards/*.json; do sed -e 's/\${DS_PROMETHEUS}/prometheus/g' -e 's/\${DS_CLOUDWATCH}/cloudwatch/g' -e 's/\${DS_CLOUDWATCH_LOGS}/cloudwatch-logs/g' -e "s/\${DS_XRAY}/$xray_uid/g" \
-    -e 's/{env=\\"$env\\",/{/g' -e 's/,env=\\"$env\\"//g' -e 's/{env=\\"$env\\"}/{}/g' -e "s|-\$env/|-$STRATO_ENV/|g" -e "s/__ENV__/$STRATO_ENV/g" "$f" > "$G/dashboards/$(basename "$f")"; done
+    -e 's/{env=\\"$env\\",/{/g' -e 's/,env=\\"$env\\"//g' -e 's/{env=\\"$env\\"}/{}/g' -e "s|ha-\$env-|ha-$STRATO_ENV-|g" -e "s/__ENV__/$STRATO_ENV/g" "$f" > "$G/dashboards/$(basename "$f")"; done
   # The tier map names CloudFront distributions from this (E123ABC=SMD,...).
   if [[ -n "${FRONTEND_LABELS:-}" ]]; then
     set -- $G/dashboards/*.json

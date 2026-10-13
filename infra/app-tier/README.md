@@ -5,17 +5,17 @@ away from the node.
 
 | Stack | What it holds |
 |---|---|
-| `StratoApp-<env>-Network` | The VPC (imported with `-c vpcId=...`, or a new two-AZ VPC). |
-| `StratoApp-<env>-Tier` | ECS Fargate service: the app's nginx (OAuth, CSRF, sessions) and the backend in one task, behind an ALB with session stickiness; sessions in the encrypted cookie, CSRF tokens per copy, no shared store. |
-| `StratoApp-<env>-Ui` | The UI bundle in S3 behind CloudFront, with `/api/*`, `/auth/*`, `/login`, `/rpc`, `/api-docs*` routed to the ALB so the browser sees one origin. |
+| `ha-<env>-app-network` | The VPC (imported with `-c vpcId=...`, or a new two-AZ VPC). |
+| `ha-<env>-app-tier` | ECS Fargate service: the app's nginx (OAuth, CSRF, sessions) and the backend in one task, behind an ALB with session stickiness; sessions in the encrypted cookie, CSRF tokens per copy, no shared store. |
+| `ha-<env>-app-ui` | The UI bundle in S3 behind CloudFront, with `/api/*`, `/auth/*`, `/login`, `/rpc`, `/api-docs*` routed to the ALB so the browser sees one origin. |
 
 ## Before deploying
 
 1. Build and push the images: `make app-backend app-nginx` at the repo root, then push to ECR. The sidecar must be the **app-nginx** image (app/nginx: it proxies /api to the backend beside it and the node paths to `NODE_URL`, listens on 80); the node's `nginx` image expects the node's layout and will not start here.
 2. Create the secrets in Secrets Manager (names are context values, defaults shown):
-   - `strato/app/oauth`: JSON `{"discoveryUrl": ..., "clientId": ..., "clientSecret": ...}` for the app's own OIDC client
-   - `strato/app/postgres-password`: the node's Postgres password (plain string)
-   - `strato/app/session-secret`: 64 random characters (plain string)
+   - `ha-<env>/app/oauth`: JSON `{"discoveryUrl": ..., "clientId": ..., "clientSecret": ...}` for the app's own OIDC client
+   - `ha-<env>/app/postgres-password`: the node's Postgres password (plain string)
+   - `ha-<env>/app/session-secret`: 64 random characters (plain string)
    - optionally a JSON secret with the backend's API keys (`-c backendSecretName=...`)
 3. Build the UI: `cd app/ui && npm ci && npm run build`.
 4. Allow the task security group (stack output `TaskSecurityGroupId`) on the node's Postgres port.
@@ -57,20 +57,18 @@ Deploys when `-c historyImage=...` is given: a Fargate service under
 the chain's Aurora cluster when `-c historyDatabaseHost=<writer endpoint>`
 is set (with `historyDatabasePort`, `historyDatabaseUser`,
 `historyDatabaseSecretName` defaulting to 5432, postgres and
-`strato/<env>/postgres`, and `historyDatabaseSecurityGroupId` to open the
+`ha-<env>/postgres`, and `historyDatabaseSecurityGroupId` to open the
 cluster to the service); that is one cluster to run and the history writes
 are small. Without it the stack creates an Aurora Serverless v2 cluster of
 its own (0.5 to 8 ACU), which is the place to move to if chart queries show
-in the chain replicas' metrics. The service feeds from the Cirrus poller;
-add `-c busBootstrap=host:port -c busSecretName=...` to also consume
-`chain_events` from the message bus.
+in the chain replicas' metrics. The service feeds from the Cirrus poller.
 
 Security groups: pass `-c postgresSecurityGroupId=<Aurora cluster SG>` and the stack opens them to its task security group at deploy time; otherwise allow the output `TaskSecurityGroupId` by hand.
 
 ## Hostname and certificate
 
 `-c domainName=<host>` names the app's public hostname. Without
-`-c cloudfrontCertificateArn`, the app adds `StratoApp-<env>-Certificate`
+`-c cloudfrontCertificateArn`, the app adds `ha-<env>-app-certificate`
 (in us-east-1, where CloudFront certificates live) holding a DNS-validated
 ACM certificate. That stack stays in `CREATE_IN_PROGRESS` until the
 validation CNAME ACM asks for exists at the registrar; the record is in the

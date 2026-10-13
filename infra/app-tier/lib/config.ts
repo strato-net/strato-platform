@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+import { deploymentPrefix } from "./naming";
 
 /**
  * Everything the app tier needs that differs between environments, read from
@@ -47,6 +48,11 @@ export interface AppTierConfig {
     postgresPasswordJsonKey?: string;
     session: string;
     backend?: string;
+    /**
+     * The keys `backend` holds. ECS refuses to start a task whose secret lacks a key it maps, and
+     * every key is optional to the backend, so name only those present; unset maps them all.
+     */
+    backendKeys?: string[];
   };
   /** Create the session secret (64 random characters) under `secrets.session` instead of importing one. */
   createSessionSecret: boolean;
@@ -72,17 +78,11 @@ export interface AppTierConfig {
    * a `history` database on an existing Postgres cluster when
    * `historyDatabaseHost` is given (the chain's Aurora cluster: one cluster
    * to run, and the writes are small), else in an Aurora Serverless cluster
-   * of its own. `busBootstrap` is host:port of the message bus (omit it to
-   * feed from the Cirrus poller only); `busSecretName` a Secrets Manager JSON
-   * {username, password} SCRAM credential (the data-plane bus stack's
-   * AmazonMSK_ app secret).
+   * of its own. It feeds from the Cirrus poller.
    */
   history?: {
     image: string;
     desiredCount: number;
-    busBootstrap?: string;
-    busSecurity: string;
-    busSecretName?: string;
     /** An existing cluster to hold the history database; the secret is JSON with a "password" field. */
     database?: {
       host: string;
@@ -114,8 +114,10 @@ function optional(app: App, key: string): string | undefined {
 }
 
 export function loadConfig(app: App): AppTierConfig {
+  const envName = ctx(app, "envName", "testnet");
+  const prefix = deploymentPrefix(envName);
   return {
-    envName: ctx(app, "envName", "testnet"),
+    envName,
     vpcId: optional(app, "vpcId"),
     nginxImage: ctx(app, "nginxImage"),
     backendImage: ctx(app, "backendImage"),
@@ -132,11 +134,12 @@ export function loadConfig(app: App): AppTierConfig {
     domainName: optional(app, "domainName"),
     oauthDiscoveryUrl: optional(app, "oauthDiscoveryUrl"),
     secrets: {
-      oauth: ctx(app, "oauthSecretName", "strato/app/oauth"),
-      postgresPassword: ctx(app, "postgresPasswordSecretName", "strato/app/postgres-password"),
+      oauth: ctx(app, "oauthSecretName", `${prefix}/app/oauth`),
+      postgresPassword: ctx(app, "postgresPasswordSecretName", `${prefix}/app/postgres-password`),
       postgresPasswordJsonKey: optional(app, "postgresPasswordJsonKey"),
-      session: ctx(app, "sessionSecretName", "strato/app/session-secret"),
+      session: ctx(app, "sessionSecretName", `${prefix}/app/session-secret`),
       backend: optional(app, "backendSecretName"),
+      backendKeys: optional(app, "backendSecretKeys")?.split(",").map((s) => s.trim()).filter(Boolean),
     },
     createSessionSecret: String(ctx(app, "createSessionSecret", "false")) === "true",
     postgresSecurityGroupId: optional(app, "postgresSecurityGroupId"),
@@ -152,15 +155,12 @@ export function loadConfig(app: App): AppTierConfig {
       ? {
           image: ctx(app, "historyImage"),
           desiredCount: Number(ctx(app, "historyDesiredCount", "1")),
-          busBootstrap: optional(app, "busBootstrap"),
-          busSecurity: ctx(app, "busSecurity", "sasl_ssl"),
-          busSecretName: optional(app, "busSecretName"),
           database: optional(app, "historyDatabaseHost")
             ? {
                 host: ctx(app, "historyDatabaseHost"),
                 port: Number(ctx(app, "historyDatabasePort", "5432")),
                 user: ctx(app, "historyDatabaseUser", "postgres"),
-                secretName: ctx(app, "historyDatabaseSecretName", `strato/${ctx(app, "envName", "testnet")}/postgres`),
+                secretName: ctx(app, "historyDatabaseSecretName", `${prefix}/postgres`),
                 securityGroupId: optional(app, "historyDatabaseSecurityGroupId"),
               }
             : undefined,

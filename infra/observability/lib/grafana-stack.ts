@@ -9,6 +9,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
 import * as path from "path";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface GrafanaServiceConfig {
   vpcId: string;
@@ -46,7 +47,7 @@ export class GrafanaStack extends Stack {
   constructor(scope: Construct, id: string, props: GrafanaStackProps) {
     super(scope, id, props);
     const { envName, workspace, config } = props;
-    const name = `strato-grafana-${envName}`;
+    const name = `${deploymentPrefix(envName)}-grafana`;
     const vpc = ec2.Vpc.fromLookup(this, "Vpc", { vpcId: config.vpcId });
 
     const oauth = config.oauthSecretName
@@ -56,7 +57,7 @@ export class GrafanaStack extends Stack {
       : undefined;
     // For the break-glass admin login; day to day everyone comes in through Keycloak.
     const adminPassword = new secretsmanager.Secret(this, "AdminPassword", {
-      secretName: `strato/${envName}/grafana/admin-password`,
+      secretName: `${deploymentPrefix(envName)}/grafana/admin-password`,
       generateSecretString: { passwordLength: 32, excludePunctuation: true },
     });
 
@@ -78,7 +79,7 @@ export class GrafanaStack extends Stack {
       resources: ["*"],
     }));
 
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/grafana/${envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(envName)}/grafana`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
     task.addContainer("grafana", {
       image: ecs.ContainerImage.fromAsset(path.join(__dirname, ".."), { file: "grafana/Dockerfile", platform: Platform.LINUX_ARM64 }),
       portMappings: [{ containerPort: 3000 }],
@@ -121,6 +122,7 @@ export class GrafanaStack extends Stack {
     });
 
     const targets = new elbv2.ApplicationTargetGroup(this, "Targets", {
+      targetGroupName: elbName(name),
       vpc,
       port: 3000,
       protocol: elbv2.ApplicationProtocol.HTTP,

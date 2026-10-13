@@ -10,6 +10,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import { AppTierConfig } from "./config";
+import { deploymentPrefix, elbName } from "./naming";
 
 export interface AppTierStackProps extends StackProps {
   vpc: ec2.IVpc;
@@ -32,7 +33,7 @@ export class AppTierStack extends Stack {
   constructor(scope: Construct, id: string, props: AppTierStackProps) {
     super(scope, id, props);
     const { vpc, config } = props;
-    const name = `strato-app-${config.envName}`;
+    const name = `${deploymentPrefix(config.envName)}-app`;
 
     // --- Secrets: named here, resolved by ECS at task start ---
     const oauth = secretsmanager.Secret.fromSecretNameV2(this, "OauthSecret", config.secrets.oauth);
@@ -63,9 +64,10 @@ export class AppTierStack extends Stack {
     this.cluster = cluster;
     // DESTROY, not the CDK default of RETAIN: a retained group keeps its name,
     // and the next create of this stack then fails with "already exists".
-    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/strato/app/${config.envName}`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
+    const logGroup = new logs.LogGroup(this, "Logs", { logGroupName: `/${deploymentPrefix(config.envName)}/app`, retention: logs.RetentionDays.ONE_MONTH, removalPolicy: RemovalPolicy.DESTROY });
 
     const task = new ecs.FargateTaskDefinition(this, "Task", {
+      family: name,
       cpu: 1024,
       memoryLimitMiB: 2048,
       runtimePlatform: { cpuArchitecture: ecs.CpuArchitecture.X86_64, operatingSystemFamily: ecs.OperatingSystemFamily.LINUX },
@@ -99,7 +101,7 @@ export class AppTierStack extends Stack {
       secrets: {
         ...backendDiscovery.secrets,
         postgres_password: ecs.Secret.fromSecretsManager(postgresPassword, config.secrets.postgresPasswordJsonKey),
-        ...(backendSecret ? backendSecretFields(backendSecret) : {}),
+        ...(backendSecret ? backendSecretFields(backendSecret, config.secrets.backendKeys) : {}),
       },
       healthCheck: {
         // /api/health is the backend's health route (/api/v1/metrics has no index route and answered 404).
@@ -192,7 +194,7 @@ export class AppTierStack extends Stack {
 
     // --- ALB ---
     const albSg = new ec2.SecurityGroup(this, "AlbSg", { vpc, description: `${name} alb` });
-    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: name });
+    this.loadBalancer = new elbv2.ApplicationLoadBalancer(this, "Alb", { vpc, internetFacing: true, securityGroup: albSg, loadBalancerName: elbName(name) });
     this.albUsesHttps = Boolean(config.albCertificateArn);
 
     // The port-80 listener keeps one logical id whether it forwards (no
@@ -215,6 +217,9 @@ export class AppTierStack extends Stack {
     }
 
     listener.addTargets("Nginx", {
+      // The port is in the name so that a port change, which replaces the
+      // target group, does not collide with the old group's name.
+      targetGroupName: elbName(`${name}-${config.httpPort}`),
       port: config.httpPort,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [service.loadBalancerTarget({ containerName: "nginx", containerPort: config.httpPort })],
@@ -252,9 +257,9 @@ function containerImage(scope: Construct, id: string, uri: string): ecs.Containe
     : ecs.ContainerImage.fromEcrRepository(repository, tag ?? "latest");
 }
 
-/** Optional backend API keys, each a field of one JSON secret. */
-function backendSecretFields(secret: secretsmanager.ISecret): Record<string, ecs.Secret> {
-  const fields = [
+/** Optional backend API keys, each a field of one JSON secret: those named, or all of them. */
+function backendSecretFields(secret: secretsmanager.ISecret, keys?: string[]): Record<string, ecs.Secret> {
+  const known = [
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
     "STRIPE_WEBHOOK_SECRET",
@@ -269,5 +274,7 @@ function backendSecretFields(secret: secretsmanager.ISecret): Record<string, ecs
     "RPC_URL_BASE_SEPOLIA",
     "RPC_URL_BASE_SEPOLIA_FALLBACK",
   ];
-  return Object.fromEntries(fields.map((f) => [f, ecs.Secret.fromSecretsManager(secret, f)]));
+  const unknown = (keys ?? []).filter((k) => !known.includes(k));
+  if (unknown.length) throw new Error(`backendSecretKeys: not backend settings: ${unknown.join(", ")}`);
+  return Object.fromEntries((keys ?? known).map((f) => [f, ecs.Secret.fromSecretsManager(secret, f)]));
 }

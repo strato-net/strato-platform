@@ -8,6 +8,7 @@ import { Construct } from "constructs";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ApiTierConfig } from "./config";
+import { deploymentPrefix } from "./naming";
 
 export interface FrontDoorStackProps extends StackProps {
   config: ApiTierConfig;
@@ -32,12 +33,16 @@ const API_PATHS = ["/strato/*", "/strato-api*", "/bloc/*", "/cirrus/*", "/apex-a
  * Viewer-request functions for the two buckets. Client-side routes (no file
  * extension in the last segment) get their SPA's index.html. Functions rather
  * than the distribution's error responses, which would also rewrite the tiers'
- * own 401s, 403s and 404s into HTML.
+ * own 401s, 403s and 404s into HTML. The root redirects to /dashboard/, as the
+ * node's nginx does (nginx-packager: location = /).
  */
 const APP_ROUTES = `
 function handler(event) {
   var request = event.request;
   var uri = request.uri;
+  if (uri === "/") {
+    return { statusCode: 302, statusDescription: "Found", headers: { location: { value: "/dashboard/" } } };
+  }
   if (uri.slice(uri.lastIndexOf("/") + 1).indexOf(".") === -1) {
     request.uri = "/index.html";
   }
@@ -104,22 +109,23 @@ export class FrontDoorStack extends Stack {
     const appTier = tierBehavior(config.appOriginDomainName);
     const apiTier = tierBehavior(apiOrigin);
 
+    const prefix = deploymentPrefix(config.envName);
     const fn = (fid: string, comment: string, code: string) =>
-      new cloudfront.Function(this, fid, { runtime: cloudfront.FunctionRuntime.JS_2_0, comment, code: cloudfront.FunctionCode.fromInline(code) });
+      new cloudfront.Function(this, fid, { functionName: `${prefix}-frontdoor-${fid}`, runtime: cloudfront.FunctionRuntime.JS_2_0, comment, code: cloudfront.FunctionCode.fromInline(code) });
     const smdBehavior: cloudfront.BehaviorOptions = {
-      origin: origins.S3BucketOrigin.withOriginAccessControl(smdBucket),
+      origin: origins.S3BucketOrigin.withOriginAccessControl(smdBucket, { originAccessControl: new cloudfront.S3OriginAccessControl(this, "SmdOac", { originAccessControlName: `${prefix}-frontdoor-smd` }) }),
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-      functionAssociations: [{ function: fn("SmdRoutes", `strato front door ${config.envName}: smd routes`, SMD_ROUTES), eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+      functionAssociations: [{ function: fn("SmdRoutes", `${prefix} front door: smd routes`, SMD_ROUTES), eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
     };
 
     const distribution = new cloudfront.Distribution(this, "Distribution", {
-      comment: `strato front door ${config.envName}`,
+      comment: `${prefix} front door`,
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(appBucket),
+        origin: origins.S3BucketOrigin.withOriginAccessControl(appBucket, { originAccessControl: new cloudfront.S3OriginAccessControl(this, "AppOac", { originAccessControlName: `${prefix}-frontdoor-app` }) }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-        functionAssociations: [{ function: fn("AppRoutes", `strato front door ${config.envName}: app routes`, APP_ROUTES), eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
+        functionAssociations: [{ function: fn("AppRoutes", `${prefix} front door: app routes`, APP_ROUTES), eventType: cloudfront.FunctionEventType.VIEWER_REQUEST }],
       },
       additionalBehaviors: {
         "/smd": smdBehavior,
