@@ -74,6 +74,7 @@ library
     , strato-conf
     , strato-model
     , strato-redis-blockdb
+    , strato-tracing
     , template-haskell
     , text
     , time
