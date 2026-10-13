@@ -98,8 +98,10 @@ async function getSyncStatus() {
   const client = await getClient();
   const buf = await client.get(commandOptions({ returnBuffers: true }), SYNC_STATUS_KEY);
   if (!buf) return null;
-  // RLP of a Bool: a single 0x01 byte for True, the empty string for False.
-  return Buffer.from(RLP.decode(buf)).length > 0;
+  // The flag is one RLP byte: 0x01 for True, 0x00 for False (seen on a node
+  // syncing from genesis; an empty value would also mean False).
+  const bytes = Buffer.from(RLP.decode(buf));
+  return bytes.length > 0 && bytes[0] !== 0;
 }
 
 // Returns the current validator list stored in Redis by strato (the same
