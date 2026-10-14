@@ -354,6 +354,25 @@ test("the HTTP retry helper preserves diagnostics and avoids repeated determinis
   calls = 0;
   await assert.rejects(retry(async () => { calls++; throw new Error("ETIMEDOUT"); }, { maxAttempts: 3 }), /ETIMEDOUT/);
   assert.equal(calls, 3, "transport retries remain unchanged");
+
+  for (const [reason, expectedCode] of [
+    ["EAB: mint limit exceeded", "MINT_CAPACITY"],
+    ["withdrawal capacity exhausted", "WITHDRAWAL_CAPACITY"],
+    ["insufficient funds for gas transaction", "FUNDING_REQUIRED"],
+    ["manual review required", "MANUAL_REVIEW"],
+    ["EAB: deposits paused", "PAUSED"],
+    ["route disabled", "POLICY_RESTRICTED"],
+    ["signer mismatch", "CONFIGURATION"],
+  ] as const) {
+    const responseError = Object.assign(new Error("Request failed with status code 422"), {
+      code: "ERR_BAD_REQUEST",
+      response: { status: 422, data: reason },
+    });
+    await assert.rejects(retry(async () => { throw responseError; }, { maxAttempts: 1 }), error => {
+      assert.equal(classifyProcessingError(error)[0].code, expectedCode);
+      return true;
+    });
+  }
 });
 
 test("processing emails use existing recipients and distinguish recovery from completion", async t => {

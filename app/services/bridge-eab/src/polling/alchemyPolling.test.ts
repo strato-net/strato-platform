@@ -597,7 +597,7 @@ test("records an expired trace failure for review and settles the next deposit i
   t.mock.method(state, "markReceiptMissing", async (deposit, graceMs, reason) => {
     assert.equal(deposit, untraceable);
     assert.equal(graceMs, getMissingReceiptGraceMs());
-    assert.equal(reason, `External trace remained unavailable: ${error.message}`);
+    assert.equal(reason, `External evidence remained unavailable: ${error.message}`);
     return { deposit, status: "review" as const, reviewReason: reason };
   });
   t.mock.method(state, "markReviewAttempted", async () => undefined);

@@ -163,6 +163,22 @@ const nativeEvidenceRpc: NativeVerificationRpc = {
     assertNativeEvidenceChain(chainId);
     return Number(BigInt(await provider.send("eth_blockNumber", [])));
   },
+  getFinalizedBlockNumber: async (chainId) => {
+    assertNativeEvidenceChain(chainId);
+    return provider.getFinalizedBlockNumber();
+  },
+  getVerifiedBlockHash: async (chainId, blockNumber) => {
+    assertNativeEvidenceChain(chainId);
+    const block = await provider.send("eth_getBlockByNumber", [
+      `0x${BigInt(blockNumber).toString(16)}`,
+      false,
+    ]);
+    if (!block || BigInt(block.number || "-1") !== BigInt(blockNumber) ||
+        !/^0x[0-9a-f]{64}$/i.test(block.hash || "")) {
+      throw new Error("Native receipt block is unavailable");
+    }
+    return block.hash.toLowerCase();
+  },
   getTransactionReceiptsBatch: async (chainId, hashes) => {
     assertNativeEvidenceChain(chainId);
     return new Map(await Promise.all(hashes.map(async (hash) => {
@@ -1430,9 +1446,15 @@ const validateRpcIdentity = async (): Promise<void> => {
 
 const validateRefundDestination = async (authorization: WithdrawalAuthorization): Promise<void> => {
   validateDestinationIdentity(authorization);
-  const latest = await provider.getBlock("latest");
+  const [latest, finalizedBlock] = await Promise.all([
+    provider.getBlock("latest"),
+    provider.getFinalizedBlockNumber(),
+  ]);
   if (!latest || latest.number < verifierConfirmations) throw new Error("Finalized vault state is unavailable");
-  const blockTag = latest.number - verifierConfirmations;
+  const blockTag = Math.min(
+    latest.number - verifierConfirmations,
+    finalizedBlock,
+  );
   const block = await provider.getBlock(blockTag);
   if (!block || BigInt(block.timestamp) <= BigInt(authorization.deadline)) {
     throw new Error("Authorization has not expired in confirmed vault state");
@@ -1491,6 +1513,7 @@ const start = async () => {
       validateAwsKmsAddress(kmsConfig),
       validatePolicyAgainstContracts(),
       validateNativeVerifierConfig(),
+      provider.getFinalizedBlockNumber(),
     ]);
     if (
       normalize(verifierPolicy.settlementAttestor) !==

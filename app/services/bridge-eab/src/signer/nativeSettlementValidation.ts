@@ -1,4 +1,9 @@
-import { NativeDepositInfo, NativeWithdrawalInfo, NativeVerificationRpc } from "../types";
+import {
+  NativeDepositInfo,
+  NativeVerificationResults,
+  NativeWithdrawalInfo,
+  NativeVerificationRpc,
+} from "../types";
 import { AbiCoder, Interface, keccak256, ZeroAddress as ZERO_ADDRESS } from "ethers";
 import {
   NATIVE_CANCELLATION_ABI,
@@ -15,6 +20,57 @@ const mintInterface = new Interface(NATIVE_MINT_EVENT_ABI);
 const refundInterface = new Interface(NATIVE_REFUND_ABI);
 const cancellationInterface = new Interface(NATIVE_CANCELLATION_ABI);
 
+const receiptBlockNumber = (receipt: any): number | undefined => {
+  if (typeof receipt?.blockNumber !== "string" ||
+      !/^0x[0-9a-f]+$/i.test(receipt.blockNumber)) return undefined;
+  const value = Number(BigInt(receipt.blockNumber));
+  return Number.isSafeInteger(value) ? value : undefined;
+};
+
+const requireFinalizedReceipt = async (
+  chainId: number,
+  transactionHash: string,
+  receipt: any,
+  confirmations: number,
+  rpc: NativeVerificationRpc,
+  pendingMessage: string,
+): Promise<void> => {
+  const blockNumber = receiptBlockNumber(receipt);
+  if (receipt?.__rpcDisagreement) {
+    throw Object.assign(new Error("Native receipt RPC disagreement"), {
+      issues: [processingIssue("DEPENDENCY_UNAVAILABLE", { transactionHash })],
+    });
+  }
+  if (!receipt || blockNumber === undefined ||
+      !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) {
+    throw Object.assign(new Error(pendingMessage), {
+      issues: [processingIssue("CONFIRMATIONS_PENDING", {
+        transactionHash,
+        requiredConfirmations: String(confirmations),
+      })],
+    });
+  }
+  const [latestBlock, finalizedBlock, canonicalHash] = await Promise.all([
+    rpc.getVerificationBlockNumber(chainId),
+    rpc.getFinalizedBlockNumber(chainId),
+    rpc.getVerifiedBlockHash(chainId, blockNumber),
+  ]);
+  if (canonicalHash.toLowerCase() !== receipt.blockHash.toLowerCase()) {
+    throw new Error("Native receipt block is not canonical");
+  }
+  if (blockNumber + confirmations > latestBlock || blockNumber > finalizedBlock) {
+    throw Object.assign(new Error(pendingMessage), {
+      issues: [processingIssue("CONFIRMATIONS_PENDING", {
+        transactionHash,
+        observedConfirmations: String(Math.max(0, latestBlock - blockNumber)),
+        requiredConfirmations: String(confirmations),
+        receiptBlock: String(blockNumber),
+        finalizedBlock: String(finalizedBlock),
+      })],
+    });
+  }
+};
+
 export const verifyNativeMint = async (
   withdrawal: NativeWithdrawalInfo,
   sourceChainId: bigint,
@@ -25,21 +81,12 @@ export const verifyNativeMint = async (
   const chainId = Number(withdrawal.externalChainId);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid native destination chain configuration");
   const confirmations = rpc.getDepositConfirmationPolicy(chainId);
-  const [receipts, latestBlock] = await Promise.all([
-    rpc.getTransactionReceiptsBatch(chainId, [transactionHash]),
-    rpc.getVerificationBlockNumber(chainId),
-  ]);
+  const receipts = await rpc.getTransactionReceiptsBatch(chainId, [transactionHash]);
   const receipt = receipts.get(transactionHash);
-  const blockNumber = receipt?.blockNumber;
-  if (!receipt || receipt.__rpcDisagreement ||
-      typeof blockNumber !== "string" || !/^0x[0-9a-f]+$/i.test(blockNumber) ||
-      BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)) {
-    throw Object.assign(new Error("Native mint awaiting confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
-      transactionHash, requiredConfirmations: String(confirmations),
-      observedConfirmations: typeof blockNumber === "string" && /^0x[0-9a-f]+$/i.test(blockNumber)
-        ? String(BigInt(latestBlock) > BigInt(blockNumber) ? BigInt(latestBlock) - BigInt(blockNumber) : 0n) : "0",
-    })] });
-  }
+  await requireFinalizedReceipt(
+    chainId, transactionHash, receipt, confirmations, rpc,
+    "Native mint awaiting finalized confirmation",
+  );
   const mintId = keccak256(AbiCoder.defaultAbiCoder().encode(
     ["uint256", "address", "uint256"], [sourceChainId, `0x${normalizeAddress(sourceBridge)}`, withdrawal.withdrawalId],
   ));
@@ -72,21 +119,12 @@ export const verifyNativeRedemptionRefund = async (
     throw new Error("Invalid native refund chain configuration");
   }
   const confirmations = rpc.getDepositConfirmationPolicy(chainId);
-  const [receipts, latestBlock] = await Promise.all([
-    rpc.getTransactionReceiptsBatch(chainId, [transactionHash]),
-    rpc.getVerificationBlockNumber(chainId),
-  ]);
+  const receipts = await rpc.getTransactionReceiptsBatch(chainId, [transactionHash]);
   const receipt = receipts.get(transactionHash);
-  const blockNumber = receipt?.blockNumber;
-  if (
-    !receipt ||
-    receipt.__rpcDisagreement ||
-    typeof blockNumber !== "string" ||
-    !/^0x[0-9a-f]+$/i.test(blockNumber) ||
-    BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)
-  ) {
-    throw new Error("Native refund awaiting confirmations");
-  }
+  await requireFinalizedReceipt(
+    chainId, transactionHash, receipt, confirmations, rpc,
+    "Native refund awaiting finalized confirmation",
+  );
   const matches =
     String(receipt.transactionHash || "").toLowerCase() ===
       transactionHash.toLowerCase() &&
@@ -132,21 +170,12 @@ export const verifyNativeMintCancellation = async (
     throw new Error("Invalid native cancellation chain configuration");
   }
   const confirmations = rpc.getDepositConfirmationPolicy(chainId);
-  const [receipts, latestBlock] = await Promise.all([
-    rpc.getTransactionReceiptsBatch(chainId, [transactionHash]),
-    rpc.getVerificationBlockNumber(chainId),
-  ]);
+  const receipts = await rpc.getTransactionReceiptsBatch(chainId, [transactionHash]);
   const receipt = receipts.get(transactionHash);
-  const blockNumber = receipt?.blockNumber;
-  if (
-    !receipt ||
-    receipt.__rpcDisagreement ||
-    typeof blockNumber !== "string" ||
-    !/^0x[0-9a-f]+$/i.test(blockNumber) ||
-    BigInt(blockNumber) + BigInt(confirmations) > BigInt(latestBlock)
-  ) {
-    throw new Error("Native cancellation awaiting confirmations");
-  }
+  await requireFinalizedReceipt(
+    chainId, transactionHash, receipt, confirmations, rpc,
+    "Native cancellation awaiting finalized confirmation",
+  );
   const mintId = keccak256(
     AbiCoder.defaultAbiCoder().encode(
       ["uint256", "address", "uint256"],
@@ -187,8 +216,10 @@ export const verifyNativeMintCancellation = async (
 export const verifyNativeRedemptionsBatch = async (
   deposits: NativeDepositInfo[],
   rpc: NativeVerificationRpc,
-): Promise<Map<string, boolean>> => {
-  const results = new Map<string, boolean>();
+): Promise<NativeVerificationResults> => {
+  const results = Object.assign(new Map<string, boolean>(), {
+    dependencyFailures: [],
+  }) as NativeVerificationResults;
 
   if (deposits.length === 0) {
     return results;
@@ -203,17 +234,63 @@ export const verifyNativeRedemptionsBatch = async (
   }
 
   for (const [externalChainId, chainDeposits] of depositsByChain) {
-    const confirmations = rpc.getDepositConfirmationPolicy(externalChainId);
-    let receipts: Map<string, any>, latestBlock: number;
+    let confirmations: number, receipts: Map<string, any>, latestBlock: number, finalizedBlock: number;
+    const canonicalHashes = new Map<number, string>();
     try {
-      [receipts, latestBlock] = await Promise.all([
+      confirmations = rpc.getDepositConfirmationPolicy(externalChainId);
+      [receipts, latestBlock, finalizedBlock] = await Promise.all([
         rpc.getTransactionReceiptsBatch(externalChainId, [...new Set(chainDeposits.map((deposit) => deposit.externalTxHash))]),
         rpc.getVerificationBlockNumber(externalChainId),
+        rpc.getFinalizedBlockNumber(externalChainId),
       ]);
     } catch (error) {
       rpc.logError?.("NativeVerificationService", error as Error, { externalChainId });
+      results.dependencyFailures.push({
+        externalChainId,
+        depositIds: chainDeposits.map((deposit) => deposit.depositId),
+        error: error as Error,
+      });
       continue;
     }
+
+    const depositsByBlock = new Map<number, NativeDepositInfo[]>();
+    for (const deposit of chainDeposits) {
+      const receipt = receipts.get(deposit.externalTxHash);
+      const blockNumber = receiptBlockNumber(receipt);
+      if (receipt?.__rpcDisagreement) {
+        results.dependencyFailures.push({
+          externalChainId,
+          depositIds: [deposit.depositId],
+          externalTxHash: deposit.externalTxHash,
+          error: new Error("Native receipt RPC disagreement"),
+        });
+      } else if (receipt && blockNumber !== undefined &&
+          blockNumber + confirmations <= latestBlock && blockNumber <= finalizedBlock) {
+        const blockDeposits = depositsByBlock.get(blockNumber) || [];
+        blockDeposits.push(deposit);
+        depositsByBlock.set(blockNumber, blockDeposits);
+      }
+    }
+    const blocks = [...depositsByBlock.keys()];
+    const canonicalReads = await Promise.allSettled(
+      blocks.map((block) => rpc.getVerifiedBlockHash(externalChainId, block)),
+    );
+    canonicalReads.forEach((read, index) => {
+      const blockNumber = blocks[index];
+      if (read.status === "fulfilled") {
+        canonicalHashes.set(blockNumber, read.value);
+        return;
+      }
+      const error = read.reason instanceof Error ? read.reason : new Error(String(read.reason));
+      const blockDeposits = depositsByBlock.get(blockNumber) || [];
+      rpc.logError?.("NativeVerificationService", error, { externalChainId, blockNumber });
+      results.dependencyFailures.push({
+        externalChainId,
+        depositIds: blockDeposits.map((deposit) => deposit.depositId),
+        blockNumber,
+        error,
+      });
+    });
 
     for (const deposit of chainDeposits) {
       try {
@@ -224,10 +301,28 @@ export const verifyNativeRedemptionsBatch = async (
         }
 
         const receipt = receipts.get(deposit.externalTxHash);
+        const blockNumber = receiptBlockNumber(receipt);
         // Missing, disputed or immature evidence stays pending; it is not a failed deposit.
-        if (!receipt || receipt.__rpcDisagreement ||
-            typeof receipt.blockNumber !== "string" || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber) ||
-            BigInt(receipt.blockNumber) + BigInt(confirmations) > BigInt(latestBlock)) continue;
+        if (!receipt || receipt.__rpcDisagreement || blockNumber === undefined ||
+            blockNumber + confirmations > latestBlock || blockNumber > finalizedBlock) continue;
+        if (!canonicalHashes.has(blockNumber)) continue;
+        if (canonicalHashes.get(blockNumber)?.toLowerCase() !==
+            String(receipt.blockHash || "").toLowerCase()) {
+          const error = new Error("Native receipt and canonical block RPC evidence disagree");
+          rpc.logError?.("NativeVerificationService", error, {
+            externalChainId,
+            externalTxHash: deposit.externalTxHash,
+            blockNumber,
+          });
+          results.dependencyFailures.push({
+            externalChainId,
+            depositIds: [deposit.depositId],
+            externalTxHash: deposit.externalTxHash,
+            blockNumber,
+            error,
+          });
+          continue;
+        }
         if (receipt.status !== "0x1" ||
             String(receipt.transactionHash || "").toLowerCase() !== deposit.externalTxHash.toLowerCase() ||
             !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) {

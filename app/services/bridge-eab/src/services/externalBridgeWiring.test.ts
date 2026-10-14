@@ -572,8 +572,9 @@ test("reads pending deposits and vault custody from ExternalAssetBridge", async 
 
 // Runs before any test that replaces getConfirmedRotationState on the module,
 // so it exercises the real pinned-block reads against a mocked provider.
-test("confirmed rotation state reads reservation and version at one pinned block", async () => {
+test("confirmed rotation state reads reservation and version at one finalized block", async (t) => {
   const { JsonRpcProvider, Interface } = await import("ethers");
+  const rpc = await import("./rpcService");
   const vaultService = await import("./externalWithdrawalService");
   process.env.CHAIN_1_RPC_URL = "https://rpc.invalid";
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "5";
@@ -585,6 +586,7 @@ test("confirmed rotation state reads reservation and version at one pinned block
   const originalCall = (JsonRpcProvider.prototype as any).call;
   const originalGetBlockNumber = (JsonRpcProvider.prototype as any).getBlockNumber;
   (JsonRpcProvider.prototype as any).getBlockNumber = async () => 120;
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
   (JsonRpcProvider.prototype as any).call = async (tx: any) => {
     blockTags.push(tx.blockTag);
     const call = iface.parseTransaction(tx)!;
@@ -617,9 +619,8 @@ test("confirmed rotation state reads reservation and version at one pinned block
     } as any);
     assert.equal(state.signerSetVersion, 2n);
     assert.equal(state.reserved, true);
-    // Both reads must be pinned to the same confirmed block: latest minus
-    // the chain's confirmation policy.
-    assert.deepEqual(blockTags, [115, 115]);
+    // Both reads use the lower of the finalized head and confirmation floor.
+    assert.deepEqual(blockTags, [100, 100]);
   } finally {
     (JsonRpcProvider.prototype as any).call = originalCall;
     (JsonRpcProvider.prototype as any).getBlockNumber = originalGetBlockNumber;

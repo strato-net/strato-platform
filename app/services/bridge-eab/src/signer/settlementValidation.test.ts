@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Interface, JsonRpcProvider } from "ethers";
+import { Interface } from "ethers";
 import { WithdrawalReleasePendingError } from "../types";
 import {
   DepositSettlementAttestation,
+  FinalityProvider,
   validateDepositSettlement,
+  validateReceiptFinality,
   validateWithdrawalRelease,
 } from "./settlementValidation";
 
@@ -17,6 +19,36 @@ const stratoToken = `0x${"66".repeat(20)}`;
 const txHash = `0x${"77".repeat(32)}`;
 const blockHash = `0x${"88".repeat(32)}`;
 const reservationId = `0x${"99".repeat(32)}`;
+const finality = {
+  getFinalizedBlockNumber: async () => 20,
+  assertCanonicalBlock: async (_blockNumber: number, expectedHash: string) => {
+    assert.equal(expectedHash, blockHash);
+  },
+};
+
+test("requires exact canonical receipt evidence at or below the finalized head", async () => {
+  let finalizedBlock = 9;
+  let canonicalHash = blockHash;
+  const provider = {
+    getBlockNumber: async () => 20,
+    getFinalizedBlockNumber: async () => finalizedBlock,
+    assertCanonicalBlock: async (_blockNumber: number, expectedHash: string) => {
+      if (expectedHash !== canonicalHash) throw new Error("Receipt block is not canonical");
+    },
+  } as unknown as FinalityProvider;
+  const pending = (message: string) => new WithdrawalReleasePendingError(message);
+  await assert.rejects(
+    validateReceiptFinality(provider, { blockNumber: 10, blockHash }, 5, pending),
+    WithdrawalReleasePendingError,
+  );
+  finalizedBlock = 10;
+  await validateReceiptFinality(provider, { blockNumber: 10, blockHash }, 5, pending);
+  canonicalHash = txHash;
+  await assert.rejects(
+    validateReceiptFinality(provider, { blockNumber: 10, blockHash }, 5, pending),
+    /not canonical/,
+  );
+});
 
 const depositInterface = new Interface([
   "event DepositRouted(address indexed token,uint256 amount,address indexed sender,address indexed stratoAddress,address targetStratoToken,uint96 depositId)",
@@ -70,9 +102,10 @@ test("independently verifies an exact ERC-20 deposit and custody transfer", asyn
     ],
   };
   const provider = {
+    ...finality,
     getTransactionReceipt: async () => receipt,
     getBlockNumber: async () => 20,
-  } as unknown as JsonRpcProvider;
+  } as unknown as FinalityProvider;
   const request: DepositSettlementAttestation = {
     externalChainId: "1",
     depositRouter: router,
@@ -108,6 +141,7 @@ test("independently verifies the exact vault release event", async () => {
   const receipt = {
     status: 1,
     to: vault,
+    blockHash,
     blockNumber: 10,
     logs: [
       log(
@@ -121,9 +155,10 @@ test("independently verifies the exact vault release event", async () => {
     ],
   };
   const provider = {
+    ...finality,
     getTransactionReceipt: async () => receipt,
     getBlockNumber: async () => 20,
-  } as unknown as JsonRpcProvider;
+  } as unknown as FinalityProvider;
 
   await validateWithdrawalRelease(
     provider,
@@ -166,11 +201,12 @@ test("accepts wrapper releases only with a confirmed, unique matching vault even
     ),
     1,
   );
-  const receipt = { status: 1, to: sender, blockNumber: 10, logs: [releaseLog] };
+  const receipt = { status: 1, to: sender, blockHash, blockNumber: 10, logs: [releaseLog] };
   const provider = {
+    ...finality,
     getTransactionReceipt: async () => receipt,
     getBlockNumber: async () => 15,
-  } as unknown as JsonRpcProvider;
+  } as unknown as FinalityProvider;
   const request = {
     withdrawalId: "7", reservationId, externalTxHash: txHash,
     token, recipient, amount: "100",
@@ -203,7 +239,7 @@ test("accepts wrapper releases only with a confirmed, unique matching vault even
   );
   const missingReceiptProvider = {
     getTransactionReceipt: async () => null,
-  } as unknown as JsonRpcProvider;
+  } as unknown as FinalityProvider;
   await assert.rejects(
     validateWithdrawalRelease(missingReceiptProvider, request, vault, 5),
     /receipt is missing or failed/,
@@ -225,6 +261,7 @@ test("verifies smart-wallet ETH deposits by invocation, including equal-sized ba
   ];
   let traces: any[] = [...pair(0), ...pair(1)];
   const provider = {
+    ...finality,
     getTransactionReceipt: async () => receipt,
     getBlockNumber: async () => 20,
     send: async (method: string, params: string[]) => {
@@ -232,7 +269,7 @@ test("verifies smart-wallet ETH deposits by invocation, including equal-sized ba
       assert.deepEqual(params, [txHash]);
       return traces;
     },
-  } as unknown as JsonRpcProvider;
+  } as unknown as FinalityProvider;
   const request = {
     externalChainId: "1", depositRouter: router, depositId: "1",
     externalSender: sender, externalToken: nativeToken, externalTokenAmount: "100",

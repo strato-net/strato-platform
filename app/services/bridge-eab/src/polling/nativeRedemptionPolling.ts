@@ -1,6 +1,6 @@
 import { processingIssueService } from "../services/processingIssueService";
 import { config, getNativeRepresentationBridgeAddress, getDepositConfirmationPolicy, NATIVE_REDEMPTION_EVENT_SIGNATURE, NATIVE_ROUTED_REDEMPTION_EVENT_SIGNATURE, NATIVE_SCAN_WINDOW_BLOCKS, getDepositReconciliationDepth } from "../config";
-import { getVerificationBlockNumber, getVerifiedNativeLogs, getVerifiedBlockHash, isChainConfigured } from "../services/rpcService";
+import { getFinalizedBlockNumber, getVerificationBlockNumber, getVerifiedNativeLogs, getVerifiedBlockHash, isChainConfigured } from "../services/rpcService";
 import { getNativeRedemptionChainIds, getRecordedNativeRedemptions } from "../services/cirrusService";
 import { recordNativeDepositBatch } from "../services/bridgeService";
 import { nativeBlockTrackingService } from "../services/nativeBlockTrackingService";
@@ -21,7 +21,14 @@ export const pollChainNativeRedemptions = async (chainId: number) => {
   const bridge = ensureHexPrefix(configuredBridge).toLowerCase();
   const depth = getDepositReconciliationDepth();
   if (!Number.isSafeInteger(depth) || depth < 1 || depth >= NATIVE_SCAN_WINDOW_BLOCKS) throw new Error("Invalid native scan overlap");
-  const head = Math.max(0, await getVerificationBlockNumber(chainId) - getDepositConfirmationPolicy(chainId));
+  const [verificationHead, finalizedHead] = await Promise.all([
+    getVerificationBlockNumber(chainId),
+    getFinalizedBlockNumber(chainId),
+  ]);
+  const head = Math.max(0, Math.min(
+    verificationHead - getDepositConfirmationPolicy(chainId),
+    finalizedHead,
+  ));
   const saved = await nativeBlockTrackingService.getCheckpoint(chainId);
   if (saved.block > head) {
     throw new Error(`Native checkpoint ${saved.block} is ahead of confirmed head ${head} for chain ${chainId}`);

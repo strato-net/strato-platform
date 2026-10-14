@@ -64,7 +64,8 @@ export const classifyProcessingError = (error: any, depth = 0): ProcessingIssue[
       ...safeIssueDetails({ policyVersion: body.policyVersion, policyDigest: body.policyDigest }) })];
   }
   if (error?.cause && error.cause !== error) return classifyProcessingError(error.cause, depth + 1);
-  const message = [body?.error?.message, body?.error, body?.message, error?.message, error?.shortMessage, error]
+  const message = [body?.error?.message, body?.error, body?.message, typeof body === "string" ? body : undefined,
+    error?.message, error?.shortMessage, error]
     .find(value => typeof value === "string" && value.length) || "";
   let code: ProcessingIssueCode = "UNKNOWN";
   if (body?.code === "UNKNOWN") code = "UNKNOWN";

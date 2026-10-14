@@ -72,6 +72,14 @@ async function worker() {
     return { number, timestamp: number * 10 };
   };
   (JsonRpcProvider.prototype as any).getBlockNumber = async () => phase === "unconfirmed" ? 106 : 120;
+  (JsonRpcProvider.prototype as any).getFinalizedBlockNumber = async () => 120;
+  (JsonRpcProvider.prototype as any).assertCanonicalBlock = async (
+    blockNumber: number,
+    blockHash: string,
+  ) => {
+    assert.equal(blockNumber, 105);
+    assert.equal(blockHash, hash("e"));
+  };
   (JsonRpcProvider.prototype as any).getLogs = async (filter: any) => {
     assert.equal(filter.address, address("2"));
     assert.equal(filter.topics[1], reservationId);
@@ -84,7 +92,7 @@ async function worker() {
   };
   (JsonRpcProvider.prototype as any).getTransactionReceipt = async (tx: string) => {
     assert.equal(tx, hash("b"));
-    return { status: phase === "failed-receipt" ? 0 : 1, blockNumber: 105,
+    return { status: phase === "failed-receipt" ? 0 : 1, blockNumber: 105, blockHash: hash("e"),
       logs: phase === "duplicate-event" ? [releaseLog, releaseLog] : [releaseLog] };
   };
   (DigestKmsSigner.prototype as any).sendTransaction = async (tx: any) => {
@@ -126,7 +134,7 @@ async function worker() {
     assert.ok(url.endsWith("/v1/attest-release"), "must not request fresh release authorization");
     assert.deepEqual(payload.authorization, authorization);
     assert.equal(payload.reservationId, reservationId);
-    await validateWithdrawalRelease(new JsonRpcProvider(), {
+    await validateWithdrawalRelease(new JsonRpcProvider() as any, {
       withdrawalId: "7", reservationId, externalTxHash: payload.externalTxHash,
       token: authorization.token, recipient: authorization.recipient, amount: authorization.amount,
     }, authorization.destinationVault, 5);

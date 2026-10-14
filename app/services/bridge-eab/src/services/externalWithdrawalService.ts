@@ -2,7 +2,7 @@ import { withSafeProposalQueue } from "./safeProposalService";
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import { getChainProvider } from "./rpcService";
+import { getChainProvider, getFinalizedBlockNumber } from "./rpcService";
 import {
   AbiCoder,
   Contract,
@@ -637,29 +637,40 @@ export const getReservationState = async (
   };
 };
 
-// Rotation and non-reservation must be established from the SAME confirmed
+// Rotation and non-reservation must be established from the SAME finalized
 // block before a signer-set refresh. getReservationState reads at latest with
 // independent calls, which can mix heads: the reservation read can miss a
 // version-N reservation that mines just before the rotation the version read
 // observes. Overwriting the committed version then strands the reservation —
 // release and refund verifiers both hold it to the original authorization
-// digest. Reading both facts at one confirmed block makes the orderings
+// digest. Reading both facts at one finalized block makes the orderings
 // coherent: a reservation always precedes the rotation that would strand it
 // (post-rotation reservations revert as StaleSignerSet), so any block that
-// shows the rotation also shows the reservation.
+// shows the rotation also shows the reservation. The confirmation floor is
+// retained in addition to finalized status.
 export const getConfirmedRotationState = async (
   authorization: WithdrawalAuthorization,
 ): Promise<{ signerSetVersion: bigint; reserved: boolean }> => {
   const destinationChainId = BigInt(authorization.destinationChainId);
+  const numericDestinationChainId = Number(destinationChainId);
+  if (!Number.isSafeInteger(numericDestinationChainId) ||
+      numericDestinationChainId <= 0) {
+    throw new Error("Invalid external destination chain ID");
+  }
   const provider = getChainProvider(destinationChainId);
   const vault = new Contract(
     authorization.destinationVault,
     EXTERNAL_VAULT_ABI,
     provider,
   );
-  const blockTag =
-    (await provider.getBlockNumber()) -
-    getDepositConfirmationPolicy(destinationChainId);
+  const [latestBlock, finalizedBlock] = await Promise.all([
+    provider.getBlockNumber(),
+    getFinalizedBlockNumber(numericDestinationChainId),
+  ]);
+  const blockTag = Math.min(
+    latestBlock - getDepositConfirmationPolicy(destinationChainId),
+    finalizedBlock,
+  );
   const [reservation, signerSetVersion] = await Promise.all([
     vault.reservations(getReservationId(authorization), { blockTag }),
     vault.signerSetVersion({ blockTag }),

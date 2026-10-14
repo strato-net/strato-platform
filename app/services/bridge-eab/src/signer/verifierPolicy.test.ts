@@ -317,12 +317,15 @@ test("refund attestations reject paid, reserved, unconfirmed, or mismatched vaul
     destinationChainId: BigInt(policy.destinationChainId), destinationVault: policy.destinationVault,
     verifierConfirmations: 5, getAddress, TypedDataEncoder,
     normalize: (value: string) => value.replace(/^0x/, "").toLowerCase(),
-    provider: { getBlock: async (tag: string | number) => tag === "latest"
-      ? { number: 20, timestamp: 1200 } : { number: 15, timestamp: confirmedTimestamp } },
+    provider: {
+      getFinalizedBlockNumber: async () => 12,
+      getBlock: async (tag: string | number) => tag === "latest"
+        ? { number: 20, timestamp: 1200 } : { number: 12, timestamp: confirmedTimestamp },
+    },
     vault: {
       getReservationId: async () => "reservation",
       reservations: async (_id: string, options: { blockTag: number }) => {
-        assert.equal(options.blockTag, 15);
+        assert.equal(options.blockTag, 12);
         return { status, authorizationDigest: digest };
       },
     },

@@ -144,3 +144,77 @@ test("compares only security-relevant block fields", async (t) => {
     }
   } finally { provider.destroy(); }
 });
+
+test("uses the lowest finalized head and verifies receipt blocks at their exact height", async (t) => {
+  let staleReceiptBlock = false;
+  t.mock.method(JsonRpcProvider.prototype, "send", async function (
+    this: JsonRpcProvider,
+    method: string,
+    params: string[],
+  ) {
+    if (method === "eth_blockNumber") return "0x20";
+    assert.equal(method, "eth_getBlockByNumber");
+    const second = this._getConnection().url.includes("two");
+    if (params[0] === "finalized") {
+      return {
+        number: second ? "0x1f" : "0x20",
+        hash: `0x${(second ? "2" : "1").repeat(64)}`,
+        parentHash: `0x${"0".repeat(64)}`,
+        timestamp: "0x10",
+      };
+    }
+    if (params[0] === "0x20" || params[0] === "0x1f") {
+      return {
+        number: params[0],
+        hash: `0x${(params[0] === "0x20" ? "1" : "2").repeat(64)}`,
+        parentHash: `0x${"0".repeat(64)}`,
+        timestamp: "0x10",
+      };
+    }
+    return {
+      number: params[0],
+      hash: `0x${(staleReceiptBlock && second ? "4" : "3").repeat(64)}`,
+      parentHash: `0x${"0".repeat(64)}`,
+      timestamp: "0x10",
+    };
+  });
+  const provider = new ConsensusProvider(urls);
+  try {
+    assert.equal(await provider.getFinalizedBlockNumber(), 31);
+    await provider.assertCanonicalBlock(16, `0x${"3".repeat(64)}`);
+    staleReceiptBlock = true;
+    await assert.rejects(
+      provider.assertCanonicalBlock(16, `0x${"3".repeat(64)}`),
+      /disagreement/,
+    );
+  } finally {
+    provider.destroy();
+  }
+});
+
+test("rejects a finalized tag that is not canonical at its reported height", async (t) => {
+  t.mock.method(JsonRpcProvider.prototype, "send", async function (
+    this: JsonRpcProvider,
+    method: string,
+    params: string[],
+  ) {
+    if (method === "eth_blockNumber") return "0x20";
+    const second = this._getConnection().url.includes("two");
+    if (params[0] === "finalized") {
+      return {
+        number: "0x1f",
+        hash: `0x${(second ? "2" : "1").repeat(64)}`,
+      };
+    }
+    return {
+      number: params[0],
+      hash: `0x${"3".repeat(64)}`,
+    };
+  });
+  const provider = new ConsensusProvider(urls);
+  try {
+    await assert.rejects(provider.getFinalizedBlockNumber(), /not canonical/);
+  } finally {
+    provider.destroy();
+  }
+});

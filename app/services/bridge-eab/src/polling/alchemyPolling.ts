@@ -392,7 +392,7 @@ const pollChainForDepositsUnlocked = async (chainInfo: ChainInfo) => {
         deposit,
         getMissingReceiptGraceMs(),
         verification.state === "missing" && verification.error
-          ? `External trace remained unavailable: ${verification.error.message}`
+          ? `External evidence remained unavailable: ${verification.error.message}`
           : undefined,
       );
       if (updated && shouldRecordReview(updated, reviewRetryMs)) {

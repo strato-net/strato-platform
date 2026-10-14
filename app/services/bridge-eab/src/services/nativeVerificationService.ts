@@ -1,12 +1,24 @@
-import { getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
+import {
+  getFinalizedBlockNumber,
+  getTransactionReceiptsBatch,
+  getVerificationBlockNumber,
+  getVerifiedBlockHash,
+} from "./rpcService";
 import { getDepositConfirmationPolicy } from "../config";
-import { NativeDepositInfo, NativeWithdrawalInfo, NativeVerificationRpc } from "../types";
+import {
+  NativeDepositInfo,
+  NativeVerificationResults,
+  NativeWithdrawalInfo,
+  NativeVerificationRpc,
+} from "../types";
 import * as evidence from "../signer/nativeSettlementValidation";
 import { logError } from "../utils/logger";
 
 const rpc: NativeVerificationRpc = {
   getTransactionReceiptsBatch: (chainId, hashes) => getTransactionReceiptsBatch(chainId, hashes),
   getVerificationBlockNumber: (chainId) => getVerificationBlockNumber(chainId),
+  getFinalizedBlockNumber: (chainId) => getFinalizedBlockNumber(chainId),
+  getVerifiedBlockHash: (chainId, blockNumber) => getVerifiedBlockHash(chainId, blockNumber),
   getDepositConfirmationPolicy: (chainId) => getDepositConfirmationPolicy(chainId),
   logError,
 };
@@ -23,5 +35,5 @@ export const verifyNativeRedemptionRefund = (deposit: NativeDepositInfo,
   transactionHash: string): Promise<void> =>
   evidence.verifyNativeRedemptionRefund(deposit, transactionHash, rpc);
 
-export const verifyNativeRedemptionsBatch = (deposits: NativeDepositInfo[]): Promise<Map<string, boolean>> =>
+export const verifyNativeRedemptionsBatch = (deposits: NativeDepositInfo[]): Promise<NativeVerificationResults> =>
   evidence.verifyNativeRedemptionsBatch(deposits, rpc);

@@ -3,6 +3,7 @@ import { verifyEthTransactionCustody } from "../utils/custodyValidation";
 import { normalizeAddress, normalizeHex as normalize } from "../utils/utils";
 import { Interface, JsonRpcProvider, ZeroAddress, getAddress } from "ethers";
 import { WithdrawalReleasePendingError } from "../types";
+import type { ConsensusProvider } from "./consensusProvider";
 
 export interface DepositSettlementAttestation {
   externalChainId: string;
@@ -44,8 +45,43 @@ const vaultInterface = new Interface([
 const logIndex = (log: any): number =>
   Number(log.index ?? log.logIndex);
 
+export type FinalityProvider = JsonRpcProvider & Pick<
+  ConsensusProvider,
+  "getFinalizedBlockNumber" | "assertCanonicalBlock"
+>;
+
+export const validateReceiptFinality = async (
+  provider: FinalityProvider,
+  receipt: { blockNumber: number; blockHash: string },
+  confirmations: number,
+  pendingError: (message: string, details: Record<string, string>) => Error,
+): Promise<void> => {
+  if (!Number.isSafeInteger(receipt.blockNumber) ||
+      !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) {
+    throw new Error("Receipt block evidence is invalid");
+  }
+  if (typeof provider.getFinalizedBlockNumber !== "function" ||
+      typeof provider.assertCanonicalBlock !== "function") {
+    throw new Error("Finalized receipt validation is unavailable");
+  }
+  await provider.assertCanonicalBlock(receipt.blockNumber, receipt.blockHash);
+  const [latestBlock, finalizedBlock] = await Promise.all([
+    provider.getBlockNumber(),
+    provider.getFinalizedBlockNumber(),
+  ]);
+  const observedConfirmations = Math.max(0, latestBlock - receipt.blockNumber);
+  if (observedConfirmations < confirmations || receipt.blockNumber > finalizedBlock) {
+    throw pendingError("Transaction is awaiting finalized confirmation", {
+      observedConfirmations: String(observedConfirmations),
+      requiredConfirmations: String(confirmations),
+      receiptBlock: String(receipt.blockNumber),
+      finalizedBlock: String(finalizedBlock),
+    });
+  }
+};
+
 export const validateDepositSettlement = async (
-  provider: JsonRpcProvider,
+  provider: FinalityProvider,
   request: DepositSettlementAttestation,
   custodyAddress: string,
   enabledRouters: string[],
@@ -58,12 +94,10 @@ export const validateDepositSettlement = async (
   if (normalize(receipt.blockHash) !== normalize(request.externalBlockHash)) {
     throw new Error("Deposit block hash changed");
   }
-  const latestBlock = await provider.getBlockNumber();
-  if (latestBlock - receipt.blockNumber < confirmations) {
-    throw Object.assign(new Error("Deposit has insufficient confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
-      observedConfirmations: String(latestBlock - receipt.blockNumber), requiredConfirmations: String(confirmations),
-    })] });
-  }
+  await validateReceiptFinality(provider, receipt, confirmations, (message, details) =>
+    Object.assign(new Error(message), {
+      issues: [processingIssue("CONFIRMATIONS_PENDING", details)],
+    }));
 
   const routers = new Set(enabledRouters.map(normalize));
   const deposits = receipt.logs
@@ -167,7 +201,7 @@ export const validateDepositSettlement = async (
 };
 
 export const validateWithdrawalRelease = async (
-  provider: JsonRpcProvider,
+  provider: FinalityProvider,
   request: WithdrawalReleaseAttestation,
   vaultAddress: string,
   confirmations: number,
@@ -195,10 +229,8 @@ export const validateWithdrawalRelease = async (
   if (matchingEvents.length !== 1) {
     throw new Error("Withdrawal release event does not match settlement");
   }
-  const latestBlock = await provider.getBlockNumber();
-  if (latestBlock - receipt.blockNumber < confirmations) {
-    throw Object.assign(new WithdrawalReleasePendingError("Withdrawal release has insufficient confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", {
-      observedConfirmations: String(latestBlock - receipt.blockNumber), requiredConfirmations: String(confirmations),
-    })] });
-  }
+  await validateReceiptFinality(provider, receipt, confirmations, (message, details) =>
+    Object.assign(new WithdrawalReleasePendingError(message), {
+      issues: [processingIssue("CONFIRMATIONS_PENDING", details)],
+    }));
 };

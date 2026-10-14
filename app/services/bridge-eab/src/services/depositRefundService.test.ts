@@ -146,6 +146,8 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   let receipt: any = { transactionHash: hash, blockHash, status: "0x1", blockNumber: "0x64", logs: [refundEvent] };
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[hash, receipt]]));
   t.mock.method(rpc, "getVerificationBlockNumber", async () => head);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => head);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => blockHash);
   originalVerified = false;
   await assert.rejects(recoverNativeDepositRefund(d), /original burn/); assert.equal(proposals, 0);
   originalVerified = true;

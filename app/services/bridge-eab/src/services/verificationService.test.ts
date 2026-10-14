@@ -27,6 +27,15 @@ for (const name of [
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const TRANSFER_EVENT_SIGNATURE = ethers.id("Transfer(address,address,uint256)");
 const verificationService = import("./verificationService");
+const mockFinality = async (
+  t: any,
+  blockHash = `0x${"cd".repeat(32)}`,
+  finalizedBlock = 1_000_000,
+) => {
+  const rpc = await import("./rpcService");
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => finalizedBlock);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => blockHash.toLowerCase());
+};
 
 const chainId = 11155111;
 process.env[`CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`] = "1";
@@ -188,7 +197,8 @@ test("rejects two deposits that share one custody transfer", async () => {
   );
 });
 
-test("invalidates every deposit in a transaction when one transfer is reused", async () => {
+test("invalidates every deposit in a transaction when one transfer is reused", async (t) => {
+  await mockFinality(t);
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const api = await import("../utils/api");
   const first = detectedDeposit("1", 1);
@@ -231,7 +241,8 @@ test("invalidates every deposit in a transaction when one transfer is reused", a
   assert.equal(traceRequests, 0);
 });
 
-test("rejects a duplicated deposit identity in the receipt", async () => {
+test("rejects a duplicated deposit identity in the receipt", async (t) => {
+  await mockFinality(t);
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const api = await import("../utils/api");
   const first = detectedDeposit("1", 1);
@@ -503,7 +514,8 @@ test("marks inconsistent RPC receipts as disagreement", async () => {
   delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });
 
-test("restarts confirmation when a receipt is relocated by a reorg", async () => {
+test("restarts confirmation when a receipt is relocated by a reorg", async (t) => {
+  await mockFinality(t, `0x${"11".repeat(32)}`);
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const api = await import("../utils/api");
   const txHash = `0x${"bb".repeat(32)}`;
@@ -623,7 +635,40 @@ test("requests internal traces from every verification RPC", async () => {
   delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });
 
+test("uses the lowest finalized head and requires a common canonical checkpoint", async (t) => {
+  process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
+  process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`] = "https://secondary-rpc";
+  t.after(() => delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`]);
+  const { fetch } = await import("../utils/api");
+  const { getFinalizedBlockNumber } = await import("./rpcService");
+  let disagree = false;
+  t.mock.method(fetch, "post", async (url: string, request: any) => {
+    const secondary = url.includes("secondary");
+    if (request.method === "eth_blockNumber") {
+      return { result: "0x20" };
+    }
+    if (request.params[0] === "finalized") {
+      return { result: {
+        number: secondary ? "0x20" : "0x1f",
+        hash: `0x${(secondary ? "1" : "2").repeat(64)}`,
+      } };
+    }
+    return { result: {
+      number: request.params[0],
+      hash: `0x${(request.params[0] === "0x20" ? "1" :
+        disagree && secondary ? "4" : "2").repeat(64)}`,
+    } };
+  });
+  assert.equal(await getFinalizedBlockNumber(chainId), 31);
+  disagree = true;
+  await assert.rejects(getFinalizedBlockNumber(chainId), /disagreement/);
+});
+
 test("waits for confirmations before tracing, then requires both RPCs on retry", async (t) => {
+  const rpc = await import("./rpcService");
+  let finalizedBlock = 15;
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => finalizedBlock);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => `0x${"cd".repeat(32)}`);
   const rpcEnv = [`CHAIN_${chainId}_RPC_URL`, `CHAIN_${chainId}_VERIFICATION_RPC_URLS`, `CHAIN_${chainId}_DEPOSIT_CONFIRMATIONS`];
   const original = rpcEnv.map((key) => process.env[key]);
   t.after(() => rpcEnv.forEach((key, index) => { if (original[index] === undefined) delete process.env[key]; else process.env[key] = original[index]; }));
@@ -647,6 +692,10 @@ test("waits for confirmations before tracing, then requires both RPCs on retry",
   const confirming = await verifyDetectedDepositsBatch([value], 27, custodyAddress);
   assert.equal(confirming.get(depositIdentity(value))?.state, "confirming");
   assert.deepEqual(traceUrls, []);
+  const awaitingFinality = await verifyDetectedDepositsBatch([value], 28, custodyAddress);
+  assert.equal(awaitingFinality.get(depositIdentity(value))?.state, "confirming");
+  assert.deepEqual(traceUrls, []);
+  finalizedBlock = 16;
   const unavailableResult = (await verifyDetectedDepositsBatch([value], 28, custodyAddress)).get(depositIdentity(value));
   assert.equal(unavailableResult?.state, "missing");
   assert.match(unavailableResult?.state === "missing" ? unavailableResult.error?.message || "" : "", /provider=secondary-rpc.*Trace not yet available/);
@@ -686,11 +735,12 @@ test("reports trace RPC failures without exposing endpoint credentials and rejec
   }
 });
 
-test("accepts a router deposit invoked through a smart wallet", async () => {
+test("accepts a router deposit invoked through a smart wallet", async (t) => {
   process.env[`CHAIN_${chainId}_RPC_URL`] = "https://primary-rpc";
   const api = await import("../utils/api");
   const txHash = `0x${"ee".repeat(32)}`;
   const blockHash = `0x${"44".repeat(32)}`;
+  await mockFinality(t, blockHash);
   const sender = "0x6666666666666666666666666666666666666666";
   const recipient = "0x7777777777777777777777777777777777777777";
   const targetToken = "0x8888888888888888888888888888888888888888";
@@ -789,7 +839,8 @@ test("reuses providers and batches concurrent reads without caching mutable resu
   }
 });
 
-test("fetches ETH traces from the full receipt even when only the ERC-20 deposit was observed", async () => {
+test("fetches ETH traces from the full receipt even when only the ERC-20 deposit was observed", async (t) => {
+  await mockFinality(t);
   const api = await import("../utils/api");
   const token = detectedDeposit("1", 1);
   const native = detectedDeposit("2", 2, { externalToken: ZERO_ADDRESS });
@@ -827,8 +878,59 @@ test("rejects mismatching traces and missing independent RPCs", async () => {
   delete process.env[`CHAIN_${chainId}_VERIFICATION_RPC_URLS`];
 });
 
+test("isolates and parallelizes canonical block read failures", async (t) => {
+  const rpc = await import("./rpcService");
+  const bad = detectedDeposit("1", 1);
+  const good = detectedDeposit("2", 1, {
+    externalTxHash: `0x${"de".repeat(32)}`,
+    externalBlockHash: `0x${"ce".repeat(32)}`,
+    externalBlockNumber: 17,
+  });
+  const receipt = (value: DepositArgs) => ({
+    transactionHash: value.externalTxHash,
+    blockHash: value.externalBlockHash,
+    blockNumber: ethers.toBeHex(value.externalBlockNumber),
+    status: "0x1",
+    to: depositRouter,
+    logs: [transferLog(0), depositReceiptLog(value)],
+  });
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([
+    [bad.externalTxHash, receipt(bad)],
+    [good.externalTxHash, receipt(good)],
+  ]));
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
+  let active = 0, maxActive = 0, badBlockUnavailable = true;
+  t.mock.method(rpc, "getVerifiedBlockHash", async (_chainId, blockNumber) => {
+    active++;
+    maxActive = Math.max(maxActive, active);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    active--;
+    if (blockNumber === bad.externalBlockNumber) {
+      if (badBlockUnavailable) throw new Error("RPC unavailable");
+      return `0x${"ff".repeat(32)}`;
+    }
+    return good.externalBlockHash;
+  });
+
+  const { depositIdentity, verifyDetectedDepositsBatch } = await verificationService;
+  const results = await verifyDetectedDepositsBatch([bad, good], 100, custodyAddress);
+  const failed = results.get(depositIdentity(bad));
+  assert.equal(failed?.state, "missing");
+  assert.match(failed?.state === "missing" ? failed.error?.message || "" : "", /RPC unavailable/);
+  assert.equal(results.get(depositIdentity(good))?.state, "verified");
+  assert.equal(maxActive, 2);
+
+  badBlockUnavailable = false;
+  const inconsistent = await verifyDetectedDepositsBatch([bad, good], 100, custodyAddress);
+  const mismatch = inconsistent.get(depositIdentity(bad));
+  assert.equal(mismatch?.state, "missing");
+  assert.match(mismatch?.state === "missing" ? mismatch.error?.message || "" : "", /RPC evidence disagree/);
+  assert.equal(inconsistent.get(depositIdentity(good))?.state, "verified");
+});
+
 for (const failure of ["missing", "error", "disagreement", "duplicate", "malformed", "empty"]) {
   test(`isolates ${failure} traces while verifying other ETH and ERC-20 transactions`, async (t) => {
+    await mockFinality(t);
     const rpcKey = `CHAIN_${chainId}_VERIFICATION_RPC_URLS`;
     const old = process.env[rpcKey];
     process.env[rpcKey] = "https://secondary-rpc";
@@ -941,7 +1043,10 @@ test("startup checks real mined transaction traces on every RPC and skips empty 
   const hash = ethers.toBeHex(42, 32);
   t.mock.method(fetch, "post", async (url: string, request: any) => {
     if (request.method === "eth_chainId") return { result: ethers.toBeHex(chainId) };
-    if (request.method === "eth_getBlockByNumber") return { result: { transactions: [], parentHash: ethers.toBeHex(1, 32) } };
+    if (request.method === "eth_getBlockByNumber") return { result: {
+      number: "0x64", hash: ethers.toBeHex(100, 32),
+      transactions: [], parentHash: ethers.toBeHex(1, 32),
+    } };
     if (request.method === "eth_getBlockByHash") return { result: { transactions: [nullHash, emptyHash, hash] } };
     assert.equal(request.method, "trace_transaction");
     if (request.params[0] === nullHash) return { result: null };
@@ -966,7 +1071,10 @@ test("startup accepts callTracer fallback and can skip trace probing", async (t)
     if (request.method === "eth_chainId") return { result: ethers.toBeHex(chainId) };
     if (request.method === "eth_getBlockByNumber") {
       blocks++;
-      return { result: { transactions: [ethers.toBeHex(1, 32)] } };
+      return { result: {
+        number: "0x64", hash: ethers.toBeHex(100, 32),
+        transactions: [ethers.toBeHex(1, 32)],
+      } };
     }
     if (request.method === "trace_transaction") {
       return { error: { code: -32601, message: "method not found" } };
@@ -983,10 +1091,10 @@ test("startup accepts callTracer fallback and can skip trace probing", async (t)
   });
   const { validateVerificationRpcEndpoints } = await import("./rpcService");
   await validateVerificationRpcEndpoints(chainId);
-  assert.equal(blocks, 2);
+  assert.equal(blocks, 4);
   blocks = 0;
   await validateVerificationRpcEndpoints(chainId, false);
-  assert.equal(blocks, 0);
+  assert.equal(blocks, 2);
 });
 
 for (const failure of ["unsupported", "empty", "malformed", "transport", "no-transactions"]) {
@@ -1005,7 +1113,11 @@ for (const failure of ["unsupported", "empty", "malformed", "transport", "no-tra
       if (request.method === "eth_chainId") return { result: ethers.toBeHex(chainId) };
       if (request.method.startsWith("eth_getBlock")) {
         if (endpoint === url) blocks++;
-        return { result: { transactions: endpoint === url && failure === "no-transactions" ? [] : [ethers.toBeHex(1, 32)], parentHash: ethers.toBeHex(2, 32) } };
+        return { result: {
+          number: "0x64", hash: ethers.toBeHex(100, 32),
+          transactions: endpoint === url && failure === "no-transactions" ? [] : [ethers.toBeHex(1, 32)],
+          parentHash: ethers.toBeHex(2, 32),
+        } };
       }
       assert.equal(request.method, "trace_transaction");
       if (endpoint !== url) return { result: ethTracePair(0) };
@@ -1018,6 +1130,6 @@ for (const failure of ["unsupported", "empty", "malformed", "transport", "no-tra
       assert.doesNotMatch(error.message, /rpc-user|rpc-password|secret-path|secret-query/);
       return true;
     });
-    if (failure === "no-transactions") assert.equal(blocks, TRACE_RPC_PROBE_BLOCKS);
+    if (failure === "no-transactions") assert.equal(blocks, TRACE_RPC_PROBE_BLOCKS + 1);
   });
 }

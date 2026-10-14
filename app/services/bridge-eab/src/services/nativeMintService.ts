@@ -1,12 +1,12 @@
 import { ExternalBridgeStatus } from "@strato/shared-types";
 import { AbiCoder, keccak256, id } from "ethers";
 import { NATIVE_CANCELLATION_ABI } from "../config/bridgeAbi";
-import { getChainProvider, getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
-import { getDepositConfirmationPolicy } from "../config";
+import { getChainProvider } from "./rpcService";
 import { getEventTransactionHash } from "./externalWithdrawalService";
 import { execute, executeAsRelayer } from "../utils/stratoHelper";
 import { processingIssue } from "../utils/processingIssues";
 import { withSafeProposalQueue } from "./safeProposalService";
+import { verifyNativeMintCancellation } from "./nativeVerificationService";
 import {
   Contract,
   Interface,
@@ -475,13 +475,13 @@ export const getNativeMintProposalExecution = async (
     { logPrefix: "NativeMintService" },
   );
 
-  if (tx.isExecuted && tx.isSuccessful) {
+  if (tx.isExecuted === true && tx.isSuccessful === true) {
     const txHash = (tx as any).transactionHash;
     return txHash
       ? { status: "executed", txHash }
       : { status: "pending" };
   }
-  if (tx.isExecuted && !tx.isSuccessful) {
+  if (tx.isExecuted === true && tx.isSuccessful === false) {
     return { status: "rejected" };
   }
 
@@ -550,26 +550,7 @@ export const processNativeMintCancellation = async (w: NativeWithdrawalInfo, sou
     return;
   }
   const hash = await getEventTransactionHash(provider, destination, "NativeMintCanceled", mintId, w.requestedAt, iface);
-  const [receipts, head] = await Promise.all([getTransactionReceiptsBatch(chainId, [hash]), getVerificationBlockNumber(chainId)]);
-  const receipt = receipts.get(hash);
-  if (receipt?.__rpcDisagreement) throw new Error("Native cancellation RPC disagreement");
-  const requiredConfirmations = getDepositConfirmationPolicy(chainId);
-  if (!receipt || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
-      BigInt(receipt.blockNumber) + BigInt(requiredConfirmations) > BigInt(head)) {
-    throw Object.assign(new Error("Native cancellation awaits confirmations"), { issues: [processingIssue("CONFIRMATIONS_PENDING", { transactionHash: hash, requiredConfirmations: String(requiredConfirmations),
-      ...(receipt && /^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ? { observedConfirmations: String(BigInt(head) > BigInt(receipt.blockNumber) ? BigInt(head) - BigInt(receipt.blockNumber) : 0n) } : {}),
-    })] });
-  }
-  if (receipt.status !== "0x1" || receipt.transactionHash?.toLowerCase() !== hash.toLowerCase() ||
-      !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") || !receipt.logs.some((log: any) => {
-        if (log.removed || safeChecksum(log.address) !== destination) return false;
-        try {
-          const event = iface.parseLog(log);
-          return event?.name === "NativeMintCanceled" && event.args.mintId === mintId &&
-            String(event.args.sourceChainId) === sourceChainId && safeChecksum(event.args.sourceBridge) === source &&
-            String(event.args.sourceWithdrawalId) === w.withdrawalId;
-        } catch { return false; }
-      })) throw new Error("Native mint cancellation evidence mismatch");
+  await verifyNativeMintCancellation(w, BigInt(sourceChainId), source, hash);
   if (w.cancellationTxHash?.replace(/^0x/i, "").toLowerCase() !== hash.replace(/^0x/i, "").toLowerCase()) {
     await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,
       method: "recordWithdrawalCancellationEvidence", args: { id: w.withdrawalId, txHash: hash } });

@@ -7,8 +7,10 @@ import {
   WAD,
 } from "../config";
 import {
+  getFinalizedBlockNumber,
   getTransactionReceiptsBatch,
-  getInternalTransactionsBatch
+  getInternalTransactionsBatch,
+  getVerifiedBlockHash,
 } from "./rpcService";
 import { getRebaseFactors } from "./cirrusService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
@@ -291,12 +293,44 @@ export const verifyDetectedDepositsBatch = async (
       ).values(),
     ];
     const receipts = await getTransactionReceiptsBatch(chainId, txHashes);
+    const finalizedBlock = await getFinalizedBlockNumber(chainId);
     const confirmations = getDepositConfirmationPolicy(chainId);
     const routers = new Set(chainDeposits.map((deposit) => normalizeAddress(deposit.depositRouter)));
+    const canonicalHashes = new Map<number, string>();
+    const canonicalErrors = new Map<number, Error>();
+    const matureBlocks = new Set<number>();
+    for (const receipt of receipts.values()) {
+      if (receipt.__rpcDisagreement || !isOkStatus(receipt) ||
+          !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "")) continue;
+      const blockNumber = Number(BigInt(receipt.blockNumber));
+      if (!Number.isSafeInteger(blockNumber) ||
+          latestBlock - blockNumber < confirmations || blockNumber > finalizedBlock) continue;
+      matureBlocks.add(blockNumber);
+    }
+    const blocks = [...matureBlocks];
+    const canonicalReads = await Promise.allSettled(
+      blocks.map((blockNumber) => getVerifiedBlockHash(chainId, blockNumber)),
+    );
+    canonicalReads.forEach((read, index) => {
+      const blockNumber = blocks[index];
+      if (read.status === "fulfilled") {
+        canonicalHashes.set(blockNumber, read.value);
+      } else {
+        canonicalErrors.set(
+          blockNumber,
+          read.reason instanceof Error ? read.reason : new Error(String(read.reason)),
+        );
+      }
+    });
     const nativeTxHashes = txHashes.filter((hash) => {
       const receipt = receipts.get(hash);
       if (!receipt || receipt.__rpcDisagreement || !isOkStatus(receipt)) return false;
-      if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) return false;
+      if (!/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
+          !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) return false;
+      const blockNumber = Number(BigInt(receipt.blockNumber));
+      if (canonicalHashes.get(blockNumber)?.toLowerCase() !==
+          String(receipt.blockHash || "").toLowerCase()) return false;
+      if (latestBlock - blockNumber < confirmations || blockNumber > finalizedBlock) return false;
       try {
         const parsed = parseReceiptDeposits(receipt, chainId, routers);
         return parsed.deposits.some((deposit) => deposit.externalToken === ZERO_ADDRESS);
@@ -348,16 +382,49 @@ export const verifyDetectedDepositsBatch = async (
           });
           continue;
         }
+        if (!/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
+            !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) {
+          setTransactionState(transactionDeposits, {
+            state: "invalid",
+            error: fail(transactionHash, "Deposit receipt block evidence is invalid"),
+          });
+          continue;
+        }
+        const receiptBlock = Number(BigInt(receipt.blockNumber));
+        if (!Number.isSafeInteger(receiptBlock)) {
+          setTransactionState(transactionDeposits, {
+            state: "invalid",
+            error: fail(transactionHash, "Deposit receipt block number is invalid"),
+          });
+          continue;
+        }
+        if (latestBlock - receiptBlock < confirmations ||
+            receiptBlock > finalizedBlock) {
+          setTransactionState(transactionDeposits, { state: "confirming" });
+          continue;
+        }
+        const canonicalError = canonicalErrors.get(receiptBlock);
+        if (canonicalError) {
+          setTransactionState(transactionDeposits, {
+            state: "missing",
+            error: canonicalError,
+          });
+          continue;
+        }
+        if (canonicalHashes.get(receiptBlock)?.toLowerCase() !==
+            receipt.blockHash.toLowerCase()) {
+          setTransactionState(transactionDeposits, {
+            state: "missing",
+            error: fail(transactionHash, "Receipt and canonical block RPC evidence disagree"),
+          });
+          continue;
+        }
         if (transactionDeposits.some(
           (deposit) =>
             String(receipt.blockHash).toLowerCase() !==
             deposit.externalBlockHash.toLowerCase(),
         )) {
           setTransactionState(transactionDeposits, { state: "relocated" });
-          continue;
-        }
-        if (latestBlock - Number(BigInt(receipt.blockNumber)) < confirmations) {
-          setTransactionState(transactionDeposits, { state: "confirming" });
           continue;
         }
         const depositRouters = new Set(

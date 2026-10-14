@@ -123,16 +123,24 @@ test("native mint completion requires independent finality and every committed w
   const event = (values = fields) => ({ address: address("2"),
     ...mint.encodeEventLog(mint.getEvent("RepresentationMinted")!, values) });
   const valid = { status: "0x1", blockNumber: "0x64", blockHash: `0x${"b".repeat(64)}`, transactionHash: txHash, logs: [event()] };
-  let receipt: any = valid, head = 111;
+  let receipt: any = valid, head = 111, finalized = 112;
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "getVerificationBlockNumber", async () => head);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => finalized);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => valid.blockHash);
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[txHash, receipt]]));
   const verify = () => verifyNativeMint(withdrawal, sourceChain, sourceBridge, txHash);
   const pending = (error: any) => error.issues?.[0]?.code === "CONFIRMATIONS_PENDING";
   await assert.rejects(verify(), pending);
   head = 112;
+  finalized = 99;
+  await assert.rejects(verify(), pending);
+  finalized = 112;
   await verify();
-  for (const incomplete of [undefined, { ...valid, __rpcDisagreement: true },
+  receipt = { ...valid, __rpcDisagreement: true };
+  await assert.rejects(verify(), (error: any) =>
+    error.issues?.[0]?.code === "DEPENDENCY_UNAVAILABLE");
+  for (const incomplete of [undefined,
     { ...valid, blockNumber: "invalid" }, { ...valid, blockNumber: "0xffff" }]) {
     receipt = incomplete;
     await assert.rejects(verify(), pending);
@@ -144,12 +152,14 @@ test("native mint completion requires independent finality and every committed w
     await assert.rejects(verify(), /does not match/);
   }
   for (const bad of [{ ...valid, status: "0x0" }, { ...valid, logs: [] },
-    { ...valid, transactionHash: `0x${"c".repeat(64)}` }, { ...valid, blockHash: undefined },
+    { ...valid, transactionHash: `0x${"c".repeat(64)}` },
     { ...valid, logs: [{ ...event(), address: address("9") }] },
     { ...valid, logs: [{ ...event(), removed: true }] }]) {
     receipt = bad;
     await assert.rejects(verify(), /does not match/);
   }
+  receipt = { ...valid, blockHash: undefined };
+  await assert.rejects(verify(), pending);
   receipt = valid;
   await verify();
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => { throw new Error("RPC unavailable"); });
@@ -299,6 +309,8 @@ test("verification binds every native route intent field and selects the correct
   let receipt: any = { status: "0x1", blockNumber: "0x64", transactionHash: event.transactionHash, blockHash: `0x${"b".repeat(64)}`, logs: [log(false), event] };
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 112);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => receipt.blockHash);
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
   const deposit = { ...parseNativeDepositLog(1, event)!, depositId: "native:2", bridgeStatus: "1", stratoToken: address("7"), requestedAt: "1", timestamp: "1" };
   assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), true);
@@ -377,12 +389,22 @@ test("native verification defers disputed, missing and immature receipts without
   const deposit = { ...parseNativeDepositLog(1, event)!, depositId: "native:2", bridgeStatus: "1",
     stratoToken: address("7"), requestedAt: "1", timestamp: "1" };
   const valid = { status: "0x1", blockNumber: "0x64", transactionHash: event.transactionHash, blockHash: `0x${"b".repeat(64)}`, logs: [event] };
-  let receipt: any = valid, head = 111;
+  let receipt: any = valid, head = 111, finalized = 112, canonicalHash = valid.blockHash;
   t.mock.method(rpc, "getTransactionReceiptsBatch", async () => new Map([[event.transactionHash, receipt]]));
   t.mock.method(rpc, "getVerificationBlockNumber", async () => head);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => finalized);
+  t.mock.method(rpc, "getVerifiedBlockHash", async () => canonicalHash);
   assert.equal((await verifyNativeRedemptionsBatch([deposit])).has(deposit.depositId), false);
   head = 112;
+  finalized = 99;
+  assert.equal((await verifyNativeRedemptionsBatch([deposit])).has(deposit.depositId), false);
+  finalized = 112;
   assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), true);
+  canonicalHash = `0x${"c".repeat(64)}`;
+  const inconsistent = await verifyNativeRedemptionsBatch([deposit]);
+  assert.equal(inconsistent.has(deposit.depositId), false);
+  assert.deepEqual(inconsistent.dependencyFailures[0].depositIds, [deposit.depositId]);
+  canonicalHash = valid.blockHash;
   for (const pending of [undefined, { ...valid, __rpcDisagreement: true },
     { ...valid, blockNumber: undefined }, { ...valid, blockNumber: "invalid" }, { ...valid, blockNumber: "0xffff" }]) {
     receipt = pending;
@@ -391,8 +413,57 @@ test("native verification defers disputed, missing and immature receipts without
   receipt = { ...valid, status: "0x0" };
   assert.equal((await verifyNativeRedemptionsBatch([deposit])).get(deposit.depositId), false);
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "0";
-  await assert.rejects(verifyNativeRedemptionsBatch([deposit]), /Invalid deposit confirmation policy/);
+  assert.equal((await verifyNativeRedemptionsBatch([deposit])).dependencyFailures.length, 1);
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+});
+
+test("native verification skips immature block reads and isolates mature block outages", async t => {
+  const rpc = await import("./rpcService");
+  const { verifyNativeRedemptionsBatch } = await import("./nativeVerificationService");
+  const { parseNativeDepositLog } = await import("../utils/nativeRedemption");
+  process.env.CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS = address("5");
+  process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
+  const inputs = [
+    { id: 2, tx: `0x${"6".repeat(64)}`, block: 100 },
+    { id: 3, tx: `0x${"7".repeat(64)}`, block: 99 },
+    { id: 4, tx: `0x${"8".repeat(64)}`, block: 110 },
+  ].map(({ id, tx, block }) => {
+    const event = { ...log(true, id), transactionHash: tx };
+    return {
+      deposit: {
+        ...parseNativeDepositLog(1, event)!,
+        depositId: `native:${id}`,
+        bridgeStatus: "1",
+        stratoToken: address("7"),
+        requestedAt: "1",
+        timestamp: "1",
+      },
+      receipt: {
+        status: "0x1",
+        blockNumber: `0x${block.toString(16)}`,
+        transactionHash: tx,
+        blockHash: `0x${String(id).repeat(64)}`,
+        logs: [event],
+      },
+    };
+  });
+  t.mock.method(rpc, "getTransactionReceiptsBatch", async () =>
+    new Map(inputs.map(({ receipt }) => [receipt.transactionHash, receipt])));
+  t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 112);
+  const reads: number[] = [];
+  t.mock.method(rpc, "getVerifiedBlockHash", async (_chainId, blockNumber) => {
+    reads.push(blockNumber);
+    if (blockNumber === 99) throw new Error("RPC unavailable");
+    return inputs.find(({ receipt }) => Number(BigInt(receipt.blockNumber)) === blockNumber)!.receipt.blockHash;
+  });
+
+  const result = await verifyNativeRedemptionsBatch(inputs.map(({ deposit }) => deposit));
+  assert.equal(result.get("native:2"), true);
+  assert.equal(result.has("native:3"), false);
+  assert.equal(result.has("native:4"), false);
+  assert.deepEqual(reads.sort((a, b) => a - b), [99, 100]);
+  assert.deepEqual(result.dependencyFailures.map((failure) => failure.depositIds), [["native:3"]]);
 });
 
 test("native confirmation head uses the slowest RPC and fails closed on bad heads", async t => {
@@ -408,6 +479,27 @@ test("native confirmation head uses the slowest RPC and fails closed on bad head
     second = bad;
     await assert.rejects(getVerificationBlockNumber(1));
   }
+});
+
+test("runtime finality rejects conflicting finalized hashes at the reported height", async t => {
+  const { getFinalizedBlockNumber } = await import("./rpcService");
+  const { fetch } = await import("../utils/api");
+  process.env.CHAIN_1_RPC_URL = "https://first.test";
+  process.env.CHAIN_1_VERIFICATION_RPC_URLS = "https://second.test";
+  t.mock.method(fetch, "post", async (url: string, request: any) => {
+    if (request.method === "eth_blockNumber") return { result: "0x20" };
+    if (request.params[0] === "finalized") {
+      return { result: {
+        number: "0x1f",
+        hash: `0x${(url.includes("first") ? "1" : "2").repeat(64)}`,
+      } };
+    }
+    return { result: {
+      number: request.params[0],
+      hash: `0x${"3".repeat(64)}`,
+    } };
+  });
+  await assert.rejects(getFinalizedBlockNumber(1), /not canonical/);
 });
 
 test("native polling neither settles nor sends immature evidence to review", async t => {
@@ -428,6 +520,48 @@ test("native polling neither settles nor sends immature evidence to review", asy
   assert.deepEqual(reviewed, ["invalid"]);
 });
 
+test("native polling reports verification dependencies and marks health failed after healthy work", async t => {
+  const cirrus = await import("./cirrusService");
+  const verification = await import("./nativeVerificationService");
+  const bridge = await import("./bridgeService");
+  const issues = await import("./processingIssueService");
+  const { healthMonitor } = await import("../utils/healthMonitor");
+  const { startNativeDepositInitiatedPolling } = await import("../polling/stratoPolling");
+  const entries = ["blocked", "valid"].map(depositId => ({
+    depositId,
+    bridgeStatus: "1",
+    externalChainId: "1",
+    externalTxHash: `0x${(depositId === "valid" ? "6" : "7").repeat(64)}`,
+    stratoToken: address("7"),
+  }));
+  const settled: string[] = [], recorded: any[] = [];
+  t.mock.method(cirrus, "getNativeDepositsByStatus", async (status: string) => status === "1" ? entries as any : []);
+  t.mock.method(verification, "verifyNativeRedemptionsBatch", async () => Object.assign(
+    new Map([["valid", true]]),
+    { dependencyFailures: [{
+      externalChainId: 1,
+      depositIds: ["blocked"],
+      error: new Error("RPC unavailable"),
+    }] },
+  ));
+  t.mock.method(bridge, "confirmNativeDepositBatch", async rows => {
+    settled.push(...rows.map(row => row.depositId));
+  });
+  t.mock.method(issues.processingIssueService, "record", async (context, error) => {
+    recorded.push({ context, error });
+  });
+  const finished = new Promise<void>(resolve => t.mock.method(globalThis, "setTimeout", (() => {
+    resolve();
+    return 0;
+  }) as any));
+  startNativeDepositInitiatedPolling();
+  await finished;
+  assert.deepEqual(settled, ["valid"]);
+  assert.equal(recorded[0].context.reference, "blocked");
+  assert.equal(recorded[0].error.issues[0].code, "DEPENDENCY_UNAVAILABLE");
+  assert.equal(healthMonitor.snapshot().checks.startNativeDepositInitiatedPolling, "failed");
+});
+
 test("native discovery scans and advances only through the confirmed head", async t => {
   const rpc = await import("./rpcService");
   const cirrus = await import("./cirrusService");
@@ -438,6 +572,7 @@ test("native discovery scans and advances only through the confirmed head", asyn
   t.mock.method(cirrus, "getNativeRedemptionChainIds", async () => [1]);
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
   t.mock.method(cursor, "getCheckpoint", async () => ({ block: 98, reconciliationBlock: 0 }));
   t.mock.method(rpc, "getVerifiedBlockHash", async () => "0x" + "a".repeat(64));
   t.mock.method(cirrus, "getRecordedNativeRedemptions", async () => []);
@@ -460,6 +595,7 @@ test("native discovery preserves a checkpoint ahead of the confirmed head", asyn
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
   t.mock.method(cursor, "getCheckpoint", async () => ({ block: 101, reconciliationBlock: 0 }));
   const logs = t.mock.method(rpc, "getVerifiedNativeLogs", async () => []);
   const updates = t.mock.method(cursor, "saveCheckpoint", async () => undefined);
@@ -484,6 +620,7 @@ test("native discovery advances past blocked burns and retries them after restar
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 5000);
   const hash = "0x" + "a".repeat(64);
   t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
   const entries = [100, 200, 2500].map((block, index) => ({
@@ -534,6 +671,7 @@ test("a conflicting historical redemption stays pending without stopping later d
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 5000);
   t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
   const old = { ...log(false, 1), blockNumber: "0x64", blockHash: hash };
   const later = { ...log(false, 2), blockNumber: "0xfa0", blockHash: hash };
@@ -572,6 +710,7 @@ test("pending native burns reject stale reorg evidence and survive a failed chec
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 5000);
   let canonical = false;
   t.mock.method(rpc, "getVerifiedBlockHash", async (_chain, block) =>
     block === 100 && !canonical ? "0x" + "b".repeat(64) : hash);
@@ -613,6 +752,7 @@ test("native forward and historical progress commit independently through scan a
       process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
       t.mock.method(rpc, "isChainConfigured", () => true);
       t.mock.method(rpc, "getVerificationBlockNumber", async () => 7012);
+      t.mock.method(rpc, "getFinalizedBlockNumber", async () => 7000);
       t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
       const old = { ...log(false, 1), blockNumber: "0x64", blockHash: hash };
       const fresh = [4000, 6000].map((block, index) => ({ ...log(false, index + 2),
@@ -672,6 +812,7 @@ test("native polling discovers native-only and disabled routes and drains retain
   t.mock.method(config, "getDepositConfirmationPolicy", () => 12);
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
   t.mock.method(rpc, "getVerifiedBlockHash", async () => hash);
   const scanned = new Set<number>();
   t.mock.method(rpc, "getVerifiedNativeLogs", async (chain, from, to) => {
@@ -721,6 +862,7 @@ test("missing native recovery configuration fails polling health and recovers af
   t.mock.method(config, "getDepositConfirmationPolicy", () => 12);
   t.mock.method(rpc, "isChainConfigured", () => rpcConfigured);
   const head = t.mock.method(rpc, "getVerificationBlockNumber", async () => 112);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 100);
   t.mock.method(rpc, "getVerifiedBlockHash", async () => "0x" + "a".repeat(64));
   t.mock.method(rpc, "getVerifiedNativeLogs", async () => []);
   let rerun!: () => Promise<void>;
@@ -830,6 +972,7 @@ test("native sweep recovers old omissions, avoids recorded payouts and detects r
   process.env.CHAIN_1_DEPOSIT_CONFIRMATIONS = "12";
   t.mock.method(rpc, "isChainConfigured", () => true);
   t.mock.method(rpc, "getVerificationBlockNumber", async () => 5012);
+  t.mock.method(rpc, "getFinalizedBlockNumber", async () => 5000);
   let state = { block: 5000, hash: "0x" + "a".repeat(64), reconciliationBlock: 0, bridge: address("5") };
   t.mock.method(cursor, "getCheckpoint", async () => state);
   const save = t.mock.method(cursor, "saveCheckpoint", async (_chain, next) => { state = next as typeof state; });
@@ -890,6 +1033,8 @@ test("native cancellation recovers Safe proposals and records only confirmed, ma
   } }) as any);
   t.mock.method(rpcService, "getTransactionReceiptsBatch", async () => new Map([[hash, receipt]]));
   t.mock.method(rpcService, "getVerificationBlockNumber", async () => head);
+  t.mock.method(rpcService, "getFinalizedBlockNumber", async () => 1000000);
+  t.mock.method(rpcService, "getVerifiedBlockHash", async () => `0x${"b".repeat(64)}`);
   t.mock.method(external, "getEventTransactionHash", async () => hash);
   t.mock.method(strato, "execute", async (call: any) => { calls.push(call); });
   t.mock.method(strato, "executeAsRelayer", async (call: any) => { calls.push(call); });
@@ -924,7 +1069,7 @@ test("native cancellation recovers Safe proposals and records only confirmed, ma
   await assert.rejects(processNativeMintCancellation(w, "2001"), /already executed/);
   assert.equal(calls.length, 0);
   minted = false; canceled = true; head = 1;
-  await assert.rejects(processNativeMintCancellation(w, "2001"), /awaits confirmations/);
+  await assert.rejects(processNativeMintCancellation(w, "2001"), /awaiting finalized confirmation/);
   head = 1000000; receipt.__rpcDisagreement = true;
   await assert.rejects(processNativeMintCancellation(w, "2001"), /disagreement/);
   delete receipt.__rpcDisagreement;

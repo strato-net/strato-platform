@@ -1,7 +1,12 @@
-import { Contract, Interface, JsonRpcProvider, getAddress } from "ethers";
+import { Contract, Interface, getAddress } from "ethers";
 import { DepositRefundAuthorization } from "../types";
 import { DEPOSIT_REFUND_ABI } from "../config/bridgeAbi";
-import { DepositSettlementAttestation, validateDepositSettlement } from "./settlementValidation";
+import {
+  DepositSettlementAttestation,
+  FinalityProvider,
+  validateDepositSettlement,
+  validateReceiptFinality,
+} from "./settlementValidation";
 import { processingIssue } from "../utils/processingIssues";
 
 const same = (a: string, b: string) => getAddress(`0x${a.replace(/^0x/i, "")}`) === getAddress(`0x${b.replace(/^0x/i, "")}`);
@@ -25,7 +30,7 @@ export const validateDepositRefundSource = (
 };
 
 export const validateDepositRefundEvidence = async (
-  provider: JsonRpcProvider, a: DepositRefundAuthorization, deposit: DepositSettlementAttestation, confirmations: number,
+  provider: FinalityProvider, a: DepositRefundAuthorization, deposit: DepositSettlementAttestation, confirmations: number,
 ): Promise<void> => {
   await validateDepositSettlement(provider, deposit, a.destinationVault, [a.depositRouter], confirmations);
   const vault = new Contract(a.destinationVault, DEPOSIT_REFUND_ABI, provider);
@@ -35,16 +40,15 @@ export const validateDepositRefundEvidence = async (
 };
 
 export const validateDepositRefundCompletion = async (
-  provider: JsonRpcProvider, a: DepositRefundAuthorization, hash: string, confirmations: number,
+  provider: FinalityProvider, a: DepositRefundAuthorization, hash: string, confirmations: number,
 ): Promise<void> => {
   if (!/^0x[0-9a-f]{64}$/i.test(hash)) throw new Error("Invalid deposit refund transaction hash");
   const receipt = await provider.getTransactionReceipt(hash);
   if (!receipt || receipt.status !== 1 || receipt.hash?.toLowerCase() !== hash.toLowerCase() || !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "")) throw new Error("Deposit refund receipt is missing or failed");
-  const head = await provider.getBlockNumber();
-  if (head - receipt.blockNumber < confirmations) throw Object.assign(new Error("Deposit refund awaiting confirmations"), {
-    issues: [processingIssue("CONFIRMATIONS_PENDING", { transactionHash: hash,
-      observedConfirmations: String(Math.max(0, head - receipt.blockNumber)), requiredConfirmations: String(confirmations) })],
-  });
+  await validateReceiptFinality(provider, receipt, confirmations, (message, details) =>
+    Object.assign(new Error(message), {
+      issues: [processingIssue("CONFIRMATIONS_PENDING", { transactionHash: hash, ...details })],
+    }));
   const vault = new Contract(a.destinationVault, DEPOSIT_REFUND_ABI, provider);
   const refundId = await vault.depositRefundId(a.depositRouter, a.depositId);
   const iface = new Interface(DEPOSIT_REFUND_ABI);

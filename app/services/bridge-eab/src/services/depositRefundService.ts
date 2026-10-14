@@ -4,10 +4,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
-import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getNativeVerifierApiTokens, getDepositConfirmationPolicy, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
+import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getNativeVerifierApiTokens, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES, NATIVE_REFUND_ABI, NATIVE_REFUND_TYPES } from "../config/bridgeAbi";
 import { DepositRefundAuthorization, NativeDepositInfo, NativeRefundProposal } from "../types";
-import { getChainProvider, getTransactionReceiptsBatch, getVerificationBlockNumber } from "./rpcService";
+import { getChainProvider, getTransactionReceiptsBatch } from "./rpcService";
 import { getRecordedDepositReviews, getBridgeReviewRecords, getDepositRefundVault, getNativeDepositRefundProposal, getNativeDepositRefundEvidence } from "./cirrusService";
 import { recoverDepositObservation } from "./depositEventService";
 import { getStratoNetworkId } from "./bridgeService";
@@ -20,8 +20,11 @@ import {
   requestVerifierQuorum,
 } from "./settlementAttestationService";
 import { processingIssueService } from "./processingIssueService";
-import { verifierIssues, processingIssue } from "../utils/processingIssues";
-import { verifyNativeRedemptionsBatch } from "./nativeVerificationService";
+import { verifierIssues } from "../utils/processingIssues";
+import {
+  verifyNativeRedemptionRefund,
+  verifyNativeRedemptionsBatch,
+} from "./nativeVerificationService";
 
 const collectNativeRefundSignatures = async (
   chainId: number,
@@ -199,31 +202,7 @@ export const recoverNativeDepositRefund = async (d: NativeDepositInfo): Promise<
       return;
     }
   }
-  const [receipts, head] = await Promise.all([getTransactionReceiptsBatch(chainId, [hash]), getVerificationBlockNumber(chainId)]);
-  const receipt = receipts.get(hash);
-  const confirmations = getDepositConfirmationPolicy(chainId);
-  if (receipt?.__rpcDisagreement) throw Object.assign(new Error("Native refund RPC disagreement"), {
-    issues: [processingIssue("DEPENDENCY_UNAVAILABLE", { transactionHash: hash })],
-  });
-  if (!receipt || !/^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ||
-      BigInt(receipt.blockNumber) + BigInt(confirmations) > BigInt(head)) throw Object.assign(new Error("Native refund awaiting confirmations"), {
-    issues: [processingIssue("CONFIRMATIONS_PENDING", {
-      transactionHash: hash, requiredConfirmations: String(confirmations),
-      ...(receipt && /^0x[0-9a-f]+$/i.test(receipt.blockNumber || "") ? {
-        observedConfirmations: String(BigInt(head) > BigInt(receipt.blockNumber) ? BigInt(head) - BigInt(receipt.blockNumber) : 0n),
-      } : {}),
-    })],
-  });
-  if (receipt.status !== "0x1" || receipt.transactionHash?.toLowerCase() !== hash.toLowerCase() ||
-      !/^0x[0-9a-f]{64}$/i.test(receipt.blockHash || "") || !receipt.logs.some((log: any) => {
-    if (log.removed || safeChecksum(log.address) !== destination) return false;
-    try {
-      const event = iface.parseLog(log);
-      return event?.name === "RedemptionRefunded" && BigInt(event.args.redemptionId) === BigInt(d.externalRedemptionId) &&
-        safeChecksum(event.args.representationToken) === safeChecksum(d.representationToken) &&
-        safeChecksum(event.args.recipient) === safeChecksum(d.externalSender) && BigInt(event.args.amount) === BigInt(d.stratoTokenAmount);
-    } catch { return false; }
-  })) throw new Error("Native refund evidence does not match the original redemption");
+  await verifyNativeRedemptionRefund(d, hash);
   const recorded = await getNativeDepositRefundEvidence(d.depositId);
   if (recorded?.replace(/^0x/i, "").toLowerCase() !== hash.replace(/^0x/i, "").toLowerCase()) {
     await execute({ contractName: "StratoNativeBridge", contractAddress: config.nativeBridge.address!,

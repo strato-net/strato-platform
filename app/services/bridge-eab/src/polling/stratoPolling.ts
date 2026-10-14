@@ -23,6 +23,7 @@ import { checkBalances } from "../utils/balanceCheck";
 import { healthMonitor } from "../utils/healthMonitor";
 import { notifyBridgeReviews, preparePendingWithdrawalRefunds } from "../services/bridgeReviewService";
 import { processPendingDepositRefunds } from "../services/depositRefundService";
+import { processingIssue } from "../utils/processingIssues";
 
 const POLLING_BATCH_SIZE = 10;
 
@@ -113,6 +114,7 @@ export const startNativeDepositInitiatedPolling = (): void => {
       if (!Array.isArray(deposits) || deposits.length === 0) return;
 
       const verificationResults = await verifyNativeRedemptionsBatch(deposits);
+      const dependencyFailures = verificationResults.dependencyFailures || [];
 
       const results: ConfirmNativeDepositArgs[] = deposits.filter((deposit) => verificationResults.has(deposit.depositId)).map((deposit) => ({
         externalChainId: deposit.externalChainId,
@@ -164,6 +166,30 @@ export const startNativeDepositInitiatedPolling = (): void => {
             batch as NonEmptyArray<ConfirmNativeDepositArgs>,
           );
         }
+      }
+
+      for (const failure of dependencyFailures) {
+        for (const depositId of failure.depositIds) {
+          const deposit = depositsById.get(depositId);
+          if (!deposit) continue;
+          const error = Object.assign(new Error("Native verification dependency unavailable"), {
+            issues: [processingIssue("DEPENDENCY_UNAVAILABLE", {
+              operation: "verifyNativeRedemption",
+              transactionHash: failure.externalTxHash || deposit.externalTxHash,
+            })],
+          });
+          await processingIssueService.record({
+            source: "native",
+            chainId: String(deposit.externalChainId),
+            bridge: config.nativeBridge.address!,
+            reference: deposit.depositId,
+            stage: "deposit-confirmation",
+            token: deposit.stratoToken,
+          }, error);
+        }
+      }
+      if (dependencyFailures.length > 0) {
+        healthMonitor.failPoll("startNativeDepositInitiatedPolling");
       }
     } catch (e: any) {
       healthMonitor.failPoll("startNativeDepositInitiatedPolling");

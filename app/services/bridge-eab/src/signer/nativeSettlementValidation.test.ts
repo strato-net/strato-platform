@@ -50,7 +50,7 @@ function harness(kind: "withdrawal" | "cancellation" | "deposit" | "refund" | "r
     kind === "refund" ? [event(NATIVE_REFUND_ABI, "RedemptionRefunded", [7, representationToken, recipient, 100])] :
     [event(["event RedemptionRequested(address indexed representationToken,uint256 amount,address indexed sender,address indexed stratoRecipient,uint96 redemptionId)"],
       "RedemptionRequested", [representationToken, 100, recipient, recipient, 7])];
-  const state = { row, head: 112, receipt: { blockNumber: "0x64", blockHash, transactionHash: hash, status: "0x1", logs },
+  const state = { row, head: 112, finalized: 112, receipt: { blockNumber: "0x64", blockHash, transactionHash: hash, status: "0x1", logs },
     canonicalHash: blockHash, disagreement: false, calls: [] as string[], submissions: [] as any[] };
   const handlers = new Map<string, Function>();
   runInNewContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, {
@@ -65,12 +65,14 @@ function harness(kind: "withdrawal" | "cancellation" | "deposit" | "refund" | "r
       version: "1", routes: [{ representationToken, stratoToken: normalize(stratoToken) }],
     } },
     verifierPolicy: { version: "1" }, verifierPolicyDigest: "policy", settlementAttestorAddress: address("6"),
-    provider: { getBlock: async () => ({ timestamp: 1000 }), send: async (method: string) => {
+    provider: { getBlock: async () => ({ timestamp: 1000 }),
+      getFinalizedBlockNumber: async () => state.finalized,
+      send: async (method: string, params: string[]) => {
       state.calls.push(method);
       if (state.disagreement) throw new Error("Verifier RPC disagreement");
       if (method === "eth_blockNumber") return `0x${state.head.toString(16)}`;
       if (method === "eth_getTransactionReceipt") return state.receipt;
-      if (method === "eth_getBlockByNumber") return { hash: state.canonicalHash };
+      if (method === "eth_getBlockByNumber") return { number: params[0], hash: state.canonicalHash };
       throw new Error(`Unexpected RPC ${method}`);
     } },
     nativeStratoGet: async (_path: string, params: any) => {

@@ -1,4 +1,4 @@
-import { JsonRpcProvider, Network } from "ethers";
+import { JsonRpcProvider, Network, toQuantity } from "ethers";
 import {
   normalizeCallTracerResult,
   normalizeParityTraces,
@@ -43,6 +43,56 @@ export class ConsensusProvider extends JsonRpcProvider {
 
   async _detectNetwork(): Promise<Network> {
     return Network.from(BigInt(await this.send("eth_chainId", [])));
+  }
+
+  async getFinalizedBlockNumber(): Promise<number> {
+    const finalized = await Promise.all(this.peers.map(async (peer) => {
+      const [block, latest] = await Promise.all([
+        peer.send("eth_getBlockByNumber", ["finalized", false]),
+        peer.send("eth_blockNumber", []),
+      ]);
+      if (!block || !/^0x[0-9a-f]+$/i.test(block.number || "") ||
+          !/^0x[0-9a-f]{64}$/i.test(block.hash || "") ||
+          !/^0x[0-9a-f]+$/i.test(latest || "")) {
+        throw new Error("Verifier RPC finalized block is unavailable");
+      }
+      const number = Number(BigInt(block.number));
+      if (!Number.isSafeInteger(number) || BigInt(block.number) > BigInt(latest)) {
+        throw new Error("Verifier RPC finalized block is invalid");
+      }
+      const canonical = await peer.send("eth_getBlockByNumber", [
+        toQuantity(number),
+        false,
+      ]);
+      if (!canonical || !/^0x[0-9a-f]+$/i.test(canonical.number || "") ||
+          BigInt(canonical.number) !== BigInt(number) ||
+          String(canonical.hash || "").toLowerCase() !== block.hash.toLowerCase()) {
+        throw new Error("Verifier RPC finalized block is not canonical");
+      }
+      return number;
+    }));
+    const commonNumber = Math.min(...finalized);
+    const commonBlocks = await Promise.all(this.peers.map((peer) =>
+      peer.send("eth_getBlockByNumber", [toQuantity(commonNumber), false])
+    ));
+    if (commonBlocks.some((block) => !block ||
+        BigInt(block.number || "-1") !== BigInt(commonNumber) ||
+        !/^0x[0-9a-f]{64}$/i.test(block.hash || ""))) {
+      throw new Error("Verifier RPC finalized checkpoint is unavailable");
+    }
+    const fingerprint = blockFingerprint(commonBlocks[0]);
+    if (commonBlocks.some((block) => blockFingerprint(block) !== fingerprint)) {
+      throw new Error("Verifier RPC disagreement: finalized checkpoint");
+    }
+    return commonNumber;
+  }
+
+  async assertCanonicalBlock(blockNumber: number, expectedHash: string): Promise<void> {
+    const block = await this.send("eth_getBlockByNumber", [toQuantity(blockNumber), false]);
+    if (!block || BigInt(block.number || "-1") !== BigInt(blockNumber) ||
+        String(block.hash || "").toLowerCase() !== expectedHash.toLowerCase()) {
+      throw new Error("Receipt block is not canonical");
+    }
   }
 
   async send(method: string, params: Array<any> | Record<string, any>): Promise<any> {

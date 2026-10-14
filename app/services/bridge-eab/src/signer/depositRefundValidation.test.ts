@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AbiCoder, Interface, JsonRpcProvider, keccak256 } from "ethers";
+import { AbiCoder, Interface, keccak256 } from "ethers";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
@@ -8,7 +8,7 @@ import ts from "typescript";
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES } from "../config/bridgeAbi";
 import { validateDepositRefundSource, validateDepositRefundEvidence, validateDepositRefundCompletion } from "./depositRefundValidation";
 import type { DepositRefundAuthorization } from "../types";
-import type { DepositSettlementAttestation } from "./settlementValidation";
+import type { DepositSettlementAttestation, FinalityProvider } from "./settlementValidation";
 
 const addr = (s: string) => `0x${s.repeat(40)}`;
 const hash = `0x${"a".repeat(64)}`, blockHash = `0x${"b".repeat(64)}`;
@@ -24,12 +24,16 @@ const iface = new Interface(DEPOSIT_REFUND_ABI);
 const refundId = keccak256(AbiCoder.defaultAbiCoder().encode(["address", "uint256"], [a.depositRouter, a.depositId]));
 const providerWith = (receipt: any, head = 112) => ({
   getTransactionReceipt: async () => receipt, getBlockNumber: async () => head, getBlock: async () => ({ timestamp: 1000 }),
+  getFinalizedBlockNumber: async () => 112,
+  assertCanonicalBlock: async (_blockNumber: number, expectedHash: string) => {
+    if (expectedHash !== receipt?.blockHash) throw new Error("Receipt block is not canonical");
+  },
   call: async ({ data }: any) => {
     const parsed = iface.parseTransaction({ data })!;
     const value: Record<string, any> = { depositRefundId: refundId, refundedDeposits: true, signerSetVersion: 1n, maxAuthorizationValiditySeconds: 1800n };
     return iface.encodeFunctionResult(parsed.name, [value[parsed.name]]);
   },
-} as unknown as JsonRpcProvider);
+} as unknown as FinalityProvider);
 
 test("refund signing binds immutable source evidence and requires the irreversible decision", () => {
   verifySource();

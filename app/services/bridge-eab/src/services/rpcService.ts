@@ -114,6 +114,44 @@ export const getVerificationBlockNumber = async (chainId: number): Promise<numbe
   return Math.min(...heads);
 };
 
+export const getFinalizedBlockNumber = async (chainId: number): Promise<number> => {
+  const urls = [...new Set(getChainRpcUrls(chainId))];
+  const finalized = await Promise.all(urls.map(async (url) => {
+    const [block, latest] = await Promise.all([
+      fetch.post(url, {
+        jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["finalized", false],
+      }).then((response) => unwrapRpcResult(response, "eth_getBlockByNumber(finalized)", chainId)),
+      fetch.post(url, {
+        jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [],
+      }).then((response) => unwrapRpcResult(response, "eth_blockNumber", chainId)),
+    ]);
+    if (!block || !/^0x[0-9a-f]+$/i.test(block.number || "") ||
+        !/^0x[0-9a-f]{64}$/i.test(block.hash || "") ||
+        !/^0x[0-9a-f]+$/i.test(latest || "")) {
+      throw new Error(`Finalized block is unavailable on chain ${chainId}`);
+    }
+    const number = Number(BigInt(block.number));
+    if (!Number.isSafeInteger(number) || BigInt(block.number) > BigInt(latest)) {
+      throw new Error(`Finalized block is invalid on chain ${chainId}`);
+    }
+    const canonical = unwrapRpcResult(await fetch.post(url, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_getBlockByNumber",
+      params: [decimalToHex(String(number)), false],
+    }), "eth_getBlockByNumber(finalized height)", chainId);
+    if (!canonical || !/^0x[0-9a-f]+$/i.test(canonical.number || "") ||
+        BigInt(canonical.number) !== BigInt(number) ||
+        String(canonical.hash || "").toLowerCase() !== block.hash.toLowerCase()) {
+      throw new Error(`Finalized block is not canonical on chain ${chainId}`);
+    }
+    return number;
+  }));
+  const commonNumber = Math.min(...finalized);
+  await getVerifiedBlockHash(chainId, commonNumber);
+  return commonNumber;
+};
+
 // Batch get transaction receipts
 export const getTransactionReceiptsBatch = async (
   chainId: number,
@@ -304,6 +342,13 @@ export const validateVerificationRpcEndpoints = async (
     try {
       const result: any = await fetch.post(url, { jsonrpc: "2.0", id: 1, method: "eth_chainId", params: [] });
       if (result.error || BigInt(result.result) !== BigInt(chainId)) throw new Error("Verification RPC chain ID mismatch");
+      const finalized = unwrapRpcResult(await fetch.post(url, {
+        jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["finalized", false],
+      }), "eth_getBlockByNumber(finalized)", chainId);
+      if (!finalized || !/^0x[0-9a-f]+$/i.test(finalized.number || "") ||
+          !/^0x[0-9a-f]{64}$/i.test(finalized.hash || "")) {
+        throw new Error("Verification RPC finalized block is unavailable");
+      }
       if (!requireTrace) return;
       let block = unwrapRpcResult(await fetch.post(url, {
         jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: ["latest", false],
