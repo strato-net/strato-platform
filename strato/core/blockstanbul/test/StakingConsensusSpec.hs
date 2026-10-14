@@ -22,6 +22,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Verification (transactionsVerificationValue)
 import Control.Lens hiding (view)
 import Conduit (runConduit, sinkNull, yieldMany, (.|))
 import Control.Monad (forM_)
@@ -98,6 +99,14 @@ v3 vals stakes' rnd removed updates =
 
 spec :: Spec
 spec = describe "stake-weighted consensus" $ do
+  describe "body against header" $ do
+    let hdr = (v3 [] [] 5 [] []) {transactionsRoot = transactionsVerificationValue []}
+    it "accepts a body whose transactions and uncles hash to the header" $
+      bodyMatchesHeader (Block hdr [] []) `shouldBe` True
+    it "rejects a body with extra uncles under the same header" $
+      bodyMatchesHeader (Block hdr [] [hdr]) `shouldBe` False
+    it "rejects a header whose transactions root is not the body's" $
+      bodyMatchesHeader (Block (v3 [] [] 5 [] []) [] []) `shouldBe` False
   describe "rounds and timers" $ do
     it "keeps the round across heights and re-arms the timer per height" $
       forM_ [activeCtx, legacyCtx] $ \ctx0 -> do
