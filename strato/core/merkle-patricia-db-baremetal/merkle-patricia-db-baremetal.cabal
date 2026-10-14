@@ -1,0 +1,79 @@
+cabal-version: 1.22
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           merkle-patricia-db-baremetal
+version:        0.0.1
+license:        Apache-2.0
+build-type:     Simple
+
+library
+  exposed-modules:
+      BatchMerge
+      Blockchain.Database.MerklePatricia
+      Blockchain.Database.MerklePatriciaNative
+  other-modules:
+      Paths_merkle_patricia_db_baremetal
+  reexported-modules:
+      merkle-patricia-db:Blockchain.Database.MerklePatricia.Internal
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.Diff
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.ForEach
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.Map
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.MPDB
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.NodeData
+    , merkle-patricia-db:Blockchain.Database.MerklePatricia.StateRoot
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -O2
+  cc-options: -std=c11 -O2 -Wall
+  include-dirs:
+      cbits
+  c-sources:
+      cbits/mp_trie.c
+  extra-libraries:
+      leveldb
+  build-depends:
+      base
+    , bytestring
+    , common-log
+    , data-default
+    , ethereum-rlp
+    , fastMP
+    , leveldb-haskell
+    , merkle-patricia-db
+    , monad-alter
+    , nibblestring
+    , strato-model
+    , transformers
+  default-language: Haskell2010
+
+test-suite test-merkle-patricia-db-baremetal
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_merkle_patricia_db_baremetal
+  hs-source-dirs:
+      test
+  ghc-options: -dynamic
+  build-depends:
+      base
+    , base16-bytestring
+    , bytestring
+    , common-log
+    , containers
+    , data-default
+    , directory
+    , ethereum-rlp
+    , fastMP
+    , hspec
+    , leveldb-haskell
+    , merkle-patricia-db
+    , merkle-patricia-db-baremetal
+    , monad-alter
+    , mtl
+    , nibblestring
+    , strato-model
+    , transformers
+  default-language: Haskell2010

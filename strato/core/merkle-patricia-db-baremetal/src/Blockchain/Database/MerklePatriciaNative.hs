@@ -1,0 +1,222 @@
+{-# LANGUAGE ForeignFunctionInterface #-}
+
+-- | Thin bindings to the C Merkle Patricia store (cbits/mp_trie.c).
+--
+-- The store owns the trie nodes: an in-memory cache in front of LevelDB,
+-- written through on 'tick' / 'flush'.  Haskell hands over a state root and
+-- raw key / RLP-serialized value bytes and gets a state root back.
+--
+-- A process activates the C trie by opening a store and calling
+-- 'setActiveHandle'; the drop-in "Blockchain.Database.MerklePatricia" and
+-- "BatchMerge" modules dispatch to it when set and to the Haskell
+-- implementation otherwise.
+module Blockchain.Database.MerklePatriciaNative
+  ( MPHandle,
+    openMemory,
+    openLevelDB,
+    close,
+
+    -- * Active store
+    activeHandle,
+    setActiveHandle,
+
+    -- * Trie operations (Left = hash of a node nobody has)
+    get,
+    putMany,
+    delete,
+    tick,
+    flush,
+
+    -- * Raw nodes by hash
+    nodeGet,
+    nodePut,
+    nodeDelete,
+
+    -- * Sandbox
+    overlayBegin,
+    overlayEnd,
+  )
+where
+
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
+import Data.IORef
+import Data.Word (Word8)
+import Foreign.C.Types
+import Foreign.Marshal.Alloc (alloca, allocaBytes)
+import Foreign.Marshal.Array (allocaArray, peekArray, pokeArray)
+import Foreign.Ptr
+import Foreign.Storable
+import System.IO.Unsafe (unsafePerformIO)
+
+newtype MPHandle = MPHandle (Ptr ())
+
+foreign import ccall unsafe "mp_db_open"
+  c_open :: Ptr () -> CUInt -> CUInt -> IO (Ptr ())
+
+foreign import ccall safe "mp_db_close"
+  c_close :: Ptr () -> IO ()
+
+foreign import ccall safe "mp_db_get"
+  c_get :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> Ptr (Ptr Word8) -> Ptr CSize -> IO CInt
+
+foreign import ccall safe "mp_db_put_many"
+  c_put_many ::
+    Ptr () -> Ptr Word8 -> CSize ->
+    Ptr (Ptr Word8) -> Ptr CSize -> Ptr (Ptr Word8) -> Ptr CSize ->
+    Ptr Word8 -> Ptr Word8 -> IO CInt
+
+foreign import ccall safe "mp_db_delete"
+  c_delete :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt
+
+foreign import ccall safe "mp_db_tick"
+  c_tick :: Ptr () -> IO CInt
+
+foreign import ccall safe "mp_db_flush"
+  c_flush :: Ptr () -> IO CInt
+
+foreign import ccall safe "mp_db_node_get"
+  c_node_get :: Ptr () -> Ptr Word8 -> Ptr (Ptr Word8) -> Ptr CSize -> IO CInt
+
+foreign import ccall unsafe "mp_db_node_put"
+  c_node_put :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
+
+foreign import ccall safe "mp_db_node_delete"
+  c_node_delete :: Ptr () -> Ptr Word8 -> IO CInt
+
+foreign import ccall unsafe "mp_db_overlay_begin"
+  c_overlay_begin :: Ptr () -> IO ()
+
+foreign import ccall unsafe "mp_db_overlay_end"
+  c_overlay_end :: Ptr () -> IO ()
+
+foreign import ccall unsafe "mp_db_missing_hash"
+  c_missing_hash :: Ptr () -> Ptr Word8 -> IO ()
+
+foreign import ccall unsafe "mp_free"
+  c_free :: Ptr Word8 -> IO ()
+
+-- | A store with no LevelDB behind it; nothing is ever evicted.
+openMemory :: IO MPHandle
+openMemory = MPHandle <$> c_open nullPtr 0 1
+
+-- | @openLevelDB ldb capacity flushEvery@: cache up to @capacity@ clean
+-- nodes over the @leveldb_t*@, writing new nodes through every
+-- @flushEvery@ ticks.
+openLevelDB :: Ptr () -> Int -> Int -> IO MPHandle
+openLevelDB ldb capacity flushEvery =
+  MPHandle <$> c_open ldb (fromIntegral capacity) (fromIntegral flushEvery)
+
+close :: MPHandle -> IO ()
+close (MPHandle p) = c_close p
+
+{-# NOINLINE activeHandle #-}
+activeHandle :: IORef (Maybe MPHandle)
+activeHandle = unsafePerformIO $ newIORef Nothing
+
+setActiveHandle :: Maybe MPHandle -> IO ()
+setActiveHandle = writeIORef activeHandle
+
+withBS :: ByteString -> (Ptr Word8 -> CSize -> IO a) -> IO a
+withBS bs f = BU.unsafeUseAsCStringLen bs $ \(p, n) -> f (castPtr p) (fromIntegral n)
+
+withBSs :: [ByteString] -> ([(Ptr Word8, CSize)] -> IO a) -> IO a
+withBSs [] f = f []
+withBSs (b : bs) f = withBS b $ \p n -> withBSs bs $ \rest -> f ((p, n) : rest)
+
+-- | Copy out a C buffer and free it.
+takeBS :: Ptr Word8 -> CSize -> IO ByteString
+takeBS p n = do
+  bs <- B.packCStringLen (castPtr p, fromIntegral n)
+  c_free p
+  return bs
+
+missing :: Ptr () -> IO ByteString
+missing p = allocaBytes 32 $ \h -> c_missing_hash p h >> B.packCStringLen (castPtr h, 32)
+
+result :: Ptr () -> CInt -> IO a -> IO (Either ByteString a)
+result p rc ok
+  | rc == -2 = Left <$> missing p
+  | rc < 0 = error ("mp_trie: error " ++ show rc)
+  | otherwise = Right <$> ok
+
+-- | Value bytes for a key under a root.
+get :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString (Maybe ByteString))
+get (MPHandle p) root key =
+  withBS root $ \rootP _ -> withBS key $ \keyP keyN ->
+    alloca $ \valPP -> alloca $ \valNP -> do
+      rc <- c_get p rootP keyP keyN valPP valNP
+      result p rc $
+        if rc == 1
+          then return Nothing
+          else do
+            valP <- peek valPP
+            valN <- peek valNP
+            Just <$> takeBS valP valN
+
+-- | Insert key/value pairs under a root; the new root and, per pair,
+-- whether the key already had a value.
+putMany :: MPHandle -> ByteString -> [(ByteString, ByteString)] -> IO (Either ByteString (ByteString, [Bool]))
+putMany (MPHandle p) root kvs =
+  withBS root $ \rootP _ ->
+    withBSs (map fst kvs) $ \keys -> withBSs (map snd kvs) $ \vals ->
+      allocaArray n $ \keyPs -> allocaArray n $ \keyNs ->
+        allocaArray n $ \valPs -> allocaArray n $ \valNs ->
+          allocaBytes 32 $ \newRoot -> allocaArray n $ \existed -> do
+            pokeArray keyPs (map fst keys)
+            pokeArray keyNs (map snd keys)
+            pokeArray valPs (map fst vals)
+            pokeArray valNs (map snd vals)
+            rc <- c_put_many p rootP (fromIntegral n) keyPs keyNs valPs valNs newRoot existed
+            result p rc $ do
+              root' <- B.packCStringLen (castPtr newRoot, 32)
+              ex <- peekArray n existed
+              return (root', map (/= (0 :: Word8)) ex)
+  where
+    n = length kvs
+
+delete :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString ByteString)
+delete (MPHandle p) root key =
+  withBS root $ \rootP _ -> withBS key $ \keyP keyN -> allocaBytes 32 $ \newRoot -> do
+    rc <- c_delete p rootP keyP keyN newRoot
+    result p rc $ B.packCStringLen (castPtr newRoot, 32)
+
+-- | A block is done; the store may write pending nodes through.
+tick :: MPHandle -> IO ()
+tick (MPHandle p) = c_tick p >>= check "tick"
+
+-- | Write every pending node through now.
+flush :: MPHandle -> IO ()
+flush (MPHandle p) = c_flush p >>= check "flush"
+
+check :: String -> CInt -> IO ()
+check what rc
+  | rc == 0 = return ()
+  | otherwise = error ("mp_trie: " ++ what ++ " failed: " ++ show rc)
+
+-- | Raw node bytes by hash (cache, then LevelDB).
+nodeGet :: MPHandle -> ByteString -> IO (Maybe ByteString)
+nodeGet (MPHandle p) hash =
+  withBS hash $ \hashP _ -> alloca $ \dataPP -> alloca $ \dataNP -> do
+    rc <- c_node_get p hashP dataPP dataNP
+    if rc /= 0
+      then return Nothing
+      else do
+        dataP <- peek dataPP
+        dataN <- peek dataNP
+        Just <$> takeBS dataP dataN
+
+nodePut :: MPHandle -> ByteString -> ByteString -> IO ()
+nodePut (MPHandle p) hash bytes =
+  withBS hash $ \hashP _ -> withBS bytes $ \dataP dataN ->
+    c_node_put p hashP dataP dataN >>= check "nodePut"
+
+nodeDelete :: MPHandle -> ByteString -> IO ()
+nodeDelete (MPHandle p) hash =
+  withBS hash $ \hashP _ -> c_node_delete p hashP >>= check "nodeDelete"
+
+-- | Nodes created until the matching 'overlayEnd' are never written through.
+overlayBegin, overlayEnd :: MPHandle -> IO ()
+overlayBegin (MPHandle p) = c_overlay_begin p
+overlayEnd (MPHandle p) = c_overlay_end p

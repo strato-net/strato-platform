@@ -25,6 +25,7 @@ packages:
 - core/fast-keccak256
 - core/fastMP
 - core/merkle-patricia-db
+- core/merkle-patricia-db-baremetal
 - core/miner-ethash
 - core/seqevents
 - core/strato-conf
