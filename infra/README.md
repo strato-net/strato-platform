@@ -61,7 +61,7 @@ reads whatever a target needs from the stacks already deployed (the VPC,
 Aurora endpoints, security groups, load balancer and instance names), so the
 same run builds the environment from nothing and updates it:
 
-1. strato-platform's images from `STRATO_BRANCH` (default `scaling`) are
+1. strato-platform's images from `STRATO_BRANCH` (default `develop`) are
    built and pushed to ECR; its `bin/strato-*` and
    `core-cell/bootstrap/strato-cell-upgrade` go to `NODE_SCRIPTS_S3`.
 2. `data-plane` and `obs-core`.
