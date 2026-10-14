@@ -16,6 +16,7 @@
 module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
+    syncTaskFetchNumber,
   )
 where
 
@@ -264,7 +265,8 @@ handleEvents peer = awaitForever $ \case
 
             syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
-            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
+            BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+            return $ syncTaskFetchNumber myNumber <$> syncTask
           else do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             return $ Just $ maxBlockNumber + 1
@@ -431,7 +433,7 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
           case maybeNewSyncTask of
             Nothing -> return ()
-            Just syncTask -> syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+            Just syncTask -> syncFetch Forward $ syncTaskFetchNumber myNumber syncTask
 
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
@@ -486,6 +488,19 @@ alignFetchNumber :: Integer -> Integer
 alignFetchNumber n = (max 0 n `div` step) * step
   where
     step = fromIntegral . max 1 $ Conf.maxReturnedHeaders (p2pConfig ethConf)
+
+-- | Where to start downloading a sync task: the first block of its chiliad
+-- above our sequenced tip.
+--
+-- Starting at the chiliad boundary re-requests headers we already have. The
+-- header cache drops every header at or below the tip, so no bodies are
+-- requested, the BlockBodies continuation never runs, and a minute later the
+-- task is handed to the next peer to repeat the same request. A node restored
+-- from a snapshot mid-chiliad sat in that loop until it was asked for the
+-- missing blocks by hand. A start past the chiliad's end is fine: the first
+-- BlockBodies batch then lies beyond it and marks the chiliad finished.
+syncTaskFetchNumber :: Integer -> SyncTask -> Integer
+syncTaskFetchNumber myBest task = max (1000 * fromIntegral (syncTaskChiliad task)) (myBest + 1)
 
 syncFetch ::
   ( MonadIO m,

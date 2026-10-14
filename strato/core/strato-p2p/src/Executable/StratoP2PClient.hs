@@ -225,6 +225,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             disableException thePeer "PeerNonResponsive" (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) False
           e' | Just NoPeerCertificate <- fromException e' -> do
             disableException thePeer "NoPeerCertificate" Nothing True
+          e' | Just SelfConnection <- fromException e' -> do
+            disableException thePeer "SelfConnection" Nothing True
           e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
             case ioErrType of
               NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) True

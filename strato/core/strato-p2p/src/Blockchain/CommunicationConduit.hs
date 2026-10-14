@@ -28,7 +28,6 @@ import           Blockchain.EventException
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Model.SyncState
-import           Blockchain.Model.SyncTask
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -83,6 +82,8 @@ handleMsgClientConduit ::
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
 
+  rejectSelfConnection myId peer
+
   lift $ clearAllSyncTasks $ pPeerHost peer
 
   yield $
@@ -131,9 +132,11 @@ handleMsgClientConduit myId peer = do
           $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
-          if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
+          BestSequencedBlock _ myBest _ _ _ <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
+          let fetchNumber = syncTaskFetchNumber myBest syncTask
+          if fetchNumber <= highestBlockNum'
             then do
-              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
+              yield . Right $ GetBlockHeaders (BlockNumber fetchNumber) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
             else do
               $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
               lift $ setSyncTaskNotReady (pPeerHost peer)
@@ -149,6 +152,8 @@ handleMsgServerConduit ::
   ConduitM Event (Either P2PCNC Message) m ()
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
+
+  rejectSelfConnection myPubkey peer
 
   lift $ clearAllSyncTasks $ pPeerHost peer
 
@@ -202,7 +207,8 @@ handleMsgServerConduit myPubkey peer = do
           $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
-          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
+          BestSequencedBlock _ myBest _ _ _ <- lift $ Mod.get (Mod.Proxy @BestSequencedBlock)
+          yield . Right $ GetBlockHeaders (BlockNumber $ syncTaskFetchNumber myBest syncTask) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
 
       lift stampActionTimestamp
     other -> assertHandshake other
@@ -214,6 +220,13 @@ awaitMsg =
     Just (MsgEvt msg) -> return (Just msg)
     Nothing           -> return Nothing
     _                 -> awaitMsg
+
+-- | A node can learn its own public address from its peers' neighbour lists
+-- and dial itself. That connection only offers our own chain, yet it was handed
+-- sync tasks like any real peer, so drop it before the handshake.
+rejectSelfConnection :: MonadIO m => Point -> PPeer -> m ()
+rejectSelfConnection myPubkey peer =
+  when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
 
 assertHandshake ::
   (MonadLogger m, MonadIO m) =>
