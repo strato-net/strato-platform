@@ -122,7 +122,7 @@ handleMsgClientConduit myId peer = do
       -- starting at protocol version 63, total difficulty is exactly block number (not 8192 more)
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-      lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
+      lift . claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum''
       $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
 
@@ -184,7 +184,7 @@ handleMsgServerConduit myPubkey peer = do
               when (networkID' /= Conf.networkID (networkConfig ethConf)) $ throwIO NetworkIDMismatch
 
               updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
-              Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum'
+              claimPeerBest (pPeerHost peer) $ BestBlock peerBestHash highestBlockNum'
               return $
                 Right
                   Status

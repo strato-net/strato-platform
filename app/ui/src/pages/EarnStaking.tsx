@@ -4,11 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAccount } from "wagmi";
 import { formatUnits } from "ethers";
-import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, Shield, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, Gift, Info, Layers, Loader2, RefreshCw, Search, TrendingUp, Trophy, Wallet, type LucideIcon } from "lucide-react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import MobileBottomNav from "@/components/dashboard/MobileBottomNav";
 import GuestSignInBanner from "@/components/ui/GuestSignInBanner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +40,9 @@ import { useToast } from "@/hooks/use-toast";
 import { STAKING_STAKE_FEE, STAKING_ACTION_FEE } from "@/lib/constants";
 import { safeParseUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import ValidatorStatusBadge, { type ValidatorLifecycle } from "@/components/staking/ValidatorStatusBadge";
-import BecomeValidatorCard, { type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
+import { CopyableText } from "@/components/staking/AuthorizationInstructions";
+import BecomeValidatorCard, { type ChangeOperatorInput, type RegisterValidatorInput } from "@/components/staking/BecomeValidatorCard";
+import { withHexPrefix } from "@/components/staking/authorization";
 
 type StakingValidator = ValidatorLifecycle & {
   address: string;
@@ -82,7 +89,7 @@ const SHOW_MOVE_BUTTON = false;
 const VALIDATOR_DISPLAY_LIMIT = 10;
 type ProcessingAction =
   | "stake" | "claim" | "unstake" | "move" | "withdraw" | "operator-claim" | "commission" | "bond" | "self-unbond"
-  | "claim-fees" | "operator-claim-fees" | "register" | "activate" | "exit" | "cancel-exit" | "profile";
+  | "claim-fees" | "operator-claim-fees" | "register" | "operator" | "activate" | "exit" | "cancel-exit" | "profile";
 
 type StakingInfo = {
   configured: boolean;
@@ -232,18 +239,40 @@ const formatRewardPeriodStatus = (startTime: string | undefined, finishTime: str
   return `Ended ${formatReleaseTime(finishTime || "0")}`;
 };
 
-// V2 phases minStake in as a self-bond requirement: delegated stake counts until the grace
-// deadline ("0" = not yet scheduled), after which only self-bond does.
-const selfBondRequirementText = (info: StakingInfo, minStakeLabel: string): string => {
-  if (info.selfBondRuleActive) {
-    return `Validators need ${minStakeLabel} of self-bond; delegated stake no longer counts toward it.`;
-  }
-  const grace = Number(info.selfBondGraceUntil || "0");
-  if (Number.isFinite(grace) && grace > 0) {
-    return `Validators need ${minStakeLabel} of self-bond. Delegated stake counts toward it until ${formatReleaseTime(info.selfBondGraceUntil || "0")}.`;
-  }
-  return `Validators need ${minStakeLabel} of self-bond. Delegated stake still counts toward it; the self-bond deadline is not yet scheduled.`;
+// "24 hours" / "7 days" from a seconds string, for the exit confirmation.
+const formatNotice = (seconds: string): string => {
+  const n = Number(seconds || "0");
+  if (!Number.isFinite(n) || n <= 0) return "the notice period";
+  if (n >= 86400) { const d = Math.round(n / 86400); return `${d} day${d === 1 ? "" : "s"}`; }
+  if (n >= 3600) { const h = Math.round(n / 3600); return `${h} hour${h === 1 ? "" : "s"}`; }
+  const m = Math.max(1, Math.round(n / 60)); return `${m} minute${m === 1 ? "" : "s"}`;
 };
+
+const DEEP_LINK_STORAGE_KEY = "staking.deepLink";
+
+// strato-authorize-operator links to this page with validator/operator/signature/nonce in the URL
+// fragment. Read it once: stash it for the login round trip, strip it from the address bar.
+const readStakingDeepLink = (): string => {
+  const fromHash = window.location.hash.replace(/^#/, "");
+  if (fromHash) {
+    try { sessionStorage.setItem(DEEP_LINK_STORAGE_KEY, fromHash); } catch { /* storage unavailable */ }
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    return fromHash;
+  }
+  try { return sessionStorage.getItem(DEEP_LINK_STORAGE_KEY) || ""; } catch { return ""; }
+};
+
+// Share of a validator's proposal slots it actually produced: proposed / (proposed + missed).
+const formatUptime = (proposed: string, missed: string): string => {
+  const p = Number(proposed || "0");
+  const m = Number(missed || "0");
+  if (!Number.isFinite(p) || !Number.isFinite(m) || p + m === 0) return "—";
+  const pct = (p / (p + m)) * 100;
+  return `${pct >= 99.995 ? "100" : pct.toFixed(2)}%`;
+};
+
+// V2: minStake is a self-bond requirement.
+const selfBondRequirementText = (minStakeLabel: string): string => `Validators need ${minStakeLabel} of self-bond.`;
 
 const TipLabel = ({ label, tooltip, className }: { label: string; tooltip: string; className?: string }) => (
   <TooltipProvider>
@@ -317,6 +346,7 @@ type OperatorPanelProps = {
   onSelfBond: (amount: bigint) => Promise<boolean>;
   onSelfUnbond: (amount: bigint) => Promise<boolean>;
   onActivate: () => Promise<boolean>;
+  exitNoticeSeconds: string;
   onRequestExit: () => Promise<boolean>;
   onCancelExit: () => Promise<boolean>;
   onUpdateProfile?: (profile: OperatorProfileInput) => Promise<boolean>;
@@ -350,6 +380,7 @@ const OperatorPanel = ({
   onSelfBond,
   onSelfUnbond,
   onActivate,
+  exitNoticeSeconds,
   onRequestExit,
   onCancelExit,
   onUpdateProfile,
@@ -358,6 +389,7 @@ const OperatorPanel = ({
   const [selfBondAmount, setSelfBondAmount] = useState("");
   const [selfUnbondAmount, setSelfUnbondAmount] = useState("");
   const [profileDraft, setProfileDraft] = useState<OperatorProfileInput | null>(null);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
 
   const active = Boolean(validator?.active);
   const inSet = Boolean(validator?.isValidator);
@@ -432,17 +464,23 @@ const OperatorPanel = ({
       <CardContent className="p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{isV2 && validator ? `Operator · ${validatorLabel}` : "Operator"}</h2>
+            <h2 className="text-lg font-semibold">{isV2 && validator ? `You operate ${validatorLabel}` : "Operator"}</h2>
             <p className="text-sm text-muted-foreground">
               {active
                 ? "Claim validator rewards, update commission, or manage self-bond."
                 : "Claim accrued validator rewards or unbond existing self-bond."}
             </p>
             {validator && validatorSetDeployed && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Validator {truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6) || "not set"}
-                {" · "}{validator.blocksProposed} blocks proposed · {validator.missedProposals} missed
-                {inSet || !active ? "" : ` · needs ${formatToken(minStake, decimals, 0)} ${symbol} ${activationStake} to activate`}
+              <p className="mt-1 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+                <span>Validator</span>
+                {((isV2 ? validator.address : validator.validatorAddress) || "") ? (
+                  <CopyableText
+                    value={withHexPrefix((isV2 ? validator.address : validator.validatorAddress) || "")}
+                    display={truncateAddress((isV2 ? validator.address : validator.validatorAddress) || "", 8, 6)}
+                  />
+                ) : <span>not set</span>}
+                <span>· {validator.blocksProposed} blocks proposed · {validator.missedProposals} missed</span>
+                {inSet || !active ? null : <span>· needs {formatToken(minStake, decimals, 0)} {symbol} {activationStake} to activate</span>}
               </p>
             )}
             {selfBondNote && (
@@ -460,9 +498,31 @@ const OperatorPanel = ({
               </Button>
             )}
             {validatorSetDeployed && inSet && !exiting && (
-              <Button size="sm" variant="outline" onClick={onRequestExit} disabled={submitting || !canCoverActionFee}>
-                {buttonLabel("exit", "Request exit", "Requesting")}
-              </Button>
+              <AlertDialog open={exitDialogOpen} onOpenChange={setExitDialogOpen}>
+                <Button size="sm" variant="destructive" onClick={() => setExitDialogOpen(true)} disabled={submitting || !canCoverActionFee}>
+                  {buttonLabel("exit", "Request exit", "Requesting")}
+                </Button>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Request exit for {validator?.name || "this validator"}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      After {formatNotice(exitNoticeSeconds)} this validator leaves the validator set and stops proposing
+                      blocks and earning rewards. Its self-bond stays bonded until you unbond it. You can cancel the exit
+                      before the notice period ends.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={submitting}>Keep validating</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={submitting}
+                      onClick={() => { setExitDialogOpen(false); void onRequestExit(); }}
+                    >
+                      Request exit
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
             {validatorSetDeployed && inSet && exiting && (
               <Button size="sm" variant="outline" onClick={onCancelExit} disabled={submitting || !canCoverActionFee}>
@@ -471,13 +531,13 @@ const OperatorPanel = ({
             )}
             {onUpdateProfile && validator && !profileDraft && (
               <Button size="sm" variant="outline" onClick={openProfile} disabled={submitting}>
-                Edit profile
+                Edit
               </Button>
             )}
           </div>
         </div>
 
-        <div className={`mt-4 grid gap-3 ${active ? "lg:grid-cols-3" : selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
+        <div className={`mt-4 grid gap-3 ${active || selfBond > 0n ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
           <div className="rounded-md bg-muted/30 p-3">
             <p className="text-xs text-muted-foreground">Operator Rewards</p>
             <p className="mt-1 font-semibold">{formatToken(claimableRewards, decimals)} {symbol}</p>
@@ -497,30 +557,6 @@ const OperatorPanel = ({
               </>
             )}
           </div>
-
-          {active && (
-            <div className="rounded-md bg-muted/30 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">Commission</p>
-                  <p className="mt-1 font-semibold">{formatPercentFromBps(currentCommissionBps)}</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Max {formatPercentFromBps(maxCommissionBps)}</p>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Input
-                  value={commissionPercent}
-                  onChange={(event) => setCommissionPercent(event.target.value)}
-                  placeholder="New %"
-                  inputMode="decimal"
-                  disabled={submitting}
-                />
-                <Button size="sm" onClick={submitCommission} disabled={!commissionReady || submitting}>
-                  {buttonLabel("commission", "Update", "Updating")}
-                </Button>
-              </div>
-            </div>
-          )}
 
           {(active || selfBond > 0n) && (
             <div className="rounded-md bg-muted/30 p-3">
@@ -604,6 +640,30 @@ const OperatorPanel = ({
                 Cancel
               </Button>
             </div>
+            {active && (
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Commission</p>
+                    <p className="mt-1 font-semibold">{formatPercentFromBps(currentCommissionBps)}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Max {formatPercentFromBps(maxCommissionBps)}</p>
+                </div>
+                <div className="mt-2 flex gap-2 md:max-w-sm">
+                  <Input
+                    value={commissionPercent}
+                    onChange={(event) => setCommissionPercent(event.target.value)}
+                    placeholder="New %"
+                    inputMode="decimal"
+                    disabled={submitting}
+                  />
+                  <Button size="sm" onClick={submitCommission} disabled={!commissionReady || submitting}>
+                    {buttonLabel("commission", "Update", "Updating")}
+                  </Button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">Commission changes are a separate transaction from the profile.</p>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -620,6 +680,8 @@ const EarnStaking = () => {
   const { tokenApys } = useEarnContext();
   const { toast } = useToast();
   const [info, setInfo] = useState<StakingInfo | null>(null);
+  // Inline error for the validator card's register / operator-change actions (the toast shows it too).
+  const [bindingError, setBindingError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [processingAction, setProcessingAction] = useState<ProcessingAction | null>(null);
@@ -645,16 +707,25 @@ const EarnStaking = () => {
   const useExternalWalletSigning = isConnected && !isAppAuthenticated;
   const stakingTxConfig = useExternalWalletSigning ? ({ walletAuth: true } as any) : undefined;
 
-  const refreshInfo = useCallback(async () => {
+  // `fresh` makes the backend bypass its short bloc-state cache; used right after a transaction.
+  const refreshInfo = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
       const endpoint = isLoggedIn ? "/staking/info" : "/staking/info/public";
-      const { data } = await api.get<StakingInfo>(endpoint);
+      const { data } = await api.get<StakingInfo>(endpoint, fresh === true ? { params: { fresh: 1 } } : undefined);
       setInfo(data);
     } finally {
       setLoading(false);
     }
   }, [isLoggedIn]);
+
+  // After a transaction: contract state is read fresh at once; the wallet balance comes from the
+  // indexer, which lags the chain by a few seconds, so read again shortly after.
+  const refreshAfterAction = useCallback(async () => {
+    await refreshInfo(true);
+    if (isLoggedIn) fetchUsdstBalance();
+    window.setTimeout(() => { refreshInfo(true); }, 4000);
+  }, [refreshInfo, isLoggedIn, fetchUsdstBalance]);
 
   usePageTitle("Stake");
 
@@ -741,13 +812,39 @@ const EarnStaking = () => {
       : []),
     [info?.operatedValidators, isV2, validators]
   );
-  const showOperatorSelfBond = isV2 ? operatedValidators.length > 0 : !!info?.isOperator;
-  const operatorSelfBondTotal = isV2
-    ? operatedValidators.reduce((total, validator) => total + BigInt(validator.selfBond || "0"), 0n).toString()
-    : operatorValidator?.selfBond;
   // A backend that predates the flag still reports the full validator set, so only an
   // explicit false hides these controls.
   const validatorSetDeployed = info?.validatorSetDeployed !== false;
+
+  // Deep link printed by strato-authorize-operator: ?validator=&operator=&signature=&nonce=.
+  // The signature only works from the operator account named in it, so a different login gets a
+  // notice instead of a prefilled form. The card itself decides between registering a new validator
+  // and taking over a listed one. The link carries its parameters in the URL fragment, which never
+  // reaches a server (no access-log or returnTo copies); the fragment is stashed in sessionStorage
+  // and stripped from the URL on arrival so it survives the login round trip but not history.
+  const [deepLinkRaw] = useState<string>(readStakingDeepLink);
+  useEffect(() => {
+    if (isLoggedIn && deepLinkRaw) {
+      try { sessionStorage.removeItem(DEEP_LINK_STORAGE_KEY); } catch { /* storage unavailable */ }
+    }
+  }, [isLoggedIn, deepLinkRaw]);
+  const deepLink = useMemo(() => {
+    const params = new URLSearchParams(deepLinkRaw);
+    return {
+      validator: params.get("validator") || "",
+      operator: params.get("operator") || "",
+      signature: params.get("signature") || "",
+      nonce: params.get("nonce") || "",
+    };
+  }, [deepLinkRaw]);
+  const deepLinkOperatorMismatch = isLoggedIn && !!deepLink.operator && !sameAddress(deepLink.operator, userAddress || undefined);
+  const deepLinkProps = isV2 && !deepLinkOperatorMismatch && deepLink.validator
+    ? {
+      initialValidator: deepLink.validator,
+      initialSignature: deepLink.signature || undefined,
+      expectedNonce: deepLink.nonce || undefined,
+    }
+    : {};
   const claimableFees = useMemo(() => BigInt(info?.claimableFees || "0"), [info?.claimableFees]);
   const totalStakeAmount = useMemo(() => safeParseUnits(stakeAmount, decimals), [decimals, stakeAmount]);
   const apyLabel = isV2 ? "APY (7d)" : "Est. APY";
@@ -853,7 +950,8 @@ const EarnStaking = () => {
     action: () => Promise<void>,
     successTitle: string,
     processing: ProcessingAction,
-    target?: string
+    target?: string,
+    onError?: (message: string) => void
   ): Promise<boolean> => {
     try {
       setSubmitting(true);
@@ -861,12 +959,14 @@ const EarnStaking = () => {
       setProcessingTarget(target ?? null);
       await action();
       toast({ title: successTitle, variant: "success" });
-      await refreshInfo();
+      await refreshAfterAction();
       return true;
     } catch (error: unknown) {
+      const message = stakingActionErrorMessage(error);
+      onError?.(message);
       toast({
         title: "Transaction failed",
-        description: stakingActionErrorMessage(error),
+        description: message,
         variant: "destructive",
       });
       return false;
@@ -1046,8 +1146,9 @@ const EarnStaking = () => {
       validator
     );
 
-  const handleRegister = (input: RegisterValidatorInput) =>
-    runAction(
+  const handleRegister = (input: RegisterValidatorInput) => {
+    setBindingError(null);
+    return runAction(
       async () => {
         const body = isV2
           ? {
@@ -1066,8 +1167,29 @@ const EarnStaking = () => {
         await api.post("/staking/register", body, stakingTxConfig);
       },
       "Registration submitted",
-      "register"
+      "register",
+      undefined,
+      setBindingError
     );
+  };
+
+  // ValidatorRegistry.setOperator(validator, caller, v, r, s): the caller takes over a listed validator.
+  const handleChangeOperator = (input: ChangeOperatorInput) => {
+    setBindingError(null);
+    return runAction(
+      async () => {
+        await api.post(
+          "/staking/operator",
+          { validator: input.validator, ...(input.signature ? { signature: input.signature } : {}) },
+          stakingTxConfig
+        );
+      },
+      "Operator change submitted",
+      "operator",
+      input.validator,
+      setBindingError
+    );
+  };
 
   const handleUpdateProfile = (validator: string, profile: OperatorProfileInput) =>
     runAction(
@@ -1123,7 +1245,7 @@ const EarnStaking = () => {
   };
 
   const selfBondNote = isV2 && info
-    ? selfBondRequirementText(info, `${formatToken(info.minStake, decimals, 0)} ${symbol}`)
+    ? selfBondRequirementText(`${formatToken(info.minStake, decimals, 0)} ${symbol}`)
     : undefined;
 
   const renderOperatorPanel = (
@@ -1155,6 +1277,7 @@ const EarnStaking = () => {
       onSelfBond={(amount) => handleSelfBond(key, amount)}
       onSelfUnbond={(amount) => handleSelfUnbond(key, amount)}
       onActivate={() => handleActivate(key)}
+      exitNoticeSeconds={info?.exitNoticeSeconds || "0"}
       onRequestExit={() => handleRequestExit(key)}
       onCancelExit={() => handleCancelExit(key)}
       onUpdateProfile={isV2 ? (profile) => handleUpdateProfile(key, profile) : undefined}
@@ -1219,16 +1342,6 @@ const EarnStaking = () => {
               tooltip="Your share of the transaction fees earned by the validators you delegate to, paid in USDST."
               value={`${formatToken(info.claimableFees, 18, 2)} USDST`}
               icon={Gift}
-            />
-          )}
-          {showOperatorSelfBond && (
-            <StatCard
-              label="Self-Bond"
-              tooltip={isV2
-                ? "STRATO you've bonded across the validators you operate. Separate from delegated stake."
-                : "STRATO you've bonded as a validator operator. Separate from delegated stake."}
-              value={`${formatToken(operatorSelfBondTotal, decimals)} ${symbol}`}
-              icon={Shield}
             />
           )}
         </div>
@@ -1300,18 +1413,42 @@ const EarnStaking = () => {
           currentCommissionBps: validator.commissionBps,
         }))}
 
-        {isLoggedIn && (isV2 || !info.isOperator) && validatorSetDeployed && (
+        {deepLinkOperatorMismatch && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              This authorization is for {truncateAddress(withHexPrefix(deepLink.operator), 8, 6)}; log in as that account.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoggedIn && isV2 && operatedValidators[0] && deepLink.validator && !deepLinkOperatorMismatch && (
+          <Alert>
+            <AlertDescription>
+              {sameAddress(deepLink.validator, operatedValidators[0].address)
+                ? "You already operate this validator."
+                : `This account already operates ${operatedValidators[0].name || truncateAddress(withHexPrefix(operatedValidators[0].address), 8, 6)}. An operator can run one validator; log in with a different account to bind ${truncateAddress(withHexPrefix(deepLink.validator), 8, 6)}.`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoggedIn && (isV2 ? operatedValidators.length === 0 : !info.isOperator) && validatorSetDeployed && (
           <BecomeValidatorCard
             isV2={isV2}
             connectedAddress={userAddress}
-            hasValidators={operatedValidators.length > 0}
-            requirementNote={selfBondNote}
+            operatedValidator={operatedValidators[0] ?? null}
             minStake={formatToken(info.minStake, decimals, 0)}
             maxCommissionBps={info.maxCommissionBps}
             symbol={symbol}
             disabled={!canCoverActionFee}
-            submitting={submitting && processingAction === "register"}
+            submitting={submitting && (processingAction === "register" || processingAction === "operator")}
             onRegister={handleRegister}
+            onChangeOperator={isV2 ? handleChangeOperator : undefined}
+            validators={validators}
+            minStakeRaw={info.minStake}
+            joinsPaused={Boolean(info.joinsPaused)}
+            errorMessage={bindingError}
+            {...deepLinkProps}
           />
         )}
 
@@ -1329,7 +1466,7 @@ const EarnStaking = () => {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={refreshInfo} disabled={loading || submitting}>
+                <Button variant="outline" size="sm" onClick={() => refreshInfo(true)} disabled={loading || submitting}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   Refresh
                 </Button>
@@ -1415,7 +1552,13 @@ const EarnStaking = () => {
                         {validatorSetDeployed && (
                           <div className="rounded-md bg-muted/30 px-3 py-2">
                             <p className="text-xs text-muted-foreground">Blocks</p>
-                            <p className="font-semibold">{validator.blocksProposed} <span className="text-xs font-normal text-muted-foreground">({validator.missedProposals} missed)</span></p>
+                            <p className="font-semibold tabular-nums">{validator.blocksProposed}</p>
+                          </div>
+                        )}
+                        {validatorSetDeployed && (
+                          <div className="rounded-md bg-muted/30 px-3 py-2">
+                            <p className="text-xs text-muted-foreground">Uptime</p>
+                            <p className="font-semibold tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</p>
                           </div>
                         )}
                         <div className="rounded-md bg-muted/30 px-3 py-2">
@@ -1487,7 +1630,7 @@ const EarnStaking = () => {
               </div>
 
               <div className="hidden max-h-[34rem] overflow-auto rounded-lg border border-border md:block">
-                <table className="w-full min-w-[1320px]">
+                <table className="w-full min-w-[1180px]">
                   <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="border-b border-border">
                       <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Validator</th>
@@ -1499,7 +1642,12 @@ const EarnStaking = () => {
                       </th>
                       {validatorSetDeployed && (
                         <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
-                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed, and proposals it missed when it was the intended proposer." />
+                          <TipLabel label="Blocks" tooltip="Blocks this validator has proposed." />
+                        </th>
+                      )}
+                      {validatorSetDeployed && (
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                          <TipLabel label="Uptime" tooltip="Share of this validator's proposal slots it actually produced: blocks proposed over blocks proposed plus proposals missed." />
                         </th>
                       )}
                       <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
@@ -1535,11 +1683,11 @@ const EarnStaking = () => {
 
                       return (
                         <tr key={rowKey} className="border-b border-border/50 last:border-b-0 hover:bg-muted/40">
-                          <td className="px-4 py-3">
-                            <div className="min-w-0">
-                              <p className="font-medium">{label}</p>
+                          <td className="w-56 max-w-[14rem] px-4 py-3">
+                            <div className="min-w-0 max-w-[12rem]">
+                              <p className="truncate font-medium" title={label}>{label}</p>
                               {validator.description && (
-                                <p className="mt-0.5 max-w-[28rem] truncate text-xs text-muted-foreground">{validator.description}</p>
+                                <p className="mt-0.5 truncate text-xs text-muted-foreground" title={validator.description}>{validator.description}</p>
                               )}
                               {isV2 && validator.operator && (
                                 <p className="mt-0.5 text-xs text-muted-foreground">Operator {truncateAddress(validator.operator, 8, 6)}</p>
@@ -1548,10 +1696,10 @@ const EarnStaking = () => {
                           </td>
                           <td className="px-4 py-3 text-sm"><ValidatorStatusBadge validator={validator} /></td>
                           {validatorSetDeployed && (
-                            <td className="px-4 py-3 text-right text-sm">
-                              {validator.blocksProposed}
-                              <span className="ml-1 text-xs text-muted-foreground">({validator.missedProposals} missed)</span>
-                            </td>
+                            <td className="px-4 py-3 text-right text-sm tabular-nums">{validator.blocksProposed}</td>
+                          )}
+                          {validatorSetDeployed && (
+                            <td className="px-4 py-3 text-right text-sm tabular-nums">{formatUptime(validator.blocksProposed, validator.missedProposals)}</td>
                           )}
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.totalStake, decimals)}</td>
                           <td className="px-4 py-3 text-right text-sm">{formatToken(validator.userStake, decimals)}</td>
