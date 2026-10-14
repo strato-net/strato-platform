@@ -1749,6 +1749,38 @@ dump_databases() {
   pg_temp_stop "$cid"
 }
 
+# Run pg_restore of /dumps/<db>.dump in the throwaway container, printing a
+# progress line every 30s: a large database (Cirrus) takes many minutes, nearly
+# all of it rebuilding indexes, and would otherwise sit silent. Progress comes
+# from pg_restore's own verbose log against the totals in the dump's TOC.
+# Args: <cid> <db> <jobs> <log>. Returns pg_restore's status.
+pg_restore_with_progress() {
+  local cid="$1" db="$2" jobs="$3" log="$4"
+  local toc tables_total indexes_total tables_done indexes_done size t0 pid rc=0 n=0
+  toc="$(docker exec "$cid" pg_restore -l "/dumps/$db.dump" 2>/dev/null || true)"
+  tables_total="$(grep -cE '^[0-9]+; [0-9]+ [0-9]+ TABLE DATA ' <<< "$toc" || true)"
+  indexes_total="$(grep -E '^[0-9]+; [0-9]+ [0-9]+ (INDEX|CONSTRAINT) ' <<< "$toc" | grep -vc ' INDEX ATTACH ' || true)"
+  t0="$(date +%s)"
+  docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges -v \
+    -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>"$log" &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    (( ++n % 30 == 0 )) || continue
+    kill -0 "$pid" 2>/dev/null || break
+    tables_done="$(grep -c 'processing data for table' "$log" || true)"
+    indexes_done="$(grep -cE 'creating (INDEX|CONSTRAINT) "' "$log" || true)"
+    size="$(docker exec "$cid" psql -U postgres -tAc "SELECT pg_database_size('$db')" 2>/dev/null || true)"
+    if (( tables_done < tables_total )); then
+      info "      ... '$db' $(elapsed_since "$t0"): loading table data, $tables_done/$tables_total tables started; $(human_bytes "${size:-0}") on disk so far"
+    else
+      info "      ... '$db' $(elapsed_since "$t0"): building indexes, $indexes_done/$indexes_total started; $(human_bytes "${size:-0}") on disk so far"
+    fi
+  done
+  wait "$pid" || rc=$?
+  return "$rc"
+}
+
 # Load the captured database dumps into the target node's postgres data dir
 # using a throwaway postgres container. If the data dir is empty (fresh
 # strato-setup node), it is first initialized with the node's own postgres
@@ -1783,18 +1815,20 @@ load_databases() {
     t1="$(date +%s)"
     info "      Database '$db': drop and recreate it empty, then pg_restore -j $jobs from $db.dump ($(human_bytes "$(file_size_bytes "$dumps_dir/$db.dump")"))"
     info "      (the dump holds table data only; every index is rebuilt here, which is what takes the time)"
-    docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null \
+    # client_min_messages keeps the expected "does not exist, skipping" NOTICE
+    # of a fresh cluster out of the output.
+    docker exec -e "PGOPTIONS=-c client_min_messages=warning" "$cid" \
+      psql -U postgres -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to drop database '$db' before restore"; }
     docker exec "$cid" psql -U postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$db\";" >/dev/null \
       || { pg_temp_stop "$cid"; die "failed to create database '$db'"; }
     restore_log="$(mktemp_dir)/pg_restore-$db.log"
-    docker exec "$cid" pg_restore -U postgres --no-owner --no-privileges \
-      -j "$jobs" -d "$db" "/dumps/$db.dump" >/dev/null 2>"$restore_log" \
+    pg_restore_with_progress "$cid" "$db" "$jobs" "$restore_log" \
       || {
         # pg_restore's own errors say why (e.g. "No space left on device": the
         # rebuilt cluster is ~15x the dumps, most of it Cirrus indexes).
         warn "pg_restore for database '$db' failed; last lines of its output:"
-        tail -n 20 "$restore_log" >&2
+        { grep -E 'error|warning|FATAL' "$restore_log" || tail -n 20 "$restore_log"; } | tail -n 20 >&2
         df -h "$data_dir" >&2
         pg_temp_stop "$cid"
         die "failed to restore dump for database '$db'"
