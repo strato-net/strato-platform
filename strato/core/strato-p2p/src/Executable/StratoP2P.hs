@@ -14,6 +14,7 @@ import           Data.Foldable            (asum)
 import qualified Data.Text as T
 import           BlockApps.Logging as BL
 import           Blockchain.Context
+import           Blockchain.Replay (replayBlocks)
 import           Blockchain.Threads
 import           Executable.StratoP2PClient
 import           Executable.StratoP2PLoopback
@@ -29,6 +30,7 @@ stratoP2P :: ( MonadP2P m
              )
           => PeerRunner m () -> IO ()
 stratoP2P runner = labelTheThread "stratoP2P" $ do
+  replayBlocks
   raceAll [ stratoP2PLoopback runner `catch` oops "stratoP2PLoopback"
           , stratoP2PClient   runner `catch` oops "stratoP2PClient"
           , stratoP2PServer   runner `catch` oops "stratoP2PServer"

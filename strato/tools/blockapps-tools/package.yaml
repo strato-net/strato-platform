@@ -18,7 +18,6 @@ library:
   dependencies:
     - composable-monads-base
     - aeson
-    - binary
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
@@ -27,7 +26,6 @@ library:
     - bytestring
     - common-log
     - data-default
-    - deepseq
     - directory
     - ethereum-discovery
     - ethereum-rlp

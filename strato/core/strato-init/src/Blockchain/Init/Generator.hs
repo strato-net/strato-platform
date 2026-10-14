@@ -17,7 +17,7 @@ import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
+import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir, flags_syncFromFile)
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
@@ -155,6 +155,11 @@ rtsWithOverride envVar computed = do
 mkFilesAndGenesis :: (MonadUnliftIO m, MonadFail m) =>
                      FilePath -> Bool -> String -> m ()
 mkFilesAndGenesis nodeDir hasFlags network = do
+  replaySource <- liftIO $ if null flags_syncFromFile
+    then pure Nothing
+    else do
+      source <- canonicalizePath flags_syncFromFile
+      pure $ Just source
   -- Create node directory and cd to it
   liftIO $ do
     createDirectoryIfMissing True nodeDir
@@ -168,6 +173,10 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
   
   unless nodeExists $ do
+    liftIO $ mapM_ (\source -> do
+      exists <- doesFileExist source
+      unless exists $ fail $ "Replay block file not found: " ++ source
+      createFileLink source "replay.blocks") replaySource
     liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
 

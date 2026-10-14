@@ -129,3 +129,18 @@ an unsigned 64-bit big-endian integer. Blocks 0 through that number follow, each
 as an unsigned 64-bit big-endian byte length and the complete block's wire RLP
 `[header, transactions, uncles]`. Readers can process one block at a time.
 This is distinct from the JSON format accepted by `addblocksfromfile`.
+
+To start a fresh node using the recording:
+
+```
+strato-up mynode --network=upquark --syncFromFile=/absolute/path/upquark.blocks
+```
+
+`--syncFromFile` is a `strato-setup` option, forwarded by `strato-up`. Setup
+links the recording as `mynode/replay.blocks`; keep the recording outside the
+node directory so deleting the node preserves it. P2P validates its genesis,
+numbering, parent links and encoding, and sends blocks through normal sequencer
+ingestion in batches. Already sequenced blocks are skipped on subsequent starts.
+After the recorded tip is sequenced, P2P starts its normal peer connections.
+Without `replay.blocks`, startup is unchanged. An unreadable or malformed
+recording causes startup to fail.

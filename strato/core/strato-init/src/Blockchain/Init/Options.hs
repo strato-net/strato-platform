@@ -57,6 +57,8 @@ defineFlag "repoUrl" ("" :: String) "Docker registry URL prefix for images (e.g.
 
 defineFlag "composeOnly" (False :: Bool) "Only generate docker-compose.yml to stdout and exit (no node setup)"
 
+defineFlag "syncFromFile" ("" :: String) "Sync a new node from saved blocks, then continue syncing from peers"
+
 defineFlag "includeBuild" (False :: Bool) "Include build directives in generated docker-compose.yml"
 
 -- P2P config flags

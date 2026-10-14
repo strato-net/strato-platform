@@ -41,7 +41,6 @@ library
   build-depends:
       aeson
     , base
-    , binary
     , blockDB
     , blockapps-data
     , blockapps-datadefs
@@ -51,7 +50,6 @@ library
     , common-log
     , composable-monads-base
     , data-default
-    , deepseq
     , directory
     , ethereum-discovery
     , ethereum-rlp

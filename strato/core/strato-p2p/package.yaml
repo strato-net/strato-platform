@@ -54,6 +54,7 @@ library:
     - cross-monitoring
     - crypto-pubkey-types
     - data-default
+    - directory
     - dns
     - either
     - ethereum-discovery
@@ -82,6 +83,7 @@ library:
     - split
     - stm-conduit
     - strato-conf
+    - strato-genesis
     - strato-model
     - strato-redis-blockdb
     - text

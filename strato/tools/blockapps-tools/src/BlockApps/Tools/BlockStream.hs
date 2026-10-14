@@ -5,30 +5,22 @@ module BlockApps.Tools.BlockStream (exportBlocks, verifyBlocks) where
 
 import Blockchain.BlockDB (getCanonicalHeader)
 import Blockchain.Data.Block
-import Blockchain.Data.BlockHeader (headerHash, number, parentHash)
+import Blockchain.BlockStream (withBlockStream, checkBlock, decodeBlock, magic, putWord)
+import Blockchain.Data.BlockHeader (headerHash)
 import Blockchain.Data.RLP
 import Blockchain.EthConf (lookupRedisBlockDBConfig)
 import Blockchain.Model.SyncState (bestBlockNumber)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex)
 import Blockchain.Strato.RedisBlockDB.Models (fromValue, toKey)
 import Blockchain.SyncDB (getBestBlockInfo)
-import Control.DeepSeq (force)
-import Control.Exception (evaluate, onException)
+import Control.Exception (onException)
 import Control.Monad (unless, when)
-import Data.Binary.Get (getWord64be, runGet)
-import Data.Binary.Put (putWord64be, runPut)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
 import Data.Word (Word64)
 import qualified Database.Redis as Redis
 import System.Directory (doesPathExist, removeFile, renameFile)
 import System.IO
-
--- Version 1: magic, final block number (uint64 big endian), then blocks 0..final.
--- Each block is its complete wire RLP, preceded by a uint64 big endian byte length.
-magic :: BS.ByteString
-magic = "STRATO-BLOCKS-1\n"
 
 exportBlocks :: FilePath -> Maybe Integer -> IO ()
 exportBlocks path requestedEnd = do
@@ -76,48 +68,13 @@ exportBlocks path requestedEnd = do
       writeBatch handle (Just next) (count + toInteger (length $ blockReceiptTransactions block)) rest
 
 verifyBlocks :: FilePath -> IO ()
-verifyBlocks path = withBinaryFile path ReadMode $ \handle -> do
-  signature <- exact handle $ BS.length magic
-  unless (signature == magic) $ fail "Unrecognized block stream format"
-  end <- toInteger <$> word handle
-  let loop height previous !count
-        | height > end = do
-            eof <- hIsEOF handle
-            unless eof $ fail "Trailing data after final block"
-            report height count previous
-        | otherwise = do
-            size <- word handle
-            unless (size > 0 && toInteger size <= toInteger (maxBound :: Int)) $ fail "Invalid block frame length"
-            bytes <- exact handle $ fromIntegral size
-            block <- decodeBlock bytes
-            unless (rlpSerialize (rlpEncode block) == bytes) $ fail $ "Noncanonical block encoding at " ++ show height
-            next <- checkBlock height previous block
-            loop (height + 1) (Just next) (count + toInteger (length $ blockReceiptTransactions block))
-  loop 0 Nothing 0
-
-decodeBlock :: BS.ByteString -> IO Block
-decodeBlock = evaluate . force . rlpDecode . rlpDeserialize
-
-checkBlock :: Integer -> Maybe Keccak256 -> Block -> IO Keccak256
-checkBlock height previous block = do
-  let header = blockBlockData block
-  unless (number header == height) $ fail $ "Unexpected block number; expected " ++ show height
-  unless (maybe True (== parentHash header) previous) $ fail $ "Parent hash mismatch at block " ++ show height
-  pure $ headerHash header
-
-putWord :: Handle -> Word64 -> IO ()
-putWord handle = BL.hPut handle . runPut . putWord64be
-
-word :: Handle -> IO Word64
-word handle = runGet getWord64be . BL.fromStrict <$> exact handle 8
-
-exact :: Handle -> Int -> IO BS.ByteString
-exact handle size = do
-  remaining <- (-) <$> hFileSize handle <*> hTell handle
-  unless (toInteger size <= remaining) $ fail "Truncated block stream"
-  bytes <- BS.hGet handle size
-  unless (BS.length bytes == size) $ fail "Truncated block stream"
-  pure bytes
+verifyBlocks path = withBlockStream path $ \_ next -> do
+  let loop !count !transactions previous = next >>= maybe
+        (report count transactions previous)
+        (\block -> loop (count + 1)
+          (transactions + toInteger (length $ blockReceiptTransactions block))
+          (Just $ headerHash $ blockBlockData block))
+  loop 0 0 Nothing
 
 report :: Integer -> Integer -> Maybe Keccak256 -> IO ()
 report count transactions final = do
