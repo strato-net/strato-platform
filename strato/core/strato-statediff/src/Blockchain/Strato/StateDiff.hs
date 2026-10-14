@@ -35,7 +35,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad (when)
-import Control.Monad.Change (Alters)
 import qualified Control.Monad.Change as A
 import Data.Binary
 import Data.ByteString (ByteString)
@@ -227,7 +226,7 @@ stateDiff' ::
   ( MonadLogger m,
     HasCodeDB m,
     HasHashDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -254,7 +253,7 @@ accountEnd ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   [N.Nibble] ->
   Val ->
@@ -270,7 +269,7 @@ accountUpdate ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   [N.Nibble] ->
   Val ->
@@ -289,7 +288,7 @@ eventualAccountState ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   AddressState ->
   m (AccountDiff 'Eventual)
@@ -318,7 +317,7 @@ incrementalAccountState ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   AddressState ->
   AddressState ->
@@ -343,7 +342,7 @@ eventualStorage ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   StateRoot ->
   m (StorageDiff 'Eventual)
@@ -356,7 +355,7 @@ incrementalStorage ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m
+    HasStateDB m
   ) =>
   StateRoot ->
   StateRoot ->

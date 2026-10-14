@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -9,12 +10,14 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 --TODO : Take this next line out
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.DB.AddressStateDB
-  ( getAddressStateMaybe,
+  ( HasAccountDB,
+    getAddressStateMaybe,
     getAllAddressStates,
     putAddressState,
     putAddressStates,
@@ -38,12 +41,15 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util
 import Control.Monad (liftM, unless)
+import Control.Monad.Change.Alter (Alters)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Foldable (for_)
 import Data.Maybe
 import qualified Data.NibbleString as N
+
+type HasAccountDB m = (Address `Alters` AddressState) m
 
 getAddressStateMaybe :: HasStateDB m => Address -> m (Maybe AddressState)
 getAddressStateMaybe address = do

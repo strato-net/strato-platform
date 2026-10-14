@@ -4,6 +4,7 @@
 
 module Blockchain.Verifier where
 
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
@@ -12,7 +13,6 @@ import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Model.WrappedBlock
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Event
 import qualified Control.Monad.Change.Alter as A
@@ -46,7 +46,7 @@ checkValidity parentBSum b = do
   let blockNumberVerified = checkParentChildValidity b parentBSum
   return $ catMaybes [ommersVerified, blockNumberVerified]
 
-isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
+isNonceValid :: HasAccountDB f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
   let tNonce = TD.nonce $ otBaseTx ot
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

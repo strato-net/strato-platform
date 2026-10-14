@@ -28,6 +28,7 @@ where
 
 import BatchMerge
 import BlockApps.Logging
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.StateDB
@@ -69,7 +70,7 @@ type FullRawStorage m =
     HasMemRawStorageDB m,
     HasStateDB m,
     HasHashDB m,
-    (Address `A.Alters` AddressState) m
+    HasAccountDB m
   )
 
 putRawStorageKeyVal' :: HasRawStorageDB m => RawStorageKey -> RawStorageValue -> m ()
@@ -97,8 +98,8 @@ deleteRawStorageKeyMC = A.delete (A.Proxy @RawStorageValue)
 
 genericLookupRawStorageDB ::
   ( HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+    HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)
@@ -113,8 +114,8 @@ genericLookupRawStorageDB key = do
 
 genericLookupWithDefaultRawStorageDB ::
   ( HasMemRawStorageDB m,
-    (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+    HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m RawStorageValue
@@ -207,16 +208,16 @@ putAllKeyValForStateRoot sr changes = do
 
   pure sr''
 
-deleteManyKeyVal :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
+deleteManyKeyVal :: HasStateDB m => MP.StateRoot -> [MP.Key] -> m MP.StateRoot
 deleteManyKeyVal sr listOfDeletes =
   concatM (map (flip deleteRawStorageKeyValDB) listOfDeletes) sr
 
-deleteRawStorageKeyValDB :: (MP.StateRoot `A.Alters` MP.NodeData) m => MP.StateRoot -> MP.Key -> m MP.StateRoot
+deleteRawStorageKeyValDB :: HasStateDB m => MP.StateRoot -> MP.Key -> m MP.StateRoot
 deleteRawStorageKeyValDB sr key = MP.deleteKey sr key
 
 getRawStorageKeyValDBMaybe ::
-  ( (Address `A.Alters` AddressState) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m
+  ( HasAccountDB m,
+    HasStateDB m
   ) =>
   RawStorageKey ->
   m (Maybe RawStorageValue)

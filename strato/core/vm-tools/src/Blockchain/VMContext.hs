@@ -92,6 +92,7 @@ import BlockApps.Init ()
 import BlockApps.Logging
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 import Blockchain.Constants
+import Blockchain.DB.AddressStateDB (HasAccountDB)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -324,9 +325,8 @@ withCurrentBlockHash ::
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m,
     HasMemAddressStateDB m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Address `A.Alters` AddressState) m,
+    HasStateDB m,
+    HasAccountDB m,
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m
@@ -350,9 +350,8 @@ flushMemDBs ::
   ( MonadLogger m,
     Mod.Modifiable MemDBs m,
     HasMemAddressStateDB m,
-    (Maybe Word256 `A.Alters` MP.StateRoot) m,
-    (MP.StateRoot `A.Alters` MP.NodeData) m,
-    (Address `A.Alters` AddressState) m,
+    HasStateDB m,
+    HasAccountDB m,
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m
@@ -604,11 +603,11 @@ withFetchMissingNodes f = do
   ctx <- accessEnv
   ContextM $ localEnv @Context (const ctx {_fetchMissingNodes = True}) (unContextM f)
 
-incrementNonce :: (Address `A.Alters` AddressState) f => Address -> f ()
+incrementNonce :: HasAccountDB f => Address -> f ()
 incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->
   pure addressState {addressStateNonce = addressStateNonce addressState + 1}
 
-getNewAddress :: (MonadIO m, (Address `A.Alters` AddressState) m) => Address -> m Address
+getNewAddress :: (MonadIO m, HasAccountDB m) => Address -> m Address
 getNewAddress address = do
   nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
@@ -616,7 +615,7 @@ getNewAddress address = do
   incrementNonce address
   return newAddress
 
-getNewAddressWithSalt :: (MonadIO m, MonadLogger m, (Address `A.Alters` AddressState) m) => Address -> Value -> Keccak256 -> [Value] -> m Address
+getNewAddressWithSalt :: (MonadIO m, MonadLogger m, HasAccountDB m) => Address -> Value -> Keccak256 -> [Value] -> m Address
 getNewAddressWithSalt address salt hsh args = do
   nonce' <- addressStateNonce <$> A.lookupWithDefault Mod.Proxy address
   when flags_debug $ liftIO $ putStrLn $ "Creating new address: owner=" ++ format address ++ ", nonce=" ++ show nonce'
