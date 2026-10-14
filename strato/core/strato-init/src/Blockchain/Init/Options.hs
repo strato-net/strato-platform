@@ -39,7 +39,6 @@ defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for 
 defineFlag "apiIPAddress" "" "Address strato-api binds to, which is also how the nginx container reaches it (default: the docker bridge 172.17.0.1 on Linux, 127.0.0.1 elsewhere)"
 
 defineFlag "httpPort" (8081 :: Int) "The external HTTP port for nginx"
-defineFlag "healthPort" (80 :: Int) "Validator role: the host port apex publishes /health and /status on, over plain HTTP, for the network monitor. Keep it on 80, 8080, 443 or 8443, the ports CDNs such as Cloudflare proxy"
 defineFlag "nodeHost" ("localhost" :: String) "The external hostname for the node"
 
 defineFlag "svmTrace" (False :: Bool) "Enable verbose logging in SolidVM"
