@@ -106,3 +106,26 @@ strato-barometer verifykafkafile --filename=<file>
 strato-barometer setparticipationmode (Full|None|NoConsensus)
 
 ```
+
+## Ordered block recording
+
+With a synced node running, export its canonical blocks from genesis through
+the indexed tip:
+
+```
+strato-barometer exportblocks /absolute/path/upquark.blocks
+strato-barometer verifyblocks /absolute/path/upquark.blocks
+```
+
+Use `--end-block=NUMBER` to record a fixed prefix. Export checks canonical hashes,
+consecutive block numbers and parent links, and publishes the file only after
+completion. It refuses to overwrite an existing file. Verification reads the
+file without querying Redis and checks numbering, parent links, RLP round trips,
+truncation and trailing data. These checks establish stream integrity; they do
+not execute transactions or validate consensus signatures.
+
+The binary format is `STRATO-BLOCKS-1\n`, followed by the final block number as
+an unsigned 64-bit big-endian integer. Blocks 0 through that number follow, each
+as an unsigned 64-bit big-endian byte length and the complete block's wire RLP
+`[header, transactions, uncles]`. Readers can process one block at a time.
+This is distinct from the JSON format accepted by `addblocksfromfile`.

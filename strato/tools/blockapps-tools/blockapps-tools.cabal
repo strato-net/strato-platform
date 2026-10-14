@@ -16,6 +16,7 @@ build-type:     Simple
 
 library
   exposed-modules:
+      BlockApps.Tools.BlockStream
       BlockApps.Tools.Code
       BlockApps.Tools.DumpKafkaSequencer
       BlockApps.Tools.DumpKafkaUnSequencer
@@ -40,6 +41,7 @@ library
   build-depends:
       aeson
     , base
+    , binary
     , blockDB
     , blockapps-data
     , blockapps-datadefs
@@ -49,6 +51,8 @@ library
     , common-log
     , composable-monads-base
     , data-default
+    , deepseq
+    , directory
     , ethereum-discovery
     , ethereum-rlp
     , format
