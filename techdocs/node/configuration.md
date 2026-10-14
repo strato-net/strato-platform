@@ -151,8 +151,8 @@ What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no 
 
 - **Identity.** The node key still comes from the Vault, so [store your OAuth credentials](install.md#4-store-your-oauth-credentials) first. `--localAuth` is refused.
 - **Snapshots.** `--snapshot` restores the chain state, Redis and JLog only; the eth and cirrus dumps are skipped (`strato-snapshot restore --skip-databases`).
-- **Monitoring.** apex serves `/health` and `/status` on port 3009 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>:3009`. There is no nginx and no TLS on a validator; `/health` carries only public data (block, PBFT view, node address, health flags), but restrict 3009 to the monitor's address all the same. `/rpc` and the other routes do not exist. `strato-ps` shows the sync position locally.
-- **Ports.** 30303 (TCP and UDP) for peers, and 3009 for the monitor.
+- **Monitoring.** apex serves `/health` and `/status` on port 80 over plain HTTP, so the network monitor can watch the validator: register it there as protocol `http` with host `<host>`. `--healthPort` moves it; stay on 80, 8080, 443 or 8443, the only ports a CDN such as Cloudflare proxies. There is no nginx and no TLS on a validator; `/health` carries only public data (block, PBFT view, node address, health flags), but restrict the port to the monitor's address all the same. `/rpc` and the other routes do not exist. `strato-ps` shows the sync position locally.
+- **Ports.** 30303 (TCP and UDP) for peers, and 80 (or `--healthPort`) for the monitor.
 - **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
 - **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
 

@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig,
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_healthPort, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -21,10 +21,6 @@ import System.Process (readProcess)
 
 -- | Which of the node's containers a role runs. A core keeps the stores the
 -- chain processes write; an API tier keeps what fronts strato-api.
--- | Where a validator publishes apex (/health, /status) for the network monitor.
-apexPort :: Int
-apexPort = 3009
-
 roleHasService :: Role -> String -> Bool
 roleHasService RoleNode _ = True
 roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
@@ -165,9 +161,10 @@ generateDockerCompose role = do
             -- On a validator apex reads the chain's state from Redis (there is
             -- no SQL block index or node_status mirror to read), requires only
             -- the Prometheus jobs the node runs, and is published for the
-            -- network monitor on the port in roleServices below.
+            -- network monitor on --healthPort (80 by default: a CDN such as
+            -- Cloudflare only proxies 80, 8080, 443 and 8443).
             ++ [ ("HEALTH_CHECK_JOBS", "strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer") | role == RoleValidator ]
-        , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
+        , ports = if role == RoleValidator then Just [show flags_healthPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
