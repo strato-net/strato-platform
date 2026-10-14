@@ -81,14 +81,6 @@ authenticate _ _ = return True
 
 -- | Do the block's transactions and uncles belong to its header? Signatures and
 -- seals cover the header alone, so without this a relay could change the body
--- under a proposer's signature.
-bodyMatchesHeader :: Block -> Bool
-bodyMatchesHeader (Block hdr txs uncles) =
-  transactionsRoot hdr == transactionsVerificationValue txs
-    && getBlockOmmersHash hdr == ommersVerificationValue uncles
-
--- | Do the block's transactions and uncles belong to its header? Signatures and
--- seals cover the header alone, so without this a relay could change the body
 -- under a proposer's signature: a peer on another build re-encodes the
 -- transactions, their hashes and recovered signers change, and the VM runs a
 -- block that is not the one the proposer sealed.
