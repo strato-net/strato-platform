@@ -412,11 +412,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         await ensureStratoChainInWallet(walletClient);
 
         const d = unsignedTx.data;
+        const chainId = Number(d.chainId);
+        if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+          throw new Error("Invalid STRATO transaction chain ID");
+        }
         return walletClient.signTypedData({
           account: walletClient.account,
           domain: {
             name: "STRATO",
             version: "1",
+            chainId,
           },
           types: {
             Transaction: [

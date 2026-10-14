@@ -23,6 +23,7 @@ import Data.String (fromString)
 import Executable.EVMFlags ()
 import Executable.EthereumVM
 import HFlags
+import qualified Strato.Tracing as Tr
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
@@ -32,6 +33,7 @@ main :: IO ()
 main = do
   blockappsInit "vm_main"
   runInstrumentation "vm-runner"
+  Tr.initTracing "vm-runner"
   void $ $initHFlags "Ethereum VM"
   let metricsRunner = runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 8009 defaultSettings) metricsApp
       runVM = runEff . runLogging $ evalContextM "ethereum-vm" initContext ethereumVM

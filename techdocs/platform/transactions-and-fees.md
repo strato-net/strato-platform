@@ -97,7 +97,7 @@ These are set per node when it starts (see [Node configuration](../node/configur
 
 nginx also limits request bodies to 4 MB (1 MB for `/api`).
 
-Gas is not priced: `eth_gasPrice` returns `0x0` and there is no gas fee to tune. The only per-transaction cost is the fee below.
+Gas does not determine the fee charged. `eth_gasPrice` returns a fixed compatibility quote that, multiplied by the fixed 21,000-gas estimate, gives approximately 0.01 USDST. Changing gas settings changes the wallet's estimate, not the fee charged. The only per-transaction cost is the fee below.
 
 ## Fees
 

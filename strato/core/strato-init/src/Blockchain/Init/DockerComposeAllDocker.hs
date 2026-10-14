@@ -114,14 +114,12 @@ generateDockerComposeAllDocker = do
   let apex = def
         { image = "${APEX_IMAGE:-" ++ repoUrl ++ "apex:" ++ stratoVersion ++ "-" ++ hashApex ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis", "strato"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "strato"]
         , environment = Just $ Map.fromList
             [ ("ADMIN_EMAIL", "${ADMIN_EMAIL:-}")
             , ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("redis_host", "redis")
-            , ("redis_port", "6379")
             , ("PROMETHEUS_HOST", "${PROMETHEUS_HOST:-prometheus:9090}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")
@@ -274,6 +272,8 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "app-backend", "app-ui"]
         , environment = Just $ Map.fromList
             [ ("APEX_HOST", "${APEX_HOST:-}")
+            , ("BUNDLED_APP", "${BUNDLED_APP:-true}")
+            , ("APP_URL", "${APP_URL:-}")
             , ("blockTime", "${blockTime:-}")
             , ("DOCS_HOST", "${DOCS_HOST:-}")
             , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")

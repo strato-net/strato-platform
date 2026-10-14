@@ -190,20 +190,32 @@ toEthV :: Word8 -> Maybe Integer -> Integer
 toEthV recId Nothing = 27 + toInteger recId
 toEthV recId (Just cid) = cid * 2 + 35 + toInteger recId
 
+nativeVToRecoveryId :: Integer -> Word8
+nativeVToRecoveryId rawV
+  | rawV >= 35 = ethVToRecoveryId rawV + 27
+  | otherwise = fromInteger rawV
+
+nativeV :: Transaction -> Integer
+nativeV t = case chainId t of
+  Nothing -> toInteger $ v t
+  Just cid -> toEthV (ethVToRecoveryId $ toInteger $ v t) (Just cid)
+
 instance RLPSerializable Transaction where
   -- 10 fields: STRATO legacy format (MessageTX or ContractCreationTX)
   rlpDecode (RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal]) =
     case partial of
           p@MessageTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
               }
           p@ContractCreationTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
@@ -216,7 +228,8 @@ instance RLPSerializable Transaction where
     case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
           p@MessageTX {} ->
             p
-              { v = fromInteger $ rlpDecode vVal,
+              { v = nativeVToRecoveryId $ rlpDecode vVal,
+                chainId = ethVToChainId $ rlpDecode vVal,
                 r = rlpDecode rVal,
                 s = rlpDecode sVal,
                 txVersion = 0
@@ -249,13 +262,15 @@ instance RLPSerializable Transaction where
               let partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
               in case partial of
                   p@MessageTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
                       }
                   p@ContractCreationTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
@@ -265,7 +280,8 @@ instance RLPSerializable Transaction where
             RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr, vVal, rVal, sVal] ->
               case partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, attr] of
                   p@MessageTX {} ->
-                    p { v = fromInteger $ rlpDecode vVal,
+                    p { v = nativeVToRecoveryId $ rlpDecode vVal,
+                        chainId = ethVToChainId $ rlpDecode vVal,
                         r = rlpDecode rVal,
                         s = rlpDecode sVal,
                         txVersion = typeByte
@@ -289,13 +305,13 @@ instance RLPSerializable Transaction where
         let innerItems = case partialRLPEncode t of
               RLPArray items -> items
               x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
-            innerRLP = RLPArray $ innerItems ++ [rlpEncode $ toInteger (v t), rlpEncode (r t), rlpEncode (s t)]
+            innerRLP = RLPArray $ innerItems ++ [rlpEncode $ nativeV t, rlpEncode (r t), rlpEncode (s t)]
         in RLPString (B.singleton (txVersion t) <> rlpSerialize innerRLP)
     | otherwise =
         case partialRLPEncode t of
           RLPArray items ->
             RLPArray $ items ++
-            [ rlpEncode $ toInteger (v t),
+            [ rlpEncode $ nativeV t,
               rlpEncode (r t),
               rlpEncode (s t)
             ]

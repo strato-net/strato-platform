@@ -9,6 +9,7 @@
 module Blockchain.Data.BlockDB
   ( getBlock,
     putBlocks,
+    putBlocksSql,
   )
 where
 
@@ -26,12 +27,14 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import qualified Data.ByteString.Short as BSS
+import Data.Containers.ListUtils (nubOrdOn)
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
 import Crypto.Secp256k1.Internal
+import UnliftIO (MonadUnliftIO)
 
 blk2BlkDataRef ::
   Block ->
@@ -92,58 +95,76 @@ putBlocks ::
   [Block] ->
   Bool ->
   m [Key BlockDataRef]
-putBlocks blockList makeHashOne = do
+putBlocks blockList makeHashOne = sqlQuery $ putBlocksSql blockList makeHashOne
+
+-- | The body of 'putBlocks' as one 'SQL.SqlPersistT' action, so a caller can
+-- commit a batch's blocks together with its receipts, state diffs and
+-- progress marker in a single transaction. Idempotent: a block whose hash is
+-- already present is skipped and its existing key returned.
+putBlocksSql ::
+  MonadUnliftIO m =>
+  [Block] ->
+  Bool ->
+  SQL.SqlPersistT m [Key BlockDataRef]
+putBlocksSql blockList makeHashOne = do
   let blocksWithHashes = (\b -> (b, blockHash b)) <$> blockList
-  sqlQuery $ do
-    -- Everything is done per batch, table by table: a fixed handful of
-    -- statements however many blocks are in the batch. insertMany returns the
-    -- generated keys in one statement, so nothing is read back row by row.
-    existing <- M.fromList . map (\e -> (blockDataRefHash (entityVal e), entityKey e))
-      <$> SQL.selectList [BlockDataRefHash SQL.<-. map snd blocksWithHashes] []
+  -- Everything is done per batch, table by table: a fixed handful of
+  -- statements however many blocks are in the batch. insertMany returns the
+  -- generated keys in one statement, so nothing is read back row by row.
+  existing <- M.fromList . map (\e -> (blockDataRefHash (entityVal e), entityKey e))
+    <$> SQL.selectList [BlockDataRefHash SQL.<-. map snd blocksWithHashes] []
 
-    -- Transactions submitted through the API already exist with block_number -1:
-    -- those get their block number set; the rest are inserted. A tx hash may
-    -- occur more than once in a batch (two blocks carrying the same tx), so
-    -- insert each hash once and let every occurrence resolve to that key.
-    let txsWithBlock = [ (tx, hash', blockBlockData b) | (b, hash') <- blocksWithHashes, tx <- blockReceiptTransactions b ]
-    known <- M.fromList . map (\(E.Value k, E.Value h) -> (h, k))
-      <$> E.select (E.from $ \t -> do
-            E.where_ $ t E.^. RawTransactionTxHash `E.in_` E.valList (map (\(tx, _, _) -> transactionHash tx) txsWithBlock)
-            return (t E.^. RawTransactionId, t E.^. RawTransactionTxHash))
-    let byBlockNumber = M.fromListWith (++)
-          [ (number bd, [k]) | (tx, _, bd) <- txsWithBlock, Just k <- [M.lookup (transactionHash tx) known] ]
-    sequence_ $ M.mapWithKey
-      (\n ks -> SQL.updateWhere [RawTransactionId SQL.<-. ks] [RawTransactionBlockNumber SQL.=. fromIntegral n])
-      byBlockNumber
-    let newTxs = M.elems $ M.fromList
-          [ (transactionHash tx, txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd))
-          | (tx, hash', bd) <- txsWithBlock, M.notMember (transactionHash tx) known ]
-    newKeys <- SQL.insertMany newTxs
-    let txKey = M.union known $ M.fromList (zip (map rawTransactionTxHash newTxs) newKeys)
+  -- Transactions submitted through the API already exist with block_number -1:
+  -- those get their block number set; the rest are inserted. A tx hash may
+  -- occur more than once in a batch (two blocks carrying the same tx), so
+  -- insert each hash once and let every occurrence resolve to that key.
+  let txsWithBlock = [ (tx, hash', blockBlockData b) | (b, hash') <- blocksWithHashes, tx <- blockReceiptTransactions b ]
+  known <- M.fromList . map (\(E.Value k, E.Value h) -> (h, k))
+    <$> E.select (E.from $ \t -> do
+          E.where_ $ t E.^. RawTransactionTxHash `E.in_` E.valList (map (\(tx, _, _) -> transactionHash tx) txsWithBlock)
+          return (t E.^. RawTransactionId, t E.^. RawTransactionTxHash))
+  let byBlockNumber = M.fromListWith (++)
+        [ (number bd, [k]) | (tx, _, bd) <- txsWithBlock, Just k <- [M.lookup (transactionHash tx) known] ]
+  sequence_ $ M.mapWithKey
+    (\n ks -> SQL.updateWhere [RawTransactionId SQL.<-. ks] [RawTransactionBlockNumber SQL.=. fromIntegral n])
+    byBlockNumber
+  let newTxs = M.elems $ M.fromList
+        [ (transactionHash tx, txAndTime2RawTX (BlockHash hash') tx (number bd) (timestamp bd))
+        | (tx, hash', bd) <- txsWithBlock, M.notMember (transactionHash tx) known ]
+  newKeys <- SQL.insertMany newTxs
+  let txKey = M.union known $ M.fromList (zip (map rawTransactionTxHash newTxs) newKeys)
 
-    let newBlocks = [ (b, hash', blk2BlkDataRef b hash' makeHashOne) | (b, hash') <- blocksWithHashes, M.notMember hash' existing ]
-    blkKeys <- SQL.insertMany [ toInsert | (_, _, (toInsert, _, _, _, _, _, _)) <- newBlocks ]
-    let withKeys = zip blkKeys newBlocks
-        sigParts sig = ( bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
-                       , bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
-                       , getCompactRecSigV sig )
-    SQL.insertMany_ [ BlockTransaction k (txKey M.! transactionHash tx) | (k, (b, _, _)) <- withKeys, tx <- blockReceiptTransactions b ]
-    SQL.insertMany_ [ BlockValidatorRef k v | (k, (_, _, (_, vs, _, _, _, _, _))) <- withKeys, v <- vs ]
-    SQL.insertMany_ $ [ ValidatorDeltaRef k v True | (k, (_, _, (_, _, va, _, _, _, _))) <- withKeys, v <- va ]
-                   ++ [ ValidatorDeltaRef k v False | (k, (_, _, (_, _, _, vr, _, _, _))) <- withKeys, v <- vr ]
-    SQL.insertMany_ [ BlockStakeRef k val st isUpd | (k, (_, _, (_, _, _, _, _, _, stakes))) <- withKeys, (val, st, isUpd) <- stakes ]
-    SQL.insertMany_
-      [ ProposalSignatureRef k signer' r s v
-      | (k, (b, _, (_, _, _, _, ps, _, _))) <- withKeys, Signature sig <- maybeToList ps
-      , let (r, s, v) = sigParts sig
-            signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
-      ]
-    SQL.insertMany_
-      [ CommitmentSignatureRef k signer' r s v
-      | (k, (_, hash', (_, _, _, _, _, sigs, _))) <- withKeys, Signature sig <- sigs
-      , let (r, s, v) = sigParts sig
-            signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
-      ]
+  -- A block can occur more than once in a batch: vm-runner emits the
+  -- genesis block twice at startup (its own bootstrap, then the copy the
+  -- sequencer hands it), and a replayed batch can repeat a block. The
+  -- existing-rows check above only sees the database, so the batch is
+  -- deduplicated by hash here too, or block 0 lands twice and every peer
+  -- handshake fails on "multiple genesis blocks". First occurrences are
+  -- kept in batch order, so row ids keep following block order (TxLast
+  -- orders by them).
+  let newBlocks = [ (b, hash', blk2BlkDataRef b hash' makeHashOne) | (b, hash') <- nubOrdOn snd blocksWithHashes, M.notMember hash' existing ]
+  blkKeys <- SQL.insertMany [ toInsert | (_, _, (toInsert, _, _, _, _, _, _)) <- newBlocks ]
+  let withKeys = zip blkKeys newBlocks
+      sigParts sig = ( bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
+                     , bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
+                     , getCompactRecSigV sig )
+  SQL.insertMany_ [ BlockTransaction k (txKey M.! transactionHash tx) | (k, (b, _, _)) <- withKeys, tx <- blockReceiptTransactions b ]
+  SQL.insertMany_ [ BlockValidatorRef k v | (k, (_, _, (_, vs, _, _, _, _, _))) <- withKeys, v <- vs ]
+  SQL.insertMany_ $ [ ValidatorDeltaRef k v True | (k, (_, _, (_, _, va, _, _, _, _))) <- withKeys, v <- va ]
+                 ++ [ ValidatorDeltaRef k v False | (k, (_, _, (_, _, _, vr, _, _, _))) <- withKeys, v <- vr ]
+  SQL.insertMany_ [ BlockStakeRef k val st isUpd | (k, (_, _, (_, _, _, _, _, _, stakes))) <- withKeys, (val, st, isUpd) <- stakes ]
+  SQL.insertMany_
+    [ ProposalSignatureRef k signer' r s v
+    | (k, (b, _, (_, _, _, _, ps, _, _))) <- withKeys, Signature sig <- maybeToList ps
+    , let (r, s, v) = sigParts sig
+          signer' = fromMaybe (Address 0) $ verifyProposerSeal b (Signature sig)
+    ]
+  SQL.insertMany_
+    [ CommitmentSignatureRef k signer' r s v
+    | (k, (_, hash', (_, _, _, _, _, sigs, _))) <- withKeys, Signature sig <- sigs
+    , let (r, s, v) = sigParts sig
+          signer' = either (const $ Address 0) id $ verifyCommitmentSeal hash' (Signature sig)
+    ]
 
-    let blockKey = M.union existing $ M.fromList [ (hash', k) | (k, (_, hash', _)) <- withKeys ]
-    return [ blockKey M.! hash' | (_, hash') <- blocksWithHashes ]
+  let blockKey = M.union existing $ M.fromList [ (hash', k) | (k, (_, hash', _)) <- withKeys ]
+  return [ blockKey M.! hash' | (_, hash') <- blocksWithHashes ]

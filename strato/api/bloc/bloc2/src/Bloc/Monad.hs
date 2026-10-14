@@ -29,12 +29,9 @@ module Bloc.Monad
 where
 
 import BlockApps.Logging
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
 import Control.Monad.Composable.Vault
 import Control.Monad.Reader
-import Data.Cache
 import Data.Text (Text)
 import GHC.Stack
 import SQLM
@@ -54,7 +51,9 @@ data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
     gasLimit :: Integer,
-    globalNonceCounter :: Cache Address Nonce,
+    -- | How long a reserved nonce counter stays valid (see "Bloc.NonceStore";
+    -- the counters live in the eth database's writer).
+    nonceTtlSeconds :: Int,
     -- | Base URL of the node's ethereum-jsonrpc service, used for sandboxed
     -- transaction simulation (same host). Derived from apiConfig.apiListenAddress.
     vmJsonRpcUrl :: String,
