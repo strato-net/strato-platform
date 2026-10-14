@@ -86,6 +86,8 @@ executables:
       - vault-monad
       - text
       - unliftio
+      - wai-middleware-prometheus
+      - warp
   strato-network-monitor:
     source-dirs:       exec_src/networkMonitor/
     main:             Main.hs

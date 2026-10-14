@@ -16,8 +16,10 @@ import Blockchain.Init.DockerCompose
 import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
 import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
+import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_jsonrpc, flags_localAuth, flags_httpPort, flags_pghost, flags_sslDir)
+import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
@@ -39,7 +41,7 @@ import qualified Data.ByteString as BS
 import Data.Char (toLower)
 import Turtle (chmod, roo)
 import UnliftIO.Directory
-import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes)
+import System.Posix.Files (setFileMode, ownerModes, groupModes, otherModes, ownerReadMode, ownerWriteMode, groupReadMode, otherReadMode)
 import Data.Bits ((.|.))
 
 -- | Create a GenesisInfo from network name. Does NOT write to file.
@@ -79,8 +81,18 @@ createGenesisInfo network =
     "beryllium" -> HELIUM.berylliumGenesisBlock
     _ -> HELIUM.genesisBlock
 
-createCommandsFile :: IO ()
-createCommandsFile = do
+-- | Processes convoke keeps restarting for as long as they keep exiting.
+-- Everything else (the sequencer and vm-runner, which share consensus state)
+-- is restarted only a bounded number of times before convoke gives up and
+-- takes the whole directory down.
+-- strato-p2p is restartable: its state is the peer store and the
+-- connections it rebuilds from it, and it exits on purpose when the SQLite
+-- peer store is wedged (see 'Blockchain.DB.SQLDB.guardPeerStore').
+restartable :: String -> String
+restartable = ("@restart " ++)
+
+createCommandsFile :: Role -> IO ()
+createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
       pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
@@ -88,51 +100,60 @@ createCommandsFile = do
       -- pinning that genEthConf applies to the other local processes: postgres
       -- publishes on 127.0.0.1 only, but "localhost" resolves to ::1 first on
       -- macOS. See preferIPv4Loopback.
-      return ["blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
-  -- The sequencer and vm-runner carry multi-GB heaps during catch-up, so
-  -- their RTS flags are sized to this machine (or container limit) instead of
-  -- being hard-coded. Sizing happens here, once, at setup time: resizing a
-  -- node means re-running strato-setup or editing commands.txt.
-  resources <- detectMachineResources
-  (sequencerRts, seqNote) <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
-    sequencerRtsFlags (mrCores resources) (mrMemMB resources)
-  (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
-    vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
-  let sizingReport =
-        [ "RTS sizing: " ++ describeMachineResources resources ]
-        ++ seqNote ++ vmNote ++
-        [ "strato-sequencer: " ++ sequencerRts
-        , "vm-runner: " ++ vmRunnerRts
-        ]
-  mapM_ (putStrLn . ("  " ++)) sizingReport
-  -- Persist the decision where support can find it later: setup's terminal
-  -- output is gone by the time anyone asks why a node runs with these flags.
-  writeFile ("logs" </> "rts-sizing.log") (unlines sizingReport)
-  when (mrMemMB resources <= smallestRamTierMB) $
-    putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
-      ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
-      ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+  coreCommands <- if not (roleRunsCore role) then return [] else do
+    -- The sequencer and vm-runner carry multi-GB heaps during catch-up, so
+    -- their RTS flags are sized to this machine (or container limit) instead of
+    -- being hard-coded. Sizing happens here, once, at setup time: resizing a
+    -- node means re-running strato-setup or editing commands.txt.
+    resources <- detectMachineResources
+    (sequencerRts, seqNote) <- rtsWithOverride "STRATO_SEQUENCER_RTS" $
+      sequencerRtsFlags (mrCores resources) (mrMemMB resources)
+    (vmRunnerRts, vmNote) <- rtsWithOverride "STRATO_VMRUNNER_RTS" $
+      vmRunnerRtsFlags (mrCores resources) (mrMemMB resources)
+    let sizingReport =
+          [ "RTS sizing: " ++ describeMachineResources resources ]
+          ++ seqNote ++ vmNote ++
+          [ "strato-sequencer: " ++ sequencerRts
+          , "vm-runner: " ++ vmRunnerRts
+          ]
+    mapM_ (putStrLn . ("  " ++)) sizingReport
+    -- Persist the decision where support can find it later: setup's terminal
+    -- output is gone by the time anyone asks why a node runs with these flags.
+    writeFile ("logs" </> "rts-sizing.log") (unlines sizingReport)
+    when (mrMemMB resources <= smallestRamTierMB) $
+      putStrLn $ "\ESC[1;33mWarning: " ++ show (mrMemMB resources) ++ " MB RAM is not enough "
+        ++ "for from-genesis sync (vm-runner live data alone is ~3.5GB). "
+        ++ "Restore this node from a snapshot instead (strato-up --snapshot).\ESC[0m"
+    -- A follower core (an RPC cell) runs the whole pipeline but its sequencer
+    -- never votes, proposes or drives round changes, even if its key is in
+    -- the validator set.
+    let followerFlag = if flags_validatorBehavior then "" else " --validatorBehavior=false"
+    return $
+      [ restartable "ethereum-discover +RTS -T -RTS"
+      , restartable "strato-p2p +RTS -T -RTS"
+      , "strato-sequencer " ++ sequencerRts ++ followerFlag
+      , "vm-runner " ++ vmRunnerRts
+      , restartable ("strato-indexer" ++ (if flags_writer then "" else " --writer=false"))
+      , restartable "slipstream +RTS -T -RTS"
+      , restartable "strato-network-monitor"
+      ]
+      -- A core cell takes the API tier's transactions through its ingress;
+      -- a monolith's strato-api writes its own stream directly.
+      ++ [restartable ("strato-ingest --port=" ++ show flags_ingressPort ++ " +RTS -T -RTS") | role == RoleCore]
 
-  let baseCommands =
-        [ "ethereum-discover +RTS -T -RTS"
-        , "strato-p2p +RTS -T -RTS"
-        , "strato-sequencer " ++ sequencerRts
-        , "vm-runner " ++ vmRunnerRts
-        , "strato-indexer"
-        , "slipstream +RTS -T -RTS"
-        , "strato-api +RTS -T -N -maxN4 -RTS"
-        , "strato-network-monitor"
-        , "strato-logrotate"
-        ]
+  let apiCommands
+        | roleRunsApi role =
+            restartable "strato-api +RTS -T -N -maxN4 -RTS"
+              : [restartable "ethereum-jsonrpc +RTS -T -N -maxN4 -RTS" | flags_jsonrpc]
+              ++ [restartable "vm-query serve +RTS -T -N -maxN4 -RTS" | flags_vmQuery]
+        | otherwise = []
 
-      jsonrpcCommands =
-        if flags_jsonrpc
-          then ["ethereum-jsonrpc +RTS -T -N -maxN4 -RTS"]
-          else []
+      commonCommands = [restartable "strato-logrotate"]
 
-  writeFile "commands.txt" $ unlines (localAuthCommands ++ baseCommands ++ jsonrpcCommands)
+  writeFile "commands.txt" $ unlines (localAuthCommands ++ coreCommands ++ apiCommands ++ commonCommands)
 
 -- | The computed RTS flags for a process, unless its escape-hatch env var is
 -- set, in which case the env var's value is used verbatim (wrapped in
@@ -162,14 +183,33 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
   -- Check if node already exists
   nodeExists <- doesFileExist (".ethereumH" </> "ethconf.yaml")
-  when nodeExists $ do
+  let regenerate = nodeExists && flags_regenerate
+  when (nodeExists && not flags_regenerate) $ do
     when hasFlags $ liftIO $
-      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first.\ESC[0m"
+      putStrLn $ "\ESC[1;33mWarning: Node already exists at " ++ nodeDir ++ ". Flags are ignored. To recreate, stop the node and remove the directory first; to re-point an existing node (e.g. at a managed Postgres), pass --regenerate with the original flags plus the changes.\ESC[0m"
     liftIO $ putStrLn $ "Node already exists at " ++ nodeDir ++ ", skipping setup."
-  
-  unless nodeExists $ do
-    liftIO $ putStrLn $ "Setting up STRATO node: " ++ nodeDir
+
+  -- --regenerate keeps everything stateful (LevelDB, genesis, secrets) and
+  -- rewrites only what setup derives from flags. The network identity is the
+  -- one thing a forgotten flag would silently change, so it is checked.
+  when regenerate $ do
+    existing <- liftIO $ YAML.decodeFileThrow (".ethereumH" </> "ethconf.yaml")
+    let oldNet = EC.networkConfig (existing :: EC.EthConf)
+        oldId = (EC.network oldNet, EC.networkID oldNet, EC.chainId oldNet)
+        newId = flagsNetworkIdentity
+    when (oldId /= newId) $
+      liftIO $ error $ "--regenerate would change the network identity from " ++ show oldId
+        ++ " to " ++ show newId ++ "; pass the original --network"
+    liftIO $ putStrLn $ "Re-generating configuration for existing directory: " ++ nodeDir
+
+  unless (nodeExists && not flags_regenerate) $ do
+    let role = currentRole
+    liftIO $ putStrLn $ "Setting up STRATO " ++ roleName role ++ ": " ++ nodeDir
     liftIO $ putStrLn $ "  Network: " ++ network
+    when (role /= RoleNode && flags_localAuth) $
+      liftIO $ error "--localAuth is only supported with --role=node"
+    when (role /= RoleNode && flags_dockerMode == "allDocker") $
+      liftIO $ error "--dockerMode=allDocker is only supported with --role=node; use docker-compose.api.yml for a containerized API tier"
 
     -- Validate SSL directory contents before doing any setup
     when (not $ null flags_sslDir) $ do
@@ -183,34 +223,34 @@ mkFilesAndGenesis nodeDir hasFlags network = do
         liftIO $ error $ "SSL key not found: " ++ keyPath
 
     -- Create node directories first (needed before genEthConf reads postgres_password)
-    liftIO $ mapM_ (createDirectoryIfMissing True)
-      (["postgres", "redis", "prometheus", "logs", "secrets", ".ethereumH"] ++ brokerVolumeDirs)
+    let coreDirs = ["postgres", "redis", "prometheus"] ++ brokerVolumeDirs
+    liftIO $ mapM_ (createDirectoryIfMissing True) $
+      ["logs", "secrets", ".ethereumH"]
+        ++ (if roleRunsCore role then coreDirs else [])
 
     -- Make logs directory world-writable for containers running as non-root users (e.g. prometheus)
     liftIO $ setFileMode "logs" (ownerModes .|. groupModes .|. otherModes)
 
-    -- Make the streaming backend's data directories writable by whatever user
-    -- ends up writing them. On the default JLog backend that is the host user
-    -- running the strato processes (JLog is embedded, so its brokerVolumeDirs
-    -- is just ["jlog"] and there is no container at all) -- but a snapshot
-    -- restore can lay that tree down under a different uid than the one that
-    -- later runs the node, so relaxing the mode here keeps both able to read
-    -- and write it. strato-snapshot applies the same treatment to the jlog
-    -- payload it stages and restores.
+    -- Make the streaming broker's data directories writable by the container's
+    -- built-in user. The apache/kafka image runs as its baked-in "appuser"
+    -- (uid 1000) and writes its data into the bind-mounted broker dir
+    -- (KAFKA_LOG_DIRS). strato-init creates that dir owned by the host login
+    -- user; when the host uid is not 1000 (e.g. some Oracle Cloud VMs) appuser
+    -- cannot write it and the broker only starts if forced to run as root.
+    -- A non-root strato-init cannot chown the dir to uid 1000, so we relax its
+    -- mode instead - the same approach already used for "logs" above. The
+    -- image's own config dir (/opt/kafka/config) is owned by uid 1000, so
+    -- running as appuser keeps that writable without any root privileges.
     --
-    -- The relaxation also covers container-based backends still selectable at
-    -- build time, which is where it originated: the apache/kafka image runs as
-    -- its baked-in "appuser" (uid 1000) and writes into the bind-mounted broker
-    -- dir, so on a host whose uid is not 1000 (e.g. some Oracle Cloud VMs)
-    -- appuser cannot write a dir strato-init created as the host login user,
-    -- and a non-root strato-init cannot chown it to uid 1000.
-    --
-    -- NOTE: this relaxes *every* dir a backend declares. That is right for a
-    -- pure data dir (jlog/, kafka/), but the Redpanda/kafka-hw backend runs as
-    -- the host uid:gid (bcNeedsUserGid = True) and declares a config dir
-    -- (redpanda/config) that should NOT be world-writable. If that backend ever
-    -- becomes the default, give it a narrower treatment instead.
-    liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
+    -- NOTE: this is scoped to the default Kafka backend, whose brokerVolumeDirs
+    -- is just ["kafka"] (a data dir). Other backends selected at build time have
+    -- different dirs: the Redpanda/kafka-hw backend runs as the host uid:gid
+    -- (bcNeedsUserGid = True), so its dirs are already owned correctly and do
+    -- NOT need this; in particular its config dir (redpanda/config) should not
+    -- be made world-writable. If that backend ever becomes the default, give it
+    -- a narrower treatment instead of relaxing every broker dir here.
+    when (roleRunsCore role) $
+      liftIO $ mapM_ (\d -> setFileMode d (ownerModes .|. groupModes .|. otherModes)) brokerVolumeDirs
 
     -- Copy SSL cert and key into the node's secrets/ssl/ directory
     when (not $ null flags_sslDir) $ liftIO $ do
@@ -219,17 +259,40 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       copyFile (flags_sslDir </> "server.key") ("secrets" </> "ssl" </> "server.key")
       putStrLn "  ✓ SSL certificate and key installed"
 
-    -- Set postgres password: use env var if provided, otherwise generate random
+    -- Set postgres password: --password, else the env var, else a random one.
+    -- An API directory talks to a core's Postgres, so it must be given that
+    -- core's password rather than invent one.
     let pgPasswordFile = "secrets" </> "postgres_password"
-    pgPasswordExists <- doesFileExist pgPasswordFile
+    pgPasswordExists' <- doesFileExist pgPasswordFile
+    -- An explicit --password replaces the stored one when re-generating
+    -- (the point of re-pointing a node at another Postgres).
+    let pgPasswordExists = pgPasswordExists' && not (regenerate && not (null flags_password))
     unless pgPasswordExists $ liftIO $ do
+      -- The stored file is read-only; make it writable before replacing it.
+      when pgPasswordExists' $ setFileMode pgPasswordFile ownerModes
       envPassword <- lookupEnv "postgres_password"
-      password <- case envPassword of
-        Just pw | not (null pw) -> return pw
-        _ -> generatePassword 32
+      password <- case (flags_password, envPassword) of
+        (pw, _) | not (null pw) -> return pw
+        (_, Just pw) | not (null pw) -> return pw
+        _ | role == RoleApi -> error "--role=api needs the core's Postgres password: pass --password or set postgres_password"
+          | otherwise -> generatePassword 32
       putStrLn $ "  Creating postgres password file: " ++ pgPasswordFile
       writeFile pgPasswordFile password
       void $ chmod roo pgPasswordFile
+
+    -- Session secret for nginx's encrypted session cookies. Every API-tier
+    -- nginx must share it, or a cookie minted by one instance fails to
+    -- decrypt on another; on a split deployment it comes from Secrets Manager.
+    let sessionSecretFile = "secrets" </> "session_secret"
+    sessionSecretExists <- doesFileExist sessionSecretFile
+    unless (sessionSecretExists || not (roleRunsApi role)) $ liftIO $ do
+      envSecret <- lookupEnv "session_secret"
+      secret <- case envSecret of
+        Just sec | not (null sec) -> return sec
+        _ -> generatePassword 64
+      putStrLn $ "  Creating session secret file: " ++ sessionSecretFile
+      writeFile sessionSecretFile secret
+      void $ chmod roo sessionSecretFile
 
     when flags_localAuth $ liftIO setupLocalAuthSecrets
 
@@ -288,9 +351,12 @@ mkFilesAndGenesis nodeDir hasFlags network = do
             else
               error "OAuth credentials not found at ~/.secrets/strato_credentials.yaml. Run 'strato-login' first."
 
-    ethconf <- liftIO genEthConf
+    ethconf <- liftIO $ genEthConf role
 
     let dir = ".ethereumH"
+    -- Writable for the rewrite, then back to the world-readable, read-only
+    -- mode the containers mounting it expect.
+    when regenerate $ liftIO $ setFileMode (dir </> "ethconf.yaml") (ownerReadMode .|. ownerWriteMode .|. groupReadMode .|. otherReadMode)
     liftIO $ YAML.encodeFile (dir </> "ethconf.yaml") ethconf
     liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
     liftIO $ putStrLn "  ✓ Generated ethconf.yaml"
@@ -306,9 +372,9 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- Generate docker-compose.yml
     liftIO $ case flags_dockerMode of
       "allDocker" -> generateDockerComposeAllDocker
-      _ -> generateDockerCompose
+      _ -> generateDockerCompose role
 
-    liftIO createCommandsFile
+    liftIO $ createCommandsFile role
     liftIO $ putStrLn "  ✓ Generated commands.txt"
 
     -- Custom genesis support: when genesis.json is pre-placed (e.g. useCustomGenesis=true in
@@ -316,7 +382,11 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     -- DO NOT REMOVE this branch — without it, custom genesis nodes crash with "Missing StateRoot".
     genesisExists <- doesFileExist "genesis.json"
 
-    if genesisExists
+    if not (roleRunsCore role)
+      then liftIO $ putStrLn "  ✓ API role: no genesis state needed"
+      else if regenerate
+      then liftIO $ putStrLn "  ✓ Existing chain state kept"
+      else if genesisExists
       then do
         liftIO $ putStrLn "  ✓ Using provided genesis.json"
         content <- liftIO $ BS.readFile "genesis.json"
@@ -332,7 +402,10 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           populateMPTAndWriteGenesis genesisInfo
         liftIO $ putStrLn "  ✓ Created genesis.json"
 
-    liftIO $ putStrLn "Node ready"
+    liftIO $ putStrLn $ case role of
+      RoleNode -> "Node ready"
+      RoleCore -> "Core ready"
+      RoleApi -> "API tier ready"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json

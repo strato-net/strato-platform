@@ -13,6 +13,7 @@ FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
+ROLE="node"
 SETUP_ARGS=()
 for arg in "$@"; do
     case "$arg" in
@@ -37,6 +38,12 @@ for arg in "$@"; do
             NETWORK="${arg#*=}"
             SETUP_ARGS+=("$arg")
             ;;
+        # --role is passed through to strato-setup; remembered here because a
+        # snapshot (chain state) has nothing to restore into an API-only directory.
+        --role=*)
+            ROLE="${arg#*=}"
+            SETUP_ARGS+=("$arg")
+            ;;
         *)
             SETUP_ARGS+=("$arg")
             ;;
@@ -44,6 +51,11 @@ for arg in "$@"; do
 done
 
 NODE_DIR="$1"
+
+if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
+    echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
+    exit 1
+fi
 
 # If the node directory already exists, we are just (re)starting an existing node,
 # not instantiating a new one - so a snapshot restore is neither needed nor safe.
@@ -102,6 +114,21 @@ export MALLOC_ARENA_MAX=2
 nohup convoke > >(tee -a logs/convoke.log >/dev/null) 2> >(tee -a logs/convoke.log >&2) &
 CONVOKE_PID=$!
 echo "CONVOKE_PID=$CONVOKE_PID" > .strato.pid
+
+# convoke's first act is `docker compose up`, and it exits if that fails - a
+# missing image, a port already bound, a corrupt compose file. Without this
+# check strato-up still returned 0, so a systemd unit wrapping it reported
+# "active (exited) status=0/SUCCESS" over a node that was not running: a cell
+# sat dead for as long as nobody thought to look past the unit. Give convoke a
+# moment, then make the exit code tell the truth.
+sleep 5
+if ! kill -0 "$CONVOKE_PID" 2>/dev/null; then
+    echo "Error: convoke exited immediately; STRATO is NOT running in $(pwd)." >&2
+    echo "Last lines of logs/convoke.log:" >&2
+    tail -n 15 logs/convoke.log >&2 2>/dev/null || true
+    rm -f .strato.pid
+    exit 1
+fi
 
 if grep -q "local-auth:" docker-compose.yml; then
     echo "Ensuring local auth admin and node identity setup..."

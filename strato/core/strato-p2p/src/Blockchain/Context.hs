@@ -110,7 +110,7 @@ import           Blockchain.Strato.Model.Keccak256
 
 import qualified Blockchain.Strato.RedisBlockDB          as RBDB
 import           Blockchain.SyncDB
-import           Control.Monad                           (forM_, void, when)
+import           Control.Monad                           (forM_, unless, void, when)
 import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
@@ -141,6 +141,8 @@ newtype Outbound a = Outbound {unOutbound :: a}
 
 data Config = Config
   { configSQLDB                    :: SQLDB,
+    -- | Peers and sync tasks; the eth pool itself on a monolith.
+    configPeerDB                   :: SQLDB,
     configRedisBlockDB             :: RBDB.RedisConnection,
     configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
@@ -464,9 +466,12 @@ instance Mod.Accessible RBDB.RedisConnection ContextM where
 instance AccessibleEnv SQLDB ContextM where
   accessEnv = asks configSQLDB
 
+instance AccessibleEnv PeerStore ContextM where
+  accessEnv = asks (PeerStore . configPeerDB)
+
 instance A.Selectable Host PPeer ContextM where
   select _ host' =
-    sqlQuery actions >>= \case
+    peerQuery actions >>= \case
       [] -> return Nothing
       (x:_) -> return . Just $ SQL.entityVal x
     where
@@ -474,7 +479,7 @@ instance A.Selectable Host PPeer ContextM where
 
 instance A.Selectable Point PPeer ContextM where
   select _ pk =
-    sqlQuery actions >>= \case
+    peerQuery actions >>= \case
       [] -> return Nothing
       (x:_) -> return . Just $ SQL.entityVal x
     where
@@ -565,8 +570,11 @@ initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m 
 initConfig wireMessagesRef = do
   dbs <- openDBs
 
-  runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
-  runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
+  -- The chiliad sequence numbers sync tasks on Postgres; the SQLite peer
+  -- store numbers them in the insert itself (see "Blockchain.SyncDB").
+  unless peerStoreIsSqlite $
+    runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ peerDB' dbs
+  runSqlPool (runPeerStoreMigration SYNCTASK.migrateAll) $ peerDB' dbs
 
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   initState <- initContext
@@ -579,6 +587,7 @@ initConfig wireMessagesRef = do
   connectionId <- liftIO newUnique
   return $ Config
     { configSQLDB = sqlDB' dbs
+    , configPeerDB = peerDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef

@@ -9,6 +9,7 @@
 -- LevelDB or re-running the VM.
 module Blockchain.Data.ReceiptRef
   ( putReceiptRefs,
+    putReceiptRefsSql,
     receiptRefsForBlock,
   )
 where
@@ -16,6 +17,7 @@ where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
+import Control.Monad.IO.Class (MonadIO)
 import qualified Database.Esqueleto.Legacy as E
 import qualified Database.Persist.Postgresql as SQL
 
@@ -23,7 +25,11 @@ import qualified Database.Persist.Postgresql as SQL
 -- key per the schema's @UniqueReceiptRefBlockTx@; duplicate inserts are
 -- swallowed via @insertUnique_@.
 putReceiptRefs :: HasSQLDB m => [ReceiptRef] -> m ()
-putReceiptRefs refs = sqlQuery $ mapM_ SQL.insertUnique_ refs
+putReceiptRefs = sqlQuery . putReceiptRefsSql
+
+-- | 'putReceiptRefs' inside a caller-owned transaction.
+putReceiptRefsSql :: MonadIO m => [ReceiptRef] -> SQL.SqlPersistT m ()
+putReceiptRefsSql = mapM_ SQL.insertUnique_
 
 -- | Fetch all receipts for a block, in tx-index order. The bytes here are
 -- exactly what the vm-runner persisted at block construction time -- safe to

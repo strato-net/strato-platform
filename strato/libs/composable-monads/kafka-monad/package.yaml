@@ -24,6 +24,7 @@ library:
   - milena
   - milena-tools
   - monad-loops
+  - resource-pool
   - mtl
   - text
   - transformers

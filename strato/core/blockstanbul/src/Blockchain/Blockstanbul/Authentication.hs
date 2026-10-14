@@ -87,6 +87,16 @@ bodyMatchesHeader (Block hdr txs uncles) =
   transactionsRoot hdr == transactionsVerificationValue txs
     && getBlockOmmersHash hdr == ommersVerificationValue uncles
 
+-- | Do the block's transactions and uncles belong to its header? Signatures and
+-- seals cover the header alone, so without this a relay could change the body
+-- under a proposer's signature: a peer on another build re-encodes the
+-- transactions, their hashes and recovered signers change, and the VM runs a
+-- block that is not the one the proposer sealed.
+bodyMatchesHeader :: Block -> Bool
+bodyMatchesHeader (Block hdr txs uncles) =
+  transactionsRoot hdr == transactionsVerificationValue txs
+    && getBlockOmmersHash hdr == ommersVerificationValue uncles
+
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
                        Set Validator -> M.Map Validator Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)
 replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk = do
