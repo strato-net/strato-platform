@@ -1,24 +1,10 @@
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeOperators #-}
-
--- | The trie node store as a composable monad layer.
+-- | The trie node store behind "Control.Monad.Composable.StateDB".
 --
--- Trie code asks only for @StateRoot `Alters` NodeData@; providing a 'NodeDB'
--- in the row satisfies it. A 'NodeDB' is a record of actions, so stores can
--- be layered: an overlay over LevelDB for sandboxed calls, or a cache over the
--- raw bytes ('Control.Monad.Composable.NodeDB.Cached').
+-- A 'NodeDB' is a record of actions, so stores can be layered: an overlay
+-- over LevelDB for sandboxed calls, or a cache over the raw bytes
+-- ('Control.Monad.Composable.NodeDB.Cached').
 module Control.Monad.Composable.NodeDB
   ( NodeDB (..),
-    NodeDBM,
-    HasNodeDB,
-    runNodeDBM,
-    tickNodeDB,
-    flushNodeDB,
     NodeBytes (..),
     levelDBBytes,
     nodeDB,
@@ -31,9 +17,6 @@ where
 
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
 import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Base
-import Control.Monad.IO.Class
 import qualified Data.ByteString as B
 import Data.Default (def)
 import Data.IORef
@@ -49,22 +32,6 @@ data NodeDB = NodeDB
     -- | Write everything held back, now.
     flushNodes :: IO ()
   }
-
-type NodeDBM es = Eff (NodeDB ': es)
-
-type HasNodeDB m = (MonadIO m, AccessibleEnv NodeDB m)
-
-runNodeDBM :: NodeDB -> NodeDBM es a -> Eff es a
-runNodeDBM = provide
-
-tickNodeDB, flushNodeDB :: HasNodeDB m => m ()
-tickNodeDB = accessEnv >>= liftIO . tickNodes
-flushNodeDB = accessEnv >>= liftIO . flushNodes
-
-instance (NodeDB :> es) => (MP.StateRoot `A.Alters` MP.NodeData) (Eff es) where
-  lookup _ k = accessEnv >>= \db -> liftIO (lookupNode db k)
-  insert _ k v = accessEnv >>= \db -> liftIO (insertNode db k v)
-  delete _ k = accessEnv >>= \db -> liftIO (deleteNode db k)
 
 -- | Raw node bytes by hash, as LevelDB holds them.
 data NodeBytes = NodeBytes

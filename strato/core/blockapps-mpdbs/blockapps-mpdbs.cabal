@@ -52,6 +52,7 @@ library
     , monad-loops
     , nibblestring
     , solid-vm-model
+    , statedb-monad
     , strato-model
     , transformers
     , unliftio-core

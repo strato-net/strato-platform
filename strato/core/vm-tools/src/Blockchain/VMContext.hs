@@ -47,9 +47,6 @@ module Blockchain.VMContext
     stateTxMap,
     stateBlockMap,
     storageBlockMap,
-    stateRoots,
-    currentBlock,
-    flushedRoot,
     memDBs,
     baggerState,
     bestBlockInfo,
@@ -126,8 +123,8 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.NodeDB
 import Control.Monad.Composable.NodeDB.Cached (cachedNodeDB)
+import Control.Monad.Composable.StateDB
 import Control.Monad.Composable.Streaming (StreamEnv (..), StreamM, createStreamEnv, runStreamMUsingEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
@@ -163,9 +160,6 @@ knownExpensiveTxs =
   S.fromList
     [
     ]
-
-newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
-  deriving (Generic, NFData, Show)
 
 newtype GasCap = GasCap {unVmGasCap :: Gas}
   deriving (Generic, NFData, Show, Eq)
@@ -214,11 +208,7 @@ data MemDBs = MemDBs
   { -- Accounts modified by the current transaction (for its TransactionResult only).
     _stateTxMap :: !(M.Map Address AddressStateModification),
     _stateBlockMap :: !(BlockMap Address AddressStateModification),
-    _storageBlockMap :: !(BlockMap (Address, StoragePath) BasicValue),
-    _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
-    _currentBlock :: !(Maybe CurrentBlockHash),
-    -- State root the block-map entries retained past the last flush are valid for.
-    _flushedRoot :: !(Maybe MP.StateRoot)
+    _storageBlockMap :: !(BlockMap (Address, StoragePath) BasicValue)
   }
   deriving (Generic, NFData, Show)
 
@@ -229,10 +219,7 @@ instance Default MemDBs where
     MemDBs
       { _stateTxMap = M.empty,
         _stateBlockMap = emptyBlockMap,
-        _storageBlockMap = emptyBlockMap,
-        _stateRoots = M.empty,
-        _currentBlock = Nothing,
-        _flushedRoot = Nothing
+        _storageBlockMap = emptyBlockMap
       }
 
 data ContextState = ContextState
@@ -285,16 +272,16 @@ makeLenses ''Context
 
 -- | The node's monad: the 'Context' record of 'IORef's and handles composed
 -- with the node store, streaming and logging monads, as one flat @Env -> IO@ layer.
-type ContextRow = '[Context, NodeDB, IORef StreamEnv, Logger]
+type ContextRow = '[Context, StateDBEnv, IORef StreamEnv, Logger]
 
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv NodeDB, AccessibleEnv (IORef StreamEnv), MonadMonitor)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv StateDBEnv, AccessibleEnv (IORef StreamEnv), MonadMonitor)
 
 runContextIO :: Context -> ContextM a -> StreamM '[Logger] a
 runContextIO ctx (ContextM m) = do
-  db <- nodeDBFor (_backend ctx)
-  a <- runNodeDBM db (provide ctx m)
-  liftIO (flushNodes db)
+  env <- newStateDBEnv =<< nodeDBFor (_backend ctx)
+  a <- runStateDBM env (provide ctx m)
+  liftIO (flushNodes (nodes env))
   pure a
 
 -- | Trie nodes live in LevelDB when there is one, behind a cache of 20k parsed
@@ -322,7 +309,8 @@ type VMBase m = (m ~ ContextM)
 
 withCurrentBlockHash ::
   ( MonadLogger m,
-    Mod.Modifiable MemDBs m,
+    MonadIO m,
+    AccessibleEnv StateDBEnv m,
     Mod.Modifiable CurrentBlockHash m,
     HasMemAddressStateDB m,
     HasStateDB m,
@@ -339,7 +327,7 @@ withCurrentBlockHash bh f = do
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
   flushMemDBs
-  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots .~ M.empty)
+  clearStateRoots
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
   pure a
 
@@ -348,7 +336,8 @@ withCurrentBlockHash bh f = do
 -- through here, or 'startFromStateRoot' cannot tell a stale map from a fresh one.
 flushMemDBs ::
   ( MonadLogger m,
-    Mod.Modifiable MemDBs m,
+    MonadIO m,
+    AccessibleEnv StateDBEnv m,
     HasMemAddressStateDB m,
     HasStateDB m,
     HasAccountDB m,
@@ -361,15 +350,15 @@ flushMemDBs = do
   flushMemStorageDB
   resetAddressStateTxDBMap
   flushMemAddressStateDB
-  sr <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (flushedRoot .~ sr)
+  setFlushedRoot =<< A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
 -- | Begin running transactions from @sr@. The block maps may keep what the last
 -- flush left in them only if this run continues from the root that flush
 -- produced; a run starting anywhere else (an ancestor, a sibling branch) must
 -- not see them. Every run must start through here.
 startFromStateRoot ::
-  ( Mod.Modifiable MemDBs m,
+  ( MonadIO m,
+    AccessibleEnv StateDBEnv m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m
@@ -379,13 +368,14 @@ startFromStateRoot ::
 startFromStateRoot sr = do
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
   startSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  fr <- _flushedRoot <$> Mod.get (Mod.Proxy @MemDBs)
+  fr <- getFlushedRoot
   when (startSR /= fr) $ do
     putAddressStateBlockDBMap emptyBlockMap
     putMemRawStorageBlockMap emptyBlockMap
 
 withCurrentBlockHashNoCommit ::
   ( MonadUnliftIO m,
+    AccessibleEnv StateDBEnv m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable CurrentBlockHash m
   ) =>
@@ -394,7 +384,9 @@ withCurrentBlockHashNoCommit ::
   m a
 withCurrentBlockHashNoCommit bh f = do
   memDBs' <- Mod.get (Mod.Proxy @MemDBs)
-  let restore = Mod.put (Mod.Proxy @MemDBs) memDBs'
+  env <- accessEnv
+  snap <- snapshotStateDBEnv env
+  let restore = Mod.put (Mod.Proxy @MemDBs) memDBs' >> restoreStateDBEnv env snap
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f `onException` restore
   restore
@@ -594,8 +586,10 @@ evalSandboxedContextM f = do
     Persistent d -> Sandbox <$> newIORef def <*> pure d
     Sandbox o d -> Sandbox <$> (newIORef =<< readIORef o) <*> pure d
     Memory o -> Memory <$> (newIORef =<< readIORef o)
-  nodes <- newIORef M.empty
-  ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @NodeDB (overlayNodeDB nodes) $ unContextM f
+  env <- ContextM accessEnv
+  overlay <- newIORef M.empty
+  sandboxEnv <- snapshotStateDBEnv env
+  ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @StateDBEnv (const sandboxEnv {nodes = overlayNodeDB overlay (nodes env)}) $ unContextM f
 
 -- | Fetch Merkle-Patricia nodes missing locally from peers for the body's duration.
 withFetchMissingNodes :: ContextM a -> ContextM a

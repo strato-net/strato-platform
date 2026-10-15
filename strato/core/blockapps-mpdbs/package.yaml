@@ -33,6 +33,7 @@ library:
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
+  - statedb-monad
   - monad-loops
   - nibblestring
   - solid-vm-model

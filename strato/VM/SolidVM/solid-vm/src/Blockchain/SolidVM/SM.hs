@@ -361,26 +361,14 @@ lookupStateFrames address (ci : rest) = case M.lookup address (stateMap ci) of
   Nothing -> lookupStateFrames address rest
 {-# INLINE lookupStateFrames #-}
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) SM
-  where
-  lookup p chainId = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    mSR <- view (stateRoots . at (bh, chainId)) <$> Mod.get (Mod.Proxy @MemDBs)
-    case mSR of
-      Just sr -> pure $ Just sr
-      Nothing -> host $ A.lookup p chainId
-  insert p chainId sr = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots %~ M.insert (bh, chainId) sr)
-    host $ A.insert p chainId sr
-  delete p chainId = do
-    (CurrentBlockHash bh) <- Mod.get (Mod.Proxy @CurrentBlockHash)
-    Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (stateRoots %~ M.delete (bh, chainId))
-    host $ A.delete p chainId
+instance (Maybe Word256 `A.Alters` MP.StateRoot) SM where
+  lookup p k = host (A.lookup p k)
+  insert p k v = host (A.insert p k v)
+  delete p k = host (A.delete p k)
 
 instance Mod.Modifiable CurrentBlockHash SM where
-  get _ = fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0) . _currentBlock <$> Mod.get (Mod.Proxy @MemDBs)
-  put _ md = Mod.modify_ (Mod.Proxy @MemDBs) $ pure . (currentBlock ?~ md)
+  get p = host (Mod.get p)
+  put p = host . Mod.put p
 
 instance (Keccak256 `A.Alters` BlockSummary) SM where
   lookup p k = host (A.lookup p k)

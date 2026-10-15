@@ -59,6 +59,7 @@ library
     , resourcet
     , servant-client
     , solid-vm-model
+    , statedb-monad
     , strato-auth
     , strato-conf
     , strato-genesis

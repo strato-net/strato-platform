@@ -55,6 +55,8 @@ library:
   - servant-client
   - strato-auth
   - solid-vm-model
+  - statedb-monad
+  - statedb-monad
   - strato-conf
   - strato-genesis
   - strato-model

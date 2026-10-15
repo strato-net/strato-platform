@@ -75,7 +75,7 @@ import Blockchain.VM.SolidException (SolidException(MissingCodeCollection, Rever
 import Blockchain.VMContext
 import Blockchain.VMOut
 import Blockchain.Wiring ()
-import Control.Monad.Composable.NodeDB (tickNodeDB)
+import Control.Monad.Composable.StateDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions

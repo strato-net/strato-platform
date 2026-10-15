@@ -26,13 +26,12 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
+import Control.Monad.Composable.StateDB
 import Control.Monad.IO.Class
 import Data.IORef
 import qualified Data.Map as M
@@ -42,46 +41,35 @@ import SolidVM.Model.Storable
 import System.Directory (createDirectoryIfMissing)
 
 data SetupDBs = SetupDBs
-  { stateDB :: StateDB,
-    stateRoots :: IORef (M.Map (Maybe Word256) MP.StateRoot),
-    hashDB :: HashDB,
+  { hashDB :: HashDB,
     codeDB :: CodeDB,
     localStorageBlock :: IORef (BlockMap (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (BlockMap Address AddressStateModification)
   }
 
-type HasDBs m = Mod.Accessible SetupDBs m
+type HasDBs m = (Mod.Accessible SetupDBs m, HasStateDB m)
 
 runSetupDBM :: (InternalState :> es) =>
-               Eff (SetupDBs ': es) b -> Eff es b
+               Eff (SetupDBs ': StateDBEnv ': es) b -> Eff es b
 runSetupDBM = runSetupDBMInDir ".ethereumH"
 
 -- | Run setup with databases in a specified directory.
 -- Useful for genesis-builder which needs its own temp database to avoid locking conflicts.
 runSetupDBMInDir :: (InternalState :> es) =>
-                    FilePath -> Eff (SetupDBs ': es) b -> Eff es b
+                    FilePath -> Eff (SetupDBs ': StateDBEnv ': es) b -> Eff es b
 runSetupDBMInDir baseDir mv = do
   liftIO $ createDirectoryIfMissing True baseDir
   let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
-  sdb <- open stateDBPath
-  srRef <- liftIO $ newIORef M.empty
+  sdb <- newStateDBEnv . nodeDB . levelDBBytes =<< open stateDBPath
+  -- Roots are kept per block; setup has no block, so use the zero hash.
+  liftIO $ writeIORef (currentBlock sdb) (Just . CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
   m2 <- liftIO $ newIORef emptyBlockMap
   m3 <- liftIO $ newIORef M.empty
   m4 <- liftIO $ newIORef emptyBlockMap
-  provide (SetupDBs sdb srRef hdb cdb m2 m3 m4) mv
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
-  lookup _ k = fmap (M.lookup k) $ liftIO . readIORef =<< fmap stateRoots (Mod.access Mod.Proxy)
-  insert _ k v = liftIO . flip modifyIORef (M.insert k v) =<< fmap stateRoots (Mod.access Mod.Proxy)
-  delete _ k = liftIO . flip modifyIORef (M.delete k) =<< fmap stateRoots (Mod.access Mod.Proxy)
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => (MP.StateRoot `A.Alters` MP.NodeData) m where
-  lookup _ = MP.genericLookupDB $ fmap stateDB $ Mod.access Mod.Proxy
-  insert _ = MP.genericInsertDB $ fmap stateDB $ Mod.access Mod.Proxy
-  delete _ = MP.genericDeleteDB $ fmap stateDB $ Mod.access Mod.Proxy
+  runStateDBM sdb $ provide (SetupDBs hdb cdb m2 m3 m4) mv
 
 instance (Monad m, MonadIO m, HasDBs m) => HasMemRawStorageDB m where
   getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< Mod.access Mod.Proxy
@@ -109,7 +97,7 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressStat
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance {-# OVERLAPPING #-} (SetupDBs :> es, Logger :> es) => (Address `A.Selectable` AddressState) (Eff es) where
+instance {-# OVERLAPPING #-} (SetupDBs :> es, StateDBEnv :> es, Logger :> es) => (Address `A.Selectable` AddressState) (Eff es) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where

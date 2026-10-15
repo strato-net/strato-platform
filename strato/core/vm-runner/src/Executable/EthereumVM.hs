@@ -53,7 +53,7 @@ import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.NodeDB (flushNodeDB)
+import Control.Monad.Composable.StateDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
 import Data.Foldable hiding (fold)
 import Data.List
