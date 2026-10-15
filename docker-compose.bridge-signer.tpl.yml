@@ -26,7 +26,9 @@ services:
     - NATIVE_KMS_REGION=${NATIVE_KMS_REGION}
     - VERIFIER_POLICY_PATH=/run/secrets/eab-verifier-policy.json
     - NATIVE_VERIFIER_POLICY_PATH=${NATIVE_VERIFIER_POLICY_PATH:-}
-    - EXTERNAL_BRIDGE_VERIFIER_API_TOKEN=${EXTERNAL_BRIDGE_VERIFIER_API_TOKEN}
+    - EXTERNAL_BRIDGE_VERIFIER_API_TOKEN=${EXTERNAL_BRIDGE_VERIFIER_API_TOKEN:-}
+    - RUNTIME_ACCESS_ADDRESS=${RUNTIME_ACCESS_ADDRESS:-}
+    - VERIFIER_PUBLIC_URL=${VERIFIER_PUBLIC_URL:-}
     - VERIFIER_CONFIRMATIONS=${VERIFIER_CONFIRMATIONS}
     image: ${BRIDGE_IMAGE:-<REPO_URL>bridge-eab:<VERSION>-<HASH_BRIDGE_EAB>}
     command: ["node", "dist/signer/index.js"]
@@ -38,7 +40,7 @@ services:
     - ${VERIFIER_POLICY_PATH_HOST}:/run/secrets/eab-verifier-policy.json:ro
     - ${NATIVE_VERIFIER_POLICY_PATH_HOST:-/dev/null}:/run/secrets/native-verifier-policy.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget --header='Authorization: Bearer $${EXTERNAL_BRIDGE_VERIFIER_API_TOKEN}' -qO- http://localhost:3004/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3004/health"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -1,3 +1,4 @@
+import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
 import axios from "axios";
 import { verifierIssues } from "../utils/processingIssues";
 import {
@@ -19,10 +20,6 @@ import {
   getNativeSettlementVerifierConfig,
   getSettlementVerifierConfig,
 } from "./cirrusService";
-
-const signerHeaders = (token: string) => ({
-  Authorization: `Bearer ${token}`,
-});
 
 export class SettlementVerifierManualReviewRequired extends Error {}
 
@@ -47,9 +44,10 @@ export const requestVerifierQuorum = async (
       `Invalid settlement verifier threshold ${threshold} for ${urls.length} verifier services`,
     );
   }
-  if (apiTokens.length !== urls.length) {
+  const credentialsError = verifierCredentialsError(urls, apiTokens);
+  if (credentialsError) {
     throw new Error(
-      `External bridge signer API token count does not match signer URL count for chain ${chainId}`,
+      `External bridge verifiers for chain ${chainId} need ${credentialsError}`,
     );
   }
   const eligible = new Set(verifiers.map((address) => address.toLowerCase().replace(/^0x/, "")));
@@ -69,7 +67,7 @@ export const requestVerifierQuorum = async (
         const response = await axios.post(`${url}${path}`, payload, {
           timeout: VERIFIER_REQUEST_TIMEOUT_MS,
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS)]),
-          headers: signerHeaders(apiTokens[index]),
+          headers: await verifierAuthorizationHeader(url, chainId, apiTokens[index]),
         });
         if (completed) return;
         const attestor = String(response.data?.settlementAttestor || "").toLowerCase().replace(/^0x/, "");

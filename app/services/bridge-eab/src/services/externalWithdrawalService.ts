@@ -1,3 +1,4 @@
+import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
 import { withSafeProposalQueue } from "./safeProposalService";
 import { promises as fs } from "fs";
 import path from "path";
@@ -313,20 +314,19 @@ export const checkWithdrawalPolicy = async (
       `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
     );
   }
-  if (signerApiTokens.length !== signerUrls.length) {
+  const credentialsError = verifierCredentialsError(signerUrls, signerApiTokens);
+  if (credentialsError) {
     throw new Error(
-      `External bridge signer API token count does not match signer URL count for chain ${authorization.destinationChainId}`,
+      `External bridge verifiers for chain ${authorization.destinationChainId} need ${credentialsError}`,
     );
   }
 
   const results = await Promise.allSettled(
-    signerUrls.map((url, index) =>
+    signerUrls.map(async (url, index) =>
       axios.post(`${url}/v1/check-withdrawal`, authorization, {
         timeout: VERIFIER_REQUEST_TIMEOUT_MS,
         signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
-        headers: {
-          Authorization: `Bearer ${signerApiTokens[index]}`,
-        },
+        headers: await verifierAuthorizationHeader(url, authorization.destinationChainId, signerApiTokens[index]),
       }),
     ),
   );
@@ -363,9 +363,10 @@ export const signWithdrawalAuthorization = async (
       `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
     );
   }
-  if (signerApiTokens.length !== signerUrls.length) {
+  const credentialsError = verifierCredentialsError(signerUrls, signerApiTokens);
+  if (credentialsError) {
     throw new Error(
-      `External bridge signer API token count does not match signer URL count for chain ${authorization.destinationChainId}`,
+      `External bridge verifiers for chain ${authorization.destinationChainId} need ${credentialsError}`,
     );
   }
 
@@ -377,9 +378,7 @@ export const signWithdrawalAuthorization = async (
         {
           timeout: VERIFIER_REQUEST_TIMEOUT_MS,
           signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
-          headers: {
-            Authorization: `Bearer ${signerApiTokens[index]}`,
-          },
+          headers: await verifierAuthorizationHeader(url, authorization.destinationChainId, signerApiTokens[index]),
         },
       );
       const signature = Signature.from(response.data.signature).serialized;

@@ -19,6 +19,7 @@ import { validateDepositRefundSource, validateDepositRefundEvidence, validateDep
 import { ConsensusProvider } from "./consensusProvider";
 import { buildBridgeDigestRequest, depositDigestArgs, parseBridgeDigest } from "./authorizationValidation";
 import { verifierAccessControl } from "./accessControl";
+import { normalizeVerifierUrl } from "../config/verifierAccess";
 import {
   Contract,
   TypedDataEncoder,
@@ -131,7 +132,16 @@ const sourceChainId = BigInt(required("SOURCE_CHAIN_ID"));
 // Cirrus stores contract addresses as bare lowercase hex and its eq. filters are case-sensitive,
 // so accept 0x-prefixed and checksummed input but always query with the lowercase form.
 const sourceBridge = required("EXTERNAL_ASSET_BRIDGE_ADDRESS").replace(/^0x/, "").toLowerCase();
-const verifierApiToken = required("EXTERNAL_BRIDGE_VERIFIER_API_TOKEN");
+// Access from the runtime: short-lived tokens signed by the runtime's KMS access key (RUNTIME_ACCESS_ADDRESS, with
+// VERIFIER_PUBLIC_URL as the audience), and during a migration also the legacy bearer token.
+const verifierApiToken = process.env.EXTERNAL_BRIDGE_VERIFIER_API_TOKEN?.trim() || undefined;
+const runtimeAccessAddress = process.env.RUNTIME_ACCESS_ADDRESS?.trim()
+  ? getAddress(process.env.RUNTIME_ACCESS_ADDRESS.trim())
+  : undefined;
+const verifierPublicUrl = runtimeAccessAddress ? normalizeVerifierUrl(required("VERIFIER_PUBLIC_URL")) : undefined;
+if (!verifierApiToken && !runtimeAccessAddress) {
+  throw new Error("RUNTIME_ACCESS_ADDRESS is required (or EXTERNAL_BRIDGE_VERIFIER_API_TOKEN while migrating)");
+}
 const { policy: verifierPolicy, digest: verifierPolicyDigest } =
   loadVerifierPolicy(required("VERIFIER_POLICY_PATH"));
 const signerOpenIdDiscoveryUrl = required(
@@ -822,6 +832,7 @@ app.get("/health", (_, res) => {
     policyDigest: verifierPolicyDigest,
     baselinePolicyHash: verifierPolicy.baselinePolicyHash,
     verifierIndex: verifierPolicy.verifierIndex,
+    access: { runtimeAccessAddress: runtimeAccessAddress ?? null, apiToken: Boolean(verifierApiToken) },
     native: nativeVerifier
       ? {
           attestationSigner: nativeVerifier.signerAddress,
@@ -835,7 +846,12 @@ app.get("/health", (_, res) => {
   });
 });
 
-app.use(verifierAccessControl(verifierApiToken));
+app.use(verifierAccessControl({
+  token: verifierApiToken,
+  signed: runtimeAccessAddress && verifierPublicUrl
+    ? { runtimeAccessAddress, verifierUrl: verifierPublicUrl, chainId: destinationChainId }
+    : undefined,
+}));
 app.use(express.json({ limit: "32kb" }));
 
 app.post("/v1/sign-native-mint", async (req, res) => {

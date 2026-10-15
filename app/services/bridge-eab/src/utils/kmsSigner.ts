@@ -145,6 +145,13 @@ const signDigest = async (
   return recoverKmsSignature(digest, response.Signature, config.address);
 };
 
+export const signTypedDataWithKms = (
+  config: AwsKmsConfig,
+  domain: Record<string, any>,
+  types: Record<string, Array<{ name: string; type: string }>>,
+  value: Record<string, any>,
+): Promise<string> => signDigest(config, TypedDataEncoder.hash(domain, types, value));
+
 export const validateAwsKmsAddress = async (
   config: AwsKmsConfig,
 ): Promise<void> => {

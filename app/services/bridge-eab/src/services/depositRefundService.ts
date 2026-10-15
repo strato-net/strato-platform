@@ -1,3 +1,4 @@
+import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
 import { withSafeProposalQueue } from "./safeProposalService";
 import { Contract, Interface, id, verifyTypedData } from "ethers";
 import { promises as fs } from "node:fs";
@@ -37,7 +38,7 @@ const collectNativeRefundSignatures = async (
   const tokens = getNativeVerifierApiTokens(chainId);
   const threshold = Number(await bridge.attestationThreshold());
   if (
-    urls.length !== tokens.length ||
+    verifierCredentialsError(urls, tokens) ||
     !Number.isSafeInteger(threshold) ||
     threshold < 2 ||
     urls.length < threshold
@@ -45,12 +46,12 @@ const collectNativeRefundSignatures = async (
     throw new Error("Native refund verifier configuration does not satisfy quorum");
   }
   const responses = await Promise.allSettled(
-    urls.map((url, index) =>
+    urls.map(async (url, index) =>
       axios.post(
         `${url}/v1/sign-native-refund`,
         { depositId, refund },
         {
-          headers: { Authorization: `Bearer ${tokens[index]}` },
+          headers: await verifierAuthorizationHeader(url, chainId, tokens[index]),
           timeout: NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
           maxRedirects: 0,
         },
@@ -245,12 +246,12 @@ export const recoverExternalDepositRefund = async (chainId: number, router: stri
     const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
     const tokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
     const threshold = Number(await vault.attestationThreshold());
-    if (threshold < 2 || threshold > urls.length || tokens.length !== urls.length) throw new Error("Invalid refund verifier configuration");
+    if (threshold < 2 || threshold > urls.length || verifierCredentialsError(urls, tokens)) throw new Error("Invalid refund verifier configuration");
     const domain = { name: "ExternalBridgeVault", version: "1", chainId, verifyingContract: vaultAddress };
     const signatures = new Map<string, string>();
     const results = await Promise.allSettled(urls.map(async (url, index) => {
       const { data } = await axios.post(`${url}/v1/sign-deposit-refund`, { authorization: a, deposit }, {
-        timeout: VERIFIER_REQUEST_TIMEOUT_MS, headers: { Authorization: `Bearer ${tokens[index]}` },
+        timeout: VERIFIER_REQUEST_TIMEOUT_MS, headers: await verifierAuthorizationHeader(url, chainId, tokens[index]),
       });
       const signer = verifyTypedData(domain, DEPOSIT_REFUND_TYPES, a, data.signature).toLowerCase();
       if (!(await vault.attestationSigners(signer))) throw new Error("Unregistered deposit refund signer");

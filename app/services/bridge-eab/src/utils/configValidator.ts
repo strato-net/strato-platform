@@ -1,4 +1,5 @@
-import { validateAwsKmsAddress } from "./kmsSigner";
+import { AwsKmsConfig, validateAwsKmsAddress } from "./kmsSigner";
+import { getRuntimeAccessKmsConfig } from "./verifierAccessToken";
 import { NATIVE_EXECUTOR_FORBIDDEN_BRIDGE_ROLES, NATIVE_EXECUTOR_FORBIDDEN_TOKEN_ROLES } from "../config/bridgeAbi";
 import { readOAuthDiscovery } from "../auth/discovery";
 import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
@@ -26,6 +27,10 @@ import {
   NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
 } from "../config";
 import { ensureHexPrefix } from "./utils";
+
+const getRuntimeAccessKmsConfigSafe = (): AwsKmsConfig | undefined => {
+  try { return getRuntimeAccessKmsConfig(); } catch { return undefined; }
+};
 
 const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
@@ -465,6 +470,16 @@ export async function validateBridgeConfig(): Promise<boolean> {
         `Found ${enabledChainsArr.length} enabled chains`,
       );
 
+      // Signed verifier access: the runtime's KMS access key must match its address, and every verifier must
+      // accept that address (its /health access.runtimeAccessAddress). Without the key the legacy tokens apply.
+      let runtimeAccess: AwsKmsConfig | undefined;
+      try {
+        runtimeAccess = getRuntimeAccessKmsConfig();
+        if (runtimeAccess) await validateAwsKmsAddress(runtimeAccess);
+      } catch (error) {
+        errors.push(`Runtime access key: ${(error as Error).message}`);
+      }
+
       for (const chain of enabledChainsArr) {
         const chainId = chain.externalChainId;
         const confirmationValue =
@@ -501,9 +516,9 @@ export async function validateBridgeConfig(): Promise<boolean> {
             `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain distinct URLs`,
           );
         }
-        if (signerApiTokens.length !== signerUrls.length) {
+        if (!runtimeAccess && signerApiTokens.length !== signerUrls.length) {
           errors.push(
-            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain one token per verifier URL`,
+            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain one token per verifier URL, unless the runtime access key is configured`,
           );
         } else if (new Set(signerApiTokens).size !== signerApiTokens.length) {
           errors.push(
@@ -520,7 +535,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
         if (
           !rpcUrl ||
           signerUrls.length === 0 ||
-          signerApiTokens.length !== signerUrls.length ||
+          (!runtimeAccess && signerApiTokens.length !== signerUrls.length) ||
           !executorAddress
         ) {
           continue;
@@ -533,12 +548,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
             new JsonRpcProvider(rpcUrl),
           );
           const signerMetadata = await Promise.all(
-            signerUrls.map(async (url, index) => {
-              const response = await fetch(`${url}/health`, {
-                headers: {
-                  Authorization: `Bearer ${signerApiTokens[index]}`,
-                },
-              });
+            signerUrls.map(async (url) => {
+              const response = await fetch(`${url}/health`);
               if (!response.ok) {
                 throw new Error(`Signer ${url} health returned ${response.status}`);
               }
@@ -552,9 +563,19 @@ export async function validateBridgeConfig(): Promise<boolean> {
                 policyDigest: string;
                 baselinePolicyHash: string;
                 verifierIndex: number;
+                access?: { runtimeAccessAddress?: string | null };
               };
             }),
           );
+          if (runtimeAccess) {
+            signerMetadata.forEach((metadata, index) => {
+              if (String(metadata.access?.runtimeAccessAddress || "").toLowerCase() !== runtimeAccess!.address.toLowerCase()) {
+                errors.push(
+                  `External bridge signer ${signerUrls[index]} does not accept signed access from runtime access address ${runtimeAccess!.address}`,
+                );
+              }
+            });
+          }
           const signerAddresses = signerMetadata.map(
             ({ authorizationSigner }) => authorizationSigner,
           );
@@ -714,8 +735,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
           if (verifierUrls.length === 0) {
             missingNativeBridgeEnvVars.push(verifierUrlsEnv);
           }
-          if (verifierTokens.length !== verifierUrls.length) {
-            errors.push(`${verifierTokensEnv} must contain one token per native verifier URL`);
+          if (!getRuntimeAccessKmsConfigSafe() && verifierTokens.length !== verifierUrls.length) {
+            errors.push(`${verifierTokensEnv} must contain one token per native verifier URL, unless the runtime access key is configured`);
           }
 
           if (
