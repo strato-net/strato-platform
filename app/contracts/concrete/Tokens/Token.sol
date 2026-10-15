@@ -115,6 +115,15 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         _burn(from, amount);
     }
 
+    /// @notice Burn `amount` of the caller's own tokens, lowering totalSupply.
+    /// @dev The transaction fee hook runs in the signer's context and pays STRATO gas with
+    ///      this: it can only ever destroy the caller's balance, so it needs no allowance.
+    ///      Deliberately not pause-gated: pausing transfers must not disable every paid
+    ///      transaction on the chain.
+    function burn(uint256 amount) external {
+        _burn(_msgSender(), amount);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
