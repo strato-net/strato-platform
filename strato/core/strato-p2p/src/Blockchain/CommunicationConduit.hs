@@ -83,8 +83,6 @@ handleMsgClientConduit ::
 handleMsgClientConduit myId peer = do
   $logDebugS "handleMsgClientConduit" "<waving hand emoji>"
 
-  rejectSelfConnection myId peer
-
   lift $ clearAllSyncTasks $ pPeerHost peer
 
   yield $
@@ -147,7 +145,9 @@ handleMsgServerConduit ::
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
-  rejectSelfConnection myPubkey peer
+  -- An inbound peer presenting our own node key only offers our own chain;
+  -- drop it before it can be handed a sync task (runPeer stops us dialing it).
+  when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
 
   lift $ clearAllSyncTasks $ pPeerHost peer
 
@@ -213,13 +213,6 @@ awaitMsg =
     Just (MsgEvt msg) -> return (Just msg)
     Nothing           -> return Nothing
     _                 -> awaitMsg
-
--- | A node can learn its own public address from its peers' neighbour lists
--- and dial itself. That connection only offers our own chain, yet it was handed
--- sync tasks like any real peer, so drop it before the handshake.
-rejectSelfConnection :: MonadIO m => Point -> PPeer -> m ()
-rejectSelfConnection myPubkey peer =
-  when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
 
 -- | Ask the peer for a newly assigned sync task's headers, or mark the task
 -- 'NotReady' when they lie beyond the peer's (version-normalized) tip.

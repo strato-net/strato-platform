@@ -82,6 +82,12 @@ runPeer peer sSource = do
           throwIO NoPeerPubKey
     Just pub -> return pub
 
+  -- A node can learn its own public address from its peers' neighbour lists.
+  -- Refuse to dial it here: exceptions raised inside runClientConnection are
+  -- only logged, so this is where SelfConnection still reaches
+  -- handleRunPeerResult and the address gets disabled.
+  when (otherPubKey == secPubKeyToPoint myPublic) $ throwIO SelfConnection
+
   $logInfoS "runPeer" . T.pack . C.blue $ "Welcome to strato-p2p-client"
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
   $logInfoS "runPeer" . T.pack . C.green $ " * " ++ "Attempting to connect to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
