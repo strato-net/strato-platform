@@ -1774,7 +1774,7 @@ async function phaseVerify() {
     ["sum(stakes) == activityStates.totalStake", totalStake === chainUint(state.totalStake), `${totalStake} vs ${state.totalStake}`],
     ["totalStake == vault totalSupply - non-position shares", chainUint(state.totalStake) === positionSupply, `${state.totalStake} vs ${positionSupply}`],
     ["per-user stake == balance + queued", perUserMatches, `${fmt18(totalStake - totalTarget)} residual drift`],
-    [`${VAULT_KEY} emission rate is zero`, chainUint(config.emissionRate) === 0n, config.emissionRate],
+    ["emission rate is zero while the vault is paused", !vault.paused || chainUint(config.emissionRate) === 0n, config.emissionRate],
   ];
 
   // Drain check: every vault event up to the snapshot block must be marked
@@ -1803,7 +1803,11 @@ async function phaseVerify() {
   }
   if (!allOk) die("Verification FAILED");
   console.log(`\nAll checks passed. Activity ${ACTIVITY_ID} totalStake = ${fmt18(state.totalStake)} = vault totalSupply - non-position shares.`);
-  console.log(`Activity ${ACTIVITY_ID} is reconciled: unpause the vault and restore its emission rate in SMD.`);
+  console.log(
+    vault.paused
+      ? `Activity ${ACTIVITY_ID} is reconciled: unpause the vault and restore its emission rate in SMD.`
+      : `Activity ${ACTIVITY_ID} is reconciled and live (emission rate ${config.emissionRate}).`
+  );
 }
 
 async function phaseRun() {
