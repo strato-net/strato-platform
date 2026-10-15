@@ -127,7 +127,10 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
             Just stored -> do
               disErr <- storeDisableException stored (T.pack "SelfConnection")
               whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-              disablePeerForSeconds stored 86400
+              selfErr <- disablePeerForSeconds stored 86400
+              whenLeft selfErr $ \theSelfErr -> do
+                $logErrorLS "stratoP2PServer/runEthServer" theSelfErr
+              return selfErr
         e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
           case ioErrType of
             NoSuchThing -> do

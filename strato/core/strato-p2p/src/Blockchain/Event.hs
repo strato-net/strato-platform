@@ -259,7 +259,7 @@ handleEvents peer = awaitForever $ \case
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            lift $ setSyncTaskFinished (pPeerHost peer)
+            lift $ setSyncTaskFinished currentSyncTask
 
             $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
 
@@ -514,7 +514,7 @@ getNewSyncFetch peer myBest worldNumber =
     Nothing -> pure Nothing
     Just task
       | myBest >= chiliadStart + 999 -> do
-          setSyncTaskFinished $ pPeerHost peer
+          setSyncTaskFinished task
           getNewSyncFetch peer myBest worldNumber
       | otherwise -> pure $ Just (task, max chiliadStart (myBest + 1))
       where
