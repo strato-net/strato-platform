@@ -83,7 +83,7 @@ export DEPLOYMENT_CONFIRMATIONS=<POSITIVE_INTEGER>
 
 Infra provisions:
 
-- one Runtime;
+- one Runtime for a new environment, or a staged update for the existing shared Runtime;
 - the network-required verifier count;
 - independent verifier RPC providers;
 - STRATO attestor identities;
@@ -91,7 +91,7 @@ Infra provisions:
 - DNS, KMS keys, API tokens and durable storage;
 - native signer/executor identities unless **EAB-only**.
 
-Return only public addresses and endpoints. Keep workloads stopped.
+Return only public addresses and endpoints. Run the infrastructure deployment for every new verifier with `Running=No`. This creates its stack, KMS identity, endpoint and ECS service, but starts no verifier task. For a new environment, create Runtime without starting it. When adding a chain to an existing environment, keep the shared Runtime running its current configuration; do not install the new chain binding yet.
 
 ### 1.1 Safe and gas readiness
 
@@ -282,8 +282,8 @@ Handle the result:
 
 Infra verifies `services.json`:
 
-- `chain-install`: merge chain bindings into the shared Runtime; never replace existing chain bindings; keep new workloads `Running=No`.
-- `native-extension`: merge only native keys/policies into running services; preserve EAB settings, journals, cursors and `Running=Yes`.
+- `chain-install`: deploy the new verifier infrastructure with `Running=No`; no verifier task runs in this state. Do not install the new chain binding into Runtime yet. Preserve all existing Runtime bindings, journals, cursors and durable volumes.
+- `native-extension`: follow section 8; preserve EAB settings, journals, cursors and active workloads.
 
 ## 5. Configure
 
@@ -300,6 +300,8 @@ Execute only the returned action:
 - Safe action: use the generated file with the Safe owner flow below.
 - Infra action: apply or repair the named service configuration.
 - Failed check: fix it and rerun `continue`.
+
+`START_OR_REPAIR_SERVICES` is the service-start boundary. Before that action, new verifiers remain `Running=No`, a new Runtime remains stopped, and an existing shared Runtime remains on its previous configuration. When it appears, follow section 6.
 
 For an admin action, each admin:
 
@@ -336,9 +338,15 @@ unset SAFE_TX_EXECUTOR_PRIVATE_KEY
 
 The executor checks its gas balance, simulates the transaction, and requires the Safe `ExecutionSuccess` event. The first generated Safe action is the live direct-execution canary; stop if it fails. This direct flow does not require a hosted Safe Transaction Service. If execution is interrupted or the Safe nonce changes, do not reuse or resubmit the signatures; the Coordinator reruns `continue`, reconciles live state and supplies the current Safe file.
 
-## 6. Start services
+## 6. Start verifiers, then Runtime
 
-Before replacement:
+Start or update services only after:
+
+- `continue` returns `START_OR_REPAIR_SERVICES`;
+- every preceding STRATO admin and Safe action is complete;
+- new external contracts remain paused and the new chain remains disabled.
+
+If replacing an existing bridge processor:
 
 - close and drain old intake;
 - reconcile pending deposits, withdrawals, refunds and Safe proposals;
@@ -353,7 +361,9 @@ For an existing fleet adopting finalized-head enforcement:
 3. Restore the intended signer set and threshold.
 4. Verify every resulting on-chain version before starting the updated services or re-attesting pending work.
 
-For each verifier:
+### 6.1 Start verifiers
+
+To start each new verifier, change its configuration from `Running=No` to `Running=Yes`, preview the change and deploy it:
 
 ```bash
 cd <ABSOLUTE_EAB_INFRA_REPOSITORY>
@@ -361,9 +371,11 @@ guides/tools/deploy.sh "deployments/$INFRA_ENV/verifier-$VERIFIER_NUMBER/$INFRA_
 guides/tools/deploy.sh "deployments/$INFRA_ENV/verifier-$VERIFIER_NUMBER/$INFRA_NETWORK.conf"
 ```
 
-Verify every verifier is healthy with the reviewed signer, policy hash, destination, RPC-host count and confirmation floor.
+The verifiers may be started in parallel. Verify the required count is healthy with the reviewed signer, policy hash, destination, RPC-host count and confirmation floor. Do not update Runtime until all required verifiers are healthy.
 
-Start Runtime:
+### 6.2 Start or update Runtime
+
+For a new environment, start Runtime with the reviewed service configuration. When adding a chain to an existing environment, install the new chain binding only now, preserve every existing binding and durable file, and increase `RestartRevision` once.
 
 ```bash
 cd <ABSOLUTE_EAB_INFRA_REPOSITORY>
@@ -371,9 +383,11 @@ guides/tools/deploy.sh "deployments/$INFRA_ENV/runtime/runtime.conf" --preview
 guides/tools/deploy.sh "deployments/$INFRA_ENV/runtime/runtime.conf"
 ```
 
-Increase `RestartRevision` once for a Runtime configuration change. Verify effective chain bindings, identities, confirmation floors, persistent storage and one proposal writer.
+Never start a second Runtime for the same bridge operator. Verify effective chain bindings, identities, confirmation floors, persistent storage and one proposal writer.
 
-Coordinator sets Runtime health:
+### 6.3 Pass readiness
+
+Coordinator supplies the deployed Runtime health URL and reruns `continue`:
 
 ```bash
 export BRIDGE_HEALTH_URL=https://<RUNTIME_HOST>/health
