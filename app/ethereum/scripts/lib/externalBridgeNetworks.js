@@ -24,7 +24,7 @@ const NETWORKS = [
     externalBridgeDeployment: true, verifierCount: 3, verifierThreshold: 2 },
   { chainId: 59141, name: "lineaSepolia", family: "linea", production: false, rpcEnv: "LINEA_SEPOLIA_RPC_URL",
     defaultRpcUrl: "https://rpc.sepolia.linea.build", alchemyHost: "linea-sepolia.g.alchemy.com", aliases: ["linea_sepolia", "linea-sepolia", "lineasepolia"],
-    externalBridgeDeployment: true, verifierCount: 3, verifierThreshold: 2 },
+    externalBridgeDeployment: true, safeTransactionService: false, verifierCount: 3, verifierThreshold: 2 },
   { chainId: 46630, name: "robinhoodTestnet", displayName: "Robinhood Chain Testnet", family: "robinhood", production: false, rpcEnv: "ROBINHOOD_TESTNET_RPC_URL",
     defaultRpcUrl: "https://rpc.testnet.chain.robinhood.com", alchemyHost: "robinhood-testnet.g.alchemy.com", aliases: ["robinhood_testnet", "robinhood-testnet"],
     explorerApiUrl: "https://explorer.testnet.chain.robinhood.com/api", explorerUrl: "https://explorer.testnet.chain.robinhood.com",

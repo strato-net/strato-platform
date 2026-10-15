@@ -3,24 +3,16 @@ const path = require("path");
 const { ethers } = require("ethers");
 const { NETWORKS } = require("./externalBridgeNetworks");
 
-const safeProtocolKitPath = path.resolve(
-  __dirname,
-  "../../../services/bridge/node_modules/@safe-global/protocol-kit",
-);
-const safeApiKitPath = path.resolve(
-  __dirname,
-  "../../../services/bridge/node_modules/@safe-global/api-kit",
-);
-
 function loadSafeDependencies() {
-  if (!fs.existsSync(safeProtocolKitPath) || !fs.existsSync(safeApiKitPath)) {
+  try {
+    const protocol = require("@safe-global/protocol-kit");
+    const api = require("@safe-global/api-kit");
+    return { SafeProtocolKit: protocol.default || protocol, SafeApiKit: api.default || api };
+  } catch {
     throw new Error(
-      "Safe dependencies not found. Run `cd app/services/bridge && npm install && npm run build` from the repo root first.",
+      "Safe dependencies not found. Run `cd app/ethereum && npm ci` from the repo root first.",
     );
   }
-  const protocol = require(safeProtocolKitPath);
-  const api = require(safeApiKitPath);
-  return { SafeProtocolKit: protocol.default || protocol, SafeApiKit: api.default || api };
 }
 
 const CHAIN_CONFIG = Object.fromEntries(NETWORKS.map((network) => [network.chainId, network]));
@@ -128,6 +120,12 @@ function resolveSafeTxGasOverride(parsedOptions) {
 }
 
 async function proposeBatch(chainId, transactions, options) {
+  const chain = getChainConfig(chainId);
+  if (chain.safeTransactionService === false) {
+    throw new Error(
+      `${chain.name} has no supported hosted Safe Transaction Service; generate Transaction Builder JSON and use npm run safe:batch`,
+    );
+  }
   const { SafeProtocolKit, SafeApiKit } = loadSafeDependencies();
   const parsedOptions =
     options && typeof options === "object" && !Array.isArray(options)

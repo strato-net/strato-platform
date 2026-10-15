@@ -23,7 +23,6 @@ export STRATO_NODE_URL=https://<STRATO_HOST>
 export ROLLOUT_DIR=<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>
 cd "$REPO_ROOT"
 test -z "$(git status --porcelain)"
-export RELEASE_COMMIT="$(git rev-parse HEAD)"
 mkdir -p "$ROLLOUT_DIR/.deployment"
 chmod 700 "$ROLLOUT_DIR" "$ROLLOUT_DIR/.deployment"
 eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
@@ -31,12 +30,25 @@ eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
 
 Verify `TARGET_NETWORK`, `TARGET_CHAIN_ID`, `TARGET_RPC_ENV`, `VERIFIER_COUNT`, and `VERIFIER_THRESHOLD`.
 
-Each role configures its own STRATO credentials in `app/contracts/.env`. Coordinator configures the external deployer and selected HTTPS RPC in `app/ethereum/.env`:
+STRATO admins keep their STRATO credentials in `app/contracts/.env`.
+
+Coordinator keeps rollout OAuth and RPC credentials in `$ROLLOUT_DIR/deployment.env`:
 
 ```dotenv
-<TARGET_RPC_ENV>=<TARGET_HTTPS_RPC>
+OAUTH_URL=<STRATO_OPENID_DISCOVERY_URL>
+OAUTH_CLIENT_ID=<STRATO_CLIENT_ID>
+OAUTH_CLIENT_SECRET=<STRATO_CLIENT_SECRET>
 CHAIN_<TARGET_CHAIN_ID>_RPC_URL=<TARGET_HTTPS_RPC>
 ```
+
+Coordinator configures the temporary external deployer and selected Hardhat RPC in `app/ethereum/.env`:
+
+```dotenv
+PRIVATE_KEY=<TEMPORARY_EXTERNAL_DEPLOYER_KEY>
+<TARGET_RPC_ENV>=<TARGET_HTTPS_RPC>
+```
+
+Safe owners provide `SAFE_OWNER_PRIVATE_KEY` only while signing. The funded Safe executor provides `SAFE_TX_EXECUTOR_PRIVATE_KEY` only while executing. Infra stores Runtime, verifier, KMS and API secrets in the deployment platform. Never copy credentials between roles.
 
 Install and compile:
 
@@ -64,6 +76,22 @@ Infra provisions:
 - native signer/executor identities unless **EAB-only**.
 
 Return only public addresses and endpoints. Keep workloads stopped.
+
+### 1.1 Safe and gas readiness
+
+Before deployment:
+
+1. Verify the Safe is deployed on `TARGET_CHAIN_ID` with the approved owners and threshold.
+2. Fund every external-chain transaction sender with the chain's native gas token. This includes the EAB executor and the account that will execute generated Safe transactions.
+3. Record each funded address and verify its balance through the selected RPC.
+4. Select one Safe submission mode:
+   - Hosted Safe Transaction Service: a Safe owner registers `services.safeProposerAddress` as a delegate of `SAFE_ADDRESS` and verifies the delegate through that service.
+   - Direct script: skip proposer delegation; Safe owners sign and the funded executor submits through `safe:batch`.
+5. Compare the legacy bridge Safe with `SAFE_ADDRESS`:
+   - Different Safes: record both addresses and proposal writers.
+   - Same Safe: designate one proposal writer and drain or reconcile every pending legacy and EAB proposal before switching writers. Do not run competing proposal writers against the same Safe nonce; use separate Safes if both writers must operate concurrently.
+
+Do not continue until funding, submission mode and shared-Safe ownership are recorded in the rollout review.
 
 ## 2. Deploy STRATO contracts
 
@@ -207,6 +235,8 @@ cd "$REPO_ROOT/app/ethereum"
 npm run external:rollout -- init --node-url "$STRATO_NODE_URL" --chain-id "$TARGET_CHAIN_ID" --source-chain-id <EXISTING_EXTERNAL_CHAIN_ID> --manifest "$ROLLOUT_DIR/deployment.json"
 ```
 
+`--chain-id` is the destination being deployed. `--source-chain-id` is an existing configured external chain whose routes seed the new manifest; every imported address, token and limit remains subject to review.
+
 Edit only `deployment.json`:
 
 - set the reviewed TokenRouter, EAB, dependencies, operator and guardian;
@@ -251,7 +281,7 @@ npm run external:rollout -- continue --manifest "$ROLLOUT_DIR/deployment.json"
 Execute only the returned action:
 
 - Admin action: send the exact `file` under its existing basename and the short `run` command to each required admin.
-- Safe action: send the exact `file` to the named Safe owners.
+- Safe action: use the generated file with the Safe owner flow below.
 - Infra action: apply or repair the named service configuration.
 - Failed check: fix it and rerun `continue`.
 
@@ -266,6 +296,29 @@ For an admin action, each admin:
 The default combined rollout produces one EAB+native STRATO configuration file per admin. Safe transactions remain separate. Coordinator reruns `continue` after each external action.
 
 If a batch is interrupted, stop. Coordinator reruns `continue`; live governance evidence excludes completed calls and generates a reduced replacement file.
+
+For each Safe action, `continue` prints bound `commands.inspect`, `commands.sign` and `commands.execute` values.
+
+1. Coordinator runs `commands.inspect` and records the displayed `safeTxHash` as `REVIEWED_SAFE_TX_HASH`.
+2. Each required owner independently reviews the same chain, Safe, calls, nonce and hash, then runs `commands.sign` with a unique `OWNER_SIGNATURE_FILE`:
+
+```bash
+read -rsp "Safe owner private key: " SAFE_OWNER_PRIVATE_KEY; export SAFE_OWNER_PRIVATE_KEY; echo
+export OWNER_SIGNATURE_FILE=<ABSOLUTE_OWNER_SIGNATURE_FILE>
+<RUN commands.sign EXACTLY>
+unset SAFE_OWNER_PRIVATE_KEY
+```
+
+3. A funded external-chain account collects the threshold, adds one `--signature` argument per owner file to `commands.execute`, and runs it:
+
+```bash
+read -rsp "Safe executor private key: " SAFE_TX_EXECUTOR_PRIVATE_KEY; export SAFE_TX_EXECUTOR_PRIVATE_KEY; echo
+export REVIEWED_SAFE_TX_HASH=<HASH_FROM_INSPECT>
+<RUN commands.execute WITH EVERY OWNER SIGNATURE FILE>
+unset SAFE_TX_EXECUTOR_PRIVATE_KEY
+```
+
+The executor checks its gas balance, simulates the transaction, and requires the Safe `ExecutionSuccess` event. The first generated Safe action is the live direct-execution canary; stop if it fails. This direct flow does not require a hosted Safe Transaction Service. If execution is interrupted or the Safe nonce changes, do not reuse or resubmit the signatures; the Coordinator reruns `continue`, reconciles live state and supplies the current Safe file.
 
 ## 6. Start services
 
@@ -330,7 +383,8 @@ Order:
 1. Native destination Safe activation, when selected.
 2. Combined EAB+native STRATO activation approval file.
 3. EAB Safe activation file.
-4. Deposit canaries.
+4. Verify the external chain is enabled on STRATO and the external vault and deposit router are unpaused.
+5. Deposit canaries.
 
 After each action, rerun `continue`. Do not reuse an earlier approval or Safe file.
 

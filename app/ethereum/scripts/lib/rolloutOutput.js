@@ -2,6 +2,21 @@ const fs = require("node:fs");
 
 const { shellQuote, governanceBatch } = require("./externalBridgeOrchestration");
 
+function safeCommands(file) {
+  if (!fs.existsSync(file)) return undefined;
+  const batch = JSON.parse(fs.readFileSync(file, "utf8"));
+  const bound = `--file ${shellQuote(file)} --chain-id ${shellQuote(batch.chainId)} --safe ${shellQuote(batch.meta.createdFromSafeAddress)}`;
+  return {
+    inspect: `npm run safe:batch -- inspect ${bound}`,
+    sign: `npm run safe:batch -- sign ${bound} --output "$OWNER_SIGNATURE_FILE"`,
+    execute: `npm run safe:batch -- execute ${bound} --signature "$OWNER_SIGNATURE_FILE" --confirm "$REVIEWED_SAFE_TX_HASH"`,
+  };
+}
+
+function safeActionCommands(file) {
+  const commands = safeCommands(file);
+  return commands ? { commands } : {};
+}
 
 function planReviewSummary(context, artifacts) {
   const { rollout, deployment, manifest } = context;
@@ -217,7 +232,12 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
     }
     if (report.nativeScopeComplete) return { status: "NATIVE_ACTIVE_CANARY_REQUIRED", role: "coordinator",
       action: "RUN_NATIVE_CANARIES", instruction: "Native is active. EAB was not changed. Reconcile native canaries before exposing native intake." };
-    if (report.nativeAction) return { status: "ACTION_REQUIRED", ...report.nativeAction };
+    if (report.nativeAction) return {
+      status: "ACTION_REQUIRED",
+      ...report.nativeAction,
+      ...(report.nativeAction.file && report.nativeAction.action?.includes("SAFE")
+        ? safeActionCommands(report.nativeAction.file) : {}),
+    };
     if (report.infraAction) return { status: "ACTION_REQUIRED", role: "infra", phase: "start",
       action: "START_OR_REPAIR_SERVICES", instruction: "Confirm the processor/Safe-writer handoff, apply the reviewed service archive and start workloads. Repair any reported readiness mismatch; then the Coordinator reruns continue.",
       infra: report.infraAction, failedChecks: operator.failedChecks };
@@ -261,6 +281,7 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
         status: "ACTION_REQUIRED",
         action: "EXECUTE_ACTIVATION_TRANSACTION_IN_SAFE",
         file: report.activationFile,
+        ...safeActionCommands(report.activationFile),
         then: "Run continue after Safe execution, then complete the canary.",
       };
     }
@@ -270,6 +291,7 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
         action: "EXECUTE_SAFE_TRANSACTION",
         step: operator.safeAction.step,
         file: operator.safeAction.path,
+        ...safeActionCommands(operator.safeAction.path),
         then: "Run continue again after the Safe transaction executes.",
       };
     }
@@ -333,4 +355,4 @@ function provisioningReviewComplete(manifest) {
   return !JSON.stringify(reviewed).includes("REVIEW_REQUIRED");
 }
 
-module.exports = { planReviewSummary, rolloutProgress, resolveNextAction, terminalSummary, preparationStage, provisioningReviewComplete };
+module.exports = { safeCommands, planReviewSummary, rolloutProgress, resolveNextAction, terminalSummary, preparationStage, provisioningReviewComplete };

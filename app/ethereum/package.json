@@ -36,6 +36,8 @@
     "external:rollout:test": "node --test test/ExternalBridgeRolloutPlan.test.js test/ExternalBridgeOrchestration.test.js",
     "external:vault:ops": "node scripts/externalBridgeVaultOps.js",
     "external:vault:ops:test": "node --test test/ExternalBridgeVaultOps.test.js",
+    "safe:batch": "node scripts/safeBatch.js",
+    "safe:batch:test": "node --test test/SafeBatchExecutor.test.js",
     "bridge:prepare": "node scripts/prepareBridgeRollout.js",
     "bridge:reconcile-backing": "node scripts/reconcileLegacyBridgeBacking.js",
     "native:configure": "node scripts/nativeBridgeConfigure.js",
@@ -63,6 +65,10 @@
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
     "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "@safe-global/api-kit": "^5.0.3",
+    "@safe-global/protocol-kit": "^8.0.7",
+    "@safe-global/safe-deployments": "1.37.63",
+    "@safe-global/types-kit": "^4.0.1",
     "dotenv": "^17.2.1"
   }
 }

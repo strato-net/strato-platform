@@ -223,6 +223,15 @@ For new deployments, follow the canonical operator runbook at
 `external:rollout:prepare|finalize|generate` flow below is retained for legacy
 artifacts and is not the new-deployment workflow.
 
+Generated Safe batches can use the hosted Safe workflow or direct execution.
+For direct execution, use the bound commands printed by `external:rollout
+continue`: `safe:batch inspect`, one `safe:batch sign` per required owner, then
+`safe:batch execute` with every signature file and the reviewed Safe
+transaction hash. Direct execution validates the chain, Safe, calls, nonce,
+owners, threshold, executor gas, simulation, receipt, and Safe
+`ExecutionSuccess` event. See the canonical runbook for credentials and
+recovery.
+
 ### Pair deployment
 
 The pair deployer creates one `ExternalBridgeVault` proxy and one new
