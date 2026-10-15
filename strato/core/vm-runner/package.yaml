@@ -31,7 +31,7 @@ library:
   - bytestring
   - common-log
   - composable-monads-base
-  - nodedb-monad
+  - statedb-monad
   - conduit
   - containers
   - cross-monitoring
@@ -42,7 +42,6 @@ library:
   - format
   - lens
   - streaming
-  - merkle-patricia-db
   - monad-alter
   - prometheus-client
   - seqevents
@@ -92,7 +91,7 @@ executables:
       - blockapps-data
       - blockapps-mpdbs
       - blockDB
-      - merkle-patricia-db
+      - statedb-monad
       - strato-genesis
       - bytestring
       - common-log
@@ -131,7 +130,7 @@ tests:
       - hspec
       - hspec-expectations-lifted
       - labeled-error
-      - merkle-patricia-db
+      - statedb-monad
       - monad-alter
       - strato-model
       - vm-runner

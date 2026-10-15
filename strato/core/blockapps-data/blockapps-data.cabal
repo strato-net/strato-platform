@@ -71,7 +71,6 @@ library
     , generic-random
     , labeled-error
     , lens
-    , merkle-patricia-db
     , monad-logger
     , network
     , openapi3
@@ -82,6 +81,7 @@ library
     , resourcet
     , servant-docs
     , solid-vm-model
+    , statedb-monad
     , strato-conf
     , strato-model
     , text

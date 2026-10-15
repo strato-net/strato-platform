@@ -30,7 +30,7 @@ module Blockchain.DB.CodeDB
   )
 where
 
-import Blockchain.Database.MerklePatricia
+import Control.Monad.Composable.StateDB
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import qualified Control.Monad.Change.Alter as A

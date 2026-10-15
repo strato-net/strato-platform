@@ -59,7 +59,6 @@ library
     , http-client
     , labeled-error
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-logger
     , monad-loops
     , nibblestring
@@ -67,6 +66,7 @@ library
     , resourcet
     , seqevents
     , solid-vm-model
+    , statedb-monad
     , strato-conf
     , strato-model
     , strato-redis-blockdb
@@ -108,8 +108,8 @@ executable strato-barometer
     , directory
     , filepath
     , labeled-error
-    , merkle-patricia-db
     , seqevents
+    , statedb-monad
     , strato-model
     , strato-p2p
     , text

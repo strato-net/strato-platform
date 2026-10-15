@@ -73,7 +73,6 @@ library
     , lens
     , lifted-async
     , lifted-base
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , network
@@ -85,6 +84,7 @@ library
     , servant-client
     , servant-server
     , split
+    , statedb-monad
     , stm-conduit
     , strato-conf
     , strato-genesis

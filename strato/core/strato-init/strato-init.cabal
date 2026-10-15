@@ -33,7 +33,8 @@ library
       src/
   ghc-options: -Wall -O2 -threaded
   build-depends:
-      aeson
+      accountdb-monad
+    , aeson
     , base
     , blockapps-data
     , blockapps-mpdbs
@@ -52,7 +53,6 @@ library
     , hflags
     , http-types
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , process

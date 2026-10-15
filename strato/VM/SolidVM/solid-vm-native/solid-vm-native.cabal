@@ -60,7 +60,6 @@ library
     , haskell-src-exts
     , lens
     , lrucache
-    , merkle-patricia-db
     , monad-alter
     , mtl
     , solid-vm
@@ -69,6 +68,7 @@ library
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-conf
     , strato-model
     , template-haskell

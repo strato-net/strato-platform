@@ -10,8 +10,9 @@ module Control.Monad.Composable.NodeDB
     nodeDB,
     encodeNode,
     decodeNode,
-    mapNodeDB,
+    memoryNodeDB,
     overlayNodeDB,
+    fetchingNodeDB,
   )
 where
 
@@ -68,6 +69,9 @@ decodeNode bs
   | otherwise = rlpDecode (rlpDeserialize bs)
 
 -- | Every node in a map; the whole store for in-memory runs.
+memoryNodeDB :: IO NodeDB
+memoryNodeDB = mapNodeDB <$> newIORef M.empty
+
 mapNodeDB :: IORef (M.Map MP.StateRoot MP.NodeData) -> NodeDB
 mapNodeDB ref =
   NodeDB
@@ -79,8 +83,20 @@ mapNodeDB ref =
     }
 
 -- | Writes stay in the overlay; a read misses through to the inner store.
-overlayNodeDB :: IORef (M.Map MP.StateRoot MP.NodeData) -> NodeDB -> NodeDB
-overlayNodeDB ref inner =
-  (mapNodeDB ref)
-    { lookupNode = \k -> M.lookup k <$> readIORef ref >>= maybe (lookupNode inner k) (pure . Just)
+overlayNodeDB :: NodeDB -> IO NodeDB
+overlayNodeDB inner = do
+  ref <- newIORef M.empty
+  pure
+    (mapNodeDB ref)
+      { lookupNode = \k -> M.lookup k <$> readIORef ref >>= maybe (lookupNode inner k) (pure . Just)
+      }
+
+-- | A node the store lacks is asked for elsewhere (a peer) and kept once it
+-- arrives.
+fetchingNodeDB :: (MP.StateRoot -> IO (Maybe MP.NodeData)) -> NodeDB -> NodeDB
+fetchingNodeDB fetch inner =
+  inner
+    { lookupNode = \k -> lookupNode inner k >>= maybe (fetch k >>= traverse (keep k)) (pure . Just)
     }
+  where
+    keep k nd = nd <$ insertNode inner k nd

@@ -33,7 +33,7 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.Exception

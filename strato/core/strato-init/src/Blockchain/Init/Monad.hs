@@ -30,74 +30,52 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.AccountDB
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.StateDB
 import Control.Monad.IO.Class
 import Data.IORef
-import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
-import SolidVM.Model.Storable
 import System.Directory (createDirectoryIfMissing)
 
 data SetupDBs = SetupDBs
   { hashDB :: HashDB,
-    codeDB :: CodeDB,
-    localStorageBlock :: IORef (BlockMap (Address, StoragePath) BasicValue),
-    localAddressStateTx :: IORef (M.Map Address AddressStateModification),
-    localAddressStateBlock :: IORef (BlockMap Address AddressStateModification)
+    codeDB :: CodeDB
   }
 
-type HasDBs m = (Mod.Accessible SetupDBs m, HasStateDB m)
+type HasDBs m = (Mod.Accessible SetupDBs m, HasStateDB m, HasMemAddressStateDB m, HasMemRawStorageDB m)
 
 runSetupDBM :: (InternalState :> es) =>
-               Eff (SetupDBs ': StateDBEnv ': es) b -> Eff es b
+               Eff (SetupDBs ': AccountDBEnv ': StateDBEnv ': es) b -> Eff es b
 runSetupDBM = runSetupDBMInDir ".ethereumH"
 
 -- | Run setup with databases in a specified directory.
 -- Useful for genesis-builder which needs its own temp database to avoid locking conflicts.
 runSetupDBMInDir :: (InternalState :> es) =>
-                    FilePath -> Eff (SetupDBs ': StateDBEnv ': es) b -> Eff es b
+                    FilePath -> Eff (SetupDBs ': AccountDBEnv ': StateDBEnv ': es) b -> Eff es b
 runSetupDBMInDir baseDir mv = do
   liftIO $ createDirectoryIfMissing True baseDir
   let open path = DB.open (baseDir ++ path) DB.defaultOptions {DB.createIfMissing = True, DB.cacheSize = 1024}
   sdb <- newStateDBEnv . nodeDB . levelDBBytes =<< open stateDBPath
+  adb <- newAccountDBEnv
   -- Roots are kept per block; setup has no block, so use the zero hash.
-  liftIO $ writeIORef (currentBlock sdb) (Just . CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)
+  liftIO $ writeIORef (currentBlock adb) (Just . CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)
   hdb <- HashDB <$> open hashDBPath
   cdb <- CodeDB <$> open codeDBPath
-  m2 <- liftIO $ newIORef emptyBlockMap
-  m3 <- liftIO $ newIORef M.empty
-  m4 <- liftIO $ newIORef emptyBlockMap
-  runStateDBM sdb $ provide (SetupDBs hdb cdb m2 m3 m4) mv
-
-instance (Monad m, MonadIO m, HasDBs m) => HasMemRawStorageDB m where
-  getMemRawStorageBlockDB = liftIO . readIORef . localStorageBlock =<< Mod.access Mod.Proxy
-  putMemRawStorageBlockMap theMap = do
-    lsbref <- fmap localStorageBlock $ Mod.access Mod.Proxy
-    liftIO $ atomicWriteIORef lsbref theMap
+  runStateDBM sdb . runAccountDBM adb $ provide (SetupDBs hdb cdb) mv
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (RawStorageKey `A.Alters` RawStorageValue) m where
   lookup _ = genericLookupRawStorageDB
   insert _ = genericInsertRawStorageDB
   delete _ = genericDeleteRawStorageDB
 
-instance (MonadIO m, HasDBs m) => HasMemAddressStateDB m where
-  getAddressStateTxDBMap = liftIO . readIORef =<< fmap localAddressStateTx (Mod.access Mod.Proxy)
-  putAddressStateTxDBMap theMap = do
-    lastref <- fmap localAddressStateTx $ Mod.access Mod.Proxy
-    liftIO $ atomicWriteIORef lastref theMap
-  getAddressStateBlockDBMap = liftIO . readIORef =<< fmap localAddressStateBlock (Mod.access Mod.Proxy)
-  putAddressStateBlockDBMap theMap = do
-    lasbref <- fmap localAddressStateBlock $ Mod.access Mod.Proxy
-    liftIO $ atomicWriteIORef lasbref theMap
-
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressState) m where
   lookup _ = getAddressStateMaybe
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance {-# OVERLAPPING #-} (SetupDBs :> es, StateDBEnv :> es, Logger :> es) => (Address `A.Selectable` AddressState) (Eff es) where
+instance {-# OVERLAPPING #-} (SetupDBs :> es, AccountDBEnv :> es, StateDBEnv :> es, Logger :> es) => (Address `A.Selectable` AddressState) (Eff es) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where

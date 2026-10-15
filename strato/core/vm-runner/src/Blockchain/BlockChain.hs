@@ -48,7 +48,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.Transaction
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Data.TransactionResultStatus
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
 import Blockchain.Forks (isReceiptsRootForkActive)

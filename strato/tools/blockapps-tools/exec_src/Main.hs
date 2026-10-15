@@ -20,7 +20,7 @@ import BlockApps.Tools.Raw as Raw
 import BlockApps.Tools.RawMP as RawMP
 import BlockApps.Tools.Redis
 import BlockApps.Tools.State as State
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address

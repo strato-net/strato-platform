@@ -46,7 +46,6 @@ library
     , format
     , hashable
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-alter
     , monad-logger
     , monad-loops
@@ -80,7 +79,6 @@ test-suite blockapps-mpdbs-test
     , hspec-expectations-lifted
     , lens
     , leveldb-haskell
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , resourcet

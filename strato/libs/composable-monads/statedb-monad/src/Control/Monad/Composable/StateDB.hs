@@ -1,127 +1,146 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
--- | The state database as a composable monad layer: the trie node store plus
--- the root cursor (which state root each chain is at, under the block being
--- worked on). Code that reads or writes state asks for 'HasStateDB'; providing
--- a 'StateDBEnv' in the row satisfies it.
+-- | The state database as a composable monad layer: a Merkle Patricia trie
+-- (key/value under a state root) over a node store. Code that reads or
+-- writes a trie asks for 'HasStateDB'; providing a 'StateDBEnv' in the row
+-- (and, for the root cursor, an @AccountDBEnv@) satisfies it. This is the
+-- only module outside the trie library that sees trie nodes; the rest of the
+-- code sees roots, keys and values.
 module Control.Monad.Composable.StateDB
   ( StateDBEnv (..),
     StateDBM,
     HasStateDB,
-    CurrentBlockHash (..),
     newStateDBEnv,
     runStateDBM,
-    snapshotStateDBEnv,
-    restoreStateDBEnv,
-    clearStateRoots,
-    getFlushedRoot,
-    setFlushedRoot,
+    runStateDBOn,
+    sandboxStateDBEnv,
     tickNodeDB,
     flushNodeDB,
-    module Control.Monad.Composable.NodeDB,
+
+    -- * The trie
+    MP.StateRoot (..),
+    MP.emptyTriePtr,
+    MP.blankStateRoot,
+    MP.sha2StateRoot,
+    MP.unboxStateRoot,
+    MP.Key,
+    MP.Val,
+    keyToSafeKey,
+    MP.getKeyVal,
+    MP.putKeyVal,
+    MP.putKeyValExisted,
+    MP.deleteKey,
+    MP.keyExists,
+    MP.initializeBlank,
+    unsafeGetAllKeyVals,
+    unsafeGetKeyVals,
+    forEachKeyVal,
+    MP.getProof,
+    MP.getInclusionProof,
+    MP.addAllKVs,
+    MP.runMP,
+    MP.StateDB (..),
+    hasStateRoot,
+    Diff.dbDiff,
+    Diff.DiffOp (..),
+    -- * Nodes, opaque; held and passed on by the peer protocol only
+    TrieNode,
+    withMissingNodeFetcher,
+    lookupNode,
+    insertNode,
+
+    -- * Node stores
+    NodeDB,
+    NodeBytes,
+    levelDBBytes,
+    nodeDB,
+    memoryNodeDB,
+    cachedNodeDB,
   )
 where
 
 import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Blockchain.Database.MerklePatricia.Diff as Diff
+import Blockchain.Database.MerklePatricia.Internal (keyToSafeKey, unsafeGetAllKeyVals, unsafeGetKeyVals)
+import qualified Blockchain.Database.MerklePatricia.Map as Map
 import Blockchain.Strato.Model.ExtendedWord (Word256)
-import Blockchain.Strato.Model.Keccak256 (Keccak256, unsafeCreateKeccak256FromWord256)
-import Control.DeepSeq (NFData)
+import Blockchain.Data.RLP (RLPObject)
+import Blockchain.Strato.Model.Keccak256 (rlpHash)
 import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base
-import Control.Monad.Composable.NodeDB
-import Control.Monad (join)
+import Control.Monad.Composable.NodeDB (NodeBytes, NodeDB, fetchingNodeDB, levelDBBytes, memoryNodeDB, nodeDB, overlayNodeDB)
+import qualified Control.Monad.Composable.NodeDB as N
+import Control.Monad.Composable.NodeDB.Cached (cachedNodeDB)
 import Control.Monad.IO.Class
-import Data.Foldable (for_)
-import Data.IORef
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import Data.Traversable (for)
-import GHC.Generics (Generic)
+import qualified Database.LevelDB as DB
+import Data.Maybe (isJust)
 
-newtype CurrentBlockHash = CurrentBlockHash {unCurrentBlockHash :: Keccak256}
-  deriving (Generic, NFData, Show)
+-- | A trie node. Nothing outside this library looks inside one.
+type TrieNode = MP.NodeData
 
-data StateDBEnv = StateDBEnv
-  { nodes :: NodeDB,
-    stateRoots :: IORef (M.Map (Keccak256, Maybe Word256) MP.StateRoot),
-    currentBlock :: IORef (Maybe CurrentBlockHash),
-    -- | The root the last flush of the block maps produced.
-    flushedRoot :: IORef (Maybe MP.StateRoot)
-  }
+newtype StateDBEnv = StateDBEnv {nodes :: NodeDB}
 
 type StateDBM es = Eff (StateDBEnv ': es)
 
 type HasStateDB m =
-  ( (MP.StateRoot `A.Alters` MP.NodeData) m,
+  ( (MP.StateRoot `A.Alters` TrieNode) m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m
   )
 
-newStateDBEnv :: MonadIO m => NodeDB -> m StateDBEnv
-newStateDBEnv db = liftIO $ StateDBEnv db <$> newIORef M.empty <*> newIORef Nothing <*> newIORef Nothing
+newStateDBEnv :: Applicative m => NodeDB -> m StateDBEnv
+newStateDBEnv = pure . StateDBEnv
 
 runStateDBM :: StateDBEnv -> StateDBM es a -> Eff es a
 runStateDBM = provide
 
--- | A copy of the cursor over the same node store; writes to it leave the
--- original alone.
-snapshotStateDBEnv :: MonadIO m => StateDBEnv -> m StateDBEnv
-snapshotStateDBEnv e = liftIO $ StateDBEnv (nodes e) <$> copy (stateRoots e) <*> copy (currentBlock e) <*> copy (flushedRoot e)
-  where
-    copy r = newIORef =<< readIORef r
+-- | Read a trie straight off a LevelDB handle (tools).
+runStateDBOn :: MonadIO m => DB.DB -> StateDBM '[] a -> m a
+runStateDBOn db m = do
+  e <- newStateDBEnv (nodeDB (levelDBBytes db))
+  liftIO . runEff $ runStateDBM e m
 
--- | Put the cursor back to what a snapshot holds.
-restoreStateDBEnv :: MonadIO m => StateDBEnv -> StateDBEnv -> m ()
-restoreStateDBEnv e snap = liftIO $ do
-  put (stateRoots e) (stateRoots snap)
-  put (currentBlock e) (currentBlock snap)
-  put (flushedRoot e) (flushedRoot snap)
-  where
-    put r s = writeIORef r =<< readIORef s
+-- | The same store with writes held in an overlay: nothing done through it
+-- reaches the store.
+sandboxStateDBEnv :: MonadIO m => StateDBEnv -> m StateDBEnv
+sandboxStateDBEnv e = liftIO $ StateDBEnv <$> overlayNodeDB (nodes e)
+
+-- | Run the body with nodes the store lacks fetched by @fetch@ (from a peer)
+-- and kept; used while comparing our state with a block's.
+withMissingNodeFetcher :: forall es a. (StateDBEnv :> es) => (MP.StateRoot -> Eff es (Maybe TrieNode)) -> Eff es a -> Eff es a
+withMissingNodeFetcher fetch m = Eff $ \outer ->
+  unEff (localEnv @StateDBEnv (\e -> e {nodes = fetchingNodeDB (\k -> unEff (fetch k) outer) (nodes e)}) m) outer
+
+lookupNode :: (MonadIO m, AccessibleEnv StateDBEnv m) => MP.StateRoot -> m (Maybe TrieNode)
+lookupNode k = env $ \e -> N.lookupNode (nodes e) k
+
+-- | Keep a node received from a peer; its hash is its key.
+insertNode :: (MonadIO m, AccessibleEnv StateDBEnv m) => TrieNode -> m ()
+insertNode nd = env $ \e -> N.insertNode (nodes e) (MP.sha2StateRoot $ rlpHash nd) nd
+
+-- | Whether the trie at this root is in the store.
+hasStateRoot :: (MP.StateRoot `A.Alters` TrieNode) m => MP.StateRoot -> m Bool
+hasStateRoot sr = isJust <$> A.lookup (A.Proxy @TrieNode) sr
+
+-- | Visit every key/value under a root.
+forEachKeyVal :: (MP.StateRoot `A.Alters` TrieNode) m => (MP.Key -> RLPObject -> m ()) -> MP.StateRoot -> m ()
+forEachKeyVal = Map.map
 
 env :: (MonadIO m, AccessibleEnv StateDBEnv m) => (StateDBEnv -> IO a) -> m a
 env f = accessEnv >>= liftIO . f
 
-clearStateRoots :: (MonadIO m, AccessibleEnv StateDBEnv m) => m ()
-clearStateRoots = env $ \e -> writeIORef (stateRoots e) M.empty
-
-getFlushedRoot :: (MonadIO m, AccessibleEnv StateDBEnv m) => m (Maybe MP.StateRoot)
-getFlushedRoot = env $ readIORef . flushedRoot
-
-setFlushedRoot :: (MonadIO m, AccessibleEnv StateDBEnv m) => Maybe MP.StateRoot -> m ()
-setFlushedRoot sr = env $ \e -> writeIORef (flushedRoot e) sr
-
 tickNodeDB, flushNodeDB :: (MonadIO m, AccessibleEnv StateDBEnv m) => m ()
-tickNodeDB = env $ tickNodes . nodes
-flushNodeDB = env $ flushNodes . nodes
+tickNodeDB = env $ N.tickNodes . nodes
+flushNodeDB = env $ N.flushNodes . nodes
 
-instance (StateDBEnv :> es) => (MP.StateRoot `A.Alters` MP.NodeData) (Eff es) where
-  lookup _ k = env $ \e -> lookupNode (nodes e) k
-  insert _ k v = env $ \e -> insertNode (nodes e) k v
-  delete _ k = env $ \e -> deleteNode (nodes e) k
-
--- | The roots are kept per block; without a current block there is nothing
--- to look up or record.
-instance (StateDBEnv :> es) => (Maybe Word256 `A.Alters` MP.StateRoot) (Eff es) where
-  lookup _ chainId = env $ \e -> do
-    mBH <- readIORef (currentBlock e)
-    fmap join . for mBH $ \(CurrentBlockHash bh) ->
-      M.lookup (bh, chainId) <$> readIORef (stateRoots e)
-  insert _ chainId sr = env $ \e -> do
-    mBH <- readIORef (currentBlock e)
-    for_ mBH $ \(CurrentBlockHash bh) -> modifyIORef' (stateRoots e) (M.insert (bh, chainId) sr)
-  delete _ chainId = env $ \e -> do
-    mBH <- readIORef (currentBlock e)
-    for_ mBH $ \(CurrentBlockHash bh) -> modifyIORef' (stateRoots e) (M.delete (bh, chainId))
-
-instance (StateDBEnv :> es) => Mod.Modifiable CurrentBlockHash (Eff es) where
-  get _ = env $ fmap (fromMaybe (CurrentBlockHash $ unsafeCreateKeccak256FromWord256 0)) . readIORef . currentBlock
-  put _ bh = env $ \e -> writeIORef (currentBlock e) (Just bh)
+instance (StateDBEnv :> es) => (MP.StateRoot `A.Alters` TrieNode) (Eff es) where
+  lookup _ k = env $ \e -> N.lookupNode (nodes e) k
+  insert _ k v = env $ \e -> N.insertNode (nodes e) k v
+  delete _ k = env $ \e -> N.deleteNode (nodes e) k

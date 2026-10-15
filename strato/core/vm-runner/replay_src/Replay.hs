@@ -18,7 +18,7 @@ import Blockchain.Event (BlockVerificationFailure)
 import Control.Monad.IO.Class (liftIO)
 import Blockchain.Model.WrappedBlock (OutputBlock (..), outputBlockHash)
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()

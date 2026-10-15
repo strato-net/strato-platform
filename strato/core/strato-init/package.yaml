@@ -46,7 +46,6 @@ library:
   - hflags
   - http-types
   - leveldb-haskell
-  - merkle-patricia-db
   - monad-alter
   - nibblestring
   - entropy
@@ -55,7 +54,7 @@ library:
   - servant-client
   - strato-auth
   - solid-vm-model
-  - statedb-monad
+  - accountdb-monad
   - statedb-monad
   - strato-conf
   - strato-genesis

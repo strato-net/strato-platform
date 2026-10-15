@@ -39,7 +39,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
 import Blockchain.Data.Util (integer2Bytes)
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import BlockApps.Solidity.ABI.Bridge (encodeEventToLogValues)
 import BlockApps.Solidity.ABI.Codec (abiDecode)
 import qualified Blockchain.SolidVM.Builtins as Builtins

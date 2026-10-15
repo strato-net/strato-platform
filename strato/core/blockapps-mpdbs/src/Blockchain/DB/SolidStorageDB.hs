@@ -22,7 +22,7 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Data.Bifunctor (second)
 import SolidVM.Model.Storable

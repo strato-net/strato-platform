@@ -48,7 +48,8 @@ library:
   - format
   - lens
   - memory
-  - merkle-patricia-db
+  - accountdb-monad
+  - statedb-monad
   - monad-alter
   - nibblestring
   - ordered-containers
@@ -134,7 +135,7 @@ tests:
       - hspec-expectations-lifted
       - labeled-error
       - lens
-      - merkle-patricia-db
+      - statedb-monad
       - monad-alter
       - pairing
       - raw-strings-qq

@@ -32,6 +32,7 @@ library
   ghc-options: -Wall -O2 -fexpose-all-unfoldings -fspecialise-aggressively -fdicts-cheap -fsolve-constant-dicts
   build-depends:
       Decimal
+    , accountdb-monad
     , base
     , base16-bytestring
     , base64-bytestring
@@ -55,7 +56,6 @@ library
     , format
     , lens
     , memory
-    , merkle-patricia-db
     , monad-alter
     , nibblestring
     , ordered-containers
@@ -67,6 +67,7 @@ library
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-conf
     , strato-model
     , text
@@ -155,7 +156,6 @@ test-suite solid-vm-spec
     , hspec-expectations-lifted
     , labeled-error
     , lens
-    , merkle-patricia-db
     , monad-alter
     , ordered-containers
     , pairing
@@ -167,6 +167,7 @@ test-suite solid-vm-spec
     , solid-vm-parser
     , solid-vm-static-analysis
     , source-tools
+    , statedb-monad
     , strato-genesis
     , strato-init
     , strato-model

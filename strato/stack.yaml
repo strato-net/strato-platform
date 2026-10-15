@@ -67,6 +67,7 @@ packages:
 - libs/composable-monads/vault-monad
 - libs/composable-monads/codedb-monad
 - libs/composable-monads/statedb-monad
+- libs/composable-monads/accountdb-monad
 - libs/ethereum-rlp
 - libs/format
 - libs/json-rpc-server

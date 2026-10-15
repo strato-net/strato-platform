@@ -31,7 +31,6 @@ library:
   - format
   - hashable
   - leveldb-haskell
-  - merkle-patricia-db
   - monad-alter
   - statedb-monad
   - monad-loops
@@ -58,7 +57,6 @@ tests:
       - hspec-expectations-lifted
       - lens
       - leveldb-haskell
-      - merkle-patricia-db
       - monad-alter
       - nibblestring
       - resourcet

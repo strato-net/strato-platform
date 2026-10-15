@@ -13,7 +13,7 @@ module Blockchain.DB.StateDB
   )
 where
 
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq
 import Control.Monad.Change

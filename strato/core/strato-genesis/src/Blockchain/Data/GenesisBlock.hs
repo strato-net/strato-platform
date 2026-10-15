@@ -31,7 +31,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisInfo (GenesisInfo)
 import qualified Blockchain.Data.GenesisInfo as GI
-import Blockchain.Database.MerklePatricia
+import Control.Monad.Composable.StateDB
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord

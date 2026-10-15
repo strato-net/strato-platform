@@ -28,9 +28,9 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Database.MerklePatricia.Internal (Key, Val, StateRoot, unsafeGetAllKeyVals)
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as Diff (dbDiff, DiffOp (..))
+import Control.Monad.Composable.StateDB (Key, Val, StateRoot, unsafeGetAllKeyVals)
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256

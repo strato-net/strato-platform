@@ -35,8 +35,7 @@ import Blockchain.DB.HashDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
-import qualified Blockchain.Database.MerklePatricia as MP
-import qualified Blockchain.Database.MerklePatricia.Internal as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Util

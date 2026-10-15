@@ -16,7 +16,7 @@ where
 import BlockApps.Logging
 import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
-import Blockchain.Database.MerklePatricia.StateRoot (emptyTriePtr)
+import Blockchain.Strato.Model.StateRoot (emptyTriePtr)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff

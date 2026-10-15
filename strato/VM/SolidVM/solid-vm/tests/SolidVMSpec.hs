@@ -34,7 +34,7 @@ import Blockchain.Data.ExecResults
 import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
-import Blockchain.Database.MerklePatricia as MP
+import Control.Monad.Composable.StateDB as MP
 import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlocks.Builder
 import Blockchain.Model.WrappedBlock

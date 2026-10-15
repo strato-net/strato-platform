@@ -24,7 +24,6 @@ library
     , composable-monads-base
     , containers
     , data-default
-    , deepseq
     , ethereum-rlp
     , kv-cache
     , leveldb-haskell

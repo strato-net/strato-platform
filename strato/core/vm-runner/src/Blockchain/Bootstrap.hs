@@ -23,7 +23,7 @@ import Blockchain.Data.BlockHeader (number, currentValidators)
 import Blockchain.Data.GenesisInfo hiding (stateRoot, number)
 import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.VMContext (ContextM, startFromStateRoot)

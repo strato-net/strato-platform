@@ -79,7 +79,7 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB ()
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import qualified Blockchain.Database.MerklePatricia as MP
+import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.EthConf (ethConf)
 import qualified Blockchain.EthConf.Model as Conf
 import qualified Blockchain.SolidVM.Environment as Env
@@ -98,6 +98,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
+import Control.Monad.Composable.AccountDB (snapshotAccountDBEnv, restoreAccountDBEnv)
 import Blockchain.Wiring ()
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
@@ -176,7 +177,6 @@ BlockData
 data SState = SState
   { env :: Env.Environment,
     callStack :: [CallInfo],
-    _ssMemDBs :: MemDBs,
     _action :: !Action,
     _gasInfo :: GasInfo,
     ssDebugSettingsValue :: Maybe DebugSettings,
@@ -191,7 +191,7 @@ makeLenses ''SState
 -- 'SM' is the node's row plus the evaluator's state cell, as one flat
 -- @Env -> IO@ layer; nothing is stacked underneath.
 newtype SM a = SM {unSM :: Eff (IORef SState ': ContextRow) a}
-  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger)
+  deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MP.StateRoot `A.Alters` MP.TrieNode, Maybe Word256 `A.Alters` MP.StateRoot, Mod.Modifiable CurrentBlockHash, HasMemAddressStateDB, HasMemRawStorageDB)
 
 -- | Run a node action from the evaluator: the same environment viewed without
 -- the evaluator-state slot.
@@ -232,16 +232,6 @@ gets f = f <$> get
 modify :: (SState -> SState) -> SM ()
 modify f = stateRef >>= \i -> atomicModifyIORef' i (\a -> (f a, ()))
 {-# INLINE modify #-}
-
-instance HasMemAddressStateDB SM where
-  getAddressStateTxDBMap = gets $ _stateTxMap . _ssMemDBs
-  putAddressStateTxDBMap m = modify $ ssMemDBs . stateTxMap .~ m
-  getAddressStateBlockDBMap = gets $ _stateBlockMap . _ssMemDBs
-  putAddressStateBlockDBMap m = modify $ ssMemDBs . stateBlockMap .~ m
-
-instance HasMemRawStorageDB SM where
-  getMemRawStorageBlockDB = gets $ _storageBlockMap . _ssMemDBs
-  putMemRawStorageBlockMap m = modify $ ssMemDBs . storageBlockMap .~ m
 
 instance (RawStorageKey `A.Alters` RawStorageValue) SM
   where
@@ -361,21 +351,7 @@ lookupStateFrames address (ci : rest) = case M.lookup address (stateMap ci) of
   Nothing -> lookupStateFrames address rest
 {-# INLINE lookupStateFrames #-}
 
-instance (Maybe Word256 `A.Alters` MP.StateRoot) SM where
-  lookup p k = host (A.lookup p k)
-  insert p k v = host (A.insert p k v)
-  delete p k = host (A.delete p k)
-
-instance Mod.Modifiable CurrentBlockHash SM where
-  get p = host (Mod.get p)
-  put p = host . Mod.put p
-
 instance (Keccak256 `A.Alters` BlockSummary) SM where
-  lookup p k = host (A.lookup p k)
-  insert p k v = host (A.insert p k v)
-  delete p k = host (A.delete p k)
-
-instance (MP.StateRoot `A.Alters` MP.NodeData) SM where
   lookup p k = host (A.lookup p k)
   insert p k v = host (A.insert p k v)
   delete p k = host (A.delete p k)
@@ -425,10 +401,6 @@ instance Mod.Modifiable Env.Sender SM where
 instance Mod.Modifiable [CallInfo] SM where
   get _ = gets callStack
   put _ cs = modify $ \ss -> ss {callStack = cs}
-
-instance Mod.Modifiable MemDBs SM where
-  get _ = gets _ssMemDBs
-  put _ md = modify $ ssMemDBs .~ md
 
 instance Mod.Modifiable GasInfo SM where
   get _ = gets _gasInfo
@@ -491,8 +463,7 @@ runSM ::
   ContextM (Env.Environment, Either SolidException a)
 runSM maybeCode envBefore gi f = do
   contextState <- Mod.get (Mod.Proxy @ContextState)
-  let csMemDBs = _memDBs contextState
-      initialDebugSettings = _debugSettings contextState
+  let initialDebugSettings = _debugSettings contextState
       initialVmTracer = _vmTracer contextState
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logDebugS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
@@ -500,7 +471,6 @@ runSM maybeCode envBefore gi f = do
         SState
           { env = envBefore,
             callStack = [],
-            _ssMemDBs = csMemDBs,
             _action = startingAction envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap}, -- capping the transaction gas limit
             ssDebugSettingsValue = initialDebugSettings,
@@ -508,6 +478,9 @@ runSM maybeCode envBefore gi f = do
             ssDbgHot = isJust initialDebugSettings || isJust initialVmTracer
           }
   startingStateRef <- newIORef startingState
+  -- The transaction works on the live account caches; a failed one is rolled back.
+  accounts <- ContextM accessEnv
+  accountsBefore <- snapshotAccountDBEnv accounts
   eVal <- try . ContextM $ provide startingStateRef (unSM f)
   sstateAfter <- readIORef startingStateRef
   let envAfter = env sstateAfter
@@ -524,14 +497,13 @@ runSM maybeCode envBefore gi f = do
       case se of
         Require _ -> $logDebugLS "runSM/error" se
         _ -> $logErrorLS "runSM/error" se
+      restoreAccountDBEnv accounts accountsBefore
       if flags_svmDev
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
         else return (envAfter, Left se)
-    Right value -> do
-      Mod.modify_ (Mod.Proxy @ContextState) $ pure . (memDBs .~ _ssMemDBs sstateAfter)
-      return (envAfter, Right value)
+    Right value -> return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
