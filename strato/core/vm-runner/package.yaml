@@ -52,7 +52,7 @@ library:
   - strato-genesis
   - strato-index
   - strato-model
-  - strato-redis-blockdb
+  - redis-monad
   - strato-statediff
   - text
   - time
@@ -73,6 +73,7 @@ executables:
       - composable-monads-base
       - hflags
       - process-monitor
+      - redis-monad
       - strato-conf
       - strato-model
       - vm-runner
@@ -101,6 +102,7 @@ executables:
       - hflags
       - process-monitor
       - prometheus-client
+      - redis-monad
       - resourcet
       - seqevents
       - strato-conf

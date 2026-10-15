@@ -11,9 +11,10 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging (runLogging)
-import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf)
+import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, lookupRedisBlockDBConfig)
 import Blockchain.VMContext (evalContextM, initContext)
 import Control.Monad.Composable.Base (runEff)
+import Control.Monad.Composable.Redis (runRedisM)
 -- HFlags
 import Blockchain.Strato.Model.Options ()
 import Blockchain.VMOptions ()
@@ -34,5 +35,5 @@ main = do
   runInstrumentation "vm-runner"
   void $ $initHFlags "Ethereum VM"
   let metricsRunner = runSettings (setHost (fromString $ apiListenAddress $ apiConfig ethConf) $ setPort 8009 defaultSettings) metricsApp
-      runVM = runEff . runLogging $ evalContextM "ethereum-vm" initContext ethereumVM
+      runVM = runEff . runLogging . runRedisM lookupRedisBlockDBConfig $ evalContextM "ethereum-vm" initContext ethereumVM
   race_ metricsRunner runVM

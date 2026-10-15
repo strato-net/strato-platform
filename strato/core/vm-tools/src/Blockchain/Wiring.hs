@@ -44,7 +44,6 @@ import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.RedisBlockDB as RBDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
@@ -186,9 +185,6 @@ instance (Keccak256 `A.Alters` BlockSummary) ContextM where
   lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) k
   insert _ k v = writeStore memBlockSummaryDB (\d -> genericInsertBlockSummaryDB (pure $ _blockSummaryDB d) k v) k (Just v)
   delete _ k = writeStore memBlockSummaryDB (\d -> genericDeleteBlockSummaryDB (pure $ _blockSummaryDB d) k) k Nothing
-
-instance Mod.Accessible RBDB.RedisConnection ContextM where
-  access _ = _redisPool <$> getDBs
 
 instance Mod.Modifiable GasCap ContextM where
   get _ = contextGets (GasCap . _vmGasCap)

@@ -43,7 +43,6 @@ import Blockchain.StateRootMismatch
 import Blockchain.Strato.Model.Address ()
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.StateRoot ()
-import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.SyncDB
 import Blockchain.Timing
@@ -51,6 +50,7 @@ import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.Wiring
 import Control.Monad
+import Control.Monad.Composable.Redis (execRedis)
 import Control.Monad.Composable.StateDB (flushNodeDB)
 import Control.Monad.Composable.Streaming
 import Data.Foldable hiding (fold)
@@ -157,11 +157,11 @@ bootstrapIfFirstRun = do
 
 initializeBestBlock :: ContextM ()
 initializeBestBlock = do
-  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
+  maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (execRedis getBestBlockInfo)
   maybeRedisBestBlock <-
     case maybeRedisBestBlockHash of
       Nothing -> error "no best block hash in redisdb"
-      Just hash -> withRedisBlockDB $ getBlock hash
+      Just hash -> execRedis $ getBlock hash
 
   case maybeRedisBestBlock of
     Nothing -> error "no best block in redisdb"

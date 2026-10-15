@@ -56,16 +56,16 @@ library
     , monad-alter
     , ordered-containers
     , prometheus-client
+    , redis-monad
     , seqevents
-    , solid-vm
     , solid-vm-compiler
     , solid-vm-model
+    , solid-vm
     , statedb-monad
     , strato-conf
     , strato-genesis
     , strato-index
     , strato-model
-    , strato-redis-blockdb
     , strato-statediff
     , streaming
     , text
@@ -96,6 +96,7 @@ executable vm-replay
     , hflags
     , process-monitor
     , prometheus-client
+    , redis-monad
     , resourcet
     , seqevents
     , statedb-monad
@@ -123,6 +124,7 @@ executable vm-runner
     , composable-monads-base
     , hflags
     , process-monitor
+    , redis-monad
     , strato-conf
     , strato-model
     , vm-runner
