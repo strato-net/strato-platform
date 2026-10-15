@@ -97,11 +97,13 @@ On an existing directory, `strato-up` does two things:
 Restart on a fresh node directory, not on top of the existing one. This applies after a crash or a stall, after changing flags, and after building a new release. The only in-place restart the repository documents is starting the same build again, for example after `strato-patch-app`.
 
 ```bash
+strato-snapshot pull mynode  # optional: download the snapshot while the node still runs
 strato-down mynode
 mv mynode mynode.old        # or: rm -rf mynode
 strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
 ```
 
+- **Downtime.** `strato-snapshot pull` fetches the latest snapshot into the download cache ahead of time, so `strato-up --snapshot` restores from the cached archive instead of downloading it while the node is down. Run both from the same directory.
 - **Keys.** With the default external auth, the node key and user keys live in the Vault, so a clean restart doesn't lose them.
 - **Local auth.** With `--localAuth`, the keys are in the node directory, and moving or deleting it removes them. Restore them by choosing "Restore from an existing recovery phrase" when `strato-up` sets up the admin.
 
@@ -119,6 +121,7 @@ cd strato-platform
 git fetch --tags
 git checkout <release-tag>        # for example 19.1
 make
+strato-snapshot pull mynode  # optional: download the snapshot while the node still runs
 strato-down mynode
 mv mynode mynode.old
 strato-up mynode --network=<network> --sslDir=/path/to/ssl --snapshot
@@ -143,7 +146,7 @@ Published snapshots live at `s3://strato-snapshots/<network>/v2/`:
 
 - **Download.** Archives are fetched over public HTTPS with `curl` or `wget`. No AWS credentials are needed.
 - **Verification.** Each archive is checked against its `.sha256` file before use.
-- **Cache.** A downloaded archive is kept in `./.snapshot-downloads/` and reused while its checksum still matches. You can delete that directory to reclaim space.
+- **Cache.** A downloaded archive is kept in `./.snapshot-downloads/` and reused while its checksum still matches. The checksum is computed during the download and recorded next to the archive, so an unchanged cached archive is not re-read. `strato-snapshot pull` fills this cache ahead of a restart. After a download, older archives of the same network in the cache are deleted automatically. Archives of other networks stay, and you can delete the directory at any time to reclaim space.
 
 Common tasks:
 
@@ -153,6 +156,10 @@ strato-up mynode --network=helium --snapshot
 
 # Start from a specific snapshot
 strato-up mynode --network=helium --snapshot=20260601-13:05:00Z
+
+# Download the latest snapshot for mynode's network while the node still runs,
+# so a later strato-up --snapshot or restore from this directory skips the download
+strato-snapshot pull mynode
 
 # Show what a published snapshot contains
 strato-snapshot inspect --snapshot --network helium
@@ -227,6 +234,8 @@ The phrase is not saved anywhere, so record it. Usernames may contain letters, n
 | Setup repeats `vault password is not set. I'll keep trying until it is set` or `unexpected error thrown by vault` | Setup is waiting for the Vault to return the node key. Check that `--vaultUrl` is reachable and that your OAuth client credentials are valid. |
 | Setup warns `... MB RAM is not enough for from-genesis sync` | Start the node with `--snapshot`. |
 | The node stops by itself | Look near the end of `logs/convoke.log` for `ERROR: Process <name> ... exited with`. The lines after it are the tail of that process's log. |
+| `vm-runner: Heap exhausted; Current maximum heap size is ...` | The node directory was created by a build from between 2026-08-27 and 2026-09-29, which capped the `vm-runner` heap with an `-M` flag that is too small for a from-genesis sync. Stop the node, remove the `-M...m` flag from the `vm-runner` line in the node's `commands.txt` and add `-c` in its place, then start it again. Make sure the host has [swap](requirements.md#hardware). |
+| A process exits with `ExitFailure (-9)` and `dmesg -T \| grep -i 'killed process'` on the host names it | The host ran out of memory and the kernel killed a process, not necessarily the one that grew. Add [swap](requirements.md#hardware), or move to a machine with more RAM. |
 | `ERROR: docker compose up failed` in `convoke.log` | A container didn't become healthy. Check its log in `logs/`. If nginx exits at start-up, `logs/nginx.log` reports an unreachable OAuth discovery URL or missing client credentials. |
 | `WARNING: 'logrotate' not found on PATH` | Install `logrotate` (re-run `install_deps.sh`) and restart the node. |
 | `payload has no jlog/ streaming state` during restore | The archive is an older Kafka-era snapshot. Use `--snapshot`, which resolves the current `v2` snapshots. |

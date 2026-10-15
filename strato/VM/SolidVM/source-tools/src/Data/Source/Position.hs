@@ -24,6 +24,8 @@ import Data.Aeson
 import Data.Binary
 import Data.Data
 import Data.Default
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import GHC.Generics
 import Test.QuickCheck
 import Text.Parsec
@@ -39,6 +41,8 @@ data SourcePosition = SourcePosition
 makeLenses ''SourcePosition
 
 instance Binary SourcePosition
+
+makeStore ''SourcePosition
 
 instance ToJSON SourcePosition where
   toJSON pos =

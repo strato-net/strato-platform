@@ -174,6 +174,16 @@ nonce makes each consent single use), or the validator key sends the transaction
 listing (`addValidator(s)`) and `adminSetOperator` are the only unsigned paths.
 `deploy/sign-validator-authorization.js` produces the signature from a node's vault.
 
+`operatorAuthorizationDigest` reads the nonce as `authorizationNonce[validator] + 0`, and the
+`+ 0` is load-bearing. SolidVM feeds a never-written storage slot to `abi.encodePacked` as zero
+bytes rather than as `uint256(0)`, so without it the on-chain digest for a validator that has not
+yet consented (every validator, initially) was 32 bytes shorter than the one every off-chain
+signer hashes, and no first `register` / `setOperator` signature could verify (helium, found
+2026-09-24). The off-chain encoders (backend, staking page, `sign-validator-authorization.js`)
+were always correct and must keep encoding the nonce as 32 bytes. The same rule applies to any
+SolidVM contract: never feed a possibly-unwritten storage read to `abi.encodePacked` without
+`+ 0` or an explicit cast.
+
 ## Validator lifecycle (permissionless eligibility, bounded set)
 
 Status is derived, not stored: **Missing** (no record) → **Registered** (listed; may self-bond and

@@ -45,7 +45,32 @@ redisConnection r =
 
 data EthConf = EthConf
   { sqlConfig :: SqlConf,
+    -- | Optional read endpoint for the eth database (a replica); the API
+    -- tier reads it and keeps 'sqlConfig' for writes and the few reads that
+    -- must see the latest commit.
+    sqlReaderConfig :: Maybe SqlConf,
     cirrusConfig :: SqlConf,
+    -- | The core cells' transaction ingress endpoints (strato-ingest), for
+    -- an API tier that runs no sequencer of its own: a submitted batch is
+    -- posted to every one of them. Empty on a node, which writes its own
+    -- stream directly.
+    ingressUrls :: [String],
+    -- | This core's name among the cores that share one Postgres cluster:
+    -- the writer lease is held by a cell, and cell-local consumer groups
+    -- carry the name. Missing means the hostname.
+    cellId :: Maybe String,
+    -- | Where strato-p2p and ethereum-discover keep peers and sync tasks.
+    -- strato-p2p resets every peer's active state at startup, so cores that
+    -- share a cluster each need their own; missing means the eth database,
+    -- as on a monolith.
+    peerDbConfig :: Maybe SqlConf,
+    -- | Keep the peer store in this SQLite file (relative to the node
+    -- directory) instead of Postgres. Peers and sync tasks are per-node
+    -- operational state, so a core whose Postgres is elsewhere keeps them
+    -- on its own disk and its networking no longer depends on the
+    -- database being reachable. Takes precedence over 'peerDbConfig'.
+    -- Missing means Postgres, as on a monolith.
+    peerSqlitePath :: Maybe FilePath,
     redisBlockDBConfig :: RedisBlockDBConf,
     streamingConfig :: StreamingConf,
     levelDBConfig :: LevelDBConf,
@@ -69,7 +94,12 @@ kafkaConfig = streamingConfig
 instance FromJSON EthConf where
   parseJSON = withObject "EthConf" $ \v -> EthConf
     <$> v .: "sqlConfig"
+    <*> v .:? "sqlReaderConfig"
     <*> v .: "cirrusConfig"
+    <*> v .:? "ingressUrls" .!= []
+    <*> v .:? "cellId"
+    <*> v .:? "peerDbConfig"
+    <*> v .:? "peerSqlitePath"
     <*> v .: "redisBlockDBConfig"
     <*> (v .:? "streamingConfig" .!= def <|> v .: "kafkaConfig")
     <*> v .:? "levelDBConfig" .!= def
@@ -89,6 +119,9 @@ instance ToJSON EthConf where
 
 data ApiConfig = ApiConfig
   { apiPort :: Int
+  -- | Address every host-side listener (strato-api, ethereum-jsonrpc and the
+  -- metrics endpoints) binds to: the address containers reach the host on
+  -- (docker0 gateway on Linux, loopback on macOS), never all interfaces.
   , apiListenAddress :: String
   } deriving (Show, Eq, Generic, ToJSON)
 
@@ -96,6 +129,10 @@ instance FromJSON ApiConfig where
   parseJSON = withObject "ApiConfig" $ \v -> ApiConfig
     <$> v .:? "apiPort" .!= 3000
     <*> v .:? "apiListenAddress" .!= "127.0.0.1"
+
+-- | Port of the node's ethereum-jsonrpc listener (not configurable).
+jsonRpcPort :: Int
+jsonRpcPort = 8545
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,
@@ -175,6 +212,10 @@ data QuarryConf = QuarryConf
 data ContractsConf = ContractsConf
   { railgunProxy :: Maybe Address  -- ^ RailgunSmartWallet proxy contract address
   , nativeTokenAddress :: Address  -- ^ ERC20 treated as native token (e.g. USDST)
+  , nativeTokenBalancesField :: Maybe String
+    -- ^ Name of the native token's balances mapping in SolidVM storage, so
+    -- eth_getBalance can be answered from the SQL state mirror instead of a
+    -- vm-runner round trip. Missing means "_balances" (OpenZeppelin ERC20).
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
@@ -313,12 +354,18 @@ data DebugConfig = DebugConfig
 data VmConf = VmConf
   { sqlDiff :: Bool
   , diffPublish :: Bool
-  -- | Base URL of the node's ethereum-jsonrpc service, used by transaction
-  -- simulation (same container). Default http://localhost:8545.
-  , vmJsonRpcUrl :: String
   -- | Ceiling on concurrent in-flight simulations; excess are shed (503) so
   -- simulations can't starve block processing on the shared VM. Default 8.
   , simMaxConcurrent :: Int
+  -- | Base URLs of vm-query services (phase 5), tried in order. Set,
+  -- ethereum-jsonrpc sends latest-state calls, simulations and call traces
+  -- there, against the SQL state mirror. Empty, everything goes to
+  -- vm-runner as before.
+  , vmQueryUrls :: [String]
+  -- | True on a tier with no consensus VM of its own (the API tier): what
+  -- vm-query cannot serve, or cannot be reached for, is answered with an
+  -- error instead of being sent to vm-runner.
+  , vmQueryOnly :: Bool
   }
   deriving (Show, Eq, Generic, ToJSON)
 
@@ -328,8 +375,9 @@ instance FromJSON VmConf where
   parseJSON = withObject "VmConf" $ \v -> VmConf
     <$> v .:? "sqlDiff" .!= True
     <*> v .:? "diffPublish" .!= True
-    <*> v .:? "vmJsonRpcUrl" .!= "http://localhost:8545"
     <*> v .:? "simMaxConcurrent" .!= 8
+    <*> ((\single many -> maybe [] pure single ++ many) <$> v .:? "vmQueryUrl" <*> v .:? "vmQueryUrls" .!= [])
+    <*> v .:? "vmQueryOnly" .!= False
 
 -- Default instances
 
@@ -404,14 +452,16 @@ instance Default VmConf where
   def = VmConf
     { sqlDiff = True
     , diffPublish = True
-    , vmJsonRpcUrl = "http://localhost:8545"
     , simMaxConcurrent = 8
+    , vmQueryUrls = []
+    , vmQueryOnly = False
     }
 
 instance Default ContractsConf where
   def = ContractsConf
     { railgunProxy = Nothing
     , nativeTokenAddress = 0
+    , nativeTokenBalancesField = Nothing
     }
 
 instance Default UrlConfig where
@@ -443,7 +493,12 @@ instance Default NetworkConf where
 instance Default EthConf where
   def = EthConf
     { sqlConfig = def
+    , sqlReaderConfig = Nothing
     , cirrusConfig = def { database = "cirrus" }
+    , ingressUrls = []
+    , cellId = Nothing
+    , peerDbConfig = Nothing
+    , peerSqlitePath = Nothing
     , redisBlockDBConfig = def
     , streamingConfig = def
     , levelDBConfig = def

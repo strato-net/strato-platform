@@ -50,6 +50,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import Data.Data
 import Data.Hashable (Hashable)
 import Data.OpenApi hiding (Format)
+import Data.Store (Store)
 import qualified Data.Text as T
 import Database.Persist.Sql
 import FastKeccak256
@@ -67,7 +68,7 @@ import Web.PathPieces
 
 newtype Keccak256 = Keccak256 ByteString
   deriving (Eq, Read, Show, Ord, Generic, Data)
-  deriving anyclass (Hashable)
+  deriving anyclass (Hashable, Store)
 
 newtype SHA = SHA ByteString
   deriving (Eq, Read, Show, Ord, Generic, Data)

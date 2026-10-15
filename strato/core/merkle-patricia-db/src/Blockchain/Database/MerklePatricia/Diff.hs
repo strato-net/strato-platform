@@ -5,10 +5,8 @@ module Blockchain.Database.MerklePatricia.Diff (dbDiff, DiffOp (..)) where
 
 import Blockchain.Database.MerklePatricia.Internal
 import Blockchain.Database.MerklePatricia.NodeData
-import Conduit
 import Control.Monad
 import Control.Monad.Change.Alter
-import Data.Function
 import qualified Data.NibbleString as N
 
 data MPChoice = Data NodeData | Ref NodeRef | Value Val | None deriving (Eq)
@@ -45,59 +43,42 @@ data DiffOp
   | Delete {key :: [N.Nibble], oldVal :: Val}
   deriving (Show, Eq)
 
+-- | Diff two choices. @path@ is the reversed nibble path down to this point;
+-- results are accumulated in reverse onto @acc@.
 diffChoice ::
   (StateRoot `Alters` NodeData) m =>
-  Maybe N.Nibble ->
+  [N.Nibble] ->
+  [DiffOp] ->
   MPChoice ->
   MPChoice ->
-  ConduitT i DiffOp m ()
-diffChoice n ch1 ch2 = case (ch1, ch2) of
-  (None, Value v) -> yield $ Create sn v
-  (Value v, None) -> yield $ Delete sn v
+  m [DiffOp]
+diffChoice path acc ch1 ch2 = case (ch1, ch2) of
+  (None, Value v) -> pure $ Create (reverse path) v : acc
+  (Value v, None) -> pure $ Delete (reverse path) v : acc
   (Value v1, Value v2)
-    | v1 /= v2 -> yield $ Update sn v1 v2
+    | v1 /= v2 -> pure $ Update (reverse path) v1 v2 : acc
   _
-    | ch1 == ch2 -> return ()
-    | otherwise -> pRecurse ch1 ch2
-  where
-    sn = maybe [] (: []) n
-    prefix =
-      let prepend n' op = op {key = n' : (key op)}
-       in maybe id prepend n
-    pRecurse = (.| awaitForever (yield . prefix)) .* recurse
-
-diffChoices ::
-  (StateRoot `Alters` NodeData) m =>
-  [MPChoice] ->
-  [MPChoice] ->
-  ConduitT i DiffOp m ()
-diffChoices =
-  void .* sequence .* zipWith3 diffChoice maybeNums
-  where
-    maybeNums = Nothing : map Just [0 ..]
+    | ch1 == ch2 -> pure acc
+    | otherwise -> recurse path acc ch1 ch2
 
 recurse ::
   (StateRoot `Alters` NodeData) m =>
+  [N.Nibble] ->
+  [DiffOp] ->
   MPChoice ->
   MPChoice ->
-  ConduitT i DiffOp m ()
-recurse = join .* (liftM2 diffChoices `on` (lift . enter))
-
-infixr 9 .*
-
-(.*) :: (c -> d) -> (a -> b -> c) -> (a -> b -> d)
-(.*) = (.) . (.)
-
-diff ::
-  (StateRoot `Alters` NodeData) m =>
-  NodeRef ->
-  NodeRef ->
-  ConduitT i DiffOp m ()
-diff = recurse `on` Ref
+  m [DiffOp]
+recurse path acc ch1 ch2 = do
+  cs1 <- enter ch1
+  cs2 <- enter ch2
+  foldM step acc (zip3 maybeNums cs1 cs2)
+  where
+    maybeNums = Nothing : map Just [0 ..]
+    step a (n, c1, c2) = diffChoice (maybe path (: path) n) a c1 c2
 
 dbDiff ::
   (StateRoot `Alters` NodeData) m =>
   StateRoot ->
   StateRoot ->
-  ConduitT i DiffOp m ()
-dbDiff = diff `on` ptrRef
+  m [DiffOp]
+dbDiff r1 r2 = reverse <$> recurse [] [] (Ref (ptrRef r1)) (Ref (ptrRef r2))

@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -14,6 +15,7 @@ module SolidVM.Solidity.Parse.ParserTypes where
 
 --import Debug.Trace
 import qualified Data.Map as M
+import SolidVM.Model.SolidString (SolidString, labelToString)
 import SolidVM.Model.CodeCollection (resolveSolidVMVersion)
 import Text.Parsec
 
@@ -21,12 +23,12 @@ import Text.Parsec
 type FileName = SourceName
 
 -- | Names of types, variables, functions, etc. in Solidity code.
-type Identifier = String
+type Identifier = SolidString
 
 -- | We parse directly from the textual source, without pre-lexing.
 
 -- Store the pragma version to allow for different things to happen when the pragma is different
-type PragmaVersion = Identifier
+type PragmaVersion = String
 
 -- | Names of contracts.  They have to be the same as identifiers because
 -- contracts can also be types.
@@ -40,14 +42,20 @@ data ParserState = ParserState
   { contractName :: ContractName,
     pragmaVersion :: PragmaVersion,
     pragmas :: [(String, String)],
-    userDefinedTypes :: (M.Map String String),
+    userDefinedTypes :: (M.Map SolidString String),
     contractSrcLength :: Int,
     -- | Parse expressions with the pre-fork operator table, in which assignment
     -- bound tighter than @&&@ / @||@ (so @a = b || c@ meant @(a = b) || c@) and
     -- the ternary bound tighter than both. Only the VM sets this, for blocks
     -- before the operator-precedence fork; everything else parses Solidity's
     -- real precedence.
-    legacyOperatorPrecedence :: Bool
+    legacyOperatorPrecedence :: Bool,
+    -- | Parse expressions by reading the operator after each operand once
+    -- ('SolidVM.Solidity.Parse.Statement.climb') rather than with
+    -- 'Text.Parsec.Expr.buildExpressionParser'. Both accept the same language
+    -- and build the same tree; only the error messages on rejected input
+    -- differ, which 'runWithReference' hides by re-parsing with the reference.
+    fastExpressions :: Bool
   }
 
 -- TODO: add lenses to make the referencing and changing of the parser state faster
@@ -55,10 +63,19 @@ data ParserState = ParserState
 type SolidityParser = Parsec SourceCode ParserState
 
 initialParserState :: ParserState
-initialParserState = ParserState "" "" [] M.empty 0 False
+initialParserState = ParserState "" "" [] M.empty 0 False True
+
+-- | Run @p@ with the fast expression parser and, only if that rejects the
+-- input, again with the reference one, so the error reported is exactly the
+-- reference parser's. Successful parses of the two are identical.
+runWithReference :: SolidityParser a -> ParserState -> SourceName -> SourceCode -> Either ParseError a
+runWithReference p st name src =
+  case runParser p st {fastExpressions = True} name src of
+    Left _ -> runParser p st {fastExpressions = False} name src
+    r -> r
 
 initialParserStateWithLength :: Int -> ParserState
-initialParserStateWithLength srcLength = ParserState "" "" [] M.empty srcLength False
+initialParserStateWithLength srcLength = ParserState "" "" [] M.empty srcLength False True
 
 -- | The parser state the VM uses for code that must keep its pre-fork meaning.
 withLegacyOperatorPrecedence :: Bool -> ParserState -> ParserState
@@ -66,6 +83,9 @@ withLegacyOperatorPrecedence legacy st = st {legacyOperatorPrecedence = legacy}
 
 getLegacyOperatorPrecedence :: SolidityParser Bool
 getLegacyOperatorPrecedence = legacyOperatorPrecedence <$> getState
+
+getFastExpressions :: SolidityParser Bool
+getFastExpressions = fastExpressions <$> getState
 
 --given inputs set the parser state
 setParserState :: ParserState -> SolidityParser ()
@@ -77,7 +97,7 @@ setPragmaVersion :: PragmaVersion -> SolidityParser ()
 setPragmaVersion p =
   do
     ParserState {..} <- getState
-    putState (ParserState contractName p pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence)
+    putState (ParserState contractName p pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence fastExpressions)
 
 --Change the contract name of the ParserState with a given input
 setContractName :: ContractName -> SolidityParser ()
@@ -85,24 +105,24 @@ setContractName :: ContractName -> SolidityParser ()
 setContractName cn =
   do
     ParserState {..} <- getState
-    putState (ParserState cn pragmaVersion pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence)
+    putState (ParserState cn pragmaVersion pragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence fastExpressions)
 
-addPragma :: String -> String -> SolidityParser ()
+addPragma :: SolidString -> String -> SolidityParser ()
 addPragma k v = do
   ParserState {..} <- getState
   case k of
     "solidvm" ->
       let pragmaList = resolveSolidVMVersion v
           newPragmas = pragmaList ++ pragmas
-      in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence
-    _ -> putState $ ParserState contractName pragmaVersion ((k,v):pragmas) userDefinedTypes contractSrcLength legacyOperatorPrecedence
+      in putState $ ParserState contractName pragmaVersion newPragmas userDefinedTypes contractSrcLength legacyOperatorPrecedence fastExpressions
+    _ -> putState $ ParserState contractName pragmaVersion ((labelToString k,v):pragmas) userDefinedTypes contractSrcLength legacyOperatorPrecedence fastExpressions
 
-addUserDefinedType :: String -> String -> SolidityParser ()
+addUserDefinedType :: SolidString -> String -> SolidityParser ()
 addUserDefinedType k v =
   --putState (ParserState contractName pragmaVersion (M.insert k v userDefinedTypes )) =<< ParserState{..} =<< getState
   do
     ParserState {..} <- getState
-    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes) contractSrcLength legacyOperatorPrecedence)
+    putState (ParserState contractName pragmaVersion pragmas (M.insert k v userDefinedTypes) contractSrcLength legacyOperatorPrecedence fastExpressions)
 
 -- Get the contract name from the parser state
 getContractName :: SolidityParser ContractName
@@ -115,15 +135,15 @@ getPragmaVersion :: SolidityParser PragmaVersion
 getPragmaVersion = pragmaVersion <$> getState
 
 -- Get the pragmaVersion from the parser state
-getUserDefinedTypes :: SolidityParser (M.Map String String)
+getUserDefinedTypes :: SolidityParser (M.Map SolidString String)
 getUserDefinedTypes = userDefinedTypes <$> getState
 
 -- Get the pragmaVersion from the parser state
-isInUserDefinedTypes :: String -> SolidityParser Bool
+isInUserDefinedTypes :: SolidString -> SolidityParser Bool
 isInUserDefinedTypes nam = M.member nam . userDefinedTypes <$> getState
 
 -- Get the pragmaVersion from the parser state
-getUserDefinedType :: String -> SolidityParser (Maybe String)
+getUserDefinedType :: SolidString -> SolidityParser (Maybe String)
 getUserDefinedType nam = M.lookup nam . userDefinedTypes <$> getState
 
 getContractSrcLength :: SolidityParser Int

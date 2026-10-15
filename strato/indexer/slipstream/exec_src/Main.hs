@@ -10,7 +10,7 @@
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.EthConf (cirrusConnStr, ethConf, runStreamMConfigured)
+import Blockchain.EthConf (cirrusConnStr, currentCellId, ethConf, runStreamMConfigured)
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Slipstream.Data.CirrusTables
 import Blockchain.Slipstream.MessageConsumer
@@ -20,10 +20,11 @@ import Blockchain.Slipstream.PostgresqlTypedShim
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Streaming (createTopicAndWait)
+import Control.Monad.Composable.Base (runEff, withResources)
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader (runReaderT)
-import Control.Monad.Trans.Resource
+import Data.String (fromString)
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text as T
 import Database.Persist.Postgresql
@@ -38,13 +39,16 @@ main = do
   _ <- $initHFlags "Setup Slipstream Variables"
   blockappsInit "slipstream_main"
   runInstrumentation "slipstream"
+  cell <- T.pack <$> currentCellId
 
-  runLoggingT
-    . runResourceT
+  runEff
+    . runLogging
+    . withResources
     . runStreamMConfigured "slipstream"
     $ do
       $logInfoS "main" "Welcome to Slipstream!!!!"
-      void . liftIO . forkIO . run 10777 $ metricsApp
+      let metricsHost = EC.apiListenAddress $ EC.apiConfig ethConf
+      void . liftIO . forkIO . runSettings (setHost (fromString metricsHost) $ setPort 10777 defaultSettings) $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
       createTopicAndWait "vmevents"
@@ -68,5 +72,6 @@ main = do
       -- 1. `conn` connects slipstream to the cirrus database
       -- 2. The `pool` in the BlocEnv connects slipstream to the eth database
 
+      $logInfoS "main" . T.pack $ "cell " ++ T.unpack cell ++ ": writing only while this cell holds the writer lease"
       runSQLM $
-        getAndProcessMessages conn
+        getAndProcessMessages cell conn

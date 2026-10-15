@@ -575,6 +575,26 @@ contract Describe_AdminRegistry is Authorizable {
         require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after failed removal");
     }
 
+    function it_admin_registry_prevents_swapping_in_the_zero_address() {
+        // Scenario: 2 admins vote to swap admin1 for address(0). Nobody can ever
+        // call as address(0), so executing this would strand the registry.
+
+        adminRegistry.swapAdmin(admin1, zeroAddress);
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin before quorum");
+
+        bool reverted = false;
+        try {
+            user1.do(address(adminRegistry), "swapAdmin", admin1, zeroAddress);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Should revert when swapping an admin for the zero address");
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after the failed swap");
+        require(!adminRegistry.isAdminAddress(zeroAddress), "Zero address should never become an admin");
+        require(adminRegistry.admins(0) == admin1, "Admin slot should be unchanged");
+    }
+
     // ============ ISSUE DISMISSAL TESTS ============
 
     function it_admin_registry_can_dismiss_issue_as_proposer() {

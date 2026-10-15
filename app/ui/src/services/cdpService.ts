@@ -216,7 +216,6 @@ export const cdpService = {
     stabilityFeeRate: string;
     debtFloor: string;
     debtCeiling: string;
-    unitScale: string;
     isPaused: boolean;
   }): Promise<TransactionResponse> {
     const response = await api.post("/cdp/admin/set-collateral-config", configData);
@@ -232,7 +231,6 @@ export const cdpService = {
     stabilityFeeRates: string[];
     debtFloors: string[];
     debtCeilings: string[];
-    unitScales: string[];
     pauses: boolean[];
   }): Promise<TransactionResponse> {
     const response = await api.post("/cdp/admin/set-collateral-config-batch", configs);

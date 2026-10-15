@@ -5,28 +5,42 @@ module Server
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Blaze.ByteString.Builder (copyByteString)
 import qualified Data.ByteString as BS
-import Blockchain.EthConf (runStreamMConfigured)
+import Blockchain.EthConf (apiConfig, apiListenAddress, ethConf, jsonRpcPort, runStreamMConfigured, vmConfig, vmQueryOnly)
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.CaseInsensitive as CI
+import Data.String (fromString)
 import Network.HTTP.Types (status200, status204)
 import Network.Wai
 import Network.Wai.Handler.Warp
+import Strato.Tracing (initTracing)
+import Strato.Tracing.Wai (tracingMiddleware)
 import System.IO (hSetBuffering, stdout, BufferMode(LineBuffering))
 
 import RPC
+import ResponseDispatcher (startResponseDispatcher)
 
 startServer :: IO ()
 startServer = do
   hSetBuffering stdout LineBuffering
-  let port = 8545
-  runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
-  putStrLn $ "Listening on port " ++ show port
+  let host = apiListenAddress $ apiConfig ethConf
+  -- The vm-runner reply path, unless this tier has no consensus VM to ask
+  -- (vmQueryOnly): one consumer of the response topic for the whole
+  -- process; request handlers register for their reply by id (see
+  -- ResponseDispatcher).
+  if vmQueryOnly (vmConfig ethConf)
+    then putStrLn "vm-query only: not opening the vm-runner reply path"
+    else do
+      runEff $ runStreamMConfigured "ethereum-jsonrpc" $ createTopicAndWait "jsonrpcresponse"
+      startResponseDispatcher
+  putStrLn $ "Listening on " ++ host ++ ":" ++ show jsonRpcPort
   -- debug_* traces and simulations can exceed Warp's 30s default timeout
-  runSettings (setPort port $ setTimeout 150 defaultSettings) app
+  initTracing "ethereum-jsonrpc"
+  runSettings (setHost (fromString host) $ setPort jsonRpcPort $ setTimeout 150 defaultSettings) (tracingMiddleware "ethereum-jsonrpc" app)
 
 corsHeaders :: [(CI.CI BS.ByteString, BS.ByteString)]
 corsHeaders =

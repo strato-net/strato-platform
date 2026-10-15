@@ -55,12 +55,6 @@ local authenticate_opts = {
 }
 
 local wallet_auth_routes = {
-  ["/api/credit-card/add-card"] = true,
-  ["/api/credit-card/approve"] = true,
-  ["/api/credit-card/config"] = true,
-  ["/api/credit-card/manual-top-up"] = true,
-  ["/api/credit-card/remove-card"] = true,
-  ["/api/credit-card/update-card"] = true,
   ["/api/bridge/requestNativeWithdrawal"] = true,
   ["/api/bridge/requestWithdrawal"] = true,
   ["/api/metal-forge/buy"] = true,
@@ -76,7 +70,6 @@ local wallet_auth_routes = {
 
 local wallet_auth_route_prefixes = {
   "/api/cdp/",
-  "/api/credit-card/config/",
   "/api/earn/",
   "/api/lend/",
   "/api/lending/",

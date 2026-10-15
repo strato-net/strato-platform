@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -12,6 +13,8 @@ import Control.Lens hiding ((.=))
 import Data.Aeson
 import Data.Aeson.Types
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.Source
 import Data.Text (Text)
 import GHC.Generics
@@ -29,6 +32,8 @@ data EventLog = EventLog
 makeLenses ''EventLog
 
 instance Binary EventLog
+
+makeStore ''EventLog
 
 instance ToJSON EventLog where
   toJSON e =
@@ -62,6 +67,8 @@ makeLenses ''EventF
 type Event = Positioned EventF
 
 instance Binary a => Binary (EventF a)
+
+makeStore ''EventF
 
 instance ToJSON a => ToJSON (EventF a) where
   toJSON e =

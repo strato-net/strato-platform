@@ -8,6 +8,7 @@ import {
   getWithdrawPreview,
   deposit,
   withdraw,
+  withdrawShares,
   pause,
   unpause,
   setMinReserve,
@@ -19,6 +20,7 @@ import {
 import {
   validateDepositArgs,
   validateWithdrawArgs,
+  validateWithdrawSharesArgs,
   validateSetMinReserveArgs,
   validateSetBotExecutorArgs,
   validateAssetArgs,
@@ -164,6 +166,24 @@ class VaultController {
       const { accessToken, address: userAddress, body } = req;
       validateWithdrawArgs(body);
       const result = await withdraw(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Withdraw from the vault by burning an exact number of shares
+   */
+  static async withdrawShares(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      validateWithdrawSharesArgs(body);
+      const result = await withdrawShares(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

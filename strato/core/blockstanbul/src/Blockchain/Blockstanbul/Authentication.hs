@@ -12,6 +12,7 @@ module Blockchain.Blockstanbul.Authentication (
     commitmentSeal,
     addCommitmentSeals,
     authenticate,
+    bodyMatchesHeader,
     verifyProposerSeal,
     getProposerSeal,
     verifyCommitmentSeal,
@@ -36,6 +37,7 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.ProposerSelection
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
+import Blockchain.Verification (ommersVerificationValue, transactionsVerificationValue)
 import Control.Lens as L
 import Control.Monad (unless, when)
 import Control.Monad.Composable.Vault
@@ -76,6 +78,16 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
       mAddress = fromPublicKey <$> mKey --getting the address of sender
   return (mAddress == Just cm)
 authenticate _ = return True
+
+-- | Do the block's transactions and uncles belong to its header? Signatures and
+-- seals cover the header alone, so without this a relay could change the body
+-- under a proposer's signature: a peer on another build re-encodes the
+-- transactions, their hashes and recovered signers change, and the VM runs a
+-- block that is not the one the proposer sealed.
+bodyMatchesHeader :: Block -> Bool
+bodyMatchesHeader (Block hdr txs uncles) =
+  transactionsRoot hdr == transactionsVerificationValue txs
+    && getBlockOmmersHash hdr == ommersVerificationValue uncles
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
                        Set Validator -> M.Map Validator Integer -> Maybe Integer -> Integer -> Integer -> Word256 -> Block -> m (Word256, Validator)

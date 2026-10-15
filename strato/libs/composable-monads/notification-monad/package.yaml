@@ -8,6 +8,7 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
+  - composable-monads-base
   - http-client
   - http-client-tls
   - monad-alter

@@ -70,7 +70,7 @@ contract Describe_ForgeLeverageWithoutFlashMint is Authorizable {
         reg.setUSDST(USDST);
         oracle.setAssetPrice(USDST, 1e18);
         oracle.setAssetPrice(GOLD, GOLD_PRICE);
-        cdp.setCollateralAssetParams(GOLD, 150e16, MINCR, 1000, 5000, 1e27, 1e18, 1e30, 1e18, false);
+        cdp.setCollateralAssetParams(GOLD, 150e16, MINCR, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         forge = new MetalForge(address(this));
         forge.initialize(address(oracle), address(0xDEAD), address(m.feeCollector()), USDST);

@@ -25,10 +25,12 @@ import Control.Concurrent.Async as Async
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TMChan
 import Control.Monad
+import Control.Monad.Composable.Base (runEff)
 import Data.String
 import qualified Database.Redis as Redis
 import Flags
 import HFlags
+import qualified Strato.Tracing as Tr
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
@@ -38,6 +40,7 @@ main :: IO ()
 main = do
   blockappsInit "seq_main"
   runInstrumentation "strato-sequencer"
+  Tr.initTracing "strato-sequencer"
   s <- $initHFlags "Block/Txn sequencer for the Haskell EVM"
 
   conn <- Redis.checkedConnect lookupRedisBlockDBConfig
@@ -108,6 +111,6 @@ main = do
             kafkaClientId = fromString flags_kafkaclientid,
             redisConn = RBDB.RedisConnection conn
           }
-  race_ (runLoggingT (runSequencerM vaultUrl' seqCfg ctx sequencer))
-    . run 8050
+  race_ (runEff . runLogging $ runSequencerM vaultUrl' seqCfg ctx sequencer)
+    . runSettings (setHost (fromString $ Conf.apiListenAddress $ Conf.apiConfig ethConf) $ setPort 8050 defaultSettings)
     $ metricsApp

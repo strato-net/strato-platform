@@ -1,6 +1,9 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Strato.Indexer.Bootstrap
   ( bootstrapIndexer,
@@ -10,6 +13,7 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Strato.Indexer.Kafka (indexEventsTopicName)
+import Control.Monad.Composable.Base (Eff, Logger, (:>))
 import Control.Monad.Composable.Streaming (createTopicAndWait)
 import Control.Monad.Trans.Reader (runReaderT)
 import qualified Data.Text as T
@@ -17,10 +21,9 @@ import Database.Persist.Postgresql (withPostgresqlConn, rawExecute, runMigration
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import qualified Text.Colors as CL
-import UnliftIO (MonadUnliftIO)
 import UnliftIO.Exception (catch, SomeException)
 
-bootstrapIndexer :: (MonadLoggerIO m, MonadUnliftIO m) => m ()
+bootstrapIndexer :: (Logger :> es) => Eff es ()
 bootstrapIndexer = do
   UEC.runStreamMConfigured "strato-api-indexer" $ createTopicAndWait indexEventsTopicName
   let ethconf = UEC.ethConf

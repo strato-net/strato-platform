@@ -151,15 +151,44 @@ npm start
 ### Bridge In Flow (Ethereum → STRATO)
 
 1. **Deposit Detection**
-   - External-chain polling reads standard and action deposit events in one ordered block range
-   - ABI-decodes the action intent
+   - External-chain polling scans block windows up to `head - CHAIN_<id>_CONFIRMATIONS`, never past a block the RPC endpoint cannot serve yet
+   - Reads standard and action deposit events in one ordered block range and ABI-decodes the action intent
    - Deduplicates exact RPC log repeats
-   - Rejects unsupported multi-deposit transactions without advancing the cursor
+   - Keys each deposit by its transaction hash, or `<hash>#<depositId>` when one transaction emitted several deposits
+   - Polls never overlap: the next run starts after the previous one finishes
 
-2. **Processing**
-   - Records standard deposits with `depositBatch`
-   - Records action deposits with `depositBatchWithAction`
-   - Advances the cursor only after both recording paths succeed
+2. **Recording** (`depositRecorder.ts`)
+   - With `BRIDGE_RECORD_DEPOSIT_WINDOW=true`, one `recordDepositWindow` call stores a window's deposits and advances the on-chain checkpoint together. The contract skips deposits it already has and records ones it cannot mint (for example a disabled route) as `QUARANTINED` (status 6), so one bad deposit never blocks the window. The relayer never confirms a quarantined deposit
+   - Otherwise it uses `depositBatch` / `depositBatchWithAction`, then `setLastProcessedBlock`
+   - A rejected batch is retried one deposit at a time. A deposit the contract can never accept is written to `data/depositDeadLetters.json` and logged as an error for manual resolution, and the rest of the window proceeds
+   - Every checkpoint (on-chain and `data/lastProcessedBlocks.json`) moves only after each deposit in the window is visible in Cirrus or dead-lettered
+
+3. **Unknown outcomes**
+   - A STRATO transaction still pending after the wait throws `TxPendingError`; its outcome is unknown, so nothing that depends on it proceeds and the window is retried on the next poll
+
+### Withdrawal Payout Safety
+
+- A Safe payout is proposed only after `confirmWithdrawalBatch` succeeded with its hash, so a withdrawal can reach the Safe with at most the one custody transaction STRATO recorded
+- Every payout carries its withdrawal in the Safe transaction's `origin` (`{"name","bridge","withdrawalId"}`, see `withdrawalOrigin.ts`). Before building a payout, the relayer reads the Safes' queued and recent executed transactions:
+  - one tagged payout already there: it is recorded on STRATO instead of proposing another
+  - more than one: nothing happens and an error is logged; reject the extras in the Safe
+- Signed payouts are saved to `data/withdrawalProposals.json` before the confirmation is sent. If STRATO records a custody tx that the Safe service never received, the withdrawal-tx poller proposes the saved copy, or aborts the withdrawal (refunding the escrow) when that Safe nonce was already used by another transaction. Neither happens while the Safe holds any tagged payout for that withdrawal
+- The custody tx of a pending withdrawal comes from the withdrawal record (the `WithdrawalPending` event table is only a fallback). A withdrawal with no custody tx hash is logged for manual resolution, never aborted
+- Payouts proposed before the `origin` tag existed are invisible to these checks: before rollout, reject any queued payout whose withdrawal is still `INITIATED` on STRATO
+
+### Deposit Window Rollout
+
+1. Upgrade `MercataBridge` to the logic with `recordDepositWindow` and `rerouteDeposit`.
+2. Whitelist the relayer (dry run, then `--execute` as each required admin):
+```bash
+cd app/contracts/deploy
+node configure-bridge-relayer-actions.js \
+  --bridge-address <bridge-proxy> \
+  --relayer-address <relayer-address> \
+  --methods recordDepositWindow
+```
+3. Set `BRIDGE_RECORD_DEPOSIT_WINDOW=true` and restart the relayer. Until then it keeps using the legacy entry points.
+4. Resolve quarantined deposits (status 6; the reason is in `depositQuarantineReasons` in Cirrus) through governance: `rerouteDeposit` returns one to `INITIATED` for re-verification and minting (reroute to the original token once its route is live again), `abortDeposit` closes it for an off-chain refund.
 
 ### Action Deposit Rollout
 

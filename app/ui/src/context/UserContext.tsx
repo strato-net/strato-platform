@@ -52,6 +52,11 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Matches the in-app custodial (vault-backed) connector, not the STRATO Wallet
+// browser extension. The extension deliberately announces the EIP-6963 name
+// "STRATO" rather than "STRATO Wallet" so that it does NOT match here -- if it
+// ever announced the latter, this test would misclassify it and wedge Connect.
+// That name is a contract with github.com/strato-net/strato-wallet.
 const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
   connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
 
@@ -400,11 +405,16 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
         await ensureStratoChainInWallet(walletClient);
 
         const d = unsignedTx.data;
+        const chainId = Number(d.chainId);
+        if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+          throw new Error("Invalid STRATO transaction chain ID");
+        }
         return walletClient.signTypedData({
           account: walletClient.account,
           domain: {
             name: "STRATO",
             version: "1",
+            chainId,
           },
           types: {
             Transaction: [

@@ -65,6 +65,15 @@ const VAULT_META: Record<string, {
     cardBorder: "border-blue-500/25 dark:border-blue-400/25 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a]",
     strategyDescription: "Deposited ETH is put to work across approved yield strategies, including wstETH staking yield. Net strategy returns are converted to ETH, which funds the vault’s configured Base APY. Funded rewards increase the ETH value of each vault share over time. The vault maintains an idle buffer for withdrawals; larger redemptions may queue while capital is deployed.",
   },
+  "hype-yield": {
+    title: "HYPE Yield Vault",
+    subtitle: "Earn HYPE yield and Reward Points",
+    badge: "Yield Vault",
+    iconBg: "bg-indigo-500/15 dark:bg-indigo-400/15",
+    iconColor: "text-indigo-600 dark:text-indigo-400",
+    cardBorder: "border-blue-500/25 dark:border-blue-400/25 bg-gradient-to-br from-[#f8fbff] to-[#edf3ff] dark:from-[#0f1a33] dark:to-[#111c3a]",
+    strategyDescription: "Deposited WHYPE is put to work across approved yield strategies, including KHYPE staking yield. Net strategy returns are converted to WHYPE, which funds the vault’s configured Base APY. Funded rewards increase the WHYPE value of each vault share over time. The vault maintains an idle buffer for withdrawals; larger redemptions may queue while capital is deployed.",
+  },
   "wbtc-carry": {
     title: "wBTC Carry Vault",
     subtitle: "ERC-4626 carry vault for wBTC deposits",

@@ -15,6 +15,7 @@ library:
   exposed-modules:
     - Blockchain.BlockChain
     - Blockchain.Event
+    - Blockchain.JsonRpcCommand
     - Blockchain.TraceReplay
     - Executable.EthereumVM
     - Executable.EthereumVM2
@@ -31,6 +32,7 @@ library:
   - bytestring
   - common-log
   - composable-monads-base
+  - nodedb-monad
   - conduit
   - containers
   - cross-monitoring
@@ -54,6 +56,7 @@ library:
   - strato-model
   - strato-redis-blockdb
   - strato-statediff
+  - strato-tracing
   - text
   - time
   - transformers
@@ -70,9 +73,12 @@ executables:
       - async
       - blockapps-init
       - common-log
+      - composable-monads-base
       - hflags
       - process-monitor
+      - strato-conf
       - strato-model
+      - strato-tracing
       - vm-runner
       - vm-tools
       - wai-middleware-prometheus

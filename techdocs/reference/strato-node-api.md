@@ -54,6 +54,7 @@ All paths are relative to `/strato-api/eth/v1.2`. Addresses and hashes are 40- a
 | GET | `/storage` | Raw contract storage entries (filtered) |
 | GET | `/receipts/hash/{blockHash}` and `/receipts/number/{blockNumber}` | RLP-encoded receipts for a block |
 | GET | `/receipts/hash/{blockHash}/proof/{txIndex}` and `/receipts/number/{blockNumber}/proof/{txIndex}` | Receipt plus inclusion proof and signed header |
+| GET | `/state/proof/{address}` | Account and storage proofs against a block's state root, plus the signed header |
 | GET | `/metadata` | Network and validator metadata |
 | GET | `/peers` | Connected peers |
 | GET | `/stats/totaltx` | Total transaction count |
@@ -248,6 +249,21 @@ Parameters: `address`, `key`, `minkey`, `maxkey`, `value`, `minvalue`, `maxvalue
 `/receipts/...` returns `{ "blockHash", "receipts": ["0x<rlp>", ...] }` in transaction order.
 
 `/receipts/.../proof/{txIndex}` returns `blockHash`, `blockNumber`, `txIndex`, `headerRLP`, the validator `signatures`, `receiptRLP`, `mptProof`, and `logs` (`contractAddress`, `eventName`, `args`). That is everything an off-chain client needs to prove a receipt against a signed header.
+
+### State proofs
+
+```
+GET /state/proof/{address}?path={storagePath}&path={storagePath}&blockNumber={n}
+```
+
+Parameters: `path` (repeatable; a SolidVM storage path such as `balances[<address>]` or `sentHash[5]`, URL-encoded) and `blockNumber` or `blockHash` (the latest block when neither is given).
+
+Returns `blockNumber`, `blockHash`, `headerRLP` and the validator `signatures` (as in the receipt proof), `address`, `accountProof`, `accountLeaf`, and one `storage` entry per path with `path`, `key`, `proof` and `value`. The header and the proofs always describe the same block, and the header's `stateRoot` is the state after that block's transactions. To verify:
+
+- **Account:** `accountProof` is the list of trie nodes from `stateRoot` to the leaf at key `keccak256(address)`. The leaf's value is an RLP string holding `accountLeaf` = `rlp([nonce, balance, contractRoot, codeHash])`.
+- **Storage:** `proof` is the list of trie nodes from `contractRoot` to the leaf at `key` = `keccak256(path)`. Mapping keys in a path are rendered as decimal for integers and 40 lowercase hex characters for addresses. The leaf's value is `value` itself, embedded as an RLP list: `[type, ...]`, where an integer `n` is `[0x00, n]`.
+
+A storage item holding its default value (`0`, `false`, an empty string) has no leaf, so asking for it returns an error.
 
 ### Node info
 

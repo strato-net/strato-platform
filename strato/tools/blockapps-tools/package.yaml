@@ -16,6 +16,7 @@ dependencies:
 library:
   source-dirs: src/
   dependencies:
+    - composable-monads-base
     - aeson
     - blockapps-data
     - blockapps-datadefs
@@ -30,6 +31,7 @@ library:
     - format
     - hedis
     - hflags
+    - http-client
     - streaming
     - labeled-error
     - leveldb-haskell

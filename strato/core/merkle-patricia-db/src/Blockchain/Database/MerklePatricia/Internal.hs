@@ -19,6 +19,7 @@ module Blockchain.Database.MerklePatricia.Internal
     sha2StateRoot,
     unboxStateRoot,
     unsafePutKeyVal,
+    unsafePutKeyValExisted,
     unsafeGetKeyVals,
     unsafeGetAllKeyVals,
     unsafeDeleteKey,
@@ -55,10 +56,21 @@ unsafePutKeyVal ::
   Key ->
   Val ->
   m StateRoot
-unsafePutKeyVal sr key val = do
+unsafePutKeyVal sr key val = fst <$> unsafePutKeyValExisted sr key val
+
+-- | Like 'unsafePutKeyVal', also reporting whether the key already held a
+-- value (True) or was newly inserted (False).
+unsafePutKeyValExisted ::
+  (StateRoot `Alters` NodeData) m =>
+  StateRoot ->
+  Key ->
+  Val ->
+  m (StateRoot, Bool)
+unsafePutKeyValExisted sr key val = do
   dbNodeData <- getNodeData $ ptrRef sr
-  dbPutNodeData <- putKV_NodeData key val dbNodeData
-  putNodeData dbPutNodeData
+  (dbPutNodeData, existed) <- putKV_NodeData key val dbNodeData
+  sr' <- putNodeData dbPutNodeData
+  return (sr', existed)
 
 unsafeGetKeyVals ::
   (StateRoot `Alters` NodeData) m =>
@@ -90,62 +102,69 @@ keyToSafeKey key
 
 -----
 
+-- | Insert a key/value under a node.  Also returns whether the key already
+-- had a value there, which the insert learns for free on its way to the leaf.
 putKV_NodeData ::
   (StateRoot `Alters` NodeData) m =>
   Key ->
   Val ->
   NodeData ->
-  m NodeData
+  m (NodeData, Bool)
 putKV_NodeData key val EmptyNodeData =
-  return $ ShortcutNodeData key (Right val)
+  return (ShortcutNodeData key (Right val), False)
 putKV_NodeData key val (FullNodeData options nodeValue)
   | options `slotIsEmpty` N.head key =
     do
       tailNode <- newShortcut (N.tail key) $ Right val
-      return $ FullNodeData (replace options (N.head key) tailNode) nodeValue
+      return (FullNodeData (replace options (N.head key) tailNode) nodeValue, False)
   | otherwise =
     do
       let conflictingNodeRef = options !! fromIntegral (N.head key)
-      newNode <- putKV_NodeRef (N.tail key) val conflictingNodeRef
-      return $ FullNodeData (replace options (N.head key) newNode) nodeValue
+      (newNode, existed) <- putKV_NodeRef (N.tail key) val conflictingNodeRef
+      return (FullNodeData (replace options (N.head key) newNode) nodeValue, existed)
 putKV_NodeData key1 val1 (ShortcutNodeData key2 val2)
   | key1 == key2 =
     case val2 of
-      Right _ -> return $ ShortcutNodeData key1 $ Right val1
+      Right _ -> return (ShortcutNodeData key1 $ Right val1, True)
       Left ref -> do
-        newNodeRef <- putKV_NodeRef key1 val1 ref
-        return $ ShortcutNodeData key2 (Left newNodeRef)
+        (newNodeRef, existed) <- putKV_NodeRef key1 val1 ref
+        return (ShortcutNodeData key2 (Left newNodeRef), existed)
   | N.null key1 = do
     newNodeRef <- newShortcut (N.tail key2) val2
-    return $ FullNodeData (list2Options 0 [(N.head key2, newNodeRef)]) $ Just val1
+    return (FullNodeData (list2Options 0 [(N.head key2, newNodeRef)]) $ Just val1, False)
   | key1 `N.isPrefixOf` key2 = do
     tailNode <- newShortcut (N.drop (N.length key1) key2) val2
-    modifiedTailNode <- putKV_NodeRef "" val1 tailNode
-    return $ ShortcutNodeData key1 $ Left modifiedTailNode
+    (modifiedTailNode, existed) <- putKV_NodeRef "" val1 tailNode
+    return (ShortcutNodeData key1 $ Left modifiedTailNode, existed)
   | key2 `N.isPrefixOf` key1 =
     case val2 of
-      Right val -> putKV_NodeData key2 val (ShortcutNodeData key1 $ Right val1)
+      Right val -> do
+        -- re-inserts the old (key2, val) around the new key1; key1 is new here
+        (nd, _) <- putKV_NodeData key2 val (ShortcutNodeData key1 $ Right val1)
+        return (nd, False)
       Left ref -> do
-        newNode <- putKV_NodeRef (N.drop (N.length key2) key1) val1 ref
-        return $ ShortcutNodeData key2 $ Left newNode
+        (newNode, existed) <- putKV_NodeRef (N.drop (N.length key2) key1) val1 ref
+        return (ShortcutNodeData key2 $ Left newNode, existed)
   | N.head key1 == N.head key2 =
     let (commonPrefix, suffix1, suffix2) =
           getCommonPrefix (N.unpack key1) (N.unpack key2)
      in do
           nodeAfterCommonBeforePut <- newShortcut (N.pack suffix2) val2
-          nodeAfterCommon <- putKV_NodeRef (N.pack suffix1) val1 nodeAfterCommonBeforePut
-          return $ ShortcutNodeData (N.pack commonPrefix) $ Left nodeAfterCommon
+          (nodeAfterCommon, existed) <- putKV_NodeRef (N.pack suffix1) val1 nodeAfterCommonBeforePut
+          return (ShortcutNodeData (N.pack commonPrefix) $ Left nodeAfterCommon, existed)
   | otherwise = do
     tailNode1 <- newShortcut (N.tail key1) $ Right val1
     tailNode2 <- newShortcut (N.tail key2) val2
-    return $
-      FullNodeData
-        ( list2Options 0 $
-            sortBy
-              (compare `on` fst)
-              [(N.head key1, tailNode1), (N.head key2, tailNode2)]
-        )
-        Nothing
+    return
+      ( FullNodeData
+          ( list2Options 0 $
+              sortBy
+                (compare `on` fst)
+                [(N.head key1, tailNode1), (N.head key2, tailNode2)]
+          )
+          Nothing,
+        False
+      )
 
 -----
 
@@ -205,8 +224,11 @@ deleteKey_NodeData key1 nd@(ShortcutNodeData key2 (Left ref))
 
 -----
 
-putKV_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> Val -> NodeRef -> m NodeRef
-putKV_NodeRef key val = nodeData2NodeRef <=< putKV_NodeData key val <=< getNodeData
+putKV_NodeRef :: (StateRoot `Alters` NodeData) m => Key -> Val -> NodeRef -> m (NodeRef, Bool)
+putKV_NodeRef key val ref = do
+  (nd, existed) <- putKV_NodeData key val =<< getNodeData ref
+  ref' <- nodeData2NodeRef nd
+  return (ref', existed)
 
 getKeyVals_NodeRef :: (StateRoot `Alters` NodeData) m => NodeRef -> Key -> m [(Key, Val)]
 getKeyVals_NodeRef ref key = do

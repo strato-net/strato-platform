@@ -1466,10 +1466,11 @@ export const setCollateralConfig = async (
     stabilityFeeRate: string;
     debtFloor: string;
     debtCeiling: string;
-    unitScale: string;
     isPaused: boolean;
   }
 ): Promise<{ status: string; hash: string }> => {
+  // unitScale is intentionally absent: CDPEngine derives it from the token's decimals() at
+  // first listing and never accepts it from calldata (audit: unitScale change on an open book).
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "setCollateralConfig");
   
   if (!registry?.cdpEngine) {
@@ -1489,7 +1490,6 @@ export const setCollateralConfig = async (
       stabilityFeeRate: configData.stabilityFeeRate,
       debtFloor: configData.debtFloor,
       debtCeiling: configData.debtCeiling,
-      unitScale: configData.unitScale,
       pause: Boolean(configData.isPaused),
     },
   };

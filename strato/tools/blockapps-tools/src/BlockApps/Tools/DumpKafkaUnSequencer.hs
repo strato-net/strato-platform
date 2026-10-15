@@ -3,16 +3,16 @@
 
 module BlockApps.Tools.DumpKafkaUnSequencer where
 
+import Control.Monad.Composable.Base (runEff, withStderrLogger)
 import Blockchain.EthConf
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Control.Monad.Composable.Streaming
 import Control.Monad.IO.Class
-import Control.Monad.Logger
 import Text.Format
 
 dumpKafkaUnSequencer :: IO ()
-dumpKafkaUnSequencer = runStderrLoggingT $ runStreamMConfigured "queryStrato" $
+dumpKafkaUnSequencer = runEff . withStderrLogger $ runStreamMConfigured "queryStrato" $
   consume "queryStrato" unseqEventsTopicName $ \unseqEvents -> do
     liftIO . putStrLn . unlines $ format <$> (unseqEvents :: [IngestEvent])
     return ()

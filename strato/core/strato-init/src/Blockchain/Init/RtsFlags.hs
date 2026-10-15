@@ -7,9 +7,8 @@
 -- Why these flags exist at all (from the 2026-08-26 from-genesis sync
 -- investigation, strato-net/private#94): the vm-runner mutator is serial —
 -- one busy OS thread regardless of @-N@ — so extra capabilities buy parallel
--- GC only, while @-A@ is per capability (total nursery = N×A) and there is no
--- @-M@ cap, so small-RAM machines die by OOM-killer during catch-up instead of
--- degrading gracefully.
+-- GC only, while @-A@ is per capability (total nursery = N×A). A @-M@ heap
+-- cap for small-RAM machines was tried and removed; see 'majorGcFlags'.
 --
 -- What actually matters (measured, 2026-08-28 A/B: five vm-runner variants,
 -- eight full from-genesis upquark syncs on a 4-core/32GB box; data in
@@ -158,15 +157,29 @@ vmNurseryPoolMB memMB
   | memMB <= 16 * 1024 = 256
   | otherwise = 512
 
--- | Heap cap for the vm-runner on small-RAM machines: @-M@ at 60% of RAM
--- converts an OOM-kill into bounded behavior (the RTS auto-enables compacting
--- GC when live data reaches ~30% of the cap), and @-F1.5@ roughly doubles
--- major-GC frequency (~2–5% throughput) to keep the peak lower. On >16GB
--- machines these must NOT be applied — the throughput cost buys nothing there.
-heapCapFlags :: Integer -> [String]
-heapCapFlags memMB
-  | memMB <= 16 * 1024 = ["-F1.5", "-M" ++ show ((memMB * 6) `div` 10) ++ "m"]
-  | otherwise = []
+-- | Major-GC shape for the vm-runner by RAM tier. On ≤16GB machines @-F1.5@
+-- roughly doubles major-GC frequency (~2–5% throughput) to keep the peak
+-- lower, and @-c@ compacts the oldest generation instead of copying it, so a
+-- major GC needs no to-space on top of the live data. On >16GB machines the
+-- milder @-F1.2@ measured −10% RSS at −1…−3% throughput (2026-09-21, one 300s
+-- pinned catch-up sync on a 32GB box).
+--
+-- Deliberately no @-M@ heap cap on any tier. A cap at 60% of RAM shipped from
+-- 2026-08-27 to 2026-09-29 and aborted the vm-runner on 8GB boxes ("Heap
+-- exhausted", exit 251, then convoke's restart loop and the node down): 60% of
+-- 8GB is 4.76GB, below the 4.3–4.8GB catch-up peak the 2026-08-28 A/B measured
+-- on a 32GB box, and the RTS was already compacting (auto @-c30@ of the cap)
+-- when it ran out, so no flag setting could have shrunk the live set. Uncapped,
+-- the heap grows into swap and the node slows down instead of crashing —
+-- hosts below 16GB must have swap (techdocs/node/requirements.md), otherwise
+-- the kernel OOM-killer picks a victim. @-c@ keeps the compaction the cap used
+-- to enable implicitly (@-c⟨n⟩@ is a no-op without @-M@); it is unmeasured
+-- against copying on the 4-core/16GB reference cell, so back it out per node
+-- with STRATO_VMRUNNER_RTS if a sync regresses there.
+majorGcFlags :: Integer -> [String]
+majorGcFlags memMB
+  | memMB <= 16 * 1024 = ["-F1.5", "-c"]
+  | otherwise = ["-F1.2"]
 
 -- | vm-runner: @-N4 -A⟨pool/4⟩@ was the fastest measured config on the
 -- 4-core reference box (2,972s vs 3,114–3,201s for -N2 at the same pool).
@@ -177,17 +190,21 @@ heapCapFlags memMB
 -- at the same pool) — on a 2-core box one capability avoids GC-sync cost and
 -- pool splitting, and leaves the other core to the sequencer/p2p/postgres.
 -- @-I2@ (idle GC) is kept from the previous fixed flags, @-T@ powers the
--- metrics export.
+-- metrics export. The pool is capped at 256MB: on a 32-core/32GB box with
+-- the in-process node cache (2026-09-21, 300s pinned catch-up sync), 256MB
+-- plus @-F1.2@ measured −26% RSS (3.4GB → 2.5GB) at −2…−3% throughput. That
+-- differs from the 2026-08-28 +8%…+35% pool-halving cost (4-core box, no
+-- node cache); re-measure there before relying on either number.
 vmRunnerRtsFlags :: Int -> Integer -> [String]
 vmRunnerRtsFlags cores memMB =
   ["-T", "-N" ++ show n, "-A" ++ show (pool `div` fromIntegral n) ++ "m", "-I2"]
-    ++ heapCapFlags memMB
+    ++ majorGcFlags memMB
   where
     n :: Int
     n | cores >= 4 = 4
       | cores == 3 = 2
       | otherwise = 1
-    pool = vmNurseryPoolMB memMB
+    pool = min 256 (vmNurseryPoolMB memMB)
 
 -- | strato-sequencer: serial event loop with a multi-GB catch-up heap, same
 -- shape as the vm-runner but never A/B'd — every rule here is a PREDICTION by
@@ -198,9 +215,10 @@ vmRunnerRtsFlags cores memMB =
 -- unmeasured: at the chain head the sequencer idles between blocks, and the
 -- RTS default 0.3s idle GC can fire repeated major GCs over its ~2.4GB
 -- post-catch-up residual heap; 2s matches the vm-runner's cadence. No @-M@
--- cap here, for two reasons: its catch-up peak is the look-ahead cache, which
--- flags don't control, and that ~2.4GB residual retention (known open issue)
--- means a cap would risk HeapOverflow aborts until it is fixed.
+-- cap here either (see 'majorGcFlags' for the vm-runner's), and two more
+-- reasons: its catch-up peak is the look-ahead cache, which flags don't
+-- control, and that ~2.4GB residual retention (known open issue) means a cap
+-- would risk HeapOverflow aborts until it is fixed.
 sequencerRtsFlags :: Int -> Integer -> [String]
 sequencerRtsFlags cores memMB =
   ["-T", "-N" ++ show n, "-A" ++ show (pool `div` fromIntegral n) ++ "m", "-I2"]

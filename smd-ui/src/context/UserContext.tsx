@@ -36,6 +36,11 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
+// Matches the in-app custodial (vault-backed) connector, not the STRATO Wallet
+// browser extension. The extension deliberately announces the EIP-6963 name
+// "STRATO" rather than "STRATO Wallet" so that it does NOT match here -- if it
+// ever announced the latter, this test would misclassify it and wedge Connect.
+// That name is a contract with github.com/strato-net/strato-wallet.
 const isStratoConnector = (connector?: { id?: string; name?: string } | null) =>
   connector?.id === "stratoWallet" || connector?.name === "STRATO Wallet";
 

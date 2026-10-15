@@ -114,14 +114,12 @@ generateDockerComposeAllDocker = do
   let apex = def
         { image = "${APEX_IMAGE:-" ++ repoUrl ++ "apex:" ++ stratoVersion ++ "-" ++ hashApex ++ "}"
         , build = Just "."
-        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "redis", "strato"]
+        , depends_on = Just $ DependsOnList ["postgres", "prometheus", "strato"]
         , environment = Just $ Map.fromList
             [ ("ADMIN_EMAIL", "${ADMIN_EMAIL:-}")
             , ("postgres_host", "postgres")
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
-            , ("redis_host", "redis")
-            , ("redis_port", "6379")
             , ("PROMETHEUS_HOST", "${PROMETHEUS_HOST:-prometheus:9090}")
             , ("SENDGRID_API_KEY", "${SENDGRID_API_KEY:-}")
             , ("STRATO_HOSTNAME", "${STRATO_HOSTNAME:-strato}")
@@ -274,6 +272,8 @@ generateDockerComposeAllDocker = do
         , depends_on = Just $ DependsOnList ["apex", "docs", "postgrest", "prometheus", "smd", "strato", "app-backend", "app-ui"]
         , environment = Just $ Map.fromList
             [ ("APEX_HOST", "${APEX_HOST:-}")
+            , ("BUNDLED_APP", "${BUNDLED_APP:-true}")
+            , ("APP_URL", "${APP_URL:-}")
             , ("blockTime", "${blockTime:-}")
             , ("DOCS_HOST", "${DOCS_HOST:-}")
             , ("NGINX_TRUST_PROXY_CIDRS", "${NGINX_TRUST_PROXY_CIDRS:-}")
@@ -349,8 +349,12 @@ generateDockerComposeAllDocker = do
             , ("KAFKA_LOG_RETENTION_HOURS", "168")
             , ("KAFKA_OFFSET_METADATA_MAX_BYTES", "1048576")
             , ("KAFKA_OFFSETS_RETENTION_MINUTES", "2147483647")
-            , ("KAFKA_MAX_REQUEST_SIZE", "${KAFKA_MAX_REQUEST_SIZE:-2500000}")
-            , ("KAFKA_MESSAGE_MAX_BYTES", "${KAFKA_MESSAGE_MAX_BYTES:-2500000}")
+            -- Keep in step with the broker config in
+            -- Control.Monad.Composable.Kafka.DockerConfig, including its upper
+            -- bound: this must stay below milena's 'defaultMaxBytes', or the
+            -- broker accepts records its own Fetch v0 consumers can never read.
+            , ("KAFKA_MAX_REQUEST_SIZE", "${KAFKA_MAX_REQUEST_SIZE:-8000000}")
+            , ("KAFKA_MESSAGE_MAX_BYTES", "${KAFKA_MESSAGE_MAX_BYTES:-8000000}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec start-kafka.sh >> /logs/kafka.log 2>&1"]

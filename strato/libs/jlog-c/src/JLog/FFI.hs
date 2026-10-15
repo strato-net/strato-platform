@@ -27,6 +27,7 @@ module JLog.FFI (
   jlog_ctx_advance_id,
   -- * Subscriber management
   jlog_ctx_add_subscriber,
+  jlog_ctx_add_subscriber_copy_checkpoint,
   jlog_ctx_remove_subscriber,
   jlog_ctx_list_subscribers,
   -- * Utility
@@ -165,6 +166,9 @@ foreign import ccall unsafe "jlog_ctx_advance_id"
 -- Subscriber management
 foreign import ccall unsafe "jlog_ctx_add_subscriber"
   jlog_ctx_add_subscriber :: Ptr JLogCtx -> CString -> CInt -> IO CInt
+
+foreign import ccall unsafe "jlog_ctx_add_subscriber_copy_checkpoint"
+  jlog_ctx_add_subscriber_copy_checkpoint :: Ptr JLogCtx -> CString -> CString -> IO CInt
 
 foreign import ccall unsafe "jlog_ctx_remove_subscriber"
   jlog_ctx_remove_subscriber :: Ptr JLogCtx -> CString -> IO CInt

@@ -4,6 +4,35 @@ Fetches asset prices from multiple sources and pushes them to the STRATO blockch
 
 Oracle config is keyed by network in `assets.json` (`networks[ORACLE_NETWORK_ID]`). Set `ORACLE_NETWORK_ID` to the upquark network ID on production (`33056204878082667`) and to the helium network ID on testnet (`114784819836269`). Each block has complete `assets` and `sources`.
 
+## Price-only feeds (symbol-derived keys)
+
+`PriceOracle` keys prices by address, so an asset with no STRATO token still needs one. For assets that
+are priced but not tokenized — commodities, or L1s with no bridge route — `targetAssetAddress` is **the
+feed symbol as left-aligned ASCII, zero-padded to 20 bytes**, and the feed behaves like any other: median
+of the sources, same batch push, same `prices` row in Cirrus.
+
+| Key | Asset | Quote |
+| --- | --- | --- |
+| `4252454e54000000000000000000000000000000` | `BRENT` | Brent crude spot, USD/barrel (TwelveData only, `minSources: 1`) |
+| `444f474500000000000000000000000000000000` | `DOGE` | Dogecoin, USD |
+
+Derive one, or read one back:
+
+```bash
+python3 -c "print('BRENT'.encode().hex().ljust(40,'0'))"
+python3 -c "print(bytes.fromhex('4252454e54000000000000000000000000000000').rstrip(b'\0').decode())"
+```
+
+Consumers read them exactly like a token price, and the existing contract tests already exercise a bare
+address as a price key. Two things to know:
+
+- **Nothing is deployed at these addresses.** There is no token, no balance and no pool. They will not
+  appear in `/tokens`, the dashboard or price-tracking, all of which build their universe from deployed
+  tokens. `/oracle/price?asset=…` and `/oracle/price-history/:assetAddress` serve them directly.
+- **No registry is needed.** The key is a function of the symbol, so two feeds added in parallel cannot
+  collide, and a `prices` row decodes back to its symbol with no lookup. Symbols are limited to 20
+  characters and uppercase ASCII. `deadbeef` remains used by proxy-only assets that are never submitted.
+
 ## Features
 
 - **Median Aggregation**: Robust price calculation using median of all valid sources
@@ -50,6 +79,9 @@ CRON_SCHEDULE="0 */15 * * * *"
 # Token Configuration (Optional)
 USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
 GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
+VOUCHER_ADDRESS=000000000000000000000000000000000000100e  # Voucher contract address
+GAS_FEE_VOUCHER=100  # Gas fee in Vouchers (1 = 100, default: 100)
+MIN_TRANSACTIONS_THRESHOLD=12000  # Total possible transactions threshold (balance check), default: 12000
 
 # AWS Configuration (for CloudWatch Metrics - Optional)
 # Leave CLOUDWATCH_NAMESPACE empty to disable metrics
@@ -81,4 +113,8 @@ The service automatically marks itself as unhealthy when:
 - Any API source fails twice in a row
 - Transaction submission fails twice in a row  
 - USDST balance check fails twice in a row
-- USDST balance is below minimum threshold (10 USDST) 
+
+Each cycle also checks the Voucher and USDST balances and estimates the transactions left
+(`voucher / GAS_FEE_VOUCHER + usdst / GAS_FEE_USDST`):
+- At or below `MIN_TRANSACTIONS_THRESHOLD` (default 12000, ~5.5 days at 90 tx/hour) it logs an error (and Slack alert, if configured)
+- Below 1 transaction the process exits with code 1

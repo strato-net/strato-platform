@@ -223,4 +223,24 @@ contract Describe_ValidatorRegistry {
         require(harness.recover(digest, 28, r, s) != signer, "the other parity is someone else");
         require(harness.recover(digest, 5, r, s) == address(0), "nonsense v recovers nobody");
     }
+
+    // SolidVM feeds a never-written storage slot to abi.encodePacked as zero bytes, not as
+    // uint256(0). Every validator starts with an unwritten nonce, so without the `+ 0` in
+    // operatorAuthorizationDigest the on-chain digest was 32 bytes short of what every off-chain
+    // signer hashes and no first `register` / `setOperator` signature could ever verify.
+    function it_digest_for_a_fresh_validator_includes_nonce_zero() public {
+        require(registry.authorizationNonce(GENESIS_X) == 0, "nonce never written");
+        bytes32 onChain = registry.operatorAuthorizationDigest(GENESIS_X, address(operatorB));
+        bytes32 offChain = registry.authorizationDigest(address(registry), GENESIS_X, address(operatorB), 0);
+        require(onChain == offChain, "operatorAuthorizationDigest must encode an unwritten nonce as uint256(0)");
+    }
+
+    function it_digest_after_a_consumed_consent_uses_the_written_nonce() public {
+        registry.sign(GENESIS_X, address(user));
+        _register(user, GENESIS_X);
+        require(registry.authorizationNonce(GENESIS_X) == 1, "consent spent");
+        bytes32 onChain = registry.operatorAuthorizationDigest(GENESIS_X, address(operatorB));
+        bytes32 offChain = registry.authorizationDigest(address(registry), GENESIS_X, address(operatorB), 1);
+        require(onChain == offChain, "operatorAuthorizationDigest must track the written nonce");
+    }
 }

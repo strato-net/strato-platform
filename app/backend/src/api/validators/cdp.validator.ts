@@ -168,14 +168,7 @@ export function validateSetCollateralConfigArgs(args: any) {
     }).messages({
       'custom.debtCeiling': 'Debt ceiling must be >= 0'
     }),
-    unitScale: Joi.string().custom((value, helpers) => {
-      if (BigInt(value) <= 0) {
-        return helpers.error('custom.unitScale');
-      }
-      return value;
-    }).messages({
-      'custom.unitScale': 'Unit scale must be > 0'
-    }),
+    // unitScale is derived on-chain from the token's decimals(); it is not accepted here.
     isPaused: Joi.boolean().required()
   });
   

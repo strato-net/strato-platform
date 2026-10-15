@@ -33,6 +33,9 @@ const VAULT_ICON_FILES: Record<string, string> = {
 const SHARE_SYMBOL_TO_VAULT_KEY: Record<string, string> = {
   saveusdst: SAVE_USDST_VAULT_KEY,
   carryeth: "eth-carry",
+  yieldhype: "hype-yield",
+  // Helium was initialized with the legacy symbol before the product naming was finalized.
+  carryhype: "hype-yield",
   carrywbtc: "wbtc-carry",
   yieldusdc: "usdc-yield",
   yieldgoldst: "goldst-yield",

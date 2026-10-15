@@ -16,7 +16,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Applicative (Alternative, empty)
 import Control.DeepSeq
-import Control.Monad.State (runState, state)
 import qualified Data.DList as DL
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -235,9 +234,7 @@ flushQueuedOnly s@BaggerState {queued = q} =
   (map (, Queued) $ concatMap toList $ M.elems q, s {queued = M.empty})
 
 flushBoth :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
-flushBoth s = runState flushBothState s
+flushBoth s0 = (pendingTxs ++ queuedTxs, s2)
   where
-    flushBothState = do
-      pendingTxs <- state flushPendingOnly
-      queuedTxs <- state flushQueuedOnly
-      return (pendingTxs ++ queuedTxs)
+    (pendingTxs, s1) = flushPendingOnly s0
+    (queuedTxs, s2) = flushQueuedOnly s1

@@ -117,6 +117,10 @@ data JsonRpcCommand
     JRCTraceBlockTxs {jrcBlockHeader :: BlockHeader, jrcTxs :: [Transaction], jrcTargetTx :: Maybe Keccak256, jrcOpts :: TraceOptions, jrcId :: String}
   | -- | strato_simulateV1: blocks of calls executed sequentially in one sandbox.
     JRCSimulate {jrcSimBlocks :: [[CallSpec]], jrcHeader :: Maybe BlockHeader, jrcId :: String}
+  | -- | strato_getStateProof / eth_getProof: Merkle-Patricia proofs of an
+    -- account and of the given raw (unhashed) keys of its storage, against a
+    -- state root.
+    JRCGetProof {jrcStateRoot :: StateRoot, jrcAddress :: A.Address, jrcKeys :: [BS.ByteString], jrcId :: String}
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format JsonRpcCommand where
@@ -140,6 +144,8 @@ instance Format JsonRpcCommand where
     "JRCTraceBlockTxs id=" ++ rid ++ " txs=" ++ show (length txs) ++ " target=" ++ maybe "all" format mTarget
   format JRCSimulate {jrcSimBlocks = blks, jrcId = rid} =
     "JRCSimulate id=" ++ rid ++ " blocks=" ++ show (map length blks)
+  format JRCGetProof {jrcStateRoot = sr, jrcAddress = addr, jrcKeys = ks, jrcId = rid} =
+    "JRCGetProof id=" ++ rid ++ " stateRoot=" ++ format sr ++ " addr=" ++ format addr ++ " keys=" ++ show (length ks)
 
 data JsonRpcResponse
   = Success { responseId :: String, returnData :: BS.ByteString }
@@ -192,6 +198,7 @@ data VmTask
   | VmRunPreprepare BDB.Block
   | VmSelfAddress Address
   | VmFlushMempool FlushMempoolRequest
+  | VmProposerStatus Bool
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmTask where
@@ -211,6 +218,7 @@ instance ShowConstructor VmTask where
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"
   showConstructor VmSelfAddress{} = "VmSelfAddress"
   showConstructor VmFlushMempool{} = "VmFlushMempool"
+  showConstructor VmProposerStatus{} = "VmProposerStatus"
 
 instance Binary IngestEvent
 

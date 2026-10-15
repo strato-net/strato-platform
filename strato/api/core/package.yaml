@@ -23,6 +23,7 @@ library:
     - bytestring
     - clock
     - common-log
+    - composable-monads-base
     - conduit
     - containers
     - deepseq
@@ -31,6 +32,7 @@ library:
     - ethereum-discovery
     - filepath
     - format
+    - http-client
     - http-types
     - lens
     - monad-alter
@@ -49,3 +51,4 @@ library:
     - unliftio
     - unordered-containers
     - strato-redis-blockdb
+    - strato-tracing

@@ -61,13 +61,20 @@ commitSingleOffset groupName topic partition offset ofsMetadata = do
 -- Functions that parse kafka responses for errors that are hidden within the list of responses
 parseKafkaResponse :: ProduceResponse -> IO ()
 parseKafkaResponse pr =
-  case maybeError of
+  case find (/= NoError) (produceResponseErrors pr) of
     (Just e) -> throwIO e
     Nothing -> return ()
+
+-- | The per-partition errors a 'ProduceResponse' carries, in order.
+--
+-- 'parseKafkaResponse' throws the first of these, which is fatal to any caller
+-- that is not catching it. Callers that must survive a rejection -- producers
+-- of records nothing in consensus reads back -- inspect them with this instead.
+produceResponseErrors :: ProduceResponse -> [KafkaError]
+produceResponseErrors pr = filter (/= NoError) es
   where
     scd = concatMap snd $ _produceResponseFields pr -- type [(Partition, KafkaError, Offset)]
     es = map (\(_, ke, _) -> ke) scd -- type [KafkaError]
-    maybeError = find (/= NoError) es
 
 -- if (any (/= NoError) e) then
 --   throwIO $ e !! 0

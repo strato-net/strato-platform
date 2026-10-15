@@ -16,6 +16,7 @@ library:
   - blockapps-data
   - bytestring
   - common-log
+  - composable-monads-base
   - containers
   - debugger
   - exceptions

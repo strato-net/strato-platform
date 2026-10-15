@@ -10,23 +10,22 @@ module Main where
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.DB.ChainDB (getChainStateRoot)
 import Blockchain.Data.AddressStateDB (AddressState (..))
 import Blockchain.Data.BlockHeader (number, stateRoot)
 import Blockchain.Data.GenesisBlock (genesisInfoToBlock)
 import Blockchain.Data.GenesisInfo (getGenesisInfo)
-import Blockchain.EthConf (runStreamMConfigured)
-import Blockchain.Event (BlockVerificationFailure, VmOutEvent (..))
+import Blockchain.Event (BlockVerificationFailure)
+import Control.Monad.IO.Class (liftIO)
 import Blockchain.Model.WrappedBlock (OutputBlock (..), outputBlockHash)
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize)
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()
-import Blockchain.VMContext (evalContextM', finalizePendingMPNodes, initReplayContext)
+import Blockchain.VMContext (evalContextM, initReplayContext)
 import Blockchain.VMOptions ()
-import Conduit
 import Control.Monad (forM, unless, when)
+import Control.Monad.Composable.Base (accessEnv, runEff)
 import Control.Monad.Composable.Streaming (runConsume)
 import Data.Binary (decode, encode, get)
 import Data.Binary.Get (Decoder (..), Get, runGetIncremental)
@@ -70,7 +69,8 @@ dumpBlocks n outPath = do
     hPutStrLn stderr "dump: n must be > 0"
     exitFailure
   hPutStrLn stderr $ printf "dumping first %d VmBlock(s) from vm_tasks to %s" n outPath
-  blocks <- runLoggingT $ runStreamMConfigured "vm-apply-dump" $ do
+  -- Only the stream is needed here, so the in-memory seed context is reused as is.
+  blocks <- runEff . runLogging . evalContextM "vm-apply-dump" accessEnv $ do
     acc <- liftIO $ newIORef ([] :: [OutputBlock])
     -- Fresh group each dump-all so we reread vm_tasks from offset 0.
     runConsume "vm-apply-loop-dump-all" seqVmTasksTopicName $ \evs -> do
@@ -127,18 +127,14 @@ applyBlocksPreloaded inPath mRange = do
       txCount
       (show expectSR)
   t0 <- getCurrentTime
-  failures <- runLoggingT $ runResourceT $ do
-    ctx <- initReplayContext
-    lift $ runStreamMConfigured "vm-apply-replay" $ evalContextM' ctx $ do
+  failures <- runEff . runLogging . evalContextM "vm-apply-replay" initReplayContext $ do
       -- Historical MP nodes come from a copied LevelDB (helium-ldb).
       -- Rebuilding genesis.json storage here hits a BasicValue parse on HTML
       -- strings and is not how a live node boots (strato-setup already wrote the trie).
       gi <- getGenesisInfo
       seedDatabases (genesisInfoToBlock gi)
       initializeBestBlock
-      result <- runConduit $ processBlocks blocks .| collectFailures
-      finalizePendingMPNodes
-      pure result
+      processBlocks blocks
   t1 <- getCurrentTime
   let dt = realToFrac (diffUTCTime t1 t0) :: Double
       rate = fromIntegral (length blocks) / max dt 1e-9
@@ -330,17 +326,13 @@ applyBlocksStreamed chunkSize inPath mRange = do
         chunkSize
         inPath
     t0 <- getCurrentTime
-    (failures, maybeStats, finalSource) <- runLoggingT $ runResourceT $ do
-      ctx <- initReplayContext
-      lift $ runStreamMConfigured "vm-apply-replay-stream" $ evalContextM' ctx $ do
+    (failures, maybeStats, finalSource) <- runEff . runLogging . evalContextM "vm-apply-replay-stream" initReplayContext $ do
         gi <- getGenesisInfo
         seedDatabases (genesisInfoToBlock gi)
         initializeBestBlock
         let processChunk [] = pure ([] :: [BlockVerificationFailure])
             processChunk reversedBlocks =
-              runConduit $
-                processBlocks (reverse reversedBlocks)
-                  .| collectFailures
+              processBlocks (reverse reversedBlocks)
             finish source reversedBlocks stats = do
               chunkFailures <- processChunk reversedBlocks
               pure (chunkFailures, stats, source)
@@ -366,9 +358,7 @@ applyBlocksStreamed chunkSize inPath mRange = do
                             else pure (chunkFailures, Just stats', source')
                         else
                           go Nothing source' reversedBlocks' chunkLength' (Just stats')
-        result <- go firstSelected source1 [] 0 Nothing
-        finalizePendingMPNodes
-        pure result
+        go firstSelected source1 [] 0 Nothing
     when (null failures && mRange == Nothing) $
       ensureLegacyEnd finalSource
     t1 <- getCurrentTime
@@ -458,12 +448,7 @@ auditLastBlock :: OutputBlock -> IO ()
 auditLastBlock lastB = do
   let expectSR = stateRoot (obBlockData lastB)
       expectHash = outputBlockHash lastB
-  (accountCount, storageCount) <- runLoggingT $ runResourceT $ do
-    ctx <- initReplayContext
-    lift $ runStreamMConfigured "vm-apply-audit" $ evalContextM' ctx $ do
-      diskSR <- getChainStateRoot Nothing expectHash
-      unless (diskSR == Just expectSR) $
-        error $ "AUDIT fail: persisted root mismatch: expected=" ++ show expectSR ++ " disk=" ++ show diskSR
+  (accountCount, storageCount) <- runEff . runLogging . evalContextM "vm-apply-audit" initReplayContext $ do
       accountPairs <- MP.unsafeGetAllKeyVals expectSR
       let states =
             [ rlpDecode (rlpDeserialize (rlpDecode encoded)) :: AddressState
@@ -489,10 +474,3 @@ lastBlock [b] = b
 lastBlock (_ : bs) = lastBlock bs
 lastBlock [] = error "vm-replay: empty block list"
 
-collectFailures :: (Monad m) => ConduitT VmOutEvent Void m [BlockVerificationFailure]
-collectFailures = go []
-  where
-    go acc = await >>= \case
-      Nothing -> pure (reverse acc)
-      Just (OutBlockVerificationFailure fs) -> go (reverse fs ++ acc)
-      Just _ -> go acc

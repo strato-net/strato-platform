@@ -45,15 +45,6 @@ export interface VaultTransaction {
   };
 }
 
-export interface UserTokenBalance {
-  address: string;
-  symbol: string;
-  name: string;
-  balance: string;
-  priceUsd: string;
-  images?: { value: string }[];
-}
-
 export interface UserActivityItem {
   type: "deposit" | "withdrawal";
   timestamp: string;
@@ -88,13 +79,6 @@ export interface VaultState {
   loadingUser: boolean;
   loadingTransactions: boolean;
   loadingUserActivity: boolean;
-  loadingBalances: boolean;
-
-  // User's token balances for deposit
-  userTokenBalances: UserTokenBalance[];
-
-  // Deposit eligibility
-  deficitAssets: string[];
 
   // Share token info
   shareTokenSymbol: string;
@@ -108,11 +92,10 @@ type VaultContextType = {
   vaultState: VaultState;
   refreshVault: (showLoading?: boolean) => Promise<void>;
   refreshUserPosition: () => Promise<void>;
-  refreshUserBalances: () => Promise<void>;
   refreshTransactions: (showLoading?: boolean) => Promise<void>;
   refreshUserActivity: (showLoading?: boolean) => Promise<void>;
-  deposit: (args: { token: string; amount: string }) => Promise<void>;
   withdraw: (args: { amountUsd: string }) => Promise<{ basket: Array<{ token: string; amount: string }> }>;
+  withdrawShares: (args: { shares: string }) => Promise<{ status: string; hash: string }>;
 
   // Admin functions
   adminPause: () => Promise<void>;
@@ -140,9 +123,6 @@ const defaultVaultState: VaultState = {
   loadingUser: true,
   loadingTransactions: true,
   loadingUserActivity: true,
-  loadingBalances: true,
-  userTokenBalances: [],
-  deficitAssets: [],
   shareTokenSymbol: "sVAULT",
   shareTokenAddress: "",
   botExecutor: "",
@@ -183,7 +163,6 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
           alpha: res.data.alpha || "0",
           paused: res.data.paused || false,
           assets: res.data.assets || [],
-          deficitAssets: res.data.deficitAssets || [],
           shareTokenSymbol: res.data.shareTokenSymbol || "sVAULT",
           shareTokenAddress: res.data.shareTokenAddress || "",
           botExecutor: res.data.botExecutor || "",
@@ -284,37 +263,13 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isLoggedIn]);
 
-  const fetchUserBalances = useCallback(async () => {
-    if (!isLoggedIn) return;
-
-    setVaultState(prev => ({ ...prev, loadingBalances: true }));
-
-    try {
-      const res = await api.get("/vault/balances");
-
-      if (res.data?.balances) {
-        setVaultState(prev => ({
-          ...prev,
-          userTokenBalances: res.data.balances,
-          loadingBalances: false,
-        }));
-      }
-    } catch (err: any) {
-      if (err.name === "AbortError" || err.code === "ERR_CANCELED" || err.name === "CanceledError") {
-        return;
-      }
-      console.error("Error fetching user balances:", err);
-    } finally {
-      setVaultState(prev => ({ ...prev, loadingBalances: false }));
-    }
-  }, [isLoggedIn]);
-
-  const deposit = async (args: { token: string; amount: string }) => {
-    await api.post("/vault/deposit", args);
-  };
-
   const withdraw = async (args: { amountUsd: string }) => {
     const res = await api.post("/vault/withdraw", args);
+    return res.data;
+  };
+
+  const withdrawShares = async (args: { shares: string }) => {
+    const res = await api.post("/vault/withdraw-shares", args);
     return res.data;
   };
 
@@ -346,10 +301,9 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
   const refreshVault = useCallback(async (showLoading: boolean = false) => {
     await fetchVaultInfo(showLoading);
     await fetchUserPosition();
-    await fetchUserBalances();
     await fetchTransactions(showLoading);
     await fetchUserActivity(showLoading);
-  }, [fetchVaultInfo, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]);
+  }, [fetchVaultInfo, fetchUserPosition, fetchTransactions, fetchUserActivity]);
 
   // Public data — fetch once on mount
   useEffect(() => {
@@ -361,10 +315,9 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (isLoggedIn) {
       fetchUserPosition();
-      fetchUserBalances();
       fetchUserActivity(true);
     }
-  }, [isLoggedIn, fetchUserPosition, fetchUserBalances, fetchUserActivity]);
+  }, [isLoggedIn, fetchUserPosition, fetchUserActivity]);
 
   // Cleanup abort controller on unmount
   useEffect(() => {
@@ -380,11 +333,10 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       vaultState,
       refreshVault,
       refreshUserPosition: fetchUserPosition,
-      refreshUserBalances: fetchUserBalances,
       refreshTransactions: fetchTransactions,
       refreshUserActivity: fetchUserActivity,
-      deposit,
       withdraw,
+      withdrawShares,
       adminPause,
       adminUnpause,
       adminSetMinReserve,
@@ -392,7 +344,7 @@ export const VaultProvider = ({ children }: { children: React.ReactNode }) => {
       adminAddAsset,
       adminRemoveAsset,
     }),
-    [vaultState, refreshVault, fetchUserPosition, fetchUserBalances, fetchTransactions, fetchUserActivity]
+    [vaultState, refreshVault, fetchUserPosition, fetchTransactions, fetchUserActivity]
   );
 
   return (

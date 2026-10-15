@@ -9,6 +9,7 @@ library:
   source-dirs: src
   dependencies:
   - blockapps-vault-wrapper-api
+  - composable-monads-base
   - blockapps-vault-wrapper-client
   - bytestring
   - mtl

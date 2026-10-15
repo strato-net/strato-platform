@@ -49,7 +49,7 @@ import Blockchain.Strato.Model.Secp256k1 (exportSignature)
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import qualified Data.Text.Encoding as TE
 import Control.Arrow ((&&&))
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Trans.Class
 import qualified Data.Text as T
 import SQLM (ApiError (..))
@@ -359,7 +359,7 @@ instance (Monad m, GetReceipts m, MonadTrans t) => GetReceipts (t m) where
   resolveBlockHashByNumber = lift . resolveBlockHashByNumber
   getBlockHeaderByHash = lift . getBlockHeaderByHash
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
+instance (SQLDB Base.:> es) => GetReceipts (Base.Eff es) where
   getReceiptsForBlockHash = receiptRefsForBlock
 
   resolveBlockHashByNumber n = do
@@ -378,6 +378,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
     -- the header reconstituted from BlockDataRef + the four side tables so
     -- the proof handler can serialize the canonical V2 header bytes (with
     -- signatures cleared) and surface the commit signatures separately.
+    -- The side-table rows are read in id (insertion) order, which is the
+    -- header's own order: unordered, a parallel scan can interleave them and
+    -- the rebuilt header no longer hashes to the block hash.
     bdrs <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $
       E.select $
         E.from $ \bdRef -> do
@@ -391,26 +394,31 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetReceipts (SQLM m) where
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. BlockValidatorRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. BlockValidatorRefId)]
               return v
         vd <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. ValidatorDeltaRefId)]
               return v
         ps <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. ProposalSignatureRefId)]
               return v
         ss <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. CommitmentSignatureRefId)]
               return v
         stakes <- fmap (map E.entityVal) . sqlQuery $
           E.select $
             E.from $ \v -> do
               E.where_ $ v E.^. BlockStakeRefBlockDataRefId E.==. E.val bdrId
+              E.orderBy [E.asc (v E.^. BlockStakeRefId)]
               return v
         -- The proof handler doesn't use blockReceiptTransactions; pass [].
         let block :: Block

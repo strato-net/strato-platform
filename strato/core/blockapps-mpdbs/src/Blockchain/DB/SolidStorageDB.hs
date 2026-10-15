@@ -10,7 +10,6 @@ module Blockchain.DB.SolidStorageDB
     getSolidStorageKeyVal',
     deleteSolidStorageKeyVal',
     getAllSolidStorageKeyVals',
-    flushMemSolidStorageTxDBToBlockDB,
     flushMemSolidStorageDB,
     FullSolidStorage,
     fromVal,
@@ -68,9 +67,6 @@ deleteSolidStorageKeyVal' acct key = deleteRawStorageKey' (toKey acct key)
 
 getAllSolidStorageKeyVals' :: FullSolidStorage m => Address -> m [(MP.Key, BasicValue)]
 getAllSolidStorageKeyVals' acct = map (second fromVal) <$> getAllRawStorageKeyVals' acct
-
-flushMemSolidStorageTxDBToBlockDB :: FullSolidStorage m => m ()
-flushMemSolidStorageTxDBToBlockDB = flushMemRawStorageTxDBToBlockDB
 
 flushMemSolidStorageDB :: (MonadLogger m, FullSolidStorage m) => m ()
 flushMemSolidStorageDB = flushMemRawStorageDB

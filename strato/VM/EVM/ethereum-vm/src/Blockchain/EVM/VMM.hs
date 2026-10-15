@@ -192,9 +192,6 @@ instance MonadIO m => Mod.Modifiable CurrentBlockHash (VMM m) where
   put _ md = Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ currentBlock ?= md
 
 instance MonadIO m => HasMemRawStorageDB (VMM m) where
-  getMemRawStorageTxDB = _storageTxMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
-  putMemRawStorageTxMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
-    pure $ s {vmMemDBs = (vmMemDBs s) {_storageTxMap = theMap}}
   getMemRawStorageBlockDB = _storageBlockMap . vmMemDBs <$> Mod.get (Mod.Proxy @VMState)
   putMemRawStorageBlockMap theMap = Mod.modify_ (Mod.Proxy @VMState) $ \s ->
     pure $ s {vmMemDBs = (vmMemDBs s) {_storageBlockMap = theMap}}

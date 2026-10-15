@@ -10,7 +10,7 @@ A cheat sheet for building on STRATO. For the full references, see [Core Platfor
 | JSON-RPC | `https://app.strato.nexus/rpc`, `https://noderpc.strato.nexus/rpc` | `https://app.testnet.strato.nexus/rpc` |
 | `eth_chainId` | `0x7030addddcf2` (`123354377739506`) | `0xb165855668ca` (`195049586845898`) |
 | `net_version` | `33056204878082667` | `114784819836269` |
-| Explorer | [stratoscan.strato.nexus](https://stratoscan.strato.nexus) | |
+| Explorer | [stratoscan.strato.nexus](https://stratoscan.strato.nexus) | [stratoscan.testnet.strato.nexus](https://stratoscan.testnet.strato.nexus) |
 
 ## API paths
 
@@ -26,6 +26,8 @@ A cheat sheet for building on STRATO. For the full references, see [Core Platfor
 | `/api/*` | App backend (DeFi operations) | Token for user data and writes |
 | `/api/public/api-docs.json` | App API OpenAPI spec | None |
 | `/api/docs` | App API Swagger UI | Browser login |
+
+The mainnet [STRATOscan API](https://stratoscan.strato.nexus/api-docs) serves Etherscan-compatible `balance`, `txlist`, `tokentx`, `tokenbalance` and `getabi` requests at `https://stratoscan.strato.nexus/api`, without an API key.
 
 ## Authentication
 

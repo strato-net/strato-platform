@@ -13,8 +13,43 @@ local CSRF_TOKEN_TTL = 1800
 -- so requests already in flight with pre-rotation cookies still validate
 local ROTATION_GRACE_TTL = 60
 
+-- Stateless mode (CSRF_STATELESS=true): the token is an HMAC of the session id
+-- under nginx's session secret. Every nginx copy that shares the secret derives
+-- and checks the same token, so several copies behind a load balancer, or two
+-- tiers under one hostname, need neither a shared token store nor stickiness.
+-- The double-submit check is unchanged (header == cookie == expected token).
+-- Off by default: tokens live in this instance's shared dict, as below.
+local STATELESS = os.getenv("CSRF_STATELESS") == "true"
+
+-- Token store: this instance's shared dict. Behind a load balancer the
+-- target group's session stickiness keeps a browser on the instance that
+-- issued its token, so no shared store is needed.
+--   get(key) -> value|nil
+--   set(key, value, ttl) -> ok, err
+--   add(key, value, ttl) -> ok, err   (err == "exists" when already present)
+--   ttl(key) -> seconds remaining|nil
+--   delete(key)
+--   expire_at_most(key, ttl)         (shorten a key's life; never extend it)
+local function new_dict_store(dict)
+    local store = {}
+    function store.get(_, key) return dict:get(key) end
+    function store.set(_, key, value, ttl) return dict:set(key, value, ttl) end
+    function store.add(_, key, value, ttl) return dict:add(key, value, ttl) end
+    function store.ttl(_, key) return dict:ttl(key) end
+    function store.delete(_, key) return dict:delete(key) end
+    function store.expire_at_most(_, key, ttl)
+        local value = dict:get(key)
+        local remaining = dict:ttl(key)
+        if value and remaining and remaining > ttl then
+            dict:set(key, value, ttl)
+        end
+    end
+    return store
+end
+
 function _M.init(csrf_tokens_dict)
-    _M.csrf_tokens = csrf_tokens_dict
+    _M.csrf_tokens = new_dict_store(csrf_tokens_dict)
+    _M.backend = "dict"
 end
 
 function _M.generate_csrf_token()
@@ -26,9 +61,24 @@ function _M.generate_csrf_token()
     return str.to_hex(random_bytes)
 end
 
+-- The stateless token for a session id (the hashed session cookie); nil when
+-- stateless mode is off or nginx has no session secret configured.
+function _M.stateless_token(session_id)
+    if not STATELESS or not session_id then
+        return nil
+    end
+    local secret = ngx.var.session_secret
+    if not secret or secret == "" or secret == "__SESSION_SECRET__" then
+        return nil
+    end
+    return str.to_hex(ngx.hmac_sha1(secret, "strato-csrf:" .. session_id))
+end
+
 function _M.build_csrf_cookie(token)
     local cookie = "CSRF-TOKEN=" .. token .. "; Path=/; SameSite=Strict"
-    if ngx.var.https == "on" then
+    -- Secure over TLS, or when the public scheme is https and TLS ends at
+    -- the load balancer in front of this nginx (PUBLIC_SCHEME).
+    if ngx.var.https == "on" or os.getenv("PUBLIC_SCHEME") == "https" then
         cookie = cookie .. "; Secure"
     end
     return cookie
@@ -41,6 +91,11 @@ function _M.validate_csrf_token(header_token, cookie_token, session_id)
     
     if header_token ~= cookie_token then
         return false
+    end
+
+    local expected = _M.stateless_token(session_id)
+    if expected then
+        return cookie_token == expected
     end
     
     local stored_token = _M.csrf_tokens:get(session_id)
@@ -114,15 +169,18 @@ function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
         return nil
     end
 
+    local stateless = _M.stateless_token(new_session_id)
+    if stateless then
+        return stateless
+    end
+
     if old_session_id and old_session_id ~= new_session_id then
         -- Keep the old session's token alive briefly instead of deleting it:
         -- a request sent with pre-rotation cookies while another request
         -- rotated the session would otherwise 403 (private issue #88).
         -- Logout still deletes immediately (nginx.tpl.conf /auth/logout).
-        local old_token = _M.csrf_tokens:get(old_session_id)
-        if old_token then
-            _M.csrf_tokens:set(old_session_id, old_token, ROTATION_GRACE_TTL)
-        end
+        -- Expressed as "shorten to the grace period" so it needs no read.
+        _M.csrf_tokens:expire_at_most(old_session_id, ROTATION_GRACE_TTL)
     end
 
     local new_token = _M.generate_csrf_token()
@@ -142,6 +200,16 @@ end
 -- Ensure CSRF token exists and is sent to client
 function _M.ensure_csrf_token_for_session(session_id, context)
     if not session_id then
+        return false
+    end
+
+    local stateless = _M.stateless_token(session_id)
+    if stateless then
+        local current = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
+        if current ~= stateless then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(stateless)
+            return true
+        end
         return false
     end
     
@@ -254,12 +322,6 @@ function _M.initialize_token()
 end
 
 local wallet_auth_routes = {
-    ["/api/credit-card/add-card"] = true,
-    ["/api/credit-card/approve"] = true,
-    ["/api/credit-card/config"] = true,
-    ["/api/credit-card/manual-top-up"] = true,
-    ["/api/credit-card/remove-card"] = true,
-    ["/api/credit-card/update-card"] = true,
     ["/api/bridge/requestNativeWithdrawal"] = true,
     ["/api/bridge/requestWithdrawal"] = true,
     ["/api/metal-forge/buy"] = true,
@@ -275,7 +337,6 @@ local wallet_auth_routes = {
 
 local wallet_auth_route_prefixes = {
     "/api/cdp/",
-    "/api/credit-card/config/",
     "/api/earn/",
     "/api/lend/",
     "/api/lending/",

@@ -20,7 +20,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.Transaction (rawTX2TX)
 import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Trans.Class
 import Data.Int
 import qualified Data.Map as Map
@@ -28,7 +28,6 @@ import qualified Database.Esqueleto.Legacy as E
 import Servant
 import Servant.Client
 import Settings
-import UnliftIO
 
 type API =
   "block" :> "last"
@@ -49,7 +48,7 @@ class GetLastBlocks m where
 instance (Monad m, GetLastBlocks m, MonadTrans t) => GetLastBlocks (t m) where
   getLastBlocks = lift . getLastBlocks
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
+instance (SQLDB Base.:> es) => GetLastBlocks (Base.Eff es) where
   getLastBlocks n = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $ E.from $ \a -> do
       E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit
@@ -61,18 +60,23 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
         get' = Map.findWithDefault []
     vs <- fmap (buildList blockValidatorRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. BlockValidatorRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. BlockValidatorRefId)]
       pure v
     vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. ValidatorDeltaRefId)]
       pure v
     ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. ProposalSignatureRefId)]
       pure v
     ss <- fmap (buildList commitmentSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. CommitmentSignatureRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. CommitmentSignatureRefId)]
       pure v
     stakes <- fmap (buildList blockStakeRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
       E.where_ $ v E.^. BlockStakeRefBlockDataRefId `E.in_` E.valList blockIds
+      E.orderBy [E.asc (v E.^. BlockStakeRefId)]
       pure v
     txs <- fmap (buildList' (blockTransactionBlockDataRefId . fst) ((: []) . rawTX2TX . snd) . map (E.entityVal *** E.entityVal)) . sqlQuery $
       E.select $ E.from $ \(btx `E.InnerJoin` rawTX) -> do

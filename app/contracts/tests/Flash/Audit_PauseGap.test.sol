@@ -65,7 +65,7 @@ contract Describe_FlashMintPauseGap is Authorizable {
         collT = Token(COLL); collT.setStatus(2);
         oracle.setAssetPrice(COLL, 4595e18);
         // mainnet params: LR 1.50, minCR 1.55, penalty 10%, closeFactor 50%
-        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, 1e18, false);
+        cdp.setCollateralAssetParams(COLL, 150e16, 155e16, 1000, 5000, 1e27, 1e18, 1e30, false);
 
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "mint", address(cdp));
         admin.castVoteOnIssue(address(admin), "addWhitelist", USDST, "burn", address(cdp));

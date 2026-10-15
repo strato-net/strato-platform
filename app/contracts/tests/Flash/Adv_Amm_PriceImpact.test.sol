@@ -340,7 +340,7 @@ contract Describe_Adv_Amm_PriceImpact is Authorizable {
         usdstT.mint(address(this), 20000000e18);
 
         oracle.setAssetPrice(gold, GOLD_PRICE);
-        cdp.setCollateralAssetParams(gold, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, WAD, false);
+        cdp.setCollateralAssetParams(gold, LR, MINCR, PEN, CF, SFR, FLOOR_, CEIL_, false);
         desk.setPrice(gold, GOLD_PRICE);
 
         address p = pf.createPool(gold, USDST);

@@ -152,6 +152,33 @@ export const getNativeWithdrawalsByStatus = async (
 };
 
 // Get deposits by status (reusable function)
+const READ_BACK_CHUNK = 50;
+
+// Which of these canonical deposit keys MercataBridge has a record for (in any state)
+export const getRecordedDepositKeys = async (
+  externalChainId: number,
+  depositKeys: string[],
+): Promise<Set<string>> => {
+  const recorded = new Set<string>();
+  for (let i = 0; i < depositKeys.length; i += READ_BACK_CHUNK) {
+    const chunk = depositKeys.slice(i, i + READ_BACK_CHUNK);
+    const data = await cirrus.get(`/${MERCATA_BRIDGE_URL}-deposits`, {
+      params: {
+        address: `eq.${bridgeAddress}`,
+        key: `eq.${externalChainId}`,
+        key2: `in.(${chunk.map((key) => `"${key}"`).join(",")})`,
+        "value->>bridgeStatus": "neq.0",
+        select: "key2",
+      },
+    });
+    if (!Array.isArray(data)) {
+      throw new Error(`Unexpected Cirrus response for recorded deposits on chain ${externalChainId}`);
+    }
+    data.forEach(({ key2 }) => recorded.add(String(key2)));
+  }
+  return recorded;
+};
+
 export const getDepositsByStatus = async (
   status: string
 ): Promise<DepositInfo[]> => {

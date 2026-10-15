@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -29,10 +31,12 @@ module Control.Monad.Composable.Streaming.JLog (
   runStreamM,
   runStreamMUsingEnv,
   createStreamEnv,
+  unconnectedStreamEnv,
   closeStreamEnv,
   getStreamEnv,
   -- Producing
   produceItems,
+  produceItemsBestEffort,
   produceItemsAsJSON,
   produceToTopics,
   -- Consuming
@@ -40,6 +44,7 @@ module Control.Monad.Composable.Streaming.JLog (
   consumeBroadcast,
   runConsume,
   consumeFromLatest,
+  seedConsumerGroupFrom,
   -- Topics
   createTopicAndWait,
   createBroadcastTopic,
@@ -55,7 +60,6 @@ import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 import Control.Monad (void, forever, when)
 import Control.Monad.Composable.Base
-import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary
 import qualified Data.ByteString.Lazy as LBS
@@ -75,7 +79,7 @@ import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 
 import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
-                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber,
+                 jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber, jlog_ctx_add_subscriber_copy_checkpoint,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
@@ -93,7 +97,7 @@ type ClientId = Text
 type StreamAddress = (String, Int)  -- (basePath, unused port)
 type ConsumerGroup = Text
 
-type StreamM = ReaderT (IORef StreamEnv)
+type StreamM es = Eff (IORef StreamEnv ': es)
 type HasStreaming m = (MonadIO m, AccessibleEnv (IORef StreamEnv) m)
 
 data StreamEnv = StreamEnv
@@ -108,23 +112,28 @@ createStreamEnv clientId (basePath, _port) = liftIO $ do
   cache <- newIORef Map.empty
   return $ StreamEnv basePath clientId cache
 
+-- | An environment for runs that never touch the stream (in-memory VM
+-- contexts): no directory is created and nothing is opened.
+unconnectedStreamEnv :: MonadIO m => ClientId -> m StreamEnv
+unconnectedStreamEnv clientId = liftIO $ StreamEnv "" clientId <$> newIORef Map.empty
+
 getStreamEnv :: HasStreaming m => m StreamEnv
 getStreamEnv = do
   ref <- accessEnv
   liftIO $ readIORef ref
 
-runStreamMUsingEnv :: MonadIO m => StreamEnv -> StreamM m a -> m a
+runStreamMUsingEnv :: StreamEnv -> StreamM es a -> Eff es a
 runStreamMUsingEnv env f = do
   ref <- liftIO $ newIORef env
-  runReaderT f ref
+  provide ref f
 
-runStreamM :: MonadUnliftIO m => ClientId -> StreamAddress -> StreamM m a -> m a
+runStreamM :: ClientId -> StreamAddress -> StreamM es a -> Eff es a
 runStreamM clientId addr f = withRunInIO $ \runInIO -> bracket
   (createStreamEnvIO clientId addr)
   closeStreamEnvIO
   (\env -> do
     ref <- newIORef env
-    runInIO $ runReaderT f ref)
+    runInIO $ provide ref f)
 
 createStreamEnvIO :: ClientId -> StreamAddress -> IO StreamEnv
 createStreamEnvIO clientId (basePath, _port) = do
@@ -153,11 +162,24 @@ produceItems topicName events = do
     mapM_ (writeRawMessage ctx . LBS.toStrict . encode) events
   return [ProduceResponse]
 
--- | Append an already-serialized payload to an open writer.
+-- | Interface parity with the Kafka backend's 'produceItemsBestEffort', which
+-- exists because a broker can reject an oversized record and must not be
+-- allowed to kill the producer (see helium block 595971). A JLog write is a
+-- local append with no broker to refuse it, so there is nothing to report and
+-- the result is always empty.
+produceItemsBestEffort :: (Binary a, HasStreaming m) => TopicName -> [a] -> m [String]
+produceItemsBestEffort topicName events = [] <$ produceItems topicName events
+
+-- | Append an already-serialized payload to an open writer. A failed append
+-- throws rather than returning: callers commit state that describes the
+-- write once this returns, and must never do so for a write that failed.
 writeRawMessage :: Ptr JLogCtx -> BS.ByteString -> IO ()
 writeRawMessage ctx bs =
-  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-    void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+  BSU.unsafeUseAsCStringLen bs $ \(ptr, len) -> do
+    rc <- jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
+    when (rc /= 0) $ do
+      errStr <- jlog_ctx_err_string ctx >>= peekCString
+      error $ "jlog_ctx_write failed (rc=" ++ show rc ++ "): " ++ errStr
 
 -- | Append already-encoded payloads to several topics in one call.
 --
@@ -208,13 +230,8 @@ produceItemsAsJSON topicName events = do
   let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
   liftIO $ do
     ctx <- getOrCreateWriter env topicName topicPath
-    mapM_ (writeMessage ctx) events
+    mapM_ (writeRawMessage ctx . LBS.toStrict . JSON.encode) events
   return [ProduceResponse]
-  where
-    writeMessage ctx e = do
-      let bs = LBS.toStrict $ JSON.encode e
-      BSU.unsafeUseAsCStringLen bs $ \(ptr, len) ->
-        void $ jlog_ctx_write ctx (castPtr ptr) (fromIntegral len)
 
 ----------------------
 --Consuming/Fetching--
@@ -370,6 +387,34 @@ runConsume consumerGroup topicName f = do
                 void $ jlog_ctx_read_checkpoint ctx idPtr
             jlog_ctx_close ctx
 
+-- | Give a consumer group that does not exist yet the checkpoint of another
+-- one on the same topic, so a group split off an existing consumer resumes
+-- where that consumer was instead of replaying the whole log. A group that
+-- already has a checkpoint is left alone; nothing happens when the old one
+-- has none either. True when a checkpoint was copied.
+seedConsumerGroupFrom :: HasStreaming m => ConsumerGroup -> ConsumerGroup -> TopicName -> m Bool
+seedConsumerGroupFrom new old topicName = do
+  env <- getStreamEnv
+  let topicPath = seBasePath env </> T.unpack (unTopicName topicName)
+  liftIO $ do
+    createDirectoryIfMissing True (seBasePath env)
+    withCString topicPath $ \cpath -> withCString (T.unpack new) $ \cnew -> withCString (T.unpack old) $ \cold -> do
+      ctx <- jlog_new cpath
+      if ctx == nullPtr
+        then return False
+        else do
+          _ <- jlog_ctx_init ctx
+          -- A reader opens only for a subscriber that exists.
+          exists <- (== 0) <$> jlog_ctx_open_reader ctx cnew
+          jlog_ctx_close ctx
+          if exists
+            then return False
+            else do
+              ctx' <- jlog_new cpath
+              rc <- jlog_ctx_add_subscriber_copy_checkpoint ctx' cnew cold
+              jlog_ctx_close ctx'
+              return (rc == 0)
+
 consumeFromLatest :: (Binary a, HasStreaming m) =>
                      TopicName -> m () -> ([a] -> m (Maybe b)) -> m b
 consumeFromLatest topicName initAction f = do
@@ -390,6 +435,17 @@ consumeFromLatest topicName initAction f = do
   initAction
   runConsume (T.pack subscriber) topicName f
 
+-- | Stream batches from a topic under the shared, durable subscriber named by
+-- the 'ClientId'.
+--
+-- Every 'conduitBatchSource' (and 'consume') instance that uses the same
+-- 'ClientId' on the same topic shares ONE checkpoint, so concurrent instances
+-- compete for messages (work-queue semantics), and a batch is checkpointed
+-- before it is yielded downstream. This differs from the Kafka backend's
+-- 'conduitBatchSource', which gave every instance its own in-memory offset
+-- starting at the latest message (broadcast semantics). A caller that needs
+-- every instance to see every message must run a single source and fan the
+-- items out in process (see strato-p2p's "Blockchain.SeqEventNotify").
 conduitBatchSource :: (Binary a, MonadIO m) =>
                       ClientId -> StreamAddress -> TopicName -> ConduitT i [a] m b
 conduitBatchSource clientId streamAddress topicName = do

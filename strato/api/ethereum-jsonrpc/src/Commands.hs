@@ -10,19 +10,22 @@ module Commands
   )
 where
 
+import Control.Monad.Composable.Base (runEff)
 import Binary
 import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..), txToEthValue)
 import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
 import Blockchain.Data.LogsBloom (emptyLogsBloom)
 import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
+import ResponseDispatcher (withPendingResponse)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
-import Blockchain.EthConf (runStreamMConfigured, ethConf)
+import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (apiConfig, apiListenAddress, apiPort, networkConfig, networkID, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
+import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState, codePtrToSHA)
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
 import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
@@ -34,13 +37,15 @@ import Blockchain.Model.JsonBlock (AddressStateRef' (..), Block', RawTransaction
 import Blockchain.Sequencer.CallSpec (CallSpec(..), TraceOptions(..), TxCreateObject(..), TxFuncCallObject(..))
 import Blockchain.Sequencer.Event (JsonRpcCommand(..), JsonRpcResponse(..), VmTask(..))
 import Blockchain.Sequencer.Kafka (writeSeqVmTasks)
+import Blockchain.Sequencer.StateProof (StateProof (..), StorageProof (..))
 import Blockchain.Strato.Model.Address (Address(..), addressToHex)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, hash, keccak256FromHex, keccak256ToByteString, keccak256ToHex)
+import Blockchain.Strato.Model.StateRoot (StateRoot (..), unboxStateRoot)
 import Text.Format (format)
-import Control.Exception (SomeException, evaluate, try)
-import Control.Monad (void, when, zipWithM)
+import Control.Exception (SomeException, evaluate, throwIO, try)
+import Control.Monad (unless, void, when, zipWithM)
 import Control.Monad.IO.Class
-import Control.Monad.Composable.Streaming (consumeFromLatest)
+import Control.Concurrent.MVar (takeMVar)
 import Control.Monad.Except
 import Blockchain.Sequencer.HexData (HexData(..))
 import qualified Blockchain.Sequencer.TxCallObject as TxCall
@@ -52,6 +57,7 @@ import qualified Handlers.Block as Blocks
 import qualified Handlers.Receipts as Receipts
 import qualified Handlers.TransactionResult as TxResults
 import System.Random (randomRIO)
+import GHC.Clock (getMonotonicTimeNSec)
 import System.Timeout (timeout)
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -63,54 +69,30 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.Char (toLower)
 import Data.Word (Word64)
-import Data.List (find, findIndex)
-import Data.Maybe (catMaybes)
+import Data.List (find, findIndex, intercalate, isPrefixOf)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
+import Data.Source.Map (deserializeSourceMap, sourceBlob)
 import Data.Aeson (FromJSON(..), Value(..), decodeStrict, withObject, (.:), (.:?), (.!=))
 import qualified Data.Aeson as Ae
 import GHC.Generics (Generic)
 import Network.JsonRpc.Server
 import Numeric (showHex)
 import Prelude
-import Network.HTTP.Client (Manager, newManager, defaultManagerSettings)
-import Network.HTTP.Types.Status (statusCode, statusMessage)
-import Servant.Client (BaseUrl (..), ClientError(..), ClientM, ResponseF(..), Scheme (Http), mkClientEnv, runClientM)
-import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Composable.CodeDB (runCodeDBM, queryEvents, queryEventsByTxHash)
+import LocalApi (formatClientError, runLocal, sharedManager)
+import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
+import Network.HTTP.Types (statusCode)
+import qualified Strato.Tracing as Tr
+import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
+import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
 protocolVersion :: Integer
 protocolVersion = fromIntegral ethVersion
 
-apiBaseUrl :: BaseUrl
-apiBaseUrl =
-  BaseUrl
-    Http
-    (apiListenAddress $ apiConfig ethConf)
-    (apiPort $ apiConfig ethConf)
-    "/eth/v1.2"
-
--- | A single, process-wide HTTP connection manager. An http-client 'Manager'
--- is a connection pool and is designed to be created once and shared for the
--- lifetime of the process. Creating a new one per request (as this used to do)
--- leaks keep-alive sockets to the backend until GC finalizers run, exhausting
--- file descriptors under load. NOINLINE keeps this a single CAF.
-{-# NOINLINE sharedManager #-}
-sharedManager :: Manager
-sharedManager = unsafePerformIO $ newManager defaultManagerSettings
-
-runLocal :: ClientM a -> IO (Either ClientError a)
-runLocal action = runClientM action (mkClientEnv sharedManager apiBaseUrl)
-
-formatClientError :: ClientError -> T.Text
-formatClientError (FailureResponse _ resp) =
-  let s = responseStatusCode resp
-  in T.pack $ "HTTP " ++ show (statusCode s) ++ " " ++ BC.unpack (statusMessage s)
-formatClientError (ConnectionError _) = "connection error"
-formatClientError (DecodeFailure msg _) = "decode error: " <> msg
-formatClientError _ = "request failed"
 
 methods :: [Method Server]
 methods =
@@ -131,6 +113,7 @@ methods =
     eth_blockNumber,
     eth_getBalance,
     eth_getStorageAt,
+    eth_getProof,
     eth_getTransactionCount,
     eth_getBlockTransactionCountByHash,
     eth_getBlockTransactionCountByNumber,
@@ -143,6 +126,7 @@ methods =
     eth_call,
     strato_getFinalizedHeader,
     strato_getReceiptProof,
+    strato_getStateProof,
     strato_simulateV1,
     strato_traceCall,
     strato_traceTransaction,
@@ -224,8 +208,8 @@ net_peerCount = toMethod "net_peerCount" f ()
 net_listening :: Method Server
 net_listening = toMethod "net_listening" f ()
   where
-    f :: RpcResult Server String
-    f = return "true"
+    f :: RpcResult Server Bool
+    f = return True
 
 eth_protocolVersion :: Method Server
 eth_protocolVersion = toMethod "eth_protocolVersion" f ()
@@ -236,8 +220,8 @@ eth_protocolVersion = toMethod "eth_protocolVersion" f ()
 eth_syncing :: Method Server
 eth_syncing = toMethod "eth_syncing" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_coinbase :: Method Server
 eth_coinbase = toMethod "eth_coinbase" f ()
@@ -248,8 +232,8 @@ eth_coinbase = toMethod "eth_coinbase" f ()
 eth_mining :: Method Server
 eth_mining = toMethod "eth_mining" f ()
   where
-    f :: RpcResult Server String
-    f = return "false"
+    f :: RpcResult Server Bool
+    f = return False
 
 eth_hashrate :: Method Server
 eth_hashrate = toMethod "eth_hashrate" f ()
@@ -257,17 +241,21 @@ eth_hashrate = toMethod "eth_hashrate" f ()
     f :: RpcResult Server String
     f = return "0x0"
 
+walletGasEstimate :: Integer
+walletGasEstimate = 21000
+
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
     f :: RpcResult Server String
-    f = return "0x0"
+    -- Quote the fixed 0.01 USDST fee across the wallet's gas estimate, rounding up.
+    f = return $ "0x" ++ showHex ((10000000000000000 + walletGasEstimate - 1) `div` walletGasEstimate) ""
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
   where
-    f :: RpcResult Server String
-    f = return "[]"
+    f :: RpcResult Server [Address]
+    f = return []
 
 ----------------
 
@@ -306,17 +294,95 @@ debugCallTimeout = 120000000
 callVM' :: Int -> JsonRpcCommand -> IO JsonRpcResponse
 callVM' waitMicros c = do
   putStrLn $ "callVM: " ++ show (jrcId c)
-  result <- timeout waitMicros $ runStreamMConfigured "ethereum-jsonrpc" $
-    consumeFromLatest "jsonrpcresponse"
-      (void $ writeSeqVmTasks [VmJsonRpcCommand c])
-      (\responses ->
-        let matched = filter ((jrcId c ==) . fst) (responses :: [(String, B.ByteString)])
-        in case matched of
-          ((_, val) : _) -> return $ Just $ Bin.decode (BL.fromStrict val)
-          [] -> return Nothing
-      )
+  let vmc = EthConf.vmConfig ethConf
+      urls = EthConf.vmQueryUrls vmc
+      -- A tier without a consensus VM: the mirror answers or nobody does.
+      only = EthConf.vmQueryOnly vmc
+  if null urls || not (routableToVmQuery c)
+    then
+      if only
+        then pure $ Error (jrcId c) "vm-query: this command needs the consensus VM's own state (a trie proof or a block replay), which this tier does not serve"
+        else callVmRunner waitMicros c
+    else do
+      started <- getMonotonicTimeNSec
+      -- The instances are tried in order; one that cannot be reached (or
+      -- fails outright) hands the command to the next. A decline is final:
+      -- every instance holds the same mirror and would decline too.
+      answer <- tryInstances urls []
+      -- The fallback gets what is left of the deadline, so a slow mirror
+      -- plus the consensus VM cannot take twice the wait (and outlive the
+      -- HTTP server's own timeout).
+      let remaining = do
+            now <- getMonotonicTimeNSec
+            pure $ max 0 (waitMicros - fromIntegral ((now - started) `div` 1000))
+      case answer of
+        Right (Error _ msg) | "vm-query:" `isPrefixOf` msg ->
+          if only
+            then pure $ Error (jrcId c) msg
+            else do
+              putStrLn $ "callVM: vm-query declined " ++ show (jrcId c) ++ " (" ++ msg ++ "), using vm-runner"
+              remaining >>= \left -> callVmRunner left c
+        Right resp -> pure resp
+        Left failures ->
+          if only
+            then pure $ Error (jrcId c) ("vm-query: no instance reachable (" ++ intercalate "; " failures ++ ")")
+            else do
+              putStrLn $ "callVM: vm-query unreachable for " ++ show (jrcId c) ++ " (" ++ intercalate "; " failures ++ "), using vm-runner"
+              remaining >>= \left -> callVmRunner left c
+  where
+    tryInstances [] failures = pure (Left (reverse failures))
+    tryInstances (url : rest) failures = do
+      r <- try (callVmQuery url waitMicros c) :: IO (Either SomeException JsonRpcResponse)
+      case r of
+        Right resp -> pure (Right resp)
+        Left e -> do
+          putStrLn $ "callVM: vm-query at " ++ url ++ " unreachable for " ++ show (jrcId c) ++ ": " ++ show e
+          tryInstances rest ((url ++ ": " ++ show e) : failures)
+
+-- | The read commands the mirror can serve; the rest never leave the queue path.
+routableToVmQuery :: JsonRpcCommand -> Bool
+routableToVmQuery = \case
+  JRCCall {} -> True
+  JRCCallV2 {} -> True
+  JRCTraceCall {} -> True
+  JRCSimulate {} -> True
+  _ -> False
+
+-- | POST the command to vm-query as the same bytes the queue would carry,
+-- with the request's trace so the service's span nests under this one.
+callVmQuery :: String -> Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmQuery url waitMicros c = do
+  initial <- parseRequest (url ++ "/command")
+  ctx <- Tr.currentRequestContext
+  let req =
+        initial
+          { method = "POST",
+            requestHeaders = [("Content-Type", "application/octet-stream")] ++ maybe [] (\t -> [("traceparent", Tr.renderTraceparent t)]) ctx,
+            requestBody = RequestBodyLBS (Bin.encode c),
+            responseTimeout = responseTimeoutMicro waitMicros
+          }
+  resp <- httpLbs req sharedManager
+  -- An instance that sheds (503) or fails is unreachable for this command,
+  -- so the caller moves on to the next one; only a 200 carries an answer.
+  let code = statusCode (responseStatus resp)
+  unless (code >= 200 && code < 300) . throwIO . userError $ "vm-query at " ++ url ++ " answered HTTP " ++ show code
+  case Bin.decodeOrFail (responseBody resp) of
+    Right (_, _, r) -> pure r
+    Left (_, _, err) -> pure $ Error (jrcId c) ("vm-query: undecodable response: " ++ err)
+
+callVmRunner :: Int -> JsonRpcCommand -> IO JsonRpcResponse
+callVmRunner waitMicros c = do
+  -- Register for the response first, then submit the command. The response
+  -- topic has a single consumer per process (see ResponseDispatcher) that
+  -- fills the slot registered under the request id; waiting here does not
+  -- touch the topic, so concurrent requests cannot consume each other's
+  -- replies.
+  result <- withPendingResponse (jrcId c) $ \slot ->
+    timeout waitMicros $ do
+      void . runEff $ runStreamMPooled "ethereum-jsonrpc" $ writeSeqVmTasks [VmJsonRpcCommand c]
+      takeMVar slot
   return $ case result of
-    Just resp -> resp
+    Just val -> Bin.decode (BL.fromStrict val)
     Nothing -> Error (jrcId c) "timeout waiting for vm-runner response"
 
 eth_getBalance :: Method Server
@@ -328,6 +394,17 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     f :: Address -> String -> RpcResult Server String
     f addr _blockString = do
+      -- Served from the SQL state mirror (latest block); the vm-runner round
+      -- trip remains only as a fallback for chains the mirror cannot answer.
+      fromSql <- liftIO $ nativeBalanceFromSql addr
+      case fromSql of
+        NativeBalance n -> return $ "0x" ++ showHex n ""
+        NativeBalanceUnavailable why -> do
+          liftIO . putStrLn $ "eth_getBalance: falling back to vm-runner: " ++ why
+          viaVm addr
+
+    viaVm :: Address -> RpcResult Server String
+    viaVm addr = do
           let padding = BC.replicate 24 '0'
               calldataHex = balanceOfSelector <> padding <> addressToHex addr
               calldata = case B16.decode calldataHex of
@@ -360,9 +437,11 @@ eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" 
           Accounts.getAccountsFilter Accounts.accountsFilterParams {Accounts._qaAddress = Just addr}
         case response of
           Right (AddressStateRef' account : _) ->
-            case addressStateRefContractName account of
-              Just cn | not (null cn) -> return "0x01"
-              _ -> return "0x"
+            case addressStateRefCodeHash account of
+              Just codeHash -> do
+                source <- runCodeDBM $ lookupCode codeHash
+                return $ maybe "0x" (bytesToHex . encodeUtf8 . sourceBlob . deserializeSourceMap) source
+              Nothing -> return "0x"
           _ -> return "0x"
 
 eth_getTransactionCount :: Method Server
@@ -383,8 +462,60 @@ eth_getStorageAt :: Method Server
 eth_getStorageAt = toMethod "eth_getStorageAt" f (Required "address" :+: Required "key" :+: Required "block" :+: ())
   where
     f :: String -> String -> String -> RpcResult Server String
-    f _addressString _key _blockString = do
-      throwError $ rpcError (-32601) "eth_getStorageAt not yet implemented"
+    f addressString key _blockString = case strToAddress addressString of
+      Left err -> throwError $ rpcError (-32602) (T.pack err)
+      Right addr -> do
+        -- Served from the SQL state mirror (latest block). The key is an EVM
+        -- slot or, as a STRATO extension, a SolidVM storage path.
+        r <- liftIO $ storageAtFromSql addr key
+        case r of
+          Right word -> return word
+          Left err -> throwError $ rpcError (-32000) (T.pack err)
+
+-- | Ask the VM for Merkle-Patricia proofs of an account and of raw (unhashed)
+-- keys of its storage against a state root. The VM answers between blocks, so
+-- the number of keys per request is capped.
+getStateProof :: StateRoot -> Address -> [HexData] -> RpcResult Server StateProof
+getStateProof sr addr keys = do
+  when (length keys > maxProofKeys) . throwError $
+    rpcError (-32602) (T.pack $ "too many storage keys (max " ++ show maxProofKeys ++ ")")
+  rpcId <- mkRpcId $ "getStateProof_" ++ showHex addr ""
+  resp <- liftIO . callVM $ JRCGetProof sr addr (map unHexData keys) rpcId
+  v <- decodeTraceResponse resp
+  case Ae.fromJSON v of
+    Ae.Success proof -> return proof
+    Ae.Error e -> throwError $ rpcError (-32603) (T.pack $ "bad proof payload: " ++ e)
+
+maxProofKeys :: Int
+maxProofKeys = 256
+
+-- | EIP-1186 account and storage proofs against the state root of a block
+-- (a tag, a hex number, or a block hash). STRATO storage keys are not 32-byte
+-- slots: a storage key is the hex of the raw key bytes (for SolidVM, the ASCII
+-- storage path, e.g. @balances[deadbeef...]@), and its trie key is the
+-- keccak256 of those bytes. A storage @value@ is the leaf's RLP item as stored
+-- (@0x@ when the key is absent); absent keys and accounts get exclusion proofs.
+eth_getProof :: Method Server
+eth_getProof = toMethod "eth_getProof" f (Required "address" :+: Required "storageKeys" :+: Optional "blockTag" "latest" :+: ())
+  where
+    f :: Address -> [HexData] -> String -> RpcResult Server Value
+    f addr keys blockTag = do
+      mBlk <- liftIO $ (if length blockTag == 66 then fetchBlockByHash else fetchBlockByNumber) blockTag
+      blk <- maybe (throwError $ rpcError (-32602) (T.pack $ "block not found: " ++ blockTag)) return mBlk
+      proof <- getStateProof (stateRoot . blockBlockData $ bPrimeToB blk) addr keys
+      let account = maybe blankAddressState (rlpDecode . rlpDeserialize . unHexData) (stpAccountLeaf proof)
+      return $ object
+        [ "address" .= EthHex addr,
+          "accountProof" .= stpAccountProof proof,
+          "balance" .= EthHex (addressStateBalance account),
+          "codeHash" .= EthHex (codePtrToSHA $ addressStateCodeHash account),
+          "nonce" .= EthHex (addressStateNonce account),
+          "storageHash" .= HexData (unboxStateRoot $ addressStateContractRoot account),
+          "storageProof"
+            .= [ object ["key" .= spKey sp, "value" .= fromMaybe (HexData B.empty) (spValue sp), "proof" .= spProof sp]
+                 | sp <- stpStorage proof
+               ]
+        ]
 
 eth_call :: Method Server
 eth_call = toMethod "eth_call" f (Required "txObject" :+: Optional "blockTag" "latest" :+: ())
@@ -678,7 +809,7 @@ eth_estimateGas :: Method Server
 eth_estimateGas = toMethod "eth_estimateGas" f (Required "txObject" :+: ())
   where
     f :: TxCallObject -> RpcResult Server String
-    f _ = return "0x5208"
+    f _ = return $ "0x" ++ showHex walletGasEstimate ""
 
 eth_getBlockByHash :: Method Server
 eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: Required "fullTransactions" :+: ())
@@ -934,29 +1065,26 @@ eth_getFilterLogs = toMethod "eth_getFilterLogs" f ()
     f = throwError $ rpcError (-32601) "eth_getFilterLogs not yet implemented"
 
 data LogFilter = LogFilter
-  { lfFromBlock :: String
-  , lfToBlock   :: String
-  , lfAddress   :: Maybe String
-  , lfTopics    :: [String]
+  { lfFromBlock :: Maybe String
+  , lfToBlock   :: Maybe String
+  , lfBlockHash :: Maybe String
+  , lfAddress   :: Maybe [String]
+  , lfTopics    :: [Maybe [String]]
   } deriving (Show, Generic)
 
 maxLogBlockRange :: Integer
 maxLogBlockRange = 10000
 
-maxLogBlock :: Integer
-maxLogBlock = 999999999
-
 maxLogResults :: Int
 maxLogResults = 1000
 
-parseLogBlockNum :: String -> Maybe Integer
-parseLogBlockNum "latest" = Just maxLogBlock
-parseLogBlockNum "pending" = Just maxLogBlock
-parseLogBlockNum block = parseBlockNum block
+parseLogBlockNum :: Integer -> String -> Maybe Integer
+parseLogBlockNum latest "latest" = Just latest
+parseLogBlockNum latest "pending" = Just latest
+parseLogBlockNum _ block = parseBlockNum block
 
-topic0EventName :: [String] -> Maybe T.Text
-topic0EventName [] = Nothing
-topic0EventName (topic0 : _)
+topic0EventName :: [Maybe [String]] -> Maybe T.Text
+topic0EventName (Just [topic0] : _)
   | null normalized = Nothing
   | otherwise = T.pack <$> lookup normalized standardEventTopics
   where
@@ -964,6 +1092,7 @@ topic0EventName (topic0 : _)
     strip0x ('0':'x':xs) = xs
     strip0x ('0':'X':xs) = xs
     strip0x xs = xs
+topic0EventName _ = Nothing
 
 standardEventTopics :: [(String, String)]
 standardEventTopics =
@@ -975,27 +1104,55 @@ eventSignatureTopic :: String -> String
 eventSignatureTopic = keccak256ToHex . hash . BC.pack
 
 instance FromJSON LogFilter where
-  parseJSON = withObject "LogFilter" $ \o ->
-    LogFilter
-      <$> o .:? "fromBlock" .!= "latest"
-      <*> o .:? "toBlock"   .!= "latest"
-      <*> o .:? "address"
-      <*> o .:? "topics"    .!= []
+  parseJSON = withObject "LogFilter" $ \o -> do
+    fromBlock <- o .:? "fromBlock"
+    toBlock <- o .:? "toBlock"
+    blockHash <- o .:? "blockHash"
+    when (isJust blockHash && (isJust fromBlock || isJust toBlock)) $
+      fail "blockHash cannot be combined with fromBlock or toBlock"
+    mapM_ validateBlockHash blockHash
+    addresses <- o .:? "address" >>= traverse parseAddresses
+    filterTopics <- o .:? "topics" .!= [] >>= mapM parseTopic
+    pure $ LogFilter fromBlock toBlock blockHash addresses filterTopics
+    where
+      parseAddresses (String addr) = pure [T.unpack addr]
+      parseAddresses value = parseJSON value
+      parseTopic Null = pure Nothing
+      parseTopic (String topic) = pure $ Just [T.unpack topic]
+      parseTopic value = Just <$> parseJSON value
+      validateBlockHash value =
+        case B16.decode (BC.pack $ drop 2 value) of
+          Right bytes | take 2 value `elem` ["0x", "0X"] && B.length bytes == 32 -> pure ()
+          _ -> fail "blockHash must be a 32-byte hex hash"
 
 eth_getLogs :: Method Server
 eth_getLogs = toMethod "eth_getLogs" f (Required "filter" :+: ())
   where
     f :: LogFilter -> RpcResult Server [Value]
     f filt = do
-      let fromBlock = maybe 0 id $ parseLogBlockNum (lfFromBlock filt)
-          toBlock   = maybe maxLogBlock id $ parseLogBlockNum (lfToBlock filt)
-          mAddr     = fmap T.pack (lfAddress filt)
+      let fromTag = fromMaybe "latest" $ lfFromBlock filt
+          toTag = fromMaybe "latest" $ lfToBlock filt
+          mAddr = fmap (map T.pack) (lfAddress filt)
+          mHash = fmap (T.pack . map toLower) (lfBlockHash filt)
           mEventName = topic0EventName (lfTopics filt)
+      latest <- if not (isJust mHash) && any (`elem` ["latest", "pending"]) [fromTag, toTag]
+        then do
+          response <- liftIO $ runLocal $ BlkLast.getBlkLastClient 1
+          case response of
+            Right (blk : _) -> pure $ getBlockNumber blk
+            Right [] -> throwError $ rpcError (-32603) "empty block list from server"
+            Left err -> throwError $ rpcError (-32603) $ formatClientError err
+        else pure 0
+      (fromBlock, toBlock) <- if isJust mHash
+        then pure (0, 0)
+        else case (parseLogBlockNum latest fromTag, parseLogBlockNum latest toTag) of
+          (Just start, Just end) | start >= 0 && end >= start -> pure (start, end)
+          _ -> throwError $ rpcError (-32602) "invalid log block range"
       when (toBlock >= fromBlock && toBlock - fromBlock > maxLogBlockRange) $
         throwError $ rpcError (-32602) $
           T.pack $
             "eth_getLogs block range exceeds " ++ show maxLogBlockRange ++ " blocks; use smaller ranges"
-      rows <- runCodeDBM $ queryEvents mAddr fromBlock toBlock mEventName (maxLogResults + 1)
+      rows <- runCodeDBM $ queryEvents mAddr mHash fromBlock toBlock mEventName (maxLogResults + 1)
       when (length rows > maxLogResults) $
         throwError $ rpcError (-32602) $
           T.pack $
@@ -1091,6 +1248,16 @@ strato_getFinalizedHeader =
               (rlpHex, sigsHex) = headerBytesAndSigs hdr
            in Just $ FinalizedHeaderResponse rlpHex sigsHex
         Nothing -> Nothing
+
+-- | The raw proofs behind 'eth_getProof', against an explicit state root. The
+-- REST state-proof route resolves a block itself and calls this, so the header
+-- it returns and the proofs always describe the same state.
+strato_getStateProof :: Method Server
+strato_getStateProof =
+  toMethod "strato_getStateProof" f (Required "stateRoot" :+: Required "address" :+: Required "keys" :+: ())
+  where
+    f :: EthHex Keccak256 -> Address -> [HexData] -> RpcResult Server StateProof
+    f (EthHex sr) = getStateProof (StateRoot $ keccak256ToByteString sr)
 
 strato_getReceiptProof :: Method Server
 strato_getReceiptProof =

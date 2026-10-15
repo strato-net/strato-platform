@@ -29,6 +29,21 @@ export const getCurrentBlockNumber = async (
   return parseInt(unwrapRpcResult(response, "eth_blockNumber", chainId) || "0", 16);
 };
 
+// Whether this RPC endpoint can serve the given block yet (a lagging backend returns null)
+export const hasBlock = async (
+  chainId: number,
+  blockNumber: number,
+): Promise<boolean> => {
+  const rpcUrl = getChainRpcUrl(chainId);
+  const response: any = await fetch.post(rpcUrl, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "eth_getBlockByNumber",
+    params: [decimalToHex(blockNumber.toString()), false],
+  });
+  return unwrapRpcResult(response, "eth_getBlockByNumber", chainId) != null;
+};
+
 // Get logs for a specific chain
 export const getChainLogs = async (
   chainId: number,

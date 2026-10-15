@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes
 import Text.Parsec

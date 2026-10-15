@@ -16,78 +16,18 @@
 {-# OPTIONS -fno-warn-orphans      #-}
 
 module Blockchain.StateRootMismatch
-  ( StateRootMismatchM(..),
-    formatStateRootMismatch
+  ( formatStateRootMismatch
   )
 where
 
-import BlockApps.Logging
-import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.Kafka
-import Blockchain.Strato.Model.CodePtr ()
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.StateDiff
-import Control.Applicative ((<|>))
-import Control.Monad (void)
-import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.Streaming
-import Control.Monad.IO.Class
-import Control.Monad.Reader
 import qualified Data.ByteString.Char8 as BC
-import Data.Foldable (for_)
 import Data.List (intercalate)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import qualified Data.Text as T
 import SolidVM.Model.Storable
+import qualified Data.Text as T
 import Text.Format
 import Text.Tools
-import UnliftIO
-
-newtype StateRootMismatchM m a = StateRootMismatchM { runStateRootMismatchM :: m a }
-
-instance Functor m => Functor (StateRootMismatchM m) where
-  fmap f (StateRootMismatchM a) = StateRootMismatchM $ f <$> a
-
-instance Applicative m => Applicative (StateRootMismatchM m) where
-  pure a = StateRootMismatchM $ pure a
-  (StateRootMismatchM fa) <*> (StateRootMismatchM fb) = StateRootMismatchM $ fa <*> fb
-
-instance Monad m => Monad (StateRootMismatchM m) where
-  (StateRootMismatchM ma) >>= f = StateRootMismatchM $ ma >>= runStateRootMismatchM . f
-
-instance MonadTrans StateRootMismatchM where
-  lift = StateRootMismatchM
-
-instance MonadLogger m => MonadLogger (StateRootMismatchM m)
-
-instance MonadIO m => MonadIO (StateRootMismatchM m) where
-  liftIO = lift . liftIO
-
-instance MonadUnliftIO m => MonadUnliftIO (StateRootMismatchM m) where
-  withRunInIO inner = StateRootMismatchM $ withRunInIO $ \run ->
-    inner (run . runStateRootMismatchM)
-
-instance ( MonadUnliftIO m
-         , MonadLogger m
-         , HasStreaming m
-         , (MP.StateRoot `A.Alters` MP.NodeData) m
-         )
-      => (MP.StateRoot `A.Alters` MP.NodeData) (StateRootMismatchM m) where
-  lookup _ k = lift (A.lookup (A.Proxy @MP.NodeData) k) >>= \case
-    Just nd -> pure $ Just nd
-    Nothing -> do
-      StateRootMismatchM . void $ writeUnseqEvents [IEGetMPNodes [k]]
-      fmap (Just . fromMaybe MP.EmptyNodeData) . timeout 10000000 $
-        runConsume "ethereum-vm" seqVmTasksTopicName $ \evs -> do
-          let findND (VmMPNodesReceived [nd]) | k == MP.sha2StateRoot (rlpHash nd) = Just nd
-              findND _ = Nothing
-              mND = foldr (<|>) Nothing (findND <$> evs)
-          for_ mND $ lift . A.insert (A.Proxy @MP.NodeData) k
-          pure mND
-  insert _ = error "StateRootMismatchM insert StateDB"
-  delete _ = error "StateRootMismatchM delete StateDB"
 
 formatStateRootMismatch :: StateDiff -> String
 formatStateRootMismatch (StateDiff _ _ _ _ c d u) = intercalate "\n" $

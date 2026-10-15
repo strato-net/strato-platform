@@ -89,6 +89,7 @@ library
     , servant
     , servant-docs
     , servant-server
+    , store
     , text
     , time
   default-language: Haskell2010

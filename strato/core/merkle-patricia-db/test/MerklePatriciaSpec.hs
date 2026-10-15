@@ -13,10 +13,12 @@ import Blockchain.Database.MerklePatricia
 import Blockchain.Database.MerklePatricia.Internal
 import Blockchain.Strato.Model.Keccak256 (hash, keccak256ToByteString)
 import Blockchain.Strato.Model.Util
+import Control.Monad (foldM, forM_)
 import Control.Monad.Change.Alter
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as LD
 import Test.HUnit
@@ -265,6 +267,43 @@ testGetInclusionProofTamperedRejected = TestCase $ do
       assertBool "tampered value rejected"
         $ not (verifyInclusionHaskell sr k tamperedValue proofNodes)
 
+-- ============ getProof tests ============
+
+-- A storage-shaped trie: keccak-hashed keys, list values embedded in the leaf.
+storageKVs :: [(Key, Val)]
+storageKVs =
+  [ (byteString2NibbleString . BC.pack $ "sentHash[" ++ show i ++ "]", RLPArray [RLPScalar 0, rlpEncode (i + 1000)])
+    | i <- [0 .. 20 :: Integer]
+  ]
+
+-- The first node hashes to the root and every later node is referenced by
+-- hash from the one before it.
+proofChains :: StateRoot -> [B.ByteString] -> Bool
+proofChains _ [] = False
+proofChains root nodes@(firstNode : rest) =
+  hashNode firstNode == unboxStateRoot root
+    && and (zipWith (\parent child -> hashNode child `B.isInfixOf` parent) nodes rest)
+  where
+    hashNode = keccak256ToByteString . hash
+
+testGetProofEmbeddedList :: Test
+testGetProofEmbeddedList = TestCase $ do
+  (sr, proofs) <- runMP $ do
+    sr <- foldM (\r (k, v) -> putKeyVal r k v) emptyTriePtr storageKVs
+    (sr,) <$> mapM (getProof sr . keyToSafeKey . fst) storageKVs
+  forM_ (zip storageKVs proofs) $ \((_, v), (mVal, proofNodes)) -> do
+    assertEqual "leaf value item is returned as stored" (Just v) mVal
+    assertBool "proof chains to the root" $ proofChains sr proofNodes
+    assertBool "leaf carries the value" $ rlpSerialize v `B.isInfixOf` last proofNodes
+
+testGetProofAbsentKey :: Test
+testGetProofAbsentKey = TestCase $ do
+  (sr, (mVal, proofNodes)) <- runMP $ do
+    sr <- foldM (\r (k, v) -> putKeyVal r k v) emptyTriePtr storageKVs
+    (sr,) <$> getProof sr (keyToSafeKey $ byteString2NibbleString "sentHash[99]")
+  assertEqual "absent key has no value" Nothing mVal
+  assertBool "exclusion path chains to the root" $ proofChains sr proofNodes
+
 spec :: Spec
 spec = do
   describe "the old merkle-patricia test suite" $ do
@@ -287,6 +326,14 @@ spec = do
             testGetInclusionProofMultiTx,
           TestLabel "tampered value rejected by verifier"
             testGetInclusionProofTamperedRejected
+        ]
+  describe "getProof" $ do
+    fromHUnitTest $
+      TestList
+        [ TestLabel "embedded-list values: each proof verifies"
+            testGetProofEmbeddedList,
+          TestLabel "absent key returns the exclusion path"
+            testGetProofAbsentKey
         ]
 
 main :: IO ()

@@ -256,7 +256,7 @@ contract Describe_Adv_Credit_RealDepth is Authorizable {
         curCollT.setStatus(2);
         curPrice = 100e18;
         oracle.setAssetPrice(curColl, curPrice);
-        cdp.setCollateralAssetParams(curColl, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, WAD, false);
+        cdp.setCollateralAssetParams(curColl, LR, MINCR, PEN, CF, RAY, 1e18, 1e30, false);
     }
 
     /// @notice Re-price the collateral (the gap), then build the exit venue so that its

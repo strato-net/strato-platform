@@ -27,6 +27,7 @@ interface UnsignedTx {
     functionName?: string;
     args?: string[];
     network?: string;
+    chainId: number | string;
   };
 }
 
@@ -76,9 +77,13 @@ async function fetchUnsignedTxs(
 
 async function signOne(walletClient: WalletClient, tx: UnsignedTx): Promise<string> {
   const d = tx.data;
+  const chainId = Number(d.chainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error("Invalid STRATO transaction chain ID");
+  }
   return walletClient.signTypedData({
     account: walletClient.account!,
-    domain: { name: "STRATO", version: "1" },
+    domain: { name: "STRATO", version: "1", chainId },
     types: {
       Transaction: [
         { name: "to", type: "address" },
@@ -113,6 +118,7 @@ async function submitSigned(
     funcName: tx.data.functionName,
     args: tx.data.args,
     network: tx.data.network ?? SIGNING_NETWORK,
+    chainId: tx.data.chainId,
     r: sig.r,
     s: sig.s,
     v: sig.v,

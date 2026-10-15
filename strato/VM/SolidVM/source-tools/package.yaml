@@ -22,6 +22,7 @@ library:
     - QuickCheck
     - quickcheck-instances
     - openapi3
+    - store
     - text
 
 tests:

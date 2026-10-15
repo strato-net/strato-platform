@@ -28,6 +28,7 @@ library:
   - base16-bytestring
   - base64-bytestring
   - blockapps-data
+  - composable-monads-base
   - blockapps-datadefs
   - blockapps-haskoin
   - blockapps-mpdbs
@@ -141,6 +142,7 @@ benchmarks:
       main: CodeBench.hs
       ghc-options: -dynamic
       dependencies:
+        - composable-monads-base
         - file-embed
         - solid-vm
         - deepseq

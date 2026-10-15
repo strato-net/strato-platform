@@ -15,7 +15,10 @@ import {
   POOL_V3_POSITION_SELECT_FIELDS,
   POSITION_MANAGER_POSITION_SELECT_FIELDS,
   POOL_V3_SWAP_HISTORY_SELECT_FIELDS,
+  POOL_V3_SWAP_24H_SELECT_FIELDS,
+  POOL_V3_TVL_HISTORY_SELECT_FIELDS,
   V3_DEADLINE_SECONDS,
+  V3_POOL_APY_MIN_TVL_USD,
 } from "../../config/poolV3Constants";
 import * as v3 from "../helpers/poolV3Math.helper";
 import { toUTCTime } from "../helpers/cirrusHelpers";
@@ -86,7 +89,8 @@ interface RawV3Token {
   images?: { value: string }[];
 }
 
-interface RawV3Pool {
+/** Exported for unit tests (buildPool input). */
+export interface RawV3Pool {
   address: string;
   fee: number;
   tickSpacing: number;
@@ -150,41 +154,93 @@ const buildToken = (raw: RawV3Token): PoolV3Token => ({
   image: raw.images?.[0]?.value,
 });
 
-/** Per-pool 24h swap input sums, in token terms (token0-in and token1-in separately) */
-interface SwapInputs24h {
+/** Trailing window behind the 24h volume and fee-APY figures */
+const APY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * One swap from the trailing 24h window: the input-side amount (exactly one of in0/in1
+ * is non-zero) and the pool's in-range liquidity when it executed, from the Swap event.
+ */
+export interface Swap24h {
+  in0: bigint;
+  in1: bigint;
+  liquidity: bigint;
+}
+
+/** Swap input sums in token terms (token0-in and token1-in separately) */
+interface SwapInputs {
   in0: bigint;
   in1: bigint;
 }
 
 /**
- * 24h swap inputs per pool from the Swap event table. Each event's positive signed
- * delta is the trade's input side; summing per token lets the caller value the
- * volume at oracle prices.
+ * Swaps since `sinceMs` per pool from the Swap event table. Each event's positive signed
+ * delta is the trade's input side; `liquidity` is the in-range liquidity the swap left
+ * behind, which stands in for the liquidity its fee was earned over.
  */
-const fetchSwapInputs24h = async (
+const fetchSwaps24h = async (
   accessToken: string,
-  poolAddresses: string[]
-): Promise<Map<string, SwapInputs24h>> => {
-  const sums = new Map<string, SwapInputs24h>();
-  if (poolAddresses.length === 0) return sums;
+  poolAddresses: string[],
+  sinceMs: number,
+): Promise<Map<string, Swap24h[]>> => {
+  const byPool = new Map<string, Swap24h[]>();
+  if (poolAddresses.length === 0) return byPool;
   try {
     const { data } = await cirrus.get(accessToken, `/${PoolV3SwapEvent}`, {
       params: {
         address: `in.(${poolAddresses.join(",")})`,
-        select: "address,amount0,amount1",
-        block_timestamp: `gte.${toUTCTime(new Date(Date.now() - 24 * 60 * 60 * 1000))}`,
+        select: POOL_V3_SWAP_24H_SELECT_FIELDS.join(","),
+        block_timestamp: `gte.${toUTCTime(new Date(sinceMs))}`,
       },
     });
-    for (const ev of (data as { address: string; amount0: string; amount1: string }[]) ?? []) {
+    type Row = { address: string; amount0: string; amount1: string; liquidity: string };
+    for (const ev of (data as Row[]) ?? []) {
       const amount0 = toBigIntOrUndefined(ev.amount0) ?? 0n;
       const amount1 = toBigIntOrUndefined(ev.amount1) ?? 0n;
-      const cur = sums.get(ev.address) || { in0: 0n, in1: 0n };
-      if (amount0 > 0n) cur.in0 += amount0;
-      else if (amount1 > 0n) cur.in1 += amount1;
-      sums.set(ev.address, cur);
+      const in0 = amount0 > 0n ? amount0 : 0n;
+      const in1 = in0 === 0n && amount1 > 0n ? amount1 : 0n;
+      if (in0 === 0n && in1 === 0n) continue;
+      const swaps = byPool.get(ev.address) ?? [];
+      swaps.push({ in0, in1, liquidity: toBigIntOrUndefined(ev.liquidity) ?? 0n });
+      byPool.set(ev.address, swaps);
     }
   } catch {
     // the event table is created lazily on the first swap — no swaps means zero volume
+  }
+  return byPool;
+};
+
+/** Actual 24h swap inputs — the volume figure shown to users */
+const sumInputs = (swaps: Swap24h[]): SwapInputs => {
+  const sums = { in0: 0n, in1: 0n };
+  for (const s of swaps) {
+    sums.in0 += s.in0;
+    sums.in1 += s.in1;
+  }
+  return sums;
+};
+
+/**
+ * Swap inputs attributable to `liquidity` units of in-range liquidity: each swap's input
+ * scaled by liquidity / L_at_swap, capped at the whole swap.
+ *
+ * This is the fee base for the per-position APY estimate. A position's cut of each swap's
+ * fee is its share of the in-range liquidity AT THAT SWAP; its share of today's liquidity
+ * would credit it with fees it never earned once other LPs withdraw. The cap keeps a
+ * position minted after the swaps from being credited with more than the pool actually
+ * collected. Swaps that left zero in-range liquidity have no usable base and contribute
+ * nothing.
+ *
+ * Exported for unit tests.
+ */
+export const attributableInputs = (swaps: Swap24h[], liquidity: bigint): SwapInputs => {
+  const sums = { in0: 0n, in1: 0n };
+  if (liquidity <= 0n) return sums;
+  for (const s of swaps) {
+    if (s.liquidity <= 0n) continue;
+    const share = liquidity < s.liquidity ? liquidity : s.liquidity;
+    sums.in0 += (s.in0 * share) / s.liquidity;
+    sums.in1 += (s.in1 * share) / s.liquidity;
   }
   return sums;
 };
@@ -232,26 +288,141 @@ const lpFees24hUSD = (raw: RawV3Pool, volume24hUSD: number): number => {
   return volume24hUSD * (Number(raw.fee) / 1e6) * lpFraction;
 };
 
-const volume24hUSDFor = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): number =>
-  swapInputs
-    ? usdAmount(priceMap, raw.token0.address, swapInputs.in0.toString()) +
-      usdAmount(priceMap, raw.token1.address, swapInputs.in1.toString())
-    : 0;
+/** Swap inputs valued at the (pool-local) display prices, in USD */
+const inputsUSD = (raw: RawV3Pool, priceMap: Map<string, string>, inputs: SwapInputs): number =>
+  usdAmount(priceMap, raw.token0.address, inputs.in0.toString()) +
+  usdAmount(priceMap, raw.token1.address, inputs.in1.toString());
 
-const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, swapInputs?: SwapInputs24h): PoolV3 => {
+const poolTvlUSD = (raw: RawV3Pool, priceMap: Map<string, string>): number =>
+  usdAmount(priceMap, raw.token0.address, raw.token0Balance) +
+  usdAmount(priceMap, raw.token1.address, raw.token1Balance);
+
+/** One storage-history interval of a pool's token balances (`toMs` is +Infinity for the live row) */
+export interface TvlSample {
+  fromMs: number;
+  toMs: number;
+  token0Balance: string;
+  token1Balance: string;
+}
+
+/** history@storage timestamps are zone-less UTC ("2026-09-21T19:40:06") or the literal "infinity" */
+const parseHistoryTs = (ts: string): number =>
+  ts === "infinity" ? Number.POSITIVE_INFINITY : Date.parse(ts.endsWith("Z") ? ts : `${ts}Z`);
+
+/**
+ * Per-pool token-balance intervals overlapping [sinceMs, now] from the generic storage
+ * history table (every state change writes a full snapshot row; the live row has
+ * valid_to = infinity). Unset storage fields come back as "" and read as 0.
+ */
+const fetchTvlHistory = async (
+  accessToken: string,
+  poolAddresses: string[],
+  sinceMs: number,
+): Promise<Map<string, TvlSample[]>> => {
+  const byPool = new Map<string, TvlSample[]>();
+  if (poolAddresses.length === 0) return byPool;
+  try {
+    const { data } = await cirrus.get(accessToken, "/history@storage", {
+      params: {
+        address: `in.(${poolAddresses.join(",")})`,
+        select: POOL_V3_TVL_HISTORY_SELECT_FIELDS.join(","),
+        valid_to: `gte.${new Date(sinceMs).toISOString().slice(0, 19)}`,
+        order: "valid_from.asc",
+      },
+    });
+    type Row = {
+      address: string;
+      valid_from: string;
+      valid_to: string;
+      token0Balance: string | null;
+      token1Balance: string | null;
+    };
+    for (const row of (data as Row[]) ?? []) {
+      const samples = byPool.get(row.address) ?? [];
+      samples.push({
+        fromMs: parseHistoryTs(row.valid_from),
+        toMs: parseHistoryTs(row.valid_to),
+        token0Balance: (toBigIntOrUndefined(row.token0Balance) ?? 0n).toString(),
+        token1Balance: (toBigIntOrUndefined(row.token1Balance) ?? 0n).toString(),
+      });
+      byPool.set(row.address, samples);
+    }
+  } catch {
+    // history unavailable — callers fall back to the current TVL
+  }
+  return byPool;
+};
+
+/**
+ * Time-weighted average TVL over [windowStartMs, windowEndMs] from storage-history
+ * intervals, valued at the given prices. Time no interval covers (a pool younger than
+ * the window) counts as zero TVL. Undefined when there are no samples.
+ *
+ * Exported for unit tests.
+ */
+export const timeWeightedTvlUSD = (
+  raw: RawV3Pool,
+  priceMap: Map<string, string>,
+  samples: TvlSample[],
+  windowStartMs: number,
+  windowEndMs: number,
+): number | undefined => {
+  const span = windowEndMs - windowStartMs;
+  if (samples.length === 0 || !(span > 0)) return undefined;
+  let weighted = 0;
+  for (const s of samples) {
+    const from = Math.max(s.fromMs, windowStartMs);
+    const to = Math.min(s.toMs, windowEndMs);
+    if (!(to > from)) continue;
+    const tvl =
+      usdAmount(priceMap, raw.token0.address, s.token0Balance) + usdAmount(priceMap, raw.token1.address, s.token1Balance);
+    weighted += tvl * (to - from);
+  }
+  return weighted / span;
+};
+
+/**
+ * Annualized fee yield (%) of `feesUSD` earned over one day on `baseUSD` of capital, to two
+ * decimals like the V2 pool APY. Rounding here matters: wei-sized probe swaps leave a yield
+ * around 1e-16 that would pass the UI's "hide when zero" guards and render as "0.00% APY".
+ */
+const annualizedFeeYield = (feesUSD: number, baseUSD: number): number =>
+  baseUSD > 0 ? Number(Math.max(0, (feesUSD / baseUSD) * 365 * 100).toFixed(2)) : 0;
+
+/** Trailing-window inputs behind a pool's volume and fee-APY figures */
+export interface PoolWindow {
+  windowStartMs: number;
+  windowEndMs: number;
+  swaps: Swap24h[];
+  tvlHistory: TvlSample[];
+}
+
+/** Exported for unit tests; production callers go through getPools / getPoolByAddress. */
+export const buildPool = (raw: RawV3Pool, priceMap: Map<string, string>, window?: PoolWindow): PoolV3 => {
   const priceWad = v3.sqrtPriceX96ToPriceWad(BigInt(raw.sqrtPriceX96));
   const displayPrices = withPoolDerivedPrices(priceMap, raw);
-  const usd = (tokenAddress: string, balance: string): number => usdAmount(displayPrices, tokenAddress, balance);
   // oracle spot price of the pair (token1 per token0, same orientation as priceWad);
   // real oracle prices only — never the pool-derived fallback (see withPoolDerivedPrices)
   const price0 = BigInt(priceMap.get(raw.token0.address) ?? "0");
   const price1 = BigInt(priceMap.get(raw.token1.address) ?? "0");
   const oraclePriceWad = price0 > 0n && price1 > 0n ? (price0 * 10n ** 18n) / price1 : 0n;
 
-  const totalLiquidityUSD = usd(raw.token0.address, raw.token0Balance) + usd(raw.token1.address, raw.token1Balance);
-  const volume24hUSD = volume24hUSDFor(raw, displayPrices, swapInputs);
-  const fees24hUSD = lpFees24hUSD(raw, volume24hUSD);
-  const apy = totalLiquidityUSD > 0 ? Math.max(0, (fees24hUSD / totalLiquidityUSD) * 365 * 100) : 0;
+  const totalLiquidityUSD = poolTvlUSD(raw, displayPrices);
+  const volume24hUSD = inputsUSD(raw, displayPrices, sumInputs(window?.swaps ?? []));
+  // Pool-wide average: the window's actual LP fees over the capital that earned them —
+  // the time-weighted TVL across the window, or today's TVL when that is larger. Today's
+  // TVL alone credits what is left after a withdrawal with a day of fees earned by capital
+  // that has gone (a pool drained to dust posts a six-figure APY). Taking the larger of
+  // the two never spreads the fees over less than is in the pool now either: a deposit
+  // dilutes, and a pool younger than the window is not extrapolated from a few hours.
+  // Out-of-range capital counts — a concentrated in-range position earns more, see
+  // getPositions.
+  const twaTvlUSD = window
+    ? timeWeightedTvlUSD(raw, displayPrices, window.tvlHistory, window.windowStartMs, window.windowEndMs)
+    : undefined;
+  const feeBaseUSD = Math.max(twaTvlUSD ?? 0, totalLiquidityUSD);
+  const apy =
+    totalLiquidityUSD >= V3_POOL_APY_MIN_TVL_USD ? annualizedFeeYield(lpFees24hUSD(raw, volume24hUSD), feeBaseUSD) : 0;
 
   return {
     address: raw.address,
@@ -307,14 +478,26 @@ const attachPrices = async (accessToken: string, rawPools: RawV3Pool[]): Promise
   const tokenAddresses = [
     ...new Set(rawPools.flatMap((p) => [p.token0.address, p.token1.address])),
   ];
-  const [priceMap, swapInputs] = await Promise.all([
+  const windowEndMs = Date.now();
+  const windowStartMs = windowEndMs - APY_WINDOW_MS;
+  const [priceMap, swaps24h] = await Promise.all([
     getOraclePrices(accessToken, {
       select: "asset:key,price:value::text",
       key: `in.(${tokenAddresses.join(",")})`,
     }),
-    fetchSwapInputs24h(accessToken, rawPools.map((p) => p.address)),
+    fetchSwaps24h(accessToken, rawPools.map((p) => p.address), windowStartMs),
   ]);
-  return rawPools.map((raw) => buildPool(raw, priceMap, swapInputs.get(raw.address)));
+  // TVL history only matters where there were fees to spread over it
+  const activePools = rawPools.map((p) => p.address).filter((a) => (swaps24h.get(a)?.length ?? 0) > 0);
+  const tvlHistory = await fetchTvlHistory(accessToken, activePools, windowStartMs);
+  return rawPools.map((raw) =>
+    buildPool(raw, priceMap, {
+      windowStartMs,
+      windowEndMs,
+      swaps: swaps24h.get(raw.address) ?? [],
+      tvlHistory: tvlHistory.get(raw.address) ?? [],
+    }),
+  );
 };
 
 export const getPools = async (accessToken: string): Promise<PoolV3[]> => {
@@ -871,8 +1054,8 @@ export const getPositions = async (
 
   // fee income + prices for the per-position APY estimate
   const tokenAddresses = [...new Set(rawPools.flatMap((p) => [p.token0.address, p.token1.address]))];
-  const [swapInputs24h, priceMap] = await Promise.all([
-    fetchSwapInputs24h(accessToken, poolAddresses),
+  const [swaps24hByPool, priceMap] = await Promise.all([
+    fetchSwaps24h(accessToken, poolAddresses, Date.now() - APY_WINDOW_MS),
     getOraclePrices(accessToken, {
       select: "asset:key,price:value::text",
       key: `in.(${tokenAddresses.join(",")})`,
@@ -923,22 +1106,27 @@ export const getPositions = async (
       pending1 = v3.pendingFees(liquidity, inside1, last1);
     }
 
-    // Estimated fee APY: an in-range position earns the pool's LP fee income in
-    // proportion to its share of the CURRENT in-range liquidity (not of TVL —
-    // that's the pool-level APY, which understates concentrated positions).
-    // Out-of-range positions earn nothing until the price re-enters the range.
+    // Estimated fee APY: what this position's liquidity would have earned from the
+    // window's swaps — each swap's LP fee scaled by the position's share of the in-range
+    // liquidity AT THAT SWAP (see attributableInputs), annualized over the position's
+    // value. Not its share of today's liquidity: once other LPs withdraw, that share
+    // climbs and would credit the position with fees it never earned. Out-of-range
+    // positions earn nothing until the price re-enters the range.
     const inRange = Number(pool.currentTick) >= tickLower && Number(pool.currentTick) < tickUpper;
     const displayPrices = withPoolDerivedPrices(priceMap, pool);
     const positionValueUsd =
       usdAmount(displayPrices, pool.token0.address, amount0.toString()) +
       usdAmount(displayPrices, pool.token1.address, amount1.toString());
-    const poolLiquidity = Number(pool.liquidity || "0");
-    let apy = 0;
-    if (inRange && positionValueUsd > 0 && poolLiquidity > 0) {
-      const share = Math.min(1, Number(liquidity) / poolLiquidity);
-      const fees24h = lpFees24hUSD(pool, volume24hUSDFor(pool, displayPrices, swapInputs24h.get(row.address)));
-      apy = Math.max(0, ((fees24h * share * 365) / positionValueUsd) * 100);
-    }
+    const apy =
+      inRange && poolTvlUSD(pool, displayPrices) >= V3_POOL_APY_MIN_TVL_USD
+        ? annualizedFeeYield(
+            lpFees24hUSD(
+              pool,
+              inputsUSD(pool, displayPrices, attributableInputs(swaps24hByPool.get(row.address) ?? [], liquidity)),
+            ),
+            positionValueUsd,
+          )
+        : 0;
 
     return [
       {

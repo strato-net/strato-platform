@@ -24,6 +24,7 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad (unless)
 import Control.Monad.Change.Alter
+import qualified Control.Monad.Composable.Base as Base
 import Control.Monad.Composable.SQL
 import Data.List
 import Data.Maybe
@@ -149,7 +150,7 @@ server = getAccount
 
 ---------------------------
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams [AddressStateRef] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable AccountsFilterParams [AddressStateRef] (Base.Eff es) where
   select _ a@AccountsFilterParams {..}
     | a == accountsFilterParams =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
@@ -213,7 +214,7 @@ proxyFilterParams = ProxyFilterParams Nothing Nothing
 -- | Each result is a proxy contract paired with the contract name of the
 -- instance its 'logicContract' storage variable points to (e.g. the 0x100c
 -- proxy paired with "AdminRegistry").
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable ProxyFilterParams [(AddressStateRef, String)] (SQLM m) where
+instance (SQLDB Base.:> es) => Selectable ProxyFilterParams [(AddressStateRef, String)] (Base.Eff es) where
   select _ ProxyFilterParams {..}
     | isNothing _qpTargetSearch && isNothing _qpTargetName = pure $ Just []
     | otherwise = do

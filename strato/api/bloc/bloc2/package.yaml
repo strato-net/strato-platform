@@ -53,12 +53,14 @@ library:
     - strato-conf
     - strato-model
     - aeson
-    - http-client
     - openapi3
     - text
     - time
     - transformers
     - unliftio
+    - resourcet
+    - persistent
+    - postgresql-simple
     - strato-auth
     - vault-monad
     - vector

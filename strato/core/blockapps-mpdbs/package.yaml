@@ -29,6 +29,7 @@ library:
   - ethereum-rlp
   - fastMP
   - format
+  - hashable
   - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
@@ -38,6 +39,7 @@ library:
   - strato-model
   - transformers
   - unliftio-core
+  - unordered-containers
   - monad-logger
 
 tests:

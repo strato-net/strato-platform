@@ -86,18 +86,20 @@ executable ethereum-discover
       base
     , blockapps-init
     , common-log
+    , composable-monads-base
     , ethereum-discovery
     , format
     , hflags
     , mtl
     , network
     , process-monitor
-    , resourcet
     , strato-conf
     , strato-networks
     , text
     , unliftio
     , vault-monad
+    , wai-middleware-prometheus
+    , warp
   default-language: Haskell2010
 
 executable strato-network-monitor
@@ -112,6 +114,7 @@ executable strato-network-monitor
   build-depends:
       base
     , common-log
+    , composable-monads-base
     , containers
     , ethereum-discovery
     , format

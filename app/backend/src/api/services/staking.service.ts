@@ -16,7 +16,7 @@ const MAX_UINT256 = (1n << 256n) - 1n;
 
 // Two staking layouts are live at once:
 //   v1 - operator-keyed StratoStaking/ValidatorRegistry paying a funded reward schedule
-//        (mainnet). Read from Cirrus, as it always has been.
+//        (mainnet). Scalars from bloc state, per-user and per-operator mappings from Cirrus.
 //   v2 - validator-keyed contracts paid only by block rewards and proposer fees (helium,
 //        upgraded in place). Read from bloc state; see getStakingBlocState.
 export type StakingContractVersion = "v1" | "v2";
@@ -337,7 +337,7 @@ const requireStratoTokenAddress = (): string => {
   return address;
 };
 
-// ---- bloc state (v2) and version detection ----
+// ---- bloc state and version detection ----
 
 // Bloc returns a contract's whole state: every scalar and mapping (nested objects keyed by
 // lowercase hex address), plus each function's signature under its name. `?name=`
@@ -381,9 +381,9 @@ const isFunctionEntry = (value: unknown): boolean =>
   typeof value === "string" && value.startsWith("function");
 
 // v2 is recognised by the creditBlockReward function in bloc state; v1 has no such call.
-// Cirrus cannot answer this: after an in-place logic upgrade it adds no scalar columns to
-// the base BlockApps-StratoStaking table, so that schema still describes whichever logic
-// was indexed first. The verdict is cached briefly so an upgrade is picked up without a
+// Cirrus cannot answer this: the BlockApps-StratoStaking view describes whichever code
+// collection named StratoStaking was uploaded last, not the logic the proxy runs (see
+// getContractState). The verdict is cached briefly so an upgrade is picked up without a
 // restart; while bloc is unreachable the last verdict stands, and null means none was
 // ever reached.
 const VERSION_TTL_MS = 60 * 1000;
@@ -432,63 +432,28 @@ const requireV1 = async (accessToken: string, feature: string): Promise<void> =>
   }
 };
 
-// ---- v1 contract state (Cirrus) ----
-
-const V1_STATE_COLUMNS = [
-  "address",
-  "stratoToken",
-  "unbondingSeconds::text",
-  "baseRewardBps::text",
-  "maxCommissionBps::text",
-  "maxBatchSize::text",
-  "totalUserStake::text",
-  "totalSelfBond::text",
-  "totalUnbonding::text",
-  "totalRewardableStake::text",
-  "activeOperatorCount::text",
-  "rewardReserve::text",
-  "rewardPeriodAmount::text",
-  "scheduledRewardRemaining::text",
-  "baseRewardRate::text",
-  "stakeRewardRate::text",
-  "periodStart::text",
-  "periodFinish::text",
-  "rewardPeriodName",
-  "rewardPeriodDescription",
-  "lastUpdateTime::text",
-  "baseRewardPerOperatorStored::text",
-  "globalStakeRewardPerTokenStored::text",
-];
+// ---- contract state ----
 
 type StakingContractState = {
   version: StakingContractVersion;
   state: Record<string, any>;
 };
 
-// Reads fall back to the v1 view when the version is unknown (bloc down since startup),
-// which is what every network showed before v2 existed.
+// Scalars for both layouts come from the bloc snapshot version detection has just
+// fetched (shared for BLOC_STATE_TTL_MS), so this costs no extra round trip. The
+// Cirrus base view is not a safe source for them: slipstream rebuilds
+// BlockApps-StratoStaking from whichever code collection was uploaded last, and any
+// deploy of BaseCodeCollection.sol redeclares it with the v2 layout while a v1 proxy
+// still holds v1 state, dropping every v1-only column (upquark, 2026-09-25). Mapping
+// views keep serving v1 reads because both layouts still declare those collections.
+// The version falls back to v1 when none was ever detected, which is what every
+// network showed before v2 existed; a null here means bloc is unreachable.
 const getContractState = async (accessToken: string): Promise<StakingContractState | null> => {
-  const address = stakingAddress();
-  if (!address) return null;
+  if (!stakingAddress()) return null;
 
   const version = (await detectContractVersion(accessToken)) ?? "v1";
-  if (version === "v2") {
-    try {
-      return { version, state: await getStakingBlocState(accessToken) };
-    } catch {
-      return null;
-    }
-  }
-
   try {
-    const { data } = await cirrus.get(accessToken, `/${StratoStaking}`, {
-      params: {
-        address: `eq.${address}`,
-        select: V1_STATE_COLUMNS.join(","),
-      },
-    });
-
-    return data?.[0] ? { version, state: data[0] } : null;
+    return { version, state: await getStakingBlocState(accessToken) };
   } catch {
     return null;
   }

@@ -1,6 +1,7 @@
 
 module Blockchain.Strato.Indexer.Model
   ( IndexEvent (..),
+    indexEventLabel,
   )
 where
 
@@ -59,3 +60,19 @@ instance Binary IndexEvent where
   put (EventDBEntry e) = putWord8 7 >> put e
   put (StateDiffEntry d) = putWord8 8 >> put d
   put (AddressStateUpdates m) = putWord8 9 >> put m
+
+-- | The constructor name alone, for log lines that identify an event.
+--
+-- Deliberately not 'show': a @RanBlock@ carries the whole block, so showing one
+-- to name it in a log message can render megabytes -- and the place that most
+-- wants to name an event is the handler for an event that was already too big.
+indexEventLabel :: IndexEvent -> String
+indexEventLabel (RanBlock _ _) = "RanBlock"
+indexEventLabel (NewBestBlock _) = "NewBestBlock"
+indexEventLabel (LogDBEntry _) = "LogDBEntry"
+indexEventLabel (TxResult _) = "TxResult"
+indexEventLabel (UpdateTxResult _) = "UpdateTxResult"
+indexEventLabel (IndexTransaction _ _) = "IndexTransaction"
+indexEventLabel (EventDBEntry _) = "EventDBEntry"
+indexEventLabel (StateDiffEntry _) = "StateDiffEntry"
+indexEventLabel (AddressStateUpdates _) = "AddressStateUpdates"

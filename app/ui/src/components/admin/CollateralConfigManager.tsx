@@ -146,9 +146,6 @@ const CollateralConfigManager = () => {
       const annualPercentage = Number(values.stabilityFeeRate);
       const stabilityFeeRateContract = convertAnnualPercentageToStabilityFeeRate(annualPercentage);
       
-      // Convert unit scale from decimal count to 1eX format
-      const unitScaleContract = BigInt(10) ** BigInt(values.unitScale);
-
       // Convert debt floor/ceiling from USD to wei (18 decimals)
       // Convert to BigInt first, then multiply to avoid precision loss
       const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor))) * (BigInt(10) ** BigInt(18));
@@ -163,7 +160,6 @@ const CollateralConfigManager = () => {
         stabilityFeeRate: stabilityFeeRateContract.toString(),
         debtFloor: debtFloorContract.toString(),
         debtCeiling: debtCeilingContract.toString(),
-        unitScale: unitScaleContract.toString(),
         isPaused: values.isPaused ?? false
       };
       
@@ -187,9 +183,6 @@ const CollateralConfigManager = () => {
     const debtFloorUI = (BigInt(asset.debtFloor || 0) / (BigInt(10) ** BigInt(18)));
     const debtCeilingUI = (BigInt(asset.debtCeiling) / (BigInt(10) ** BigInt(18)));
     
-    // Convert unit scale from 1eX back to decimal count
-    const unitScaleUI = Math.log10(Number(asset.unitScale));
-    
     form.setFieldsValue({
       asset: asset.asset.trim(),
       liquidationRatio: (asset.liquidationRatio / 100).toString(), // Convert percentage to decimal for form
@@ -201,7 +194,6 @@ const CollateralConfigManager = () => {
       stabilityFeeRate: asset.stabilityFeeRate.toFixed(2),
       debtFloor: debtFloorUI.toString(),
       debtCeiling: debtCeilingUI.toString(),
-      unitScale: unitScaleUI.toString(),
       isPaused: asset.isPaused,
     });
     setActiveTab('add');
@@ -482,21 +474,7 @@ const CollateralConfigManager = () => {
                     />
                   </Form.Item>
 
-                  <Form.Item
-                    name="unitScale"
-                    label={<span className="dark:text-foreground">Token Decimals</span>}
-                    // rules={formRules.unitScale}
-                    extra={<span className="dark:text-muted-foreground">Range: 0-18 (decimal places, e.g., 18 for standard ERC20)</span>}
-                    validateStatus={inputErrors.unitScale ? 'error' : ''}
-                    help={inputErrors.unitScale}
-                  >
-                    <Input 
-                      placeholder="Enter decimal places (e.g., 18 for standard ERC20)"
-                      className="w-full dark:bg-background dark:text-foreground dark:border-input"
-                      inputMode="numeric"
-                      onChange={(e) => handleNumericInputChange('unitScale', e.target.value, "18", 0, "0")}
-                    />
-                  </Form.Item>
+                  {/* Token decimals are no longer entered here: CDPEngine derives unitScale from the token's decimals() at first listing. */}
 
                   {/* Pause Status */}
                   <Form.Item

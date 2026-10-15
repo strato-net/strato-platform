@@ -23,15 +23,18 @@ executables:
     - cache
     - clock
     - common-log
+    - composable-monads-base
     - containers
     - core-api2
     - ethereum-discovery
     - format
+    - time
     - http-types
     - insert-ordered-containers
     - lens
     - monad-alter
     - process-monitor
+    - seqevents
     - servant-multipart
     - servant-server
     - servant-openapi3
@@ -41,6 +44,7 @@ executables:
     - sql-monad
     - strato-model
     - strato-redis-blockdb
+    - strato-tracing
     - openapi3
     - text
     - transformers

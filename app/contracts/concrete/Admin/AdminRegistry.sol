@@ -20,6 +20,16 @@ contract record AdminRegistry is Ownable {
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
     event IssueDismissed(address sender, string issueId);
 
+    event AdminAdded(address indexed admin);
+    event AdminRemoved(address indexed admin);
+    event AdminSwapped(address indexed replacedAdmin, address indexed newAdmin);
+
+    event WhitelistGranted(address indexed target, string func, address indexed user);
+    event WhitelistRevoked(address indexed target, string func, address indexed user);
+    event VotingThresholdSet(address indexed target, string func, uint votingThresholdBps);
+    event DefaultVotingThresholdSet(uint votingThresholdBps);
+    event ContractCreated(address indexed contractAddress, string contractName);
+
     bool public initialized = false;
 
     modifier onlyOnce() {
@@ -159,6 +169,7 @@ contract record AdminRegistry is Ownable {
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
+        emit AdminAdded(_admin);
     }
 
     function _removeAdmin(address _admin) external onlyOwner {
@@ -171,17 +182,19 @@ contract record AdminRegistry is Ownable {
         adminMap[_admin] = 0;
         admins[admins.length - 1] = address(0);
         admins.length -= 1;
+        emit AdminRemoved(_admin);
     }
 
     function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
+        require(_admin != address(0), "Invalid admin address");
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
-        require(index > 0, "Caller is not an admin");
-        address swap = admins[admins.length - 1];
+        require(index > 0, "Account to replace is not an admin");
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
+        emit AdminSwapped(_adminToReplace, _admin);
     }
 
     function addWhitelist(address _target, string _func, address _user) external onlyOwner {
@@ -203,29 +216,37 @@ contract record AdminRegistry is Ownable {
             );
         }
         whitelist[_target][_func][_user] = true;
+        emit WhitelistGranted(_target, _func, _user);
     }
 
     function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
         whitelist[_target][_func][_user] = false;
+        emit WhitelistRevoked(_target, _func, _user);
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
         require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+        emit VotingThresholdSet(_target, _func, _votingThresholdBps);
     }
 
     function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
         require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
+        emit DefaultVotingThresholdSet(_defaultVotingThresholdBps);
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
-        return create(_contractName, _contractSrc, _args);
+        address deployed = create(_contractName, _contractSrc, _args);
+        emit ContractCreated(deployed, _contractName);
+        return deployed;
     }
 
     function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
-        return create2(_salt, _contractName, _contractSrc, _args);
+        address deployed = create2(_salt, _contractName, _contractSrc, _args);
+        emit ContractCreated(deployed, _contractName);
+        return deployed;
     }
 }

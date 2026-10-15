@@ -40,10 +40,11 @@ import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Concurrent hiding (yield)
 import qualified Control.Exception as E
-import Control.Monad (forever, forM, void, when)
+import Control.Monad (forever, forM, unless, void, when)
 import qualified Data.ByteString as B
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Streaming
 import Control.Monad.Composable.Vault (runVaultM, getPub)
 import Data.Foldable
@@ -52,6 +53,8 @@ import Data.Proxy
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Blockchain.Strato.Model.MicroTime (Microtime (..))
+import qualified Strato.Tracing as Tr
 import Data.Time.Clock
 import Prometheus as P
 import Text.Format
@@ -63,9 +66,9 @@ import Text.ShortDescription
 -- round trip instead of two (see 'writeSeqEvents').
 data SeqOutEvent
   = SeqOutEvent [P2pEvent] [VmTask]
-  | -- | End of a sequencer loop iteration: write whatever has accumulated.
-    -- Bounds how long output can sit unwritten on a quiet node, without
-    -- needing a timer.
+  | -- | End of a sequencer loop iteration: write whatever has accumulated
+    -- and commit the state staged behind it. Bounds how long output can sit
+    -- unwritten on a quiet node, without needing a timer.
     SeqFlush
 
 -- | Yield events to the P2P layer (via @seq_p2p_events@ topic).
@@ -79,9 +82,6 @@ yieldToVm ts = yield $ SeqOutEvent [] ts
 -- | Emit both topics as a single unit, so they cost one Kafka round trip.
 yieldToBoth :: Monad m => [P2pEvent] -> [VmTask] -> ConduitT i SeqOutEvent m ()
 yieldToBoth es ts = yield $ SeqOutEvent es ts
-
-instance MonadMonitor m => MonadMonitor (ConduitT i o m) where
-  doIO = lift . doIO
 
 logFF :: MonadLogger m => T.Text -> String -> m ()
 logFF str = $logInfoS str . T.pack
@@ -98,7 +98,7 @@ tryResolveSelfAddr = do
     Just addr -> return (Just addr)
     Nothing -> do
       let vaultUrl' = vaultUrl . urlConfig $ ethConf
-      result <- liftIO $ E.try @E.SomeException $ runLoggingT $ runVaultM vaultUrl' $ do
+      result <- liftIO $ E.try @E.SomeException $ runEff $ runLogging $ runVaultM vaultUrl' $ do
         pubKey <- getPub
         return $ fromPublicKey pubKey
       case result of
@@ -135,7 +135,7 @@ type MonadSequencer m =
 --
 -- Note: 'initSequencer' runs before the main loop to yield initial events (e.g., 'VmSelfAddress').
 sequencer :: SequencerM ()
-sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka
+sequencer = fuseChannels >>= \source -> runConduit $ (initSequencer >> (source .| eventHandler)) .| writeToKafka commitSequencerState
 
 initSequencer :: (
   MonadFail m,
@@ -153,12 +153,22 @@ initSequencer = do
   bootstrapBlockstanbul
   yield SeqFlush
 
+-- | Write sequencer output, then run the commit action.
+--
+-- The commit is where the sequencer makes durable what it records about its
+-- output ('commitSequencerState': the emitted marks and the best sequenced
+-- block). It runs after every write and never without one, so those records
+-- can never claim a block the log does not have: 'blockstanbulSend'' marks a
+-- block emitted before yielding it, but the mark only lands once the block
+-- has. Losing both to a crash is harmless, the block is emitted again when
+-- p2p re-delivers it; losing only the block was the permanent vm_tasks gap.
 writeToKafka :: (
   MonadSequencer m,
   HasStreaming m
   ) =>
+  m () ->
   ConduitT SeqOutEvent Void m ()
-writeToKafka = go noPendingWrites
+writeToKafka commit = go noPendingWrites
   where
     go pending =
       await >>= \case
@@ -184,11 +194,12 @@ writeToKafka = go noPendingWrites
     -- to that whole set, not to the individual events. Bounding only the
     -- accumulator is not enough: a single oversized add would still build a
     -- set the broker rejects with MessageSizeTooLarge, which is fatal here.
-    flush pending =
+    flush pending = do
       mapM_ (\(p2pRaw, vmRaw) -> void . lift $ writeSeqEncoded p2pRaw vmRaw) $
         zipChunks
           (chunkByBytes maxProduceBytes . reverse $ pendingP2p pending)
           (chunkByBytes maxProduceBytes . reverse $ pendingVm pending)
+      lift commit
 
     -- Pair the two topics' chunks so each request still carries both, and keep
     -- whichever list is longer going once the other runs out.
@@ -238,6 +249,9 @@ maxProduceBytes = 768 * 1024
 -- batch held across a produce kept ~2GiB live). Four megabytes still coalesces
 -- hundreds of ordinary blocks into one round trip. Kept below
 -- 'maxProduceBytes' so the common path is a single message set per topic.
+--
+-- It also bounds what a crash can discard: the state describing pending
+-- output is staged with it and committed by the same flush.
 maxPendingBytes :: Int
 maxPendingBytes = 512 * 1024
 
@@ -294,7 +308,11 @@ unseqEventHandler events = do
   let transactions = [(ts, tx) | IETx ts tx <- events]
 
   when (not $ null transactions) $ record "inevent_type_transaction" "IngestTransactions" (length transactions)
-  transformFullTransactions transactions
+  newTxs <- transformFullTransactions transactions
+  -- Only the proposer's VM builds blocks, so a new transaction is what tells
+  -- the other validators to expect a proposal. Re-gossip of a transaction we
+  -- already witnessed does not count: it may be committed already.
+  unless (newTxs == 0) $ lift createNewViewTimer
 
   forM_ events $ \event ->
     case event of
@@ -352,13 +370,10 @@ blockstanbulSend' ::
   InEvent -> ConduitT i SeqOutEvent m [OutputBlock]
 blockstanbulSend' msg = do
   (p2pevs, vmevs, committedBlocks) <- lift $ do
-    case msg of
-      UnannouncedBlock blk -> createNewViewTimer blk
-      _ -> pure ()
     resp <- sendAllMessages [msg]
     let blocks = [b | ToCommit b <- resp]
     for_ resp $ \case
-      ResetTimer vw -> createNewTimer vw
+      ResetTimer vw -> createNewTimer vw >> carryViewTimer vw
       FailedHistoric blk -> A.delete (Proxy @DependentBlockEntry) (blockHash blk) -- First time using `delete`
       _ -> pure ()
     updateViewTimer
@@ -374,6 +389,7 @@ blockstanbulSend' msg = do
       $logWarnS "seq/pbft/send" . T.pack $
         "Rejected " ++ show droppedCount ++ " committed block(s) with unrecoverable transaction signatures"
     committedBlocks <- catMaybes <$> traverse insertEmitted rBlocks
+    liftIO $ recordSequencedSpans committedBlocks
     let (vms, p2ps) = vmEvenP2pCheckptFilterHelper resp
 
     let vmevs =
@@ -416,15 +432,17 @@ blockstanbulSend' msg = do
         GapFound h l p -> (vms, (P2pAskForBlocks (h + 1) l p) : p2ps)
         LeadFound h l p -> (vms, (P2pPushBlocks (l + 1) h p) : p2ps)
         RunPreprepare b -> (VmRunPreprepare b : vms, p2ps)
+        ProposerStatus p -> (VmProposerStatus p : vms, p2ps)
         _ -> (vms, p2ps)
     vmEvenP2pCheckptFilterHelper [] = ([], [])
 
 transformFullTransactions ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     MonadMonitor m,
     (Keccak256 `A.Alters` ()) m
   ) =>
-  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m ()
+  [(Timestamp, IngestTx)] -> ConduitT i SeqOutEvent m Int
 transformFullTransactions pairs = do
   let logF = logFF "transformEvents/emitTxs"
   mOtxs <- lift . forM pairs $ \(ts, itx) ->
@@ -445,9 +463,11 @@ transformFullTransactions pairs = do
 
 
   let txs = catMaybes mOtxs
+  lift . liftIO $ recordReceivedSpans txs
   lift . logF $ "Sending " ++ show (length txs) ++ " public transactions to P2P and the VM"
   yieldToVm $ map pairToVmTx txs
   yieldToP2p $ map (P2pTx . snd) txs
+  pure $ length txs
 
 emitOrCacheHistoricBlock ::
   ( MonadLogger m,
@@ -506,7 +526,13 @@ runConsensus sb = do
     then emitOrCacheHistoricBlock sb
     -- Blockstanbul will check that the seals and validators match up before
     -- announcing it to the network or forwarding to the EVM.
-    else void . blockstanbulSend' $ UnannouncedBlock blk
+    else case sbOrigin sb of
+      TO.Quarry -> void . blockstanbulSend' $ UnannouncedBlock blk
+      -- Only this node's own VM builds candidates. An unsealed block from anywhere
+      -- else would be stamped, sealed and proposed as ours.
+      origin ->
+        $logWarnS "runConsensus" . T.pack $
+          "Ignoring unsealed " ++ shortDescription sb ++ " from " ++ format origin ++ ": not a candidate built by this node"
 
 transformBlocks ::
   ( MonadLogger m,
@@ -544,3 +570,42 @@ prettyTx IngestTx {itOrigin = o, itTransaction = t} = prefix t ++ " via " ++ sho
 
     shortOrigin (TO.PeerString peer) = "Peer " ++ take 8 peer
     shortOrigin x = format x
+
+-- | Transaction-trace spans (see Strato.Tracing: the trace id derives from
+-- the hash, so these land in the same trace as the API's submit span and
+-- the VM's execute span with nothing propagated).
+--
+-- "tx.received": from the API's submit timestamp (carried on the ingest
+-- event) to the sequencer taking the transaction, so the span's length is
+-- the submit-to-sequencer latency itself.
+recordReceivedSpans :: [(Timestamp, OutputTx)] -> IO ()
+recordReceivedSpans txs = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ txs $ \(Microtime micros, otx) ->
+      Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.received" Tr.Consumer (micros * 1000) now
+        [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+          Tr.attrText "strato.stage" "sequencer",
+          Tr.attrText "strato.origin" (T.pack (show (otOrigin otx)))
+        ]
+        []
+        Nothing
+
+-- | "tx.sequenced": the instant a committed block carrying the transaction
+-- leaves the sequencer for the VM and the peers.
+recordSequencedSpans :: [OutputBlock] -> IO ()
+recordSequencedSpans blocks = do
+  enabled <- Tr.tracingEnabled
+  when enabled $ do
+    now <- Tr.nowNanos
+    forM_ blocks $ \ob ->
+      forM_ (obReceiptTransactions ob) $ \otx ->
+        Tr.recordSpan (Tr.traceIdFromHash (keccak256ToByteString (otHash otx))) Nothing "tx.sequenced" Tr.Internal now now
+          [ Tr.attrText "strato.tx_hash" (T.pack (keccak256ToHex (otHash otx))),
+            Tr.attrText "strato.stage" "sequencer",
+            Tr.attrInt "strato.block_number" (number (obBlockData ob)),
+            Tr.attrText "strato.block_hash" (T.pack (keccak256ToHex (blockHeaderHash (obBlockData ob))))
+          ]
+          []
+          Nothing

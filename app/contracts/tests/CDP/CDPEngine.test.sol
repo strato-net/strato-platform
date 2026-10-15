@@ -141,7 +141,6 @@ contract Describe_CDPEngine is Authorizable {
             STABILITY_FEE_RATE,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false // not paused
         );
 
@@ -1920,7 +1919,6 @@ contract Describe_CDPEngine is Authorizable {
             2e27, // 2.0 RAY
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(2500); // 25% reserve, 75% collector
@@ -1984,7 +1982,6 @@ contract Describe_CDPEngine is Authorizable {
             2e27, // 2.0 RAY
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
 
@@ -2034,7 +2031,6 @@ contract Describe_CDPEngine is Authorizable {
             twoPctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(0);
@@ -2077,7 +2073,6 @@ contract Describe_CDPEngine is Authorizable {
             twoPctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(0);
@@ -2127,7 +2122,6 @@ contract Describe_CDPEngine is Authorizable {
             twoPctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(0); // 100% to FeeCollector for direct assertions
@@ -2202,7 +2196,6 @@ contract Describe_CDPEngine is Authorizable {
             sevenPctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(3333); // intentionally uneven split
@@ -2253,7 +2246,6 @@ contract Describe_CDPEngine is Authorizable {
             threePctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(0); // all fees to collector for simpler assertions
@@ -2330,7 +2322,6 @@ contract Describe_CDPEngine is Authorizable {
             elevenPctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(2718); // odd split percent
@@ -2395,7 +2386,6 @@ contract Describe_CDPEngine is Authorizable {
             ninePctPerYear,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         cdpEngine.setFeeToReserveBps(2468); // ugly split
@@ -2710,7 +2700,6 @@ contract Describe_CDPEngine is Authorizable {
             STABILITY_FEE_RATE,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         ) {
             // Should not reach here
@@ -2729,7 +2718,6 @@ contract Describe_CDPEngine is Authorizable {
             STABILITY_FEE_RATE,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
 
@@ -2765,7 +2753,6 @@ contract Describe_CDPEngine is Authorizable {
             STABILITY_FEE_RATE,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         priceOracle.setAssetPrice(tokenAddress, 5e18);
@@ -2785,7 +2772,6 @@ contract Describe_CDPEngine is Authorizable {
             STABILITY_FEE_RATE,
             DEBT_FLOOR,
             DEBT_CEILING,
-            UNIT_SCALE,
             false
         );
         require(cdpEngine.collateralAssetCount() == countBefore, "reconfigure should not duplicate");

@@ -37,7 +37,6 @@ export const constants = (() => {
   const StratoStaking = `${CONTRACT_PREFIX}StratoStaking`;
   const ValidatorRegistry = `${CONTRACT_PREFIX}ValidatorRegistry`;
   const MercataGovernance = "MercataGovernance";
-  const CreditCardTopUp = `${CONTRACT_PREFIX}CreditCardTopUp`;
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
@@ -160,7 +159,6 @@ export const constants = (() => {
     StratoStaking,
     ValidatorRegistry,
     MercataGovernance,
-    CreditCardTopUp,
     CDPEngine,
     CDPVault,
     CDPRegistry,
@@ -189,7 +187,6 @@ export const constants = (() => {
     get stratoToken() { return config.stratoToken; },
     get stratoStaking() { return config.stratoStaking; },
     get validatorRegistry() { return config.validatorRegistry; },
-    get creditCardTopUp() { return config.creditCardTopUp; },  // Use getter to get current value after init
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,

@@ -82,6 +82,10 @@ isAuthorized iev = fmap (either AuthFailure (const AuthSuccess)) . runExceptT $ 
   -- TODO(tim): RoundChange a Preprepare correctly signed by the proposer,
   -- but with incorrect extraData.
     IMsg _ (Preprepare _ pp) -> do
+      -- Dropped here, before it can become the round's proposal: the sender did
+      -- not sign this body, and its real PREPREPARE must still be acceptable.
+      unless (bodyMatchesHeader pp) $
+        raiseInProd "Rejecting Preprepare; transactions or uncles do not match the block header"
       valSet <- use validators -- this is _validators from bloctanbul context?
       let mSignatory = verifyProposerSeal pp =<< getProposerSeal pp -- same convention getProposerSeal :: Block -> Maybe Signature
       case mSignatory of
@@ -217,8 +221,13 @@ nextRound nt = do
   proposer .= leader
   proposal .= Nothing
   self <- use selfAddr
-  whenM mayVote $
-    when (Just leader == fmap Validator self) $ do
+  canVote <- mayVote
+  let isLeader = Just leader == fmap Validator self
+  -- Only the proposer for this view builds a candidate block; every other
+  -- node's VM skips that speculative execution.
+  yieldR $ ProposerStatus (canVote && isLeader)
+  when canVote $
+    when isLeader $ do
       lock <- use blockLock
       v <- use view
       case lock of
@@ -362,7 +371,13 @@ eventLoop ctx = execStateC ctx $
           chainId' <- use chainId
           lastRound' <- use lastRound
           seqNo <- use $ view . sequence
-          eNextSeqNo <- lift $ lift $ runExceptT $
+          doAuthn <- use productionAuth
+          eNextSeqNo <- lift $ lift $ runExceptT $ do
+            -- The seals cover the header alone. A copy with another body must fail
+            -- here, where the real block can still follow, not in the VM after this
+            -- height has been committed with the wrong transactions.
+            when (doAuthn && not (bodyMatchesHeader blk)) $
+              throwE "transactions or uncles do not match the block header"
             replayHistoricBlock realValidators realStakes activation chainId' lastRound' seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
@@ -589,3 +604,4 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         RunPreprepare {} -> inc "run_preprepare"
+        ProposerStatus {} -> inc "proposer_status"

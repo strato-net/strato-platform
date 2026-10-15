@@ -7,11 +7,12 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - common-log
+  - composable-monads-base
+  - conduit
   - cross-monitoring
   - prometheus-client
-  - resourcet
   - text
+  - transformers
   - unix
 
 executables:

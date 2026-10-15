@@ -19,7 +19,6 @@ How the `strato-platform` monorepo is organized and how its parts fit together a
 | `bin/` | Node lifecycle scripts: `strato-login`, `strato-up`, `strato-down`, `strato-ps`, `strato-snapshot`, `strato-patch-app`, `strato-user-add`, `strato-logrotate` |
 | `pipelines/` | Jenkins pipelines |
 | `scripts/` | Repository scripts, including the `pre-commit` hook |
-| `strato-wallet/` | Browser wallet extension |
 | `strato-vscode/` | VS Code extension |
 | `design-documents/`, `load-testing/` | Design notes and load tests |
 | `techdocs/` + `mkdocs.yml` | This documentation site |
@@ -185,7 +184,6 @@ All services are TypeScript, and each has a `README.md`.
 | `bridge` | Bridges assets between external EVM chains and STRATO using a Safe multisig |
 | `oracle` | Fetches asset prices from external sources and pushes them on-chain |
 | `rewards-poller` | Reads protocol events from Cirrus and posts activity batches to the Rewards contract |
-| `card-top-up` | Watches crypto card wallet balances and calls `topUpCard` |
 | `referral` | Referral service |
 | `tracking` | Tracking-link service and dashboard (`/t/`, `/tracking-api/`) |
 | `tracking-bot` | CI/CD bot for the tracking service |

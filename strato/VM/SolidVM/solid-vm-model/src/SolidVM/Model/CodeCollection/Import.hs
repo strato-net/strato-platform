@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -25,6 +26,8 @@ import Data.Aeson
 import Data.Aeson.Casing
 import Data.Aeson.Casing.Internal (dropFPrefix)
 import Data.Binary
+import Data.Store ()
+import Data.Store.TH (makeStore)
 import Data.OpenApi
 import Data.Source
 import Data.Text (Text)
@@ -55,6 +58,8 @@ extractItemImport (Named _ x) = x
 extractItemImport (Aliased _ _ x) = x
 
 instance Binary a => Binary (ItemImportF a)
+
+makeStore ''ItemImportF
 
 instance ToJSON a => ToJSON (ItemImportF a)
 
@@ -90,6 +95,8 @@ extractFileImport (Qualified _ _ x) = x
 extractFileImport (Braced _ _ x) = x
 
 instance Binary a => Binary (FileImportF a)
+
+makeStore ''FileImportF
 
 instance ToJSON a => ToJSON (FileImportF a)
 
