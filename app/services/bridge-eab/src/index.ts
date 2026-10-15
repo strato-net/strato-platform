@@ -23,6 +23,7 @@ import { prepareBridgeOperation } from "./services/bridgeReviewService";
 import { processingIssueService } from "./services/processingIssueService";
 import { nativeBlockTrackingService } from "./services/nativeBlockTrackingService";
 import { NativeRedemptionHealth } from "./types";
+import { getExternalBridgeVerifierUrls } from "./config";
 
 const app = express();
 const port = process.env.PORT || 3003;
@@ -76,7 +77,13 @@ app.post("/operations/reviews/prepare", async (req, res) => {
   }
 });
 
-app.get("/health", async (_, res) => {
+app.get("/health", async (req, res) => {
+  const deploymentChainId = typeof req.query?.deploymentChainId === "string" &&
+    /^\d+$/.test(req.query.deploymentChainId) ? req.query.deploymentChainId : undefined;
+  if (req.query?.deploymentChainId !== undefined && !deploymentChainId) {
+    res.status(400).json({ status: false, message: "Invalid deployment chain ID" });
+    return;
+  }
   let nativeRedemptions: Record<string, NativeRedemptionHealth>;
   try { nativeRedemptions = await nativeBlockTrackingService.getHealth(); }
   catch {
@@ -87,7 +94,26 @@ app.get("/health", async (_, res) => {
   }
   const health = healthMonitor.snapshot(nativeRedemptions);
   const errorLogPresent = await healthMonitor.errorFileExists();
-  res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
+  if (!deploymentChainId) {
+    res.status(health.status ? 200 : 503).json({ ...health, message: 'pong', errorLogPresent });
+    return;
+  }
+  try {
+    const verifiers = await Promise.all(getExternalBridgeVerifierUrls(BigInt(deploymentChainId)).map(async (url) => {
+      const response = await fetch(`${url}/health`, { signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw new Error(`Verifier health returned HTTP ${response.status}`);
+      return response.json();
+    }));
+    res.status(health.status ? 200 : 503).json({
+      ...health, message: "pong", errorLogPresent,
+      deployment: { chainId: deploymentChainId, verifiers },
+    });
+  } catch {
+    res.status(503).json({
+      ...health, status: false, message: "pong", errorLogPresent,
+      deployment: { chainId: deploymentChainId, error: "Verifier health is unavailable from Runtime" },
+    });
+  }
 });
 
 app.get("/metrics/deposits", (_, res) => {

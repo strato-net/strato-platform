@@ -461,10 +461,17 @@ Bridge service env:
 STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
 CHAIN_1_RPC_URL=<ETHEREUM_RPC_URL>
 CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
-CHAIN_1_NATIVE_MINT_EXECUTOR_PRIVATE_KEY=<gas-paying-executor-key>
+CHAIN_1_NATIVE_MINT_EXECUTOR_ADDRESS=<KMS_EXECUTOR_ADDRESS>
+CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<KMS_KEY_ARN>
+CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_REGION=<AWS_REGION>
 CHAIN_1_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
 CHAIN_1_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 ```
+
+The Ethereum Safe must grant `MINT_EXECUTOR_ROLE` on the representation bridge
+to `CHAIN_1_NATIVE_MINT_EXECUTOR_ADDRESS` before instant mint or redemption
+refund processing is enabled. Verify the role on-chain. Private-key executor
+configuration is rejected; Runtime uses workload-identity KMS.
 
 Run each native verifier with a separate KMS key, AWS identity, native policy file,
 RPC provider, API token, and `SETTLEMENT_ATTESTOR_*` STRATO credentials. Enable
@@ -517,10 +524,10 @@ cd <node-dir>
 docker compose -p strato up -d --no-deps app-backend app-ui
 ```
 
-Restart the bridge service after native bridge-service env is set:
+Restart the EAB bridge service after native bridge-service env is set:
 
 ```bash
-docker compose -p strato up -d --no-deps bridge
+docker compose -p strato up -d --no-deps bridge-eab
 ```
 
 Verify the running backend has native route code:
@@ -762,8 +769,9 @@ If a native redemption is stuck after the Ethereum-side burn:
 4. Confirm STRATO_NATIVE_BRIDGE_ADDRESS, STRATO_NATIVE_CUSTODY_VAULT_ADDRESS, and BRIDGE_OPERATOR are correct.
 5. Check whether the STRATO native deposit was recorded in Cirrus.
 6. If not recorded, fix polling/RPC/service configuration and let the bridge service retry recordDeposit.
-7. If recorded but not completed, fix the blocking STRATO state (route enabled, deposits unpaused, custody vault unpaused, vault locked balance sufficient, token whitelist if paused) and let the bridge service retry confirmDeposit.
-8. Do not create an external re-mint or off-chain compensation without governance approval and a written incident record.
+7. If recorded but not completed, confirm that each verifier can independently validate the external redemption and that at least settlementVerifierThreshold distinct attestDepositSettlement transactions exist for the current deposit digest.
+8. Fix any blocking STRATO state (route enabled, deposits unpaused, custody vault unpaused, vault locked balance sufficient, token whitelist if paused) and let the bridge service collect verifier quorum and retry confirmDeposit.
+9. Do not create an external re-mint or off-chain compensation without governance approval and a written incident record.
 ```
 
 If Safe execution shows `GS013` for native mint:

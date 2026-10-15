@@ -25,9 +25,20 @@ function readManifestOutput(manifestDirectory, file, label) {
 async function queryFilterInChunks(contract, filter, fromBlock, provider) {
   const latestBlock = await provider.getBlockNumber();
   const events = [];
-  for (let start = fromBlock; start <= latestBlock; start += 500) {
-    const end = Math.min(start + 499, latestBlock);
-    events.push(...await contract.queryFilter(filter, start, end));
+  let span = 1_000_000;
+  for (let start = fromBlock; start <= latestBlock;) {
+    const end = Math.min(start + span - 1, latestBlock);
+    try {
+      events.push(...await contract.queryFilter(filter, start, end));
+      start = end + 1;
+    } catch (error) {
+      // Some RPCs limit log ranges/results. Retry the same interval with a smaller range;
+      // never skip history or interpret a failed read as an empty result.
+      const message = `${error.message || ""} ${error.info?.error?.message || ""}`;
+      const rangeLimited = /block range|range.*(?:limit|large|exceed)|too many (?:results|logs)|query returned more|response size|result.*(?:limit|large|exceed)/i.test(message);
+      if (!rangeLimited || span <= 500) throw error;
+      span = Math.max(500, Math.floor(span / 2));
+    }
   }
   return events;
 }
@@ -102,7 +113,7 @@ function buildExpectedConfiguration(manifest, manifestDirectory) {
   };
 }
 
-async function verifyFromManifest(manifestPath, { expectedPaused = true, provider = ethers.provider, quiet = false } = {}) {
+async function verifyFromManifest(manifestPath, { expectedPaused = true, provider = ethers.provider, quiet = false, scanHistory = true } = {}) {
   const absoluteManifestPath = path.resolve(manifestPath);
   const manifest = readJson(absoluteManifestPath, "rollout manifest");
   const expected = buildExpectedConfiguration(
@@ -130,12 +141,12 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
     contract.paused(),
     contract.owner(),
     contract.externalBridgeVault(),
-    queryFilterInChunks(
+    scanHistory ? queryFilterInChunks(
       contract,
       contract.filters.RoutePermittedUpdated(),
       expected.deploymentBlock,
       provider,
-    ),
+    ) : [],
   ]);
   const errors = [];
   if (Number(network.chainId) !== expected.chainId) {
@@ -152,6 +163,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
     errors.push(`Vault mismatch: expected ${expected.vaultAddress}, got ${vault}`);
   }
 
+  const configurationErrors = [];
   const tokenResults = [];
   for (const expectedToken of expected.tokens.values()) {
     const current = await contract.tokenConfig(expectedToken.token);
@@ -161,6 +173,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
       permitted: Boolean(current.isPermitted ?? current[1]),
     };
     tokenResults.push(actual);
+    const errorCount = errors.length;
     if (actual.minimum !== expectedToken.minimum) {
       errors.push(
         `${actual.token} minimum mismatch: expected ${expectedToken.minimum}, got ${actual.minimum}`,
@@ -171,6 +184,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
         `${actual.token} permission mismatch: expected ${expectedToken.permitted}, got ${actual.permitted}`,
       );
     }
+    configurationErrors.push(...errors.slice(errorCount));
   }
 
   const observedRoutes = new Map();
@@ -199,9 +213,11 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
       actualPermitted,
     });
     if (actualPermitted !== expectedPermitted) {
+      const errorCount = errors.length;
       errors.push(
         `${routeKey} permission mismatch: expected ${expectedPermitted}, got ${actualPermitted}`,
       );
+      if (expected.routes.has(routeKey)) configurationErrors.push(...errors.slice(errorCount));
     }
   }
 
@@ -209,6 +225,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
     manifest: absoluteManifestPath,
     chainId: expected.chainId,
     deploymentBlock: expected.deploymentBlock,
+    historyVerified: scanHistory,
     depositRouterAddress: expected.depositRouterAddress,
     paused,
     owner,
@@ -217,6 +234,7 @@ async function verifyFromManifest(manifestPath, { expectedPaused = true, provide
     routes: routeResults,
     status: errors.length ? "FAILED" : "PASSED",
     errors,
+    configurationErrors,
   };
   if (!quiet) console.log(JSON.stringify(report, null, 2));
   if (errors.length && !quiet) {
@@ -273,5 +291,6 @@ if (require.main === module) {
 
 module.exports = {
   buildExpectedConfiguration,
+  queryFilterInChunks,
   verifyFromManifest,
 };

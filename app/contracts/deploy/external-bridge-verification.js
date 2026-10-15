@@ -34,7 +34,7 @@ function requiredRoutePermissions(settings) {
   return [...permissions.values()];
 }
 
-async function validateRoutePermissions(settings, nodeUrl, token, fetchImpl = fetch) {
+async function validateRoutePermissions(settings, nodeUrl, token, fetchImpl = fetch, diagnostics) {
   const required = requiredRoutePermissions(settings);
   if (!required.length) return [];
   const rows = await cirrusSearch(nodeUrl, token, "BlockApps-AdminRegistry-whitelist", {
@@ -50,18 +50,35 @@ async function validateRoutePermissions(settings, nodeUrl, token, fetchImpl = fe
     parseBool(row.value) && normalizeAddress(row.key3) === normalizeAddress(settings.bridge.address),
   ).map((row) => `${normalizeAddress(row.key)}:${row.key2}`));
   return required.filter(({ token, func }) => !granted.has(`${token}:${func}`))
-    .map(({ token, func }) => `Missing bridge ${func} permission for STRATO token ${token}`);
+    .map(({ token, func }) => {
+      const message = `Missing bridge ${func} permission for STRATO token ${token}`;
+      diagnostics?.push({ code: "TOKEN_PERMISSION_MISSING", message, governance: {
+        target: settings.adminRegistry, method: "addWhitelist", arguments: { 0: token, 1: func, 2: settings.bridge.address },
+      } });
+      return message;
+    });
 }
 
-function compareInitialization(settings, state) {
+function recordDifference(errors, diagnostics, code, message, governance) {
+  errors.push(message);
+  diagnostics?.push({ code, message, ...(governance ? { governance } : {}) });
+}
+
+function compareInitialization(settings, state, diagnostics) {
   const errors = [];
+  const add = (code, message, governance) => recordDifference(errors, diagnostics, code, message, governance);
   const compareAddress = (label, actual, expected) => {
     if (normalizeAddress(actual) !== normalizeAddress(expected)) {
-      errors.push(`${label} mismatch: expected ${expected}, got ${actual}`);
+      const router = label.startsWith("TokenRouter.");
+      const method = label === "ExternalAssetBridge.priceOracle" ? "setPriceOracle"
+        : label === "ExternalAssetBridge.tokenRouter" ? "setTokenRouter" : "initialize";
+      add("INITIALIZATION_ADDRESS_MISMATCH", `${label} mismatch: expected ${expected}, got ${actual}`, {
+        target: router ? settings.tokenRouter.address : settings.bridge.address, method,
+      });
     }
   };
   if (!parseBool(state.tokenRouter.initialized)) {
-    errors.push("TokenRouter is not initialized");
+    add("ROUTER_UNINITIALIZED", "TokenRouter is not initialized", { target: settings.tokenRouter.address, method: "initialize" });
   }
   compareAddress(
     "TokenRouter.poolFactory",
@@ -90,12 +107,12 @@ function compareInitialization(settings, state) {
   );
   for (const vault of settings.tokenRouter.yieldVaults) {
     if (!state.approvedYieldVaults.has(normalizeAddress(vault))) {
-      errors.push(`TokenRouter yield vault is not approved: ${vault}`);
+      add("YIELD_VAULT_MISSING", `TokenRouter yield vault is not approved: ${vault}`, { target: settings.tokenRouter.address, method: "setYieldVault", arguments: { 0: vault } });
     }
   }
 
   if (!parseBool(state.bridge.initialized)) {
-    errors.push("ExternalAssetBridge is not initialized");
+    add("BRIDGE_UNINITIALIZED", "ExternalAssetBridge is not initialized", { target: settings.bridge.address, method: "initialize" });
   }
   for (const [label, actual, expected] of [
     [
@@ -131,22 +148,22 @@ function compareInitialization(settings, state) {
   ]) {
     compareAddress(label, actual, expected);
   }
-  if (Number(state.bridge.settlementVerifierCount) !== 3) {
-    errors.push(
-      `Settlement verifier count must be 3, got ${state.bridge.settlementVerifierCount}`,
-    );
+  const expectedVerifierCount = settings.bridge.settlementVerifiers.length;
+  if (Number(state.bridge.settlementVerifierCount) !== expectedVerifierCount) {
+    add("VERIFIER_COUNT_MISMATCH", `Settlement verifier count must be ${expectedVerifierCount}, got ${state.bridge.settlementVerifierCount}`,
+      Number(state.bridge.settlementVerifierCount) < settings.bridge.settlementVerifiers.length
+        ? { target: settings.bridge.address, method: "setSettlementVerifier" } : undefined);
   }
   if (
     String(state.bridge.settlementVerifierThreshold) !==
     String(settings.bridge.settlementVerifierThreshold)
   ) {
-    errors.push(
-      `Settlement verifier threshold mismatch: expected ${settings.bridge.settlementVerifierThreshold}, got ${state.bridge.settlementVerifierThreshold}`,
-    );
+    add("VERIFIER_THRESHOLD_MISMATCH", `Settlement verifier threshold mismatch: expected ${settings.bridge.settlementVerifierThreshold}, got ${state.bridge.settlementVerifierThreshold}`,
+      { target: settings.bridge.address, method: "setSettlementVerifierThreshold" });
   }
   for (const verifier of settings.bridge.settlementVerifiers) {
     if (!state.settlementVerifiers.has(normalizeAddress(verifier))) {
-      errors.push(`Settlement verifier is not enabled: ${verifier}`);
+      add("VERIFIER_MISSING", `Settlement verifier is not enabled: ${verifier}`, { target: settings.bridge.address, method: "setSettlementVerifier", arguments: { 0: verifier } });
     }
   }
   return errors;
@@ -166,16 +183,19 @@ function verifyUninitializedProxy(settings, name, targetAddress, proxyRows, logi
   return { initialized: false };
 }
 
-function compareRoutes(settings, state) {
+function compareRoutes(settings, state, diagnostics) {
   const errors = [];
+  const add = (code, message, method, args) => recordDifference(errors, diagnostics, code, message,
+    method ? { target: settings.bridge.address, method, arguments: args } : undefined);
+  const routeArgs = (route, chain) => ({ 0: route.externalToken, 1: chain.externalChainId, 2: route.stratoToken });
   for (const policy of settings.mintPolicies || []) {
     const actual = state.mintPolicies?.get(normalizeAddress(policy.token));
-    if (!actual || String(actual.capacity) !== policy.capacity || String(actual.refillRate) !== policy.refillRate) errors.push(`Mint policy mismatch for ${policy.token}`);
+    if (!actual || String(actual.capacity) !== policy.capacity || String(actual.refillRate) !== policy.refillRate) add("MINT_POLICY_MISMATCH", `Mint policy mismatch for ${policy.token}`, "setMintPolicy", { 0: policy.token });
   }
   for (const expectedChain of settings.chains) {
     const actualChain = state.chains.get(String(expectedChain.externalChainId));
     if (!actualChain) {
-      errors.push(`Missing chain ${expectedChain.externalChainId}`);
+      add("CHAIN_MISSING", `Missing chain ${expectedChain.externalChainId}`, "setChain", { 4: expectedChain.externalChainId });
       continue;
     }
     const addressFields = [
@@ -184,20 +204,16 @@ function compareRoutes(settings, state) {
     ];
     for (const [field, expected] of addressFields) {
       if (normalizeAddress(actualChain[field]) !== normalizeAddress(expected)) {
-        errors.push(
-          `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expected}, got ${actualChain[field]}`,
-        );
+        add("CHAIN_FIELD_MISMATCH", `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expected}, got ${actualChain[field]}`, "setChain", { 4: expectedChain.externalChainId });
       }
     }
     for (const field of ["chainName", "lastProcessedBlock"]) {
       if (String(actualChain[field]) !== String(expectedChain[field])) {
-        errors.push(
-          `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expectedChain[field]}, got ${actualChain[field]}`,
-        );
+        add("CHAIN_FIELD_MISMATCH", `Chain ${expectedChain.externalChainId} ${field} mismatch: expected ${expectedChain[field]}, got ${actualChain[field]}`, "setChain", { 4: expectedChain.externalChainId });
       }
     }
     if (parseBool(actualChain.enabled) !== expectedChain.enabled) {
-      errors.push(`Chain ${expectedChain.externalChainId} enabled mismatch`);
+      add("CHAIN_ENABLED_MISMATCH", `Chain ${expectedChain.externalChainId} enabled mismatch`, "setChain", { 4: expectedChain.externalChainId });
     }
 
     const expectedRoutes = new Set();
@@ -210,7 +226,7 @@ function compareRoutes(settings, state) {
       expectedRoutes.add(key);
       const actualRoute = state.routes.get(key);
       if (!actualRoute) {
-        errors.push(`Missing route ${key}`);
+        add("ROUTE_MISSING", `Missing route ${key}`, "setRoute", routeArgs(expectedRoute, expectedChain));
         continue;
       }
       for (const field of [
@@ -231,16 +247,12 @@ function compareRoutes(settings, state) {
             ? expectedRoute[field]
             : String(expectedRoute[field]);
         if (actual !== expected) {
-          errors.push(
-            `${key} ${field} mismatch: expected ${expected}, got ${actual}`,
-          );
+          add("ROUTE_FIELD_MISMATCH", `${key} ${field} mismatch: expected ${expected}, got ${actual}`, "setRoute", routeArgs(expectedRoute, expectedChain));
         }
       }
       const actualRebase = state.rebaseRequired.has(key);
       if (actualRebase !== expectedRoute.rebaseRequired) {
-        errors.push(
-          `${key} rebaseRequired mismatch: expected ${expectedRoute.rebaseRequired}, got ${actualRebase}`,
-        );
+        add("ROUTE_REBASE_MISMATCH", `${key} rebaseRequired mismatch: expected ${expectedRoute.rebaseRequired}, got ${actualRebase}`, "setRouteRebaseRequired", routeArgs(expectedRoute, expectedChain));
       }
     }
     for (const [key, route] of state.routes) {
@@ -249,7 +261,7 @@ function compareRoutes(settings, state) {
         !expectedRoutes.has(key) &&
         (parseBool(route.depositsEnabled) || parseBool(route.withdrawalsEnabled))
       ) {
-        errors.push(`Unexpected enabled route ${key}`);
+        add("UNEXPECTED_ENABLED_ROUTE", `Unexpected enabled route ${key}`);
       }
     }
     for (const key of state.rebaseRequired) {
@@ -257,15 +269,16 @@ function compareRoutes(settings, state) {
         key.split(":")[1] === String(expectedChain.externalChainId) &&
         !expectedRoutes.has(key)
       ) {
-        errors.push(`Unexpected rebase requirement ${key}`);
+        add("UNEXPECTED_REBASE_REQUIREMENT", `Unexpected rebase requirement ${key}`);
       }
     }
   }
   return errors;
 }
 
-function compareActions(settings, state) {
+function compareActions(settings, state, diagnostics) {
   const errors = [];
+  const add = (code, message, governance) => recordDifference(errors, diagnostics, code, message, governance);
   const expectedRoutes = new Set();
   const expectedChainIds = new Set(
     settings.chains.map((chain) => String(chain.externalChainId)),
@@ -282,15 +295,15 @@ function compareActions(settings, state) {
       const actual = state.actionConfigs.get(key) || {};
       const actualAutoRoute = parseBool(actual.autoRoute);
       if (actualAutoRoute !== route.autoRouteEnabled) {
-        errors.push(
-          `${key} AUTO_ROUTE mismatch: expected ${route.autoRouteEnabled}, got ${actualAutoRoute}`,
-        );
+        add("AUTO_ROUTE_MISMATCH", `${key} AUTO_ROUTE mismatch: expected ${route.autoRouteEnabled}, got ${actualAutoRoute}`, {
+          target: settings.bridge.address, method: "setDepositAction", arguments: { 0: route.externalToken, 1: chain.externalChainId, 2: route.stratoToken },
+        });
       }
       if (parseBool(actual.autoSave)) {
-        errors.push(`Unexpected AUTO_SAVE action ${key}`);
+        add("UNEXPECTED_AUTO_SAVE", `Unexpected AUTO_SAVE action ${key}`);
       }
       if (parseBool(actual.autoForge)) {
-        errors.push(`Unexpected AUTO_FORGE action ${key}`);
+        add("UNEXPECTED_AUTO_FORGE", `Unexpected AUTO_FORGE action ${key}`);
       }
     }
   }
@@ -303,7 +316,7 @@ function compareActions(settings, state) {
         parseBool(actual.autoSave) ||
         parseBool(actual.autoForge))
     ) {
-      errors.push(`Unexpected enabled deposit action ${key}`);
+      add("UNEXPECTED_DEPOSIT_ACTION", `Unexpected enabled deposit action ${key}`);
     }
   }
 

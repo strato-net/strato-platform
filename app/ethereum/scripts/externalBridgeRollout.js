@@ -4,1280 +4,75 @@ const { randomUUID } = require("node:crypto");
 const dotenv = require("dotenv");
 dotenv.config({ quiet: true });
 dotenv.config({ path: path.resolve(__dirname, "../../contracts/.env"), quiet: true, override: false });
-const { ethers } = require("ethers");
-const {
-  CONTRACTS, digest, readJson, writeJson, address, bool, initializeManifest, createPortableBundle, loadManifest,
-  generate, governanceProgress, currentCursorSettings, loadConfig, shellQuote,
-} = require("./lib/externalBridgeOrchestration");
-const verification = require("../../contracts/deploy/external-bridge-verification");
-const { buildPlan, submit } = require("../../contracts/deploy/configure-external-bridge");
-const { normalizeConfig } = require("./lib/externalBridgeVaultPlan");
-const { buildTransactionBuilderBatch } = require("./lib/depositRouterSafeOps");
-const { readState } = require("./externalBridgeVaultOps");
-const { verifyFromManifest } = require("./scanTokenConfig");
-const { buildDepositRouterControl } = require("./lib/externalBridgeArtifacts");
-const { getExternalBridgeNetwork } = require("./lib/externalBridgeNetworks");
+const { digest, readJson, writeJson, initializeManifest, loadManifest, generate, loadConfig, shellQuote, governanceBatch } = require("./lib/externalBridgeOrchestration");
+const { buildPlan } = require("../../contracts/deploy/configure-external-bridge");
+const { limitConcurrentFetches, withDeadline, acquireRolloutLock, parseArgs, loadRolloutEnvironment, redact, jsonFetch, fetchRolloutOAuthToken, resolveSourceToken, stratoApiUrl, normalizeStratoRequestUrl, TIMEOUT_MS, INSPECTION_TIMEOUT_MS } = require("./lib/rolloutRuntime");
+const { fetchAdminVotingPolicy, requiredAdminVotes, recordedVoteMetadata, recordedIssueIds, comparableGovernanceValue, parseGovernanceEventArgs, sameGovernanceArgs, fetchLiveAdminVoteCounts, requireLiveAdminVoteCounts, vote, recordedVoteCounts, approvedCallsCompleted } = require("./lib/rolloutGovernance");
+const { validateSafeRuntimeIdentities, sourceState, checkImplementations, checkImplementationsAtBlock, expectedSourceDifferences, inspect, activate } = require("./lib/rolloutEabInspection");
+const { nativeGovernanceCalls, nativeGovernanceProgress, nativeOnlyEabVerified, validateNativeReadiness, nativeApprovalInspection, nativeHandoff, nativeConfigurationFingerprint, nativeCoordinatorAction, recordNativeCompletion, advanceNative, verifyNativeActivation } = require("./lib/rolloutNativeInspection");
+const { portableSnapshot, createApprovalRequest, decodeApprovalRequest, writeApprovalFile, readApprovalFile,
+  approvalReview, validateApprovalCalls, runApproval, createServiceHandoff, infraStartRequired, groupSafeAction } = require("./lib/rolloutHandoff");
+const { planReviewSummary, rolloutProgress, resolveNextAction, terminalSummary, preparationStage, provisioningReviewComplete } = require("./lib/rolloutOutput");
 
-const TIMEOUT_MS = 30_000;
-const ROLES = ["coordinator", "admin-1", "admin-2", "infra"];
-function parseArgs(argv) {
-  const command = argv[0]?.startsWith("--") ? "plan" : argv.shift() || "plan";
-  if (!["init", "bundle", "setup", "prepare", "join", "plan", "resume", "status", "continue", "next", "verify", "vote", "activate"].includes(command)) {
-    throw new Error("Use init|prepare|join|bundle|setup|plan|continue|status|next|resume|verify|vote|activate");
-  }
-  const args = { command };
-  const allowed = command === "init" ? ["manifest", "settings", "policy", "discovery"]
-    : command === "bundle" ? ["manifest", "bundle", "stage"]
-      : command === "setup" ? ["role", "config", "manifest", "output-dir", "stage", "env-file"]
-        : command === "prepare" ? ["manifest", "output-dir", "stage", "env-file", "bundle", "config"]
-          : command === "join" ? ["role", "bundle", "config", "output-dir", "stage", "env-file"]
-        : ["config", "manifest", "output-dir", "stage", "env-file",
-          ...(["vote", "activate"].includes(command) ? ["approve"] : [])];
-  for (let index = 0; index < argv.length; index += 2) {
-    const name = argv[index].replace(/^--/, "");
-    if (!argv[index].startsWith("--") || !allowed.includes(name) || !argv[index + 1] || argv[index + 1].startsWith("--") || args[name]) throw new Error(`Invalid or duplicate option ${argv[index]}`);
-    args[name] = argv[index + 1];
-  }
-  if (command === "join") {
-    if (!ROLES.includes(args.role)) throw new Error(`join requires --role ${ROLES.join("|")}`);
-    if (!args.bundle) throw new Error("join requires --bundle");
-    const bundle = path.resolve(args.bundle);
-    const directory = path.dirname(bundle);
-    args.manifest = bundle;
-    args.config ||= path.join(directory, ".deployment", `${args.role}.json`);
-    args["output-dir"] ||= path.join(directory, ".deployment", args.role);
-    const provisioning = fs.existsSync(bundle) && readJson(bundle).bundlePurpose === "provisioning";
-    args.stage ||= provisioning ? "initial" : "activation";
-    if (provisioning && args.role !== "infra") {
-      throw new Error("Only Infra joins provisioning bundles; administrators join the final reviewed bundle");
-    }
-  }
-  if (command === "prepare") {
-    args.stage ||= "activation";
-  }
-  if (!args.config && !args.manifest && process.env.EAB_ROLLOUT_CONFIG) {
-    args.config = process.env.EAB_ROLLOUT_CONFIG;
-  }
-  if (args.config && !["setup", "join", "prepare"].includes(command)) {
-    const config = readJson(path.resolve(args.config));
-    if (config.manifestSha256 && digest(fs.readFileSync(config.manifest, "utf8")) !== config.manifestSha256) {
-      throw new Error("Configured deployment bundle changed; stop and repeat setup with the coordinator");
-    }
-    args.manifest ||= config.manifest;
-    args["output-dir"] ||= config.outputDir;
-    args.stage ||= config.stage;
-    args["env-file"] ||= config.environmentFile;
-    args.role ||= config.role;
-    if (config.admin) args.admin ||= config.admin;
-    if (config.role === "admin-1") args.admin = "1";
-    if (config.role === "admin-2") args.admin = "2";
-  }
-  if (["setup", "join"].includes(command)) {
-    if (!ROLES.includes(args.role)) throw new Error(`setup requires --role ${ROLES.join("|")}`);
-    for (const required of ["config", "manifest", "output-dir"]) {
-      if (!args[required]) throw new Error(`setup requires --${required}`);
-    }
-    return args;
-  }
-  if (command === "bundle" && !args.bundle) throw new Error("bundle requires --bundle");
-  if (!args.manifest) throw new Error("--manifest is required");
-  if (args.role === "infra" && ["vote", "activate"].includes(command)) throw new Error("Infra cannot submit governance votes or activation");
-  if (["vote", "activate"].includes(command) && !/^[a-f0-9]{64}$/.test(args.approve || "")) throw new Error("Explicit --approve <approvalHash> from the reviewed resume report is required");
-  if (args.stage && !["initial", "activation"].includes(args.stage)) throw new Error("--stage must be initial|activation");
-  if (args.discovery && (args.settings || args.policy)) throw new Error("Use --discovery or --settings/--policy, not both");
-  return args;
-}
-
-function loadRolloutEnvironment(manifest, configuredFile) {
-  const file = configuredFile
-    ? path.resolve(configuredFile) : path.join(path.dirname(path.resolve(manifest)), "deployment.env");
-  if (fs.existsSync(file)) {
-    dotenv.config({ path: file, quiet: true, override: true });
-    const config = require("../../contracts/deploy/config");
-    config.nodes[0].oauth.openIdDiscoveryUrl = process.env.OAUTH_URL;
-    config.nodes[0].oauth.clientId = process.env.OAUTH_CLIENT_ID;
-    config.nodes[0].oauth.clientSecret = process.env.OAUTH_CLIENT_SECRET;
-  }
-  return file;
-}
-
-function redact(message, env = process.env, secretNames = []) {
-  let result = String(message);
-  for (const [name, value] of Object.entries(env)) {
-    if (value?.length >= 8 && (/TOKEN|SECRET|PASSWORD|PRIVATE_KEY|RPC.*URL|API_KEY/.test(name) || secretNames.includes(name))) result = result.split(value).join("[REDACTED]");
-  }
-  return result.replace(/https?:\/\/[^\s"<>]+/g, (url) => {
-    try { const parsed = new URL(url); return `${parsed.protocol}//${parsed.host}/[REDACTED]`; } catch { return "[REDACTED URL]"; }
-  });
-}
-
-const redactFor = (context, message) => redact(message, process.env, [
-  context.manifest.services.sourceTokenEnv, context.manifest.services.rpcUrlEnv,
-  ...context.manifest.services.verifiers.map(({ tokenEnv }) => tokenEnv),
-]);
-
-function validateSafeRuntimeIdentities(context, owners, threshold) {
-  const { safeProposerAddress, executorAddress } = context.manifest.services;
-  const identities = [safeProposerAddress, executorAddress, ...context.manifest.authorizationSigners];
-  const expectedIdentities = getExternalBridgeNetwork(context.rollout.chainId).verifierCount + 2;
-  if (identities.length !== expectedIdentities || identities.some((value) => !ethers.isAddress(value)) ||
-      new Set(identities.map(address)).size !== expectedIdentities) {
-    throw new Error(`Configure ${expectedIdentities} distinct proposer, executor and verifier KMS addresses`);
-  }
-  const normalizedOwners = owners.map(address);
-  const minimumThreshold = context.deployment.production === false ? 1n : 2n;
-  if (threshold < minimumThreshold || normalizedOwners.includes(address(safeProposerAddress)) ||
-      normalizedOwners.includes(address(executorAddress))) {
-    throw new Error(`Safe must exclude the proposer and executor and require a threshold of at least ${minimumThreshold}`);
-  }
-  return { owners: [...owners], threshold: String(threshold), executorAddress, safeProposerAddress };
-}
-
-async function jsonFetch(url, token, fetchImpl = fetch) {
-  const response = await fetchImpl(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: token ? { Authorization: `Bearer ${token}` } : {} });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
-}
-
-async function resolveSourceToken(context, authImpl) {
-  const tokenEnv = context.manifest.services.sourceTokenEnv;
-  if (process.env[tokenEnv]) return process.env[tokenEnv];
-  const { GLOBAL_ADMIN_NAME: username, GLOBAL_ADMIN_PASSWORD: password } = process.env;
-  if (!username || !password) throw new Error(`Set ${tokenEnv} or configure STRATO credentials in app/contracts/.env`);
-  const auth = authImpl || require("../../contracts/deploy/auth");
-  const token = await auth.getUserToken(username, password);
-  if (!token) throw new Error("STRATO OAuth did not return an access token");
-  process.env[tokenEnv] = token;
-  return token;
-}
-
-function stratoApiUrl(nodeUrl) {
-  const url = new URL(nodeUrl);
-  const pathName = url.pathname.replace(/\/+$/, "");
-  url.pathname = pathName.endsWith("/strato-api") ? pathName : `${pathName}/strato-api`;
-  return url.href.replace(/\/$/, "");
-}
-
-function normalizeStratoRequestUrl(nodeUrl, requestUrl) {
-  const baseUrl = nodeUrl.replace(/\/$/, "");
-  if (requestUrl.startsWith(`${baseUrl}/eth/`)) {
-    return `${stratoApiUrl(baseUrl)}${requestUrl.slice(baseUrl.length)}`;
-  }
-  return requestUrl;
-}
-
-async function fetchAdminVotingPolicy(settings, nodeUrl, token, fetchImpl = fetch) {
-  const registry = address(settings.adminRegistry);
-  const fetchRows = (table, params) => jsonFetch(
-    `${nodeUrl.replace(/\/$/, "")}/cirrus/search/${table}?${new URLSearchParams(params)}`, token, fetchImpl);
-  const registryRows = await fetchRows("BlockApps-AdminRegistry", {
-    address: `eq.${registry}`,
-    select: "defaultVotingThresholdBps,admins:BlockApps-AdminRegistry-admins(address:value),thresholds:BlockApps-AdminRegistry-votingThresholds(target:key,func:key2,threshold:value)",
-    limit: 1,
-  });
-  const row = registryRows[0] || {};
-  const admins = Array.isArray(row.admins)
-    ? row.admins.filter(({ address: admin }) => admin && admin !== "Unknown") : [];
-  if (!Array.isArray(admins) || admins.length === 0) throw new Error("AdminRegistry admins are unavailable");
-  const defaultThresholdBps = Number(row.defaultVotingThresholdBps);
-  if (!Number.isSafeInteger(defaultThresholdBps) || defaultThresholdBps <= 0) throw new Error("AdminRegistry default threshold is unavailable");
-  const thresholds = new Map((row.thresholds || []).map(({ target, func, threshold }) =>
-    [`${address(target)}:${func}`, Number(threshold)]));
-  return { adminCount: admins.length, defaultThresholdBps, thresholds };
-}
-
-function requiredAdminVotes(policy, call) {
-  if (!policy) return undefined;
-  const bps = policy.thresholds.get(`${address(call.args._target)}:${call.args._func}`) ||
-    policy.defaultThresholdBps;
-  return Math.ceil((bps * policy.adminCount) / 10000);
-}
-
-function recordedVoteMetadata(calls, artifacts) {
-  if (!artifacts?.directory || !fs.existsSync(path.dirname(artifacts.directory))) return new Map();
-  const callIds = new Set(calls.map(({ id }) => id));
-  const metadata = new Map();
-  for (const entry of fs.readdirSync(path.dirname(artifacts.directory), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const directory = path.join(path.dirname(artifacts.directory), entry.name);
-    for (const file of fs.readdirSync(directory).filter((name) => /^votes-[a-f0-9]{40}\.json$/.test(name))) {
-      for (const [id, vote] of Object.entries(readJson(path.join(directory, file)))) {
-        if (!callIds.has(id)) continue;
-        const current = metadata.get(id) || { hashes: new Set() };
-        for (const hash of vote.hashes || []) current.hashes.add(String(hash).toLowerCase());
-        const issueId = vote.issueId || vote.receipt?.issueId;
-        if (issueId) current.issueId = String(issueId).toLowerCase();
-        metadata.set(id, current);
+async function expandDeploymentDraft(manifestPath) {
+  const draft = readJson(manifestPath);
+  if (draft.schemaVersion !== 0 || !draft.discovery) return false;
+      const internal = path.join(path.dirname(manifestPath), ".deployment");
+      const input = structuredClone(draft.discovery);
+      const base = draft.discoveryDirectory || path.dirname(manifestPath);
+      for (const field of ["externalDeployment", "nativeDeployment"]) {
+        if (input.target?.[field]) input.target[field] = path.resolve(base, input.target[field]);
       }
-    }
-  }
-  return metadata;
-}
-
-function recordedIssueIds(calls, artifacts) {
-  return new Map([...recordedVoteMetadata(calls, artifacts)]
-    .filter(([, value]) => value.issueId).map(([id, value]) => [id, value.issueId]));
-}
-
-function comparableGovernanceValue(value) {
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (value && typeof value === "object" && "value" in value) return comparableGovernanceValue(value.value);
-  const text = String(value ?? "").trim();
-  if (/^(true|false)$/i.test(text)) return text.toLowerCase();
-  if (/^0x[0-9a-fA-F]{40}$/.test(text) || /^[0-9a-fA-F]{40}$/.test(text)) return address(text);
-  if (/^-?\d+$/.test(text)) return BigInt(text).toString();
-  return text;
-}
-
-function parseGovernanceEventArgs(raw) {
-  if (raw == null || raw === "") return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      return [raw];
-    }
-  }
-  return [raw];
-}
-
-function sameGovernanceArgs(call, eventArgs) {
-  const expected = (call.args?._args || []).map(({ value }) => comparableGovernanceValue(value));
-  const actual = parseGovernanceEventArgs(eventArgs).map(comparableGovernanceValue);
-  return expected.length === actual.length && expected.every((value, index) => value === actual[index]);
-}
-
-async function fetchLiveAdminVoteCounts(settings, nodeUrl, token, calls, artifacts, fetchImpl = fetch) {
-  if (!calls.length) return new Map();
-  const registry = address(settings.adminRegistry);
-  const read = async (table, params) => {
-    const rows = [];
-    for (let offset = 0; ;) {
-      const page = await jsonFetch(`${nodeUrl.replace(/\/$/, "")}/cirrus/search/BlockApps-AdminRegistry${table}?${new URLSearchParams({
-        address: `eq.${registry}`, order: "key.asc", ...params, limit: 200, offset,
-      })}`, token, fetchImpl);
-      if (!Array.isArray(page)) throw new Error("Governance state unavailable");
-      if (!page.length) return rows;
-      rows.push(...page);
-      offset += page.length;
-    }
-  };
-  const [active, adminRows] = await Promise.all([
-    read("-currentIssues", { value: "eq.true", select: "key,value" }),
-    read("-admins", { select: "key,value" }),
-  ]);
-  const admins = new Set(adminRows.map(row => address(row.value)));
-  if (!admins.size || [...admins].some(value => !/^[a-f0-9]{40}$/.test(value) || /^0+$/.test(value))) {
-    throw new Error("Current governance voter set is unavailable");
-  }
-  const ids = [...new Set(active.filter(row => bool(row.value)).map(row => String(row.key)))];
-  if (ids.some(id => !/^(0x)?[a-f0-9]{64}$/i.test(id))) throw new Error("Invalid active governance issue ID");
-  const created = [], executed = [], votes = [];
-  for (let start = 0; start < ids.length; start += 20) {
-    const filter = `in.(${ids.slice(start, start + 20).join(",")})`;
-    const pages = await Promise.all([
-      read("-IssueCreated", { issueId: filter, select: "issueId,target,func,args,block_number,event_index", order: "block_number.desc,event_index.desc" }),
-      read("-IssueExecuted", { issueId: filter, select: "issueId,block_number,event_index", order: "block_number.desc,event_index.desc" }),
-      read("-votes", { key: filter, select: "key,key2,value", order: "key.asc,key2.asc" }),
-    ]);
-    created.push(...pages[0]); executed.push(...pages[1]); votes.push(...pages[2]);
-  }
-  const position = row => {
-    if (!/^\d+$/.test(String(row.block_number)) || !/^\d+$/.test(String(row.event_index))) throw new Error("Governance lifecycle ordering unavailable");
-    return [BigInt(row.block_number), BigInt(row.event_index)];
-  };
-  const compare = (a, b) => {
-    const x = position(a), y = position(b);
-    return x[0] === y[0] ? (x[1] > y[1] ? -1 : x[1] < y[1] ? 1 : 0) : x[0] > y[0] ? -1 : 1;
-  };
-  created.forEach(position);
-  executed.forEach(position);
-  created.sort(compare);
-  const latest = new Map();
-  for (const row of created) if (!latest.has(row.issueId)) latest.set(row.issueId, row);
-  for (const id of ids) {
-    const creation = latest.get(id);
-    if (!creation || executed.some(row => row.issueId === id && compare(row, creation) <= 0)) {
-      throw new Error("Governance issue lifecycle is inconsistent; wait for indexing before voting");
-    }
-  }
-  const counts = new Map();
-  for (const item of calls) {
-    if (!item.call?.args?._target || !item.call?.args?._func) throw new Error("Governance call identity unavailable");
-    const match = [...latest.values()].find(row => address(row.target) === address(item.call.args._target) &&
-      row.func === item.call.args._func && sameGovernanceArgs(item.call, row.args));
-    const voters = new Set();
-    if (match) for (const row of votes.filter(row => row.key === match.issueId)) {
-      const voter = address(row.value);
-      if (/^0{40}$/.test(voter)) continue;
-      if (!admins.has(voter) || voters.has(voter)) throw new Error("Governance issue contains an invalid or stale voter set");
-      voters.add(voter);
-    }
-    if (match && voters.size === 0) throw new Error("Active governance issue has no indexed votes; retry before voting");
-    item.governanceIssueId = match?.issueId;
-    item.governanceVoters = [...voters];
-    counts.set(item.id, voters.size);
-  }
-  return counts;
-}
-
-async function sourceState(context, artifacts, fetchImpl = fetch) {
-  const { services } = context.manifest;
-  const token = await resolveSourceToken(context);
-  const nodeUrl = services.nodeUrl.replace(/\/$/, "");
-  const boundedFetch = (url, options) => fetchImpl(normalizeStratoRequestUrl(nodeUrl, url),
-    { ...options, signal: AbortSignal.timeout(TIMEOUT_MS) });
-  const metadata = await jsonFetch(normalizeStratoRequestUrl(nodeUrl, `${nodeUrl}/eth/v1.2/metadata`), token, boundedFetch);
-  if (typeof metadata.networkID === "number" && !Number.isSafeInteger(metadata.networkID)) throw new Error("Unsafe numeric STRATO network ID");
-  if (String(metadata.networkID) !== context.settings.sourceChainId) throw new Error("STRATO node chain ID does not match the manifest");
-  const settings = loadConfig(artifacts.bridgeConfigPath);
-  const args = [settings, nodeUrl, token, boundedFetch];
-  await verification.validateDeploymentDependencies(...args);
-  const [initialization, routes, actions, permissionErrors, inactiveTokens, votingPolicyResult] = await Promise.all([
-    verification.fetchInitializationState(...args), verification.fetchRouteState(...args),
-    verification.fetchActionState(...args), verification.validateRoutePermissions(...args), verification.validateActiveRouteTokens(...args),
-    fetchAdminVotingPolicy(settings, nodeUrl, token, boundedFetch)
-      .then((policy) => ({ policy })).catch((error) => ({ error: error.message })),
-  ]);
-  const votingPolicy = votingPolicyResult.policy;
-  const state = { initialization, routes, actions, permissionErrors };
-  // Before enabling, accept already-enabled desired routes and verify all remaining actions are disabled.
-  const beforeEnable = { ...settings, chains: settings.chains.map((chain) => ({ ...chain,
-    routes: chain.routes.map((route) => ({ ...route, autoRouteEnabled: route.autoRouteEnabled && bool(
-      actions.actionConfigs.get(`${address(route.externalToken)}:${chain.externalChainId}:${address(route.stratoToken)}`)?.autoRoute),
-    })),
-  })) };
-  const prerequisiteErrors = [
-    ...verification.compareInitialization(settings, initialization),
-    ...verification.compareRoutes(currentCursorSettings(settings, routes), routes),
-    ...permissionErrors, ...inactiveTokens,
-  ];
-  const activationErrors = [...prerequisiteErrors, ...verification.compareActions(beforeEnable, actions)];
-  const calls = governanceProgress(settings, state, { stage: context.stage, activationErrors });
-  calls.forEach((item) => { item.requiredAdminVotes = requiredAdminVotes(votingPolicy, item.call); });
-  const liveVoteCountsResult = await fetchLiveAdminVoteCounts(
-    settings, nodeUrl, token, calls.filter(({ status }) => status === "READY"),
-    artifacts, boundedFetch).then((counts) => ({ counts })).catch((error) => ({ error: error.message }));
-  if (liveVoteCountsResult.counts) {
-    calls.forEach((item) => { item.recordedAdminVotes = liveVoteCountsResult.counts.get(item.id); });
-  }
-  return { settings, state, inactiveTokens, votingPolicy: votingPolicy && {
-    adminCount: votingPolicy.adminCount, defaultThresholdBps: votingPolicy.defaultThresholdBps,
-  }, votingPolicyError: votingPolicyResult.error, liveVoteCountsError: liveVoteCountsResult.error, calls, errors: [
-    ...prerequisiteErrors, ...verification.compareActions(settings, actions),
-    ...(initialization.bridge.depositsPaused === false || initialization.bridge.depositsPaused === "false" ? [] : ["STRATO deposit settlement is paused or its pause state is unavailable"]),
-  ] };
-}
-
-async function checkImplementations(context, provider) {
-  const results = [];
-  const slot = ethers.toBeHex(BigInt(ethers.keccak256(ethers.toUtf8Bytes("eip1967.proxy.implementation"))) - 1n, 32);
-  const block = await provider.getBlockNumber();
-  for (const [field, name] of [["externalBridgeVault", "ExternalBridgeVault"], ["depositRouter", "ExternalAssetDepositRouter"]]) {
-    const entry = context.deployment[field];
-    const actual = ethers.getAddress(`0x${(await provider.getStorage(entry.proxy, slot, block)).slice(-40)}`);
-    if (address(actual) !== address(entry.implementation)) throw new Error(`${name} implementation differs from deployment artifact`);
-    const artifactPath = path.resolve(__dirname, `../artifacts/contracts/bridge/${name}.sol/${name}.json`);
-    const artifact = readJson(artifactPath);
-    const debugPath = artifactPath.replace(/\.json$/, ".dbg.json");
-    const build = readJson(path.resolve(path.dirname(debugPath), readJson(debugPath).buildInfo));
-    const sources = new Set([artifact.sourceName]);
-    for (const sourceName of sources) {
-      const source = build.input.sources[sourceName];
-      const sourceFile = path.resolve(__dirname, "..", sourceName.startsWith("@") ? "node_modules" : "", sourceName);
-      if (fs.readFileSync(sourceFile, "utf8") !== source.content) throw new Error("Local contract build is stale; compile the approved release before verification");
-      for (const node of build.output.sources[sourceName].ast.nodes) {
-        if (node.nodeType === "ImportDirective") sources.add(node.absolutePath);
+      const external = path.join(internal, "external", "external-deployment.json");
+      if (!input.target?.externalDeployment && fs.existsSync(external)) input.target.externalDeployment = external;
+      for (const route of input.nativeRoutes || []) if (route.deployment) route.deployment = path.resolve(base, route.deployment);
+      const key = digest(input);
+      const config = path.join(internal, `prepare-${key}.json`);
+      const prepared = path.join(internal, `prepared-${key}`);
+      writeJson(config, input);
+      const completion = path.join(prepared, ".complete");
+      if (!fs.existsSync(completion)) {
+        if (fs.existsSync(prepared)) fs.renameSync(prepared, `${prepared}.incomplete-${randomUUID()}`);
+        const token = await resolveSourceToken({ manifest: { services: { sourceTokenEnv: "ACCESS_TOKEN" } } });
+        await withDeadline("Deployment input preparation", () => require("./prepareBridgeRollout").main(["--config", config, "--output-dir", prepared], { token, quiet: true }), INSPECTION_TIMEOUT_MS);
+        fs.writeFileSync(completion, key, { mode: 0o600 });
       }
-    }
-    const compiled = build.output.contracts[artifact.sourceName][name].evm.deployedBytecode;
-    const code = await provider.getCode(actual, block);
-    const mask = (hex) => {
-      const bytes = Buffer.from(hex.replace(/^0x/, ""), "hex");
-      for (const ranges of Object.values(compiled.immutableReferences || {})) {
-        for (const { start, length } of ranges) bytes.fill(0, start, start + length);
-      }
-      return bytes;
-    };
-    if (code === "0x" || code.length !== compiled.object.length + 2 || !mask(code).equals(mask(compiled.object))) throw new Error(`${name} deployed bytecode does not match the local build; verify or replace the old deployment`);
-    results.push({ name, proxy: entry.proxy, implementation: actual, codeHash: ethers.keccak256(code), block });
-  }
-  return results;
-}
-
-async function inspect(context, artifacts, options = {}) {
-  const checks = [];
-  const check = async (name, work) => {
-    try {
-      const data = await work();
-      const errors = data?.errors || [];
-      checks.push({ name, status: errors.length ? "FAILED" : "PASSED", data });
-      return data;
-    } catch (error) { checks.push({ name, status: "FAILED", error: redactFor(context, error.message) }); return undefined; }
-  };
-  const source = await check("strato", () => (options.sourceState || sourceState)(context, artifacts));
-  // Maps/sets are only used for reconciliation; persist the actionable errors and cursor evidence.
-  if (source) {
-    const stratoCheck = checks.find((item) => item.name === "strato");
-    stratoCheck.data = { errors: source.errors,
-      cursors: source.settings.chains.map((chain) => ({ chainId: chain.externalChainId, configuredStart: chain.lastProcessedBlock,
-        live: source.state.routes.chains.get(chain.externalChainId)?.lastProcessedBlock })) };
-    const incompleteGovernanceIsExpected = source.calls.some(({ status }) => status === "READY") &&
-      source.calls.filter(({ status }) => status === "BLOCKED")
-        .every(({ reason }) => String(reason).startsWith("Wait for "));
-    if (stratoCheck.status === "FAILED" && incompleteGovernanceIsExpected) {
-      stratoCheck.status = "PENDING";
-      stratoCheck.reason = "Expected configuration differences remain until the current governance stage executes";
-    }
-  }
-  let router;
-  let vaultState;
-  let externalReady = false;
-  const rpcUrl = process.env[context.manifest.services.rpcUrlEnv];
-  if (!rpcUrl || !/^https:\/\//.test(rpcUrl)) checks.push({ name: "external", status: "FAILED", error: `Set HTTPS ${context.manifest.services.rpcUrlEnv}` });
-  else {
-    const request = new ethers.FetchRequest(rpcUrl);
-    request.timeout = TIMEOUT_MS;
-    const provider = options.provider || new ethers.JsonRpcProvider(request, undefined, {
-      batchMaxCount: 1,
-      cacheTimeout: -1,
-    });
-    try {
-      const identity = await check("external-identity", async () => {
-        if ((await provider.getNetwork()).chainId !== BigInt(context.rollout.chainId)) throw new Error("External RPC chain ID mismatch");
-        return (options.checkImplementations || checkImplementations)(context, provider);
-      });
-      if (identity) {
-        router = await check("deposit-router", async () => {
-          const contract = new ethers.Contract(context.rollout.depositRouter.address, ["function paused() view returns (bool)"], provider);
-          const paused = await contract.paused();
-          return verifyFromManifest(artifacts.manifestPath, { expectedPaused: paused, provider, quiet: true });
-        });
-        vaultState = await check("withdrawal-pause", async () => {
-          const vault = new ethers.Contract(context.rollout.vaultConfig.chains[0].vaultAddress, ["function paused() view returns (bool)"], provider);
-          const paused = await vault.paused();
-          const expectedPaused = router?.paused !== false || context.rollout.summary.withdrawalsEnabledCount === 0;
-          if (paused !== expectedPaused) {
-            throw new Error(expectedPaused ? "External vault must remain paused before activation"
-              : "External vault must be unpaused with a withdrawal-enabled ExternalAssetDepositRouter");
-          }
-          return { paused };
-        });
-        externalReady = !!vaultState;
-        await check("safe-runtime-identities", async () => {
-          const safe = new ethers.Contract(context.rollout.vaultConfig.chains[0].safeAddress,
-            ["function getOwners() view returns (address[])", "function getThreshold() view returns (uint256)"], provider);
-          const [owners, threshold] = await Promise.all([safe.getOwners(), safe.getThreshold()]);
-          return validateSafeRuntimeIdentities(context, owners, threshold);
-        });
-        await check("vault-configuration", async () => {
-          const config = normalizeConfig(context.rollout.vaultConfig);
-          const base = path.resolve(__dirname, "../artifacts/contracts/bridge");
-          const state = await readState(config, config.chains[0], readJson(`${base}/ExternalBridgeVault.sol/ExternalBridgeVault.json`), readJson(`${base}/ExternalAssetDepositRouter.sol/ExternalAssetDepositRouter.json`), provider);
-          return { ...state, errors: state.configurationMatches && state.routerTargetsVault && state.safeHasGovernanceRoles && state.guardianCanPause && state.routerOwnerIsSafe ? [] : ["Vault policies, signer set, governance roles, or router binding differ"] };
-        });
-      }
-    } finally { if (!options.provider) provider.destroy(); }
-  }
-  const preActivationGovernancePending = source?.calls.some(({ status, call }) =>
-    status !== "COMPLETE" && call.args._func !== "setDepositAction");
-  const activationChecksRequired = context.stage === "activation" && !!source && !preActivationGovernancePending;
-  const checkVerifiers = async () => {
-    const services = context.manifest.services;
-    const verifierCount = getExternalBridgeNetwork(context.rollout.chainId).verifierCount;
-    if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) throw new Error("Approve services.confirmations as a positive integer");
-    if (services.verifiers.length !== verifierCount || context.manifest.authorizationSigners.length !== verifierCount) {
-      throw new Error(`Configure ${verifierCount} verifier endpoints and KMS addresses in the manifest`);
-    }
-    const urls = new Set();
-    for (const verifier of services.verifiers) {
-      const url = new URL(verifier.url);
-      if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("Verifier base URLs must be HTTPS without embedded credentials or query strings");
-      if (urls.has(url.href)) throw new Error("Verifier URLs must be distinct");
-      urls.add(url.href);
-    }
-    const metadata = await Promise.all(services.verifiers.map(async (verifier, index) => {
-      const data = await jsonFetch(`${verifier.url.replace(/\/$/, "")}/health`, undefined, options.fetchImpl);
-      const policy = context.rollout.verifierPolicies[index];
-      const expectedConfirmations = verifier.confirmations ?? services.confirmations;
-      const confirmationMismatch = verifier.confirmations === undefined
-        ? !Number.isSafeInteger(data.verifierConfirmations) || data.verifierConfirmations < expectedConfirmations
-        : data.verifierConfirmations !== expectedConfirmations;
-      if (data.status !== "ok" || String(data.destinationChainId) !== String(context.rollout.chainId) ||
-          address(data.destinationVault) !== address(policy.destinationVault) || address(data.authorizationSigner) !== address(context.manifest.authorizationSigners[index]) ||
-          address(data.settlementAttestor) !== address(policy.settlementAttestor) || data.verifierIndex !== index + 1 ||
-          data.baselinePolicyHash !== context.rollout.baselinePolicyHash ||
-          data.policyDigest !== `sha256:${digest(fs.readFileSync(artifacts.verifierPolicyPaths[index], "utf8"))}` ||
-          !Number.isSafeInteger(data.verificationRpcHostCount) || data.verificationRpcHostCount < 2 ||
-          confirmationMismatch) throw new Error(`Verifier ${index + 1} identity, policy, or confirmation mismatch`);
-      return data;
-    }));
-    return metadata;
-  };
-  const checkBridgeHealth = async () => {
-    const { bridgeHealthUrl, bridgeHealthUrlEnv = "BRIDGE_HEALTH_URL" } = context.manifest.services;
-    const url = process.env[bridgeHealthUrlEnv] || bridgeHealthUrl;
-    if (!url || !/^https:\/\/[^<>\s]+$/.test(url)) {
-      throw new Error(`Set ${bridgeHealthUrlEnv} to the deployed Runtime HTTPS health URL`);
-    }
-    const data = await jsonFetch(url, undefined, options.fetchImpl);
-    if (data.status !== true) throw new Error("Bridge health is not ready");
-    return data;
-  };
-  if (activationChecksRequired) {
-    await check("verifiers", checkVerifiers);
-    await check("bridge-health", checkBridgeHealth);
-  } else {
-    checks.push({ name: "verifiers", status: "DEFERRED", reason: "Required only after pre-activation governance completes" });
-    checks.push({ name: "bridge-health", status: "DEFERRED", reason: "Required only after pre-activation governance completes" });
-  }
-  const calls = source?.calls || [];
-  for (const item of calls) {
-    if (item.status === "READY" && item.call.args._func === "setDepositAction" && item.call.args._args[4].value === true &&
-        (!externalReady || router?.paused !== true || checks.some(({ name, status }) => name !== "strato" && status !== "PASSED"))) {
-      item.status = "BLOCKED";
-      item.reason = "Activation requires verified policy artifacts, verifier policies, vault/router configuration and service health";
-    }
-  }
-  const ready = checks.every(({ status }) => status === "PASSED");
-  const failedCheckNames = checks.filter(({ status }) => status === "FAILED").map(({ name }) => name);
-  const configurationStatus = (name) => {
-    const checkResult = checks.find((item) => item.name === name);
-    if (checkResult?.status === "PASSED") return "DONE";
-    return !checkResult || checkResult.error ? "UNVERIFIED" : "PENDING";
-  };
-  const safeExecutionOrder = [
-    { step: "pause-router", path: artifacts.depositRouterPausePath,
-      status: router?.paused === true ? "DONE" : router?.paused === false ? "PENDING" : "UNVERIFIED" },
-    { step: "pause-vault", path: artifacts.vaultPausePath,
-      status: vaultState?.paused === true ? "DONE" : vaultState?.paused === false ? "PENDING" : "UNVERIFIED" },
-    ...artifacts.depositRouterBatchPaths.map((file, index) =>
-      ({ step: `configure-router-${index + 1}`, path: file, status: configurationStatus("deposit-router") })),
-    ...(artifacts.vaultConfigurePath
-      ? [{ step: "configure-vault", path: artifacts.vaultConfigurePath, status: configurationStatus("vault-configuration") }]
-      : []),
-  ];
-  const pendingSafeConfiguration = safeExecutionOrder.some(({ status }) => status === "PENDING");
-  const unverifiedSafeConfiguration = safeExecutionOrder.some(({ status }) => status === "UNVERIFIED");
-  const report = {
-    revision: context.revision, observedAt: new Date().toISOString(), checks, calls, activationChecksRequired,
-    governance: source?.votingPolicy
-      ? { status: "LIVE", ...source.votingPolicy }
-      : { status: "UNAVAILABLE", error: source?.votingPolicyError },
-    liveVoteCounts: source?.liveVoteCountsError
-      ? { status: "UNAVAILABLE", error: redactFor(context, source.liveVoteCountsError) }
-      : source ? { status: "LIVE" } : undefined,
-    status: ready ? (router.paused ? "READY_FOR_ACTIVATION_REVIEW" : "DEPOSITS_ACTIVE_CANARY_REQUIRED") : "PENDING",
-    approvalHash: digest({ revision: context.revision, calls: calls.map(({ id, status }) => ({ id, status })), ready, routerPaused: router?.paused }),
-    safe: { executionOrder: safeExecutionOrder, vaultPause: artifacts.vaultPausePath,
-      vaultConfigure: artifacts.vaultConfigurePath, routerPause: artifacts.depositRouterPausePath,
-      routerTokens: artifacts.depositRouterBatchPaths },
-    next: !source ? "Resolve STRATO read access before voting" : source.liveVoteCountsError
-      ? "Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun status"
-      : calls.some(({ status }) => status === "READY") ? "Review READY governance calls and run vote with approvalHash" : !ready
-      ? pendingSafeConfiguration
-        ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun status"
-        : unverifiedSafeConfiguration
-          ? "EAB configuration could not be verified. Do not execute generated Safe files; rerun status after the failed reads recover"
-          : activationChecksRequired
-          ? failedCheckNames.length
-            ? `Resolve failed activation checks (${failedCheckNames.join(", ")}); activation governance remains blocked until they pass`
-            : "Resolve remaining activation readiness checks and rerun status"
-          : "Resolve failed EAB readiness checks and rerun status"
-      : router.paused ? "Review activation, then generate the Safe unpause file with activate --approve" : "Reconcile canary custody and issuance before declaring launch complete",
-  };
-  return { report, source, externalReady, router };
-}
-
-function requireLiveAdminVoteCounts(source, report) {
-  if (source?.liveVoteCountsError || report?.liveVoteCounts?.status === "UNAVAILABLE") {
-    throw new Error("Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun status");
-  }
-}
-
-async function vote(context, artifacts, inspection, approval, options = {}) {
-  if (inspection.report.approvalHash !== approval) throw new Error("Approval is stale; review a fresh resume report");
-  if (!inspection.source || !inspection.externalReady || inspection.router?.paused !== true) throw new Error("Voting requires verified external code, paused vault/router, and readable STRATO state");
-  if (inspection.source.inactiveTokens?.length || inspection.report.calls.some(({ status, call }) => status === "BLOCKED" && call.args._func === "initialize")) {
-    throw new Error("Resolve inactive tokens or conflicting initialization before voting");
-  }
-  requireLiveAdminVoteCounts(inspection.source, inspection.report);
-  const token = await resolveSourceToken(context);
-  const nodeUrl = context.manifest.services.nodeUrl.replace(/\/$/, "");
-  const identity = await jsonFetch(`${nodeUrl.replace(/\/$/, "")}/strato/v2.3/key`, token, options.fetchImpl);
-  if (!/^[a-f0-9]{40}$/.test(address(identity.address))) throw new Error("Unable to resolve STRATO voter identity");
-  const config = require(path.join(CONTRACTS, "config"));
-  config.nodes[0].url = nodeUrl;
-  const journalFile = path.join(artifacts.directory, `votes-${address(identity.address)}.json`);
-  const journal = fs.existsSync(journalFile) ? readJson(journalFile) : {};
-  const submitted = [];
-  for (const item of inspection.report.calls.filter(({ status }) => status === "READY")) {
-    const enabling = item.call.args._func === "setDepositAction" && item.call.args._args[4].value === true;
-    const refreshed = enabling ? await (options.inspect || inspect)(context, artifacts) : undefined;
-    if (enabling && (!refreshed.externalReady || refreshed.router?.paused !== true ||
-        refreshed.report.calls.find(({ id }) => id === item.id)?.status !== "READY")) {
-      throw new Error("Activation gates changed; stop and review before voting");
-    }
-    const fresh = refreshed?.source || await (options.sourceState || sourceState)(context, artifacts);
-    if (fresh.inactiveTokens?.length) throw new Error("Token status changed; stop and review before voting");
-    if (fresh.calls.find(({ id }) => id === item.id)?.status !== "READY") continue;
-    requireLiveAdminVoteCounts(fresh, refreshed?.report);
-    if (journal[item.id]) {
-      const previous = journal[item.id];
-      if (!previous.hashes?.length) throw new Error(`Uncertain prior submission for ${item.id}; reconcile chain evidence before retrying`);
-      const results = await (options.receipts || (async (hashes) => {
-        const { rest } = require(require.resolve("blockapps-rest", { paths: [CONTRACTS] }));
-        return rest.getBlocResults({ token }, hashes, { config, isAsync: true });
-      }))(previous.hashes);
-      if (!Array.isArray(results) || results.length !== previous.hashes.length || results.some((result) => result.status !== "Success" || !previous.hashes.includes(result.hash)) || new Set(results.map((result) => result.hash)).size !== results.length) throw new Error(`Prior vote ${item.id} is pending, failed, or unavailable; reconcile before retrying`);
-      journal[item.id] = { ...previous, status: "VOTED", receipt: results };
-      writeJson(journalFile, journal);
-      const live = fresh.calls.find(call => call.id === item.id);
-      if (!Array.isArray(live?.governanceVoters)) throw new Error("Live governance voter set unavailable; reconcile before retrying");
-      if (live.governanceVoters.includes(address(identity.address))) {
-        submitted.push({ id: item.id, status: "WAITING_FOR_QUORUM", hashes: previous.hashes });
-        continue;
-      }
-    }
-    journal[item.id] = { status: "SUBMITTING", call: item.call };
-    writeJson(journalFile, journal);
-    try {
-      const receipt = await (options.submit || submit)({ token }, item.call, async (hashes) => {
-        journal[item.id].hashes = hashes;
-        writeJson(journalFile, journal);
-      });
-      journal[item.id] = { ...journal[item.id], status: "VOTED", receipt };
-      writeJson(journalFile, journal);
-      submitted.push({ id: item.id, ...receipt, note: "Vote succeeded; execution is established by the next live reconciliation" });
-    } catch (error) {
-      journal[item.id].error = redactFor(context, error.message);
-      writeJson(journalFile, journal);
-      throw error;
-    }
-  }
-  return submitted;
-}
-
-function activate(context, artifacts, inspection, approval) {
-  const report = inspection.report;
-  if (report.approvalHash !== approval) throw new Error("Approval is stale; review a fresh resume report");
-  if (report.status !== "READY_FOR_ACTIVATION_REVIEW") throw new Error("Activation gates are not satisfied or deposits are already active");
-  const routerBatch = buildDepositRouterControl(context.rollout, "unpause");
-  const transactions = [...routerBatch.transactions];
-  if (context.rollout.summary.withdrawalsEnabledCount > 0) {
-    const chain = context.rollout.vaultConfig.chains[0];
-    const vault = new ethers.Interface(["function unpause()"]);
-    transactions.unshift({ to: chain.vaultAddress, value: "0", data: vault.encodeFunctionData("unpause"), operation: 0 });
-  }
-  const file = path.join(artifacts.directory, `activation-unpause-${approval}.json`);
-  writeJson(file, buildTransactionBuilderBatch(context.rollout.chainId,
-    context.rollout.vaultConfig.chains[0].safeAddress, transactions,
-    { name: "Activate External Asset Bridge", description: "Unpause the reviewed EAB vault and ExternalAssetDepositRouter" }));
-  return file;
-}
-
-function recordedVoteCounts(calls, artifacts) {
-  if (!artifacts?.directory) return calls.map(() => 0);
-  const journals = new Map();
-  for (const entry of fs.readdirSync(path.dirname(artifacts.directory), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const directory = path.join(path.dirname(artifacts.directory), entry.name);
-    for (const file of fs.readdirSync(directory).filter((name) => /^votes-[a-f0-9]{40}\.json$/.test(name))) {
-      const voter = file.slice(6, -5);
-      const journal = journals.get(voter) || {};
-      for (const [id, vote] of Object.entries(readJson(path.join(directory, file)))) {
-        if (vote.status === "VOTED") journal[id] = vote;
-      }
-      journals.set(voter, journal);
-    }
-  }
-  return calls.map(({ id }) => [...journals.values()].filter((journal) => journal[id]?.status === "VOTED").length);
-}
-
-function approvedCallsCompleted(artifacts, approval, currentCalls = []) {
-  if (!artifacts?.directory || !fs.existsSync(artifacts.directory)) return false;
-  const currentStatuses = new Map(currentCalls.map(({ id, status }) => [id, status]));
-  for (const file of fs.readdirSync(artifacts.directory).filter((name) => /^report-.*\.json$/.test(name))) {
-    const prior = readJson(path.join(artifacts.directory, file));
-    if (prior.approvalHash !== approval) continue;
-    const approvedCallIds = (prior.calls || [])
-      .filter(({ status }) => status === "READY")
-      .map(({ id }) => id);
-    if (approvedCallIds.length &&
-        approvedCallIds.every((id) => currentStatuses.get(id) === "COMPLETE")) return true;
-  }
-  return false;
-}
-
-function nativeDeploymentSteps(context, args, artifacts, stage = "configure") {
-  if (!context?.manifest?.settings?.depositPlan || !args?.manifest) return [];
-  const manifestDirectory = path.dirname(path.resolve(args.manifest));
-  const serviceStep = {
-    step: "7",
-    action: "DEPLOY_VERIFIERS_AND_RUNTIME",
-    then: "Start all reviewed verifier stacks and Runtime, set BRIDGE_HEALTH_URL, then rerun EAB status.",
-  };
-  const preparedDirectory = path.dirname(path.resolve(
-    manifestDirectory,
-    context.manifest.settings.depositPlan,
-  ));
-  const routesPath = artifacts?.nativeRoutesPath || path.join(preparedDirectory, "native-routes.json");
-  const nativePath = artifacts?.nativeConfigPath || path.join(preparedDirectory, "native.json");
-  if (!fs.existsSync(routesPath) || !fs.existsSync(nativePath)) return [serviceStep];
-  const routes = readJson(routesPath);
-  if (!Array.isArray(routes)) throw new Error("native-routes.json must contain an array");
-  if (!routes.length) return [serviceStep];
-  const repoRoot = path.resolve(__dirname, "../../..");
-  const rolloutDirectory = artifacts?.directory || path.join(manifestDirectory, ".deployment");
-  const routeCount = routes.length;
-  const steps = [];
-  if (stage === "activate") {
-    steps.push({ action: "VERIFY_NATIVE_CONFIGURATION", role: "coordinator",
-      run: `cd ${shellQuote(path.join(repoRoot, "app/ethereum"))} && npm run native:configure -- --config ${shellQuote(nativePath)} --stage configure`,
-      then: "Require 0 pending calls; finish readiness and the processor/Safe-writer handoff before either activation action." });
-    routes.forEach((settings, route) => steps.push({ action: `ACTIVATE_NATIVE_ROUTE_${route}`, roles: ["admin-1", "admin-2"],
-      run: `cd ${shellQuote(path.join(repoRoot, "app/contracts"))} && npm run configure:native-route -- --config ${shellQuote(routesPath)} --route ${route} --enabled ${settings.enabled === true} --auto-route-enabled ${settings["auto-route-enabled"] === true} --execute`,
-      then: "Each required administrator votes with their own credentials; wait for execution and verify the reviewed route permissions." }));
-    const output = path.join(rolloutDirectory, `native-activate-${randomUUID()}.safe.json`);
-    steps.push({ action: "GENERATE_NATIVE_ACTIVATION", role: "coordinator",
-      run: `cd ${shellQuote(path.join(repoRoot, "app/ethereum"))} && npm run native:configure -- --config ${shellQuote(nativePath)} --stage activate --output ${shellQuote(output)}`,
-      then: "Admin 1 and Admin 2 review/sign/execute the generated Safe JSON, then verify and run native canaries." });
-    steps.push({ action: "VERIFY_NATIVE_ACTIVATION", role: "coordinator",
-      run: `cd ${shellQuote(path.join(repoRoot, "app/ethereum"))} && npm run native:configure -- --config ${shellQuote(nativePath)} --stage verify` });
-    return steps;
-  }
-  for (let route = 0; route < routeCount; route++) {
-    const command = `cd ${shellQuote(path.join(repoRoot, "app/contracts"))} && npm run configure:native-route -- --config ${shellQuote(routesPath)} --route ${route} --enabled false --auto-route-enabled false`;
-    steps.push({
-      step: `6.2.${route + 1}`,
-      action: `DRY_RUN_NATIVE_ROUTE_${route}`,
-      run: command,
-      then: `Each required STRATO administrator reruns this exact command with --execute; wait for execution${route + 1 < routeCount ? ` before route ${route + 1}` : " before external native Safe configuration"}.`,
-    });
-  }
-  const nativeSafe = path.join(rolloutDirectory, "native-configure.safe.json");
-  steps.push({
-    step: "6.3",
-    action: "GENERATE_NATIVE_SAFE_CONFIGURATION",
-    run: `cd ${shellQuote(path.join(repoRoot, "app/ethereum"))} && npm run native:configure -- --config ${shellQuote(nativePath)} --stage configure --output ${shellQuote(nativeSafe)}`,
-    then: `Safe owners review and execute ${nativeSafe}.`,
-  });
-  steps.push({
-    step: "6.3 verify",
-    action: "VERIFY_NATIVE_SAFE_CONFIGURATION",
-    run: `cd ${shellQuote(path.join(repoRoot, "app/ethereum"))} && npm run native:configure -- --config ${shellQuote(nativePath)} --stage configure`,
-    then: "Require 0 pending native configuration calls before service deployment.",
-  });
-  steps.push(serviceStep);
-  return steps;
-}
-
-function planReviewSummary(context, artifacts) {
-  const { rollout, deployment, manifest } = context;
-  const bridgeChain = rollout.bridgeConfig.chains[0];
-  const vaultChain = rollout.vaultConfig.chains[0];
-  const verifierPolicy = rollout.verifierPolicies[0];
-  const withPrefix = (value) => String(value).startsWith("0x") ? String(value) : `0x${value}`;
-  const byToken = (items) => new Map(items.map((item) =>
-    [withPrefix(item.token).toLowerCase(), item]));
-  const vaultTokens = byToken(vaultChain.tokens);
-  const verifierTokens = byToken(verifierPolicy.tokens);
-  const verifierRoutes = new Map(verifierPolicy.routes.map((route) =>
-    [`${withPrefix(route.externalToken).toLowerCase()}:${withPrefix(route.stratoToken).toLowerCase()}`, route]));
-  const mintPolicies = byToken(rollout.bridgeConfig.mintPolicies);
-  const routes = bridgeChain.routes.map((route) => {
-    const externalToken = withPrefix(route.externalToken);
-    const stratoToken = withPrefix(route.stratoToken);
-    const vaultToken = vaultTokens.get(externalToken.toLowerCase());
-    const verifierToken = verifierTokens.get(externalToken.toLowerCase());
-    const verifierRoute = verifierRoutes.get(`${externalToken.toLowerCase()}:${stratoToken.toLowerCase()}`);
-    const mintPolicy = mintPolicies.get(stratoToken.toLowerCase());
-    return {
-      symbol: route.externalSymbol,
-      externalToken,
-      stratoToken,
-      permissions: {
-        depositsEnabled: route.depositsEnabled,
-        withdrawalsEnabled: route.withdrawalsEnabled,
-        autoRouteEnabled: route.autoRouteEnabled,
-      },
-      limitsRaw: {
-        maxPerWithdrawal: route.maxPerWithdrawal,
-        manualReviewThreshold: route.manualReviewThreshold,
-        maxAutoDepositAmount: verifierRoute?.maxAutoDepositAmount,
-        maxAutoWithdrawalAmount: verifierToken?.maxAutoWithdrawalAmount,
-        bucketCapacity: vaultToken?.bucketCapacity,
-        withdrawalRefillRate: vaultToken?.refillRate,
-        mintCapacity: mintPolicy?.capacity,
-        mintRefillRate: mintPolicy?.refillRate,
-      },
-      notes: BigInt(route.maxPerWithdrawal) === 0n
-        ? ["maxPerWithdrawal=0 means there is no separate per-withdrawal cap; bucket capacity still applies."]
-        : [],
-    };
-  });
-  return {
-    requiresHumanApproval: [
-      "contractBindings",
-      "governanceIdentitiesAndThresholds",
-      "startingBlock",
-      "routePermissions",
-      "limitsRaw",
-    ],
-    scope: {
-      mode: context.nativeInputs?.nativeRoutes?.length ? "eab-and-native" : "eab-only",
-      network: deployment.network,
-      sourceChainId: rollout.bridgeConfig.sourceChainId,
-      externalChainId: rollout.chainId,
-      startingBlock: bridgeChain.lastProcessedBlock,
-      routeCount: routes.length,
-    },
-    contractBindings: {
-      tokenRouter: manifest.settings.tokenRouter,
-      externalAssetBridge: manifest.settings.externalAssetBridge,
-      safe: vaultChain.safeAddress,
-      vault: vaultChain.vaultAddress,
-      depositRouter: vaultChain.depositRouterAddress,
-    },
-    governanceIdentitiesAndThresholds: {
-      bridgeOperator: manifest.settings.bridgeOperator,
-      guardian: manifest.settings.guardian,
-      settlementAttestors: manifest.settings.settlementVerifiers,
-      settlementThreshold: rollout.bridgeConfig.externalAssetBridge.settlementVerifierThreshold,
-      authorizationSigners: vaultChain.attestationSigners,
-      authorizationThreshold: vaultChain.attestationThreshold,
-      authorizationValiditySeconds: vaultChain.maxAuthorizationValiditySeconds,
-      safeProposer: manifest.services.safeProposerAddress,
-      externalExecutor: manifest.services.executorAddress,
-    },
-    confirmations: {
-      runtime: manifest.services.confirmations,
-      verifiers: manifest.services.verifiers.map(({ url, confirmations }) => ({
-        url,
-        confirmations: confirmations ?? manifest.services.confirmations,
-      })),
-    },
-    routes,
-    ...(context.nativeInputs?.nativeRoutes?.length ? { native: context.nativeInputs } : {}),
-    mechanicalChecks: {
-      schemaAndCrossFileConsistency: "PASSED",
-      unresolvedReviewValues: JSON.stringify(manifest).includes("REVIEW_REQUIRED")
-        ? "FAILED" : "PASSED",
-      artifactHashIndex: "WRITTEN",
-      verifierPolicyHashes: rollout.verifierPolicies.map((_, index) =>
-        artifacts.hashes[`verifier-${index + 1}.json`]),
-      infraPolicyComparison: "Compare these hashes with the reviewed files deployed by Infra.",
-    },
-    serviceTemplateNote: "bridge.env.template contains only this rollout. When adding a chain to an existing multi-network Runtime, merge these chain bindings instead of replacing the existing template.",
-  };
-}
-
-function operatorGuidance(report, args, artifacts, context, environmentFile) {
-  if (["OFFLINE_PLAN_READY", "OFFLINE_PLAN_INCOMPLETE", "PREPARED_FOR_REVIEW", "PROVISIONING_PACKAGE_READY"].includes(report.status)) {
-    return {
-      action: report.next,
-      nextSteps: report.nextSteps,
-    };
-  }
-  const common = args.config ? [`--config ${shellQuote(args.config)}`] : [`--manifest ${shellQuote(args.manifest)}`];
-  if (!args.config && args["output-dir"]) common.push(`--output-dir ${shellQuote(args["output-dir"])}`);
-  if (!args.config && args.stage) common.push(`--stage ${args.stage}`);
-  const resumeCommand = `npm run external:rollout -- status ${common.join(" ")}`;
-  const safeChecklist = report.safe?.executionOrder;
-  const sourceToken = context?.manifest.services.sourceTokenEnv;
-  const rpcUrl = context?.manifest.services.rpcUrlEnv;
-  const oauthReady = process.env[sourceToken] || (process.env.GLOBAL_ADMIN_NAME &&
-    process.env.GLOBAL_ADMIN_PASSWORD && process.env.OAUTH_URL && process.env.OAUTH_CLIENT_ID &&
-    process.env.OAUTH_CLIENT_SECRET);
-  const oauthRequirement = `${sourceToken} or GLOBAL_ADMIN_NAME + GLOBAL_ADMIN_PASSWORD + OAUTH_URL + OAUTH_CLIENT_ID + OAUTH_CLIENT_SECRET`;
-  const environment = context && {
-    secretsFile: environmentFile,
-    secretsFileLoaded: fs.existsSync(environmentFile),
-    availableNow: [
-      process.env[rpcUrl] && rpcUrl,
-      oauthReady && oauthRequirement,
-    ].filter(Boolean),
-    missingNow: [
-      !process.env[rpcUrl] && rpcUrl,
-      !oauthReady && oauthRequirement,
-    ].filter(Boolean),
-    runtimeServiceVariables: "Not rollout inputs; fill the generated bridge/verifier env templates only when deploying services.",
-  };
-  if (report.previousStageCompleted) {
-    return {
-      action: "The previously approved stage completed. Run status to review the next stage.",
-      stageExecuted: true,
-      safeChecklist,
-      environment,
-      resumeCommand,
-    };
-  }
-  if (report.operationError) {
-    if (report.operationError.startsWith("Approval is stale")) {
-      return {
-        action: "The approval no longer matches live state, and completion of its approved calls could not be confirmed. Run status and review the current stage.",
-        approvalInvalidated: true,
-        safeChecklist,
-        environment,
-        resumeCommand,
-      };
-    }
-    return { action: "The operation submitted no new work. Resolve the error and rerun resume.", safeChecklist, environment, resumeCommand };
-  }
-  const safeAction = safeChecklist?.find(({ status }) => status === "PENDING");
-  if (safeAction) {
-    return {
-      action: "Execute the next generated Safe transaction, then rerun status.",
-      safeAction,
-      safeChecklist,
-      environment,
-      resumeCommand,
-    };
-  }
-  const ready = report.calls?.filter(({ status }) => status === "READY") || [];
-  if (ready.length) {
-    if (report.liveVoteCounts?.status === "UNAVAILABLE") {
-      return {
-        currentStage: `${ready[0].deploymentStage}/12: ${ready[0].deploymentStageName}`,
-        readyCallCount: ready.length,
-        voteState: "LIVE_ADMIN_VOTES_UNAVAILABLE",
-        action: "Live AdminRegistry vote counts are unavailable. Do not infer zero votes. Restore the STRATO vote query and rerun status.",
-        safeChecklist,
-        environment,
-        resumeCommand,
-      };
-    }
-    const voteCounts = ready.map(item => item.recordedAdminVotes || 0);
-    const requirementsKnown = ready.every(({ requiredAdminVotes }) =>
-      Number.isSafeInteger(requiredAdminVotes) && requiredAdminVotes > 0);
-    const voteRequirements = ready.map((item, index) => ({
-      id: item.id,
-      required: item.requiredAdminVotes,
-      recorded: voteCounts[index],
-      remaining: requirementsKnown ? Math.max(0, item.requiredAdminVotes - voteCounts[index]) : undefined,
-    }));
-    const maximumRemainingVotes = requirementsKnown
-      ? Math.max(...voteRequirements.map(({ remaining }) => remaining)) : undefined;
-    const minimumRecordedVotes = Math.min(...voteCounts);
-    const readyMethods = Object.entries(ready.reduce((counts, { call }) => {
-      counts[call.args._func] = (counts[call.args._func] || 0) + 1;
-      return counts;
-    }, {})).map(([method, count]) => ({ method, count }));
-    const voteCommand = `npm run external:rollout -- vote ${common.join(" ")} --approve ${report.approvalHash}`;
-    const adminHandoffCommand = args.config
-      ? `npm run external:rollout -- vote --approve ${report.approvalHash}`
-      : voteCommand;
-    const voteState = !requirementsKnown ? "GOVERNANCE_THRESHOLD_UNAVAILABLE"
-      : maximumRemainingVotes === 0 ? "WAITING_FOR_EXECUTION"
-      : maximumRemainingVotes === 1 && minimumRecordedVotes === 1 &&
-        voteRequirements.every(({ required }) => required === 2)
-        ? "WAITING_ON_SECOND_ADMIN"
-        : minimumRecordedVotes === 0 ? "FIRST_ADMIN_VOTE_REQUIRED" : "ADMIN_VOTES_REQUIRED";
-    return {
-      currentStage: `${ready[0].deploymentStage}/12: ${ready[0].deploymentStageName}`,
-      readyCallCount: ready.length,
-      readyMethods,
-      voteRequirements,
-      voteState,
-      action: voteState === "WAITING_FOR_EXECUTION"
-        ? "The live AdminRegistry threshold is met. Wait for execution/indexing, then rerun status."
-        : voteState === "WAITING_ON_SECOND_ADMIN"
-          ? "The first administrator vote is recorded. This stage is waiting on the second administrator."
-          : voteState === "GOVERNANCE_THRESHOLD_UNAVAILABLE"
-            ? "The live AdminRegistry threshold is unavailable. Do not infer quorum from local vote files; restore the STRATO governance query and rerun status."
-          : voteState === "FIRST_ADMIN_VOTE_REQUIRED"
-            ? "No successful administrator vote is recorded for every READY call. An administrator votes now."
-            : `${maximumRemainingVotes} additional administrator vote(s) are required for at least one READY call.`,
-      voteCommand: ["WAITING_FOR_EXECUTION", "GOVERNANCE_THRESHOLD_UNAVAILABLE"].includes(voteState)
-        ? undefined : voteCommand,
-      adminHandoffCommand,
-      afterQuorum: "Wait for execution, then rerun status. Never reuse an older approval hash.",
-      safeChecklist,
-      environment,
-      resumeCommand,
-    };
-  }
-  if (report.status === "READY_FOR_ACTIVATION_REVIEW") {
-    return {
-      action: "All governance and verification gates pass. Review and generate the Safe unpause transaction.",
-      safeChecklist,
-      environment,
-      activateCommand: `npm run external:rollout -- activate ${common.join(" ")} --approve ${report.approvalHash}`,
-      nativeActivation: artifacts?.nativeRoutesPath
-        ? nativeDeploymentSteps(context, args, artifacts, "activate") : undefined,
-    };
-  }
-  const failedChecks = report.checks?.filter(({ status }) => status === "FAILED").map(({ name }) => name) || [];
-  const nextSteps = report.activationChecksRequired && !failedChecks.length &&
-    safeChecklist?.every(({ status }) => status === "DONE")
-    ? nativeDeploymentSteps(context, args, artifacts) : [];
-  return {
-    action: report.next,
-    failedChecks,
-    nextSteps,
-    safeChecklist,
-    environment,
-    resumeCommand,
-  };
-}
-
-function terminalSummary(report, reportFile) {
-  const operator = report.operator || {};
-  const details = reportFile;
-  if (report.status === "OFFLINE_PLAN_INCOMPLETE") {
-    return {
-      status: "OFFLINE_PLAN_INCOMPLETE",
-      action: "RESOLVE_REVIEW_REQUIRED",
-      then: report.next,
-      review: report.review,
-      details,
-    };
-  }
-  if (report.status === "OFFLINE_PLAN_READY") {
-    return {
-      status: "OFFLINE_PLAN_READY",
-      action: "REVIEW_POLICY_SUMMARY",
-      then: report.next,
-      review: report.review,
-      nextSteps: report.nextSteps,
-      details,
-    };
-  }
-  if (["PREPARED_FOR_REVIEW", "PROVISIONING_PACKAGE_READY"].includes(report.status)) {
-    return {
-      status: report.status,
-      action: report.status === "PROVISIONING_PACKAGE_READY" ? "PROVISION_STOPPED_WORKLOADS" : "APPROVE_POLICY_SUMMARY",
-      then: report.next,
-      review: report.review,
-      bundle: report.bundle,
-      coordinator: report.coordinator,
-      adminHandoff: report.adminHandoff,
-      infraHandoff: report.infraHandoff,
-      nextSteps: report.nextSteps,
-      details,
-    };
-  }
-  if (operator.stageExecuted) {
-    return {
-      status: "STAGE_EXECUTED",
-      action: "RERUN_STATUS",
-      run: operator.resumeCommand,
-      then: "Review the next stage and use only its newly reported approval hash.",
-      details,
-    };
-  }
-  if (operator.approvalInvalidated) {
-    return {
-      status: "APPROVAL_INVALIDATED",
-      action: "RERUN_STATUS",
-      run: operator.resumeCommand,
-      then: "Review live state before submitting any further transaction.",
-      details,
-    };
-  }
-  if (report.activationFile) {
-    return {
-      status: "ACTION_REQUIRED",
-      action: "EXECUTE_ACTIVATION_TRANSACTION_IN_SAFE",
-      file: report.activationFile,
-      then: "Run status after Safe execution, then complete the canary.",
-      details,
-    };
-  }
-  if (report.submittedVotes?.length) {
-    if (report.voteOutcome === "STAGE_EXECUTED") {
-      return {
-        status: "STAGE_EXECUTED",
-        action: "COORDINATOR_RUN_STATUS",
-        run: "npm run external:rollout -- status",
-        then: "The coordinator runs status with their own coordinator profile.",
-        details,
-      };
-    }
-    if (report.voterAdmin === "2" || report.voteInputState === "WAITING_ON_SECOND_ADMIN") {
-      return {
-        status: "VOTE_SUBMITTED",
-        action: "COORDINATOR_RUN_STATUS",
-        run: "npm run external:rollout -- status",
-        then: "The coordinator runs status with their own profile. If still pending, wait for indexing; do not vote again.",
-        details,
-      };
-    }
-    return {
-      status: "HANDOFF_REQUIRED",
-      action: "ADMIN_2_VOTE",
-      run: operator.adminHandoffCommand,
-      then: "The coordinator runs status after Admin 2 votes.",
-      details,
-    };
-  }
-  if (operator.safeAction) {
-    return {
-      status: "ACTION_REQUIRED",
-      action: "EXECUTE_SAFE_TRANSACTION",
-      step: operator.safeAction.step,
-      file: operator.safeAction.path,
-      then: "Run status again after the Safe transaction executes.",
-      details,
-    };
-  }
-  const requirements = operator.voteRequirements || [];
-  const progress = requirements.length === 1
-    ? `${requirements[0].recorded}/${requirements[0].required} admin votes recorded`
-    : undefined;
-  if (operator.voteState === "LIVE_ADMIN_VOTES_UNAVAILABLE" ||
-      operator.voteState === "GOVERNANCE_THRESHOLD_UNAVAILABLE") {
-    return {
-      status: "WAITING",
-      step: operator.currentStage,
-      action: operator.voteState,
-      then: operator.action,
-      run: operator.resumeCommand,
-      details,
-    };
-  }
-  if (operator.voteState === "FIRST_ADMIN_VOTE_REQUIRED") {
-    return {
-      status: "ACTION_REQUIRED",
-      step: operator.currentStage,
-      action: "ADMIN_1_VOTE",
-      progress,
-      run: operator.adminHandoffCommand,
-      then: "Run status again. It will tell Admin 2 to vote.",
-      details,
-    };
-  }
-  if (operator.voteState === "WAITING_ON_SECOND_ADMIN") {
-    return {
-      status: "ACTION_REQUIRED",
-      step: operator.currentStage,
-      action: "ADMIN_2_VOTE",
-      progress,
-      run: operator.adminHandoffCommand,
-      then: "Run status again after Admin 2 votes.",
-      details,
-    };
-  }
-  if (operator.voteState === "ADMIN_VOTES_REQUIRED") {
-    return {
-      status: "ACTION_REQUIRED",
-      step: operator.currentStage,
-      action: "ADDITIONAL_ADMIN_VOTE",
-      progress,
-      run: operator.adminHandoffCommand,
-      then: "Run status again after this admin votes.",
-      details,
-    };
-  }
-  if (operator.voteState === "WAITING_FOR_EXECUTION") {
-    return {
-      status: "WAITING",
-      step: operator.currentStage,
-      action: "Wait for governance execution/indexing.",
-      run: operator.resumeCommand,
-      details,
-    };
-  }
-  if (operator.activateCommand) {
-    return {
-      status: "ACTION_REQUIRED",
-      action: "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION",
-      run: operator.activateCommand,
-      ...(operator.nativeActivation ? { nativeActivation: operator.nativeActivation } : {}),
-      then: "The coordinator proposes the generated transaction; the required Safe owners approve and execute it; then the coordinator reruns status.",
-      details,
-    };
-  }
-  return {
-    status: report.status,
-    action: operator.action || report.next,
-    run: operator.nextSteps?.[0]?.run || operator.resumeCommand,
-    nextSteps: operator.nextSteps?.length ? operator.nextSteps : undefined,
-    failedChecks: operator.failedChecks?.length ? operator.failedChecks : undefined,
-    details,
-  };
-}
-
-function configureRolloutProfile({ role, config, manifest, outputDir, stage = "activation", environmentFile }) {
-  const configPath = path.resolve(config);
-  const manifestPath = path.resolve(manifest);
-  loadManifest(manifestPath, stage);
-  const profile = {
-    role,
-    manifest: manifestPath,
-    manifestSha256: digest(fs.readFileSync(manifestPath, "utf8")),
-    outputDir: path.resolve(outputDir),
-    stage,
-    ...(environmentFile ? { environmentFile: path.resolve(environmentFile) } : {}),
-  };
-  fs.mkdirSync(path.dirname(configPath), { recursive: true, mode: 0o700 });
-  writeJson(configPath, profile);
-  fs.chmodSync(configPath, 0o600);
-  return {
-    status: `${role.toUpperCase().replace("-", "_")}_CONFIGURED`,
-    config: configPath,
-    action: "Export this persona's rollout profile.",
-    run: `export EAB_ROLLOUT_CONFIG=${shellQuote(configPath)}`,
-    then: role === "coordinator"
-      ? "After both administrator profiles are configured, run live reconciliation."
-      : "Wait for the coordinator's reviewed handoff; do not run status or submit transactions independently.",
-    ...(role === "coordinator"
-      ? { nextRun: "npm run external:rollout -- continue" } : {}),
-  };
+      const expanded = path.join(internal, `expanded-${key}.json`);
+      if (!fs.existsSync(expanded)) initializeManifest(path.join(prepared, "settings.json"), path.join(prepared, "policy.json"), expanded);
+      writeJson(manifestPath, readJson(expanded));
+  return true;
 }
 
 async function main(argv = process.argv.slice(2)) {
   const args = parseArgs([...argv]);
+  if (args.command === "approve") {
+    console.log(JSON.stringify(await runApproval(args), null, 2));
+    return;
+  }
   const manifestPath = path.resolve(args.manifest);
-  if (["setup", "join"].includes(args.command)) {
-    const profile = configureRolloutProfile({
-      role: args.role,
-      config: args.config,
-      manifest: manifestPath,
-      outputDir: args["output-dir"],
-      stage: args.stage,
-      environmentFile: args["env-file"],
-    });
-    if (args.command === "join" && args.role === "infra") {
-      const context = loadManifest(manifestPath, args.stage);
-      const artifacts = generate(context, args["output-dir"]);
-      profile.services = {
-        runtimeTemplate: artifacts.serviceTemplates.find((file) => path.basename(file) === "bridge.env.template"),
-        verifierPolicies: artifacts.verifierPolicyPaths.map((file, index) => ({ file, sha256: artifacts.hashes[`verifier-${index + 1}.json`] })),
-        verifierTemplates: artifacts.serviceTemplates.filter((file) => /^verifier-\d+\.env\.template$/.test(path.basename(file))),
-        ...(artifacts.nativeRoutesPath ? {
-          nativeRoutes: artifacts.nativeRoutesPath, nativeConfig: artifacts.nativeConfigPath,
-          nativeVerifierPolicies: artifacts.nativeVerifierPolicyPaths.map((file, index) => ({ file, sha256: artifacts.hashes[`native-verifier-${index + 1}.json`] })),
-        } : {}),
-      };
-      profile.action = "Deploy from the printed managed service files; keep secrets in Infra's private configuration.";
-      profile.then = "Keep workloads stopped until configuration and the processor/Safe-writer handoff are complete.";
-      writeJson(path.join(args["output-dir"], "services.json"), profile.services);
-    }
-    console.log(JSON.stringify(profile, null, 2));
-    return;
-  }
-  if (args.command === "bundle") {
-    const bundlePath = path.resolve(args.bundle);
-    createPortableBundle(manifestPath, bundlePath, args.stage || "activation");
-    console.log(JSON.stringify({
-      status: "BUNDLE_CREATED",
-      bundle: bundlePath,
-      sha256: digest(fs.readFileSync(bundlePath, "utf8")),
-      action: "Give this non-secret file and its SHA-256 checksum to the coordinator, both administrators, and infra deployer.",
-    }, null, 2));
-    return;
-  }
   if (args.command === "init") {
+    if (args["node-url"]) {
+      if (fs.existsSync(manifestPath)) throw new Error("Deployment file already exists; discovery did not overwrite it");
+      loadRolloutEnvironment(manifestPath, args["env-file"]);
+      const token = await resolveSourceToken({ manifest: { services: { sourceTokenEnv: "ACCESS_TOKEN" } } });
+      const result = await withDeadline("Route discovery", (signal) => require("./prepareBridgeRollout").discover(
+        args["node-url"], args["chain-id"], token,
+        (url, options) => fetch(url, { ...options, signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) }),
+        { sourceChainId: args["source-chain-id"] }), INSPECTION_TIMEOUT_MS);
+      const directory = path.join(path.dirname(manifestPath), ".deployment", `discovery-${randomUUID()}`);
+      writeJson(path.join(directory, "discovery.json"), { candidates: result.candidates, missing: result.missing });
+      writeJson(manifestPath, { schemaVersion: 0, discovery: result.config, discoveryDirectory: directory });
+      console.log(JSON.stringify({ status: "DRAFT_CREATED", manifest: manifestPath,
+        action: "Select the approved EAB/native routes and target addresses in this file. Run prepare; no bridge:prepare or second init command is needed.",
+        next: `npm run external:rollout -- prepare --manifest ${shellQuote(manifestPath)}` }, null, 2));
+      return;
+    }
     if (args.discovery) {
       if (fs.existsSync(manifestPath)) throw new Error("Deployment file already exists; it was not overwritten");
       const discoveryPath = path.resolve(args.discovery);
       writeJson(manifestPath, { schemaVersion: 0, discovery: readJson(discoveryPath), discoveryDirectory: path.dirname(discoveryPath) });
       console.log(JSON.stringify({ status: "DRAFT_CREATED", manifest: manifestPath,
-        action: "Edit discovery.target and route include flags in this deployment file; then rerun init without --discovery." }, null, 2));
+        action: "Edit discovery.target and route include flags in this deployment file, then run prepare; expansion is automatic." }, null, 2));
       return;
     }
     const settingsPath = args.settings ? path.resolve(args.settings) : manifestPath;
@@ -1295,26 +90,10 @@ async function main(argv = process.argv.slice(2)) {
     if (!fs.existsSync(settingsPath)) throw new Error(`Settings file not found: ${settingsPath}`);
     const draft = readJson(settingsPath);
     if (draft.schemaVersion === 0 && draft.discovery) {
-      loadRolloutEnvironment(manifestPath, undefined);
-      const internal = path.join(path.dirname(manifestPath), ".deployment");
-      const input = structuredClone(draft.discovery);
-      const base = draft.discoveryDirectory || path.dirname(manifestPath);
-      for (const field of ["externalDeployment", "nativeDeployment"]) {
-        if (input.target?.[field]) input.target[field] = path.resolve(base, input.target[field]);
-      }
-      const external = path.join(internal, "external", "external-deployment.json");
-      if (!input.target?.externalDeployment && fs.existsSync(external)) input.target.externalDeployment = external;
-      for (const route of input.nativeRoutes || []) if (route.deployment) route.deployment = path.resolve(base, route.deployment);
-      const key = digest(input);
-      const config = path.join(internal, `prepare-${key}.json`);
-      const prepared = path.join(internal, `prepared-${key}`);
-      writeJson(config, input);
-      if (!fs.existsSync(prepared)) await require("./prepareBridgeRollout").main(["--config", config, "--output-dir", prepared]);
-      const expanded = path.join(internal, `expanded-${key}.json`);
-      if (!fs.existsSync(expanded)) initializeManifest(path.join(prepared, "settings.json"), path.join(prepared, "policy.json"), expanded);
-      writeJson(manifestPath, readJson(expanded));
+      loadRolloutEnvironment(manifestPath, args["env-file"]);
+      await expandDeploymentDraft(manifestPath);
       console.log(JSON.stringify({ status: "MANIFEST_CREATED", manifest: manifestPath,
-        action: "Review settings, policy and inputs.nativeConfig in this deployment file. Do not edit generated files." }, null, 2));
+        action: "Review the same deployment file, then run prepare. Expansion also runs automatically inside prepare." }, null, 2));
       return;
     }
     initializeManifest(settingsPath, args.policy && path.resolve(args.policy), manifestPath);
@@ -1328,20 +107,23 @@ async function main(argv = process.argv.slice(2)) {
   ));
   fs.mkdirSync(output, { recursive: true, mode: 0o700 });
   const lock = path.join(output, ".lock");
-  const handle = fs.openSync(lock, "wx", 0o600);
-  fs.writeFileSync(handle, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
+  const releaseLock = acquireRolloutLock(lock);
   try {
+    if (args.command === "prepare" && await expandDeploymentDraft(manifestPath)) {
+      console.log(JSON.stringify({ status: "MANIFEST_CREATED", manifest: manifestPath,
+        action: "Review settings, policy and native inputs in this same file, then rerun the same prepare command.",
+        next: `npm run external:rollout -- prepare --manifest ${shellQuote(manifestPath)}${args.stage === "initial" ? " --stage initial" : ""}` }, null, 2));
+      return;
+    }
+    if (args.command === "prepare" && !argv.includes("--stage")) args.stage = preparationStage(readJson(manifestPath));
     const context = loadManifest(manifestPath, args.stage);
-    const adminProfile = ["administrator", "admin-1", "admin-2"].includes(args.role);
-    const artifacts = generate(context, output, { includeServiceTemplates: !adminProfile });
+    if (context.manifest.scope && !["all", "native"].includes(context.manifest.scope)) throw new Error("scope must be all or native");
+    if (context.manifest.scope === "native" && !context.nativeInputs.nativeRoutes?.length) throw new Error("Native scope requires native routes and configuration");
+    const artifacts = generate(context, output);
     let report;
+    let currentInspection;
     if (["plan", "prepare"].includes(args.command)) {
       const settings = loadConfig(artifacts.bridgeConfigPath);
-      const rolloutDirectory = path.dirname(manifestPath);
-      const bundlePath = path.resolve(args.bundle || path.join(rolloutDirectory,
-        context.stage === "initial" ? ".deployment/provisioning-bundle.json" : "deployment-bundle.json"));
-      const coordinatorConfig = path.resolve(args.config || path.join(rolloutDirectory, ".deployment", "coordinator.json"));
-      const coordinatorEnvironment = path.resolve(args["env-file"] || path.join(rolloutDirectory, "coordinator.env"));
       const review = planReviewSummary(context, artifacts);
       const planComplete = review.mechanicalChecks.unresolvedReviewValues === "PASSED";
       report = { revision: context.revision,
@@ -1350,144 +132,93 @@ async function main(argv = process.argv.slice(2)) {
         governance: ["initialize", "routes", "actions"].flatMap((step) => buildPlan(settings, step)),
         review,
         next: planComplete
-          ? "Approve the printed bindings, identities, starting block, route permissions, and raw limits; then create and distribute the bundle and configure every persona before live reconciliation."
-          : "Resolve every REVIEW_REQUIRED value in the manifest and rerun plan. Do not create a bundle or begin live reconciliation.",
-        nextSteps: planComplete ? [
-          {
-            step: 1,
-            action: "REVIEW_POLICY_SUMMARY",
-            then: "Approve only the fields listed in requiresHumanApproval. Mechanical validation and hashes are reported separately.",
-          },
-          {
-            step: 2,
-            action: "CREATE_PORTABLE_BUNDLE",
-            run: `npm run external:rollout -- bundle --manifest ${shellQuote(manifestPath)} --bundle ${shellQuote(bundlePath)}`,
-          },
-          {
-            step: 3,
-            action: "DISTRIBUTE_AND_VERIFY_BUNDLE",
-            then: "Give the bundle and printed SHA-256 to both administrators and infra; each recipient verifies the checksum.",
-          },
-          {
-            step: 4,
-            action: "SETUP_COORDINATOR_PROFILE",
-            run: `npm run external:rollout -- setup --role coordinator --config ${shellQuote(coordinatorConfig)} --manifest ${shellQuote(bundlePath)} --output-dir ${shellQuote(output)} --stage ${context.stage} --env-file ${shellQuote(coordinatorEnvironment)}`,
-            then: "Each administrator runs setup with their own local bundle copy, config path, output directory, and environment file.",
-          },
-          {
-            step: 5,
-            action: "RUN_LIVE_RECONCILIATION",
-            run: "npm run external:rollout -- status",
-            when: "Only after the coordinator and administrator profiles are configured.",
-          },
-        ] : undefined };
-      if (args.command === "prepare" && context.stage === "initial") {
-        createPortableBundle(manifestPath, bundlePath, "initial");
-        report.status = "PROVISIONING_PACKAGE_READY";
-        report.bundle = { path: bundlePath, sha256: digest(fs.readFileSync(bundlePath, "utf8")) };
-        report.infraHandoff = {
-          bundle: bundlePath,
-          run: "npm run external:rollout -- join --role infra --bundle ./deployment-bundle.json",
-        };
-        report.next = "Send this provisioning package to Infra. Keep workloads stopped. Record the returned public identities in the deployment file, resolve every REVIEW_REQUIRED value, then run prepare without --stage initial.";
-      } else if (args.command === "prepare" && planComplete) {
-        createPortableBundle(manifestPath, bundlePath);
-        const coordinator = configureRolloutProfile({
-          role: "coordinator",
-          config: coordinatorConfig,
-          manifest: bundlePath,
-          outputDir: output,
-          stage: context.stage,
-          environmentFile: args["env-file"],
-        });
-        report.status = "PREPARED_FOR_REVIEW";
-        report.bundle = {
-          path: bundlePath,
-          sha256: digest(fs.readFileSync(bundlePath, "utf8")),
-        };
-        report.coordinator = coordinator;
-        report.adminHandoff = {
-          files: [bundlePath],
-          admin1: "npm run external:rollout -- join --role admin-1 --bundle ./deployment-bundle.json",
-          admin2: "npm run external:rollout -- join --role admin-2 --bundle ./deployment-bundle.json",
-        };
-        report.infraHandoff = {
-          bundle: bundlePath,
-          bundleSha256: report.bundle.sha256,
-          run: "npm run external:rollout -- join --role infra --bundle ./deployment-bundle.json",
-          then: "Infra generates its own managed policies/templates from this bundle; no separate generated files need to be sent.",
-        };
-        report.next = "Approve the printed policy summary, distribute the bundle to both administrators, and have each administrator run the printed join command. Then export the coordinator profile and run status.";
-        report.nextSteps = [
-          {
-            step: 1,
-            action: "APPROVE_POLICY_SUMMARY",
-            then: "Stop if any binding, identity, starting block, permission, or raw limit is incorrect.",
-          },
-          {
-            step: 2,
-            action: "DISTRIBUTE_BUNDLE",
-            file: bundlePath,
-            sha256: report.bundle.sha256,
-          },
-          {
-            step: 3,
-            action: "ADMINS_JOIN",
-            commands: [report.adminHandoff.admin1, report.adminHandoff.admin2],
-          },
-          {
-            step: 4,
-            action: "COORDINATOR_RUN_STATUS",
-            run: `${coordinator.run} && ${coordinator.nextRun}`,
-            when: "Only after both administrators have joined.",
-          },
-        ];
-      } else if (args.command === "prepare") {
-        process.exitCode = 1;
-      }
-    } else {
-      const inspection = await inspect(context, artifacts);
-      report = inspection.report;
-      if (["activate", "vote"].includes(args.command)) {
-        if (context.manifest.bundlePurpose === "provisioning") throw new Error("Provisioning bundles cannot authorize governance or activation");
-        try {
-          if (report.approvalHash !== args.approve) throw new Error("Approval is stale; review a fresh resume report");
-          if (args.command === "vote") {
-            report.voterAdmin = args.admin;
-            report.voteInputState = operatorGuidance(
-              report, args, artifacts, context, environmentFile).voteState;
-            report.submittedVotes = await vote(context, artifacts, inspection, args.approve);
-            const submittedIds = new Set(report.submittedVotes.map(({ id }) => id));
-            const refreshed = await sourceState(context, artifacts).catch(() => undefined);
-            const refreshedCalls = refreshed?.calls.filter(({ id }) => submittedIds.has(id)) || [];
-            report.voteOutcome = refreshedCalls.length === submittedIds.size &&
-              refreshedCalls.every(({ status }) => status === "COMPLETE")
-              ? "STAGE_EXECUTED" : "AWAITING_ANOTHER_ADMIN";
-          } else {
-            report.activationFile = activate(context, artifacts, inspection, args.approve);
-            report.next = "Review and execute this Safe transaction manually, then run resume and reconcile the canary";
-          }
-        } catch (error) {
-          const staleApproval = error.message.startsWith("Approval is stale");
-          if (staleApproval && approvedCallsCompleted(artifacts, args.approve, report.calls)) {
-            report.previousStageCompleted = true;
-            report.status = "STAGE_EXECUTED";
-          } else {
-            report.operationError = redactFor(context, error.message);
-            report.status = staleApproval ? "APPROVAL_INVALIDATED" : "OPERATION_FAILED";
-            process.exitCode = 1;
-          }
+          ? "Review the saved bindings, identities, starting block, permissions and raw limits; run prepare to create the Infra service archive, then continue for current approvals."
+          : "Resolve every REVIEW_REQUIRED value in the manifest and rerun prepare before live reconciliation." };
+      if (args.command === "prepare") {
+        if (!planComplete && (context.stage === "activation" || !provisioningReviewComplete(context.manifest))) process.exitCode = 1;
+        else {
+          portableSnapshot(manifestPath, artifacts.directory, context.stage);
+          report.status = context.stage === "initial" ? "PROVISIONING_PACKAGE_READY" : "PREPARED_FOR_REVIEW";
+          report.managed = true;
+          report.serviceHandoff = createServiceHandoff(artifacts, { nativeExtension: context.manifest.scope === "native" });
+          if (context.manifest.scope === "native") report.serviceHandoff.instruction = "Provision/apply native additions on existing Runtime/verifiers while retaining Running=Yes, EAB bindings, policies and journals. Return any new native identities; no EAB redeployment.";
+          report.nativeExtension = context.manifest.scope === "native";
+          report.resume = context.stage === "initial"
+            ? `npm run external:rollout -- prepare --manifest ${shellQuote(manifestPath)}`
+            : `npm run external:rollout -- continue --manifest ${shellQuote(manifestPath)}`;
+          report.next = "Review the saved configuration summary. Give Infra the service archive; keep workloads stopped. Continue as Coordinator to generate the current admin commands and Safe JSON.";
+          delete report.nextSteps;
         }
       }
+    } else {
+      console.error("Checking live rollout state (60s per check; 180s overall). No transactions are submitted during inspection.");
+      const inspection = await withDeadline("Live rollout inspection", (signal) => inspect(context, artifacts, {
+        signal, staged: args.command === "continue", onProgress: (message) => console.error(`[rollout] ${message}`),
+      }), INSPECTION_TIMEOUT_MS);
+      currentInspection = inspection;
+      report = inspection.report;
+      if (context.manifest.scope === "native" && !nativeOnlyEabVerified(context, inspection)) throw new Error("Native extension requires unchanged, healthy, active EAB configuration. Resolve EAB drift/readiness before continuing; no EAB changes were submitted.");
+
     }
-    report.operator = operatorGuidance(report, args, artifacts, context, environmentFile);
+    report.operator = resolveNextAction(report, args, artifacts, context, environmentFile).progress;
+    if (["continue", "verify"].includes(args.command)) {
+      if (report.operator.safeAction) report.operator.safeAction = groupSafeAction(context, artifacts, report.safe.executionOrder);
+      report.nativeAction = nativeCoordinatorAction(context, report, output, manifestPath);
+      const externalReadsVerified = ["external-identity", "safe-runtime-identities"].every(name => report.checks?.find(check => check.name === name)?.status === "PASSED");
+      const safeConfigured = report.safe?.executionOrder?.every(({ status }) => status === "DONE");
+      if (!externalReadsVerified) {
+        report.nativeAction = undefined;
+        report.operator = { action: "Restore external code/Safe identity verification before approving configuration.",
+          failedChecks: report.checks.filter(({ status }) => status === "FAILED").map(({ name }) => name),
+          resumeCommand: report.operator.resumeCommand };
+      } else if (report.operator.approvalRequired && !safeConfigured && !report.operator.safeAction) {
+        report.operator = { action: "Restore Safe configuration reads before approving governance.",
+          failedChecks: report.checks.filter(({ status }) => status === "FAILED").map(({ name }) => name),
+          resumeCommand: report.operator.resumeCommand };
+      }
+      if (report.nativeAction && externalReadsVerified && safeConfigured) report.nativeAction = await advanceNative(context, artifacts, report, output, manifestPath, currentInspection);
+      if (report.nativeAction?.status === "NATIVE_APPROVAL_READY") {
+        const nativeInspection = report.nativeAction.inspection;
+        const calls = [...report.calls, ...nativeInspection.report.calls];
+        if (new Set(calls.map(({ id }) => id)).size !== calls.length) throw new Error("Combined EAB/native approval contains duplicate governance calls");
+        report.calls = calls;
+        report.approvalKind = "all";
+        report.approvalHash = digest({ phase: governanceBatch(report).phase, calls: calls.map(({ id, status }) => ({ id, status })) });
+        report.nativeAction = undefined;
+      }
+      if (context.manifest.scope === "native" && !report.nativeAction) {
+        await verifyNativeActivation(context, artifacts, currentInspection);
+        report.nativeScopeComplete = true;
+      }
+      if (!report.nativeAction && !report.approvalKind && !report.operator.safeAction && externalReadsVerified && report.status === "READY_FOR_ACTIVATION_REVIEW" && context.manifest.scope !== "native") {
+        await verifyNativeActivation(context, artifacts, currentInspection);
+        report.activationFile = activate(context, artifacts, currentInspection, report.approvalHash);
+      }
+      if (!report.nativeAction && !report.operator.safeAction && externalReadsVerified && infraStartRequired(report)) {
+        report.infraAction = createServiceHandoff(artifacts, { nativeExtension: context.manifest.scope === "native" });
+      }
+      if (report.operator.approvalRequired && report.liveVoteCounts?.status === "LIVE" && safeConfigured && !report.operator.safeAction && !report.nativeAction && !report.infraAction) {
+        const snapshot = portableSnapshot(manifestPath, artifacts.directory);
+        const request = createApprovalRequest(snapshot, report);
+        const handoff = writeApprovalFile(artifacts.directory, request);
+        report.adminApproval = { phase: request.packet.phase === "activation" ? "activate" : "configure", summary: request.packet.calls.map(({ call }) => ({ target: call.args._target, method: call.args._func, args: call.args._args })),
+          expiresAt: new Date(request.packet.expiresAt).toISOString(),
+          file: handoff.file, approvalId: handoff.approvalId,
+          run: `npm run external:rollout -- approve --file ${shellQuote(path.basename(handoff.file))}`,
+          instruction: "Send this file to each required admin under its existing basename. From app/ethereum, each admin runs the short command with their own credentials, reviews the decoded calls and confirms the displayed approval ID. The Coordinator reconciles live execution afterward." };
+      }
+    }
+    report.nextAction = resolveNextAction(report, args, artifacts, context, environmentFile).nextAction;
     const reportFile = path.join(artifacts.directory, `report-${Date.now()}-${randomUUID()}.json`);
     writeJson(reportFile, report);
     writeJson(path.join(output, "latest.json"), { revision: context.revision, reportFile });
     console.log(JSON.stringify(terminalSummary(report, reportFile), null, 2));
     if (args.command === "verify" && report.status !== "READY_FOR_ACTIVATION_REVIEW" && report.status !== "DEPOSITS_ACTIVE_CANARY_REQUIRED") process.exitCode = 1;
-  } finally { fs.closeSync(handle); fs.unlinkSync(lock); }
+  } finally { releaseLock(); }
 }
 
-if (require.main === module) main().catch((error) => { console.error(redact(error.message)); process.exitCode = 1; });
-module.exports = { parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl, normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, recordedIssueIds, fetchLiveAdminVoteCounts, sourceState, checkImplementations, inspect, vote, activate, recordedVoteCounts, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary, main };
+if (require.main === module) main().then(() => {
+  // Timed-out read-only requests may still hold third-party sockets; never leave the CLI hanging.
+  process.exit(process.exitCode || 0);
+}).catch((error) => { console.error(redact(error.message)); process.exit(1); });
+module.exports = { expectedSourceDifferences, limitConcurrentFetches, expandDeploymentDraft, advanceNative, validateNativeReadiness, nativeOnlyEabVerified, infraStartRequired, fetchRolloutOAuthToken, nativeCoordinatorAction, nativeConfigurationFingerprint, nativeGovernanceCalls, nativeGovernanceProgress, nativeApprovalInspection, nativeHandoff, portableSnapshot, createApprovalRequest, decodeApprovalRequest, writeApprovalFile, readApprovalFile, approvalReview, validateApprovalCalls, runApproval, createServiceHandoff, groupSafeAction, withDeadline, acquireRolloutLock, parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl, normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, recordedIssueIds, fetchLiveAdminVoteCounts, sourceState, checkImplementations, inspect, vote, activate, recordedVoteCounts, approvedCallsCompleted, resolveNextAction, terminalSummary, preparationStage, main };

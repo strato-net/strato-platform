@@ -131,7 +131,7 @@ function buildRolloutTemplates({
     );
   }
   const network = getExternalBridgeNetwork(chainId);
-  const chainName = network.name;
+  const chainName = network.displayName || network.name;
   const sourceChainId = uint(settings.sourceChainId, "sourceChainId");
   if (BigInt(sourceChainId) === 0n) {
     throw new Error("sourceChainId must be positive");

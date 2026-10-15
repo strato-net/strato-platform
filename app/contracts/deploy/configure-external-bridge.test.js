@@ -253,6 +253,12 @@ test("verifies initialized bridge and TokenRouter state", () => {
   assert.deepEqual(compareInitialization(settings, state), []);
   state.bridge.settlementVerifierCount = "2";
   assert.match(compareInitialization(settings, state)[0], /count must be 3/);
+  const productionSettings = structuredClone(settings);
+  productionSettings.bridge.settlementVerifiers.push("d".repeat(40), "e".repeat(40));
+  state.bridge.settlementVerifierCount = "5";
+  state.settlementVerifiers.add("d".repeat(40));
+  state.settlementVerifiers.add("e".repeat(40));
+  assert.deepEqual(compareInitialization(productionSettings, state), []);
 });
 
 test("verifies chains, routes, and rebase policy independently of actions", () => {

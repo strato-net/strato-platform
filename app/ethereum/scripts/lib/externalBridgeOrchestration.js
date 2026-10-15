@@ -23,7 +23,8 @@ const shellQuote = (value) => {
 };
 const key = (token, chain, stratoToken) => `${address(token)}:${chain}:${address(stratoToken)}`;
 const rolloutCodeFiles = () => [
-  __filename, path.join(__dirname, "externalBridgeRolloutPlan.js"),
+  __filename, ...["rolloutRuntime", "rolloutGovernance", "rolloutEabInspection", "rolloutNativeInspection", "rolloutHandoff", "rolloutOutput"].map(name => path.join(__dirname, `${name}.js`)),
+  path.join(__dirname, "externalBridgeRolloutPlan.js"),
   path.join(__dirname, "externalBridgeVaultPlan.js"), path.join(__dirname, "depositRouterSafeOps.js"),
   path.join(__dirname, "externalBridgeArtifacts.js"), path.join(__dirname, "externalBridgeNetworks.js"),
   path.join(__dirname, "../externalBridgeRollout.js"),
@@ -432,6 +433,8 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
   const initialized = bool(init.tokenRouter.initialized) && bool(init.bridge.initialized);
   const order = (call) => {
     const method = call.call.args._func;
+    if (method === "setChain" && call.call.args._args[3].value === true) return 12;
+    if (method === "setDepositAction" && call.call.args._args[4].value === false) return 11;
     if (method === "initialize") {
       return address(call.call.args._target) === address(settings.tokenRouter.address) ? 1 : 3;
     }
@@ -446,7 +449,7 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
       setChain: 9,
       setRoute: 10,
       setRouteRebaseRequired: 11,
-      setDepositAction: 12,
+      setDepositAction: 13,
     }[method] || Number.MAX_SAFE_INTEGER;
   };
   const stageNames = {
@@ -460,32 +463,42 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
     8: "mint policy",
     9: "external chain configuration",
     10: "route configuration",
-    11: "route rebase configuration",
-    12: "deposit action configuration",
+    11: "route rebase and deposit action safety configuration",
+    12: "external chain activation",
+    13: "deposit action configuration",
   };
   for (const step of ["initialize", "routes", "actions"]) {
-    buildPlan(settings, step).forEach((call, index) => {
+    const plan = buildPlan(settings, step);
+    if (step === "routes") {
+      for (const call of plan.filter(call => call.args._func === "setChain")) call.args._args[3].value = false;
+    }
+    if (step === "actions") {
+      plan.unshift(...buildPlan(currentCursorSettings(settings, routes), "routes").filter(call =>
+        call.args._func === "setChain" && call.args._args[3].value === true));
+    }
+    plan.forEach((call, index) => {
       const method = call.args._func;
       const values = call.args._args.map(({ value }) => value);
       let complete = false;
       let blocked;
+      let blockCode;
       if (method === "initialize") {
         const router = address(call.args._target) === address(settings.tokenRouter.address);
         const actual = router ? init.tokenRouter : init.bridge;
         const fields = router ? ["poolFactory", "poolV3Factory", "directMintPsm", "metalForge", "saveUsdstVault"] : ["tokenFactory", "bridgeOperator", "guardian", "USDST_ADDRESS"];
         if (bool(actual.initialized)) {
           complete = fields.every((field, i) => address(actual[field]) === address(values[i]));
-          if (!complete) blocked = "Already initialized with different values; requires reviewed corrective governance, never reinitialization";
-        } else if (actual.initialized !== false && actual.initialized !== "false") blocked = "Initialization state is unknown";
+          if (!complete) { blocked = "Already initialized with different values; requires reviewed corrective governance, never reinitialization"; blockCode = "INITIALIZATION_CONFLICT"; }
+        } else if (actual.initialized !== false && actual.initialized !== "false") { blocked = "Initialization state is unknown"; blockCode = "STATE_UNAVAILABLE"; }
       } else if (method === "setYieldVault") {
         complete = init.approvedYieldVaults.has(address(values[0]));
-        if (!bool(init.tokenRouter.initialized)) blocked = "Wait for TokenRouter initialization quorum";
+        if (!bool(init.tokenRouter.initialized)) { blocked = "Wait for TokenRouter initialization quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
       } else if (method === "setPriceOracle" || method === "setTokenRouter") {
         complete = address(init.bridge[method === "setPriceOracle" ? "priceOracle" : "tokenRouter"]) === address(values[0]);
       } else if (method === "setSettlementVerifier") complete = init.settlementVerifiers.has(address(values[0]));
       else if (method === "setSettlementVerifierThreshold") {
         complete = String(init.bridge.settlementVerifierThreshold) === String(values[0]);
-        if (settings.bridge.settlementVerifiers.some((verifier) => !init.settlementVerifiers.has(address(verifier)))) blocked = "Wait for verifier registration quorum";
+        if (settings.bridge.settlementVerifiers.some((verifier) => !init.settlementVerifiers.has(address(verifier)))) { blocked = "Wait for verifier registration quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
       } else if (method === "setMintPolicy") {
         const actual = routes.mintPolicies?.get(address(values[0]));
         complete = !!actual && String(actual.capacity) === String(values[1]) && String(actual.refillRate) === String(values[2]);
@@ -494,50 +507,80 @@ function governanceProgress(settings, state, { stage = "initial", activationErro
       } else if (method === "setChain") {
         const actual = routes.chains.get(String(values[4]));
         if (actual) {
-          complete = actual.chainName === values[0] && address(actual.vault) === address(values[1]) &&
-            address(actual.depositRouter) === address(values[2]) && bool(actual.enabled) === values[3];
-          if (!complete) blocked = "Existing chain differs; reconcile separately to preserve its live cursor and pending operations";
+          const matching = actual.chainName === values[0] && address(actual.vault) === address(values[1]) &&
+            address(actual.depositRouter) === address(values[2]);
+          complete = matching && (values[3] === false || bool(actual.enabled));
+          if (!matching) { blocked = "Existing chain differs; reconcile separately to preserve its live cursor and pending operations"; blockCode = "CHAIN_CONFLICT"; }
           else if (BigInt(actual.lastProcessedBlock) < BigInt(values[5])) {
             complete = false;
             blocked = "Live cursor is behind configured start; reconcile instead of advancing it automatically";
+            blockCode = "CURSOR_CONFLICT";
           }
+        }
+        if (!complete && values[3] === true && !blocked) {
+          if (stage !== "activation") { blocked = "Chain enablement requires activation"; blockCode = "ACTIVATION_STAGE_REQUIRED"; }
+          else if (!activationErrors || activationErrors.length) { blocked = "Chain enablement requires activation readiness"; blockCode = "ACTIVATION_PREREQUISITES"; }
         }
       } else if (method === "setRoute") {
         const actual = routes.routes.get(key(values[0], values[1], values[2]));
         const fields = ["depositsEnabled", "withdrawalsEnabled", "externalDecimals", "externalName", "externalSymbol", "maxPerWithdrawal", "manualReviewThreshold"];
         complete = !!actual && fields.every((field, i) => String(actual[field]) === String(values[i + 3]));
-        if (!routes.chains.has(String(values[1]))) blocked = "Wait for chain configuration quorum";
+        if (!routes.chains.has(String(values[1]))) { blocked = "Wait for chain configuration quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
       } else if (method === "setRouteRebaseRequired") {
         const routeKey = key(values[0], values[1], values[2]);
-        complete = routes.routes.has(routeKey) && routes.rebaseRequired.has(routeKey) === values[3];
-        if (!routes.routes.has(routeKey)) blocked = "Wait for route configuration quorum";
+        complete = routes.rebaseRequired.has(routeKey) === values[3];
+        if (!routes.routes.has(routeKey)) { blocked = "Wait for route configuration quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
       } else if (method === "setDepositAction") {
         const config = actions.actionConfigs.get(key(values[0], values[1], values[2])) || {};
         complete = bool(config.autoRoute) === bool(values[4]);
         if (!complete && bool(values[4])) {
-          if (stage !== "activation") blocked = "Regenerate policy artifacts with --stage activation";
-          else if (!activationErrors || activationErrors.length) blocked = "Activation prerequisites and pre-enable verify-actions must pass";
+          if (stage !== "activation") { blocked = "Regenerate policy artifacts with --stage activation"; blockCode = "ACTIVATION_STAGE_REQUIRED"; }
+          else if (!activationErrors || activationErrors.length) { blocked = "Activation prerequisites and pre-enable verify-actions must pass"; blockCode = "ACTIVATION_PREREQUISITES"; }
         }
-      } else blocked = `Unsupported governance method ${method}`;
-      if (step !== "initialize" && !initialized) blocked = "Wait for both initializations";
-      if (step === "routes" && method !== "addWhitelist" && permissionErrors.length) blocked = "Wait for token permission quorum";
-      if (step === "initialize" && !["initialize", "setYieldVault"].includes(method) && !bool(init.bridge.initialized)) blocked = "Wait for ExternalAssetBridge initialization quorum";
+      } else { blocked = `Unsupported governance method ${method}`; blockCode = "UNSUPPORTED_METHOD"; }
+      if (step !== "initialize" && !initialized && (!blocked || blockCode === "WAIT_FOR_GOVERNANCE")) { blocked = "Wait for both initializations"; blockCode = "WAIT_FOR_GOVERNANCE"; }
+      if (step === "routes" && method !== "addWhitelist" && permissionErrors.length && (!blocked || blockCode === "WAIT_FOR_GOVERNANCE")) { blocked = "Wait for token permission quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
+      if (step === "initialize" && !["initialize", "setYieldVault"].includes(method) && !bool(init.bridge.initialized) && (!blocked || blockCode === "WAIT_FOR_GOVERNANCE")) { blocked = "Wait for ExternalAssetBridge initialization quorum"; blockCode = "WAIT_FOR_GOVERNANCE"; }
       calls.push({ id: digest(call), step, callNumber: index + 1, call,
-        status: complete ? "COMPLETE" : blocked ? "BLOCKED" : "READY", reason: complete ? undefined : blocked });
+        status: complete ? "COMPLETE" : blocked ? "BLOCKED" : "READY", reason: complete ? undefined : blocked, reasonCode: complete ? undefined : blockCode });
     });
   }
   for (const item of calls) {
     item.deploymentStage = order(item);
     item.deploymentStageName = stageNames[item.deploymentStage];
   }
+  for (const item of calls) item.dependencies = calls.filter(parent => parent.status !== "COMPLETE" &&
+    parent.deploymentStage < item.deploymentStage).map(({ id }) => id);
   const earliestIncompleteStage = Math.min(...calls.filter(({ status }) => status !== "COMPLETE").map(order));
   for (const item of calls) {
     if (item.status === "READY" && order(item) > earliestIncompleteStage) {
       item.status = "BLOCKED";
       item.reason = `Wait for ${stageNames[earliestIncompleteStage]} quorum`;
+      item.reasonCode = "WAIT_FOR_GOVERNANCE";
     }
   }
   return calls;
+}
+
+function isDependencyPending(item) {
+  return item.status === "BLOCKED" && item.reasonCode === "WAIT_FOR_GOVERNANCE" && item.dependencies?.length > 0;
+}
+
+function isActivationCall(item) {
+  return (item.call.args._func === "setChain" && item.call.args._args[3]?.value === true) ||
+    (item.call.args._func === "setDepositAction" && item.call.args._args[4]?.value === true);
+}
+
+function governanceBatch(report) {
+  const calls = report.calls || [];
+  const isActivation = isActivationCall;
+  const configuration = calls.filter(item => !isActivation(item) && item.status !== "COMPLETE");
+  const phase = report.nativeMode ? (report.nativeMode === "activate" ? "activation" : "configuration")
+    : configuration.length ? "configuration" : "activation";
+  const pending = calls.filter(item => item.status !== "COMPLETE" &&
+    (report.nativeMode || (phase === "configuration" ? !isActivation(item) : isActivation(item))));
+  const blocked = pending.some(item => item.status !== "READY" && !isDependencyPending(item));
+  return { phase, calls: blocked ? [] : pending.sort((a, b) => (a.deploymentStage || 0) - (b.deploymentStage || 0)) };
 }
 
 function currentCursorSettings(settings, routes) {
@@ -549,4 +592,4 @@ function currentCursorSettings(settings, routes) {
 }
 
 module.exports = { CONTRACTS, digest, readJson, writeJson, address, bool, initializeManifest, createPortableBundle, loadManifest,
-  generate, governanceProgress, currentCursorSettings, loadConfig, shellQuote };
+  generate, governanceProgress, governanceBatch, isActivationCall, isDependencyPending, currentCursorSettings, loadConfig, shellQuote };

@@ -174,14 +174,22 @@ NONE -> INITIATED
 
 ### Step 3: Deposit Is Confirmed or Reviewed
 
-If verification passes, the relayer calls `confirmDeposit(...)`.
+Each configured settlement verifier independently validates the external
+redemption and calls `attestDepositSettlement(depositId)`. After the configured
+verifier threshold is reached, the relayer calls `confirmDeposit(...)`.
 
 STRATO contract behavior:
 
 - Allows confirmation from `INITIATED` or `PENDING_REVIEW`.
+- Requires at least two settlement-verifier attestations and the configured
+  `settlementVerifierThreshold`.
 - Calls `StratoNativeCustodyVault.unlock(stratoToken, stratoRecipient, amount)`.
 - Sets deposit status to `COMPLETED`.
 - Emits `NativeDepositCompleted`.
+
+If verifier quorum is unavailable or the external evidence does not match the
+stored deposit, confirmation does not unlock custody and the deposit remains in
+its current state.
 
 State transition:
 
@@ -366,11 +374,12 @@ Custody state:
 
 ### Withdrawal Abort Path
 
-`abortWithdrawal(id)` can unlock funds back to the STRATO sender.
+`abortWithdrawal(id)` can unlock funds back to the STRATO sender only while the
+withdrawal is still `INITIATED`.
 
 Operator or whitelisted abort:
 
-- Allowed from `INITIATED` or `PENDING_REVIEW`.
+- Allowed only from `INITIATED`.
 - Not allowed after `externalTxHash` is set.
 
 User abort:
@@ -389,7 +398,6 @@ State transition:
 
 ```text
 INITIATED -> ABORTED
-PENDING_REVIEW -> ABORTED
 ```
 
 Custody state:
@@ -399,6 +407,29 @@ vault balance decreases
 lockedBalance[stratoToken] decreases
 user balance increases
 ```
+
+### Pending Withdrawal Cancellation Path
+
+A `PENDING_REVIEW` withdrawal cannot be directly aborted. Governance calls
+`requestWithdrawalCancellation(id)`, or the original sender calls
+`requestUserWithdrawalCancellation(id)` after `WITHDRAWAL_ABORT_DELAY`.
+
+The bridge operator then records external cancellation evidence. Settlement
+verifiers independently validate that evidence and call
+`attestWithdrawalCancellation(id, cancellationTxHash)`. After verifier quorum,
+`refundCanceledWithdrawal(id, cancellationTxHash)` returns the escrow.
+
+State transitions:
+
+```text
+PENDING_REVIEW -> CANCELLATION_PENDING
+CANCELLATION_PENDING -> ABORTED     verified cancellation wins
+CANCELLATION_PENDING -> COMPLETED   external mint wins
+```
+
+The refund requires matching recorded cancellation evidence, no recorded
+external execution transaction, and the configured settlement-verifier quorum.
+The custody vault must be unpaused for the refund transfer.
 
 ## State Transition Summary
 
@@ -432,6 +463,7 @@ PENDING_REVIEW -> ABORTED
 NONE
   -> INITIATED        requestWithdrawal
   -> PENDING_REVIEW   markWithdrawalPending
+  -> CANCELLATION_PENDING requestWithdrawalCancellation / requestUserWithdrawalCancellation
   -> COMPLETED        finalizeWithdrawal
   -> ABORTED          abortWithdrawal
 ```
@@ -446,6 +478,8 @@ Completion is atomic:
 
 ```text
 PENDING_REVIEW -> COMPLETED        finalizeWithdrawal(id, externalTxHash, nativeMintProposalHash)
+CANCELLATION_PENDING -> COMPLETED   finalizeWithdrawal(id, externalTxHash, nativeMintProposalHash)
+CANCELLATION_PENDING -> ABORTED     refundCanceledWithdrawal(id, cancellationTxHash)
 ```
 
 ## Security-Relevant Invariants
@@ -462,9 +496,10 @@ PENDING_REVIEW -> COMPLETED        finalizeWithdrawal(id, externalTxHash, native
 - `nativeMintNotBefore` delays instant-lane destination mint eligibility.
 - Manual lane withdrawals are not automatically executed by the STRATO contract.
 - Withdrawals cannot be aborted after destination execution has been recorded.
+- Native deposit custody release requires the configured STRATO settlement-verifier quorum.
 - External minting requires valid EIP-712 attestations from configured attestation signers.
 - Pauses exist independently for STRATO deposits, STRATO withdrawals, vault custody operations, external mints, and external redemptions.
 - User abort after delay is available only before the withdrawal is moved out of `INITIATED`.
-- Operator/whitelisted abort can handle pending review cases.
+- Pending withdrawals require verified external cancellation before escrow is refunded.
 
 

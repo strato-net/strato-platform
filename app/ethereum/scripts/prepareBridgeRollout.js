@@ -430,7 +430,7 @@ function writeNativeOutputs(directory, routes, baseline) {
   writeJson(path.join(directory, "native.json"), baseline);
 }
 
-async function main(argv) {
+async function main(argv, options = {}) {
   require("dotenv").config({ quiet: true });
   require("dotenv").config({ path: path.resolve(__dirname, "../../contracts/.env"), quiet: true, override: false });
   if (argv[0] === "--discover") {
@@ -441,12 +441,12 @@ async function main(argv) {
     }
     if (!args["--output-dir"]) throw new Error("--output-dir is required");
     if (fs.existsSync(args["--output-dir"])) throw new Error("Output directory exists");
-    const result = await discover(args["--node-url"], args["--chain-id"], await getReadToken(), fetch, {
+    const result = await discover(args["--node-url"], args["--chain-id"], options.token || await getReadToken(), options.fetchImpl || fetch, {
       eab: args["--eab-address"], native: args["--native-address"], sourceChainId: args["--source-chain-id"],
     });
     writeJson(path.join(args["--output-dir"], "prepare.json"), result.config);
     writeJson(path.join(args["--output-dir"], "discovery.json"), { candidates: result.candidates, missing: result.missing });
-    console.log(`Discovered ${result.config.eabRoutes.length} EAB and ${result.config.nativeRoutes.length} native routes. Select include:true for intended routes; ${result.missing.length} contract selections unresolved.`);
+    if (!options.quiet) console.log(`Discovered ${result.config.eabRoutes.length} EAB and ${result.config.nativeRoutes.length} native routes. Select include:true for intended routes; ${result.missing.length} contract selections unresolved.`);
     return;
   }
   if (argv.length !== 4 || argv[0] !== "--config" || argv[2] !== "--output-dir") throw new Error("Usage: --config FILE --output-dir NEW_DIRECTORY");
@@ -456,7 +456,7 @@ async function main(argv) {
   applyDeploymentArtifacts(input, argv[1]);
   const directory = path.resolve(argv[3]);
   if (fs.existsSync(directory)) throw new Error("Output directory exists; use a new directory to preserve reviewed inputs");
-  const state = await snapshot(input, await getReadToken());
+  const state = await snapshot(input, options.token || await getReadToken(), options.fetchImpl || fetch);
   await readTargetTokenMetadata(input);
   const external = await readExternal(input, state);
   const output = prepare(input, state, external);
@@ -478,7 +478,7 @@ async function main(argv) {
   writeJson(path.join(directory, "deposit-plan.json"), output.depositPlan);
   writeNativeOutputs(directory, output.native, nativeBaseline);
   writeJson(path.join(directory, "review-required.json"), output.unresolved);
-  console.log(`Prepared current-network inputs. ${output.unresolved.length} unresolved fields; no transactions submitted.`);
+  if (!options.quiet) console.log(`Prepared current-network inputs. ${output.unresolved.length} unresolved fields; no transactions submitted.`);
 }
 if (require.main === module) main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
 module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken, writeNativeOutputs, main };

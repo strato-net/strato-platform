@@ -11,8 +11,10 @@ const {
 const {
   parseArgs, loadRolloutEnvironment, redact, validateSafeRuntimeIdentities, resolveSourceToken, stratoApiUrl,
   normalizeStratoRequestUrl, fetchAdminVotingPolicy, requiredAdminVotes, fetchLiveAdminVoteCounts,
-  vote, activate, inspect, approvedCallsCompleted, nativeDeploymentSteps, operatorGuidance, terminalSummary, main,
+  vote, activate, inspect, approvedCallsCompleted, resolveNextAction, terminalSummary, main,
 } = require("../scripts/externalBridgeRollout");
+const progressDetails = (...args) => resolveNextAction(...args).progress;
+const formatAction = (report, file) => terminalSummary({ ...report, nextAction: resolveNextAction(report).nextAction }, file);
 const { NETWORKS } = require("../scripts/lib/externalBridgeNetworks");
 const { verifyUninitializedProxy } = require("../../contracts/deploy/external-bridge-verification");
 
@@ -195,9 +197,6 @@ test("a relocated single bundle recreates native inputs, policies and runtime bi
   const runtime = fs.readFileSync(artifacts.serviceTemplates[0], "utf8");
   assert.match(runtime, /STRATO_NATIVE_BRIDGE_ADDRESS=999/);
   assert.match(runtime, /NATIVE_MINT_EXECUTOR_ADDRESS=0x222/);
-  const guidance = nativeDeploymentSteps(context, { manifest: bundle }, artifacts);
-  assert(guidance[0].run.includes(shellQuote(artifacts.nativeRoutesPath)));
-  assert(guidance[1].run.includes(shellQuote(artifacts.nativeConfigPath)));
   assert.deepEqual(generate(context, path.join(f.directory, "handoff", ".deployment")).hashes, artifacts.hashes);
 });
 
@@ -220,22 +219,18 @@ test("native bundle bindings fail closed and incomplete native source files are 
   assert.throws(() => loadManifest(f.manifestPath), /native-routes.json and native.json/);
 });
 
-test("Infra regenerates provisioning files from one package but cannot use it for activation", (t) => {
+test("initial configuration snapshots generate Infra files but cannot authorize activation", (t) => {
   const f = fixture(t);
-  const bundle = path.join(f.directory, "handoff", "deployment-bundle.json");
-  createPortableBundle(f.manifestPath, bundle, "initial");
-  assert.throws(() => loadManifest(bundle, "activation"), /Provisioning bundles/);
-  assert.throws(() => parseArgs(["join", "--role", "admin-1", "--bundle", bundle]), /Only Infra/);
-  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
-  const joined = spawnSync(process.execPath, [script, "join", "--role", "infra", "--bundle", bundle], { encoding: "utf8" });
-  assert.equal(joined.status, 0, joined.stderr);
-  const profile = readJson(path.join(f.directory, "handoff", ".deployment", "infra.json"));
-  assert.equal(profile.stage, "initial");
-  const services = readJson(path.join(profile.outputDir, "services.json"));
-  assert.equal(services.verifierPolicies.length, 3);
-  assert(fs.existsSync(services.runtimeTemplate));
-  assert.throws(() => parseArgs(["vote", "--config", path.join(f.directory, "handoff", ".deployment", "infra.json"), "--approve", "a".repeat(64)]), /Infra cannot/);
-  assert.equal(services.nativeConfig, undefined);
+  const { portableSnapshot } = require("../scripts/externalBridgeRollout");
+  const directory = path.join(f.directory, "initial");
+  const snapshot = portableSnapshot(f.manifestPath, directory, "initial");
+  assert.equal(snapshot.bundlePurpose, "provisioning");
+  const file = path.join(directory, "configuration.snapshot.json");
+  assert.throws(() => loadManifest(file, "activation"), /Provisioning bundles/);
+  const artifacts = generate(loadManifest(file, "initial"), path.join(f.directory, "infra"));
+  assert.equal(artifacts.verifierPolicyPaths.length, 3);
+  assert.equal(artifacts.nativeConfigPath, undefined);
+  assert.equal(artifacts.serviceTemplates.length, 4);
 });
 
 test("init imports existing settings without overwriting and plan never emits activation", (t) => {
@@ -260,8 +255,7 @@ test("init can expand a draft manifest in place without settings.json", (t) => {
   initializeManifest(draft, undefined, draft);
   assert.equal(readJson(draft).schemaVersion, 1);
   assert.throws(() => initializeManifest(draft, undefined, draft), /already initialized/);
-  assert.equal(parseArgs(["status", "--manifest", draft]).command, "status");
-  assert.equal(parseArgs(["next", "--manifest", draft]).command, "next");
+  assert.equal(parseArgs(["continue", "--manifest", draft]).command, "continue");
 });
 
 test("init creates the only operator-managed manifest when it is missing", (t) => {
@@ -419,153 +413,30 @@ test("governance exposes only the earliest incomplete deployment stage", (t) => 
   assert.equal(calls.find(({ status }) => status === "READY").call.args._target, f.config.bridge.address);
 });
 
-test("operator guidance identifies first and second administrator vote state", (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-guidance-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const directory = path.join(root, "revision");
-  fs.mkdirSync(directory);
-  const artifacts = { directory };
-  const args = { manifest: "/secure/manifest.json", "output-dir": "/secure/output", stage: "activation" };
-  const report = {
-    approvalHash: "a".repeat(64),
-    safe: { executionOrder: [{ step: "pause-router", path: "/secure/router-pause.json", status: "PENDING" }] },
-    calls: [{
-      id: "call-id",
-      status: "READY",
-      requiredAdminVotes: 2,
-      deploymentStage: 6,
-      deploymentStageName: "settlement verifier threshold",
-      call: { args: { _func: "setSettlementVerifierThreshold" } },
-    }],
-  };
-  let guidance = operatorGuidance(report, args, artifacts);
-  assert.equal(guidance.safeAction.step, "pause-router");
-  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
-    status: "ACTION_REQUIRED",
-    action: "EXECUTE_SAFE_TRANSACTION",
-    step: "pause-router",
-    file: "/secure/router-pause.json",
-    then: "Run status again after the Safe transaction executes.",
-    details: "/secure/report.json",
-  });
-  report.safe.executionOrder[0].status = "DONE";
-  guidance = operatorGuidance(report, args, artifacts);
-  assert.equal(guidance.currentStage, "6/12: settlement verifier threshold");
-  assert.deepEqual(guidance.readyMethods, [{ method: "setSettlementVerifierThreshold", count: 1 }]);
+test("Coordinator guidance uses live quorum and emits only the current continuation command", (t) => {
+  const f = fixture(t);
+  const args = { manifest: f.manifestPath, stage: "activation", "env-file": "/private/coordinator.env" };
+  const report = { approvalHash: "a".repeat(64), calls: [{ id: "call", status: "READY", requiredAdminVotes: 2,
+    recordedAdminVotes: 0, deploymentStage: 6, deploymentStageName: "settlement verifier threshold",
+    call: { args: { _func: "setSettlementVerifierThreshold" } } }], safe: { executionOrder: [] } };
+  let guidance = progressDetails(report, args, f.artifacts);
   assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED");
-  assert.equal(guidance.safeChecklist[0].step, "pause-router");
-  assert.match(guidance.voteCommand, /external:rollout -- vote/);
-  assert.match(guidance.voteCommand, new RegExp(report.approvalHash));
-  assert.equal(guidance.adminHandoffCommand, guidance.voteCommand);
-  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
-    status: "ACTION_REQUIRED",
-    step: "6/12: settlement verifier threshold",
-    action: "ADMIN_1_VOTE",
-    progress: "0/2 admin votes recorded",
-    run: guidance.adminHandoffCommand,
-    then: "Run status again. It will tell Admin 2 to vote.",
-    details: "/secure/report.json",
-  });
-  assert.deepEqual(terminalSummary({
-    operator: guidance,
-    submittedVotes: [{ id: "call-id" }],
-    voteOutcome: "AWAITING_ANOTHER_ADMIN",
-  }, "/secure/report.json"), {
-    status: "HANDOFF_REQUIRED",
-    action: "ADMIN_2_VOTE",
-    run: guidance.adminHandoffCommand,
-    then: "The coordinator runs status after Admin 2 votes.",
-    details: "/secure/report.json",
-  });
-  const secondAdminSummary = terminalSummary({
-    operator: guidance,
-    submittedVotes: [{ id: "call-id" }],
-    voterAdmin: "2",
-    voteOutcome: "AWAITING_ANOTHER_ADMIN",
-  }, "/secure/report.json");
-  assert.equal(secondAdminSummary.action, "COORDINATOR_RUN_STATUS");
-  assert.equal(secondAdminSummary.run, "npm run external:rollout -- status");
-  writeJson(path.join(directory, `votes-${"1".repeat(40)}.json`),
-    { "call-id": { status: "VOTED" } });
-  guidance = operatorGuidance(report, args, artifacts);
-  assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED", "historical journals cannot override current lifecycle counts");
-  report.calls[0].recordedAdminVotes = 1;
-  guidance = operatorGuidance(report, args, artifacts);
-  assert.equal(guidance.voteState, "WAITING_ON_SECOND_ADMIN");
-  assert.match(guidance.action, /waiting on the second administrator/);
-  writeJson(path.join(directory, `votes-${"2".repeat(40)}.json`),
-    { "call-id": { status: "VOTED" } });
-  report.calls[0].recordedAdminVotes = 2;
-  guidance = operatorGuidance(report, args, artifacts);
-  assert.equal(guidance.voteState, "WAITING_FOR_EXECUTION");
+  assert.equal(guidance.approvalRequired, true);
+  assert.match(guidance.resumeCommand, /external:rollout -- continue --manifest/);
+  assert.match(guidance.resumeCommand, /--env-file '\/private\/coordinator.env'/);
   assert.equal(guidance.voteCommand, undefined);
-  guidance = operatorGuidance({
-    status: "READY_FOR_ACTIVATION_REVIEW",
-    approvalHash: "b".repeat(64),
-    calls: [],
-    safe: { executionOrder: [] },
-  }, args, artifacts);
-  assert.equal(guidance.activateCommand,
-    `npm run external:rollout -- activate --manifest '/secure/manifest.json' --output-dir '/secure/output' --stage activation --approve ${"b".repeat(64)}`);
-  assert.equal(terminalSummary({ operator: guidance }, "/secure/report.json").action,
-    "COORDINATOR_GENERATE_ACTIVATION_TRANSACTION");
-  guidance = operatorGuidance({ operationError: "Approval is stale; review a fresh resume report" }, args, artifacts);
-  assert.deepEqual(terminalSummary({ status: "APPROVAL_INVALIDATED", operator: guidance }, "/secure/report.json"), {
-    status: "APPROVAL_INVALIDATED",
-    action: "RERUN_STATUS",
-    run: "npm run external:rollout -- status --manifest '/secure/manifest.json' --output-dir '/secure/output' --stage activation",
-    then: "Review live state before submitting any further transaction.",
-    details: "/secure/report.json",
-  });
-  writeJson(path.join(directory, "report-prior.json"), {
-    approvalHash: "c".repeat(64),
-    calls: [{ id: "completed-call", status: "READY" }],
-  });
-  assert.equal(approvedCallsCompleted(
-    artifacts,
-    "c".repeat(64),
-    [{ id: "completed-call", status: "COMPLETE" }],
-  ), true);
-  guidance = operatorGuidance({ previousStageCompleted: true }, args, artifacts);
-  assert.equal(terminalSummary({ status: "STAGE_EXECUTED", operator: guidance }, "/secure/report.json").status,
-    "STAGE_EXECUTED");
-});
-
-test("combined rollout guidance emits ordered native and service steps", (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "combined-rollout-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const prepared = path.join(root, "prepared");
-  fs.mkdirSync(prepared);
-  writeJson(path.join(prepared, "native-routes.json"), [{}, {}]);
-  writeJson(path.join(prepared, "native.json"), {});
-  const steps = nativeDeploymentSteps({
-    manifest: { settings: { depositPlan: path.join(prepared, "deposit-plan.json") } },
-  }, { manifest: path.join(root, "deployment-manifest.json") });
-  assert.equal(steps.length, 5);
-  assert.match(steps[0].run, /--route 0 --enabled false --auto-route-enabled false$/);
-  assert.match(steps[1].run, /--route 1 --enabled false --auto-route-enabled false$/);
-  assert.equal(steps[2].action, "GENERATE_NATIVE_SAFE_CONFIGURATION");
-  assert.equal(steps[3].action, "VERIFY_NATIVE_SAFE_CONFIGURATION");
-  assert.match(steps[3].run, /--stage configure$/);
-  assert.doesNotMatch(steps[3].run, /--output/);
-  assert.equal(steps[4].action, "DEPLOY_VERIFIERS_AND_RUNTIME");
-});
-
-test("EAB-only rollout guidance omits native configuration and retains service deployment", (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "eab-only-rollout-"));
-  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const prepared = path.join(root, "prepared");
-  fs.mkdirSync(prepared);
-  const context = {
-    manifest: { settings: { depositPlan: path.join(prepared, "deposit-plan.json") } },
-  };
-  const args = { manifest: path.join(root, "deployment-manifest.json") };
-  assert.deepEqual(nativeDeploymentSteps(context, args).map(({ action }) => action),
-    ["DEPLOY_VERIFIERS_AND_RUNTIME"]);
-  writeJson(path.join(prepared, "native-routes.json"), []);
-  writeJson(path.join(prepared, "native.json"), {});
-  assert.deepEqual(nativeDeploymentSteps(context, args).map(({ action }) => action),
-    ["DEPLOY_VERIFIERS_AND_RUNTIME"]);
+  assert.equal(guidance.adminHandoffCommand, undefined);
+  report.calls[0].recordedAdminVotes = 1;
+  guidance = progressDetails(report, args, f.artifacts);
+  assert.equal(guidance.voteState, "WAITING_ON_SECOND_ADMIN");
+  report.calls[0].recordedAdminVotes = 2;
+  guidance = progressDetails(report, args, f.artifacts);
+  assert.equal(guidance.voteState, "WAITING_FOR_EXECUTION");
+  assert.equal(guidance.approvalRequired, false);
+  assert.equal(formatAction({ operator: guidance }, "report.json").status, "WAITING");
+  guidance = progressDetails({ status: "READY_FOR_ACTIVATION_REVIEW", calls: [], safe: { executionOrder: [] } }, args, f.artifacts);
+  assert.equal(guidance.activateCommand, undefined);
+  assert.match(guidance.resumeCommand, /continue/);
 });
 
 test("rollout automatically loads deployment.env beside the manifest", (t) => {
@@ -598,86 +469,28 @@ test("unknown initialization state never authorizes initialize", (t) => {
   assert.equal(call.status, "BLOCKED");
 });
 
-test("commands reject implicit mutations, invalid options and missing approval", () => {
+test("CLI accepts current handoffs and rejects removed profiles, bundles and mutations", () => {
   assert.equal(parseArgs(["--manifest", "file"]).command, "plan");
-  assert.throws(() => parseArgs(["vote", "--manifest", "file"]), /Explicit/);
-  assert.throws(() => parseArgs(["plan", "--manifest", "file", "--execute", "yes"]), /Invalid/);
-  assert.throws(() => parseArgs(["liquidity", "--manifest", "file"]), /Use/);
-});
-
-test("one-time admin config supplies portable rollout arguments", (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-admin-config-"));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const config = path.join(directory, "admin.json");
-  const manifest = path.join(directory, "deployment-bundle.json");
-  fs.writeFileSync(manifest, "{}\n");
-  writeJson(config, {
-    role: "admin-1",
-    manifest,
-    manifestSha256: digest("{}\n"),
-    outputDir: path.join(directory, "generated"),
-    stage: "activation",
-    environmentFile: path.join(directory, "admin.env"),
-  });
-  assert.deepEqual(parseArgs(["status", "--config", config]), {
-    command: "status",
-    config,
-    manifest: path.join(directory, "deployment-bundle.json"),
-    "output-dir": path.join(directory, "generated"),
-    stage: "activation",
-    "env-file": path.join(directory, "admin.env"),
-    role: "admin-1",
-    admin: "1",
-  });
-  const previous = process.env.EAB_ROLLOUT_CONFIG;
-  process.env.EAB_ROLLOUT_CONFIG = config;
-  t.after(() => previous === undefined
-    ? delete process.env.EAB_ROLLOUT_CONFIG : process.env.EAB_ROLLOUT_CONFIG = previous);
-  assert.equal(parseArgs(["status"]).config, config);
-  fs.writeFileSync(manifest, '{"changed":true}\n');
-  assert.throws(() => parseArgs(["status", "--config", config]), /bundle changed/);
-});
-
-test("setup supports each deployment persona", () => {
-  const args = parseArgs(["setup", "--role", "coordinator", "--config", "/secure/coordinator.json",
-    "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]);
-  assert.equal(args.command, "setup");
-  assert.equal(args.role, "coordinator");
-  assert.equal(args.config, "/secure/coordinator.json");
-  assert.equal(args.admin, undefined);
-  for (const role of ["admin-1", "admin-2", "infra"]) {
-    assert.equal(parseArgs(["setup", "--role", role, "--config", `/secure/${role}.json`,
-      "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]).role, role);
+  assert.deepEqual(parseArgs(["prepare", "--manifest", "file"]), { command: "prepare", manifest: "file", stage: "activation" });
+  assert.equal(parseArgs(["prepare", "--manifest", "file", "--stage", "initial"]).stage, "initial");
+  assert.deepEqual(parseArgs(["approve", "--file", "approval.json"]), { command: "approve", file: "approval.json" });
+  assert.throws(() => parseArgs(["approve", "--request", "packet"]), /Legacy approval requires/);
+  assert.throws(() => parseArgs(["approve", "--file", "approval.json", "--request", "packet"]), /one current --file/);
+  for (const command of ["setup", "join", "bundle", "vote", "activate", "native-handoff", "status", "resume", "next"]) {
+    assert.throws(() => parseArgs([command, "--manifest", "file"]), /Use init/);
   }
-  assert.throws(() => parseArgs(["setup", "--role", "unknown", "--config", "/secure/config.json",
-    "--manifest", "/secure/bundle.json", "--output-dir", "/secure/generated"]), /setup requires --role/);
-  assert.deepEqual(parseArgs(["prepare", "--manifest", "/secure/manifest.json"]), {
-    command: "prepare",
-    manifest: "/secure/manifest.json",
-    stage: "activation",
-  });
-  assert.equal(parseArgs(["prepare", "--manifest", "/secure/manifest.json", "--stage", "initial"]).stage, "initial");
-  assert.deepEqual(parseArgs(["join", "--role", "admin-1",
-    "--bundle", "/secure/deployment-bundle.json"]), {
-    command: "join",
-    role: "admin-1",
-    bundle: "/secure/deployment-bundle.json",
-    manifest: "/secure/deployment-bundle.json",
-    config: "/secure/.deployment/admin-1.json",
-    "output-dir": "/secure/.deployment/admin-1",
-    stage: "activation",
-  });
-  assert.deepEqual(terminalSummary({
-    status: "OFFLINE_PLAN_INCOMPLETE",
-    next: "Resolve REVIEW_REQUIRED values.",
-    review: { mechanicalChecks: { unresolvedReviewValues: "FAILED" } },
-  }, "/secure/report.json"), {
-    status: "OFFLINE_PLAN_INCOMPLETE",
-    action: "RESOLVE_REVIEW_REQUIRED",
-    then: "Resolve REVIEW_REQUIRED values.",
-    review: { mechanicalChecks: { unresolvedReviewValues: "FAILED" } },
-    details: "/secure/report.json",
-  });
+  for (const flag of ["config", "bundle", "execute", "role"]) {
+    assert.throws(() => parseArgs(["prepare", "--manifest", "file", `--${flag}`, "value"]), /Invalid/);
+  }
+  const previous = process.env.EAB_ROLLOUT_CONFIG;
+  process.env.EAB_ROLLOUT_CONFIG = "/obsolete/profile.json";
+  try {
+    assert.throws(() => parseArgs(["continue"]), /--manifest is required/);
+    assert.equal(parseArgs(["continue", "--manifest", "file"]).manifest, "file");
+  } finally {
+    if (previous === undefined) delete process.env.EAB_ROLLOUT_CONFIG;
+    else process.env.EAB_ROLLOUT_CONFIG = previous;
+  }
 });
 
 test("every supported network enforces its Safe and KMS identity gate", () => {
@@ -801,14 +614,14 @@ test("unavailable live vote counts do not produce first-admin vote guidance", ()
       call: { args: { _func: "setSettlementVerifierThreshold" } },
     }],
   };
-  const guidance = operatorGuidance(report, args, { directory: "/secure/missing" });
+  const guidance = progressDetails(report, args, { directory: "/secure/missing" });
   assert.equal(guidance.voteState, "LIVE_ADMIN_VOTES_UNAVAILABLE");
   assert.equal(guidance.voteCommand, undefined);
   assert.equal(guidance.adminHandoffCommand, undefined);
   assert.match(guidance.action, /Do not infer zero votes/);
-  assert.deepEqual(terminalSummary({ operator: guidance }, "/secure/report.json"), {
+  assert.deepEqual(formatAction({ operator: guidance }, "/secure/report.json"), {
     status: "WAITING",
-    step: "6/12: settlement verifier threshold",
+    step: "Configuration",
     action: "LIVE_ADMIN_VOTES_UNAVAILABLE",
     then: guidance.action,
     run: guidance.resumeCommand,
@@ -865,43 +678,25 @@ test("process CLI offline plan works and refuses a concurrent run", (t) => {
   assert.deepEqual(report.review.routes[0].notes, []);
   assert.equal(report.review.mechanicalChecks.unresolvedReviewValues, "PASSED");
   assert.equal(report.review.mechanicalChecks.verifierPolicyHashes.length, 3);
-  assert.deepEqual(report.nextSteps.map(({ action }) => action), [
-    "REVIEW_POLICY_SUMMARY",
-    "CREATE_PORTABLE_BUNDLE",
-    "DISTRIBUTE_AND_VERIFY_BUNDLE",
-    "SETUP_COORDINATOR_PROFILE",
-    "RUN_LIVE_RECONCILIATION",
-  ]);
-  assert.match(report.nextSteps[1].run, /external:rollout -- bundle/);
-  assert.match(report.nextSteps[3].run, /external:rollout -- setup --role coordinator/);
-  assert.equal(report.nextSteps[4].run, "npm run external:rollout -- status");
-  assert.equal(report.operator.resumeCommand, undefined);
-  const setup = spawnSync(process.execPath, [script, "setup", "--role", "coordinator",
-    "--config", path.join(f.directory, ".deployment", "coordinator.json"), "--manifest", f.manifestPath,
-    "--output-dir", path.join(f.directory, "output"), "--stage", "initial"], { encoding: "utf8" });
-  assert.equal(setup.status, 0, setup.stderr);
-  assert.match(setup.stdout, /"action": "Export this persona's rollout profile."/);
-  assert.match(setup.stdout, /"nextRun": "npm run external:rollout -- continue"/);
+  assert.equal(report.nextSteps, undefined);
+  assert.doesNotMatch(JSON.stringify(report), /external:rollout -- (join|setup|bundle|vote|activate)\b/);
   const preparedOutput = path.join(f.directory, "prepared");
   const prepared = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
     "--output-dir", preparedOutput], { encoding: "utf8" });
   assert.equal(prepared.status, 0, prepared.stderr);
   assert.match(prepared.stdout, /"status": "PREPARED_FOR_REVIEW"/);
-  assert.match(prepared.stdout, /"action": "APPROVE_POLICY_SUMMARY"/);
-  assert.match(prepared.stdout, /external:rollout -- join --role admin-1/);
-  const bundlePath = path.join(f.directory, "deployment-bundle.json");
-  assert.equal(fs.existsSync(bundlePath), true);
-  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), true);
-  assert.equal(readJson(path.join(f.directory, ".deployment", "coordinator.json")).environmentFile, undefined);
+  const summary = JSON.parse(prepared.stdout.slice(prepared.stdout.indexOf("{\n")));
+  assert.equal(summary.action, "REVIEW_CONFIGURATION");
+  assert.match(summary.resume, /continue --manifest/);
+  assert.equal(summary.adminJoin, undefined);
+  assert.equal(fs.existsSync(summary.infra.file), true);
+  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), false);
+  const saved = readJson(summary.details);
+  assert.equal(saved.review.mechanicalChecks.unresolvedReviewValues, "PASSED");
   const preparedAgain = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
     "--output-dir", preparedOutput], { encoding: "utf8" });
   assert.equal(preparedAgain.status, 0, preparedAgain.stderr);
-  const joined = spawnSync(process.execPath, [script, "join", "--role", "admin-1",
-    "--bundle", bundlePath], { encoding: "utf8" });
-  assert.equal(joined.status, 0, joined.stderr);
-  assert.match(joined.stdout, /"status": "ADMIN_1_CONFIGURED"/);
-  assert.doesNotMatch(joined.stdout, /nextRun/);
-  assert.equal(readJson(path.join(f.directory, ".deployment", "admin-1.json")).environmentFile, undefined);
   fs.writeFileSync(path.join(f.directory, "output/.lock"), "other process");
   const busy = run();
   assert.notEqual(busy.status, 0);
@@ -1002,7 +797,7 @@ test("missing external access and verifier setup produce a pending consolidated 
   const f = fixture(t);
   f.context.manifest.services.rpcUrlEnv = "EAB_ORCHESTRATION_TEST_MISSING_RPC";
   const inspection = await inspect(f.context, f.artifacts, { sourceState: async () => ({
-    settings: f.config, state: f.state, errors: ["TokenRouter is not initialized"], calls: governanceProgress(f.config, f.state),
+    settings: f.config, state: f.state, errors: ["TokenRouter is not initialized"], differences: [{ code: "ROUTER_UNINITIALIZED", governanceCallIds: governanceProgress(f.config, f.state).filter(i => i.call.args._func === "initialize" && i.call.args._target === f.config.tokenRouter.address).map(i => i.id) }], calls: governanceProgress(f.config, f.state),
   }) });
   assert.equal(inspection.report.status, "PENDING");
   const strato = inspection.report.checks.find(({ name }) => name === "strato");
@@ -1075,9 +870,9 @@ test("failed activation checks do not repeat unverified native deployment remind
     calls: [],
     safe: { executionOrder: [{ step: "configure-vault", status: "DONE" }] },
   };
-  const guidance = operatorGuidance(report, { manifest: "/secure/manifest.json", stage: "activation" }, {});
+  const guidance = progressDetails(report, { manifest: "/secure/manifest.json", stage: "activation" }, {});
   assert.deepEqual(guidance.failedChecks, ["verifiers", "bridge-health"]);
-  assert.deepEqual(guidance.nextSteps, []);
+  assert.equal(guidance.nextSteps, undefined);
   assert.doesNotMatch(guidance.action, /steps 6\.2|steps 6\.3/);
 });
 
@@ -1171,7 +966,7 @@ test("router scanner supports active-state reconciliation without changing its p
     getNetwork: async () => ({ chainId: 11155111n }), getBlockNumber: async () => 2234,
     getCode: async () => "0x01",
     getLogs: async ({ fromBlock, toBlock }) => {
-      assert(Number(toBlock) - Number(fromBlock) <= 499);
+      assert(Number(toBlock) - Number(fromBlock) < 1_000_000);
       return [];
     },
     call: async (transaction) => {
@@ -1225,4 +1020,1127 @@ test("implementation gate compares the actual build and rejects stale source or 
     return String(file).endsWith("contracts/bridge/ExternalBridgeVault.sol") ? `${result}\n` : result;
   });
   await assert.rejects(checkImplementations(f.context, provider), /build is stale/);
+});
+
+
+test("terminal fallback presents only the first pending action while retaining diagnostics", () => {
+  const report = { status: "PENDING", operator: {
+    action: "Configure native routes.", resumeCommand: "npm run external:rollout -- continue",
+    nextSteps: [{ action: "Review native route", run: "native dry-run" },
+      { action: "Vote", run: "native execute" }], failedChecks: [{ name: "native", status: "FAILED" }],
+  } };
+  const summary = formatAction(report, "/secure/report.json");
+  assert.equal(summary.run, "native dry-run");
+  assert.equal(summary.instruction, "Review native route");
+  assert.equal(summary.nextSteps, undefined);
+  assert.deepEqual(summary.failedChecks, report.operator.failedChecks);
+  assert.equal(report.operator.nextSteps.length, 2);
+});
+
+
+
+
+test("stalled checks time out and abort their requests", async () => {
+  const { withDeadline } = require("../scripts/externalBridgeRollout");
+  let signal;
+  await assert.rejects(withDeadline("STRATO", (value) => {
+    signal = value;
+    return new Promise(() => {});
+  }, 15), /STRATO timed out/);
+  assert.equal(signal.aborted, true);
+  assert.equal(signal.reason.code, "ROLLOUT_TIMEOUT");
+  assert.equal(await withDeadline("fast", async () => "ok", 100), "ok");
+  const parent = new AbortController();
+  parent.abort(new Error("inspection stopped"));
+  let ran = false;
+  await assert.rejects(withDeadline("cancelled", () => { ran = true; }, 100, parent.signal), /inspection stopped/);
+  assert.equal(ran, false);
+});
+
+test("Ctrl+C releases only the owned rollout lock and removes signal handlers", (t) => {
+  const { EventEmitter } = require("node:events");
+  const { acquireRolloutLock } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  const file = path.join(f.directory, ".lock");
+  const fake = new EventEmitter();
+  fake.pid = 123;
+  let code;
+  fake.exit = (value) => { code = value; };
+  const cleanup = acquireRolloutLock(file, fake);
+  assert.throws(() => acquireRolloutLock(file, fake), /EEXIST/);
+  fake.emit("SIGINT");
+  assert.equal(code, 130);
+  assert.equal(fs.existsSync(file), false);
+  assert.equal(fake.listenerCount("SIGINT"), 0);
+  cleanup();
+  const replacementCleanup = acquireRolloutLock(file, fake);
+  fs.writeFileSync(file, "another owner");
+  replacementCleanup();
+  assert.equal(fs.readFileSync(file, "utf8"), "another owner");
+});
+
+test("stalled STRATO inspection reports progress and cannot authorize a vote", async (t) => {
+  const f = fixture(t);
+  f.context.manifest.services.rpcUrlEnv = "ROLLOUT_TEST_UNUSED_RPC";
+  const previous = process.env.ROLLOUT_TEST_UNUSED_RPC;
+  delete process.env.ROLLOUT_TEST_UNUSED_RPC;
+  t.after(() => { if (previous !== undefined) process.env.ROLLOUT_TEST_UNUSED_RPC = previous; });
+  const progress = [];
+  const result = await inspect(f.context, f.artifacts, {
+    sourceState: () => new Promise(() => {}), checkTimeoutMs: 15,
+    onProgress: (message) => progress.push(message),
+  });
+  assert.equal(result.source, undefined);
+  assert.equal(result.externalReady, false);
+  assert.match(progress[0], /strato: checking/);
+  assert.match(progress[1], /strato: FAILED.*timed out/);
+  assert.equal(result.report.checks.find(({ name }) => name === "strato").status, "FAILED");
+  await assert.rejects(vote(f.context, f.artifacts, result, result.report.approvalHash), /Voting requires/);
+});
+
+test("managed preparation is repeatable and emits one Infra archive without admin setup", (t) => {
+  const f = fixture(t);
+  completeHandoff(f);
+  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
+  const run = () => spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath], { encoding: "utf8" });
+  for (let i = 0; i < 2; i++) {
+    const result = run();
+    assert.equal(result.status, 0, result.stderr);
+    const summary = JSON.parse(result.stdout.slice(result.stdout.indexOf("{\n")));
+    assert.equal(summary.status, "PREPARED_FOR_REVIEW");
+    assert.match(summary.resume, /continue --manifest/);
+    assert.doesNotMatch(summary.resume, /--config/);
+    assert.equal(summary.adminJoin, undefined);
+    assert.equal(summary.bundle, undefined);
+    assert.equal(fs.existsSync(summary.infra.file), true);
+    const archiveFiles = spawnSync("tar", ["-tzf", summary.infra.file], { encoding: "utf8" });
+    assert.equal(archiveFiles.status, 0);
+    assert.doesNotMatch(archiveFiles.stdout, /deployment|votes-|safe|\.env$/);
+    assert.match(archiveFiles.stdout, /services\.json/);
+  }
+  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment/admin-1.json")), false);
+});
+
+test("self-contained approvals reject tampering, expiry and changed calls but survive reporting revisions", (t) => {
+  const { portableSnapshot, createApprovalRequest, decodeApprovalRequest, writeApprovalFile, readApprovalFile, validateApprovalCalls } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  const snapshot = portableSnapshot(f.manifestPath, f.artifacts.directory);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY");
+  const now = Date.now();
+  const request = createApprovalRequest(snapshot, { calls }, now);
+  const packet = decodeApprovalRequest(request.request, request.approval, now);
+  assert.equal(packet.manifest.toolingRevision, undefined);
+  const handoff = writeApprovalFile(f.directory, request);
+  assert.equal(readApprovalFile(handoff.file, now).expiresAt, packet.expiresAt);
+  const altered = readJson(handoff.file);
+  altered.packet.calls[0].call.args._func = "tampered";
+  writeJson(handoff.file, altered);
+  assert.throws(() => readApprovalFile(handoff.file, now), /altered/);
+  assert.throws(() => decodeApprovalRequest(request.request, "0".repeat(64), now), /mismatch/);
+  assert.throws(() => decodeApprovalRequest(request.request, request.approval, now + 2 * 60 * 60 * 1000), /expired/);
+  const inspection = { source: {}, report: { calls } };
+  assert.equal(validateApprovalCalls(packet, inspection).length, calls.length);
+  const changed = structuredClone(calls);
+  changed[0].call.args._func = "somethingElse";
+  assert.throws(() => validateApprovalCalls(packet, { ...inspection, report: { calls: changed } }), /changed/);
+  assert.throws(() => validateApprovalCalls(packet, { ...inspection, source: { liveVoteCountsError: "unknown" } }), /unavailable/);
+});
+
+test("file approval prints one decoded review and requires confirmation before submission", async (t) => {
+  const { portableSnapshot, createApprovalRequest, writeApprovalFile, runApproval } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY");
+  const request = createApprovalRequest(portableSnapshot(f.manifestPath, f.artifacts.directory), { calls });
+  const handoff = writeApprovalFile(f.directory, request);
+  let review, submissions = 0;
+  const inspectApproval = async () => ({ source: {}, externalReady: true, router: { paused: true }, report: { calls, approvalHash: "fresh" } });
+  const result = await runApproval({ file: handoff.file }, {
+    inspect: inspectApproval,
+    confirmApproval: async value => { review = value; return true; },
+    vote: async () => { submissions++; return [{ status: "VOTED" }]; },
+  });
+  assert.equal(result.status, "APPROVAL_SUBMITTED");
+  assert.equal(submissions, 1);
+  assert.equal(review.approvalId, handoff.approvalId);
+  assert.deepEqual(review.calls.map(call => call.method), calls.map(call => call.call.args._func));
+  const cancelled = await runApproval({ file: handoff.file }, {
+    inspect: inspectApproval,
+    confirmApproval: async () => false,
+    vote: async () => { submissions++; return [{ status: "VOTED" }]; },
+  });
+  assert.equal(cancelled.status, "APPROVAL_CANCELLED");
+  assert.equal(submissions, 1);
+});
+
+test("combined rollout gives each admin one reviewed EAB and native approval file per phase", async (t) => {
+  const handoff = require("../scripts/lib/rolloutHandoff");
+  const nativeInspection = require("../scripts/lib/rolloutNativeInspection");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const eabCall = { ...governanceProgress(f.config, f.state).find(({ status }) => status === "READY"),
+    requiredAdminVotes: 2, recordedAdminVotes: 0 };
+  const nativeCall = { id: digest({ native: true }), status: "READY", deploymentStage: 0,
+    requiredAdminVotes: 2, recordedAdminVotes: 0,
+    call: { args: { _target: context.nativeInputs.nativeRoutes[0]["bridge-address"], _func: "setPause",
+      _args: [{ type: "bool", value: true }, { type: "bool", value: true }] } } };
+  const request = handoff.createApprovalRequest(handoff.portableSnapshot(f.manifestPath, f.artifacts.directory),
+    { calls: [eabCall, nativeCall], approvalKind: "all" });
+  assert.equal(request.packet.kind, "all");
+  const file = handoff.writeApprovalFile(f.directory, request).file;
+  t.mock.method(nativeInspection, "nativeApprovalInspection", async () => ({
+    source: { calls: [nativeCall] }, report: { calls: [nativeCall], nativeMode: "configure" },
+  }));
+  let reviewed, submitted;
+  const result = await handoff.runApproval({ file }, {
+    inspect: async () => ({ source: { calls: [eabCall] }, externalReady: true, router: { paused: true },
+      report: { calls: [eabCall], approvalHash: "eab" } }),
+    confirmApproval: async value => { reviewed = value; return true; },
+    vote: async (_context, _artifacts, inspection) => {
+      submitted = inspection.report.calls;
+      return [{ status: "VOTED" }];
+    },
+  });
+  assert.equal(result.status, "APPROVAL_SUBMITTED");
+  assert.deepEqual(reviewed.calls.map(({ method }) => method), ["setPause", eabCall.call.args._func]);
+  assert.equal(submitted.length, 2);
+});
+
+test("admin approval needs no profiles/history and removes its transient files", async (t) => {
+  const { portableSnapshot, createApprovalRequest, runApproval } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY");
+  const request = createApprovalRequest(portableSnapshot(f.manifestPath, f.artifacts.directory), { calls });
+  // The command carries its current inputs; the admin cannot read any original deployment files.
+  for (const file of fs.readdirSync(f.directory).filter(name => name.endsWith(".json"))) fs.unlinkSync(path.join(f.directory, file));
+  let temporary;
+  const result = await runApproval({ request: request.request, approve: request.approval }, {
+    inspect: async (_context, artifacts) => {
+      temporary = path.dirname(path.dirname(artifacts.directory));
+      return { source: {}, externalReady: true, router: { paused: true }, report: { calls, approvalHash: "fresh" } };
+    },
+    vote: async (_context, _artifacts, inspection, approval, options) => {
+      assert.equal(options.stateless, true);
+      assert.equal(approval, "fresh");
+      assert.equal(inspection.report.calls.length, calls.length);
+      return [{ status: "VOTED" }];
+    },
+  });
+  assert.equal(result.status, "APPROVAL_SUBMITTED");
+  assert.equal(fs.existsSync(temporary), false);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment/admin-1.json")), false);
+});
+
+test("stateless approval skips a live vote even on a new machine without a journal", async (t) => {
+  const f = fixture(t);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY").slice(0, 1);
+  calls[0].governanceVoters = [addr("8").slice(2)];
+  calls[0].governanceAdmins = [addr("8").slice(2)];
+  const inspection = { source: {}, externalReady: true, router: { paused: true }, report: { calls, approvalHash: "fresh" } };
+  let submitted = false;
+  const result = await vote(f.context, f.artifacts, inspection, "fresh", {
+    stateless: true,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ address: addr("8") }) }),
+    sourceState: async () => ({ calls }),
+    submit: async () => { submitted = true; },
+  });
+  assert.equal(submitted, false);
+  assert.equal(result[0].status, "ALREADY_VOTED");
+});
+
+test("Safe grouping preserves chain, owner, boundaries and earlier reviewed files", (t) => {
+  const { groupSafeAction } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  f.context = loadManifest(f.manifestPath, "activation");
+  f.artifacts = generate(f.context, path.join(f.directory, "activation"));
+  const checklist = [
+    { step: "pause-router", path: f.artifacts.depositRouterPausePath, status: "PENDING" },
+    { step: "pause-vault", path: f.artifacts.vaultPausePath, status: "PENDING" },
+    { step: "configure-router-1", path: f.artifacts.depositRouterBatchPaths[0], status: "PENDING" },
+    { step: "configure-vault", path: f.artifacts.vaultConfigurePath, status: "PENDING" },
+  ];
+  const pause = groupSafeAction(f.context, f.artifacts, checklist);
+  assert.equal(path.basename(pause.path), "pause.safe.json");
+  const pauseJson = readJson(pause.path);
+  assert.equal(pauseJson.transactions.length, 2);
+  checklist[0].status = checklist[1].status = "DONE";
+  const configure = groupSafeAction(f.context, f.artifacts, checklist);
+  assert.equal(path.basename(configure.path), "configure.safe.json");
+  assert.equal(readJson(pause.path).transactions.length, 2);
+  checklist[3].status = "UNVERIFIED";
+  const partial = groupSafeAction(f.context, f.artifacts, checklist);
+  assert.notEqual(partial.path, configure.path);
+  assert.equal(readJson(partial.path).transactions.length, readJson(checklist[2].path).transactions.length);
+});
+
+
+test("native configuration creates current stateless handoffs with dependencies and conflict checks", (t) => {
+  const { nativeGovernanceCalls, nativeGovernanceProgress, createApprovalRequest, decodeApprovalRequest, portableSnapshot } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  Object.assign(f.manifest.inputs.nativeRoutes[0], { "external-name": "Test", "external-symbol": "TEST" });
+  writeJson(f.manifestPath, f.manifest);
+  const context = loadManifest(f.manifestPath, "activation");
+  context.nativeInputs.nativeRoutes[0]["settlement-verifiers"] = context.settings.settlementVerifiers.join(",");
+  context.nativeInputs.nativeRoutes[0].sharedTokenSettings = {
+    depositsDisabled: false,
+    withdrawalsDisabled: true,
+    maxOutstandingWithdrawal: "250",
+  };
+  const state = { bridge: { depositsPaused: false, withdrawalsPaused: false, tokenRouter: addr("0"), settlementVerifierThreshold: 0 },
+    verifiers: new Map(), assets: new Map(), tokenConfigs: new Map(), autoRoutes: new Map() };
+  const calls = nativeGovernanceCalls(context, "configure");
+  assert.deepEqual(calls.find(({ args }) => args._func === "setTokenBridgeConfig").args._args.map(({ value }) => value),
+    [addr("c").slice(2), false, true, "250"]);
+  let progress = nativeGovernanceProgress(calls, state);
+  assert.deepEqual(progress.filter(({ status }) => status === "READY").map(({ call }) => call.args._func), ["setPause"]);
+  state.bridge.depositsPaused = state.bridge.withdrawalsPaused = true;
+  state.bridge.bridgeOperator = context.settings.bridgeOperator;
+  state.bridge.guardian = context.settings.guardian;
+  progress = nativeGovernanceProgress(calls, state);
+  assert.equal(progress.filter(({ status }) => status === "READY").length, 3);
+  const snapshot = portableSnapshot(f.manifestPath, path.join(f.directory, "native-handoff"));
+  const request = createApprovalRequest(snapshot, { calls: progress, nativeMode: "configure" });
+  const packet = decodeApprovalRequest(request.request, request.approval);
+  assert.equal(packet.kind, "native");
+  assert.equal(packet.nativeMode, "configure");
+  assert.equal(packet.calls.length, 7);
+  const activation = nativeGovernanceProgress(nativeGovernanceCalls(context, "activate"), state);
+  assert.notEqual(activation.find(({ call }) => call.args._func === "setPause").status, "READY");
+  context.nativeInputs.nativeRoutes.push({ ...context.nativeInputs.nativeRoutes[0], "max-per-withdrawal": "999" });
+  assert.throws(() => nativeGovernanceCalls(context, "configure"), /Conflicting/);
+});
+
+test("OAuth uses bounded HTTPS requests and never includes server error bodies", async (t) => {
+  const { fetchRolloutOAuthToken } = require("../scripts/externalBridgeRollout");
+  const previous = process.env.OAUTH_URL;
+  process.env.OAUTH_URL = "https://oauth.example/discovery";
+  t.after(() => previous === undefined ? delete process.env.OAUTH_URL : process.env.OAUTH_URL = previous);
+  const requests = [];
+  const token = await fetchRolloutOAuthToken("admin", "local-password", async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, json: async () => url.endsWith("discovery") ? { token_endpoint: "https://oauth.example/token" } : { access_token: "transient" } };
+  });
+  assert.equal(token, "transient");
+  assert.equal(requests[1].options.body.get("username"), "admin");
+  assert.equal(requests[1].options.body.get("password"), "local-password");
+  assert.ok(requests.every(({ options }) => options.signal));
+  await assert.rejects(fetchRolloutOAuthToken("admin", "secret", async url => url.endsWith("discovery")
+    ? { ok: true, json: async () => ({ token_endpoint: "https://oauth.example/token" }) }
+    : { ok: false, status: 401, text: async () => "secret" }), error => error.message === "STRATO authentication failed (HTTP 401)");
+});
+
+test("native source handoff reconciles complete inventory, rejects migration and gates activation", async (t) => {
+  const { nativeApprovalInspection, nativeHandoff, nativeGovernanceCalls } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  Object.assign(f.manifest.inputs.nativeRoutes[0], { "external-name": "Test", "external-symbol": "TEST" });
+  writeJson(f.manifestPath, f.manifest);
+  const context = loadManifest(f.manifestPath, "activation");
+  const artifacts = generate(context, path.join(f.directory, "native"));
+  const calls = nativeGovernanceCalls(context, "configure");
+  const values = calls.find(call => call.args._func === "setAsset").args._args.map(({ value }) => value);
+  const asset = Object.fromEntries(["enabled", "externalChainId", "externalBridge", "representationToken", "externalName", "externalSymbol", "maxPerWithdrawal", "instantWithdrawalThreshold", "stratoToken"].map((name, i) => [name, values[i]]));
+  const base = { owner: context.settings.dependencies.adminRegistry, bridgeOperator: context.settings.bridgeOperator,
+    guardian: context.settings.guardian, depositsPaused: true, withdrawalsPaused: true,
+    settlementVerifierCount: 3, settlementVerifierThreshold: 2, tokenRouter: context.settings.tokenRouter,
+    tokenFactory: context.settings.dependencies.tokenFactory, custodyVault: addr("8") };
+  const eab = { source: {}, externalReady: true, router: { paused: true },
+    report: { status: "READY_FOR_ACTIVATION_REVIEW", calls: [], approvalHash: "eab" } };
+  const fetchImpl = async url => {
+    const u = new URL(url), table = u.pathname.split("/").at(-1);
+    let rows = [];
+    if (Number(u.searchParams.get("offset")) === 0) {
+      if (table === "BlockApps-StratoNativeBridge") rows = [base];
+      if (table === "BlockApps-StratoNativeCustodyVault") rows = [{ owner: context.settings.dependencies.adminRegistry,
+        bridge: context.nativeInputs.nativeRoutes[0]["bridge-address"], paused: true }];
+      if (table === "BlockApps-StratoNativeBridge-settlementVerifiers") rows = context.settings.settlementVerifiers.map(key => ({ key, value: true }));
+      if (table === "BlockApps-StratoNativeBridge-assets") rows = [{ key: asset.stratoToken, key2: asset.externalChainId, value: asset }];
+      if (table === "BlockApps-AdminRegistry-whitelist") rows = ["transfer", "transferFrom"].map(method => ({ key: asset.stratoToken, key2: method, key3: base.custodyVault, value: true }));
+      if (table === "BlockApps-AdminRegistry") rows = [{ defaultVotingThresholdBps: 6666,
+        admins: [1, 2, 3].map(n => ({ address: addr(String(n)) })), thresholds: [] }];
+      if (table === "BlockApps-AdminRegistry-admins") rows = [1, 2, 3].map(n => ({ key: n, value: addr(String(n)) }));
+    }
+    return { ok: true, json: async () => rows };
+  };
+  const options = { fetchImpl, inspectEab: async () => eab, validateNativeReadiness: async () => {} };
+  const configured = await nativeApprovalInspection(context, artifacts, "configure", eab, options);
+  assert.ok(configured.report.calls.every(({ status }) => status === "COMPLETE"));
+  const activated = await nativeApprovalInspection(context, artifacts, "activate", eab, options);
+  assert.equal(activated.report.calls.find(({ status }) => status === "READY").call.args._func, "setAsset");
+  const activeEab = { ...eab, router: { paused: false }, report: { ...eab.report, status: "DEPOSITS_ACTIVE_CANARY_REQUIRED",
+    checks: ["strato", "external-identity", "deposit-router", "withdrawal-pause", "safe-runtime-identities", "vault-configuration", "verifiers", "bridge-health"].map(name => ({ name, status: "PASSED" })) } };
+  await assert.rejects(nativeApprovalInspection(context, artifacts, "activate", activeEab, options), /paused external intake/);
+  const readOnly = await nativeApprovalInspection(context, artifacts, "activate", activeEab, { ...options, readOnlyActiveEab: true });
+  await assert.rejects(vote(context, artifacts, readOnly, readOnly.report.approvalHash, { allowActiveEab: true }), /Voting requires/);
+  await assert.rejects(nativeApprovalInspection(context, artifacts, "activate", { ...eab, report: { status: "PENDING" } }, options), /readiness/);
+  asset.representationToken = addr("b");
+  await assert.rejects(nativeApprovalInspection(context, artifacts, "configure", eab, options), /migration requires separate/);
+  asset.representationToken = values[3];
+  base.settlementVerifierCount = 4;
+  await assert.rejects(nativeApprovalInspection(context, artifacts, "configure", eab, options), /inventory is incomplete/);
+  base.settlementVerifierCount = 3;
+  const rpcEnv = context.manifest.services.rpcUrlEnv;
+  const previous = process.env[rpcEnv];
+  process.env[rpcEnv] = "https://rpc.example";
+  t.after(() => previous === undefined ? delete process.env[rpcEnv] : process.env[rpcEnv] = previous);
+  const result = await nativeHandoff(context, artifacts, f.manifestPath, "configure", {
+    ...options, provider: {}, nativePlan: async () => ({ transactions: [] }),
+  });
+  assert.equal(result.status, "NATIVE_CONFIGURED");
+});
+
+test("native progress belongs to the Coordinator and code-only changes do not reset it", (t) => {
+  const { nativeCoordinatorAction, nativeConfigurationFingerprint } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const output = path.join(f.directory, ".deployment");
+  const report = { status: "PENDING", calls: [], operator: {}, safe: { executionOrder: [] } };
+  assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath).action, "CONFIGURE_NATIVE_BRIDGE");
+  writeJson(path.join(output, "native-configured.json"), { fingerprint: nativeConfigurationFingerprint(context) });
+  assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath), undefined);
+  report.status = "READY_FOR_ACTIVATION_REVIEW";
+  assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath).action, "ACTIVATE_NATIVE_BRIDGE");
+  assert.match(nativeCoordinatorAction(context, report, output, f.manifestPath).run, /external:rollout -- continue --manifest/);
+  writeJson(path.join(output, "native-active.json"), { fingerprint: nativeConfigurationFingerprint(context) });
+  assert.equal(nativeCoordinatorAction(context, { ...report, revision: "new-reporting-code" }, output, f.manifestPath), undefined);
+  context.settings.bridgeOperator = addr("d");
+  assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath).action, "CONFIGURE_NATIVE_BRIDGE");
+});
+
+test("service handoff remains stable for reporting changes and rejects altered package files", (t) => {
+  const { createServiceHandoff } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  const context = loadManifest(f.manifestPath, "activation");
+  const artifacts = generate(context, path.join(f.directory, ".deployment"));
+  const first = createServiceHandoff(artifacts);
+  assert.equal(readJson(path.join(path.dirname(first.file), "services.json")).application.kind, "chain-install");
+  const second = createServiceHandoff(generate({ ...context, revision: "new-reporting-code" }, path.join(f.directory, ".deployment")));
+  assert.equal(second.file, first.file);
+  const extension = createServiceHandoff(artifacts, { nativeExtension: true });
+  assert.notEqual(extension.file, first.file);
+  assert.equal(readJson(path.join(path.dirname(extension.file), "services.json")).application.kind, "native-extension");
+  assert.equal(second.sha256, first.sha256);
+  const packageDirectory = path.dirname(first.file);
+  const policy = path.join(packageDirectory, "verifier-1.json");
+  fs.writeFileSync(policy, "tampered");
+  assert.throws(() => createServiceHandoff(artifacts), /package file changed/);
+});
+
+test("start handoff requires only service readiness failures after verified configuration", () => {
+  const { infraStartRequired } = require("../scripts/externalBridgeRollout");
+  const report = { activationChecksRequired: true, safe: { executionOrder: [{ status: "DONE" }] },
+    checks: [{ name: "verifiers", status: "FAILED" }, { name: "bridge-health", status: "FAILED" }] };
+  assert.equal(infraStartRequired(report), true);
+  assert.equal(infraStartRequired({ ...report, checks: [...report.checks, { name: "external-identity", status: "FAILED" }] }), false);
+  assert.equal(infraStartRequired({ ...report, safe: { executionOrder: [{ status: "UNVERIFIED" }] } }), false);
+  assert.equal(infraStartRequired({ ...report, activationChecksRequired: false }), false);
+});
+
+test("completed approval handoff is a no-op without creating admin history", async (t) => {
+  const { portableSnapshot, createApprovalRequest, runApproval } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY");
+  const approval = createApprovalRequest(portableSnapshot(f.manifestPath, f.artifacts.directory), { calls });
+  let voted = false;
+  const result = await runApproval({ request: approval.request, approve: approval.approval }, {
+    inspect: async () => ({ source: {}, report: { calls: calls.map(call => ({ ...call, status: "COMPLETE" })) } }),
+    vote: async () => { voted = true; },
+  });
+  assert.equal(result.status, "ALREADY_COMPLETE");
+  assert.equal(voted, false);
+});
+
+test("native custody unpause precedes origin intake unpause", (t) => {
+  const { nativeGovernanceCalls, nativeGovernanceProgress } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  Object.assign(f.manifest.inputs.nativeRoutes[0], { "external-name": "Test", "external-symbol": "TEST" });
+  writeJson(f.manifestPath, f.manifest);
+  const context = loadManifest(f.manifestPath, "activation");
+  const calls = nativeGovernanceCalls(context, "activate", addr("8"));
+  const v = calls.find(call => call.args._func === "setAsset").args._args.map(({ value }) => value);
+  const asset = Object.fromEntries(["enabled", "externalChainId", "externalBridge", "representationToken", "externalName", "externalSymbol", "maxPerWithdrawal", "instantWithdrawalThreshold", "stratoToken"].map((field, i) => [field, v[i]]));
+  const state = { bridge: { depositsPaused: true, withdrawalsPaused: true, bridgeOperator: context.settings.bridgeOperator,
+    guardian: context.settings.guardian, tokenRouter: context.settings.tokenRouter, settlementVerifierThreshold: 2 },
+    custody: { paused: true }, whitelist: new Set(["transfer", "transferFrom"].map(method => `${asset.stratoToken}:${method}:${addr("8").slice(2)}`)),
+    verifiers: new Map(context.settings.settlementVerifiers.map(value => [value.slice(2), true])),
+    assets: new Map([[`${asset.stratoToken}:${asset.externalChainId}`, asset]]), tokenConfigs: new Map(), autoRoutes: new Map() };
+  let ready = nativeGovernanceProgress(calls, state).filter(({ status }) => status === "READY");
+  assert.equal(ready.length, 1);
+  assert.equal(ready[0].call.args._target, addr("8").slice(2));
+  state.custody.paused = false;
+  ready = nativeGovernanceProgress(calls, state).filter(({ status }) => status === "READY");
+  assert.equal(ready.length, 1);
+  assert.equal(ready[0].call.args._args.length, 2);
+  assert.equal(ready[0].deploymentStage, 8);
+  assert.equal(parseArgs(["continue", "--manifest", f.manifestPath]).stage, "activation");
+});
+
+
+test("one init command discovers routes and prepare expands the same deployment file", async (t) => {
+  const f = fixture(t);
+  const preparation = require("../scripts/prepareBridgeRollout");
+  const file = path.join(f.directory, "single-deployment.json");
+  let discoveryReads = 0, expansions = 0;
+  t.mock.method(preparation, "discover", async (url, chain, token, fetchImpl, selections) => {
+    discoveryReads++;
+    assert.equal(url, "https://node.example");
+    assert.equal(chain, "11155111");
+    assert.equal((await fetchImpl("data:application/json,{}", {})).ok, true);
+    assert.equal(token, "test-access-token");
+    assert.equal(selections.sourceChainId, "1");
+    return { config: { source: { nodeUrl: url }, target: { chainId: 11155111 }, eabRoutes: [{ include: false }], nativeRoutes: [] }, candidates: {}, missing: [] };
+  });
+  t.mock.method(preparation, "main", async (argv, options) => {
+    expansions++;
+    assert.equal(options.quiet, true);
+    assert.equal(options.token, "test-access-token");
+    const input = readJson(argv[1]);
+    assert.equal(input.eabRoutes[0].include, true);
+    const settings = readJson(path.join(f.directory, "settings.json"));
+    settings.externalDeployment = path.join(f.directory, "deployment.json");
+    settings.depositPlan = path.join(f.directory, "discovery.json");
+    writeJson(path.join(argv[3], "settings.json"), settings);
+    writeJson(path.join(argv[3], "policy.json"), f.manifest.policy);
+  });
+  await main(["init", "--manifest", file, "--node-url", "https://node.example", "--chain-id", "11155111", "--source-chain-id", "1"]);
+  assert.equal(readJson(file).schemaVersion, 0);
+  const draft = readJson(file);
+  draft.discovery.eabRoutes[0].include = true;
+  writeJson(file, draft);
+  await main(["prepare", "--manifest", file]);
+  assert.equal(readJson(file).schemaVersion, 1);
+  assert.equal(discoveryReads, 1);
+  assert.equal(expansions, 1);
+  assert.equal(fs.existsSync(path.join(f.directory, ".deployment/.lock")), false);
+  await assert.rejects(main(["init", "--manifest", file, "--node-url", "https://node.example", "--chain-id", "11155111", "--source-chain-id", "1"]), /already exists/);
+  assert.equal(discoveryReads, 1);
+});
+
+test("continue completes read-only native phases internally and returns real handoffs", async (t) => {
+  const { advanceNative } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const report = { status: "READY_FOR_ACTIVATION_REVIEW", calls: [], operator: {}, safe: { executionOrder: [] } };
+  const output = path.join(f.directory, ".deployment");
+  const modes = [];
+  const pending = await advanceNative(context, f.artifacts, report, output, f.manifestPath, {}, {
+    nativeHandoff: async (_context, _artifacts, _path, mode) => {
+      modes.push(mode);
+      return mode === "configure" ? { status: "NATIVE_CONFIGURED" }
+        : { status: "ACTION_REQUIRED", action: "APPROVE_NATIVE_CONFIGURATION", run: "current admin command" };
+    },
+  });
+  assert.deepEqual(modes, ["configure", "activate"]);
+  assert.equal(pending.action, "APPROVE_NATIVE_CONFIGURATION");
+  assert.equal(pending.run, "current admin command");
+  const done = await advanceNative(context, f.artifacts, report, output, f.manifestPath, {}, {
+    nativeHandoff: async () => ({ status: "NATIVE_ACTIVE" }),
+  });
+  assert.equal(done, undefined);
+  assert.equal(fs.existsSync(path.join(output, "native-active.json")), true);
+});
+
+test("later native enablement requires unchanged healthy active EAB and permits no EAB approvals", (t) => {
+  const { nativeOnlyEabVerified, portableSnapshot, createApprovalRequest, decodeApprovalRequest } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  f.manifest.scope = "native";
+  writeJson(f.manifestPath, f.manifest);
+  const context = loadManifest(f.manifestPath, "activation");
+  const proof = { source: {}, externalReady: true, router: { paused: false }, report: {
+    status: "DEPOSITS_ACTIVE_CANARY_REQUIRED", calls: [{ status: "COMPLETE" }],
+    checks: ["strato", "external-identity", "deposit-router", "withdrawal-pause", "safe-runtime-identities", "vault-configuration", "verifiers", "bridge-health"].map(name => ({ name, status: "PASSED" })),
+  } };
+  assert.equal(nativeOnlyEabVerified(context, proof), true);
+  assert.equal(nativeOnlyEabVerified(context, { ...proof, report: { ...proof.report, calls: [{ status: "READY" }] } }), false);
+  assert.equal(nativeOnlyEabVerified(context, { ...proof, report: { ...proof.report, checks: [] } }), false);
+  const calls = governanceProgress(f.config, f.state).filter(({ status }) => status === "READY");
+  const packet = createApprovalRequest(portableSnapshot(f.manifestPath, f.artifacts.directory), { calls });
+  assert.throws(() => decodeApprovalRequest(packet.request, packet.approval), /cannot approve EAB changes/);
+});
+
+test("native readiness checks bind all native KMS signers and policy hashes", async (t) => {
+  const { validateNativeReadiness } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t);
+  completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const artifacts = generate(context, path.join(f.directory, "native-metadata"));
+  let mismatch = false;
+  const fetchImpl = async url => {
+    const index = context.manifest.services.verifiers.findIndex(verifier => url.startsWith(verifier.url));
+    const policy = readJson(artifacts.nativeVerifierPolicyPaths[index]);
+    return { ok: true, json: async () => ({ status: "ok", native: {
+      attestationSigner: mismatch ? addr("1") : context.nativeInputs.nativeConfig.attestationSigners[index],
+      sourceBridge: policy.sourceBridge, destinationBridge: policy.destinationBridge, policyVersion: policy.version,
+      baselinePolicyHash: policy.baselinePolicyHash, policyDigest: `sha256:${digest(fs.readFileSync(artifacts.nativeVerifierPolicyPaths[index], "utf8"))}`,
+    } }) };
+  };
+  await validateNativeReadiness(context, artifacts, fetchImpl);
+  mismatch = true;
+  await assert.rejects(validateNativeReadiness(context, artifacts, fetchImpl), error => error.code === "NATIVE_READINESS");
+});
+
+test("router history uses wide complete ranges and safely narrows RPC range limits", async () => {
+  const { queryFilterInChunks } = require("../scripts/scanTokenConfig");
+  const intervals = [];
+  const latest = 2_763_366;
+  const history = [100, 999_999, 1_000_000, 2_763_366].map(blockNumber => ({ blockNumber }));
+  const contract = { queryFilter: async (_filter, start, end) => {
+    intervals.push([start, end]); return history.filter(event => event.blockNumber >= start && event.blockNumber <= end);
+  } };
+  assert.deepEqual(await queryFilterInChunks(contract, {}, 0, { getBlockNumber: async () => latest }), history);
+  assert.equal(intervals.length, 3);
+  assert.deepEqual(intervals, [[0, 999999], [1000000, 1999999], [2000000, latest]]);
+  const accepted = [];
+  const limited = { queryFilter: async (_filter, start, end) => {
+    if (end - start + 1 > 1000) throw new Error("block range exceeds limit");
+    accepted.push([start, end]); return history.filter(event => event.blockNumber >= start && event.blockNumber <= end);
+  } };
+  assert.deepEqual(await queryFilterInChunks(limited, {}, 0, { getBlockNumber: async () => 2000 }), [history[0]]);
+  assert.equal(accepted[0][0], 0);
+  assert.equal(accepted.at(-1)[1], 2000);
+  for (let i = 1; i < accepted.length; i++) assert.equal(accepted[i][0], accepted[i-1][1] + 1);
+  await assert.rejects(queryFilterInChunks({ queryFilter: async () => { throw new Error("RPC unavailable"); } }, {}, 0,
+    { getBlockNumber: async () => 2000 }), /RPC unavailable/);
+});
+
+test("governance scans all active lifecycle batches with bounded concurrency", async () => {
+  const ids = Array.from({ length: 205 }, (_, i) => i.toString(16).padStart(64, "0"));
+  const call = { id: "call", call: { args: { _target: addr("2"), _func: "setRoute", _args: [{ value: "0" }] } } };
+  let concurrent = 0, maximum = 0;
+  const queried = new Set();
+  const fetchImpl = async url => {
+    const parsed = new URL(url), q = parsed.searchParams, offset = Number(q.get("offset"));
+    let rows;
+    if (parsed.pathname.endsWith("-currentIssues")) rows = ids.map(key => ({ key, value: true }));
+    else if (parsed.pathname.endsWith("-admins")) rows = [{ value: addr("1") }];
+    else {
+      const batch = (q.get("issueId") || q.get("key")).slice(4,-1).split(",");
+      assert(batch.length <= 50);
+      if (parsed.pathname.endsWith("-IssueCreated")) {
+        concurrent++; maximum = Math.max(maximum, concurrent);
+        await new Promise(resolve => setTimeout(resolve, 5)); concurrent--;
+        batch.forEach(id => queried.add(id));
+        rows = batch.map(issueId => ({ issueId, target: addr("2"), func: "setRoute",
+          args: [String(ids.indexOf(issueId))], block_number: "1", event_index: 0 }));
+      } else if (parsed.pathname.endsWith("-IssueExecuted")) {
+        assert.deepEqual(batch, [ids[0]], "unrelated execution history is not queried"); rows = [];
+      } else {
+        assert.deepEqual(batch, [ids[0]], "unrelated voter history is not queried");
+        rows = batch.map(key => ({ key, value: addr("1"), key2: "0" }));
+      }
+    }
+    return { ok: true, json: async () => rows.slice(offset, offset + 200) };
+  };
+  const counts = await fetchLiveAdminVoteCounts({ adminRegistry: addr("9") }, "https://node.example", "token", [call], {}, fetchImpl);
+  assert.equal(counts.get("call"), 1);
+  assert.equal(queried.size, 205);
+  assert(maximum <= 3);
+});
+
+test("STRATO read limiter caps in-flight requests and releases slots after failures", async () => {
+  const { limitConcurrentFetches } = require("../scripts/externalBridgeRollout");
+  let active = 0, maximum = 0, completed = 0;
+  const fetchImpl = async url => {
+    active++; maximum = Math.max(maximum, active);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 5));
+      if (url === "fail") throw new Error("unavailable");
+      completed++; return { ok: true };
+    } finally { active--; }
+  };
+  const limited = limitConcurrentFetches(fetchImpl);
+  const results = await Promise.allSettled(["fail", ...Array(11).fill("read")].map(url => limited(url)));
+  assert.equal(maximum, 3);
+  assert.equal(active, 0);
+  assert.equal(completed, 11);
+  assert.equal(results.filter(r => r.status === "rejected").length, 1);
+});
+
+test("aborted queued STRATO reads are never sent to the server", async () => {
+  const { limitConcurrentFetches } = require("../scripts/externalBridgeRollout");
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  const limited = limitConcurrentFetches(async () => { calls++; await gate; return { ok: true }; }, 1);
+  const first = limited("first");
+  const controller = new AbortController();
+  const queued = limited("queued", { signal: controller.signal });
+  controller.abort(new Error("inspection deadline"));
+  release();
+  await first;
+  await assert.rejects(queued, /inspection deadline/);
+  assert.equal(calls, 1);
+});
+
+async function stagedFixture(t, { paused = true, enabling = false, inventoryError = false, routerMismatch = false, vaultMismatch = false, previousReport, sourceErrors = [], servicesReady = false } = {}) {
+  const f = fixture(t); completeHandoff(f);
+  const context = loadManifest(f.manifestPath, "activation");
+  if (servicesReady) context.manifest.services.bridgeHealthUrl = "https://runtime.example/health";
+  const rpcName = context.manifest.services.rpcUrlEnv;
+  const previousRpc = process.env[rpcName]; process.env[rpcName] = "https://rpc.example";
+  t.after(() => previousRpc === undefined ? delete process.env[rpcName] : process.env[rpcName] = previousRpc);
+  const artifacts = generate(context, path.join(f.directory, "staged"));
+  const { ethers } = require("ethers");
+  const iface = new ethers.Interface(["function paused() view returns (bool)",
+    "function getOwners() view returns (address[])", "function getThreshold() view returns (uint256)"]);
+  const provider = { getNetwork: async () => ({ chainId: 11155111n }), call: async transaction => {
+    const method = iface.parseTransaction(transaction).name;
+    return iface.encodeFunctionResult(method, method === "paused" ? [paused] : method === "getOwners" ? [[addr("1"), addr("d")]] : [2n]);
+  } }; provider.provider = provider;
+  const readyCall = enabling ? { id: "enable", status: "READY", requiredAdminVotes: 2,
+    call: { args: { _func: "setDepositAction", _args: Array.from({length: 5}, (_, i) => ({ value: i === 4 ? true : "0" })) } } }
+    : { ...governanceProgress(f.config, f.state).find(item => item.status === "READY"), requiredAdminVotes: 2 };
+  const history = []; let voteReads = 0;
+  const progress = [];
+  const inspection = await inspect(context, artifacts, { staged: true, provider, previousReport, onProgress: line => progress.push(line),
+    sourceState: async (_context, _artifacts, _fetch, _signal, options) => {
+      assert.equal(options.deferVoteCounts, true);
+      return { settings: f.config, state: f.state, calls: [readyCall], errors: sourceErrors, differences: sourceErrors.map(message => ({ code: "ROUTER_UNINITIALIZED", message, governanceCallIds: [readyCall.id] })), voteCountsDeferred: true };
+    },
+    checkImplementations: async () => [],
+    verifyRouter: async (_file, options) => {
+      history.push(options.scanHistory);
+      const differences = routerMismatch ? ["Selected token permission mismatch"] : [];
+      return { paused, historyVerified: options.scanHistory, errors: options.scanHistory && inventoryError ? ["Unexpected permitted route"] : differences, configurationErrors: differences };
+    },
+    readVaultState: async () => ({ configurationMatches: !vaultMismatch, routerTargetsVault: true,
+      safeHasGovernanceRoles: true, guardianCanPause: true, routerOwnerIsSafe: true }),
+    fetchVoteCounts: async (_settings, _url, _token, calls) => {
+      voteReads++; calls.forEach(call => { call.governanceVoters = [addr("1").slice(2)]; });
+      return new Map(calls.map(call => [call.id, 1]));
+    },
+    fetchImpl: async url => {
+      if (!servicesReady) return { ok: false, status: 503 };
+      const parsed = new URL(url);
+      assert.equal(parsed.hostname, "runtime.example");
+      assert.equal(parsed.searchParams.get("deploymentChainId"), "11155111");
+      const verifiers = context.manifest.services.verifiers.map((verifier, index) => {
+        const policy = context.rollout.verifierPolicies[index];
+        return { status: "ok", destinationChainId: "11155111", destinationVault: policy.destinationVault,
+          authorizationSigner: context.manifest.authorizationSigners[index], settlementAttestor: policy.settlementAttestor,
+          verifierIndex: index + 1, baselinePolicyHash: context.rollout.baselinePolicyHash,
+          policyDigest: `sha256:${digest(fs.readFileSync(artifacts.verifierPolicyPaths[index], "utf8"))}`,
+          verificationRpcHostCount: 2, verifierConfirmations: verifier.confirmations };
+      });
+      return { ok: true, json: async () => ({ status: true, deployment: { chainId: "11155111", verifiers } }) };
+    },
+  });
+  return { ...f, context, artifacts, inspection, history, voteReads, progress };
+}
+
+test("continue defers history and vote reads while a pause handoff is pending", async t => {
+  const { inspection, history, voteReads } = await stagedFixture(t, { paused: false });
+  assert.deepEqual(history, [false]);
+  assert.equal(voteReads, 0);
+  assert.equal(inspection.report.liveVoteCounts.status, "DEFERRED");
+  assert.equal(inspection.report.checks.find(c => c.name === "deposit-router").status, "DEFERRED");
+  assert.equal(inspection.report.checks.find(c => c.name === "verifiers").status, "DEFERRED");
+  assert.equal(inspection.report.safe.executionOrder[0].status, "PENDING");
+});
+
+test("configuration approval checks fresh votes without a full historical router scan", async t => {
+  const { inspection, history, voteReads } = await stagedFixture(t);
+  assert.deepEqual(history, [false]);
+  assert.equal(voteReads, 1);
+  assert.equal(inspection.report.liveVoteCounts.status, "LIVE");
+  assert.equal(inspection.report.calls[0].recordedAdminVotes, 1);
+  assert.equal(inspection.report.checks.find(c => c.name === "deposit-router").status, "DEFERRED");
+  assert(inspection.report.safe.executionOrder.every(c => c.status === "DONE"));
+});
+
+test("activation requires the complete historical inventory and never approves an unexpected route", async t => {
+  const { inspection, history, voteReads, context, artifacts } = await stagedFixture(t, { enabling: true, inventoryError: true });
+  assert.deepEqual(history, [false, true]);
+  assert.equal(inspection.report.checks.find(c => c.name === "deposit-router").status, "FAILED");
+  assert.equal(inspection.report.calls[0].status, "BLOCKED");
+  assert.equal(voteReads, 0);
+  assert.throws(() => activate(context, artifacts, inspection, inspection.report.approvalHash), /gates/);
+});
+
+test("successful historical activation verification still requires service readiness", async t => {
+  const { inspection, history } = await stagedFixture(t, { enabling: true });
+  assert.deepEqual(history, [false, true]);
+  assert.equal(inspection.report.checks.find(c => c.name === "deposit-router").status, "PASSED");
+  assert.equal(inspection.report.checks.find(c => c.name === "verifiers").status, "FAILED");
+  assert.equal(inspection.report.calls[0].status, "BLOCKED");
+  assert.notEqual(inspection.report.status, "READY_FOR_ACTIVATION_REVIEW");
+});
+
+test("activation verifies private verifier metadata through Runtime", async t => {
+  const { inspection } = await stagedFixture(t, { enabling: true, servicesReady: true });
+  assert.equal(inspection.report.checks.find(c => c.name === "bridge-health").status, "PASSED");
+  assert.equal(inspection.report.checks.find(c => c.name === "verifiers").status, "PASSED");
+  assert.equal(inspection.report.calls[0].status, "READY");
+});
+
+test("deferred governance evidence cannot validate an admin approval", () => {
+  const { validateApprovalCalls } = require("../scripts/externalBridgeRollout");
+  const call = { id: "call", call: { args: { _func: "initialize" } } };
+  const packet = { calls: [call] };
+  const report = { calls: [{ ...call, status: "READY" }], liveVoteCounts: { status: "DEFERRED" } };
+  assert.throws(() => validateApprovalCalls(packet, { source: {}, report }), /unavailable/);
+  assert.throws(() => validateApprovalCalls(packet, { source: { voteCountsDeferred: true },
+    report: { ...report, liveVoteCounts: undefined } }), /unavailable/);
+});
+
+test("uncompleted planned configuration is PENDING in both reports and progress", async t => {
+  const { inspection, progress } = await stagedFixture(t, { routerMismatch: true, vaultMismatch: true,
+    sourceErrors: ["TokenRouter is not initialized"] });
+  for (const name of ["strato", "router-configuration", "vault-configuration"]) {
+    assert.equal(inspection.report.checks.find(c => c.name === name).status, "PENDING");
+    assert(progress.some(line => line.startsWith(`${name}: PENDING`)));
+    assert(!progress.some(line => line.startsWith(`${name}: FAILED`)));
+  }
+  assert.notEqual(inspection.report.status, "READY_FOR_ACTIVATION_REVIEW");
+});
+
+test("completed configuration drift remains FAILED across subsequent runs", async t => {
+  const first = await stagedFixture(t);
+  const second = await stagedFixture(t, { routerMismatch: true, vaultMismatch: true, previousReport: first.inspection.report });
+  assert.equal(first.inspection.report.configurationFingerprint, second.inspection.report.configurationFingerprint);
+  const third = await stagedFixture(t, { routerMismatch: true, vaultMismatch: true, previousReport: second.inspection.report });
+  for (const inspection of [second.inspection, third.inspection]) {
+    for (const name of ["router-configuration", "vault-configuration"]) assert.equal(inspection.report.checks.find(c => c.name === name).status, "FAILED");
+  }
+});
+
+test("STRATO pending status covers unfinished steps but excludes unsafe state and completed-call drift", t => {
+  const { expectedSourceDifferences } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t); initialized(f);
+  const chain = f.config.chains[0], route = chain.routes[0]; route.autoRouteEnabled = true;
+  const calls = governanceProgress(f.config, f.state, { stage: "activation", activationErrors: [] });
+  const methods = ["setMintPolicy", "setChain", "addWhitelist", "setDepositAction"];
+  const differences = methods.map((method, index) => ({ code: `PLANNED_${index}`, message: `Human wording ${index}`,
+    governanceCallIds: calls.filter(c => c.call.args._func === method).map(c => c.id) }));
+  const source = { calls, settings: f.config, state: f.state, errors: differences.map(d => d.message), differences };
+  assert.equal(expectedSourceDifferences(source), true);
+  assert.equal(expectedSourceDifferences({ ...source, errors: [...source.errors, "Unexpected enabled route"],
+    differences: [...differences, { code: "UNEXPECTED_ENABLED_ROUTE", governanceCallIds: [] }] }), false);
+  const mint = calls.find(c => c.call.args._func === "setMintPolicy");
+  assert.equal(expectedSourceDifferences(source, new Set([mint.id])), false);
+  assert.equal(expectedSourceDifferences({ ...source, differences: undefined }), false);
+
+});
+
+test("implementation reads retry only unsupported numbered state at the same pinned block", async t => {
+  const f = fixture(t), { ethers } = require("ethers");
+  const { checkImplementations } = require("../scripts/externalBridgeRollout");
+  const artifacts = new Map([[addr("a"), "ExternalBridgeVault"], [addr("b"), "ExternalAssetDepositRouter"]].map(([address, name]) =>
+    [address, readJson(path.resolve(__dirname, `../artifacts/contracts/bridge/${name}.sol/${name}.json`)).deployedBytecode]));
+  const blocks = []; let reads = 0, heads = 0;
+  const provider = {
+    getBlockNumber: async () => { heads++; return 1234; },
+    getStorage: async (proxy, _slot, block) => {
+      blocks.push(block); reads++;
+      if (reads === 1) throw Object.assign(new Error("could not coalesce error"), { error: { code: -32000, message: "unsupported block number 1234" } });
+      return ethers.zeroPadValue(proxy === addr("2") ? addr("a") : addr("b"), 32);
+    },
+    getCode: async (address, block) => { blocks.push(block); return artifacts.get(address.toLowerCase()); },
+  };
+  assert.equal((await checkImplementations(f.context, provider)).length, 2);
+  assert.equal(heads, 1);
+  assert.equal(reads, 3);
+  assert(blocks.every(block => block === 1234));
+  let failures = 0;
+  await assert.rejects(checkImplementations(f.context, { ...provider, getStorage: async () => {
+    failures++; throw Object.assign(new Error("RPC rejected block"), { error: { code: -32000, message: "unsupported block number 1234" } });
+  } }), /after three attempts/);
+  assert.equal(failures, 3);
+  failures = 0;
+  await assert.rejects(checkImplementations(f.context, { ...provider, getStorage: async () => {
+    failures++; throw new Error("RPC unavailable");
+  } }), /RPC unavailable/);
+  assert.equal(failures, 1);
+});
+
+test("approval reports a failed external identity before deferred vote diagnostics", () => {
+  const { validateApprovalCalls } = require("../scripts/externalBridgeRollout");
+  const inspection = { source: { voteCountsDeferred: true }, report: { calls: [],
+    liveVoteCounts: { status: "DEFERRED" }, checks: [{ name: "external-identity", status: "FAILED", error: "External RPC cannot serve pinned block" }] } };
+  assert.throws(() => validateApprovalCalls({ calls: [] }, inspection), /Approval blocked by external-identity: External RPC/);
+  assert.throws(() => validateApprovalCalls({ calls: [] }, { ...inspection,
+    report: { ...inspection.report, checks: [] } }), /Live AdminRegistry vote counts are unavailable/);
+});
+
+
+test("one prepare command provisions public identities then prepares the reviewed release", t => {
+  const f = fixture(t);
+  f.manifest.services.confirmations = 12;
+  writeJson(f.manifestPath, f.manifest);
+  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
+  const run = () => spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath], { encoding: "utf8" });
+  const provision = run();
+  assert.equal(provision.status, 0, provision.stderr);
+  const first = JSON.parse(provision.stdout.slice(provision.stdout.indexOf("{\n")));
+  assert.equal(first.status, "PROVISIONING_PACKAGE_READY");
+  assert.match(first.instruction, /Running=No/);
+  assert.match(first.resume, /prepare --manifest/);
+  assert.doesNotMatch(first.resume, /--stage/);
+  const { decodeApprovalRequest, createApprovalRequest } = require("../scripts/externalBridgeRollout");
+  const saved = readJson(first.details);
+  assert.equal(saved.nextAction.status, first.status);
+  const snapshot = readJson(path.join(saved.artifacts.directory, "configuration.snapshot.json"));
+  assert.equal(snapshot.bundlePurpose, "provisioning");
+  assert.throws(() => createApprovalRequest(snapshot, { calls: [] }), /Provisioning/);
+  completeHandoff(f);
+  const prepared = run();
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const final = JSON.parse(prepared.stdout.slice(prepared.stdout.indexOf("{\n")));
+  assert.equal(final.status, "PREPARED_FOR_REVIEW");
+  assert.match(final.resume, /continue --manifest/);
+  const report = readJson(final.details);
+  assert.deepEqual(terminalSummary(report, final.details), final);
+});
+
+test("preparation refuses unresolved reviewed limits even when identities need provisioning", t => {
+  const f = fixture(t);
+  f.manifest.services.confirmations = 12;
+  f.manifest.policy.tokens[addr("b")].bucketCapacity = "REVIEW_REQUIRED";
+  writeJson(f.manifestPath, f.manifest);
+  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
+  const run = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath], { encoding: "utf8" });
+  assert.notEqual(run.status, 0);
+  assert.doesNotMatch(run.stdout, /PROVISIONING_PACKAGE_READY/);
+});
+
+test("current action is shared by saved reports and terminal output", () => {
+  const args = { manifest: "/secure/deployment.json" };
+  const cases = [
+    [{ previousStageCompleted: true }, "RERUN_CONTINUE"],
+    [{ operationError: "Approval is stale; reconcile" }, "RERUN_CONTINUE"],
+    [{ status: "PENDING", nativeAction: { action: "EXECUTE_NATIVE_SAFE_TRANSACTION", file: "native.json" },
+      adminApproval: { run: "expired-command" } }, "EXECUTE_NATIVE_SAFE_TRANSACTION"],
+  ];
+  for (const [report, expected] of cases) {
+    const resolved = resolveNextAction(report, args);
+    report.nextAction = resolved.nextAction;
+    assert.equal(report.nextAction.action, expected);
+    assert.deepEqual(terminalSummary(report, "report.json"), { ...report.nextAction, details: "report.json" });
+  }
+});
+
+test("native progress changes with reviewed bindings and guardian, not reporting revisions", t => {
+  const { nativeConfigurationFingerprint } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t); completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const hash = nativeConfigurationFingerprint(context);
+  context.revision = "a-reporting-only-change";
+  assert.equal(nativeConfigurationFingerprint(context), hash);
+  context.settings.guardian = addr("f");
+  assert.notEqual(nativeConfigurationFingerprint(context), hash);
+});
+
+
+test("an active combined rollout refreshes native progress only after read-only validation", async t => {
+  const { advanceNative, nativeCoordinatorAction, nativeConfigurationFingerprint } = require("../scripts/externalBridgeRollout");
+  const f = fixture(t); completeHandoff(f, true);
+  const context = loadManifest(f.manifestPath, "activation");
+  const output = path.join(f.directory, ".deployment");
+  const report = { status: "DEPOSITS_ACTIVE_CANARY_REQUIRED", calls: [], operator: {}, safe: { executionOrder: [] } };
+  for (const stage of ["configured", "active"]) writeJson(path.join(output, `native-${stage}.json`), { fingerprint: "old-code-fingerprint" });
+  let validations = 0;
+  const options = { verifyNativeActivation: async () => { validations++; },
+    nativeHandoff: async () => { throw new Error("active configuration must not be repeated"); } };
+  assert.equal(await advanceNative(context, f.artifacts, report, output, f.manifestPath, {}, options), undefined);
+  assert.equal(validations, 1);
+  assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath), undefined);
+  assert.equal(readJson(path.join(output, "native-active.json")).fingerprint, nativeConfigurationFingerprint(context));
+  writeJson(path.join(output, "native-active.json"), { fingerprint: "unverified" });
+  await assert.rejects(advanceNative(context, f.artifacts, report, output, f.manifestPath, {}, {
+    ...options, verifyNativeActivation: async () => { throw new Error("native configuration drift"); },
+  }), /native configuration drift/);
+  assert.equal(readJson(path.join(output, "native-active.json")).fingerprint, "unverified");
+});
+
+
+function remainingConfiguration(t, { required = () => 2, lag = false } = {}) {
+  const { governanceBatch } = require("../scripts/lib/externalBridgeOrchestration");
+  const f = fixture(t); configured(f);
+  const chain = f.config.chains[0];
+  chain.routes[0].rebaseRequired = true;
+  chain.routes.forEach(route => { route.autoRouteEnabled = true; });
+  f.state.routes.chains.clear(); f.state.routes.routes.clear(); f.state.routes.rebaseRequired.clear();
+  const admins = [addr("8").slice(2), addr("9").slice(2), addr("a").slice(2)];
+  const votes = new Map(), sends = [], executions = [];
+  let actor = admins[0], staleState, waitCount = 0;
+  const read = async () => {
+    const calls = governanceProgress(f.config, staleState || f.state, { stage: "activation", activationErrors: [] });
+    for (const item of calls) {
+      item.governanceAdmins = admins;
+      item.governanceVoters = [...(votes.get(item.id) || [])];
+      item.requiredAdminVotes = required(item);
+      item.recordedAdminVotes = item.governanceVoters.length;
+    }
+    return { calls, inactiveTokens: [] };
+  };
+  const inspect = async () => {
+    const source = await read();
+    return { source, externalReady: true, router: { paused: true }, report: {
+      approvalHash: "batch", calls: source.calls, checks: [{ name: "strato", status: "PENDING" }], liveVoteCounts: { status: "LIVE" },
+    } };
+  };
+  const options = {
+    stateless: true, indexWaitMs: 1000,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ address: `0x${actor}` }) }),
+    sourceState: read,
+    wait: async () => { waitCount++; staleState = undefined; },
+    submit: async (_user, call, record) => {
+      const id = digest(call), item = (await read()).calls.find(item => item.id === id);
+      assert(item, "only a call from the reviewed configuration can be submitted");
+      const voters = votes.get(id) || new Set();
+      assert(!voters.has(actor), "a prior vote must not be submitted again");
+      voters.add(actor); votes.set(id, voters); sends.push({ id, actor, method: call.args._func });
+      if (voters.size >= item.requiredAdminVotes) {
+        assert.equal(item.status, "READY", "dependent calls must not execute before prerequisites");
+        const values = call.args._args.map(arg => arg.value);
+        if (call.args._func === "setChain") {
+          if (lag) staleState = structuredClone(f.state);
+          f.state.routes.chains.set(String(values[4]), { ...chain, enabled: values[3], lastProcessedBlock: values[5] });
+        } else if (call.args._func === "setRoute") {
+          const route = chain.routes.find(route => route.externalToken === values[0] && route.stratoToken === values[2]);
+          f.state.routes.routes.set(`${values[0]}:${values[1]}:${values[2]}`, { ...route });
+        } else if (call.args._func === "setRouteRebaseRequired") {
+          const key = `${values[0]}:${values[1]}:${values[2]}`;
+          values[3] ? f.state.routes.rebaseRequired.add(key) : f.state.routes.rebaseRequired.delete(key);
+        } else throw new Error(`Unexpected mutation ${call.args._func}`);
+        votes.delete(id); executions.push(call.args._func);
+      }
+      await record([`tx-${sends.length}`]);
+      return { status: "VOTED", hashes: [`tx-${sends.length}`] };
+    },
+  };
+  return { f, inspect, options, read, sends, executions, admins, votes, setActor: value => { actor = value; },
+    batch: governanceBatch, waitCount: () => waitCount };
+}
+
+test("one reviewed batch resumes a partial rollout and completes dependencies with two admins", async t => {
+  const { createApprovalRequest, decodeApprovalRequest, validateApprovalCalls } = require("../scripts/externalBridgeRollout");
+  const h = remainingConfiguration(t), initial = await h.inspect();
+  const request = createApprovalRequest({ schemaVersion: 1 }, initial.report);
+  assert.equal(request.packet.phase, "configuration");
+  assert.equal(request.packet.calls.length, 3);
+  assert.deepEqual(request.packet.calls.map(item => item.call.args._func), ["setChain", "setRoute", "setRouteRebaseRequired"]);
+  assert(!request.packet.calls.some(item => item.call.args._func === "initialize" || item.call.args._func === "setDepositAction"));
+  const approved = validateApprovalCalls(request.packet, initial);
+  const inspection = { ...initial, report: { ...initial.report, calls: approved } };
+  const first = await vote(h.f.context, h.f.artifacts, inspection, "batch", h.options);
+  assert.equal(first.length, 3); assert.equal(h.sends.length, 3); assert.equal(h.executions.length, 0);
+  const retry = await vote(h.f.context, h.f.artifacts, inspection, "batch", h.options);
+  assert(retry.every(result => result.status === "ALREADY_VOTED")); assert.equal(h.sends.length, 3);
+  h.setActor(h.admins[1]);
+  const current = await h.inspect();
+  const second = await vote(h.f.context, h.f.artifacts, { ...current, report: { ...current.report,
+    calls: validateApprovalCalls(request.packet, current) } }, "batch", h.options);
+  assert.equal(second.length, 3); assert.equal(h.sends.length, 6);
+  assert.deepEqual(h.executions, ["setChain", "setRoute", "setRouteRebaseRequired"]);
+  const completed = await h.inspect();
+  assert(validateApprovalCalls(request.packet, completed).every(item => item.status === "COMPLETE"));
+  assert.deepEqual(h.batch(completed.report).calls.map(item => item.call.args._func), ["setChain", "setDepositAction"]);
+  assert.equal(h.batch(completed.report).phase, "activation");
+});
+
+test("batch waits briefly for indexed prerequisite execution and then finishes in the same command", async t => {
+  const h = remainingConfiguration(t, { lag: true });
+  const first = await h.inspect(); await vote(h.f.context, h.f.artifacts, first, "batch", h.options);
+  h.setActor(h.admins[1]);
+  const second = await h.inspect(); await vote(h.f.context, h.f.artifacts, second, "batch", h.options);
+  assert.equal(h.waitCount(), 1); assert.equal(h.executions.length, 3); assert.equal(h.sends.length, 6);
+});
+
+test("dependent votes that would execute under a lower threshold wait for prerequisites", async t => {
+  const h = remainingConfiguration(t, { required: item => item.call.args._func === "setRoute" ? 1 : 2 });
+  const inspection = await h.inspect();
+  const result = await vote(h.f.context, h.f.artifacts, inspection, "batch", h.options);
+  assert.deepEqual(h.sends.map(item => item.method), ["setChain"]);
+  assert.equal(result.at(-1).status, "WAITING_FOR_PREREQUISITES");
+  assert.equal(h.executions.length, 0); assert.equal(h.waitCount(), 0);
+});
+
+test("an interrupted batch resumes after fresh reconciliation without repeating votes", async t => {
+  const h = remainingConfiguration(t), inspection = await h.inspect();
+  let count = 0;
+  await assert.rejects(vote(h.f.context, h.f.artifacts, inspection, "batch", { ...h.options,
+    submit: async (...args) => { const receipt = await h.options.submit(...args); if (++count === 2) throw new Error("response lost after submitted vote"); return receipt; },
+  }), /response lost/);
+  assert.equal(h.sends.length, 2);
+  const resumed = await h.inspect();
+  const result = await vote(h.f.context, h.f.artifacts, resumed, "batch", h.options);
+  assert.equal(h.sends.length, 3);
+  assert.equal(result.filter(item => item.status === "ALREADY_VOTED").length, 2);
+});
+
+test("batch rejects changed arguments, missing parents, non-admin identities and expiry", async t => {
+  const { createApprovalRequest, validateApprovalCalls } = require("../scripts/externalBridgeRollout");
+  const h = remainingConfiguration(t), initial = await h.inspect();
+  const packet = createApprovalRequest({ schemaVersion: 1 }, initial.report).packet;
+  assert.throws(() => validateApprovalCalls({ ...packet, calls: packet.calls.slice(1) }, initial), /prerequisite/);
+  const changed = structuredClone(packet); changed.calls[1].call.args._args[3].value = false;
+  assert.throws(() => validateApprovalCalls(changed, initial), /changed/);
+  h.setActor(addr("b").slice(2));
+  await assert.rejects(vote(h.f.context, h.f.artifacts, initial, "batch", h.options), /not an admin/);
+  assert.equal(h.sends.length, 0);
+  h.setActor(h.admins[0]);
+  await assert.rejects(vote(h.f.context, h.f.artifacts, initial, "batch", { ...h.options, approvalExpiresAt: Date.now() - 1 }), /expired/);
+  assert.equal(h.sends.length, 0);
+});
+
+test("chain conflicts remain hard blockers even while token permissions are pending", t => {
+  const { governanceBatch } = require("../scripts/lib/externalBridgeOrchestration");
+  const f = fixture(t); configured(f);
+  f.state.routes.chains.get(String(f.config.chains[0].externalChainId)).vault = addr("f");
+  f.state.permissionErrors = [`Missing bridge mint permission for STRATO token ${f.config.chains[0].routes[0].stratoToken}`];
+  const calls = governanceProgress(f.config, f.state);
+  assert.equal(calls.find(item => item.call.args._func === "setChain").reasonCode, "CHAIN_CONFLICT");
+  assert.equal(governanceBatch({ calls }).calls.length, 0);
+});
+
+test("default rebase flags do not create stale future governance issues", t => {
+  const { governanceBatch } = require("../scripts/lib/externalBridgeOrchestration");
+  const f = fixture(t); initialized(f);
+  const calls = governanceProgress(f.config, f.state);
+  assert(calls.filter(item => item.call.args._func === "setRouteRebaseRequired").every(item => item.status === "COMPLETE"));
+  assert(!governanceBatch({ calls }).calls.some(item => item.call.args._func === "setRouteRebaseRequired"));
+});
+
+
+test("new EAB chains stay disabled through configuration and require readiness before enablement", t => {
+  const { governanceBatch, isActivationCall } = require("../scripts/lib/externalBridgeOrchestration");
+  const f = fixture(t); configured(f);
+  const chain = f.config.chains[0];
+  f.state.routes.chains.delete(String(chain.externalChainId));
+  const initial = governanceProgress(f.config, f.state);
+  const configuredChain = initial.find(item => item.call.args._func === "setChain" && !isActivationCall(item));
+  assert.equal(configuredChain.call.args._args[3].value, false);
+  assert.equal(governanceBatch({ calls: initial }).phase, "configuration");
+  assert(governanceBatch({ calls: initial }).calls.every(item => !isActivationCall(item)));
+  f.state.routes.chains.set(String(chain.externalChainId), { ...chain, enabled: false, lastProcessedBlock: "2000" });
+  for (const route of chain.routes) f.state.actions.actionConfigs.set(`${route.externalToken}:${chain.externalChainId}:${route.stratoToken}`, { autoRoute: route.autoRouteEnabled });
+  for (const options of [{ stage: "initial" }, { stage: "activation", activationErrors: ["runtime unavailable"] }]) {
+    const calls = governanceProgress(f.config, f.state, options);
+    const activation = calls.find(item => item.call.args._func === "setChain" && isActivationCall(item));
+    assert.equal(activation.status, "BLOCKED");
+    assert.equal(governanceBatch({ calls }).calls.length, 0);
+  }
+  const calls = governanceProgress(f.config, f.state, { stage: "activation", activationErrors: [] });
+  const batch = governanceBatch({ calls });
+  assert.equal(batch.phase, "activation");
+  const enable = batch.calls.find(item => item.call.args._func === "setChain");
+  assert.equal(enable.call.args._args[3].value, true);
+  assert.equal(enable.call.args._args[5].value, "2000");
+  assert.equal(enable.status, "READY");
+  f.state.routes.chains.get(String(chain.externalChainId)).enabled = true;
+  assert(governanceProgress(f.config, f.state, { stage: "activation", activationErrors: [] })
+    .filter(item => item.call.args._func === "setChain").every(item => item.status === "COMPLETE"));
 });

@@ -643,3 +643,22 @@ test("deprecated generator explains how to use the new settings format", () => {
   assert.match(result.stderr, /deprecated generator accepts legacy settings/);
   assert.match(result.stderr, /scripts\/externalBridgeRollout.js/);
 });
+
+
+test("Robinhood testnet stores its friendly chain name without changing deployment identifiers or boundaries", () => {
+  const { getExternalBridgeNetwork } = require("../scripts/lib/externalBridgeNetworks");
+  const { buildPlan } = require("../../contracts/deploy/configure-external-bridge");
+  const network = getExternalBridgeNetwork(46630);
+  assert.equal(network.name, "robinhoodTestnet");
+  assert.equal(network.rpcEnv, "ROBINHOOD_TESTNET_RPC_URL");
+  const generated = buildRolloutTemplates({ settings,
+    deployment: { ...deployment, chainId: "46630", network: network.name }, bridgeDefaults: bridgeTemplate });
+  const chain = generated.bridgeTemplate.chains[0];
+  assert.equal(chain.chainName, "Robinhood Chain Testnet");
+  const calls = buildPlan({ adminRegistry: bridgeTemplate.adminRegistry, tokenRouter: generated.bridgeTemplate.tokenRouter,
+    bridge: generated.bridgeTemplate.externalAssetBridge, chains: [chain], mintPolicies: [] }, "routes");
+  const setChain = calls.find(call => call.args._func === "setChain");
+  assert.deepEqual(setChain.args._args.map(({ value }) => value),
+    ["Robinhood Chain Testnet", vault.slice(2), router.slice(2), true, "46630", "1234"]);
+  assert.equal(buildRolloutTemplates({ settings, deployment, bridgeDefaults: bridgeTemplate }).bridgeTemplate.chains[0].chainName, "sepolia");
+});

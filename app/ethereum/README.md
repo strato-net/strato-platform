@@ -219,7 +219,7 @@ administration, and large-withdrawal approval explicitly. The new
 
 For new deployments, follow the canonical operator runbook at
 [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md) and use
-`external:rollout init|bundle|setup|plan|status|vote|verify|activate`. The standalone
+`external:rollout init|prepare|continue|approve|verify`. The standalone
 `external:rollout:prepare|finalize|generate` flow below is retained for legacy
 artifacts and is not the new-deployment workflow.
 
