@@ -118,7 +118,8 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
           whenLeft udpErr $ \theUDPErr -> do
             $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
           logAndLengthenPeerDisableBy (24 * 60 * 60) p
-        e' | Just SelfConnection <- fromException e' ->
+        e' | Just SelfConnection <- fromException e' -> do
+          $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: another node is running with it"
           -- p carries this connection's source port, but stored peers are
           -- matched by (host, listening port), so disable the stored record.
           getPeerByIP host >>= \case
@@ -126,10 +127,7 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
             Just stored -> do
               disErr <- storeDisableException stored (T.pack "SelfConnection")
               whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-              udpErr <- disableUDPPeerForSeconds stored 86400
-              whenLeft udpErr $ \theUDPErr -> do
-                $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
-              logAndLengthenPeerDisableBy (24 * 60 * 60) stored
+              disablePeerForSeconds stored 86400
         e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
           case ioErrType of
             NoSuchThing -> do

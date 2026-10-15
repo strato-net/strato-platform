@@ -37,6 +37,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     resetPeerUdp,
     getPeersClosestTo,
     disableUDPPeerForSeconds,
+    disablePeerForSeconds,
     jamshidBirth,
     lengthenPeerDisableBy,
     pPeerString,
@@ -232,6 +233,20 @@ disableUDPPeerForSeconds peer seconds = try $ do
       let seconds' = thisOr100Years seconds
           enableTime = fromIntegral seconds' `addUTCTime` currentTime
        in updateUdpEnableTime peer enableTime
+
+-- | Keep a peer from being dialed (TCP) or pinged (UDP) for a fixed time.
+-- Unlike 'lengthenPeerDisableBy', which starts a fresh peer's exponential
+-- backoff at five seconds, both deadlines are set to the full duration.
+disablePeerForSeconds ::
+  (MonadUnliftIO m, HasPeerDB m) =>
+  PPeer ->
+  Int ->
+  m (Either SomeException ())
+disablePeerForSeconds peer seconds = try $ do
+  currentTime <- liftIO getCurrentTime
+  let enableTime = fromIntegral (thisOr100Years seconds) `addUTCTime` currentTime
+  updateTcpEnableTime peer enableTime
+  updateUdpEnableTime peer enableTime
 
 resetPeers :: IO ()
 resetPeers = withGlobalSQLPool $ runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
