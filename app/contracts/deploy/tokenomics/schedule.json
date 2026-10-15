@@ -1,0 +1,145 @@
+{
+  "source": "tokenomics.xlsx",
+  "sheetTgeDate": "2026-06-30",
+  "totalSupplyWei": "100000000000000000000000000",
+  "categories": [
+    {
+      "key": "team",
+      "label": "Team",
+      "category": "Team",
+      "kind": "vesting",
+      "sheetPercent": "14.03999999999999400",
+      "tokens": "14040000",
+      "wei": "14040000000000000000000000",
+      "cliffMonths": 12,
+      "cliffUnlockBps": 0,
+      "vestingMonths": 24
+    },
+    {
+      "key": "advisors",
+      "label": "Advisors",
+      "category": "Advisors",
+      "kind": "vesting",
+      "sheetPercent": "0.500",
+      "tokens": "500000",
+      "wei": "500000000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 2500,
+      "vestingMonths": 12
+    },
+    {
+      "key": "investors",
+      "label": "Private sales",
+      "category": "Investors",
+      "kind": "vesting",
+      "sheetPercent": "30.2948901440611400",
+      "tokens": "30294890",
+      "wei": "30294890000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 0,
+      "vestingMonths": 24
+    },
+    {
+      "key": "publicSales",
+      "label": "Public sales",
+      "category": "Public sales",
+      "kind": "vesting",
+      "sheetPercent": "5.00",
+      "tokens": "5000000",
+      "wei": "5000000000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 10000,
+      "vestingMonths": 0
+    },
+    {
+      "key": "airdrop",
+      "label": "Airdrop",
+      "category": "Airdrop",
+      "kind": "vesting",
+      "sheetPercent": "5.00",
+      "tokens": "5000000",
+      "wei": "5000000000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 10000,
+      "vestingMonths": 0
+    },
+    {
+      "key": "tvlDeal1",
+      "label": "Ecosystem rewards (TVL Deal 1)",
+      "category": "Ecosystem rewards",
+      "kind": "vesting",
+      "sheetPercent": "0.900",
+      "tokens": "900000",
+      "wei": "900000000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 2500,
+      "vestingMonths": 6
+    },
+    {
+      "key": "ongoingTvl",
+      "label": "Ecosystem rewards (Ongoing TVL)",
+      "category": "Ecosystem rewards",
+      "kind": "emission",
+      "sheetPercent": "15.100",
+      "tokens": "15100000",
+      "wei": "15100000000000000000000000",
+      "yearlyWei": [
+        "3379079504070713640000000",
+        "2704462905336795360000000",
+        "2164530191589619920000000",
+        "1732392387803719920000000",
+        "1386528770530209600000000",
+        "1109715122880018720000000",
+        "888165958127000520000000",
+        "710847994148621760000000",
+        "568930689317034648000000",
+        "455346476196265912000000"
+      ]
+    },
+    {
+      "key": "bootstrapping",
+      "label": "Ecosystem rewards (Bootstrapping Emissions)",
+      "category": "Ecosystem rewards",
+      "kind": "emission",
+      "sheetPercent": "8.00",
+      "tokens": "8000000",
+      "wei": "8000000000000000000000000",
+      "yearlyWei": [
+        "1491669895449853800000000",
+        "1268577542662776960000000",
+        "1078850613434820960000000",
+        "917499015208478400000000",
+        "780278967658375920000000",
+        "663581385132798720000000",
+        "564336952482813600000000",
+        "479935397636048208000000",
+        "408156837667096488000000",
+        "347113392666936944000000"
+      ]
+    },
+    {
+      "key": "ecosystemFund",
+      "label": "Ecosystem fund (Listing costs, Launchpool, MM loans, DEX liquidity)",
+      "category": "Ecosystem fund",
+      "kind": "vesting",
+      "sheetPercent": "15.165109855938800",
+      "tokens": "15165110",
+      "wei": "15165110000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 5000,
+      "vestingMonths": 24
+    },
+    {
+      "key": "ecosystemDev",
+      "label": "Ecosystem development",
+      "category": "Ecosystem development",
+      "kind": "vesting",
+      "sheetPercent": "6.00",
+      "tokens": "6000000",
+      "wei": "6000000000000000000000000",
+      "cliffMonths": 0,
+      "cliffUnlockBps": 0,
+      "vestingMonths": 24
+    }
+  ]
+}

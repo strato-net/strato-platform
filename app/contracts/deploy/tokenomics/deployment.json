@@ -1,0 +1,22 @@
+{
+  "tge": "2026-10-26T00:00:00Z",
+  "token": "2ca3e170e6714282da77815f7864b17f612f5f83",
+  "cirrusPrefix": "BlockApps",
+  "setupAdmin": "<SETUP_ADMIN>",
+  "treasury": "<TREASURY_MULTISIG>",
+  "preMinted": {
+    "publicSales": "2750000",
+    "remainder": "bootstrapping"
+  },
+  "beneficiaries": {
+    "team": [{ "address": "<TEAM_MEMBER_1>", "tokens": "14040000" }],
+    "advisors": [{ "address": "<ADVISOR_1>", "tokens": "500000" }],
+    "investors": [{ "address": "<INVESTOR_1>", "tokens": "30294890" }],
+    "publicSales": [{ "address": "<PUBLIC_SALE_RECIPIENT>", "tokens": "2250000" }],
+    "airdrop": [{ "address": "<AIRDROP_RECIPIENT_1>", "tokens": "5000000" }],
+    "tvlDeal1": [{ "address": "treasury", "tokens": "900000" }],
+    "ecosystemFund": [{ "address": "treasury", "tokens": "15165110" }],
+    "ecosystemDev": [{ "address": "treasury", "tokens": "6000000" }]
+  },
+  "addresses": {}
+}
