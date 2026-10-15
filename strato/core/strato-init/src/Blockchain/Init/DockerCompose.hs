@@ -157,18 +157,20 @@ generateDockerCompose role = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | role == RoleValidator ])
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | roleHasService role "redis" ])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
-            -- On a validator apex reads the chain's state from Redis (there is
-            -- no SQL block index or node_status mirror to read), requires only
-            -- the Prometheus jobs the node runs, and is published for the
+            -- apex reads the last block and validators from Redis wherever the
+            -- node has one, so it starts after Redis. On a validator it requires
+            -- only the Prometheus jobs the node runs, serves the health routes
+            -- alone (no /user, no SMD socket rooms), and is published for the
             -- network monitor on apexPort.
             ++ [ ("HEALTH_CHECK_JOBS", "strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer") | role == RoleValidator ]
+            ++ [ ("APEX_ROLE", "validator") | role == RoleValidator ]
         , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"

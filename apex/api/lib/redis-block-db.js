@@ -20,6 +20,24 @@ const BEST_SEQUENCED_BLOCK_KEY = "<best_sequenced>";
 
 let clientPromise = null;
 
+// How long a Redis call may take before apex gives up on the block cache and
+// reads SQL instead. Left to its defaults, node-redis retries a failed
+// connection for ever (connect() never rejects) and parks commands in an
+// offline queue while Redis is away, which would hang /health and /status
+// rather than let them fall back.
+const REDIS_TIMEOUT_MS = 2000;
+
+function withTimeout(promise, what) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`Redis ${what} timed out after ${REDIS_TIMEOUT_MS} ms`)),
+      REDIS_TIMEOUT_MS
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 function getClient() {
   if (clientPromise) return clientPromise;
 
@@ -27,20 +45,43 @@ function getClient() {
   const port = parseInt(process.env.redis_port || "6379", 10);
 
   const client = createClient({
-    socket: { host, port },
+    socket: {
+      host,
+      port,
+      connectTimeout: REDIS_TIMEOUT_MS,
+      // Keep reconnecting in the background once Redis has been seen, so the
+      // cache comes back by itself; commands issued meanwhile fail at once
+      // (no offline queue) and the callers read SQL.
+      reconnectStrategy: (retries) => Math.min(retries * 100, 1000),
+    },
+    disableOfflineQueue: true,
   });
 
   client.on("error", (err) => {
     winston.warn(`Redis client error: ${err.message}`);
   });
 
-  clientPromise = client.connect().then(() => client).catch((err) => {
-    // Reset so subsequent calls retry the connection.
-    clientPromise = null;
-    throw err;
+  const connecting = withTimeout(client.connect(), "connect")
+    .then(() => client)
+    .catch((err) => {
+      // Stop the client's own retry loop; the next call starts afresh.
+      if (clientPromise === connecting) clientPromise = null;
+      client.disconnect().catch(() => {});
+      throw err;
+    });
+  client.on("end", () => {
+    if (clientPromise === connecting) clientPromise = null;
   });
 
-  return clientPromise;
+  clientPromise = connecting;
+  return connecting;
+}
+
+// GET a key as a Buffer, or null when it is absent; rejects within
+// REDIS_TIMEOUT_MS when Redis cannot answer.
+async function redisGet(key) {
+  const client = await getClient();
+  return withTimeout(client.get(commandOptions({ returnBuffers: true }), key), `GET ${key}`);
 }
 
 // Matches `syncStatusKey = "<sync_status>"` in SyncDB.hs: the node's own
@@ -63,8 +104,7 @@ function rlpNumber(bytes) {
 // { number, hash }, the hash as 64 hex chars without a 0x prefix like the
 // block_data_ref.hash column, or null when Redis has no best block yet.
 async function getBestBlock() {
-  const client = await getClient();
-  const buf = await client.get(commandOptions({ returnBuffers: true }), BEST_BLOCK_KEY);
+  const buf = await redisGet(BEST_BLOCK_KEY);
   if (!buf) return null;
 
   const decoded = RLP.decode(buf);
@@ -86,8 +126,7 @@ async function getBestBlockNumber() {
 // Returns the parent hash of the block with the given hex hash, or null when
 // Redis does not hold that block.
 async function getParentHash(hash) {
-  const client = await getClient();
-  const buf = await client.get(commandOptions({ returnBuffers: true }), PARENT_KEY_PREFIX + hash);
+  const buf = await redisGet(PARENT_KEY_PREFIX + hash);
   if (!buf) return null;
   return Buffer.from(RLP.decode(buf)).toString("hex").padStart(64, "0");
 }
@@ -95,8 +134,7 @@ async function getParentHash(hash) {
 // Returns the node's sync status from Redis (true, false), or null when the
 // node has not written one yet.
 async function getSyncStatus() {
-  const client = await getClient();
-  const buf = await client.get(commandOptions({ returnBuffers: true }), SYNC_STATUS_KEY);
+  const buf = await redisGet(SYNC_STATUS_KEY);
   if (!buf) return null;
   // The flag is one RLP byte: 0x01 for True, 0x00 for False (seen on a node
   // syncing from genesis; an empty value would also mean False).
@@ -109,8 +147,7 @@ async function getSyncStatus() {
 // Each validator is returned as a 40-char lowercase hex address without a
 // 0x prefix, matching the metadata endpoint's JSON format.
 async function getValidators() {
-  const client = await getClient();
-  const buf = await client.get(commandOptions({ returnBuffers: true }), BEST_SEQUENCED_BLOCK_KEY);
+  const buf = await redisGet(BEST_SEQUENCED_BLOCK_KEY);
   if (!buf) return null;
 
   const decoded = RLP.decode(buf);

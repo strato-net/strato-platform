@@ -16,11 +16,13 @@ so that they could be properly moved to their respective version's subsection.
 
 ## [Unrealeased]
 ### Added
-- `--role=validator` (`strato-up --validator` for short): a lite validator that runs only the chain processes (ethereum-discover, strato-p2p, strato-sequencer, vm-runner, the Redis block index) with Postgres, Redis, Prometheus and apex, the last published on port 80 (plain HTTP) so the network monitor can poll `/health`. No app, SMD, nginx, PostgREST, Cirrus (slipstream), strato-api or JSON-RPC; no SQL state mirror and no `vmevents` stream. Built from `strato-indexer --sql=false`, the `publishVmEvents` VM setting, strato-p2p reading the genesis hash and seeding its sync tasks from Redis, and apex reading the last block, validators and sync flag from Redis before SQL.
+- `--role=validator` (`strato-up --validator` for short): a lite validator that runs only the chain processes (ethereum-discover, strato-p2p, strato-sequencer, vm-runner, the Redis block index) with Postgres, Redis, Prometheus and apex, the last published on port 80 (plain HTTP) so the network monitor can poll `/health`; on a validator apex serves only `/health`, `/status`, `/_ping` and `/metrics` (no `/user`, no SMD socket rooms). No app, SMD, nginx, PostgREST, Cirrus (slipstream), strato-api or JSON-RPC; no SQL state mirror and no `vmevents` stream. Built from `strato-indexer --sql=false`, the `publishVmEvents` VM setting, strato-p2p reading the genesis hash and seeding its sync tasks from Redis, and apex reading the last block, validators and sync flag from Redis before SQL.
 - Partial support for ipv6
 - `Blockchain.Forks.isOperatorPrecedenceForkActive`: the SolidVM parser's operator table is now a fork-gated choice. Live networks (helium, upquark, forktest) keep the legacy table until a height is scheduled; every other network gets Solidity's precedence from genesis. The code-collection cache is keyed by the choice.
 
 ### Changed
+- apex `/health` and `/status` read the last block and the validator list from the Redis block cache wherever the node has one, before `node_status` and SQL; `lastBlock.nonce` is therefore null on such nodes. Redis reads fail fast (2 s) and fall back, instead of waiting for Redis to come back. The stall check gives no verdict on its first run, and the SMD pollers stay idle, without crashing apex, while the SQL block index is absent or Postgres is not up yet.
+- strato-p2p reads the genesis hash for the handshake from Redis before `block_data_ref`, and on every start retires unfinished sync tasks below the chiliad of the Redis best block and starts the next task there (logged at startup); this applies to every role, not only validators.
 - Total difficulty now refers to block number (corresponds to ethVersion now being 63)
 
 ### Fixed

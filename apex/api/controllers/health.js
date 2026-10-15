@@ -169,11 +169,6 @@ module.exports = {
   },
 };
 
-// Fetches the node's own blockchain address from Prometheus.
-// The address is carried in the `address` label of the `pbft_node_identity`
-// metric, which the blockstanbul consensus layer emits once it has resolved
-// the node identity (from Vault). Returns null if unavailable so /status
-// remains usable.
 // The last block, as { number, hash, parentHash, nonce }. Redis first: the
 // block cache strato-indexer keeps for p2p, which is what strato-ps reports
 // and all a lite validator has (no SQL block index, no node_status mirror).
@@ -235,6 +230,11 @@ async function getValidators() {
   });
 }
 
+// Fetches the node's own blockchain address from Prometheus.
+// The address is carried in the `address` label of the `pbft_node_identity`
+// metric, which the blockstanbul consensus layer emits once it has resolved
+// the node identity (from Vault). Returns null if unavailable so /status
+// remains usable.
 async function getNodeAddress() {
   try {
     if (!process.env["PROMETHEUS_HOST"]) {

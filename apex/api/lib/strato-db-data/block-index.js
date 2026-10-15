@@ -10,8 +10,10 @@ let probe = null;
 
 function hasBlockIndex() {
   if (!probe) {
-    // One probe shared by every poller that asks before it resolves; a failed
-    // probe (the database not up yet) is forgotten so the next poll retries.
+    // One probe shared by every poller that asks before it resolves. A failed
+    // probe (the database not up yet) answers false and is forgotten so the
+    // next poll retries; it never rejects, because the pollers run from
+    // setInterval, where a rejection is unhandled and ends the process.
     probe = db.sequelize
       .query("SELECT to_regclass('public.block_data_ref') AS t")
       .then(([[row]]) => {
@@ -25,7 +27,8 @@ function hasBlockIndex() {
       })
       .catch((err) => {
         probe = null;
-        throw err;
+        winston.warn(`Could not tell whether this node keeps the SQL block index, retrying next poll: ${err.message}`);
+        return false;
       });
   }
   return probe;

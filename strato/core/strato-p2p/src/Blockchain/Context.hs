@@ -565,12 +565,16 @@ initConfig wireMessagesRef = do
   -- blocks it misses; a node that kept up by gossip for a long time has a
   -- sequence far behind its chain. Start the next task at the chiliad of the
   -- best block Redis holds, and retire unfinished tasks below it: those
-  -- blocks are already here.
+  -- blocks are already here. This runs on every role; cores sharing a peer
+  -- database may run it at the same time, which is harmless: the UPDATE is
+  -- idempotent and GREATEST keeps the sequence monotonic.
   bestBlock <- liftIO $ Redis.runRedis redisBDBPool getBestBlockInfo
   case bestBlock of
     Just (BestBlock _ n) | n >= 1000 -> do
       let chiliad = n `div` 1000
           chiliadV = SQL.PersistInt64 (fromIntegral chiliad)
+      $logInfoS "initConfig/syncTasks" . T.pack $
+        "Redis best block is #" ++ show n ++ ": sync tasks start at chiliad " ++ show chiliad ++ ", unfinished tasks below it are retired"
       runSqlPool (SQL.rawExecute "UPDATE sync_task SET status = 'Finished' WHERE chiliad < ? AND status != 'Finished'" [chiliadV]) $ peerDB' dbs
       if peerStoreIsSqlite
         then do

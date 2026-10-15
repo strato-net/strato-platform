@@ -42,11 +42,13 @@ for arg in "$@"; do
         # snapshot (chain state) has nothing to restore into an API-only directory.
         --role=*)
             ROLE="${arg#*=}"
+            ROLE_FLAG="$ROLE"
             SETUP_ARGS+=("$arg")
             ;;
         # Shorthand for --role=validator, understood by strato-setup too.
         --validator|--validator=true)
             ROLE="validator"
+            VALIDATOR_FLAG="true"
             SETUP_ARGS+=("$arg")
             ;;
         *)
@@ -56,6 +58,10 @@ for arg in "$@"; do
 done
 
 NODE_DIR="$1"
+
+if [[ "${VALIDATOR_FLAG:-}" == "true" && -n "${ROLE_FLAG:-}" && "$ROLE_FLAG" != "validator" ]]; then
+    echo "Note: --validator overrides --role=$ROLE_FLAG; setting up a validator."
+fi
 
 if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
     echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
