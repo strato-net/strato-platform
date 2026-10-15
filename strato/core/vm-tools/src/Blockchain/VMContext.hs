@@ -45,7 +45,6 @@ module Blockchain.VMContext
     codeDB,
     blockSummaryDB,
     redisPool,
-    sqldb,
     memHashDB,
     memCodeDB,
     memBlockSummaryDB,
@@ -93,7 +92,6 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SQLDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
@@ -134,7 +132,6 @@ import qualified Data.NibbleString as N
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Database.LevelDB.Base as DB
-import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Blockchain.Data.VmTrace (VmTracer)
 import Debugger
@@ -174,8 +171,7 @@ data ContextDBs = ContextDBs
     _hashDB :: HashDB,
     _codeDB :: CodeDB,
     _blockSummaryDB :: BlockSummaryDB,
-    _redisPool :: RBDB.RedisConnection,
-    _sqldb :: SQLDB
+    _redisPool :: RBDB.RedisConnection
   }
   deriving (Generic, NFData)
 
@@ -309,9 +305,8 @@ nodeDBFor (Memory _) = liftIO memoryNodeDB
 nodeDBFor (Persistent d) = liftIO $ cachedNodeDB 20000 256 (levelDBBytes . MP.unStateDB $ _stateDB d)
 nodeDBFor (Sandbox _ d) = pure $ nodeDB (levelDBBytes . MP.unStateDB $ _stateDB d)
 
--- | Build the context inside 'ContextM' (the SQL pool wants the logger),
--- then run the body under it. The builder runs under an inert in-memory
--- context.
+-- | Build the context inside 'ContextM', then run the body under it. The
+-- builder runs under an inert in-memory context.
 runWithContext :: ContextM Context -> ContextM a -> StreamM '[Logger] (a, ContextState)
 runWithContext mkCtx f = do
   seed <- memContext (const (pure Nothing)) Nothing
@@ -414,11 +409,9 @@ runTestContextM ::
   ContextM a ->
   Eff '[Logger] (a, ContextState)
 runTestContextM f =
-  withRunInIO $ \runInIO -> withSystemTempDirectory "test_evm_context" $ \tmpdir ->
-    withTempFile tmpdir "evm.sqlite" $ \filepath _ -> runInIO $ do
+  withRunInIO $ \runInIO -> withSystemTempDirectory "test_evm_context" $ \tmpdir -> runInIO $ do
       env <- createStreamEnv "test" (tmpdir ++ "/jlog", 0)
       let mkCtx = do
-            conn <- Lite.createSqlitePool (T.pack filepath) 20
             let ldbOptions =
                   DB.defaultOptions
                     { DB.createIfMissing = True,
@@ -454,8 +447,7 @@ runTestContextM f =
                           _hashDB = HashDB hdb,
                           _codeDB = CodeDB cdb,
                           _blockSummaryDB = BlockSummaryDB blksumdb,
-                          _redisPool = RBDB.RedisConnection rPool,
-                          _sqldb = SQLDB conn
+                          _redisPool = RBDB.RedisConnection rPool
                         },
                   _state = cstate,
                   _stateDiffQueue = que,
@@ -482,7 +474,6 @@ initReplayContext = initContextWithOptions
 initContextWithOptions :: Int -> Int -> ContextM Context
 initContextWithOptions cacheBytes writeBufferBytes = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  conn <- createPostgresqlPool connStr 20
   let ldbOptions =
         DB.defaultOptions
           { DB.createIfMissing = True,
@@ -504,8 +495,7 @@ initContextWithOptions cacheBytes writeBufferBytes = do
             _hashDB = HashDB hdb,
             _codeDB = CodeDB cdb,
             _blockSummaryDB = BlockSummaryDB blksumdb,
-            _redisPool = RBDB.RedisConnection rPool,
-            _sqldb = conn
+            _redisPool = RBDB.RedisConnection rPool
           }
 
   cstate <-
@@ -541,7 +531,7 @@ evalContextM clientId mkCtx f = fst <$> runContextM clientId mkCtx f
 execContextM :: T.Text -> ContextM Context -> ContextM a -> Eff '[Logger] ContextState
 execContextM clientId mkCtx f = snd <$> runContextM clientId mkCtx f
 
--- | A context over in-memory stores only: no LevelDB, SQL, or Redis.
+-- | A context over in-memory stores only: no LevelDB or Redis.
 memContext :: MonadIO m => (FilePath -> IO (Maybe (Either String String))) -> Maybe DebugSettings -> m Context
 memContext resolver dSettings = liftIO $ do
   overlay <- newIORef def

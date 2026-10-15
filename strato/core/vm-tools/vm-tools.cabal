@@ -76,7 +76,6 @@ library
     , mtl
     , nibblestring
     , ordered-containers
-    , persistent-sqlite
     , prometheus-client
     , quickcheck-instances
     , resourcet

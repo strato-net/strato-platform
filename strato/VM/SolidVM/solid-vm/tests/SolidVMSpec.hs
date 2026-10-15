@@ -35,7 +35,6 @@ import Blockchain.Data.GenesisInfo
 import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Control.Monad.Composable.StateDB as MP
-import Blockchain.DB.SQLDB
 import Blockchain.GenesisBlocks.Builder
 import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
@@ -304,9 +303,6 @@ writeBlockSummary block =
       header = obBlockData block
       txCnt = fromIntegral $ length (obReceiptTransactions block)
    in putBSum sha (blockHeaderToBSum header txCnt)
-
-instance AccessibleEnv SQLDB ContextM where
-  accessEnv = fmap (view $ dbs . sqldb) accessEnv
 
 runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do

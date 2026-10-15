@@ -34,7 +34,6 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
@@ -187,9 +186,6 @@ instance (Keccak256 `A.Alters` BlockSummary) ContextM where
   lookup _ k = readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) k) k
   insert _ k v = writeStore memBlockSummaryDB (\d -> genericInsertBlockSummaryDB (pure $ _blockSummaryDB d) k v) k (Just v)
   delete _ k = writeStore memBlockSummaryDB (\d -> genericDeleteBlockSummaryDB (pure $ _blockSummaryDB d) k) k Nothing
-
-instance Mod.Accessible SQLDB ContextM where
-  access _ = _sqldb <$> getDBs
 
 instance Mod.Accessible RBDB.RedisConnection ContextM where
   access _ = _redisPool <$> getDBs
