@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -O0 #-}
+{-# OPTIONS_GHC -O0 -fno-ignore-interface-pragmas #-}
 -- Optimizing embedded inspection syntax trees is costly and does not improve
 -- native execution. SolidVM.Compile retains the package's optimization level.
 {-# LANGUAGE DataKinds, GADTs, KindSignatures, TypeOperators, RankNTypes, ScopedTypeVariables,
