@@ -28,7 +28,18 @@ chmod 700 "$ROLLOUT_DIR" "$ROLLOUT_DIR/.deployment"
 eval "$(cd "$REPO_ROOT/app/ethereum" && npm run --silent network:environment)"
 ```
 
-Verify `TARGET_NETWORK`, `TARGET_CHAIN_ID`, `TARGET_RPC_ENV`, `VERIFIER_COUNT`, and `VERIFIER_THRESHOLD`.
+Verify the selected network before continuing:
+
+```bash
+printf '%s\n' \
+  "TARGET_NETWORK=$TARGET_NETWORK" \
+  "TARGET_CHAIN_ID=$TARGET_CHAIN_ID" \
+  "TARGET_RPC_ENV=$TARGET_RPC_ENV" \
+  "VERIFIER_COUNT=$VERIFIER_COUNT" \
+  "VERIFIER_THRESHOLD=$VERIFIER_THRESHOLD"
+```
+
+Confirm that the network, chain ID and RPC variable name match the intended target. Testnet must show `VERIFIER_COUNT=3` and `VERIFIER_THRESHOLD=2`; production must show `VERIFIER_COUNT=5` and `VERIFIER_THRESHOLD=3`. `TARGET_RPC_ENV` is the variable name to populate in `app/ethereum/.env`, not the RPC URL itself.
 
 STRATO admins keep their STRATO credentials in `app/contracts/.env`.
 
@@ -38,8 +49,13 @@ Coordinator keeps rollout OAuth and RPC credentials in `$ROLLOUT_DIR/deployment.
 OAUTH_URL=<STRATO_OPENID_DISCOVERY_URL>
 OAUTH_CLIENT_ID=<STRATO_CLIENT_ID>
 OAUTH_CLIENT_SECRET=<STRATO_CLIENT_SECRET>
+GLOBAL_ADMIN_NAME=<COORDINATOR_STRATO_USER>
+GLOBAL_ADMIN_PASSWORD=<COORDINATOR_STRATO_PASSWORD>
+# OAUTH_TOTP=<CURRENT_TOTP_IF_REQUIRED>
 CHAIN_<TARGET_CHAIN_ID>_RPC_URL=<TARGET_HTTPS_RPC>
 ```
+
+These are the Coordinator's own STRATO credentials. Do not copy a STRATO approval admin's credentials into this file. An existing `ACCESS_TOKEN` may be supplied instead of `GLOBAL_ADMIN_NAME` and `GLOBAL_ADMIN_PASSWORD`, but it can expire during the rollout.
 
 Coordinator configures the temporary external deployer and selected Hardhat RPC in `app/ethereum/.env`:
 
@@ -249,7 +265,7 @@ Edit only `deployment.json`:
 - add native bridge, Safe, token, signer and executor inputs unless **EAB-only**;
 - **EAB-only:** set every native route to `include=false` and omit native configuration.
 
-Review finality, automatic deposit exposure, mint refill exposure, withdrawal limits, quorum, RPC independence, authorization validity and Safe ownership.
+Use [EAB Production Configuration Guidelines](EAB_PRODUCTION_CONFIG_GUIDELINES.md) to review finality, automatic deposit exposure, mint refill exposure, withdrawal limits, quorum, RPC independence, authorization validity and Safe ownership.
 
 Run:
 
