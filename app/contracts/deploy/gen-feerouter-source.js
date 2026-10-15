@@ -3,16 +3,23 @@
 //
 //   - STRATO was deployed after genesis, so its address differs per network (and
 //     helium's STRATO address is a different token on upquark).
+//   - The canonical STRATO/USDST PoolV3 the fee is priced from. Neither network has
+//     one yet, so it is passed explicitly; without it every transaction that is not
+//     covered by a voucher fails, which is never what a deployment wants.
 //   - Helium's genesis MercataGovernance (logic 0xff behind the 0x100 proxy) predates
 //     staking and has no stakingContract() to ask, so the subclass names the staking
-//     proxy. Upquark names none: until its governance can answer, the router sends
-//     the whole USDST fee to the FeeCollector, as DeciderState's own payFees does.
+//     proxy. Upquark names none: until its governance can answer, the router still
+//     pays fees, but never notifies staking.
 //
-// Neither address can live in storage — payFees is DELEGATECALLed and SolidVM storage
+// None of these can live in storage — payFees is DELEGATECALLed and SolidVM storage
 // is name-keyed, so a state read there resolves against the signer, not the router.
 //
-//   node gen-feerouter-source.js [helium|upquark] [contractName]
-//   node gen-feerouter-source.js <stakingAddress> [contractName]   (helium STRATO)
+//   node gen-feerouter-source.js [helium|upquark] --pool <poolAddress> [contractName]
+//   node gen-feerouter-source.js <stakingAddress> --pool <poolAddress> [contractName]   (helium STRATO)
+//
+// Before installing, check the pool prices: once the router is deployed, read
+// stratoFeeQuote() after a block has run payBlockRewards; `valid` stays false until
+// the pool's observation ring covers the TWAP window.
 const path = require('path');
 const fs = require('fs');
 
@@ -30,8 +37,17 @@ const NETWORKS = {
 };
 const OUT = 'feerouter-source.txt';
 
-const arg = (process.argv[2] || 'helium').replace(/^0x/, '');
 const isAddress = (a) => /^[0-9a-fA-F]{40}$/.test(a);
+const argv = process.argv.slice(2);
+const poolIdx = argv.indexOf('--pool');
+const pool = poolIdx >= 0 ? (argv[poolIdx + 1] || '').replace(/^0x/, '') : '';
+if (!isAddress(pool)) {
+  console.error('FAILED: --pool <address> is required: the canonical STRATO/USDST PoolV3 the fee is priced from');
+  process.exit(1);
+}
+const positional = argv.filter((a, i) => a !== '--pool' && i !== poolIdx + 1);
+
+const arg = (positional[0] || 'helium').replace(/^0x/, '');
 let network;
 if (NETWORKS[arg]) {
   network = { ...NETWORKS[arg], label: arg };
@@ -41,7 +57,7 @@ if (NETWORKS[arg]) {
   console.error(`FAILED: expected ${Object.keys(NETWORKS).join('|')} or a 20-byte staking address, got ${arg}`);
   process.exit(1);
 }
-const NAME = process.argv[3] || network.name;
+const NAME = positional[1] || network.name;
 
 const base = fs.readFileSync(
   path.join(__dirname, '../concrete/Staking/FeeRouter.sol'),
@@ -63,9 +79,15 @@ contract record ${NAME} is FeeRouter {
     function _strato() internal view override returns (address) {
         return address(0x${network.strato});
     }
+
+    // The canonical STRATO/USDST PoolV3. Replacing it is a new router, and the new
+    // pool prices nothing until its observation ring covers the TWAP window.
+    function _pool() internal view override returns (address) {
+        return address(0x${pool});
+    }
 ${stakingOverride}}
 `;
 
 fs.writeFileSync(OUT, base.trimEnd() + '\n' + subclass);
 console.log(`${OUT} written: ${fs.statSync(OUT).size} bytes | ${network.label} | contract ${NAME} | ` +
-  `STRATO ${network.strato} | staking ${network.staking || '(governance only)'}`);
+  `STRATO ${network.strato} | pool ${pool} | staking ${network.staking || '(governance only)'}`);

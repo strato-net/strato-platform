@@ -1,15 +1,27 @@
 abstract contract ERC20_Template {
   function transfer(address _to, uint _amount) public;
   function approve(address _spender, uint _amount) public;
-  function balanceOf(address _owner) public view returns (uint);
 }
 
-interface IPausableFeeToken {
-    function paused() external view returns (bool);
+interface IGasToken {
+    function burn(uint amount) external; // holder-only Token.burn(uint256)
+    function decimals() external view returns (uint8);
 }
 
-interface IFeePriceOracle {
-    function getAssetPriceWithTimestamp(address asset) external view returns (uint256 price, uint256 timestamp);
+interface IFeeContractLookup {
+    function getImplContract() external view returns (address);
+}
+
+interface IStratoFeeQuote {
+    function stratoFeeQuote() external view returns (uint fee, uint priceVersion, bool valid);
+}
+
+interface ICanonicalPool {
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+    function liquidity() external view returns (uint);
+    function observe(uint[] secondsAgos) external view returns (int[] tickCumulatives, int[] secondsPerLiquidityCumulativeX128s);
+    function getSqrtRatioAtTick(int tick) external pure returns (uint);
 }
 
 interface IStakingGovernanceLookup {
@@ -17,42 +29,63 @@ interface IStakingGovernanceLookup {
 }
 
 interface IStakingFeeHook {
-    function proposerFeeBps() external view returns (uint);
     function processBlock() external;
     function stratoToken() external view returns (address);
     function creditBlockReward(address validator, uint256 amount) external;
 }
 
+enum FeeMethod { NONE, VOUCHER, STRATO_BURN }
+
 // Transaction fee implementation for Decider (0xDEC1DE), installed with
 // DeciderState.updatePayFeeContract. The platform DELEGATECALLs payFees for every
-// transaction in the signer's storage context, so this contract keeps no storage:
-// address(this) is the signer and every address is a constant: a genesis address, or
-// one the per-network deployable subclass names.
+// transaction in the signer's storage context, so nothing payFees touches may be this
+// contract's storage: there, address(this) is the signer and every address is a
+// constant, a genesis address or one the per-network deployable subclass names.
 //
-// Fee policy, $0.01 paid with the first of these the signer can cover:
-//   1. STRATO at the PriceOracle price, to the FeeCollector;
-//   2. USDST, split between the FeeCollector and the staking contract (credited to
-//      block.proposer's operator and delegators);
-//   3. one voucher.
+// Fee policy, $0.01 per submitted transaction, paid with the first of:
+//   1. one whole voucher;
+//   2. STRATO worth 0.01 USDST, burned from the signer. Nothing is collected or split.
+// A signer with neither has not paid, and the platform rejects the transaction before
+// it runs. Included transactions that revert have still paid.
+//
+// The STRATO amount is priced once per block, before any of the block's transactions,
+// from the canonical STRATO/USDST PoolV3's time-weighted average price over committed
+// parent state, so every transaction in a block pays the same amount. That quote is
+// written by payBlockRewards, a plain call whose storage really is the router's, and
+// payFees reads it back through a plain call to the installed router (DeciderState
+// names it), never through its own storage reads.
+//
 // Every transaction also gives the staking contract a chance to process the previous
 // block (missed-proposal slashing); that call must never fail the transaction.
 contract record FeeRouter {
     // Genesis addresses, as functions so a test harness can point them elsewhere.
     function _voucher() internal view virtual returns (address) { return address(0x000000000000000000000000000000000000100e); }
     function _usdst() internal view virtual returns (address) { return address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010); }
-    function _feeCollector() internal view virtual returns (address) { return address(0x100d); }
     function _governance() internal view virtual returns (address) { return address(0x100); } // MercataGovernance
-    function _priceOracle() internal view virtual returns (address) { return address(0x1002); }
+    function _deciderState() internal view virtual returns (address) { return address(0xDEC1DE02); }
 
     // STRATO was deployed after genesis and its address differs per network, so the
     // deployable subclass names it (gen-feerouter-source.js). Zero leaves STRATO out of
-    // the fee path.
+    // the fee path, which makes every transaction voucher-only.
     function _strato() internal view virtual returns (address) { return address(0); }
 
-    // Oldest oracle price a STRATO fee may be charged at. The oracle service pushes
-    // every 15 minutes, so this rides out a few missed rounds; past it, fees fall back
-    // to USDST rather than charge at a price that may have moved.
-    function _maxPriceAge() internal view virtual returns (uint) { return 3600; }
+    // The canonical STRATO/USDST PoolV3 the fee is priced from, also named by the
+    // subclass. Replacing it means a new router, and the new pool prices nothing until
+    // its observation ring covers the window, so the swap is voucher-only until then.
+    function _pool() internal view virtual returns (address) { return address(0); }
+
+    // Averaging window for the pool price. observe() reverts until the pool has that
+    // much history, so a fresh pool is inert rather than priced off a single tick.
+    function _twapWindow() internal view virtual returns (uint) { return 1800; }
+
+    // How long the last good quote stays chargeable once the pool stops pricing (no
+    // history, liquidity gone, pair changed). Past it, fees are voucher-only until
+    // pricing recovers.
+    function _priceGrace() internal view virtual returns (uint) { return 3600; }
+
+    // In-range liquidity below which the pool is not trusted to price. A time average
+    // alone does not make a thin pool reliable; set from depth and manipulation cost.
+    function _minPoolLiquidity() internal view virtual returns (uint) { return 0; }
 
     // Chains whose genesis governance predates staking have no stakingContract() to
     // ask, so they subclass this with the deployed address. It cannot be storage:
@@ -70,20 +103,36 @@ contract record FeeRouter {
         return staking;
     }
 
-    // Block-number latch for payBlockRewards. Unlike payFees this is a plain call,
-    // so address(this) is the router and this really is the router's own storage.
+    uint constant USD_FEE = 1e16; // $0.01, in 18-decimal USDST
+    uint constant VOUCHER_FEE = 1e18; // one whole voucher
+    uint constant Q192 = 6277101735386680763835789423207666416102355444464034512896; // 2**192: sqrtPriceX96 squared is Q192
+
+    // ---- Router storage. Only payBlockRewards and the views may touch it: those are
+    // plain calls, so address(this) is the router and this really is its own state. ----
+
+    // Block-number latch for payBlockRewards.
     uint256 public lastRewardedBlock;
+
+    // The STRATO fee from the last pricing that succeeded, when it was priced, and a
+    // counter that moves with every new price so receipts can name the rate they paid at.
+    uint256 public quotedFee;
+    uint256 public quotedAt;
+    uint256 public priceVersion;
 
     // Flat reward per block for the proposer, paid out of this contract's own
     // STRATO balance into staking, which splits it between the proposer's operator
     // and its delegators. Fund the router to switch it on: an unfunded router pays
-    // nothing rather than stalling the chain.
+    // nothing rather than stalling the chain. Burning the fee leaves this as the
+    // validators' funding.
     uint256 constant BLOCK_REWARD = 1e16; // 0.01 STRATO
 
+    event StratoFeeQuoted(uint256 indexed blockNumber, uint256 fee, uint256 priceVersion);
+    event FeePaid(address indexed payer, FeeMethod method, uint256 amount, uint256 priceVersion);
     event BlockRewardsPaid(uint256 indexed blockNumber, address indexed proposer, uint256 amount);
 
-    // Block reward hook: the platform calls this once per block, before any of the
-    // block's transactions, on whatever DeciderState currently points at.
+    // Block hook: the platform calls this once per block, before any of the block's
+    // transactions, on whatever DeciderState currently points at. It freezes the
+    // block's STRATO fee and then pays the block reward.
     //
     // The platform decides once-per-block on its own (Bagger clears a flag when
     // the height advances), so this latch is a second line of defence rather than
@@ -94,6 +143,70 @@ contract record FeeRouter {
         if (lastRewardedBlock == block.number) return;
         lastRewardedBlock = block.number;
 
+        _quoteStratoFee();
+        _payBlockReward();
+    }
+
+    // Pricing that cannot be trusted leaves the previous quote in place; stratoFeeQuote
+    // decides, by age, whether that quote is still chargeable.
+    function _quoteStratoFee() internal {
+        uint fee = _priceStratoFee();
+        if (fee == 0) return;
+        quotedFee = fee;
+        quotedAt = block.timestamp;
+        priceVersion += 1;
+        emit StratoFeeQuoted(block.number, fee, priceVersion);
+    }
+
+    // STRATO worth USD_FEE at the pool's time-weighted average price, rounded up so the
+    // division never short-changes the fee; 0 when the pool cannot price. Must never
+    // revert: it runs inside block execution on every node.
+    function _priceStratoFee() internal view returns (uint) {
+        address pool = _pool();
+        address strato = _strato();
+        if (pool == address(0) || strato == address(0)) return 0;
+
+        uint fee = 0;
+        try {
+            // The pool's token fields are contract-typed; the cast makes them comparable.
+            address token0 = address(ICanonicalPool(pool).token0());
+            address token1 = address(ICanonicalPool(pool).token1());
+            bool stratoIsToken0 = token0 == strato && token1 == _usdst();
+            bool stratoIsToken1 = token1 == strato && token0 == _usdst();
+            // 18 decimals on both sides, so the raw pool ratio is USDST per STRATO.
+            bool priced = (stratoIsToken0 || stratoIsToken1)
+                && IGasToken(token0).decimals() == 18
+                && IGasToken(token1).decimals() == 18
+                && ICanonicalPool(pool).liquidity() >= _minPoolLiquidity();
+            if (priced) {
+                uint window = _twapWindow();
+                // Reverts "OLD" until the observation ring reaches back a full window.
+                (int[] cums, ) = ICanonicalPool(pool).observe([window, uint(0)]);
+                // SolidVM's int division floors, which is how the canonical oracle rounds
+                // a time-weighted tick.
+                int avgTick = (cums[1] - cums[0]) / int(window);
+                uint sqrtP = ICanonicalPool(pool).getSqrtRatioAtTick(avgTick);
+                uint ratio = sqrtP * sqrtP; // token1 per token0, Q192
+                if (stratoIsToken0) {
+                    fee = (USD_FEE * Q192 + ratio - 1) / ratio;
+                } else {
+                    fee = (USD_FEE * ratio + Q192 - 1) / Q192;
+                }
+            }
+        } catch {
+            fee = 0;
+        }
+        return fee;
+    }
+
+    // What a transaction in the current block pays in STRATO. Invalid once the last
+    // good price is older than the grace period; then only a voucher pays.
+    function stratoFeeQuote() external view returns (uint fee, uint version, bool valid) {
+        bool usable = quotedFee > 0 && block.timestamp <= quotedAt + _priceGrace();
+        return (quotedFee, priceVersion, usable);
+    }
+
+    function _payBlockReward() internal {
         address proposer = block.proposer;
         if (proposer == address(0)) return;
 
@@ -130,114 +243,40 @@ contract record FeeRouter {
     }
 
     function payFees() external {
-        uint usdFee = 1e16; // $0.01, 18-decimal like the oracle's prices
         address staking = _staking();
 
-        bool paid = _payWithStrato(usdFee);
-        if (!paid) {
-            paid = _payWithUsdst(usdFee, staking);
+        FeeMethod method = FeeMethod.VOUCHER;
+        uint amount = VOUCHER_FEE;
+        uint version = 0;
+
+        // The voucher burns from msg.sender, which here is the signer, and reverts
+        // on less than a whole voucher.
+        bool paidWithVoucher = false;
+        try {
+            _voucher().call("burn", address(this), VOUCHER_FEE);
+            paidWithVoucher = true;
+        } catch {
         }
-        if (!paid) {
-            // The last option is the only one allowed to throw: a signer without a
-            // voucher either has not paid, and the platform rejects the transaction.
-            address voucher = _voucher();
-            voucher.call("burn", address(this), 1e18);
+
+        if (!paidWithVoucher) {
+            // The quote lives in the installed router's own storage, which this
+            // DELEGATECALL cannot see; DeciderState names the router, so ask it.
+            address router = IFeeContractLookup(_deciderState()).getImplContract();
+            (uint fee, uint ver, bool valid) = IStratoFeeQuote(router).stratoFeeQuote();
+            require(valid, "FeeRouter: no STRATO price, a voucher is required");
+            // A short signer reverts here, and the platform rejects the transaction
+            // before it runs: nothing is burned for a transaction that is not included.
+            IGasToken(_strato()).burn(fee);
+            method = FeeMethod.STRATO_BURN;
+            amount = fee;
+            version = ver;
         }
+        emit FeePaid(address(this), method, amount, version);
 
         if (staking != address(0)) {
             try IStakingFeeHook(staking).processBlock() {
             } catch {
             }
         }
-    }
-
-    // Each option either takes the whole fee or declines having moved nothing, so the
-    // caller can move on to the next one without charging twice.
-
-    function _payWithStrato(uint usdFee) internal returns (bool) {
-        address strato = _strato();
-        if (strato == address(0)) return false;
-
-        // A paused STRATO refuses the signer's transfer anyway; asking first is cheaper
-        // than failing through the token's whitelist lookup on every transaction.
-        bool transferable = false;
-        try IPausableFeeToken(strato).paused() returns (bool isPaused) {
-            transferable = !isPaused;
-        } catch {
-        }
-        if (!transferable) return false;
-
-        // Block-form try on purpose: SolidVM's `try f() returns (a, b)` raises an
-        // uncatchable type error for any multi-value return, which here would reject
-        // every transaction that reaches this point.
-        uint price = 0;
-        uint updatedAt = 0;
-        try {
-            (uint p, uint t) = IFeePriceOracle(_priceOracle()).getAssetPriceWithTimestamp(strato);
-            price = p;
-            updatedAt = t;
-        } catch {
-        }
-        if (price == 0) return false;
-        if (updatedAt > block.timestamp) return false;
-        if (block.timestamp - updatedAt > _maxPriceAge()) return false;
-
-        // Rounded up, so the protocol is never short-changed by the division.
-        uint fee = (usdFee * 1e18 + price - 1) / price;
-        return _tryTransfer(strato, _feeCollector(), fee);
-    }
-
-    // The proposer's share (staking's proposerFeeBps) goes to staking, the rest to the
-    // FeeCollector. A SolidVM catch does not roll back, so the whole fee is checked
-    // against the balance before anything moves: once one transfer has landed, the
-    // other cannot fail for want of funds.
-    function _payWithUsdst(uint fee, address staking) internal returns (bool) {
-        address USDST = _usdst();
-        address feeCollector = _feeCollector();
-
-        uint balance = 0;
-        try ERC20_Template(USDST).balanceOf(address(this)) returns (uint b) {
-            balance = b;
-        } catch {
-        }
-        if (balance < fee) return false;
-
-        uint proposerShare = 0;
-        if (staking != address(0)) {
-            uint bpsDivisor = 10000;
-            try IStakingFeeHook(staking).proposerFeeBps() returns (uint bps) {
-                if (bps > bpsDivisor) bps = bpsDivisor;
-                proposerShare = (fee * bps) / bpsDivisor;
-            } catch {
-            }
-        }
-
-        // Staking's share first; if staking will not take it, it goes to the collector.
-        uint toCollector = fee;
-        if (proposerShare > 0) {
-            if (_tryTransfer(USDST, staking, proposerShare)) {
-                toCollector = fee - proposerShare;
-            }
-        }
-        if (toCollector == fee) {
-            return _tryTransfer(USDST, feeCollector, fee);
-        }
-        if (toCollector > 0) {
-            // Staking's share has landed and the balance covers the rest, so this can
-            // only fail on a token fault; if it does, reject the transaction rather than
-            // go on to charge a voucher as well.
-            ERC20_Template(USDST).transfer(feeCollector, toCollector);
-        }
-        return true;
-    }
-
-    function _tryTransfer(address token, address to, uint amount) internal returns (bool) {
-        bool ok = false;
-        try {
-            ERC20_Template(token).transfer(to, amount);
-            ok = true;
-        } catch {
-        }
-        return ok;
     }
 }
