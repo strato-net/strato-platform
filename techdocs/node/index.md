@@ -74,7 +74,11 @@ A node is a validator when its address is in the validator set stored in `Mercat
 
 `/health` reports `pbftData.is_validator` for the local node. Validators need at least 8 GB of RAM.
 
+A validator does not need the app, the APIs or Cirrus. `strato-up --role=validator` runs only the chain processes with Postgres, Redis, Prometheus and apex; see [Validator mode](configuration.md#validator-mode).
+
 For details, see [Consensus](../platform/consensus.md).
+
+**API node.** A node that serves the chain and its APIs without the app, the SMD and the Swagger docs. `strato-up --role=api-node` runs everything else, including Cirrus, nginx and `/health`; see [API node](configuration.md#api-node).
 
 ## In this section
 

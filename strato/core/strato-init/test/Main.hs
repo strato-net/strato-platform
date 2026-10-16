@@ -4,10 +4,15 @@
 -- sizing, no GC trimmings (-n/-qg1/-qn measured as no-ops). No tier gets an
 -- @-M@ heap cap: the 60%-of-RAM cap aborted 8GB nodes mid-sync (2026-09-29);
 -- the ≤16GB tiers compact the oldest generation (@-c@) instead.
+--
+-- Also pins how strato-setup reads @--role@ and its shorthand flags, and which
+-- role may turn monitoring off.
 module Main (main) where
 
+import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad (forM_)
+import Data.Either (isLeft)
 import Data.List (isPrefixOf)
 import Test.Hspec
 
@@ -82,3 +87,31 @@ main = hspec $ do
         `shouldBe` Just 16000
     it "garbage" $
       parseMemInfoMB "no meminfo here" `shouldBe` Nothing
+
+  describe "parseRole" $ do
+    it "--role names the role, case-insensitively" $ do
+      parseRole "node" False False `shouldBe` Right RoleNode
+      parseRole "core" False False `shouldBe` Right RoleCore
+      parseRole "api" False False `shouldBe` Right RoleApi
+      parseRole "api-node" False False `shouldBe` Right RoleApiNode
+      parseRole "API-Node" False False `shouldBe` Right RoleApiNode
+      parseRole "validator" False False `shouldBe` Right RoleValidator
+    it "rejects an unknown --role" $
+      parseRole "lite" False False `shouldSatisfy` isLeft
+    it "--validator is shorthand for --role=validator and wins over --role" $ do
+      parseRole "node" True False `shouldBe` Right RoleValidator
+      parseRole "core" True False `shouldBe` Right RoleValidator
+    it "--apiNode is shorthand for --role=api-node" $ do
+      parseRole "node" False True `shouldBe` Right RoleApiNode
+      parseRole "api-node" False True `shouldBe` Right RoleApiNode
+    it "--apiNode with --validator is an error, not a guess" $
+      parseRole "node" True True `shouldSatisfy` isLeft
+    it "--apiNode with another --role is an error, not a guess" $ do
+      parseRole "core" False True `shouldSatisfy` isLeft
+      parseRole "api" False True `shouldSatisfy` isLeft
+      parseRole "validator" False True `shouldSatisfy` isLeft
+
+  describe "roleAllowsMonitoringOff" $
+    it "only an api-node may drop prometheus and apex (--monitoring=false)" $
+      filter roleAllowsMonitoringOff [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
+        `shouldBe` [RoleApiNode]
