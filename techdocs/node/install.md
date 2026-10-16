@@ -45,6 +45,8 @@ For a Nix-based build, use `NIX=true make` instead.
 2. It installs a BIP-39 word list to `~/.local/share/strato/`.
 3. It builds the node's Docker images: nginx, apex, smd, postgrest, prometheus, app-backend, app-ui, local-auth, bridge and tracking.
 
+For a validator (`--role=validator`), `make validator` builds the executables and only the two images a validator runs, apex and prometheus, and skips the rest.
+
 If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 
 ## 4. Store your OAuth credentials

@@ -166,6 +166,13 @@ genEthConf role = do
         { vmQueryUrls = ["http://127.0.0.1:8546" | flags_vmQuery] ++ commaList flags_vmQueryUrls
         -- An API directory runs no vm-runner: the mirror answers or nobody does.
         , vmQueryOnly = role == RoleApi
+        -- A validator serves no API and runs no slipstream: no SQL state mirror
+        -- (sqlDiff), no state diffs on the VM event stream (diffPublish), and no
+        -- VM event stream at all (publishVmEvents): with nobody reading it, JLog
+        -- would never trim it.
+        , sqlDiff = flags_sqlDiff && roleIndexesSql role
+        , diffPublish = flags_diffPublish && roleIndexesSql role
+        , publishVmEvents = roleIndexesSql role
         }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
