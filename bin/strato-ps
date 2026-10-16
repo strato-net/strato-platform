@@ -66,7 +66,7 @@ if [[ "$CONVOKE_RUNNING" == "true" ]]; then
     # A lite validator runs no slipstream; its Redis may still carry the
     # cirrus position of the snapshot it was restored from, which would only
     # mislead here.
-    if grep -q "^slipstream" commands.txt 2>/dev/null; then
+    if grep -qE "^(@restart +)?slipstream" commands.txt 2>/dev/null; then
         printf "  %-10s %-10s %s\n" "cirrus:" "$CIRRUS_BLOCK" "(slipstream, indexed into Cirrus)"
     fi
     printf "  %-10s %-10s %s\n" "world:" "$WORLD_BLOCK" "(highest peer-reported)"
