@@ -22,11 +22,11 @@ import qualified Control.Monad.Composable.StateDB as MP
 import Blockchain.Sequencer.Event (VmTask (..))
 import Blockchain.Sequencer.Kafka (seqVmTasksTopicName)
 import Blockchain.Strato.Model.Options ()
-import Blockchain.VMContext (evalContextM, initReplayContext)
+import Blockchain.VMContext (evalContextM, initReplayContext, memContext, runContextIO)
 import Blockchain.VMOptions ()
 import Control.Monad (forM, unless, when)
-import Blockchain.EthConf (lookupRedisBlockDBConfig)
-import Control.Monad.Composable.Base (accessEnv, runEff)
+import Blockchain.EthConf (lookupRedisBlockDBConfig, runStreamMConfigured)
+import Control.Monad.Composable.Base (runEff)
 import Control.Monad.Composable.Redis (runRedisM)
 import Control.Monad.Composable.Streaming (runConsume)
 import Data.Binary (decode, encode, get)
@@ -71,8 +71,9 @@ dumpBlocks n outPath = do
     hPutStrLn stderr "dump: n must be > 0"
     exitFailure
   hPutStrLn stderr $ printf "dumping first %d VmBlock(s) from vm_tasks to %s" n outPath
-  -- Only the stream is needed here, so the in-memory seed context is reused as is.
-  blocks <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . evalContextM "vm-apply-dump" accessEnv $ do
+  -- Only the stream is needed here, so no LevelDB is opened.
+  ctx <- memContext (const (pure Nothing)) Nothing
+  blocks <- runEff . runLogging . runRedisM lookupRedisBlockDBConfig . runStreamMConfigured "vm-apply-dump" . MP.runMemStateDBM . runContextIO ctx $ do
     acc <- liftIO $ newIORef ([] :: [OutputBlock])
     -- Fresh group each dump-all so we reread vm_tasks from offset 0.
     runConsume "vm-apply-loop-dump-all" seqVmTasksTopicName $ \evs -> do

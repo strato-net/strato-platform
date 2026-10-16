@@ -48,6 +48,7 @@ module Blockchain.Database.MerklePatricia
     getKeyVal,
     deleteKey,
     keyExists,
+    unsafeGetAllKeyVals,
     initializeBlank,
     blankStateRoot,
     addAllKVs,

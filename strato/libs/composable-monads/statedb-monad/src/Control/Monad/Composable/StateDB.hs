@@ -21,6 +21,8 @@ module Control.Monad.Composable.StateDB
     newStateDBEnv,
     runStateDBM,
     runStateDBOn,
+    runStateDBAt,
+    runMemStateDBM,
     sandboxStateDBEnv,
     tickNodeDB,
     flushNodeDB,
@@ -47,7 +49,7 @@ module Control.Monad.Composable.StateDB
     MP.getInclusionProof,
     MP.addAllKVs,
     MP.runMP,
-    MP.StateDB (..),
+    MP.withSandbox,
     hasStateRoot,
     Diff.dbDiff,
     Diff.DiffOp (..),
@@ -69,7 +71,8 @@ where
 
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Database.MerklePatricia.Internal (keyToSafeKey, unsafeGetAllKeyVals, unsafeGetKeyVals)
+import Blockchain.Database.MerklePatricia (unsafeGetAllKeyVals)
+import Blockchain.Database.MerklePatricia.Internal (keyToSafeKey, unsafeGetKeyVals)
 import qualified Blockchain.Database.MerklePatricia.Map as Map
 import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Data.RLP (RLPObject)
@@ -107,6 +110,22 @@ runStateDBOn db m = do
   e <- newStateDBEnv (nodeDB (levelDBBytes db))
   liftIO . runEff $ runStateDBM e m
 
+-- | Open the state database at @path@ and run the body over it. Trie nodes
+-- live in LevelDB behind a cache of 20k parsed nodes (tens of MB) that
+-- writes through every 256 blocks and when the body ends; a long-running
+-- loop must 'flushNodeDB' before acknowledging input.
+runStateDBAt :: FilePath -> DB.Options -> StateDBM es a -> Eff es a
+runStateDBAt path opts m = do
+  sdb <- liftIO $ MP.openMPDB path opts
+  e <- newStateDBEnv =<< liftIO (cachedNodeDB 20000 256 (levelDBBytes (MP.unStateDB sdb)))
+  runStateDBM e (m <* flushNodeDB)
+
+-- | Trie nodes live in a map for the run (CLI, tests, tools).
+runMemStateDBM :: StateDBM es a -> Eff es a
+runMemStateDBM m = do
+  e <- newStateDBEnv =<< liftIO memoryNodeDB
+  runStateDBM e m
+
 -- | The same store with writes held in an overlay: nothing done through it
 -- reaches the store.
 sandboxStateDBEnv :: MonadIO m => StateDBEnv -> m StateDBEnv
@@ -137,8 +156,8 @@ env :: (MonadIO m, AccessibleEnv StateDBEnv m) => (StateDBEnv -> IO a) -> m a
 env f = accessEnv >>= liftIO . f
 
 tickNodeDB, flushNodeDB :: (MonadIO m, AccessibleEnv StateDBEnv m) => m ()
-tickNodeDB = env $ N.tickNodes . nodes
-flushNodeDB = env $ N.flushNodes . nodes
+tickNodeDB = env (N.tickNodes . nodes) >> MP.tick
+flushNodeDB = env (N.flushNodes . nodes) >> MP.flush
 
 instance (StateDBEnv :> es) => (MP.StateRoot `A.Alters` TrieNode) (Eff es) where
   lookup _ k = env $ \e -> N.lookupNode (nodes e) k

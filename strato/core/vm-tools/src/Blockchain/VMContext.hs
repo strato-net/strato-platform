@@ -40,7 +40,6 @@ module Blockchain.VMContext
     readStore,
     writeStore,
     GasCap (..),
-    stateDB,
     hashDB,
     codeDB,
     blockSummaryDB,
@@ -62,11 +61,11 @@ module Blockchain.VMContext
     resolveFile,
     runTestContextM,
     initContext,
-    initContextWithLevelDBTuning,
     initReplayContext,
     runContextM,
     evalContextM,
     execContextM,
+    memContext,
     runMemContextM,
     evalMemContextM,
     evalSandboxedContextM,
@@ -119,7 +118,7 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.AccountDB
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.StateDB
-import Control.Monad.Composable.Streaming (StreamEnv (..), StreamM, createStreamEnv, runStreamMUsingEnv)
+import Control.Monad.Composable.Streaming (StreamEnv (..), createStreamEnv, runStreamMUsingEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
 import Data.Binary
@@ -163,8 +162,7 @@ data ContextBestBlockInfo = Unspecified | ContextBestBlockInfo !Keccak256 !Block
 instance Binary ContextBestBlockInfo
 
 data ContextDBs = ContextDBs
-  { _stateDB :: MP.StateDB,
-    _hashDB :: HashDB,
+  { _hashDB :: HashDB,
     _codeDB :: CodeDB,
     _blockSummaryDB :: BlockSummaryDB
   }
@@ -244,14 +242,13 @@ type ContextRow = '[Context, AccountDBEnv, StateDBEnv, IORef StreamEnv, RedisEnv
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv RedisEnv, AccessibleEnv AccountDBEnv, AccessibleEnv StateDBEnv, AccessibleEnv (IORef StreamEnv), MonadMonitor, MP.StateRoot `A.Alters` MP.TrieNode, Maybe Word256 `A.Alters` MP.StateRoot, Mod.Modifiable CurrentBlockHash, HasMemAddressStateDB, HasMemRawStorageDB)
 
-runContextIO :: Context -> ContextM a -> StreamM '[RedisEnv, Logger] a
+runContextIO :: Context -> ContextM a -> StateDBM '[IORef StreamEnv, RedisEnv, Logger] a
 runContextIO ctx (ContextM m) = do
-  sdb <- newStateDBEnv =<< nodeDBFor (_backend ctx)
   adb <- newAccountDBEnv
   -- A block's state root is in its summary before any of its chains' roots
   -- are in the cursor.
   let summaryRoot bh = fmap bSumStateRoot <$> readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) bh) bh
-  runStateDBM sdb . runAccountDBM adb . provide ctx $ withHeaderRoot (unContextM . summaryRoot) (m <* flushNodeDB)
+  runAccountDBM adb . provide ctx $ withHeaderRoot (unContextM . summaryRoot) m
 
 getBackend :: ContextM Backend
 getBackend = _backend <$> accessEnv
@@ -291,21 +288,10 @@ writeStore l disk k mv = getBackend >>= \case
   Sandbox o _ -> modifyIORef' o $ l . at k .~ mv
 {-# INLINE writeStore #-}
 
--- | Trie nodes live in LevelDB when there is one, behind a cache of 20k parsed
--- nodes (tens of MB) that writes through every 256 blocks and when the run
--- ends; a long-running loop must 'flushNodeDB' before acknowledging input.
--- Otherwise they live in a map for the run.
-nodeDBFor :: MonadIO m => Backend -> m NodeDB
-nodeDBFor (Memory _) = liftIO memoryNodeDB
-nodeDBFor (Persistent d) = liftIO $ cachedNodeDB 20000 256 (levelDBBytes . MP.unStateDB $ _stateDB d)
-nodeDBFor (Sandbox _ d) = pure $ nodeDB (levelDBBytes . MP.unStateDB $ _stateDB d)
-
--- | Build the context inside 'ContextM', then run the body under it. The
--- builder runs under an inert in-memory context.
-runWithContext :: ContextM Context -> ContextM a -> StreamM '[RedisEnv, Logger] (a, ContextState)
+-- | Build the context, run the body under it, and return the final state.
+runWithContext :: IO Context -> ContextM a -> StateDBM '[IORef StreamEnv, RedisEnv, Logger] (a, ContextState)
 runWithContext mkCtx f = do
-  seed <- memContext (const (pure Nothing)) Nothing
-  ctx <- runContextIO seed mkCtx
+  ctx <- liftIO mkCtx
   a <- runContextIO ctx f
   (a,) <$> readIORef (_state ctx)
 
@@ -408,18 +394,11 @@ runTestContextM f =
       env <- createStreamEnv "test" (tmpdir ++ "/jlog", 0)
       renv <- fmap RedisEnv . liftIO . Redis.connect $ Redis.defaultConnectInfo {Redis.connectPort = Redis.PortNumber 2023}
       let mkCtx = do
-            let ldbOptions =
-                  DB.defaultOptions
-                    { DB.createIfMissing = True,
-                      DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
-                      DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
-                    }
-                openDB base = DB.open (tmpdir ++ base) ldbOptions
-            sdb <- openDB stateDBPath
+            let openDB base = DB.open (tmpdir ++ base) ldbOptions
             hdb <- openDB hashDBPath
             cdb <- openDB codeDBPath
             blksumdb <- openDB blockSummaryCacheDBPath
-            cache <- liftIO $ TRC.new 64
+            cache <- TRC.new 64
             cstate <-
               newIORef $
                 def
@@ -432,8 +411,7 @@ runTestContextM f =
                 { _backend =
                     Persistent
                       ContextDBs
-                        { _stateDB = MP.StateDB sdb,
-                          _hashDB = HashDB hdb,
+                        { _hashDB = HashDB hdb,
                           _codeDB = CodeDB cdb,
                           _blockSummaryDB = BlockSummaryDB blksumdb
                         },
@@ -441,45 +419,31 @@ runTestContextM f =
                   _stateDiffQueue = que,
                   _resolveFile = const (pure Nothing)
                 }
-      runRedisMUsingEnv renv . runStreamMUsingEnv env . runWithContext mkCtx $ do
+      runRedisMUsingEnv renv . runStreamMUsingEnv env . runStateDBAt (tmpdir ++ stateDBPath) ldbOptions . runWithContext mkCtx $ do
         MP.initializeBlank
         setStateDBStateRoot Nothing MP.emptyTriePtr
         f
 
-initContext :: ContextM Context
-initContext = initContextWithLevelDBTuning
-  (Conf.cacheSize $ levelDBConfig ethConf)
-  (DB.writeBufferSize DB.defaultOptions)
+ldbOptions :: DB.Options
+ldbOptions =
+  DB.defaultOptions
+    { DB.createIfMissing = True,
+      DB.cacheSize = Conf.cacheSize (levelDBConfig ethConf),
+      DB.blockSize = Conf.blockSize (levelDBConfig ethConf)
+    }
 
-initContextWithLevelDBTuning :: Int -> Int -> ContextM Context
-initContextWithLevelDBTuning = initContextWithOptions
-
-initReplayContext :: ContextM Context
-initReplayContext = initContextWithOptions
-  (Conf.cacheSize $ levelDBConfig ethConf)
-  (DB.writeBufferSize DB.defaultOptions)
-
-initContextWithOptions :: Int -> Int -> ContextM Context
-initContextWithOptions cacheBytes writeBufferBytes = do
-  liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  let ldbOptions =
-        DB.defaultOptions
-          { DB.createIfMissing = True,
-            DB.cacheSize = cacheBytes,
-            DB.blockSize = Conf.blockSize (levelDBConfig ethConf),
-            DB.writeBufferSize = writeBufferBytes
-          }
-  sdb <- DB.open (dbDir "h" ++ stateDBPath) ldbOptions
+-- | The node's persistent stores other than the trie, which 'runContextM' opens.
+initContext :: IO Context
+initContext = do
   hdb <- DB.open (dbDir "h" ++ hashDBPath) ldbOptions
   cdb <- DB.open (dbDir "h" ++ codeDBPath) ldbOptions
   blksumdb <- DB.open (dbDir "h" ++ blockSummaryCacheDBPath) ldbOptions
-  liftIO $ mapM_ removeStaleInfoLog [stateDBPath, hashDBPath, codeDBPath, blockSummaryCacheDBPath]
-  cache <- liftIO $ TRC.new 64
+  mapM_ removeStaleInfoLog [stateDBPath, hashDBPath, codeDBPath, blockSummaryCacheDBPath]
+  cache <- TRC.new 64
 
   let cdbs =
         ContextDBs
-          { _stateDB = MP.StateDB sdb,
-            _hashDB = HashDB hdb,
+          { _hashDB = HashDB hdb,
             _codeDB = CodeDB cdb,
             _blockSummaryDB = BlockSummaryDB blksumdb
           }
@@ -506,16 +470,21 @@ removeStaleInfoLog dbPath = do
   exists <- doesFileExist f
   when exists $ removeFile f
 
--- | The node's entry point: one @Env -> IO@ layer from here on. The streaming
--- environment is opened around the run and the context is built inside it;
--- Redis comes from the caller ('runRedisM').
-runContextM :: T.Text -> ContextM Context -> ContextM a -> Eff '[RedisEnv, Logger] (a, ContextState)
-runContextM clientId mkCtx f = runStreamMConfigured clientId (runWithContext mkCtx f)
+initReplayContext :: IO Context
+initReplayContext = initContext
 
-evalContextM :: T.Text -> ContextM Context -> ContextM a -> Eff '[RedisEnv, Logger] a
+-- | The node's entry point: one @Env -> IO@ layer from here on. The streaming
+-- environment and the state database are opened around the run and the
+-- context is built inside them; Redis comes from the caller ('runRedisM').
+runContextM :: T.Text -> IO Context -> ContextM a -> Eff '[RedisEnv, Logger] (a, ContextState)
+runContextM clientId mkCtx f = do
+  liftIO $ createDirectoryIfMissing False $ dbDir "h"
+  runStreamMConfigured clientId . runStateDBAt (dbDir "h" ++ stateDBPath) ldbOptions $ runWithContext mkCtx f
+
+evalContextM :: T.Text -> IO Context -> ContextM a -> Eff '[RedisEnv, Logger] a
 evalContextM clientId mkCtx f = fst <$> runContextM clientId mkCtx f
 
-execContextM :: T.Text -> ContextM Context -> ContextM a -> Eff '[RedisEnv, Logger] ContextState
+execContextM :: T.Text -> IO Context -> ContextM a -> Eff '[RedisEnv, Logger] ContextState
 execContextM clientId mkCtx f = snd <$> runContextM clientId mkCtx f
 
 -- | A context over in-memory stores only: no LevelDB or Redis.
@@ -548,7 +517,7 @@ runMemContextM resolver dSettings f = do
   sref <- liftIO $ newIORef . StreamEnv "" "mem" =<< newIORef M.empty
   ctx <- memContext resolver dSettings
   renv <- liftIO $ RedisEnv <$> Redis.connect Redis.defaultConnectInfo
-  a <- runRedisMUsingEnv renv . provide sref . runContextIO ctx $ do
+  a <- runRedisMUsingEnv renv . provide sref . runMemStateDBM . runContextIO ctx $ do
     MP.initializeBlank
     setStateDBStateRoot Nothing MP.emptyTriePtr
     f
@@ -575,7 +544,7 @@ evalSandboxedContextM f = do
     Memory o -> Memory <$> (newIORef =<< readIORef o)
   sandboxEnv <- sandboxStateDBEnv =<< ContextM accessEnv
   accounts <- snapshotAccountDBEnv =<< ContextM accessEnv
-  ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @AccountDBEnv (const accounts) . localEnv @StateDBEnv (const sandboxEnv) $ unContextM f
+  withRunInIO $ \run -> MP.withSandbox . run . ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @AccountDBEnv (const accounts) . localEnv @StateDBEnv (const sandboxEnv) $ unContextM f
 
 incrementNonce :: HasAccountDB f => Address -> f ()
 incrementNonce address = A.adjustWithDefault_ Mod.Proxy address $ \addressState ->

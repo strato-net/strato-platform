@@ -36,6 +36,7 @@ module Blockchain.Database.MerklePatricia
     getKeyVal,
     deleteKey,
     keyExists,
+    unsafeGetAllKeyVals,
     initializeBlank,
     blankStateRoot,
     addAllKVs,
@@ -50,7 +51,8 @@ module Blockchain.Database.MerklePatricia
 where
 
 import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.Internal hiding (flush, openMPDB, tick, withSandbox)
+import Blockchain.Database.MerklePatricia.Internal hiding (flush, openMPDB, tick, unsafeGetAllKeyVals, withSandbox)
+import qualified Blockchain.Database.MerklePatricia.Internal as HS
 import Blockchain.Database.MerklePatricia.NodeData (ptrRef)
 import qualified Blockchain.Database.MerklePatriciaNative as N
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
@@ -107,7 +109,7 @@ instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
 -- | Parsed nodes kept in memory, and how many blocks of new nodes are held
 -- back before being written through.
 cacheNodes, flushEvery :: Int
-cacheNodes = 20000
+cacheNodes = 200000
 flushEvery = 256
 
 -- | Open the LevelDB at @path@ and the C store over it, and make that store
@@ -227,6 +229,13 @@ keyExists ::
   Key ->
   m Bool
 keyExists sr key = isJust <$> getKeyVal sr key
+
+-- | Every key/value under a root, keys as the trie holds them.
+{-# NOINLINE unsafeGetAllKeyVals #-}
+unsafeGetAllKeyVals :: (StateRoot `Alters` NodeData) m => StateRoot -> m [(Key, Val)]
+unsafeGetAllKeyVals sr@(StateRoot root) = case active sr of
+  Just h -> viaC h $ fmap (map (\(k, v) -> (N.pack k, rlpDeserialize v))) <$> N.forEach h root
+  Nothing -> HS.unsafeGetAllKeyVals sr
 
 -- | Returns the StateRoot of the blank database.
 blankStateRoot :: StateRoot
