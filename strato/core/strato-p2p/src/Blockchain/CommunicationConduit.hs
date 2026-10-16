@@ -136,11 +136,6 @@ handleMsgServerConduit ::
 handleMsgServerConduit myPubkey peer = do
   $logDebugS "handleMsgServerConduit" "about to parse message"
 
-  -- runPeer never dials our own key, so an inbound peer presenting it is
-  -- another node running with this node's key. Drop it before it can be
-  -- handed a sync task.
-  when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
-
   lift $ clearAllSyncTasks $ pPeerHost peer
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
@@ -152,6 +147,11 @@ handleMsgServerConduit myPubkey peer = do
   awaitMsg >>= \case
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
+      -- The key from the RLPx handshake is only a claim until the first frame
+      -- authenticates it, which this Hello just did. runPeer never dials our
+      -- own key, so a peer presenting it is another node running with this
+      -- node's key: drop it before it can be handed a sync task.
+      when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
       let helloMsg' =
             Hello
               { version = 4,
@@ -215,7 +215,7 @@ startSyncTask peer peerBest = do
     Just (syncTask, fetchNumber) -> do
       $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
       if fetchNumber <= peerBest
-        then yield . Right $ GetBlockHeaders (BlockNumber fetchNumber) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 Forward
+        then syncFetchTask syncTask fetchNumber
         else do
           $logInfoS "startSyncTask" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show peerBest ++ "), marking the new chiliad as 'NotReady'"
           lift $ setSyncTaskNotReady (pPeerHost peer)

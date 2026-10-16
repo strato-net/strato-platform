@@ -17,6 +17,7 @@ module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
     getNewSyncFetch,
+    syncFetchTask,
   )
 where
 
@@ -266,12 +267,12 @@ handleEvents peer = awaitForever $ \case
             BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
             newSyncFetch <- lift $ getNewSyncFetch peer myNumber worldNumber
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show (fst <$> newSyncFetch)
-            return $ snd <$> newSyncFetch
+            return newSyncFetch
           else do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            return $ Just $ maxBlockNumber + 1
+            return $ Just (currentSyncTask, maxBlockNumber + 1)
 
-    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show maybeFetchNumber
+    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show (snd <$> maybeFetchNumber)
 
     bodyHashes' <- lift getBodiesToFetch
 
@@ -280,7 +281,7 @@ handleEvents peer = awaitForever $ \case
       case maybeFetchNumber of
         Nothing ->
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
-        Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
+        Just (task, fetchNumber) | fetchNumber <= worldNumber -> syncFetchTask task fetchNumber
         _ -> do
           currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
@@ -433,7 +434,7 @@ handleEvents peer = awaitForever $ \case
           $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show (fst <$> maybeNewSyncFetch)
           case maybeNewSyncFetch of
             Nothing -> return ()
-            Just (_, fetchNumber) -> syncFetch Forward fetchNumber
+            Just (task, fetchNumber) -> syncFetchTask task fetchNumber
 
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
@@ -529,6 +530,22 @@ syncFetch ::
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
   yieldR $ GetBlockHeaders (BlockNumber num) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 d
+  lift stampActionTimestamp
+
+-- | Fetch a sync task's headers from @start@, never past the end of its
+-- chiliad: the batch of bodies that reaches the end finishes the task, and
+-- bodies beyond it would arrive with no task to account them to.
+syncFetchTask ::
+  ( MonadIO m,
+    Modifiable ActionTimestamp m
+  ) =>
+  SyncTask ->
+  Integer ->
+  ConduitM Event (Either P2PCNC Message) m ()
+syncFetchTask task start = do
+  let chiliadEnd = 1000 * fromIntegral (syncTaskChiliad task) + 999
+      count = min (Conf.maxReturnedHeaders (p2pConfig ethConf)) (fromIntegral $ chiliadEnd - start + 1)
+  yieldR $ GetBlockHeaders (BlockNumber start) count 0 Forward
   lift stampActionTimestamp
 
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
