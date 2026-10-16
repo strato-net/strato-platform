@@ -108,26 +108,27 @@ instance MonadIO m => HasPeerDB m where
       SQL.updateWhere (thisPeer peer) [PPeerUdpPort SQL.=. pn]
 
   updatePeerDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    -- A new disable never ends sooner than the one in force (see
-    -- disableTCPPeerForSeconds).
+    -- The TCP deadline never moves closer (see disableTCPPeerForSeconds); the
+    -- backoff bookkeeping is updated regardless.
     let selector = thisPeer peer
-        notShortening enableTime = selector ++ [PPeerEnableTime SQL.<. enableTime]
+        setTcpEnableTime enableTime =
+          SQL.updateWhere (selector ++ [PPeerEnableTime SQL.<. enableTime]) [PPeerEnableTime SQL.=. enableTime]
     flip runSqlPool sqldb $ case d of
-      ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
+      ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor -> do
         SQL.updateWhere
-          (notShortening enableTime)
-          [ PPeerEnableTime SQL.=. enableTime,
-            PPeerUdpEnableTime SQL.=. enableTime,
+          selector
+          [ PPeerUdpEnableTime SQL.=. enableTime,
             PPeerNextDisableWindowSeconds SQL.*=. nextDisableWindowFactor
           ]
-      SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
+        setTcpEnableTime enableTime
+      SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration -> do
         SQL.updateWhere
-          (notShortening enableTime)
-          [ PPeerEnableTime SQL.=. enableTime,
-            PPeerUdpEnableTime SQL.=. enableTime,
+          selector
+          [ PPeerUdpEnableTime SQL.=. enableTime,
             PPeerNextDisableWindowSeconds SQL.=. nextDisableWindow,
             PPeerDisableExpiration SQL.=. disableExpiration
           ]
+        setTcpEnableTime enableTime
   updatePeerUdpDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     currentTime <- liftIO getCurrentTime
