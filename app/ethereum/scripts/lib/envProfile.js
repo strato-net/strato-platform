@@ -1,5 +1,6 @@
 const PROFILE_TESTNET = "testnet";
 const PROFILE_PROD = "prod";
+const { NETWORKS, chainRpcEnvironment, defaultDiscoveryChains } = require("./externalBridgeNetworks");
 
 const PROFILE_ALIASES = {
   testnet: PROFILE_TESTNET,
@@ -12,21 +13,15 @@ const PROFILE_ALIASES = {
 const DEFAULTS = {
   [PROFILE_TESTNET]: {
     NODE_URL: "https://node1.testnet.strato.nexus",
-    DEFAULT_CHAINS: "11155111,84532",
+    DEFAULT_CHAINS: defaultDiscoveryChains(false),
   },
   [PROFILE_PROD]: {
     NODE_URL: "https://app.strato.nexus",
-    DEFAULT_CHAINS: "1,8453",
+    DEFAULT_CHAINS: defaultDiscoveryChains(true),
   },
 };
 
-const CHAIN_RPC_ENV_MAP = {
-  CHAIN_11155111_RPC_URL: "SEPOLIA_RPC_URL",
-  CHAIN_84532_RPC_URL: "BASE_SEPOLIA_RPC_URL",
-  CHAIN_1_RPC_URL: "MAINNET_RPC_URL",
-  CHAIN_8453_RPC_URL: "BASE_RPC_URL",
-  CHAIN_59144_RPC_URL: "LINEA_RPC_URL",
-};
+const CHAIN_RPC_ENV_MAP = chainRpcEnvironment();
 
 function normalizeProfile(value) {
   const key = String(value || PROFILE_TESTNET).trim().toLowerCase();
@@ -55,16 +50,8 @@ function applyEnvProfile(profile) {
   if (!alchemyKey) {
     throw new Error("Missing ALCHEMY_API_KEY");
   }
-  const rpcDefaults = {
-    SEPOLIA_RPC_URL: `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`,
-    BASE_SEPOLIA_RPC_URL: `https://base-sepolia.g.alchemy.com/v2/${alchemyKey}`,
-    LINEA_SEPOLIA_RPC_URL: `https://linea-sepolia.g.alchemy.com/v2/${alchemyKey}`,
-    MAINNET_RPC_URL: `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`,
-    BASE_RPC_URL: `https://base-mainnet.g.alchemy.com/v2/${alchemyKey}`,
-    LINEA_RPC_URL: `https://linea-mainnet.g.alchemy.com/v2/${alchemyKey}`,
-  };
-
-  for (const [key, fallback] of Object.entries(rpcDefaults)) {
+  for (const { rpcEnv: key, alchemyHost } of NETWORKS) {
+    const fallback = `https://${alchemyHost}/v2/${alchemyKey}`;
     if (!process.env[key]) {
       process.env[key] = fallback;
     }

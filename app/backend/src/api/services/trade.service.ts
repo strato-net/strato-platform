@@ -474,7 +474,9 @@ export const getTradeQuotes = async (
 
   const quotes = await Promise.all(
     candidates.map((candidate) =>
-      quoteCandidate(accessToken, candidate, tokenIn, tokenOut, amount, exactOut).catch(
+      candidate.pool.isPaused || candidate.pool.isDisabled
+        ? errorQuote(candidate, exactOut, "Pool is paused or disabled")
+        : quoteCandidate(accessToken, candidate, tokenIn, tokenOut, amount, exactOut).catch(
         (err: Error) => errorQuote(candidate, exactOut, err.message)
       )
     )

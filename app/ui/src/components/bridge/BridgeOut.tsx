@@ -68,10 +68,11 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ isSaving = false, guestMode = fal
 
   const currentTokens = useMemo(() => {
     return bridgeableTokens.filter((token) =>
-      (token.routeType !== "native" || (!token.withdrawalsPaused && !token.withdrawalsDisabled)) &&
-      (isSaving ? !token.isDefaultRoute : token.isDefaultRoute)
+      (token.routeType !== "native"
+        ? token.withdrawalsEnabled !== false
+        : !token.withdrawalsPaused && !token.withdrawalsDisabled)
     );
-  }, [bridgeableTokens, isSaving]);
+  }, [bridgeableTokens]);
 
   const currentNetwork = useMemo(() => {
     return (

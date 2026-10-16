@@ -10,7 +10,7 @@ import { useTradeForm } from "@/context/TradeFormContext";
 import { useTradeTokens, useTradePairableTokens } from "@/hooks/trade/useTradeTokens";
 import { useDerivedTradeInfo } from "@/hooks/trade/useDerivedTradeInfo";
 import { useTradeSwap } from "@/hooks/trade/useTradeSwap";
-import { usdstAddress, SWAP_FEE } from "@/lib/constants";
+import { usdstAddress, SWAP_FEE, USDST_BALANCE_REFRESH_MS, LOW_USDST_THRESHOLD } from "@/lib/constants";
 import { safeParseUnits, formatAmount, formatUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/transferValidation";
 import { TokenInputPanel } from "@/components/swap/TokenInputPanel";
@@ -20,9 +20,6 @@ import { SlippageControl } from "@/components/swap/SlippageControl";
 import { SwapConfirmDialog } from "@/components/swap/SwapConfirmDialog";
 import { RewardsWidget } from "@/components/rewards/RewardsWidget";
 import { UserRewardsData } from "@/services/rewardsService";
-
-const USDST_BALANCE_REFRESH_MS = 10_000;
-const LOW_USDST_THRESHOLD = "0.10";
 
 interface SwapWidgetProps {
   userRewards?: UserRewardsData | null;

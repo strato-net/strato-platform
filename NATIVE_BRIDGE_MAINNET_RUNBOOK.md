@@ -77,7 +77,6 @@ EXTERNAL_NAME=STRATO
 EXTERNAL_SYMBOL=STRATO
 MAX_PER_WITHDRAWAL=<wei amount>
 INSTANT_WITHDRAWAL_THRESHOLD=<wei amount>
-INSTANT_WITHDRAWAL_DELAY_SECONDS=<seconds>
 
 AUCTION_DEPLOYER_SAFE=<Safe that deploys/funds auction>
 LIQUIDITY_LAUNCHER=<LiquidityLauncher address>
@@ -159,15 +158,6 @@ npm run initialize:native-bridge -- \
   --guardian <GUARDIAN>
 ```
 
-Set instant withdrawal delay if required:
-
-```text
-target: <STRATO_NATIVE_BRIDGE_PROXY>
-method: setInstantWithdrawalDelaySeconds(uint256)
-args:
-  newDelaySeconds: <INSTANT_WITHDRAWAL_DELAY_SECONDS>
-```
-
 If the STRATO token is paused, whitelist the custody vault for bridge lock/unlock movement:
 
 ```text
@@ -227,14 +217,48 @@ ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY=<printed bridge proxy>
 ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL=<printed bridge implementation>
 ```
 
-Verify implementations and proxies on Etherscan before Safe administration:
+Contract publication and Safe decoding are production deployment checks. Use the
+exact reviewed source commit and the compiler settings used for deployment.
+Record the commit, compiler version/settings, proxy addresses, implementation
+addresses, and deployment transaction hashes before verification.
+
+Set `ETHERSCAN_API_KEY` and run from `app/ethereum`. Hardhat is configured to
+publish to both Etherscan and Sourcify:
+
+```bash
+npm run verify:mainnet -- <ETHEREUM_REPRESENTATION_TOKEN_IMPL>
+npm run verify:mainnet -- <ETHEREUM_REPRESENTATION_TOKEN_PROXY>
+npm run verify:mainnet -- <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL>
+npm run verify:mainnet -- <ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
+```
+
+Preserve the OpenZeppelin deployment manifest used to deploy the UUPS proxies;
+the proxy verification task uses it to identify the implementations and
+constructor data. If Etherscan does not associate a proxy automatically, use
+Etherscan's **Is this a proxy?** check for that proxy and confirm that it points
+to the recorded implementation.
+
+Check and record all of the following during deployment:
 
 ```text
-ETHEREUM_REPRESENTATION_TOKEN_PROXY verified
-ETHEREUM_REPRESENTATION_TOKEN_IMPL verified
-ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY verified
-ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_IMPL verified
+Etherscan shows verified source for both implementations and both proxies.
+Etherscan Read/Write as Proxy points each proxy to the recorded implementation.
+Sourcify reports the implementations and proxies as verified.
+Safe Contract interaction loads the ABI automatically for both proxy addresses.
+Safe displays named methods and parameters, including
+mintRepresentationWithAttestationV2 on the bridge proxy.
 ```
+
+Create and discard an unsigned Safe draft to confirm decoding; do not execute a
+test administration or mint transaction. Record the Etherscan and Sourcify
+links and the Safe decoding evidence in the deployment record. Do not proceed
+silently if a verification or decoding check is missing; record the failed
+check, owner, and follow-up action. These checks do not block the initial Safe
+batch or bridge activation.
+
+After every implementation upgrade, record the new implementation and source
+commit, verify the new implementation on Etherscan and Sourcify, reconfirm the
+proxy association, and repeat the Safe decoding check.
 
 ## 5. Ethereum Safe Initial Admin Batch
 
@@ -358,7 +382,9 @@ Import into Ethereum mainnet Safe Transaction Builder after replacing placeholde
 }
 ```
 
-If `ATTESTATION_THRESHOLD` is greater than `1`, add one `setAttestationSigner(<signer>, true)` transaction for each additional signer before `setAttestationThreshold`.
+Add at least two distinct `setAttestationSigner(<signer>, true)` transactions
+before `setAttestationThreshold`. `ATTESTATION_THRESHOLD` must be at least `2`
+and cannot exceed the enabled signer count.
 
 ## 6. Rename CATA To STRATO
 
@@ -410,8 +436,16 @@ npm run configure:native-route -- \
   --max-per-withdrawal <MAX_PER_WITHDRAWAL> \
   --instant-withdrawal-threshold <INSTANT_WITHDRAWAL_THRESHOLD> \
   --strato-token <STRATO_NATIVE_TOKEN> \
+  --settlement-verifiers <STRATO_ATTESTOR_1>,<STRATO_ATTESTOR_2>,<STRATO_ATTESTOR_3> \
+  --settlement-verifier-threshold 2 \
   --enabled true
 ```
+
+Review the dry-run output first. Every required STRATO administrator must then
+run the same command with `--execute`. The settlement verifier addresses are the
+STRATO accounts used by the verifier processes, not their external-chain KMS
+signer addresses. Do not enable the route until both source and destination
+thresholds are at least two.
 
 Verify Cirrus:
 
@@ -427,15 +461,24 @@ Bridge service env:
 STRATO_NATIVE_BRIDGE_ADDRESS=<STRATO_NATIVE_BRIDGE_PROXY>
 CHAIN_1_RPC_URL=<ETHEREUM_RPC_URL>
 CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS=<ETHEREUM_NATIVE_REPRESENTATION_BRIDGE_PROXY>
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY=<native-mint-signer-and-gas-key>
+CHAIN_1_NATIVE_MINT_EXECUTOR_ADDRESS=<KMS_EXECUTOR_ADDRESS>
+CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<KMS_KEY_ARN>
+CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_REGION=<AWS_REGION>
+CHAIN_1_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
+CHAIN_1_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
 ```
 
-If multiple signers are required:
+The Ethereum Safe must grant `MINT_EXECUTOR_ROLE` on the representation bridge
+to `CHAIN_1_NATIVE_MINT_EXECUTOR_ADDRESS` before instant mint or redemption
+refund processing is enabled. Verify the role on-chain. Private-key executor
+configuration is rejected; Runtime uses workload-identity KMS.
 
-```bash
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_1=<second-native-mint-signer-key>
-CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY_2=<third-native-mint-signer-key>
-```
+Run each native verifier with a separate KMS key, AWS identity, native policy file,
+RPC provider, API token, and `SETTLEMENT_ATTESTOR_*` STRATO credentials. Enable
+each verifier's KMS address through `setAttestationSigner` on the representation
+bridge and its STRATO settlement-attestor account through
+`setSettlementVerifier` on `StratoNativeBridge`; never enable the executor
+address as either signer.
 
 STRATO App mainnet addresses should be added to `app/backend/src/config/config.ts` before building the backend image. Update the Upquark entries after the production proxies are final:
 
@@ -481,10 +524,10 @@ cd <node-dir>
 docker compose -p strato up -d --no-deps app-backend app-ui
 ```
 
-Restart the bridge service after native bridge-service env is set:
+Restart the EAB bridge service after native bridge-service env is set:
 
 ```bash
-docker compose -p strato up -d --no-deps bridge
+docker compose -p strato up -d --no-deps bridge-eab
 ```
 
 Verify the running backend has native route code:
@@ -713,7 +756,7 @@ If a native withdrawal is stuck in `INITIATED`:
 ```text
 1. Confirm bridge service is running with STRATO_NATIVE_BRIDGE_ADDRESS.
 2. Confirm BRIDGE_OPERATOR matches the bridge service STRATO account.
-3. Confirm CHAIN_1_NATIVE_REPRESENTATION_BRIDGE_ADDRESS and CHAIN_1_NATIVE_BRIDGE_PRIVATE_KEY are configured.
+3. Confirm the representation bridge, executor, source settlement-attestor accounts, verifier URLs, and verifier tokens are configured.
 4. Check bridge service logs for queueManualNativeWithdrawalBatch or finalizeNativeWithdrawalBatch.
 ```
 
@@ -726,8 +769,9 @@ If a native redemption is stuck after the Ethereum-side burn:
 4. Confirm STRATO_NATIVE_BRIDGE_ADDRESS, STRATO_NATIVE_CUSTODY_VAULT_ADDRESS, and BRIDGE_OPERATOR are correct.
 5. Check whether the STRATO native deposit was recorded in Cirrus.
 6. If not recorded, fix polling/RPC/service configuration and let the bridge service retry recordDeposit.
-7. If recorded but not completed, fix the blocking STRATO state (route enabled, deposits unpaused, custody vault unpaused, vault locked balance sufficient, token whitelist if paused) and let the bridge service retry confirmDeposit.
-8. Do not create an external re-mint or off-chain compensation without governance approval and a written incident record.
+7. If recorded but not completed, confirm that each verifier can independently validate the external redemption and that at least settlementVerifierThreshold distinct attestDepositSettlement transactions exist for the current deposit digest.
+8. Fix any blocking STRATO state (route enabled, deposits unpaused, custody vault unpaused, vault locked balance sufficient, token whitelist if paused) and let the bridge service collect verifier quorum and retry confirmDeposit.
+9. Do not create an external re-mint or off-chain compensation without governance approval and a written incident record.
 ```
 
 If Safe execution shows `GS013` for native mint:

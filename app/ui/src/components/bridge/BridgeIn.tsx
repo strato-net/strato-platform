@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ApySource, DepositAction } from "@strato/shared-types";
+import { DepositAction } from "@strato/shared-types";
 import { metalForgeService, MetalConfig, PayTokenConfig } from "@/services/metalForgeService";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,8 +34,8 @@ import {
 } from "@/lib/bridge/contractService";
 import { normalizeError } from "@/lib/bridge/utils";
 import EarnApyTooltip from "@/components/earn/EarnApyTooltip";
-import { buildEarnApyMap } from "@/utils/earnUtils";
-import { ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
+import { buildEarnApyMap, pathForApyInfo } from "@/utils/earnUtils";
+import { fmtSpotDollarWei, effectiveDollarWei, ensureHexPrefix, formatBalance, safeParseUnits, formatUnits, truncateAddress, truncateDecimals } from "@/utils/numberUtils";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useEarnContext } from "@/context/EarnContext";
@@ -106,24 +106,6 @@ const combinedActionFeeBps = (action: DepositAction): string => {
   }
 };
 
-const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
-  switch (info.source) {
-    case "lending":
-      return "/dashboard/earn-lending";
-    case "vault":
-      return "/dashboard/earn-vault";
-    case "swap":
-    case "weighted_swap":
-      return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
-    case "safety":
-      return "/dashboard/advanced?tab=safety";
-    case "staking":
-      return "/dashboard/earn-staking";
-    default:
-      return "/dashboard/earn";
-  }
-};
-
 const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTokenConfig): bigint => {
   try {
     const input = safeParseUnits(payAmount, 18);
@@ -132,38 +114,6 @@ const calcMetalAmount = (payAmount: string, metal: MetalConfig, payToken: PayTok
     const metalPrice = BigInt(metal.price);
     return metalPrice > 0n ? (fundsUSD * WAD) / metalPrice : 0n;
   } catch { return 0n; }
-};
-
-/** WAD-scaled oracle USD price per metal unit → formatted $ */
-const fmtSpotDollarWei = (weiStr: string): string | null => {
-  try {
-    const v = BigInt(weiStr);
-    if (v <= 0n) return null;
-    const s = formatUnits(v, 18);
-    const n = parseFloat(s);
-    if (!Number.isFinite(n)) return null;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return null;
-  }
-};
-
-/** Effective USD per metal unit after mint fee spread: spot * 10000 / (10000 - feeBps) */
-const effectiveDollarWei = (spotWeiStr: string, feeBps: string): string | null => {
-  try {
-    const spot = BigInt(spotWeiStr);
-    const bps = BigInt(feeBps || "0");
-    if (spot <= 0n || bps >= 10000n) return null;
-    const eff = (spot * 10000n) / (10000n - bps);
-    return fmtSpotDollarWei(eff.toString());
-  } catch {
-    return null;
-  }
 };
 
 const metalPriceRowLabels = (oracleWei: string | undefined, feeBps: string | undefined): { spot: string; effective: string } => {

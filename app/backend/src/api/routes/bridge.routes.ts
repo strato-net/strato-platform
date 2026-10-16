@@ -3,7 +3,15 @@ import authHandler from "../middleware/authHandler";
 import BridgeController from "../controllers/bridge.controller";
 
 const router = Router();
+const adminAuth = authHandler.authorizeRequest({ requireAuthenticatedIdentity: true });
 const walletAuth = authHandler.authorizeRequest({ allowWalletAuth: true });
+
+router.get("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
+router.post("/withdrawalCancellation", walletAuth, BridgeController.cancelWithdrawal);
+
+router.get("/admin/policies", adminAuth, BridgeController.policies);
+router.get("/admin/reviews", adminAuth, BridgeController.reviews);
+router.post("/admin/reviews/prepare", adminAuth, BridgeController.reviews);
 
 /**
  * @openapi
@@ -164,8 +172,6 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                 properties:
  *                   id:
  *                     type: string
- *                   isDefaultRoute:
- *                     type: boolean
  *                   enabled:
  *                     type: boolean
  *                   stratoToken:
@@ -183,7 +189,7 @@ router.get("/depositActions", authHandler.authorizeRequest(), BridgeController.g
  *                   externalChainId:
  *                     type: string
  */
-router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(true), BridgeController.getBridgeableTokens);
 
 /**
  * @openapi
@@ -207,13 +213,17 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
  *                     type: object
  *                     additionalProperties: true
  */
-router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
+router.get("/networkConfigs", authHandler.authorizeRequest(true), BridgeController.getNetworkConfigs);
 
 /**
  * @openapi
  * /bridge/transactions/{type}:
  *   get:
  *     summary: Retrieve bridge transaction history
+ *     description: >-
+ *       Available at /api/bridge/transactions/{type} and
+ *       /api/trade/bridge/transactions/{type}. External chain filters use
+ *       direction-specific storage fields with an eq. prefix.
  *     tags: [Bridge]
  *     parameters:
  *       - name: type
@@ -247,12 +257,20 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  *         description: Filter results by STRATO token address
  *         schema:
  *           type: string
- *       - name: externalChainId
+ *       - name: key
  *         in: query
  *         required: false
- *         description: Filter results by external chain identifier
+ *         description: Filter external deposit history by chain; use only when type is deposit (e.g. key=eq.84532)
  *         schema:
  *           type: string
+ *           example: eq.84532
+ *       - name: 'value->>externalChainId'
+ *         in: query
+ *         required: false
+ *         description: Filter external withdrawal history by chain; use only when type is withdrawal (e.g. value->>externalChainId=eq.84532)
+ *         schema:
+ *           type: string
+ *           example: eq.84532
  *     responses:
  *       200:
  *         description: Paginated transaction records
@@ -269,7 +287,7 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  *                 totalCount:
  *                   type: integer
  */
-router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
+router.get("/transactions/:type", walletAuth, BridgeController.getTransactions);
 
 /**
  * @openapi

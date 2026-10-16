@@ -240,6 +240,12 @@ const buildTokenCompositeInfo = (
   };
 };
 
+export const buildAssetApyInfo = (apys: ApySource[]): EarnApyInfo | null =>
+  buildTokenCompositeInfo(apys.filter((entry) => !entry.poolAddress && (
+    entry.source === "base" || entry.source === "vault" || entry.source === "vault_weighted" ||
+    (entry.source === "lending" && entry.meta === "save_usdst")
+  )));
+
 export const buildEarnApyMap = (
   tokenApys: TokenApyEntry[],
   options?: EarnApyLookupOptions
@@ -299,4 +305,22 @@ export const findPoolEarnApyInfo = (
     if (info) return info;
   }
   return null;
+};
+
+export const pathForApyInfo = (info: { source: ApySource["source"]; poolAddress?: string }): string => {
+  switch (info.source) {
+    case "lending":
+      return "/dashboard/earn-lending";
+    case "vault":
+      return "/dashboard/earn-vault";
+    case "swap":
+    case "weighted_swap":
+      return info.poolAddress ? `/dashboard/earn-pools?pool=${info.poolAddress}` : "/dashboard/earn-pools";
+    case "safety":
+      return "/dashboard/advanced?tab=safety";
+    case "staking":
+      return "/dashboard/earn-staking";
+    default:
+      return "/dashboard/earn";
+  }
 };

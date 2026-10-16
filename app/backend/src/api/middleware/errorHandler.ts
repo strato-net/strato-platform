@@ -28,8 +28,8 @@ export const errorHandler: ErrorRequestHandler = (error: any, req: Request, res:
   }
 
   if (error instanceof StratoError) {
-    logError('StratoError', error);
-    return sendErrorResponse(res, error.status, 'StratoError', sanitizeMessage(error.status, error.message));
+    logError('StratoError', error, error.status, error.details);
+    return sendErrorResponse(res, error.status, 'StratoError', sanitizeMessage(error.status, error.message), error.status < 500 ? error.details : undefined);
   }
 
   if (error instanceof CirrusError) {
