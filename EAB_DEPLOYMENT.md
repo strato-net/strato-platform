@@ -15,28 +15,45 @@ Production STRATO accounts that require OTP must set a fresh `OAUTH_TOTP` in `ap
 
 **Who:** Coordinator creates the rollout. Infra base accounts may already exist, but chain-specific verifier and Runtime identities are not required yet.
 
-Create `<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>/deployment.env`:
+Set the rollout directory:
 
-```dotenv
-REPO_ROOT=<ABSOLUTE_REPOSITORY_PATH>
-ROLLOUT_DIR=<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>
-SOURCE_CHAIN_ID=<EQUIVALENT_OR_REFERENCE_CHAIN_ID>
-DEPLOY_ENV=<testnet-or-prod>
-NETWORK=<ethereum-or-base-or-linea-or-robinhood-or-hyperevm>
+```bash
+export ROLLOUT_DIR=<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>
 ```
 
-Load only the rollout file at the start of every Coordinator session. The tooling loads `app/contracts/.env` and `app/ethereum/.env` directly:
+If `deployment.env` does not exist, replace every `<...>` value and create it:
+
+```bash
+export REPO_ROOT=<ABSOLUTE_REPOSITORY_PATH>
+export SOURCE_CHAIN_ID=<EQUIVALENT_OR_REFERENCE_CHAIN_ID>
+export DEPLOY_ENV=<testnet-or-prod>
+export NETWORK=<ethereum-or-base-or-linea-or-robinhood-or-hyperevm>
+
+mkdir -p "$ROLLOUT_DIR"
+chmod 700 "$ROLLOUT_DIR"
+
+cat > "$ROLLOUT_DIR/deployment.env" <<EOF
+REPO_ROOT=$REPO_ROOT
+ROLLOUT_DIR=$ROLLOUT_DIR
+SOURCE_CHAIN_ID=$SOURCE_CHAIN_ID
+DEPLOY_ENV=$DEPLOY_ENV
+NETWORK=$NETWORK
+EOF
+
+chmod 600 "$ROLLOUT_DIR/deployment.env"
+```
+
+Load the existing file at the start of every Coordinator session:
 
 ```bash
 set -a
-source <ABSOLUTE_NEW_ROLLOUT_DIRECTORY>/deployment.env
+source "$ROLLOUT_DIR/deployment.env"
 set +a
-mkdir -p "$ROLLOUT_DIR"
-chmod 700 "$ROLLOUT_DIR"
-chmod 600 "$ROLLOUT_DIR/deployment.env"
 cd "$REPO_ROOT/app/ethereum"
 eval "$(npm run --silent network:environment)"
 ```
+
+The tooling loads `app/contracts/.env` and `app/ethereum/.env` directly.
 
 ```bash
 npm run external:rollout -- init \
