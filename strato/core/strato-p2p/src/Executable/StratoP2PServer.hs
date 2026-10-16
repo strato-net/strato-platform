@@ -119,7 +119,7 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
             $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
           logAndLengthenPeerDisableBy (24 * 60 * 60) p
         e' | Just SelfConnection <- fromException e' -> do
-          $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: another node is running with it"
+          $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: our own public address, or another node running with this node's key"
           -- p carries this connection's source port, but stored peers are
           -- matched by (host, listening port), so disable the stored record.
           getPeerByIP host >>= \case

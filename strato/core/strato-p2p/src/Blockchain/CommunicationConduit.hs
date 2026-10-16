@@ -148,9 +148,11 @@ handleMsgServerConduit myPubkey peer = do
     Just Hello {} -> do
       $logInfoS "handshake/Hello{}" "received hello"
       -- The key from the RLPx handshake is only a claim until the first frame
-      -- authenticates it, which this Hello just did. runPeer never dials our
-      -- own key, so a peer presenting it is another node running with this
-      -- node's key: drop it before it can be handed a sync task.
+      -- authenticates it, which this Hello just did. A peer presenting our own
+      -- key is either this node dialing its own public address or another
+      -- node running with this node's key; neither may be handed a sync task.
+      -- This is the only place that bans for it: a self-dial always lands
+      -- here, and only here is the key proven rather than claimed.
       when (pPeerPubkey peer == Just myPubkey) $ throwIO SelfConnection
       let helloMsg' =
             Hello

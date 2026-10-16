@@ -69,14 +69,9 @@ runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
-  let myPoint = secPubKeyToPoint myPublic
-  -- A stored key is only as trustworthy as the Neighbors entry it came from,
-  -- so a stored copy of our own key is checked against the endpoint itself
-  -- (the Pong is signed) before it can earn the address a SelfConnection ban.
   otherPubKey <- case (pPeerPubkey peer) of
-    Just pub | pub /= myPoint -> return pub
-    _ -> do
-      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have a verified pubkey.  I will try to use a UDP ping to get the pubkey."
+    Nothing -> do
+      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
       eitherOtherPubKey <- getServerPubKey peer
       case eitherOtherPubKey of
         Right pub -> do
@@ -85,12 +80,7 @@ runPeer peer sSource = do
         Left e -> do
           $logErrorS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
           throwIO NoPeerPubKey
-
-  -- A node can learn its own public address from its peers' neighbour lists.
-  -- Refuse to dial it here: exceptions raised inside runClientConnection are
-  -- only logged, so this is where SelfConnection still reaches
-  -- handleRunPeerResult and the address gets disabled.
-  when (otherPubKey == myPoint) $ throwIO SelfConnection
+    Just pub -> return pub
 
   $logInfoS "runPeer" . T.pack . C.blue $ "Welcome to strato-p2p-client"
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
@@ -235,14 +225,6 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             disableException thePeer "PeerNonResponsive" (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) False
           e' | Just NoPeerCertificate <- fromException e' -> do
             disableException thePeer "NoPeerCertificate" Nothing True
-          e' | Just SelfConnection <- fromException e' -> do
-            -- Our own address: a full day without dialing it, not the
-            -- five-second first step of disableException's backoff.
-            disErr <- storeDisableException thePeer "SelfConnection"
-            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-            selfErr <- disableTCPPeerForSeconds thePeer 86400
-            whenLeft selfErr $ \theSelfErr -> do
-              $logErrorLS "stratoP2PClient/handleRunPeerResult" theSelfErr
           e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
             case ioErrType of
               NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * Conf.connectionTimeout (p2pConfig ethConf)) True
