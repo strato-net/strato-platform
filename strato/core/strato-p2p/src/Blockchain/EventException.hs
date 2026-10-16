@@ -15,6 +15,7 @@ data EventException
   | NetworkIDMismatch
   | NoPeerPubKey
   | NoPeerCertificate
+  | SelfConnection
   deriving (Show)
 
 instance Exception EventException

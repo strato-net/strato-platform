@@ -112,6 +112,7 @@ import           Control.Monad.Composable.Base
 import qualified Database.Persist.Sql                    as SQL
 import qualified Database.Redis                          as Redis
 import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
+import           Text.Read                               (readMaybe)
 import           UnliftIO
 
 -- TODO: These type families should be exposed by monad-alter, not defined here
@@ -444,7 +445,10 @@ instance A.Selectable Host PPeer ContextM where
       [] -> return Nothing
       (x:_) -> return . Just $ SQL.entityVal x
     where
-      actions = SQL.selectList [PPeerHost SQL.==. host'] []
+      byHost = [PPeerHost SQL.==. host']
+      -- A peer stored under a DNS name keeps its resolved address in pPeerIp,
+      -- so a numeric host must match that too.
+      actions = SQL.selectList (maybe byHost (\ip -> byHost SQL.||. [PPeerIp SQL.==. Just ip]) (readMaybe $ hostToString host')) []
 
 instance A.Selectable Point PPeer ContextM where
   select _ pk =

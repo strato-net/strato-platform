@@ -343,7 +343,9 @@ class HasSyncDB m where
   clearAllSyncTasks :: Host -> m ()
   getCurrentSyncTask :: Host -> m (Maybe SyncTask)
   getNewSyncTask :: Host -> Integer -> m (Maybe SyncTask)
-  setSyncTaskFinished :: Host -> m ()
+  -- Scoped to the task: a host holds more than one assignment when two
+  -- connections to it overlap, and finishing by host would cover them all.
+  setSyncTaskFinished :: SyncTask -> m ()
   setSyncTaskNotReady :: Host -> m ()
 
 -- Sync tasks live in the peer store, which on a cell is not the eth
@@ -446,11 +448,13 @@ instance HasPeerStore m => HasSyncDB m where
           []  -> return Nothing
           _   -> error "this seems impossible, getNewSyncTask tried to create one new task, but multiple were created.  Internal error"
 
-  setSyncTaskFinished host = peerQuery $ do
+  setSyncTaskFinished task = peerQuery $ do
     update $ \syncTask -> do
       set syncTask [SyncTaskStatus =. val Finished]
       where_ (
-        (syncTask^.SyncTaskHost ==. val host)
+        (syncTask^.SyncTaskHost ==. val (syncTaskHost task))
+        &&.
+        (syncTask^.SyncTaskChiliad ==. val (syncTaskChiliad task))
         &&.
         (syncTask^.SyncTaskStatus ==. val Assigned)
         )
