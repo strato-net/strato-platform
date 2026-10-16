@@ -116,11 +116,14 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
 
   updatePeerDisable peer' d = do
     peerMap <- fmap stringPPeerMap accessEnv
+    -- A new disable never ends sooner than the one in force (see
+    -- disableTCPPeerForSeconds).
+    let notShortening enableTime f p = if pPeerEnableTime p < enableTime then f p else p
     case d of
       ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
-        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor}))
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ notShortening enableTime (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = pPeerNextDisableWindowSeconds p * nextDisableWindowFactor}))
       SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration ->
-        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ notShortening enableTime (\p -> p {pPeerEnableTime = enableTime, pPeerNextDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
 
   updatePeerLastBestBlockHash p (PeerLastBestBlockHash h) = do
     peerMap <- fmap stringPPeerMap accessEnv
@@ -135,7 +138,7 @@ instance {-# OVERLAPPING #-} (MemPeerDBEnv :> es) => HasPeerDB (Eff es) where
       SetPeerUdpDisableTime (UdpEnableTime enableTime) nextDisableWindow disableExpiration ->
         atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = enableTime, pPeerNextUdpDisableWindowSeconds = nextDisableWindow, pPeerDisableExpiration = disableExpiration}))
       ResetPeerUdpDisable ->
-        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> if pPeerUdpEnableTime p <= currentTime then p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime} else p))
+        atomicModifyIORef' peerMap $ (,()) . (ix (pPeerHost peer') %~ (\p -> p {pPeerUdpEnableTime = currentTime, pPeerNextUdpDisableWindowSeconds = 5, pPeerDisableExpiration = currentTime}))
 
   setPeerPubkey peer' point = do
     peerMap <- fmap stringPPeerMap accessEnv

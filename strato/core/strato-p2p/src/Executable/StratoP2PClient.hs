@@ -236,11 +236,11 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           e' | Just NoPeerCertificate <- fromException e' -> do
             disableException thePeer "NoPeerCertificate" Nothing True
           e' | Just SelfConnection <- fromException e' -> do
-            -- Our own address: a full day off for TCP and UDP, not the
+            -- Our own address: a full day without dialing it, not the
             -- five-second first step of disableException's backoff.
             disErr <- storeDisableException thePeer "SelfConnection"
             whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
-            selfErr <- disablePeerForSeconds thePeer 86400
+            selfErr <- disableTCPPeerForSeconds thePeer 86400
             whenLeft selfErr $ \theSelfErr -> do
               $logErrorLS "stratoP2PClient/handleRunPeerResult" theSelfErr
           e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
