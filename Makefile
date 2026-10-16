@@ -214,13 +214,19 @@ local: build_common apex nginx postgrest prometheus smd app-backend app-ui bridg
 # nginx, PostgREST, bridge, oracle or local-auth builds.
 validator: build_common apex prometheus
 
+# What a --role=api-node directory runs: the binaries plus the four images it
+# starts (postgres and redis are stock images, pulled by compose). With
+# --monitoring=false the apex and prometheus images go unused. No app, SMD,
+# bridge, oracle or local-auth builds.
+api-node: build_common nginx apex prometheus postgrest
+
 docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle docker-compose
 
 all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local validator oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local validator api-node oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
 app: app-backend app-ui
 	@echo ""

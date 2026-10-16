@@ -47,6 +47,8 @@ For a Nix-based build, use `NIX=true make` instead.
 
 For a validator (`--role=validator`), `make validator` builds the executables and only the two images a validator runs, apex and prometheus, and skips the rest.
 
+For an API node (`--role=api-node`), `make api-node` builds the executables and the four images it runs: nginx, apex, prometheus and postgrest.
+
 If `~/.local/bin` is not on your `PATH`, `make` prints a note. Run `source ~/.profile` or open a new terminal.
 
 ## 4. Store your OAuth credentials

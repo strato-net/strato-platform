@@ -78,6 +78,8 @@ A validator does not need the app, the APIs or Cirrus. `strato-up --role=validat
 
 For details, see [Consensus](../platform/consensus.md).
 
+**API node.** A node that serves the chain and its APIs without the app, the SMD and the Swagger docs. `strato-up --role=api-node` runs everything else, including Cirrus, nginx and `/health`; see [API node](configuration.md#api-node).
+
 ## In this section
 
 - [Requirements](requirements.md): hardware, operating systems, ports, credentials, TLS and DNS

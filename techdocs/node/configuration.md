@@ -26,7 +26,8 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |
-| `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, or `validator`, a lite validator with only the chain processes, their stores and apex. `--validator` is shorthand for `--role=validator`. See [Validator mode](#validator-mode). |
+| `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, `validator` (a lite validator with only the chain processes, their stores and apex) or `api-node` (a full node without the app, SMD and Swagger docs). `--validator` and `--apiNode` are shorthands for `--role=validator` and `--role=api-node`. See [Validator mode](#validator-mode) and [API node](#api-node). |
+| `--monitoring` | `true` | API node only: `false` drops the `prometheus` and `apex` containers, and with them `/health`. Refused with any other `--role`. See [API node](#api-node). |
 | `--publicStratoRpc` | `false` | Allow the `strato_*` simulation and trace methods on the public `/rpc` endpoint. |
 | `--generateKey` | `true` | During setup, create a node key in the Vault if none exists. When `false`, setup waits for the key to be inserted manually. |
 
@@ -156,6 +157,35 @@ What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no 
 - **Ports.** 30303 (TCP and UDP) for peers, and 80 for the monitor.
 - **Resources.** The host still needs the validator minimum of 8 GB of RAM. What you save is Cirrus's disk and the app's memory.
 - **Changing your mind.** The role is fixed when the directory is created, like every other flag. To turn a validator into a full node, create a new directory.
+
+## API node
+
+`--role=api-node`, or `--apiNode` for short, sets up a full node without the services that only serve people. It syncs and serves the chain and every API, and runs no app, SMD or Swagger docs.
+
+```bash
+make api-node    # the executables plus the nginx, apex, prometheus and postgrest images
+strato-up myapinode --role=api-node --network=helium --sslDir=/path/to/ssl --snapshot
+```
+
+What runs:
+
+| Host processes | Containers |
+|---|---|
+| The same as a full node: `ethereum-discover`, `strato-p2p`, `strato-sequencer`, `vm-runner`, `strato-indexer`, `slipstream`, `strato-api`, `ethereum-jsonrpc`, `strato-network-monitor`, `strato-logrotate` | `postgres`, `redis`, `nginx`, `postgrest`, `prometheus`, `apex` |
+
+What doesn't: `app-backend`, `app-ui`, `smd` and `docs`. Everything the APIs depend on stays. `slipstream` and PostgREST stay because transaction results, `eth_getLogs` and `/cirrus/search` come from Cirrus. nginx stays because it terminates TLS, checks the caller's token on every API route, rate-limits and guards `/rpc`. `prometheus` and `apex` stay because they produce `/health`.
+
+What answers:
+
+| Path | Response |
+|---|---|
+| `/strato-api/`, `/bloc/v2.2/`, `/rpc`, `/cirrus/search/`, `/health`, `/apex-api/`, `/metrics` | As on a full node |
+| `/`, `/smd/` | 404, or a redirect when `--appUrl` or `--smdUrl` is given |
+| `/docs/` | 502 |
+
+- **`--monitoring=false`** drops `prometheus` and `apex`, for operators who scrape the node processes themselves. `/health` and `/apex-api/` then answer 502, and the network monitor cannot watch the node. The flag is refused with any other `--role`.
+- **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on 30303, `--httpPort` and 443. `--localAuth` is not supported.
+- **Resources.** An API node needs the same host as a full node. On a testnet node, the app, SMD and docs containers use about 170 MB of memory between them and prometheus and apex about 350 MB more, while Postgres, Redis, `vm-runner` and `strato-p2p` use several GB and Cirrus is the disk. What you get is a faster build and fewer containers, not a smaller machine.
 
 ## JSON-RPC and the STRATO RPC extensions
 

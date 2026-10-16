@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_monitoring, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_validatorBehavior, flags_vmQuery, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -220,6 +220,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       liftIO $ error "--localAuth is only supported with --role=node"
     when (role /= RoleNode && flags_dockerMode == "allDocker") $
       liftIO $ error "--dockerMode=allDocker is only supported with --role=node; use docker-compose.api.yml for a containerized API tier"
+    when (not flags_monitoring && not (roleAllowsMonitoringOff role)) $
+      liftIO $ error "--monitoring=false is only supported with --role=api-node"
 
     -- Validate SSL directory contents before doing any setup
     when (not $ null flags_sslDir) $ do
@@ -412,11 +414,14 @@ mkFilesAndGenesis nodeDir hasFlags network = do
           populateMPTAndWriteGenesis genesisInfo
         liftIO $ putStrLn "  ✓ Created genesis.json"
 
+    when (role == RoleApiNode && not flags_monitoring) $
+      liftIO $ putStrLn "  Monitoring off: no prometheus or apex; /health is not served"
     liftIO $ putStrLn $ case role of
       RoleNode -> "Node ready"
       RoleCore -> "Core ready"
       RoleApi -> "API tier ready"
       RoleValidator -> "Validator ready"
+      RoleApiNode -> "API node ready"
 
 -- We have to normalize the information held in GenesisInfo, unfortunalely we have some characters that done encode and decode back from JSON the same
 -- If we don't do this, the stateroot created from the raw data won't match that if created from the data read from genesis.json
