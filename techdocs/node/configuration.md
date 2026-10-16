@@ -180,8 +180,8 @@ What answers:
 | Path | Response |
 |---|---|
 | `/strato-api/`, `/bloc/v2.2/`, `/rpc`, `/cirrus/search/`, `/health`, `/apex-api/`, `/metrics` | As on a full node |
-| `/`, `/smd/` | 404, or a redirect when `--appUrl` or `--smdUrl` is given |
-| `/docs/` | 502 |
+| `/` (after its usual redirect to `/dashboard/`), `/smd/` | 404, or a redirect when `--appUrl` or `--smdUrl` is given |
+| `/docs/` | 502 (a browser is sent through the login first, as on a full node) |
 
 - **`--monitoring=false`** drops `prometheus` and `apex`, for operators who scrape the node processes themselves. `/health` and `/apex-api/` then answer 502, and the network monitor cannot watch the node. The flag is refused with any other `--role`.
 - **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on 30303, `--httpPort` and 443. `--localAuth` is not supported.
