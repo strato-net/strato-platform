@@ -138,6 +138,7 @@ Where these variables take effect:
 `--role=validator`, or `--validator` for short, sets up a lite validator: a node that takes part in consensus and does nothing else.
 
 ```bash
+make validator   # the executables plus the apex and prometheus images, nothing else
 strato-up myvalidator --role=validator --network=helium --snapshot
 ```
 
