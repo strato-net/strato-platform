@@ -1,4 +1,7 @@
 const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+require("dotenv").config({ quiet: true });
 const { NETWORKS, getExternalBridgeNetwork } = require("./lib/externalBridgeNetworks");
 
 const FAMILY_ALIASES = {
@@ -57,6 +60,36 @@ function buildCommand(action, network, args = []) {
   throw new Error("Use deploy-external|deploy-proxy|deploy-implementation|verify");
 }
 
+function deploymentEnvironment(manifestFile, network, env = process.env) {
+  if (!manifestFile) return { ...env };
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(manifestFile), "utf8"));
+  if (manifest.schemaVersion !== 0 || !manifest.discovery?.target) {
+    throw new Error("--manifest must reference the reviewed pre-deployment deployment.json");
+  }
+  const target = manifest.discovery.target;
+  if (Number(target.chainId) !== network.chainId) throw new Error("Manifest target chain mismatch");
+  const names = {
+    SAFE_ADDRESS: target.safeAddress,
+    PERMIT2_ADDRESS: target.permit2Address,
+    DEPLOYMENT_CONFIRMATIONS: target.deploymentConfirmations,
+    VAULT_DEFAULT_ADMIN_ADDRESS: target.roles?.vaultDefaultAdminAddress,
+    VAULT_UPGRADER_ADDRESS: target.roles?.vaultUpgraderAddress,
+    VAULT_POLICY_ADMIN_ADDRESS: target.roles?.vaultPolicyAdminAddress,
+    GUARDIAN_ADDRESS: target.roles?.guardianAddress,
+    VAULT_UNPAUSER_ADDRESS: target.roles?.vaultUnpauserAddress,
+    VAULT_ATTESTATION_ADMIN_ADDRESS: target.roles?.vaultAttestationAdminAddress,
+    LARGE_WITHDRAWAL_APPROVER_ADDRESS: target.roles?.largeWithdrawalApproverAddress,
+  };
+  const configured = { ...env };
+  for (const [name, value] of Object.entries(names)) {
+    if (value === undefined || value === "REVIEW_REQUIRED") throw new Error(`Manifest target is missing ${name}`);
+    configured[`CHAIN_${network.chainId}_${name}`] = String(value);
+  }
+  const chainRpc = configured[`CHAIN_${network.chainId}_RPC_URL`];
+  if (chainRpc && !configured[network.rpcEnv]) configured[network.rpcEnv] = chainRpc;
+  return configured;
+}
+
 function environmentExports(network) {
   return [
     `export TARGET_NETWORK=${network.name}`,
@@ -68,7 +101,18 @@ function environmentExports(network) {
 }
 
 function main() {
-  const [action, ...args] = process.argv.slice(2);
+  const [action, ...rawArgs] = process.argv.slice(2);
+  let manifestFile;
+  const args = [];
+  for (let index = 0; index < rawArgs.length; index++) {
+    if (rawArgs[index] === "--manifest") {
+      if (!rawArgs[index + 1] || manifestFile) throw new Error("--manifest requires one file");
+      manifestFile = rawArgs[++index];
+    } else args.push(rawArgs[index]);
+  }
+  if (manifestFile && action !== "deploy-external") {
+    throw new Error("--manifest is supported only by deploy-external");
+  }
   const network = selectNetwork();
   if (action === "environment") {
     if (args.length) throw new Error("environment does not accept command arguments");
@@ -79,7 +123,7 @@ function main() {
   console.log(`network=${network.name} chainId=${network.chainId} environment=${network.production ? "prod" : "testnet"}`);
   const result = spawnSync(invocation.command, invocation.args, {
     cwd: require("node:path").resolve(__dirname, ".."),
-    env: { ...process.env, HARDHAT_NETWORK: network.name },
+    env: { ...deploymentEnvironment(manifestFile, network), HARDHAT_NETWORK: network.name },
     stdio: "inherit",
   });
   if (result.error) throw result.error;
@@ -95,4 +139,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { selectNetwork, buildCommand, environmentExports };
+module.exports = { selectNetwork, buildCommand, deploymentEnvironment, environmentExports };

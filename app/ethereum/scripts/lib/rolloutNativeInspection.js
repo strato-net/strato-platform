@@ -103,7 +103,8 @@ function nativeGovernanceProgress(calls, state) {
 }
 
 function nativeOnlyEabVerified(context, inspection) {
-  return context.manifest.scope === "native" && inspection.externalReady && inspection.router?.paused === false &&
+  return ["native", "native-extension"].includes(context.manifest.scope) &&
+    inspection.externalReady && inspection.router?.paused === false &&
     inspection.report.status === "DEPOSITS_ACTIVE_CANARY_REQUIRED" &&
     !!inspection.source && inspection.report.calls?.every(({ status }) => status === "COMPLETE") &&
     ["strato", "external-identity", "deposit-router", "withdrawal-pause", "safe-runtime-identities", "vault-configuration", "verifiers", "bridge-health"]
@@ -137,8 +138,11 @@ async function validateNativeReadiness(context, artifacts, fetchImpl = fetch, ru
 async function nativeApprovalInspection(context, artifacts, mode, eabInspection, options = {}) {
   const eab = eabInspection || await (options.inspectEab || inspect)(context, artifacts);
   const existingEab = nativeOnlyEabVerified(context, eab) || (mode === "activate" && options.readOnlyActiveEab === true &&
-    nativeOnlyEabVerified({ ...context, manifest: { ...context.manifest, scope: "native" } }, eab));
-  if (!eab.source || !eab.externalReady || (eab.router?.paused !== true && !existingEab)) throw new Error("Native governance requires verified EAB configuration and paused external intake");
+    nativeOnlyEabVerified({ ...context, manifest: { ...context.manifest, scope: "native-extension" } }, eab));
+  if (!eab.source || !eab.externalReady ||
+      (mode === "activate" && eab.router?.paused !== true && !existingEab)) {
+    throw new Error("Native governance requires verified EAB configuration and paused external intake for activation");
+  }
   if (mode === "activate" && eab.report.status !== "READY_FOR_ACTIVATION_REVIEW" && !existingEab) throw new Error("Native activation requires completed EAB governance and service readiness");
   if (mode === "activate") {
     const runtimeVerifierHealth = eab.report.checks?.find(check => check.name === "bridge-health")?.data?.deployment?.verifiers;
@@ -244,14 +248,14 @@ async function nativeHandoff(context, artifacts, manifestPath, mode, options = {
             summary: approval.packet.calls.map(({ call }) => ({ target: call.args._target, method: call.args._func, args: call.args._args })),
             file: handoff.file, approvalId: handoff.approvalId,
             run: `npm run external:rollout -- approve --file ${shellQuote(path.basename(handoff.file))}`,
-            instruction: "Run with each required admin account; Coordinator reruns continue before Safe activation." };
+            instruction: "Run with each required admin account; Coordinator reruns generate before Safe activation." };
         }
       }
       result.safe.createdAt = 0;
       const file = path.join(artifacts.directory, `native-safe-${digest(result.safe)}`, `${mode}.safe.json`);
       writeJson(file, result.safe);
       return { status: "ACTION_REQUIRED", role: "admins", action: "EXECUTE_NATIVE_SAFE_TRANSACTION", file,
-        instruction: "Review and execute this one Safe batch, then the Coordinator reruns continue." };
+        instruction: "Review and execute this one Safe batch, then the Coordinator reruns generate." };
     }
     const inspection = await withDeadline("Native STRATO configuration", () => nativeApprovalInspection(context, artifacts, mode, undefined, options), INSPECTION_TIMEOUT_MS);
     if (governanceBatch(inspection.report).calls.length) {
@@ -262,10 +266,10 @@ async function nativeHandoff(context, artifacts, manifestPath, mode, options = {
         summary: approval.packet.calls.map(({ call }) => ({ target: call.args._target, method: call.args._func, args: call.args._args })),
         file: handoff.file, approvalId: handoff.approvalId,
         run: `npm run external:rollout -- approve --file ${shellQuote(path.basename(handoff.file))}`,
-        instruction: "Each required admin runs the same current command with their own credentials. No profiles or history. Coordinator reruns continue after execution." };
+        instruction: "Each required admin runs the same current command with their own credentials. No profiles or history. Coordinator reruns generate after execution." };
     }
-    return { status: mode === "configure" ? "NATIVE_CONFIGURED" : "NATIVE_ACTIVE", action: "COORDINATOR_CONTINUE",
-      run: `npm run external:rollout -- continue --manifest ${shellQuote(manifestPath)}` };
+    return { status: mode === "configure" ? "NATIVE_CONFIGURED" : "NATIVE_ACTIVE", action: "COORDINATOR_GENERATE",
+      run: `npm run external:rollout -- generate --manifest ${shellQuote(manifestPath)}` };
   } finally { if (!options.provider) provider.destroy(); }
 }
 
@@ -291,7 +295,7 @@ function nativeCoordinatorAction(context, report, output, manifestPath) {
   const stage = !completed("configured") ? "initial"
     : ["READY_FOR_ACTIVATION_REVIEW", "DEPOSITS_ACTIVE_CANARY_REQUIRED"].includes(report.status) && !completed("active") ? "activation" : undefined;
   return stage && { role: "coordinator", action: stage === "initial" ? "CONFIGURE_NATIVE_BRIDGE" : "ACTIVATE_NATIVE_BRIDGE",
-    run: `npm run external:rollout -- continue --manifest ${shellQuote(manifestPath)}`,
+    run: `npm run external:rollout -- generate --manifest ${shellQuote(manifestPath)}`,
     instruction: "This generates the current native Safe JSON or self-contained admin command. Rerun it after execution; no admin setup or deployment history." };
 }
 
@@ -321,9 +325,9 @@ async function advanceNative(context, artifacts, report, output, manifestPath, i
       if (!["NATIVE_CONFIGURED", "NATIVE_ACTIVE"].includes(result.status)) return {
         ...result,
         instruction: result.action === "EXECUTE_NATIVE_SAFE_TRANSACTION"
-          ? "Safe owners import this JSON into the intended Safe, review and execute it. Coordinator reruns continue after execution."
-          : "Send each required admin the exact approval file and short command. Each admin reviews the decoded calls, confirms the short ID and runs with their own credentials. Coordinator reruns continue after execution/indexing.",
-        resume: `npm run external:rollout -- continue --manifest ${shellQuote(manifestPath)}`,
+          ? "Safe owners import this JSON into the intended Safe, review and execute it. Coordinator reruns generate after execution."
+          : "Send each required admin the exact approval file and short command. Each admin reviews the decoded calls, confirms the short ID and runs with their own credentials. Coordinator reruns generate after execution/indexing.",
+        resume: `npm run external:rollout -- generate --manifest ${shellQuote(manifestPath)}`,
       };
       recordNativeCompletion(context, output, result);
     } catch (error) {
@@ -331,8 +335,8 @@ async function advanceNative(context, artifacts, report, output, manifestPath, i
       return { status: "ACTION_REQUIRED", role: "infra", action: "ENABLE_NATIVE_SERVICES",
         infra: createServiceHandoff(artifacts, { nativeExtension: context.manifest.scope === "native" }), failedChecks: [redactFor(context, error.message)],
         instruction: context.manifest.scope === "native"
-          ? "Apply native settings to the existing Runtime/verifiers, preserving Running=Yes, EAB bindings, journals and Safe writer ownership. Confirm healthy native policies, then Coordinator reruns continue."
-          : "Start/repair the native Runtime/verifier configuration from this archive, then Coordinator reruns continue." };
+          ? "Apply native settings to the existing Runtime/verifiers, preserving Running=Yes, EAB bindings, journals and Safe writer ownership. Confirm healthy native policies, then Coordinator reruns generate."
+          : "Start/repair the native Runtime/verifier configuration from this archive, then Coordinator reruns generate." };
     }
   }
   return undefined;

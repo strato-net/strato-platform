@@ -72,20 +72,21 @@ The supported rollout commands are:
 
 ```bash
 npm run external:rollout -- init --manifest <deployment.json> ...
-npm run external:rollout -- prepare --manifest <deployment.json>
-npm run external:rollout -- continue --manifest <deployment.json>
+npm run external:rollout -- preflight --manifest <deployment.json>
+npm run external:rollout -- generate --manifest <deployment.json>
 npm run external:rollout -- approve --file <admin-approval-ID.json>
 npm run external:rollout -- verify --manifest <deployment.json>
+npm run external:rollout -- activate --manifest <deployment.json>
 ```
 
-`continue` is read-only. It reconciles live AdminRegistry, Cirrus, Safe and
-contract state, then emits only the current external action. Admin approval files
+`generate` reconciles live AdminRegistry, Cirrus, Safe and contract state, then
+replaces `.deployment/current/` with only the current handoffs. Admin approval files
 contain the exact current calls and expire after two hours. `approve --file`
 rechecks live state, prints decoded calls and vote counts, and requires
 `APPROVE <short-id>` before submission.
 
 Admins keep no rollout history or activity trace. If a sequential governance
-batch is interrupted, the Coordinator reruns `continue`; completed calls are
+batch is interrupted, the Coordinator reruns `generate`; completed calls are
 derived from live evidence and the replacement approval file contains only
 incomplete calls. Safe MultiSend batches remain atomic and are regenerated
 against the current Safe nonce after a failure.

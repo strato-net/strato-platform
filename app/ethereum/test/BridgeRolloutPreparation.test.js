@@ -147,6 +147,23 @@ test('EAB settings use live storage over canonical dependency defaults', () => {
   assert.deepEqual(migrated.settlementVerifiers,[a(3)]);
   assert.equal(migrated.dependencies.priceOracle,a(4));
 });
+test('fresh EAB settings preserve reviewed target identities and source dependencies', () => {
+  const { rolloutSettings } = require('../scripts/prepareBridgeRollout');
+  const freshInput = { ...input, target: { ...input.target,
+    externalAssetBridge:a(10), tokenRouter:a(11), bridgeOperator:a(12), guardian:a(13),
+    settlementVerifiers:[a(14),a(15)] } };
+  const settings = rolloutSettings(freshInput, { ...state,
+    eab:{ address:a(9), storage:{ _owner:a(8), tokenFactory:a(7), USDST_ADDRESS:a(6), priceOracle:a(5) }, mappings:[] },
+    targetEab:{ address:a(10), storage:{ _owner:a(8), tokenFactory:a(0), USDST_ADDRESS:a(0), priceOracle:a(0) }, mappings:[] } });
+  assert.equal(settings.externalAssetBridge,a(10));
+  assert.equal(settings.tokenRouter,a(11));
+  assert.equal(settings.bridgeOperator,a(12));
+  assert.equal(settings.guardian,a(13));
+  assert.deepEqual(settings.settlementVerifiers,[a(14),a(15)]);
+  assert.equal(settings.dependencies.tokenFactory,a(7));
+  assert.equal(settings.dependencies.usdst,a(6));
+  assert.equal(settings.dependencies.priceOracle,a(5));
+});
 test('Helium EAB settings prefill canonical dependencies', () => {
   const { rolloutSettings } = require('../scripts/prepareBridgeRollout');
   const settings = rolloutSettings(input, { stratoChainId:'114784819836269',

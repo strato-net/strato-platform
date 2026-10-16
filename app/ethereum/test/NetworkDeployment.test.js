@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const test = require("node:test");
-const { selectNetwork, buildCommand, environmentExports } = require("../scripts/networkDeployment");
+const { selectNetwork, buildCommand, deploymentEnvironment, environmentExports } = require("../scripts/networkDeployment");
 
 const select = (DEPLOY_ENV, NETWORK) => selectNetwork({ DEPLOY_ENV, NETWORK });
 
@@ -56,4 +59,35 @@ test("derives all per-network runbook values from one environment selection", ()
       ].join("\n"));
     }
   }
+});
+
+test("loads reviewed public deployment values without changing the standard path", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "network-deployment-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "deployment.json");
+  const roles = Object.fromEntries([
+    "vaultDefaultAdminAddress", "vaultUpgraderAddress", "vaultPolicyAdminAddress",
+    "guardianAddress", "vaultUnpauserAddress", "vaultAttestationAdminAddress",
+    "largeWithdrawalApproverAddress",
+  ].map((name, index) => [name, `0x${String(index + 2).repeat(40)}`]));
+  fs.writeFileSync(file, JSON.stringify({
+    schemaVersion: 0,
+    discovery: { target: {
+      chainId: 11155111,
+      safeAddress: `0x${"1".repeat(40)}`,
+      permit2Address: `0x${"9".repeat(40)}`,
+      deploymentConfirmations: 12,
+      roles,
+    } },
+  }));
+  const network = select("testnet", "ethereum");
+  const standard = { KEEP: "yes" };
+  assert.deepEqual(deploymentEnvironment(undefined, network, standard), standard);
+  const configured = deploymentEnvironment(file, network, {
+    CHAIN_11155111_RPC_URL: "https://rpc.example",
+  });
+  assert.equal(configured.SEPOLIA_RPC_URL, "https://rpc.example");
+  assert.equal(configured.CHAIN_11155111_SAFE_ADDRESS, `0x${"1".repeat(40)}`);
+  assert.equal(configured.CHAIN_11155111_DEPLOYMENT_CONFIRMATIONS, "12");
+  assert.equal(configured.CHAIN_11155111_GUARDIAN_ADDRESS, roles.guardianAddress);
 });

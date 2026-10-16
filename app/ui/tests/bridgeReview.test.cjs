@@ -222,6 +222,15 @@ test('deposit and Safe stages name the next actor without requesting an unnecess
   }
 });
 
+test('confirmed deposit refunds wait for finalization, not another governance approval', () => {
+  const h = harness({ kind: 'deposit_recovery', overrides: {
+    actions: [], recoveryStatus: 'refund_pending', source: 'native', refundEvidenceHash: 'a'.repeat(64),
+  } });
+  const text = h.text(h.render());
+  assert.match(text, /Refund confirmed · finalization pending/);
+  assert.doesNotMatch(text, /Refund confirmation requires governance approval/);
+});
+
 test('review actions reflect your vote and quorum without claiming approval', () => {
   const h = harness({ progress: { votesCast: 1, votesRequired: 2, hasVoted: true } });
   const tree = h.render();

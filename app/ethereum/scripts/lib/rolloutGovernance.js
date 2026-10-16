@@ -189,7 +189,7 @@ async function fetchLiveAdminVoteCounts(settings, nodeUrl, token, calls, artifac
 
 function requireLiveAdminVoteCounts(source, report) {
   if (source?.voteCountsDeferred || source?.liveVoteCountsError || ["UNAVAILABLE", "DEFERRED"].includes(report?.liveVoteCounts?.status)) {
-    throw new Error("Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun continue");
+    throw new Error("Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun generate");
   }
 }
 
@@ -197,7 +197,8 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
   const { inspect, sourceState } = require("./rolloutEabInspection");
   if (inspection.report.approvalHash !== approval) throw new Error("Approval is stale; review a fresh resume report");
   if (!inspection.source || !inspection.externalReady || (inspection.router?.paused !== true &&
-      !(options.allowActiveEab && context.manifest.scope === "native" && inspection.report.nativeMode && inspection.router?.paused === false))) throw new Error("Voting requires verified external code, paused vault/router, and readable STRATO state");
+      !(options.allowActiveEab && ["native", "native-extension"].includes(context.manifest.scope) &&
+        inspection.report.nativeMode && inspection.router?.paused === false))) throw new Error("Voting requires verified external code, paused vault/router, and readable STRATO state");
   if (inspection.source.inactiveTokens?.length || inspection.report.calls.some(item => item.status === "BLOCKED" && !isDependencyPending(item) && item.call.args._func === "initialize")) {
     throw new Error("Resolve inactive tokens or conflicting initialization before voting");
   }
@@ -230,7 +231,7 @@ async function vote(context, artifacts, inspection, approval, options = {}) {
     let fresh, liveCall;
     while (true) {
       if (options.approvalExpiresAt !== undefined && Date.now() >= options.approvalExpiresAt) {
-        throw new Error("Approval command expired during processing; Coordinator reruns continue. Submitted votes remain recorded.");
+        throw new Error("Approval command expired during processing; Coordinator reruns generate. Submitted votes remain recorded.");
       }
       const enabling = isActivationCall(item);
       const refreshed = enabling ? await withDeadline("Activation readiness recheck", () => (options.inspect || inspect)(context, artifacts), INSPECTION_TIMEOUT_MS) : undefined;

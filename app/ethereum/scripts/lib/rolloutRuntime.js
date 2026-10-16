@@ -34,7 +34,7 @@ async function withDeadline(label, work, timeoutMs, parentSignal) {
       onAbort = () => reject(signal.reason);
       signal.addEventListener("abort", onAbort, { once: true });
       timer = setTimeout(() => {
-        const error = new Error(`${label} timed out after ${timeoutMs / 1000}s; restore connectivity and rerun continue`);
+        const error = new Error(`${label} timed out after ${timeoutMs / 1000}s; restore connectivity and rerun the command`);
         error.code = "ROLLOUT_TIMEOUT";
         controller.abort(error);
       }, timeoutMs);
@@ -68,14 +68,14 @@ function acquireRolloutLock(file, processImpl = process) {
 }
 
 function parseArgs(argv) {
-  const command = argv[0]?.startsWith("--") ? "plan" : argv.shift() || "plan";
-  if (!["init", "prepare", "continue", "approve", "plan", "verify"].includes(command)) {
-    throw new Error("Use init|prepare|continue|approve|plan|verify; resume existing deployments with continue --manifest <deployment-file>");
+  const command = argv.shift();
+  if (!["init", "preflight", "generate", "verify", "activate", "approve"].includes(command)) {
+    throw new Error("Use init|preflight|generate|verify|activate|approve");
   }
   const args = { command };
   const allowed = command === "approve" ? ["file", "request", "approve", "env-file"]
     : command === "init" ? ["manifest", "settings", "policy", "discovery", "node-url", "chain-id", "source-chain-id", "env-file"]
-    : ["manifest", "output-dir", "stage", "env-file"];
+    : ["manifest", "env-file"];
   for (let index = 0; index < argv.length; index += 2) {
     const name = argv[index].replace(/^--/, "");
     if (!argv[index].startsWith("--") || !allowed.includes(name) || !argv[index + 1] || argv[index + 1].startsWith("--") || args[name]) throw new Error(`Invalid or duplicate option ${argv[index]}`);
@@ -91,10 +91,10 @@ function parseArgs(argv) {
     return args;
   }
   if (!args.manifest) throw new Error("--manifest is required; local role profiles are no longer used");
-  if (["prepare", "continue", "verify"].includes(command)) args.stage ||= "activation";
-  if (args.stage && !["initial", "activation"].includes(args.stage)) throw new Error("--stage must be initial|activation");
-  if (command === "init" && args["node-url"] && (!args["chain-id"] || !args["source-chain-id"] || args.discovery || args.settings || args.policy)) throw new Error("Discovery init requires --node-url, --chain-id and --source-chain-id without --settings/--policy/--discovery");
-  if (command === "init" && !args["node-url"] && (args["chain-id"] || args["source-chain-id"])) throw new Error("--node-url is required for discovery init");
+  if (command === "init" && (args["node-url"] || args["chain-id"] || args["source-chain-id"]) &&
+      (!args["chain-id"] || !args["source-chain-id"] || args.discovery || args.settings || args.policy)) {
+    throw new Error("Discovery init requires --chain-id and --source-chain-id without --settings/--policy/--discovery");
+  }
   if (args.discovery && (args.settings || args.policy)) throw new Error("Use --discovery or --settings/--policy, not both");
   return args;
 }
@@ -102,12 +102,22 @@ function parseArgs(argv) {
 function loadRolloutEnvironment(manifest, configuredFile) {
   const file = configuredFile
     ? path.resolve(configuredFile) : path.join(path.dirname(path.resolve(manifest)), "deployment.env");
+  dotenv.config({ path: path.resolve(__dirname, "../../../contracts/.env"), quiet: true, override: false });
+  dotenv.config({ path: path.resolve(__dirname, "../../.env"), quiet: true, override: false });
   if (fs.existsSync(file)) {
     dotenv.config({ path: file, quiet: true, override: true });
-    const config = require("../../../contracts/deploy/config");
-    config.nodes[0].oauth.openIdDiscoveryUrl = process.env.OAUTH_URL;
-    config.nodes[0].oauth.clientId = process.env.OAUTH_CLIENT_ID;
-    config.nodes[0].oauth.clientSecret = process.env.OAUTH_CLIENT_SECRET;
+  }
+  const config = require("../../../contracts/deploy/config");
+  config.nodes[0].url = process.env.NODE_URL;
+  config.nodes[0].oauth.openIdDiscoveryUrl = process.env.OAUTH_URL;
+  config.nodes[0].oauth.clientId = process.env.OAUTH_CLIENT_ID;
+  config.nodes[0].oauth.clientSecret = process.env.OAUTH_CLIENT_SECRET;
+  if (process.env.DEPLOY_ENV && process.env.NETWORK) {
+    const network = require("../networkDeployment").selectNetwork(process.env);
+    const rpc = process.env[network.rpcEnv];
+    if (rpc && !process.env[`CHAIN_${network.chainId}_RPC_URL`]) {
+      process.env[`CHAIN_${network.chainId}_RPC_URL`] = rpc;
+    }
   }
   return file;
 }

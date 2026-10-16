@@ -120,10 +120,8 @@ function planReviewSummary(context, artifacts) {
 
 function rolloutProgress(report, args, artifacts, context, environmentFile) {
   const common = [`--manifest ${shellQuote(args.manifest)}`];
-  if (args["output-dir"]) common.push(`--output-dir ${shellQuote(args["output-dir"])}`);
-  if (args.stage) common.push(`--stage ${args.stage}`);
   if (args["env-file"]) common.push(`--env-file ${shellQuote(args["env-file"])}`);
-  const resumeCommand = `npm run external:rollout -- continue ${common.join(" ")}`;
+  const resumeCommand = `npm run external:rollout -- generate ${common.join(" ")}`;
   const safeChecklist = report.safe?.executionOrder;
   const sourceToken = context?.manifest.services.sourceTokenEnv;
   const rpcUrl = context?.manifest.services.rpcUrlEnv;
@@ -154,7 +152,7 @@ function rolloutProgress(report, args, artifacts, context, environmentFile) {
         currentStage: batch.phase === "activation" ? "Activation" : "Configuration",
         readyCallCount: ready.length,
         voteState: report.liveVoteCounts.status === "DEFERRED" ? "VOTES_DEFERRED" : "LIVE_ADMIN_VOTES_UNAVAILABLE",
-        action: report.liveVoteCounts.status === "DEFERRED" ? "Complete the paused external configuration before issuing admin approvals." : "Live AdminRegistry vote counts are unavailable. Do not infer zero votes. Restore the STRATO vote query and rerun continue.",
+        action: report.liveVoteCounts.status === "DEFERRED" ? "Complete the paused external configuration before issuing admin approvals." : "Live AdminRegistry vote counts are unavailable. Do not infer zero votes. Restore the STRATO vote query and rerun generate.",
         safeAction,
       failedChecks,
       safeChecklist,
@@ -191,16 +189,16 @@ function rolloutProgress(report, args, artifacts, context, environmentFile) {
       voteRequirements,
       voteState,
       action: voteState === "WAITING_FOR_EXECUTION"
-        ? "The live AdminRegistry threshold is met. Wait for execution/indexing, then rerun continue."
+        ? "The live AdminRegistry threshold is met. Wait for execution/indexing, then rerun generate."
         : voteState === "WAITING_ON_SECOND_ADMIN"
           ? "The first administrator vote is recorded. This batch is waiting on the second administrator."
           : voteState === "GOVERNANCE_THRESHOLD_UNAVAILABLE"
-            ? "The live AdminRegistry threshold is unavailable. Do not infer quorum from local vote files; restore the STRATO governance query and rerun continue."
+            ? "The live AdminRegistry threshold is unavailable. Do not infer quorum from local vote files; restore the STRATO governance query and rerun generate."
           : voteState === "FIRST_ADMIN_VOTE_REQUIRED"
             ? "No successful administrator vote is recorded for every remaining call. An administrator runs the configuration batch now."
             : `${maximumRemainingVotes} additional administrator vote(s) are required for at least one remaining call.`,
       approvalRequired: !["WAITING_FOR_EXECUTION", "GOVERNANCE_THRESHOLD_UNAVAILABLE"].includes(voteState),
-      afterQuorum: "Wait for execution, then rerun continue. Never reuse an older approval hash.",
+      afterQuorum: "Wait for execution, then rerun generate. Never reuse an older approval hash.",
       safeAction,
       failedChecks,
       safeChecklist,
@@ -239,7 +237,7 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
         ? safeActionCommands(report.nativeAction.file) : {}),
     };
     if (report.infraAction) return { status: "ACTION_REQUIRED", role: "infra", phase: "start",
-      action: "START_OR_REPAIR_SERVICES", instruction: "Confirm the processor/Safe-writer handoff, apply the reviewed service archive and start workloads. Repair any reported readiness mismatch; then the Coordinator reruns continue.",
+      action: "START_OR_REPAIR_SERVICES", instruction: "Confirm the processor/Safe-writer handoff, apply the reviewed service archive and start workloads. Repair any reported readiness mismatch; then the Coordinator reruns generate.",
       infra: report.infraAction, failedChecks: operator.failedChecks };
     if (report.managed) {
       return { status: report.status, role: "coordinator", action: "REVIEW_CONFIGURATION",
@@ -260,7 +258,7 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
       operator.stageExecuted = true;
       return {
         status: "STAGE_EXECUTED",
-        action: "RERUN_CONTINUE",
+        action: "RERUN_GENERATE",
         run: operator.resumeCommand,
         then: "Review the next stage and use only its newly reported approval hash.",
       };
@@ -269,20 +267,20 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
       operator.approvalInvalidated = true;
       return {
         status: "APPROVAL_INVALIDATED",
-        action: "RERUN_CONTINUE",
+        action: "RERUN_GENERATE",
         run: operator.resumeCommand,
         then: "Review live state before submitting any further transaction.",
       };
     }
     if (report.operationError) return { status: "WAITING", action: "RESOLVE_OPERATION_ERROR",
-      instruction: "Resolve the error and rerun continue; reconcile any uncertain submission first.", run: operator.resumeCommand };
+      instruction: "Resolve the error and rerun generate; reconcile any uncertain submission first.", run: operator.resumeCommand };
     if (report.activationFile) {
       return {
         status: "ACTION_REQUIRED",
         action: "EXECUTE_ACTIVATION_TRANSACTION_IN_SAFE",
         file: report.activationFile,
         ...safeActionCommands(report.activationFile),
-        then: "Run continue after Safe execution, then complete the canary.",
+        then: "Run generate after Safe execution, then complete the canary.",
       };
     }
     if (operator.safeAction) {
@@ -292,7 +290,7 @@ function resolveNextAction(report, args = {}, artifacts, context, environmentFil
         step: operator.safeAction.step,
         file: operator.safeAction.path,
         ...safeActionCommands(operator.safeAction.path),
-        then: "Run continue again after the Safe transaction executes.",
+        then: "Run generate again after the Safe transaction executes.",
       };
     }
     const requirements = operator.voteRequirements || [];

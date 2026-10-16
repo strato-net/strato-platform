@@ -33,7 +33,7 @@ function decodeApprovalRequest(request, approval, now = Date.now()) {
   if (request.length > 90_000 || !/^[A-Za-z0-9_-]+$/.test(request)) throw new Error("Invalid approval request encoding");
   const packet = JSON.parse(gunzipSync(Buffer.from(request, "base64url"), { maxOutputLength: 65_536 }).toString("utf8"));
   if (digest(packet) !== approval) throw new Error("Approval request/hash mismatch");
-  if (packet.schemaVersion !== 3 || !["configuration", "activation"].includes(packet.phase)) throw new Error("Approval command is from an earlier rollout version; rerun continue for the current batch");
+  if (packet.schemaVersion !== 3 || !["configuration", "activation"].includes(packet.phase)) throw new Error("Approval command is from an earlier rollout version; ask the Coordinator to rerun generate");
   if (!Number.isSafeInteger(packet.issuedAt) || !Number.isSafeInteger(packet.expiresAt) || packet.expiresAt <= now ||
       packet.expiresAt - packet.issuedAt !== 2 * 60 * 60 * 1000 || packet.issuedAt > now + 5 * 60 * 1000) throw new Error("Approval handoff expired; request a fresh command from the Coordinator");
   if (!["eab", "native", "all"].includes(packet.kind) || (packet.kind === "native" && !["configure", "activate"].includes(packet.nativeMode))) throw new Error("Unsupported approval kind");
@@ -42,7 +42,9 @@ function decodeApprovalRequest(request, approval, now = Date.now()) {
       m.settings?.externalDeployment !== "embedded:externalDeployment" || m.settings?.depositPlan !== "embedded:depositPlan" ||
       !m.inputs?.externalDeployment || !m.inputs?.depositPlan || !Array.isArray(packet.calls) || !packet.calls.length ||
       new Set(packet.calls.map(({ id }) => id)).size !== packet.calls.length) throw new Error("Approval request must contain a complete current configuration and unique calls");
-  if (m.scope === "native" && packet.kind !== "native") throw new Error("Native-only scope cannot approve EAB changes");
+  if (["native", "native-extension"].includes(m.scope) && packet.kind !== "native") {
+    throw new Error("Native-extension scope cannot approve EAB changes");
+  }
   return packet;
 }
 
@@ -115,7 +117,7 @@ async function confirmApproval(review, options = {}) {
 function validateApprovalCalls(packet, inspection) {
   const blocker = inspection.report.checks?.find(check => check.status === "FAILED" &&
     ["strato", "external", "external-identity", "safe-runtime-identities"].includes(check.name));
-  if (blocker) throw new Error(`Approval blocked by ${blocker.name}: ${blocker.error || blocker.data?.errors?.join("; ") || "verification failed"}. Resolve this check and rerun continue before issuing another approval.`);
+  if (blocker) throw new Error(`Approval blocked by ${blocker.name}: ${blocker.error || blocker.data?.errors?.join("; ") || "verification failed"}. Resolve this check and ask the Coordinator to rerun generate before issuing another approval.`);
   requireLiveAdminVoteCounts(inspection.source, inspection.report);
   const approvedIds = new Set(packet.calls.map(({ id }) => id));
   const batch = governanceBatch(inspection.report);
@@ -127,7 +129,7 @@ function validateApprovalCalls(packet, inspection) {
       throw new Error("Approved calls changed or are no longer eligible; request a fresh Coordinator command");
     }
     if (isDependencyPending(live) && live.dependencies.some(id => !approvedIds.has(id))) {
-      throw new Error("Approval batch omits an unfinished prerequisite; rerun continue for the complete batch");
+      throw new Error("Approval batch omits an unfinished prerequisite; ask the Coordinator to rerun generate for the complete batch");
     }
     return live;
   }).sort((a, b) => (a.deploymentStage || 0) - (b.deploymentStage || 0));
@@ -181,7 +183,8 @@ async function runApproval(args, options = {}) {
     const result = await (options.vote || vote)(context, artifacts, {
       ...approvalInspection, report: { ...approvalInspection.report, calls },
     }, approvalInspection.report.approvalHash, {
-      stateless: true, approvalExpiresAt: packet.expiresAt, allowActiveEab: packet.kind === "native" && context.manifest.scope === "native",
+      stateless: true, approvalExpiresAt: packet.expiresAt,
+      allowActiveEab: packet.kind === "native" && ["native", "native-extension"].includes(context.manifest.scope),
       ...(packet.kind === "native" ? { sourceState: async () => (await nativeApprovalInspection(context, artifacts, packet.nativeMode, undefined, options)).source,
         inspect: async () => nativeApprovalInspection(context, artifacts, packet.nativeMode, undefined, options) } : {}),
       ...(packet.kind === "all" ? {

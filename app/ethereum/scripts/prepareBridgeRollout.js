@@ -327,18 +327,29 @@ async function readExternal(input, state, env = process.env) {
 
 function rolloutSettings(input, state) {
   const a = v => /^(0x)?[a-f0-9]{40}$/i.test(String(v)) && bare(v) !== "0".repeat(40) ? address(v) : REQUIRED;
+  const configured = (...values) => values.find(value => a(value) !== REQUIRED);
   const targetEab = state.targetEab;
   const defaults = STRATO_BRIDGES[state.stratoChainId]?.dependencies || {};
   const bridge = targetEab?.storage || state.eab?.storage || {}, router = state.router?.storage || {};
+  const sourceBridge = state.eab?.storage || {};
+  const configuredVerifiers = (targetEab?.mappings || [])
+    .filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true)
+    .map(r => a(r.key?.key));
   return {
     sourceChainId: state.stratoChainId, externalDeployment: input.target.externalDeployment || "../external-deployment.json", depositPlan: "./deposit-plan.json",
-    tokenRouter: a(state.router?.address), externalAssetBridge: targetEab ? a(targetEab.address) : input.source.legacy ? REQUIRED : a(state.eab?.address),
-    bridgeOperator: a(bridge.bridgeOperator), guardian: a(bridge.guardian),
-    settlementVerifiers: (targetEab?.mappings || state.eab?.mappings || []).filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true).map(r => a(r.key?.key)),
-    dependencies: { adminRegistry: a(bridge._owner), poolFactory: a(router.poolFactory || defaults.poolFactory), poolV3Factory: a(router.poolV3Factory || defaults.poolV3Factory),
+    tokenRouter: a(input.target.tokenRouter || state.router?.address),
+    externalAssetBridge: targetEab ? a(targetEab.address) : input.source.legacy ? REQUIRED : a(state.eab?.address),
+    bridgeOperator: a(input.target.bridgeOperator || bridge.bridgeOperator || sourceBridge.bridgeOperator),
+    guardian: a(input.target.guardian || bridge.guardian || sourceBridge.guardian),
+    settlementVerifiers: input.target.settlementVerifiers?.map(a) ||
+      (configuredVerifiers.length ? configuredVerifiers :
+        (state.eab?.mappings || []).filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true).map(r => a(r.key?.key))),
+    dependencies: { adminRegistry: a(configured(bridge._owner, sourceBridge._owner)), poolFactory: a(router.poolFactory || defaults.poolFactory), poolV3Factory: a(router.poolV3Factory || defaults.poolV3Factory),
       directMintPsm: a(router.directMintPsm || defaults.directMintPsm), metalForge: a(router.metalForge || defaults.metalForge), saveUsdstVault: a(router.saveUsdstVault || defaults.saveUsdstVault),
       yieldVaults: (state.router?.mappings || []).filter(r => r.collection_name === "approvedYieldVaults" && flag(value(r)) === true).map(r => a(r.key?.key)),
-      tokenFactory: a(bridge.tokenFactory), usdst: a(bridge.USDST_ADDRESS), priceOracle: a(bridge.priceOracle || defaults.priceOracle) },
+      tokenFactory: a(configured(bridge.tokenFactory, sourceBridge.tokenFactory)),
+      usdst: a(configured(bridge.USDST_ADDRESS, sourceBridge.USDST_ADDRESS)),
+      priceOracle: a(configured(bridge.priceOracle, sourceBridge.priceOracle, defaults.priceOracle)) },
   };
 }
 

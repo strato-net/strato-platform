@@ -116,6 +116,7 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
       sourceTokenEnv: "ACCESS_TOKEN",
       confirmations: "REVIEW_REQUIRED",
       verifiers: [],
+      bridgeHealthUrl: "REVIEW_REQUIRED",
       bridgeHealthUrlEnv: "BRIDGE_HEALTH_URL",
       safeProposerAddress: "REVIEW_REQUIRED",
       executorAddress: "REVIEW_REQUIRED",
@@ -158,8 +159,10 @@ function createPortableBundle(manifestPath, bundlePath, stage = "activation") {
       manifest.authorizationSigners.length !== network.verifierCount ||
       identities.some((value) => !ethers.isAddress(value)) ||
       new Set(identities.map(address)).size !== identities.length ||
-      !services.bridgeHealthUrlEnv || JSON.stringify(context.nativeInputs).includes("REVIEW_REQUIRED"))) {
-    throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 2} distinct KMS identities, and bridgeHealthUrlEnv`);
+      !(/^https:\/\//.test(services.bridgeHealthUrl || "") ||
+        /^[A-Z][A-Z0-9_]*$/.test(services.bridgeHealthUrlEnv || "")) ||
+      JSON.stringify(context.nativeInputs).includes("REVIEW_REQUIRED"))) {
+    throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 2} distinct KMS identities, and bridgeHealthUrl`);
   }
   const directory = path.dirname(manifestPath);
   const externalDeployment = manifest.inputs?.externalDeployment ||
@@ -210,6 +213,10 @@ function loadManifest(file, stage = "initial") {
   if (!services || !/^https:\/\//.test(services.nodeUrl || "")) throw new Error("services.nodeUrl must use HTTPS");
   for (const name of ["rpcUrlEnv", "sourceTokenEnv"]) {
     if (!/^[A-Z][A-Z0-9_]*$/.test(services[name] || "")) throw new Error(`${name} must name an environment variable, not a secret value`);
+  }
+  if (services.bridgeHealthUrl !== "REVIEW_REQUIRED" &&
+      !/^https:\/\//.test(services.bridgeHealthUrl || "")) {
+    throw new Error("services.bridgeHealthUrl must be a reviewed HTTPS URL");
   }
   if (services.bridgeHealthUrlEnv &&
       !/^[A-Z][A-Z0-9_]*$/.test(services.bridgeHealthUrlEnv)) {

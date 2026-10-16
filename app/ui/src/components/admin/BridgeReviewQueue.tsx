@@ -103,7 +103,7 @@ const BridgeReviewQueue = () => {
           <span className="text-sm text-muted-foreground">{item.source === 'eab' ? 'EAB' : item.source === 'native' ? 'Native bridge' : 'Legacy bridge'} · {getChainName(Number(item.chainId))} ({item.chainId})</span>
         </div>
         {item.approvalStatus === 'approved' && <p role="status" className="text-sm font-medium text-green-700 dark:text-green-400">Approved · awaiting settlement</p>}
-        {item.recoveryStatus === 'refund_pending' && <p role="status" className="text-sm font-medium">{item.refundEvidenceHash ? 'Refund confirmation requires governance approval' : `Refund processing${item.safeProposalHash ? ' · Safe approval required' : ''}`}</p>}
+        {item.recoveryStatus === 'refund_pending' && <p role="status" className="text-sm font-medium">{item.refundEvidenceHash ? 'Refund confirmed · finalization pending' : `Refund processing${item.safeProposalHash ? ' · Safe approval required' : ''}`}</p>}
         {item.approvalStatus === 'unavailable' && <p role="alert" className="text-sm text-destructive">Deposit approval status is unavailable.</p>}
         {actionsFor(item).length > 0 && item.governanceStatus !== 'available' && <p role="alert" className="text-sm text-destructive">Voting status is unavailable. Refresh before voting.</p>}
         <p role={unavailable ? 'alert' : 'status'} className={`text-sm font-medium${unavailable ? ' text-destructive' : ''}`}>Next step: {reviews.isError ? 'Admin — refresh the queue. Displayed transaction and voting status may be stale.' : nextStepFor(item)}</p>

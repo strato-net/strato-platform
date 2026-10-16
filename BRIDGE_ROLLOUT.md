@@ -17,10 +17,11 @@ The supported workflow is:
 
 ```bash
 npm run external:rollout -- init --manifest <deployment.json> ...
-npm run external:rollout -- prepare --manifest <deployment.json>
-npm run external:rollout -- continue --manifest <deployment.json>
+npm run external:rollout -- preflight --manifest <deployment.json>
+npm run external:rollout -- generate --manifest <deployment.json>
 npm run external:rollout -- approve --file <admin-approval-ID.json>
 npm run external:rollout -- verify --manifest <deployment.json>
+npm run external:rollout -- activate --manifest <deployment.json>
 ```
 
 Older persona setup, bundle, status, resume, vote and

@@ -289,9 +289,11 @@ async function inspect(context, artifacts, options = {}) {
   };
   const checkBridgeHealth = async () => {
     const { bridgeHealthUrl, bridgeHealthUrlEnv = "BRIDGE_HEALTH_URL" } = context.manifest.services;
-    const url = process.env[bridgeHealthUrlEnv] || bridgeHealthUrl;
+    const url = bridgeHealthUrl === "REVIEW_REQUIRED"
+      ? process.env[bridgeHealthUrlEnv]
+      : bridgeHealthUrl || process.env[bridgeHealthUrlEnv];
     if (!url || !/^https:\/\/[^<>\s]+$/.test(url)) {
-      throw new Error(`Set ${bridgeHealthUrlEnv} to the deployed Runtime HTTPS health URL`);
+      throw new Error("Set services.bridgeHealthUrl to the deployed Runtime HTTPS health URL");
     }
     const deploymentUrl = new URL(url);
     deploymentUrl.searchParams.set("deploymentChainId", String(context.rollout.chainId));
@@ -376,18 +378,18 @@ async function inspect(context, artifacts, options = {}) {
       vaultConfigure: artifacts.vaultConfigurePath, routerPause: artifacts.depositRouterPausePath,
       routerTokens: artifacts.depositRouterBatchPaths },
     next: !source ? "Resolve STRATO read access before voting" : source.liveVoteCountsError
-      ? "Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun continue"
+      ? "Live AdminRegistry vote counts are unavailable; restore the STRATO vote query and rerun generate"
       : calls.some(({ status }) => status === "READY") ? "Review the current self-contained admin approval command" : !ready
       ? pendingSafeConfiguration
-        ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun continue"
+        ? "Resolve failed checks; execute only the pending reviewed Safe configuration; rerun generate"
         : unverifiedSafeConfiguration
-          ? "EAB configuration could not be verified. Do not execute generated Safe files; rerun continue after the failed reads recover"
+          ? "EAB configuration could not be verified. Do not execute generated Safe files; rerun generate after the failed reads recover"
           : activationChecksRequired
           ? failedCheckNames.length
             ? `Resolve failed activation checks (${failedCheckNames.join(", ")}); activation governance remains blocked until they pass`
-            : "Resolve remaining activation readiness checks and rerun continue"
-          : "Resolve failed EAB readiness checks and rerun continue"
-      : router.paused ? "Review activation, then rerun continue to generate the Safe unpause file" : "Reconcile canary custody and issuance before declaring launch complete",
+            : "Resolve remaining activation readiness checks and rerun verify"
+          : "Resolve failed EAB readiness checks and rerun verify"
+      : router.paused ? "Review activation, then run activate to generate the Safe unpause file" : "Reconcile canary custody and issuance before declaring launch complete",
   };
   return { report, source, externalReady, router };
 }

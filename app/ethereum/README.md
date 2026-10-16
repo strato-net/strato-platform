@@ -219,15 +219,15 @@ administration, and large-withdrawal approval explicitly. The new
 
 For new deployments, follow the canonical operator runbook at
 [`EAB_DEPLOYMENT.md`](../../EAB_DEPLOYMENT.md) and use
-`external:rollout init|prepare|continue|approve|verify`. The standalone
+`external:rollout init|preflight|generate|approve|verify|activate`. The standalone
 `external:rollout:prepare|finalize|generate` flow below is retained for legacy
 artifacts and is not the new-deployment workflow. Review chain, token and limit
 policy with
 [`EAB_PRODUCTION_CONFIG_GUIDELINES.md`](../../EAB_PRODUCTION_CONFIG_GUIDELINES.md).
 
 Generated Safe batches can use the hosted Safe workflow or direct execution.
-For direct execution, use the bound commands printed by `external:rollout
-continue`: `safe:batch inspect`, one `safe:batch sign` per required owner, then
+For direct execution, use `safe:batch inspect`, one `safe:batch sign` per
+required owner, then
 `safe:batch execute` with every signature file and the reviewed Safe
 transaction hash. Direct execution validates the chain, Safe, calls, nonce,
 owners, threshold, executor gas, simulation, receipt, and Safe

@@ -1,10 +1,10 @@
 # Native Bridge Deployment
 
-For a combined EAB/native rollout, use Configure → Start → Activate in `EAB_DEPLOYMENT.md`. The Coordinator edits one deployment file and owns the history. `continue` directly generates the current EAB or native Safe JSON or self-contained admin approval command; completed phases advance internally. No separate native handoff command is needed. Admins do not join, create profiles or retain deployment files/history. Infra independently receives one service archive/checksum. The combined guide includes native contract deployment steps and an explicit defer-now branch. To enable native later on an active EAB chain, follow section 6 of `EAB_DEPLOYMENT.md`: reuse its rollout file/history, select native scope, preserve the healthy EAB configuration and execute only current native handoffs. The guide below remains the native-only contract lifecycle reference.
+For production combined, EAB-only, or native-extension rollout steps, use `EAB_DEPLOYMENT.md`. That flow reuses and upgrades the existing STRATO native bridge and custody proxies; it never creates or initializes fresh STRATO native proxies.
 
-Before activation or a native extension, complete the **Required review — Finality and asset exposure before activation** table in `EAB_DEPLOYMENT.md`. Explicitly review per-chain Runtime/verifier confirmations, reconciliation depth, native limits and attestation validity against the applied configuration. Sepolia and Base Sepolia require separate approved values; do not rely on global `DEPOSIT_CONFIRMATIONS`. Configuration mitigates risk but does not replace finalized-block code changes.
+Before activation or a native extension, review the chain-specific Runtime/verifier confirmations, finality, native limits, and attestation validity recorded in `deployment.json`.
 
-This is the canonical end-to-end install guide for a new non-production native bridge deployment. For production, use `NATIVE_BRIDGE_MAINNET_RUNBOOK.md`. For contract lifecycle and audit workflow details, use `NATIVE_BRIDGE_CONTRACT_WORKFLOWS.md`.
+The fresh-deployment material below is retained only as a non-production native contract lifecycle reference. It is not part of the production bridge rollout.
 
 Follow the numbered sections in order:
 1. `Naming`
@@ -21,7 +21,7 @@ The native bridge is split across:
 
 ## Rejected deposit recovery update
 
-Native refund completion requires a separate governance vote on `finalizeDepositRefund(depositId, refundTxHash)` after the operator records confirmed external evidence. Verify the bridge is owned by AdminRegistry (not the hot operator), its finalization voting threshold is correct, the operator has no whitelist bypass for `finalizeDepositRefund`, and `depositRefundEvidence` is indexed. Deploy backend/UI with the Confirm refund action; keep the item pending until that vote executes.
+After the owner requests a refund, the operator records confirmed external evidence and verifier quorum attests it. `finalizeDepositRefund(depositId, refundTxHash)` is then permissionless and the bridge service finalizes it automatically; there is no separate Admin UI governance vote.
 
 Before enabling **Complete delivery** or **Return funds** in Admin, upgrade StratoNativeBridge and StratoNativeRepresentationBridge and follow the [deposit recovery upgrade gate](app/services/bridge-eab/README.md#deposit-delivery-and-source-network-refunds). Native refunds restore representations to the original external sender and retain STRATO backing. They use the native KMS identities configured in the shared EAB verifier fleet and execute through the authorized refund executor or Safe. Preserve `data/native-refunds/` across service replacements and test Safe expiry/retry if execution requires Safe approval.
 
@@ -306,7 +306,7 @@ Confirm that `StratoNativeBridge` has the bridge service STRATO address configur
 
 Native withdrawal authorization is immediately valid when the withdrawal becomes pending, matching EAB. The attestation maximum validity window is configured on `StratoNativeRepresentationBridge` with `setMaxAttestationValiditySeconds`.
 
-The native runtime is `bridge-eab`; the legacy `/bridge` service remains unchanged. If `bridge-eab` is deployed through `docker-compose.bridge-eab.tpl.yml`, these values must be present in its runtime env file. The template forwards:
+The native runtime uses the `bridge` Compose service in `docker-compose.bridge-eab.tpl.yml`; `bridge-eab` is the image name, not a Compose service name. The legacy `/bridge` service remains unchanged. These values must be present in the runtime env file. The template forwards:
 - `STRATO_NATIVE_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`
 - `CHAIN_11155111_NATIVE_MINT_EXECUTOR_ADDRESS`

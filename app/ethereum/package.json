@@ -33,7 +33,7 @@
     "external:rollout:generate": "node scripts/generateExternalBridgeRollout.js",
     "external:rollout:prepare": "node scripts/generateExternalBridgeRollout.js --mode prepare",
     "external:rollout:finalize": "node scripts/generateExternalBridgeRollout.js --mode finalize",
-    "external:rollout:test": "node --test test/ExternalBridgeRolloutPlan.test.js test/ExternalBridgeOrchestration.test.js",
+    "external:rollout:test": "npm run compile && node --test test/ExternalBridgeRolloutPlan.test.js test/ExternalBridgeOrchestration.test.js test/BridgeDeploymentFlow.test.js test/BridgeRolloutPreparation.test.js test/NetworkDeployment.test.js",
     "external:vault:ops": "node scripts/externalBridgeVaultOps.js",
     "external:vault:ops:test": "node --test test/ExternalBridgeVaultOps.test.js",
     "safe:batch": "node scripts/safeBatch.js",

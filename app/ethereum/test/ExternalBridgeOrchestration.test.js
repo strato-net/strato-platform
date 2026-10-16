@@ -110,49 +110,6 @@ function completeHandoff(f, native = false) {
   writeJson(f.manifestPath, f.manifest);
 }
 
-test("continue uses the same read-only reconciliation command and shell paths remain literal", () => {
-  assert.equal(parseArgs(["continue", "--manifest", "/secure/deployment.json"]).command, "continue");
-  const value = "/secure/a space/$(touch unwanted)'quoted`file`";
-  const output = spawnSync("bash", ["-c", `printf '%s' ${shellQuote(value)}`], { encoding: "utf8" });
-  assert.equal(output.status, 0);
-  assert.equal(output.stdout, value);
-  assert.throws(() => shellQuote("bad\npath"), /line breaks/);
-});
-
-test("discovery is edited in one deployment file and expanded without submitting transactions", async (t) => {
-  const f = fixture(t);
-  const discovery = path.join(f.directory, "prepare.json");
-  const deployment = path.join(f.directory, "deployment-input.json");
-  writeJson(discovery, { target: { chainId: "11155111" }, eabRoutes: [{ include: true }], nativeRoutes: [] });
-  const preparation = require("../scripts/prepareBridgeRollout");
-  const original = preparation.main;
-  const originalLog = console.log;
-  console.log = () => {};
-  t.after(() => { preparation.main = original; console.log = originalLog; });
-  await main(["init", "--discovery", discovery, "--manifest", deployment]);
-  assert.equal(readJson(deployment).schemaVersion, 0);
-  const draft = readJson(deployment);
-  draft.discovery.target.externalAssetBridge = addr("5");
-  writeJson(deployment, draft);
-  let calls = 0;
-  preparation.main = async ([flag, config, outputFlag, directory]) => {
-    calls++;
-    assert.equal(flag, "--config");
-    assert.equal(outputFlag, "--output-dir");
-    assert.equal(readJson(config).target.externalAssetBridge, addr("5"));
-    const settings = readJson(path.join(f.directory, "settings.json"));
-    settings.externalDeployment = path.join(f.directory, "deployment.json");
-    settings.depositPlan = path.join(f.directory, "discovery.json");
-    writeJson(path.join(directory, "settings.json"), settings);
-    writeJson(path.join(directory, "policy.json"), f.manifest.policy);
-  };
-  await main(["init", "--manifest", deployment]);
-  assert.equal(calls, 1);
-  assert.equal(readJson(deployment).schemaVersion, 1);
-  assert.equal(readJson(deployment).inputs.externalDeployment.depositRouterDeploymentBlock, "1234");
-  await assert.rejects(main(["init", "--manifest", deployment]), /already initialized/);
-});
-
 test("portable bundles embed legacy dependency templates instead of referencing local files", (t) => {
   const f = fixture(t);
   completeHandoff(f);
@@ -248,29 +205,6 @@ test("init imports existing settings without overwriting and plan never emits ac
   assert.equal(fs.existsSync(adminArtifacts.bridgeConfigPath), true);
 });
 
-test("init can expand a draft manifest in place without settings.json", (t) => {
-  const f = fixture(t);
-  const draft = path.join(f.directory, "draft-manifest.json");
-  writeJson(draft, readJson(path.join(f.directory, "settings.json")));
-  initializeManifest(draft, undefined, draft);
-  assert.equal(readJson(draft).schemaVersion, 1);
-  assert.throws(() => initializeManifest(draft, undefined, draft), /already initialized/);
-  assert.equal(parseArgs(["continue", "--manifest", draft]).command, "continue");
-});
-
-test("init creates the only operator-managed manifest when it is missing", (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "eab-draft-"));
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
-  const manifest = path.join(directory, "deployment-manifest.json");
-  const result = spawnSync(process.execPath, [
-    path.resolve(__dirname, "../scripts/externalBridgeRollout.js"),
-    "init", "--manifest", manifest,
-  ], { encoding: "utf8" });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /DRAFT_CREATED/);
-  assert.equal(readJson(manifest).schemaVersion, undefined);
-});
-
 test("KMS addresses are generated from the manifest and survive repeated generation", (t) => {
   const f = fixture(t);
   f.manifest.authorizationSigners = [addr("d"), addr("e"), addr("f")];
@@ -296,19 +230,6 @@ test("embedded deployment inputs make the manifest portable and revision-bound",
   f.manifest.inputs.externalDeployment.deployedAt = "2026-09-10";
   writeJson(f.manifestPath, f.manifest);
   assert.notEqual(loadManifest(f.manifestPath).revision, policyRevision);
-});
-
-test("bundle creation rejects incomplete service ownership inputs", (t) => {
-  const f = fixture(t);
-  assert.throws(() => createPortableBundle(f.manifestPath,
-    path.join(f.directory, "deployment-bundle.json")), /Bundle requires 3 verifiers/);
-  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
-  const prepared = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath],
-    { encoding: "utf8" });
-  assert.notEqual(prepared.status, 0);
-  assert.match(prepared.stdout, /"status": "OFFLINE_PLAN_INCOMPLETE"/);
-  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
-  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), false);
 });
 
 test("coordinator bundle loads without the original deployment files", (t) => {
@@ -422,7 +343,7 @@ test("Coordinator guidance uses live quorum and emits only the current continuat
   let guidance = progressDetails(report, args, f.artifacts);
   assert.equal(guidance.voteState, "FIRST_ADMIN_VOTE_REQUIRED");
   assert.equal(guidance.approvalRequired, true);
-  assert.match(guidance.resumeCommand, /external:rollout -- continue --manifest/);
+  assert.match(guidance.resumeCommand, /external:rollout -- generate --manifest/);
   assert.match(guidance.resumeCommand, /--env-file '\/private\/coordinator.env'/);
   assert.equal(guidance.voteCommand, undefined);
   assert.equal(guidance.adminHandoffCommand, undefined);
@@ -436,7 +357,7 @@ test("Coordinator guidance uses live quorum and emits only the current continuat
   assert.equal(formatAction({ operator: guidance }, "report.json").status, "WAITING");
   guidance = progressDetails({ status: "READY_FOR_ACTIVATION_REVIEW", calls: [], safe: { executionOrder: [] } }, args, f.artifacts);
   assert.equal(guidance.activateCommand, undefined);
-  assert.match(guidance.resumeCommand, /continue/);
+  assert.match(guidance.resumeCommand, /generate/);
 });
 
 test("rollout automatically loads deployment.env beside the manifest", (t) => {
@@ -467,30 +388,6 @@ test("unknown initialization state never authorizes initialize", (t) => {
   f.state.initialization.bridge = {};
   const call = governanceProgress(f.config, f.state).find(({ call }) => call.args._func === "initialize" && call.args._target === f.config.bridge.address);
   assert.equal(call.status, "BLOCKED");
-});
-
-test("CLI accepts current handoffs and rejects removed profiles, bundles and mutations", () => {
-  assert.equal(parseArgs(["--manifest", "file"]).command, "plan");
-  assert.deepEqual(parseArgs(["prepare", "--manifest", "file"]), { command: "prepare", manifest: "file", stage: "activation" });
-  assert.equal(parseArgs(["prepare", "--manifest", "file", "--stage", "initial"]).stage, "initial");
-  assert.deepEqual(parseArgs(["approve", "--file", "approval.json"]), { command: "approve", file: "approval.json" });
-  assert.throws(() => parseArgs(["approve", "--request", "packet"]), /Legacy approval requires/);
-  assert.throws(() => parseArgs(["approve", "--file", "approval.json", "--request", "packet"]), /one current --file/);
-  for (const command of ["setup", "join", "bundle", "vote", "activate", "native-handoff", "status", "resume", "next"]) {
-    assert.throws(() => parseArgs([command, "--manifest", "file"]), /Use init/);
-  }
-  for (const flag of ["config", "bundle", "execute", "role"]) {
-    assert.throws(() => parseArgs(["prepare", "--manifest", "file", `--${flag}`, "value"]), /Invalid/);
-  }
-  const previous = process.env.EAB_ROLLOUT_CONFIG;
-  process.env.EAB_ROLLOUT_CONFIG = "/obsolete/profile.json";
-  try {
-    assert.throws(() => parseArgs(["continue"]), /--manifest is required/);
-    assert.equal(parseArgs(["continue", "--manifest", "file"]).manifest, "file");
-  } finally {
-    if (previous === undefined) delete process.env.EAB_ROLLOUT_CONFIG;
-    else process.env.EAB_ROLLOUT_CONFIG = previous;
-  }
 });
 
 test("every supported network enforces its Safe and KMS identity gate", () => {
@@ -641,66 +538,6 @@ test("missing state is uninitialized only for a verified fresh proxy", () => {
     [{ ...proxyRows[0], _owner: addr("4") }], logicRows), /proxy was not found/);
   assert.throws(() => verifyUninitializedProxy(settings, "TokenRouter", addr("2"), proxyRows,
     [{ ...logicRows[0], initialized: true }]), /cannot prove/);
-});
-
-test("process CLI offline plan works and refuses a concurrent run", (t) => {
-  const f = fixture(t);
-  const completedManifest = readJson(f.manifestPath);
-  completedManifest.authorizationSigners = [addr("b"), addr("c"), addr("d")];
-  completedManifest.services = {
-    ...completedManifest.services,
-    confirmations: 12,
-    verifiers: [1, 2, 3].map((index) => ({
-      url: `https://verifier-${index}.example`,
-      tokenEnv: `VERIFIER_${index}_TOKEN`,
-      confirmations: 12,
-    })),
-    safeProposerAddress: addr("e"),
-    executorAddress: addr("f"),
-  };
-  writeJson(f.manifestPath, completedManifest);
-  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
-  const run = () => spawnSync(process.execPath, [script, "--manifest", f.manifestPath, "--output-dir", path.join(f.directory, "output")], { encoding: "utf8" });
-  const planned = run();
-  assert.equal(planned.status, 0);
-  assert.match(planned.stdout, /"status": "OFFLINE_PLAN_READY"/);
-  assert.match(planned.stdout, /"action": "REVIEW_POLICY_SUMMARY"/);
-  assert.doesNotMatch(planned.stdout, /OFFLINE_PLAN_NOT_VERIFIED|Run resume to reconcile/);
-  const latest = readJson(path.join(f.directory, "output/latest.json"));
-  const report = readJson(latest.reportFile);
-  assert.equal(report.status, "OFFLINE_PLAN_READY");
-  assert.equal(report.review.scope.externalChainId, 11155111);
-  assert.equal(report.review.scope.routeCount, 1);
-  assert.equal(report.review.contractBindings.vault, addr("2"));
-  assert.equal(report.review.routes[0].symbol, "TEST");
-  assert.equal(report.review.routes[0].permissions.depositsEnabled, true);
-  assert.equal(report.review.routes[0].limitsRaw.manualReviewThreshold, "50");
-  assert.deepEqual(report.review.routes[0].notes, []);
-  assert.equal(report.review.mechanicalChecks.unresolvedReviewValues, "PASSED");
-  assert.equal(report.review.mechanicalChecks.verifierPolicyHashes.length, 3);
-  assert.equal(report.nextSteps, undefined);
-  assert.doesNotMatch(JSON.stringify(report), /external:rollout -- (join|setup|bundle|vote|activate)\b/);
-  const preparedOutput = path.join(f.directory, "prepared");
-  const prepared = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
-    "--output-dir", preparedOutput], { encoding: "utf8" });
-  assert.equal(prepared.status, 0, prepared.stderr);
-  assert.match(prepared.stdout, /"status": "PREPARED_FOR_REVIEW"/);
-  const summary = JSON.parse(prepared.stdout.slice(prepared.stdout.indexOf("{\n")));
-  assert.equal(summary.action, "REVIEW_CONFIGURATION");
-  assert.match(summary.resume, /continue --manifest/);
-  assert.equal(summary.adminJoin, undefined);
-  assert.equal(fs.existsSync(summary.infra.file), true);
-  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
-  assert.equal(fs.existsSync(path.join(f.directory, ".deployment", "coordinator.json")), false);
-  const saved = readJson(summary.details);
-  assert.equal(saved.review.mechanicalChecks.unresolvedReviewValues, "PASSED");
-  const preparedAgain = spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath,
-    "--output-dir", preparedOutput], { encoding: "utf8" });
-  assert.equal(preparedAgain.status, 0, preparedAgain.stderr);
-  fs.writeFileSync(path.join(f.directory, "output/.lock"), "other process");
-  const busy = run();
-  assert.notEqual(busy.status, 0);
-  assert.match(busy.stderr, /EEXIST/);
 });
 
 test("votes require a fresh approval and safe pause gates", async (t) => {
@@ -1025,7 +862,7 @@ test("implementation gate compares the actual build and rejects stale source or 
 
 test("terminal fallback presents only the first pending action while retaining diagnostics", () => {
   const report = { status: "PENDING", operator: {
-    action: "Configure native routes.", resumeCommand: "npm run external:rollout -- continue",
+    action: "Configure native routes.", resumeCommand: "npm run external:rollout -- generate",
     nextSteps: [{ action: "Review native route", run: "native dry-run" },
       { action: "Vote", run: "native execute" }], failedChecks: [{ name: "native", status: "FAILED" }],
   } };
@@ -1096,30 +933,6 @@ test("stalled STRATO inspection reports progress and cannot authorize a vote", a
   assert.match(progress[1], /strato: FAILED.*timed out/);
   assert.equal(result.report.checks.find(({ name }) => name === "strato").status, "FAILED");
   await assert.rejects(vote(f.context, f.artifacts, result, result.report.approvalHash), /Voting requires/);
-});
-
-test("managed preparation is repeatable and emits one Infra archive without admin setup", (t) => {
-  const f = fixture(t);
-  completeHandoff(f);
-  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
-  const run = () => spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath], { encoding: "utf8" });
-  for (let i = 0; i < 2; i++) {
-    const result = run();
-    assert.equal(result.status, 0, result.stderr);
-    const summary = JSON.parse(result.stdout.slice(result.stdout.indexOf("{\n")));
-    assert.equal(summary.status, "PREPARED_FOR_REVIEW");
-    assert.match(summary.resume, /continue --manifest/);
-    assert.doesNotMatch(summary.resume, /--config/);
-    assert.equal(summary.adminJoin, undefined);
-    assert.equal(summary.bundle, undefined);
-    assert.equal(fs.existsSync(summary.infra.file), true);
-    const archiveFiles = spawnSync("tar", ["-tzf", summary.infra.file], { encoding: "utf8" });
-    assert.equal(archiveFiles.status, 0);
-    assert.doesNotMatch(archiveFiles.stdout, /deployment|votes-|safe|\.env$/);
-    assert.match(archiveFiles.stdout, /services\.json/);
-  }
-  assert.equal(fs.existsSync(path.join(f.directory, "deployment-bundle.json")), false);
-  assert.equal(fs.existsSync(path.join(f.directory, ".deployment/admin-1.json")), false);
 });
 
 test("self-contained approvals reject tampering, expiry and changed calls but survive reporting revisions", (t) => {
@@ -1407,7 +1220,7 @@ test("native progress belongs to the Coordinator and code-only changes do not re
   assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath), undefined);
   report.status = "READY_FOR_ACTIVATION_REVIEW";
   assert.equal(nativeCoordinatorAction(context, report, output, f.manifestPath).action, "ACTIVATE_NATIVE_BRIDGE");
-  assert.match(nativeCoordinatorAction(context, report, output, f.manifestPath).run, /external:rollout -- continue --manifest/);
+  assert.match(nativeCoordinatorAction(context, report, output, f.manifestPath).run, /external:rollout -- generate --manifest/);
   writeJson(path.join(output, "native-active.json"), { fingerprint: nativeConfigurationFingerprint(context) });
   assert.equal(nativeCoordinatorAction(context, { ...report, revision: "new-reporting-code" }, output, f.manifestPath), undefined);
   context.settings.bridgeOperator = addr("d");
@@ -1482,51 +1295,11 @@ test("native custody unpause precedes origin intake unpause", (t) => {
   assert.equal(ready.length, 1);
   assert.equal(ready[0].call.args._args.length, 2);
   assert.equal(ready[0].deploymentStage, 8);
-  assert.equal(parseArgs(["continue", "--manifest", f.manifestPath]).stage, "activation");
+  assert.equal(parseArgs(["activate", "--manifest", f.manifestPath]).command, "activate");
 });
 
 
-test("one init command discovers routes and prepare expands the same deployment file", async (t) => {
-  const f = fixture(t);
-  const preparation = require("../scripts/prepareBridgeRollout");
-  const file = path.join(f.directory, "single-deployment.json");
-  let discoveryReads = 0, expansions = 0;
-  t.mock.method(preparation, "discover", async (url, chain, token, fetchImpl, selections) => {
-    discoveryReads++;
-    assert.equal(url, "https://node.example");
-    assert.equal(chain, "11155111");
-    assert.equal((await fetchImpl("data:application/json,{}", {})).ok, true);
-    assert.equal(token, "test-access-token");
-    assert.equal(selections.sourceChainId, "1");
-    return { config: { source: { nodeUrl: url }, target: { chainId: 11155111 }, eabRoutes: [{ include: false }], nativeRoutes: [] }, candidates: {}, missing: [] };
-  });
-  t.mock.method(preparation, "main", async (argv, options) => {
-    expansions++;
-    assert.equal(options.quiet, true);
-    assert.equal(options.token, "test-access-token");
-    const input = readJson(argv[1]);
-    assert.equal(input.eabRoutes[0].include, true);
-    const settings = readJson(path.join(f.directory, "settings.json"));
-    settings.externalDeployment = path.join(f.directory, "deployment.json");
-    settings.depositPlan = path.join(f.directory, "discovery.json");
-    writeJson(path.join(argv[3], "settings.json"), settings);
-    writeJson(path.join(argv[3], "policy.json"), f.manifest.policy);
-  });
-  await main(["init", "--manifest", file, "--node-url", "https://node.example", "--chain-id", "11155111", "--source-chain-id", "1"]);
-  assert.equal(readJson(file).schemaVersion, 0);
-  const draft = readJson(file);
-  draft.discovery.eabRoutes[0].include = true;
-  writeJson(file, draft);
-  await main(["prepare", "--manifest", file]);
-  assert.equal(readJson(file).schemaVersion, 1);
-  assert.equal(discoveryReads, 1);
-  assert.equal(expansions, 1);
-  assert.equal(fs.existsSync(path.join(f.directory, ".deployment/.lock")), false);
-  await assert.rejects(main(["init", "--manifest", file, "--node-url", "https://node.example", "--chain-id", "11155111", "--source-chain-id", "1"]), /already exists/);
-  assert.equal(discoveryReads, 1);
-});
-
-test("continue completes read-only native phases internally and returns real handoffs", async (t) => {
+test("generate completes read-only native phases internally and returns real handoffs", async (t) => {
   const { advanceNative } = require("../scripts/externalBridgeRollout");
   const f = fixture(t);
   completeHandoff(f, true);
@@ -1740,7 +1513,7 @@ async function stagedFixture(t, { paused = true, enabling = false, inventoryErro
   return { ...f, context, artifacts, inspection, history, voteReads, progress };
 }
 
-test("continue defers history and vote reads while a pause handoff is pending", async t => {
+test("generate defers history and vote reads while a pause handoff is pending", async t => {
   const { inspection, history, voteReads } = await stagedFixture(t, { paused: false });
   assert.deepEqual(history, [false]);
   assert.equal(voteReads, 0);
@@ -1875,35 +1648,6 @@ test("approval reports a failed external identity before deferred vote diagnosti
 });
 
 
-test("one prepare command provisions public identities then prepares the reviewed release", t => {
-  const f = fixture(t);
-  f.manifest.services.confirmations = 12;
-  writeJson(f.manifestPath, f.manifest);
-  const script = path.resolve(__dirname, "../scripts/externalBridgeRollout.js");
-  const run = () => spawnSync(process.execPath, [script, "prepare", "--manifest", f.manifestPath], { encoding: "utf8" });
-  const provision = run();
-  assert.equal(provision.status, 0, provision.stderr);
-  const first = JSON.parse(provision.stdout.slice(provision.stdout.indexOf("{\n")));
-  assert.equal(first.status, "PROVISIONING_PACKAGE_READY");
-  assert.match(first.instruction, /Running=No/);
-  assert.match(first.resume, /prepare --manifest/);
-  assert.doesNotMatch(first.resume, /--stage/);
-  const { decodeApprovalRequest, createApprovalRequest } = require("../scripts/externalBridgeRollout");
-  const saved = readJson(first.details);
-  assert.equal(saved.nextAction.status, first.status);
-  const snapshot = readJson(path.join(saved.artifacts.directory, "configuration.snapshot.json"));
-  assert.equal(snapshot.bundlePurpose, "provisioning");
-  assert.throws(() => createApprovalRequest(snapshot, { calls: [] }), /Provisioning/);
-  completeHandoff(f);
-  const prepared = run();
-  assert.equal(prepared.status, 0, prepared.stderr);
-  const final = JSON.parse(prepared.stdout.slice(prepared.stdout.indexOf("{\n")));
-  assert.equal(final.status, "PREPARED_FOR_REVIEW");
-  assert.match(final.resume, /continue --manifest/);
-  const report = readJson(final.details);
-  assert.deepEqual(terminalSummary(report, final.details), final);
-});
-
 test("preparation refuses unresolved reviewed limits even when identities need provisioning", t => {
   const f = fixture(t);
   f.manifest.services.confirmations = 12;
@@ -1918,8 +1662,8 @@ test("preparation refuses unresolved reviewed limits even when identities need p
 test("current action is shared by saved reports and terminal output", () => {
   const args = { manifest: "/secure/deployment.json" };
   const cases = [
-    [{ previousStageCompleted: true }, "RERUN_CONTINUE"],
-    [{ operationError: "Approval is stale; reconcile" }, "RERUN_CONTINUE"],
+    [{ previousStageCompleted: true }, "RERUN_GENERATE"],
+    [{ operationError: "Approval is stale; reconcile" }, "RERUN_GENERATE"],
     [{ status: "PENDING", nativeAction: { action: "EXECUTE_NATIVE_SAFE_TRANSACTION", file: "native.json" },
       adminApproval: { run: "expired-command" } }, "EXECUTE_NATIVE_SAFE_TRANSACTION"],
   ];
