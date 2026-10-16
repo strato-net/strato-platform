@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -28,6 +29,9 @@ module Blockchain.VMContext
     ContextDBs (..),
     MemContextDBs (..),
     Backend (..),
+    StateMirror (..),
+    TrieAccess (..),
+    stateMirror,
     ContextState (..),
     QueueEvent (..),
     Context (..),
@@ -118,7 +122,8 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.Composable.AccountDB
 import Control.Monad.Composable.Base
 import Control.Monad.Composable.StateDB
-import Control.Monad.Composable.Streaming (StreamEnv (..), createStreamEnv, runStreamMUsingEnv)
+import qualified Control.Monad.Composable.NodeDB as Node
+import Control.Monad.Composable.Streaming (StreamEnv, createStreamEnv, runStreamMUsingEnv, unconnectedStreamEnv)
 import Control.Monad.IO.Class
 import Prometheus (MonadMonitor)
 import Data.Binary
@@ -183,12 +188,36 @@ makeLenses ''MemContextDBs
 instance Default MemContextDBs where
   def = MemContextDBs M.empty M.empty M.empty
 
+-- | The state as something other than the trie holds it: vm-query's SQL
+-- state mirror. Accounts, storage slots, code and block summaries are read by
+-- key; there are no trie nodes and no hash preimages behind it.
+data StateMirror = StateMirror
+  { mirrorAccount :: Address -> IO (Maybe AddressState),
+    mirrorStorage :: RawStorageKey -> IO (Maybe RawStorageValue),
+    mirrorCode :: Keccak256 -> IO (Maybe DBCode),
+    mirrorBlockSummary :: Keccak256 -> IO (Maybe BlockSummary),
+    -- | Told of every read of the empty trie's root, the one trie node a
+    -- mirror answers; a count of them says how often a run walked a storage
+    -- trie instead of reading slots.
+    mirrorEmptyTrieRead :: IO ()
+  }
+
+-- | Thrown when a run over a 'StateMirror' reaches for the state trie, which
+-- the mirror cannot serve.
+newtype TrieAccess = TrieAccess String
+  deriving (Show)
+
+instance Exception TrieAccess
+
 -- | Where the stores live. 'Sandbox' reads through to the persistent stores
 -- on a miss and keeps every write in the overlay (eth_call, tracing).
+-- 'Mirror' does the same over a 'StateMirror': reads the block maps and the
+-- overlay do not answer come from the mirror, and nothing is written to it.
 data Backend
   = Persistent ContextDBs
   | Memory (IORef MemContextDBs)
   | Sandbox (IORef MemContextDBs) ContextDBs
+  | Mirror (IORef MemContextDBs) StateMirror
 
 data ContextState = ContextState
   { _baggerState :: !BaggerState,
@@ -242,17 +271,45 @@ type ContextRow = '[Context, AccountDBEnv, StateDBEnv, IORef StreamEnv, RedisEnv
 newtype ContextM a = ContextM {unContextM :: Eff ContextRow a}
   deriving newtype (Functor, Applicative, Monad, MonadIO, MonadFail, MonadThrow, MonadCatch, MonadMask, MonadUnliftIO, MonadLogger, MonadLoggerIO, AccessibleEnv Context, AccessibleEnv RedisEnv, AccessibleEnv AccountDBEnv, AccessibleEnv StateDBEnv, AccessibleEnv (IORef StreamEnv), MonadMonitor, MP.StateRoot `A.Alters` MP.TrieNode, Maybe Word256 `A.Alters` MP.StateRoot, Mod.Modifiable CurrentBlockHash, HasMemAddressStateDB, HasMemRawStorageDB)
 
+-- | The mirror the context runs over, if it runs over one.
+stateMirror :: ContextM (Maybe StateMirror)
+stateMirror =
+  accessEnv >>= \ctx -> pure $ case _backend ctx of
+    Mirror _ m -> Just m
+    _ -> Nothing
+{-# INLINE stateMirror #-}
+
 runContextIO :: Context -> ContextM a -> StateDBM '[IORef StreamEnv, RedisEnv, Logger] a
 runContextIO ctx (ContextM m) = do
   adb <- newAccountDBEnv
   -- A block's state root is in its summary before any of its chains' roots
   -- are in the cursor.
-  let summaryRoot bh = fmap bSumStateRoot <$> readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) bh) bh
-  runAccountDBM adb . provide ctx $ withHeaderRoot (unContextM . summaryRoot) m
+  let summaryRoot bh = fmap bSumStateRoot <$> readStore memBlockSummaryDB (\d -> genericLookupBlockSummaryDB (pure $ _blockSummaryDB d) bh) mirrorBlockSummary bh
+  let body = runAccountDBM adb . provide ctx $ withHeaderRoot (unContextM . summaryRoot) m
+  case _backend ctx of
+    Mirror _ mirror -> do
+      db <- newStateDBEnv (mirrorNodeDB mirror)
+      localEnv @StateDBEnv (const db) body
+    _ -> body
 
 getBackend :: ContextM Backend
 getBackend = _backend <$> accessEnv
 {-# INLINE getBackend #-}
+-- | A mirror has no trie nodes. The empty trie's root is the one node there
+-- is an answer for (there is nothing under it); any other read is a path the
+-- mirror cannot serve, and says so. Writes are dropped.
+mirrorNodeDB :: StateMirror -> Node.NodeDB
+mirrorNodeDB m =
+  Node.NodeDB
+    { Node.lookupNode = \sr ->
+        if sr == MP.emptyTriePtr
+          then Just (Node.decodeNode "") <$ mirrorEmptyTrieRead m
+          else throwIO (TrieAccess ("state trie node " ++ format sr)),
+      Node.insertNode = \_ _ -> pure (),
+      Node.deleteNode = \_ -> pure (),
+      Node.tickNodes = pure (),
+      Node.flushNodes = pure ()
+    }
 
 -- | The persistent stores; absent in 'Memory' mode.
 getDBs :: ContextM ContextDBs
@@ -260,18 +317,21 @@ getDBs = getBackend >>= \case
   Persistent d -> pure d
   Sandbox _ d -> pure d
   Memory _ -> error "ContextM: no persistent stores in memory mode"
+  Mirror _ _ -> error "ContextM: no persistent stores over a state mirror"
 
 -- | Overlay first, then the persistent store on a miss.
 readStore ::
   Ord k =>
   Lens' MemContextDBs (M.Map k v) ->
   (ContextDBs -> ContextM (Maybe v)) ->
+  (StateMirror -> k -> IO (Maybe v)) ->
   k ->
   ContextM (Maybe v)
-readStore l disk k = getBackend >>= \case
+readStore l disk mirror k = getBackend >>= \case
   Persistent d -> disk d
   Memory o -> M.lookup k . view l <$> readIORef o
   Sandbox o d -> M.lookup k . view l <$> readIORef o >>= maybe (disk d) (pure . Just)
+  Mirror o m -> M.lookup k . view l <$> readIORef o >>= maybe (liftIO (mirror m k)) (pure . Just)
 {-# INLINE readStore #-}
 
 -- | Writes stay in the overlay when there is one.
@@ -286,6 +346,7 @@ writeStore l disk k mv = getBackend >>= \case
   Persistent d -> disk d
   Memory o -> modifyIORef' o $ l . at k .~ mv
   Sandbox o _ -> modifyIORef' o $ l . at k .~ mv
+  Mirror o _ -> modifyIORef' o $ l . at k .~ mv
 {-# INLINE writeStore #-}
 
 -- | Build the context, run the body under it, and return the final state.
@@ -514,7 +575,7 @@ runMemContextM ::
   ContextM a ->
   Eff '[Logger] (a, MemContextDBs)
 runMemContextM resolver dSettings f = do
-  sref <- liftIO $ newIORef . StreamEnv "" "mem" =<< newIORef M.empty
+  sref <- liftIO . newIORef =<< liftIO (unconnectedStreamEnv "mem")
   ctx <- memContext resolver dSettings
   renv <- liftIO $ RedisEnv <$> Redis.connect Redis.defaultConnectInfo
   a <- runRedisMUsingEnv renv . provide sref . runMemStateDBM . runContextIO ctx $ do
@@ -542,6 +603,7 @@ evalSandboxedContextM f = do
     Persistent d -> Sandbox <$> newIORef def <*> pure d
     Sandbox o d -> Sandbox <$> (newIORef =<< readIORef o) <*> pure d
     Memory o -> Memory <$> (newIORef =<< readIORef o)
+    Mirror o m -> Mirror <$> (newIORef =<< readIORef o) <*> pure m
   sandboxEnv <- sandboxStateDBEnv =<< ContextM accessEnv
   accounts <- snapshotAccountDBEnv =<< ContextM accessEnv
   withRunInIO $ \run -> MP.withSandbox . run . ContextM . localEnv @Context (const ctx {_backend = sandboxed, _state = st}) . localEnv @AccountDBEnv (const accounts) . localEnv @StateDBEnv (const sandboxEnv) $ unContextM f

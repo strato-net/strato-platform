@@ -71,7 +71,7 @@ import System.Clock
 
 instance TransactionLike Transaction where
   txHash = hash . rlpSerialize . rlpEncode
-  txPartialHash = hash . rlpSerialize . partialRLPEncode
+  txPartialHash = partialTransactionHash
   txChainHash = error "Transaction.txChainHash: Not a private transaction"
   txSigner = whoSignedThisTransaction
   txNonce = nonce
@@ -272,7 +272,10 @@ transactionHash :: Transaction -> Keccak256
 transactionHash = hash . rlpSerialize . rlpEncode
 
 partialTransactionHash :: Transaction -> Keccak256
-partialTransactionHash = hash . rlpSerialize . partialRLPEncode
+partialTransactionHash tx = hash $ rlpSerialize $ case (tx, chainId tx, partialRLPEncode tx) of
+  (EthereumTX {}, _, encoded) -> encoded
+  (_, Just cid, RLPArray items) -> RLPArray $ items ++ [rlpEncode cid, rlpEncode (0::Integer), rlpEncode (0::Integer)]
+  (_, _, encoded) -> encoded
 
 -- EIP-712 support for external wallet signing (MetaMask, etc.)
 
@@ -288,12 +291,14 @@ eip712TxTypeHash = keccak256ToByteString $ hash ("Transaction(address to,string 
 eip712TxTypeHashWithAttribution :: B.ByteString
 eip712TxTypeHashWithAttribution = keccak256ToByteString $ hash ("Transaction(address to,string funcName,string[] args,uint256 nonce,uint256 gasLimit,string network,bytes attribution)" :: B.ByteString)
 
-eip712DomainSeparator :: B.ByteString
-eip712DomainSeparator = keccak256ToByteString $ hash $ B.concat
-  [ eip712DomainTypeHash
+eip712DomainSeparator :: Maybe Integer -> B.ByteString
+eip712DomainSeparator cid = keccak256ToByteString $ hash $ B.concat $
+  [ case cid of
+      Nothing -> eip712DomainTypeHash
+      Just _ -> keccak256ToByteString $ hash ("EIP712Domain(string name,string version,uint256 chainId)" :: B.ByteString)
   , keccak256ToByteString $ hash ("STRATO" :: B.ByteString)
   , keccak256ToByteString $ hash ("1" :: B.ByteString)
-  ]
+  ] ++ maybe [] (\c -> [word256ToBytes $ fromInteger c]) cid
 
 eip712EncodeStringArray :: [T.Text] -> B.ByteString
 eip712EncodeStringArray texts = keccak256ToByteString $ hash $ B.concat
@@ -317,6 +322,6 @@ eip712StructHash _ = error "eip712StructHash: only MessageTX supported"
 eip712SignHash :: Transaction -> B.ByteString
 eip712SignHash tx = keccak256ToByteString $ hash $ B.concat
   [ "\x19\x01"
-  , eip712DomainSeparator
+  , eip712DomainSeparator (chainId tx)
   , eip712StructHash tx
   ]

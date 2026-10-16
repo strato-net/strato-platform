@@ -12,7 +12,7 @@ const os = require('os');
 
 // TODO: do the mass-refactoring of the daemon. Use the OOP! Really, don't even try refactoring this without the main Object (SingleCheck object with methods and shared params). Don't change any db data formats.
 
-const neededJobs = {
+const defaultNeededJobs = {
   slipstream_main: "slipstream",
   strato_p2p: "strato-p2p",
   vm_main: "vm-runner",
@@ -20,6 +20,21 @@ const neededJobs = {
   // TODO: add vault-proxy in prometheus
   "core-api": "core-api",
 };
+
+// HEALTH_CHECK_JOBS ("location=job,...") replaces the set above where some of
+// those processes are not in this Prometheus: an API tier's apex reading a core
+// cell's Prometheus has no core-api there (strato-api runs next to apex).
+function parseNeededJobs(spec) {
+  const jobs = {};
+  for (const pair of spec.split(",")) {
+    const [location, job] = pair.split("=").map((x) => (x || "").trim());
+    if (location && job) jobs[location] = job;
+  }
+  return Object.keys(jobs).length ? jobs : defaultNeededJobs;
+}
+const neededJobs = process.env.HEALTH_CHECK_JOBS
+  ? parseNeededJobs(process.env.HEALTH_CHECK_JOBS)
+  : defaultNeededJobs;
 
 const maxStalledIntervals = config.healthCheck.maxStalledIntervals;
 

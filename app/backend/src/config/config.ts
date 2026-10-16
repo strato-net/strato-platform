@@ -6,15 +6,12 @@ if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
 }
 
-// Verify the env vars
+// Verify the env vars. The OpenID discovery URL is needed to verify the
+// access tokens of logged-in users (its JWKS); the node's read APIs and the
+// unsigned-transaction endpoints are open, so no client credentials are needed
+// to call them on behalf of anonymous users.
 if (!process.env.OAUTH_DISCOVERY_URL) {
   throw new Error("OAUTH_DISCOVERY_URL is not defined");
-}
-if (!process.env.OAUTH_CLIENT_ID) {
-  throw new Error("OAUTH_CLIENT_ID is not defined");
-}
-if (!process.env.OAUTH_CLIENT_SECRET) {
-  throw new Error("OAUTH_CLIENT_SECRET is not defined");
 }
 if (!process.env.NODE_URL) {
   throw new Error("NODE_URL is not defined");
@@ -32,8 +29,13 @@ export async function initOpenIdConfig() {
   openIdJwks = jwks;
 }
 
+// Optional OAuth client credentials. When present, anonymous requests to the
+// node carry a client-credentials ("service") token, as they did when the
+// node's APIs required one; when absent they are sent unauthenticated. The
+// bridge deposit flow (onramp.service) also needs them for its password grant.
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;
+export const hasClientCredentials = Boolean(clientId && clientSecret);
 export const nodeUrl = process.env.NODE_URL;
 
 // Direct Postgres access to cirrus DB (used instead of Cirrus/PostgREST for heavy queries)

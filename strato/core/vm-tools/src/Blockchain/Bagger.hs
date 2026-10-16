@@ -42,7 +42,7 @@ import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Data.ExecResults (ExecResults, erEvents, erLogs)
 import Blockchain.Data.LogsBloom (bloomFromItems, emptyLogsBloom)
 import SolidVM.Model.Event (evContractAddress, evTopics)
-import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive)
+import Blockchain.Forks (isBlockRewardReceiptForkActive, isReceiptsRootForkActive, isReplayProtectionForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.Data.Receipt (Receipt)
 import Control.Monad
@@ -152,6 +152,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress p
     Just f@TFIntrinsicGasExceedsTxLimit {} -> recoverable f
     Just f@TFNonceMismatch {} -> error $ "mineTransactions' we messed up: " ++ format f
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
+    Just f@TFIncorrectChainId {} -> recoverable f
 
 
 -- todo batch insert results
@@ -222,6 +223,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ formatKeccak256WithoutColor hashBetter ++ " being a more lucrative transaction", hashWorse)
   TXSizeLimitExceeded s q e l OutputTx {otHash = hsh} ->
     (p s q ++ "tx size limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
+  ChainIdMismatch s q expected OutputTx {otHash = hsh, otBaseTx = bt} ->
+    (p s q ++ "incorrect chain ID (expected: " ++ show expected ++ ", actual: " ++ show (TD.chainId bt) ++ ")", hsh)
   AdminFlushed s q scope OutputTx {otHash = hsh} ->
     (p s q ++ "administratively flushed from mempool with scope " ++ show scope, hsh)
   where
@@ -595,9 +598,12 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       txSize = toInteger $ BS.length $ BL.toStrict $ Bin.encode bt
       gLimit = Conf.gasLimit (networkConfig ethConf)
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
+      nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
+      expectedChainId = Conf.chainId $ networkConfig ethConf
   (addressNonce, addressBalance) <- getAddressNonceAndBalance address
   return $
     if
+      | isReplayProtectionForkActive nextBlock && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t

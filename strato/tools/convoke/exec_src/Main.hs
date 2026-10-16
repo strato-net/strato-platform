@@ -41,6 +41,8 @@ parseLine line =
   case Sh.parse line of
     Left _ -> Nothing
     Right [] -> Nothing
+    Right ("@restart":cmd:args) -> Just (cmd, args)
+    Right ["@restart"] -> Nothing
     Right (cmd:args) -> Just (cmd, args)
 
 -- Launch a command and track its PID
