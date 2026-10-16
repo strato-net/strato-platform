@@ -335,6 +335,9 @@ resetPeerTimeouts :: Monad m =>
 resetPeerTimeouts = do
   return ()
 
+-- | Clear a peer's UDP backoff after it answered us. Only a peer we were
+-- allowed to contact is cleared: an unsolicited response must not lift a
+-- disable that is still running (see 'disablePeerForSeconds').
 resetPeerUdp ::
   (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->

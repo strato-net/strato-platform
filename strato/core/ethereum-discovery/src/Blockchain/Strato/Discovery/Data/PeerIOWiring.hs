@@ -144,7 +144,7 @@ instance MonadIO m => HasPeerDB m where
           ]
       ResetPeerUdpDisable ->
         SQL.updateWhere
-          selector
+          (selector ++ [PPeerUdpEnableTime SQL.<=. currentTime])
           [ PPeerUdpEnableTime SQL.=. currentTime,
             PPeerNextUdpDisableWindowSeconds SQL.=. 5,
             PPeerDisableExpiration SQL.=. currentTime

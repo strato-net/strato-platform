@@ -69,9 +69,14 @@ runPeer peer sSource = do
   ender <- toIO . $logInfoS "runPeer/exit" . T.pack . C.green $ " * Connection ended to " ++ C.yellow (format (pPeerHost peer) ++ ":" ++ show (pPeerTcpPort peer))
   void $ register ender
   myPublic <- getPub
+  let myPoint = secPubKeyToPoint myPublic
+  -- A stored key is only as trustworthy as the Neighbors entry it came from,
+  -- so a stored copy of our own key is checked against the endpoint itself
+  -- (the Pong is signed) before it can earn the address a SelfConnection ban.
   otherPubKey <- case (pPeerPubkey peer) of
-    Nothing -> do
-      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have the pubkey.  I will try to use a UDP ping to get the pubkey."
+    Just pub | pub /= myPoint -> return pub
+    _ -> do
+      $logInfoS "getPubKeyRunPeer" $ T.pack $ "Attempting to connect to " ++ pPeerString peer ++ ", but I don't have a verified pubkey.  I will try to use a UDP ping to get the pubkey."
       eitherOtherPubKey <- getServerPubKey peer
       case eitherOtherPubKey of
         Right pub -> do
@@ -80,13 +85,12 @@ runPeer peer sSource = do
         Left e -> do
           $logErrorS "getPubKeyRunPeer" $ T.pack $ "Error, couldn't get public key for peer: " ++ show e
           throwIO NoPeerPubKey
-    Just pub -> return pub
 
   -- A node can learn its own public address from its peers' neighbour lists.
   -- Refuse to dial it here: exceptions raised inside runClientConnection are
   -- only logged, so this is where SelfConnection still reaches
   -- handleRunPeerResult and the address gets disabled.
-  when (otherPubKey == secPubKeyToPoint myPublic) $ throwIO SelfConnection
+  when (otherPubKey == myPoint) $ throwIO SelfConnection
 
   $logInfoS "runPeer" . T.pack . C.blue $ "Welcome to strato-p2p-client"
   $logInfoS "runPeer" . T.pack . C.blue $ "============================"
