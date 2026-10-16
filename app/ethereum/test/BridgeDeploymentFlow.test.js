@@ -11,7 +11,7 @@ const {
 } = require("../scripts/lib/rolloutRuntime");
 const {
   scopeOf, mergeDiscovery, initializeDraft, preflightDraft, preflight,
-  activationReady, generateCurrent,
+  activationReady, generateBootstrap, generateCurrent,
 } = require("../scripts/lib/bridgeDeploymentFlow");
 
 const address = digit => `0x${digit.repeat(40)}`;
@@ -88,14 +88,14 @@ function fixture(t, scope = "eab-only") {
   return { directory, manifestPath, safe, context, generated, inspection };
 }
 
-test("operator CLI is init, preflight, generate, verify, activate", () => {
-  for (const command of ["init", "preflight", "generate", "verify", "activate"]) {
+test("operator CLI is init, bootstrap, preflight, generate, verify, activate", () => {
+  for (const command of ["init", "bootstrap", "preflight", "generate", "verify", "activate"]) {
     assert.equal(parseArgs([command, "--manifest", "deployment.json"]).command, command);
   }
   assert.equal(parseArgs(["init", "--manifest", "deployment.json",
     "--chain-id", "11155111", "--source-chain-id", "1"])["chain-id"], "11155111");
   for (const command of ["prepare", "continue", "plan", "resume"]) {
-    assert.throws(() => parseArgs([command, "--manifest", "deployment.json"]), /Use init\|preflight\|generate\|verify\|activate/);
+    assert.throws(() => parseArgs([command, "--manifest", "deployment.json"]), /Use init\|bootstrap\|preflight\|generate\|verify\|activate/);
   }
 });
 
@@ -268,6 +268,46 @@ test("generate writes only canonical atomic preactivation outputs and recovers b
     nativeInspection: async () => ({ report: { calls: [] } }),
   });
   assert.equal(fs.existsSync(path.join(second.directory, "stale.json")), false);
+});
+
+test("bootstrap writes only the eab-infra package needed to provision stopped services", t => {
+  const f = fixture(t);
+  fs.writeFileSync(f.manifestPath, JSON.stringify({
+    scope: "combined",
+    inputs: { nativeRoutes: [{}] },
+  }));
+  const result = generateBootstrap(f.manifestPath, {
+    context: f.context,
+    generate: f.generated,
+  });
+  assert.deepEqual(result.files, ["infra-bootstrap.json", "infra-bootstrap.tar.gz"]);
+  const index = JSON.parse(fs.readFileSync(path.join(result.directory, "infra-bootstrap.json")));
+  assert.deepEqual(index.application, { initialRunning: false });
+  assert.equal(index.chainId, "11155111");
+  assert.ok(index.requiredReturn.includes("nativeAttestationSigners"));
+  assert.ok(index.requiredReturn.includes("nativeExecutorAddress"));
+  assert.deepEqual(index.files.map(({ name }) => name), [
+    "bridge.env.template",
+    "verifier-1.json",
+  ]);
+  const extracted = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-bootstrap-test-"));
+  t.after(() => fs.rmSync(extracted, { recursive: true, force: true }));
+  execFileSync("tar", ["-xzf", path.join(result.directory, "infra-bootstrap.tar.gz"), "-C", extracted]);
+  index.files.forEach(({ name, sha256 }) => {
+    const actual = createHash("sha256")
+      .update(fs.readFileSync(path.join(extracted, name), "utf8"))
+      .digest("hex");
+    assert.equal(sha256, actual);
+  });
+});
+
+test("native extension reuses provisioned infrastructure instead of creating a bootstrap package", t => {
+  const f = fixture(t, "native-extension");
+  fs.writeFileSync(f.manifestPath, JSON.stringify({ scope: "native-extension" }));
+  assert.throws(() => generateBootstrap(f.manifestPath, {
+    context: f.context,
+    generate: f.generated,
+  }), /reuses the existing Runtime and verifier infrastructure/);
 });
 
 test("generate rejects EAB and native destination on different Safes", async t => {

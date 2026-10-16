@@ -69,8 +69,8 @@ function acquireRolloutLock(file, processImpl = process) {
 
 function parseArgs(argv) {
   const command = argv.shift();
-  if (!["init", "preflight", "generate", "verify", "activate", "approve"].includes(command)) {
-    throw new Error("Use init|preflight|generate|verify|activate|approve");
+  if (!["init", "bootstrap", "preflight", "generate", "verify", "activate", "approve"].includes(command)) {
+    throw new Error("Use init|bootstrap|preflight|generate|verify|activate|approve");
   }
   const args = { command };
   const allowed = command === "approve" ? ["file", "request", "approve", "env-file"]

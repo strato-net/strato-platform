@@ -13,7 +13,7 @@ Production STRATO accounts that require OTP must set a fresh `OAUTH_TOTP` in `ap
 
 ## 1. Setup and init
 
-**Who:** Infra returns public service identities/URLs; Coordinator creates the rollout.
+**Who:** Coordinator creates the rollout. Infra base accounts may already exist, but chain-specific verifier and Runtime identities are not required yet.
 
 Create `<ABSOLUTE_NEW_ROLLOUT_DIRECTORY>/deployment.env`:
 
@@ -45,7 +45,7 @@ npm run external:rollout -- init \
   --source-chain-id "$SOURCE_CHAIN_ID"
 ```
 
-Set `include`, target Safe/Permit2/role addresses, deployment and finality confirmations, route limits, Runtime health URL, verifier URLs, and all public identities in that file. For a first STRATO EAB deployment, leave `target.externalAssetBridge` and `target.tokenRouter` as `DEPLOY_REQUIRED` until step 3.
+Set `include`, target Safe/Permit2/role addresses, deployment and finality confirmations, route limits, and known public identities. For a first STRATO EAB deployment, leave `target.externalAssetBridge` and `target.tokenRouter` as `DEPLOY_REQUIRED` until step 2. Leave Infra-created verifier URLs, authorization signers, Runtime health URL, proposer, and executor values as `REVIEW_REQUIRED` until step 3.
 
 Choose `scope: "combined"` (default EAB + native) or `"eab-only"`.
 
@@ -93,15 +93,7 @@ For a later native extension, reuse the existing schema-version-1 EAB `deploymen
 
 `chainId` and `attestationThreshold` are JSON numbers; amounts and validity are decimal strings. Use the production verifier count and threshold. Existing EAB routes remain unchanged; schema-version-1 native extension does not use discovery `include` flags.
 
-## 2. Preflight
-
-```bash
-npm run external:rollout -- preflight --manifest "$ROLLOUT_DIR/deployment.json"
-```
-
-Check: `PREFLIGHT_PASSED`. This is read-only and creates no handoffs. It fails on unresolved review values, missing scope/routes/limits/identities/confirmations/finality/Safe/health values, STRATO network mismatch, target RPC mismatch, or missing Safe code.
-
-## 3. Deploy or upgrade contracts
+## 2. Deploy or upgrade contracts
 
 **Who:** STRATO admins for STRATO; Coordinator for target-chain contracts.
 
@@ -190,6 +182,47 @@ perl -i -pe 's/^PRIVATE_KEY=.*/PRIVATE_KEY=/' "$REPO_ROOT/app/ethereum/.env"
 unset PRIVATE_KEY CONFIRM_EXTERNAL_BRIDGE_DEPLOY CONFIRM_NATIVE_DEPLOY
 ```
 
+## 3. Bootstrap Infra and preflight
+
+**Who:** Coordinator generates the stopped-service package; Infra provisions or reuses the service foundations.
+
+After all target deployment paths are recorded:
+
+```bash
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- bootstrap --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+Check only `.deployment/bootstrap/`. Give Infra:
+
+- the reviewed `strato-net/eab-infra` kit tag or commit;
+- the release commit and image digests;
+- `infra-bootstrap.json`;
+- `infra-bootstrap.tar.gz`.
+
+Infra verifies the archive hashes and creates or reuses the Runtime and proposer foundations first, using the generated `bridge.env.template`. Infra records the Runtime access address and egress IP, but Runtime may remain not ready.
+
+Infra then gives each verifier operator its EAB policy and Runtime access address and creates the chain's verifier stack with `Running=No`:
+
+```bash
+eab-infra/guides/tools/deploy.sh <verifier-folder>/<network>.conf --preview
+eab-infra/guides/tools/deploy.sh <verifier-folder>/<network>.conf
+```
+
+`Running=No` is provisioning mode: it creates the endpoint and KMS signer identities without starting traffic. It must not require the new attestor to be registered or funded yet; those checks apply when changing to `Running=Yes`. If the selected `eab-infra` version performs those checks for `Running=No`, update it before continuing.
+
+Infra returns every value named in `infra-bootstrap.json`: verifier URLs and EAB/native signer addresses, Runtime EAB/native executors, proposer, Runtime access address, and Runtime health URL. New deployments use short-lived requests signed by the Runtime access KMS key; verifier API tokens are not exchanged.
+
+The Coordinator records those public values in `deployment.json`. For a combined rollout, also set `inputs.nativeConfig.executor`, `eabExecutor`, and `attestationSigners` from the returned identities. Resolve every remaining `REVIEW_REQUIRED`, then run:
+
+```bash
+npm run external:rollout -- preflight --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+Check: `PREFLIGHT_PASSED`. This is read-only and fails on unresolved review values, missing scope/routes/limits/identities/confirmations/finality/Safe/health values, STRATO network mismatch, target RPC mismatch, or missing Safe code.
+
+For `native-extension`, skip `bootstrap`: reuse the existing Runtime, proposer, verifier URLs, EAB/native signer identities, and executors, record them in the schema-version-1 manifest, then run `preflight`.
+
 ## 4. Generate preactivation
 
 ```bash
@@ -204,7 +237,7 @@ Check only `.deployment/current/`. It contains the current bound outputs:
 
 Generation fails if EAB and native use different Safes. It never emits activation calls.
 
-STRATO admins use the same existing `app/contracts/.env` from step 3:
+STRATO admins use the same existing `app/contracts/.env` from step 2:
 
 ```bash
 export ADMIN_APPROVAL_FILE=<ABSOLUTE_GENERATED_ADMIN_JSON_FROM_COORDINATOR>
@@ -230,7 +263,32 @@ npm run safe:batch -- execute --file <SAFE_JSON> --chain-id "$TARGET_CHAIN_ID" -
 unset SAFE_TX_EXECUTOR_PRIVATE_KEY
 ```
 
-Infra verifies `services.json`, applies `service-config.tar.gz`, and starts/updates Runtime and verifiers while preserving existing bindings and durable state.
+### Infra handoff and service startup
+
+**Who:** Coordinator hands off the final generated package; Infra starts the provisioned services.
+
+The Coordinator gives Infra:
+
+- `.deployment/current/services.json`;
+- `.deployment/current/service-config.tar.gz`;
+
+Infra must:
+
+1. Verify the archive against `services.json` and distribute the final EAB policy and, when present, native policy to each verifier operator.
+2. After the preactivation STRATO and Safe batches have registered every signer, set `Running=Yes`, preview, and deploy each verifier. Confirm every verifier is healthy.
+3. Give the Runtime operator the final `bridge.env.template`. Preserve its data volume, journals, and polling cursors; run only one Runtime for the STRATO environment.
+4. Resolve the Runtime secrets, increase `RestartRevision`, then preview and deploy:
+
+   ```bash
+   eab-infra/guides/tools/deploy.sh <runtime-folder>/runtime.conf --preview
+   eab-infra/guides/tools/deploy.sh <runtime-folder>/runtime.conf
+   ```
+
+5. Confirm `LastStart` reports `started <time>, ready`, the Runtime HTTPS health endpoint is ready, and its deployment metadata lists every reviewed verifier.
+
+An `eab-only` package omits native Runtime variables and native verifier policy. A `combined` or `native-extension` package includes them. Infra must not add or remove native configuration independently of the generated package.
+
+Infra then returns the deployed image revisions and confirms that the URLs and identities match `services.json`. Do not activate routes yet; the Coordinator runs step 5 first.
 
 ## 5. Verify
 
@@ -265,4 +323,4 @@ npm run external:rollout -- activate --manifest "$ROLLOUT_DIR/deployment.json"
 
 Never reuse an older admin file, Safe signature, or Safe nonce.
 
-`network:deploy-external --manifest` accepts only the reviewed schema-version-0 predeployment manifest. After `generate` expands it to schema version 1, do not redeploy those contracts; recover from the existing deployment checkpoint and live transaction receipts. A separately approved replacement deployment must use the standalone chain-prefixed environment configuration and a new rollout directory.
+`network:deploy-external --manifest` accepts only the reviewed schema-version-0 predeployment manifest. `bootstrap` expands it to schema version 1. After that, do not redeploy those contracts; recover from the existing deployment checkpoint and live transaction receipts. A separately approved replacement deployment must use the standalone chain-prefixed environment configuration and a new rollout directory.

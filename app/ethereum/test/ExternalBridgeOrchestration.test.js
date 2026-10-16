@@ -747,6 +747,7 @@ test("service templates derive shared addresses without storing secret values", 
   const bridge = fs.readFileSync(path.join(f.artifacts.directory, "bridge.env.template"), "utf8");
   assert(bridge.includes(`TOKEN_ROUTER=${addr("4")}`));
   assert(bridge.includes("BA_PASSWORD=${BA_PASSWORD}"));
+  assert.equal(bridge.includes("VERIFIER_API_TOKENS"), false);
   const verifier = fs.readFileSync(path.join(f.artifacts.directory, "verifier-2.env.template"), "utf8");
   assert(verifier.includes("VERIFIER_INDEPENDENT_RPC_URLS=${VERIFIER_2_INDEPENDENT_RPC_URLS}"));
   assert(verifier.includes("SETTLEMENT_ATTESTOR_BA_PASSWORD=${VERIFIER_2_BA_PASSWORD}"));

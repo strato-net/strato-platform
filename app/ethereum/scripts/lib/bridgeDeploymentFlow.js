@@ -348,6 +348,87 @@ function writeServices(current, artifacts, scope) {
   }
 }
 
+function bootstrapContext(manifestPath, directory) {
+  const manifest = structuredClone(readJson(manifestPath));
+  if (manifest.schemaVersion !== 1) {
+    throw new Error("Bootstrap requires an initialized deployment.json");
+  }
+  manifest.scope = "eab-only";
+  manifest.authorizationSigners = [];
+  manifest.services = { ...manifest.services, verifiers: [] };
+  if (manifest.inputs) {
+    delete manifest.inputs.nativeRoutes;
+    delete manifest.inputs.nativeConfig;
+  }
+  const file = path.join(directory, "bootstrap-manifest.json");
+  writeJson(file, manifest);
+  return loadManifest(file, "initial");
+}
+
+function writeBootstrapPackage(current, artifacts, context, includeNative) {
+  const bridgeTemplate = artifacts.serviceTemplates.find(file =>
+    path.basename(file) === "bridge.env.template");
+  if (!bridgeTemplate) throw new Error("Bootstrap did not generate bridge.env.template");
+  const files = [bridgeTemplate, ...artifacts.verifierPolicyPaths];
+  const entries = files.map(file => ({
+    name: path.basename(file),
+    sha256: digest(fs.readFileSync(file, "utf8")),
+  }));
+  const index = {
+    format: "eab-infra-bootstrap",
+    chainId: String(context.rollout.chainId),
+    application: { initialRunning: false },
+    files: entries,
+    requiredReturn: [
+      "verifierUrls",
+      "authorizationSigners",
+      "safeProposerAddress",
+      "executorAddress",
+      "bridgeHealthUrl",
+      "runtimeAccessAddress",
+      ...(includeNative ? ["nativeAttestationSigners", "nativeExecutorAddress"] : []),
+    ],
+  };
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-bootstrap-package-"));
+  try {
+    writeJson(path.join(staging, "infra-bootstrap.json"), index);
+    files.forEach(file => fs.copyFileSync(file, path.join(staging, path.basename(file))));
+    writeJson(path.join(current, "infra-bootstrap.json"), index);
+    execFileSync("tar", ["-czf", path.join(current, "infra-bootstrap.tar.gz"), "-C", staging,
+      "infra-bootstrap.json", ...entries.map(({ name }) => name)]);
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+function generateBootstrap(manifestPath, options = {}) {
+  const current = path.join(path.dirname(manifestPath), ".deployment", "bootstrap");
+  fs.rmSync(current, { recursive: true, force: true });
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-bootstrap-"));
+  try {
+    const reviewedManifest = readJson(manifestPath);
+    if (reviewedManifest.scope === "native-extension") {
+      throw new Error("Native extension reuses the existing Runtime and verifier infrastructure; complete its reviewed identities and run preflight");
+    }
+    const includeNative = reviewedManifest.scope !== "eab-only" &&
+      !!reviewedManifest.inputs?.nativeRoutes?.length;
+    const context = options.context || bootstrapContext(manifestPath, work);
+    const artifacts = (options.generate || generate)(context, path.join(work, "artifacts"));
+    fs.mkdirSync(current, { recursive: true, mode: 0o700 });
+    writeBootstrapPackage(current, artifacts, context, includeNative);
+    return {
+      status: "INFRA_BOOTSTRAP_GENERATED",
+      directory: current,
+      files: fs.readdirSync(current).sort(),
+    };
+  } catch (error) {
+    fs.rmSync(current, { recursive: true, force: true });
+    throw error;
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+}
+
 function activationReady(context, inspection) {
   if (scopeOf(context) === "native-extension") return nativeOnlyEabVerified(context, inspection);
   const checks = inspection.report.checks;
@@ -496,7 +577,14 @@ async function main(argv = process.argv.slice(2), options = {}) {
     await expandDraft(manifestPath, options);
     return { status: "INITIALIZED", manifest: manifestPath };
   }
-  const draft = readJson(manifestPath);
+  let draft = readJson(manifestPath);
+  if (args.command === "bootstrap") {
+    if (draft.schemaVersion === 0) {
+      await expandDraft(manifestPath, options);
+      draft = readJson(manifestPath);
+    }
+    return generateBootstrap(manifestPath, options);
+  }
   if (args.command === "preflight" && draft.schemaVersion === 0) {
     return preflightDraft(draft, options);
   }
@@ -531,5 +619,5 @@ async function main(argv = process.argv.slice(2), options = {}) {
 
 module.exports = {
   scopeOf, mergeDiscovery, initializeDraft, expandDraft, preflightDraft, preflight, activationReady,
-  generateCurrent, main,
+  generateBootstrap, generateCurrent, main,
 };

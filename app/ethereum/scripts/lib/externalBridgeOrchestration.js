@@ -384,7 +384,6 @@ function generate(context, outputDirectory, options = {}) {
       [`CHAIN_${rollout.chainId}_RPC_URL`]: reference(services.rpcUrlEnv),
       [`CHAIN_${rollout.chainId}_DEPOSIT_CONFIRMATIONS`]: services.confirmations,
       [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`]: services.verifiers.map(({ url }) => url).join(","),
-      [`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`]: services.verifiers.map(({ tokenEnv }) => reference(tokenEnv)).join(","),
     };
     for (const name of ["BRIDGE_IMAGE", "BRIDGENGINX_IMAGE", "BRIDGE_ADDRESS", "STRATO_APP_API_URL", "BA_USERNAME", "BA_PASSWORD", "CLIENT_ID", "CLIENT_SECRET", "OPENID_DISCOVERY_URL",
       "RELAYER_BA_USERNAME", "RELAYER_BA_PASSWORD", "RELAYER_CLIENT_ID", "RELAYER_CLIENT_SECRET", "RELAYER_OPENID_DISCOVERY_URL",
@@ -396,7 +395,6 @@ function generate(context, outputDirectory, options = {}) {
       bridgeEnvironment.STRATO_NATIVE_BRIDGE_ADDRESS = context.nativeInputs.nativeRoutes[0]["bridge-address"];
       bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`] = context.nativeInputs.nativeConfig.bridgeAddress;
       bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_VERIFIER_URLS`] = services.verifiers.map(({ url }) => url).join(",");
-      bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_VERIFIER_API_TOKENS`] = services.verifiers.map(({ tokenEnv }) => reference(tokenEnv)).join(",");
       bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_ADDRESS`] = context.nativeInputs.nativeConfig.executor;
       for (const suffix of ["KMS_KEY_ID", "KMS_REGION"]) bridgeEnvironment[`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_${suffix}`] = reference(`CHAIN_${rollout.chainId}_NATIVE_MINT_EXECUTOR_${suffix}`);
     }
