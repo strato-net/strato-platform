@@ -13,14 +13,14 @@ library
   exposed-modules:
       BatchMerge
       Blockchain.Database.MerklePatricia
+      Blockchain.Database.MerklePatricia.Diff
+      Blockchain.Database.MerklePatricia.Map
       Blockchain.Database.MerklePatriciaNative
   other-modules:
       Paths_merkle_patricia_db_baremetal
   reexported-modules:
       merkle-patricia-db:Blockchain.Database.MerklePatricia.Internal
-    , merkle-patricia-db:Blockchain.Database.MerklePatricia.Diff
     , merkle-patricia-db:Blockchain.Database.MerklePatricia.ForEach
-    , merkle-patricia-db:Blockchain.Database.MerklePatricia.Map
     , merkle-patricia-db:Blockchain.Database.MerklePatricia.MPDB
     , merkle-patricia-db:Blockchain.Database.MerklePatricia.NodeData
     , merkle-patricia-db:Blockchain.Database.MerklePatricia.StateRoot
@@ -36,6 +36,7 @@ library
       leveldb
   build-depends:
       base
+    , binary
     , bytestring
     , common-log
     , data-default
@@ -60,6 +61,7 @@ test-suite test-merkle-patricia-db-baremetal
   build-depends:
       base
     , base16-bytestring
+    , binary
     , bytestring
     , common-log
     , containers

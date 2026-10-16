@@ -5,6 +5,7 @@ license: Apache-2.0
 dependencies:
   - base
   - bytestring
+  - binary
   - common-log
   - data-default
   - ethereum-rlp
@@ -21,12 +22,12 @@ library:
   exposed-modules:
     - BatchMerge
     - Blockchain.Database.MerklePatricia
+    - Blockchain.Database.MerklePatricia.Diff
+    - Blockchain.Database.MerklePatricia.Map
     - Blockchain.Database.MerklePatriciaNative
   reexported-modules:
     - merkle-patricia-db:Blockchain.Database.MerklePatricia.Internal
-    - merkle-patricia-db:Blockchain.Database.MerklePatricia.Diff
     - merkle-patricia-db:Blockchain.Database.MerklePatricia.ForEach
-    - merkle-patricia-db:Blockchain.Database.MerklePatricia.Map
     - merkle-patricia-db:Blockchain.Database.MerklePatricia.MPDB
     - merkle-patricia-db:Blockchain.Database.MerklePatricia.NodeData
     - merkle-patricia-db:Blockchain.Database.MerklePatricia.StateRoot

@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,9 +9,10 @@
 
 -- | Drop-in replacement for the merkle-patricia-db public module.
 --
--- With a C store active ('N.activeHandle') the trie operations hand the
--- root and raw bytes to C, which owns the nodes; otherwise they run the
--- Haskell implementation over the caller's node store.
+-- 'openMPDB' opens the C store over the LevelDB and makes it active; from
+-- then on the trie operations hand the root and raw bytes to C, which owns
+-- the nodes.  With no store active they run the Haskell implementation
+-- over the caller's node store.
 module Blockchain.Database.MerklePatricia
   ( genericLookupDB,
     genericInsertDB,
@@ -23,6 +25,9 @@ module Blockchain.Database.MerklePatricia
     NodeData,
     runMP,
     openMPDB,
+    tick,
+    flush,
+    withSandbox,
     emptyTriePtr,
     sha2StateRoot,
     unboxStateRoot,
@@ -45,20 +50,26 @@ module Blockchain.Database.MerklePatricia
 where
 
 import Blockchain.Data.RLP
-import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.Internal hiding (flush, openMPDB, tick, withSandbox)
 import Blockchain.Database.MerklePatricia.NodeData (ptrRef)
 import qualified Blockchain.Database.MerklePatriciaNative as N
 import Blockchain.Strato.Model.Util (byteString2NibbleString)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Alter as A
+import Control.Exception (bracket_)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
+import Data.Binary (encode)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import Data.Default
 import Data.IORef (readIORef)
 import Data.Maybe (isJust, listToMaybe)
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
+import qualified Database.LevelDB.Base as LDB
+import Database.LevelDB.Internal (DB (..))
+import Foreign.Ptr (castPtr)
 import System.IO.Unsafe (unsafePerformIO)
 
 -- ================================================================
@@ -88,6 +99,40 @@ instance MonadIO m => (StateRoot `Alters` NodeData) (ReaderT DB.DB m) where
   lookup _ = genericLookupDB ask
   insert _ = genericInsertDB ask
   delete _ = genericDeleteDB ask
+
+-- ================================================================
+-- The store
+-- ================================================================
+
+-- | Parsed nodes kept in memory, and how many blocks of new nodes are held
+-- back before being written through.
+cacheNodes, flushEvery :: Int
+cacheNodes = 20000
+flushEvery = 256
+
+-- | Open the LevelDB at @path@ and the C store over it, and make that store
+-- active for every trie operation in the process.
+openMPDB :: FilePath -> DB.Options -> IO StateDB
+openMPDB path opts = do
+  ldb@(DB ptr _ _) <- LDB.open path opts
+  LDB.put ldb def (BL.toStrict $ encode emptyTriePtr) B.empty
+  h <- N.openLevelDB (castPtr ptr) cacheNodes flushEvery
+  N.setActiveHandle (Just h)
+  return $ StateDB ldb
+
+-- | A block is done; the store may write new nodes through.
+tick :: MonadIO m => m ()
+tick = liftIO $ readIORef N.activeHandle >>= mapM_ N.tick
+
+-- | Write every new node through now.
+flush :: MonadIO m => m ()
+flush = liftIO $ readIORef N.activeHandle >>= mapM_ N.flush
+
+-- | Nothing the body writes to the trie reaches the store.
+withSandbox :: IO a -> IO a
+withSandbox act = readIORef N.activeHandle >>= \case
+  Just h -> bracket_ (N.overlayBegin h) (N.overlayEnd h) act
+  Nothing -> act
 
 -- ================================================================
 -- C dispatch
@@ -206,12 +251,15 @@ getInclusionProof rootSr key = do
   (mVal, proof) <- getProof rootSr key
   return $ (\val -> (rlpDecode val, proof)) <$> mVal
 
+{-# NOINLINE getProof #-}
 getProof ::
   (StateRoot `Alters` NodeData) m =>
   StateRoot ->
   Key ->
   m (Maybe Val, [B.ByteString])
-getProof rootSr key = walkRef (ptrRef rootSr) key []
+getProof rootSr@(StateRoot root) key = case active rootSr of
+  Just h -> viaC h $ fmap (\(mVal, nodes) -> (rlpDeserialize <$> mVal, nodes)) <$> N.getProof h root (keyBytes key)
+  Nothing -> walkRef (ptrRef rootSr) key []
   where
     walkRef (Right sr') k acc = do
       mNd <- A.lookup (Proxy @NodeData) sr'
