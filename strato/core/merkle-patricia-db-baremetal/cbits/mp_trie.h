@@ -81,7 +81,7 @@ int mp_db_get_proof(mp_store_t *db, const uint8_t root[32],
 
 /* Fetcher for nodes the store lacks: asked for hash, returns 0 and a
  * malloc'd copy of the node's RLP in *data_out (the store frees it), or
- * non-zero when nobody has it. fn NULL clears. */
+ * 1 when nobody has it, negative on failure. fn NULL clears. */
 typedef int (*mp_fetch_fn)(void *ctx, const uint8_t hash[32],
                            uint8_t **data_out, size_t *data_len_out);
 void mp_db_set_fetcher(mp_store_t *db, mp_fetch_fn fn, void *ctx);
@@ -92,6 +92,9 @@ void mp_db_overlay_end(mp_store_t *db);
 
 /* Hash of the node whose absence caused the last MP_ERR_MISSING. */
 void mp_db_missing_hash(const mp_store_t *db, uint8_t hash_out[32]);
+
+/* Last operation's error; valid until the next operation on this store. */
+const char *mp_db_error(const mp_store_t *db);
 
 void mp_free(void *ptr);
 

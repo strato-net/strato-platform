@@ -101,5 +101,16 @@ SQL feed).
   sync-tested since the `runStateDBAt` wiring.
 - The state-root-mismatch diagnostic (`hasStateRoot`, `insertNode`,
   `withMissingNodeFetcher`) still goes through the Haskell node store, not C.
-- `test/Spec.hs` predates the renamed C API and is not built by `make`.
+- `test/Spec.hs` is not built or run by the root `make`.
 - No C-vs-Haskell equivalence test for `for_each` / `diff` / `get_proof`.
+
+## Failure checks
+
+Storage failures and malformed nodes raise IO exceptions with the underlying
+error or node hash. Fetcher exceptions are rethrown after returning from C;
+only a genuine missing node takes the fetch/retry path. Failed flushes retain
+pending writes for a retry.
+
+From the repo root, `make -f strato/core/merkle-patricia-db-baremetal/test/errors.mk test`
+runs injected LevelDB failures, malformed-node checks, and flush/reopen checks.
+The Haskell test suite also checks exception propagation and trie equivalence.

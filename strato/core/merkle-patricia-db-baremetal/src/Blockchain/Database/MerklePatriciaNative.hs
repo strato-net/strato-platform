@@ -52,7 +52,10 @@ import qualified Data.ByteString.Unsafe as BU
 import Data.IORef
 import Data.Word (Word8)
 import Foreign.C.Types
-import Control.Exception (SomeException, try)
+import Control.Exception (SomeException, finally, mask_, onException, throwIO, try)
+import Control.Concurrent.MVar
+import Control.Monad (when)
+import Foreign.C.String (CString, peekCString)
 import Foreign.Marshal.Alloc (alloca, allocaBytes, mallocBytes)
 import Foreign.Marshal.Array (allocaArray, peekArray, pokeArray)
 import Foreign.Marshal.Utils (copyBytes)
@@ -60,7 +63,32 @@ import Foreign.Ptr
 import Foreign.Storable
 import System.IO.Unsafe (unsafePerformIO)
 
-newtype MPHandle = MPHandle (Ptr ())
+data MPHandle = MPHandle
+  (Ptr ())
+  (MVar ())
+  (IORef (FunPtr FetchFn))
+  (IORef (Maybe SomeException))
+
+-- Keep each call and its error retrieval together, including callback failures.
+withHandle :: MPHandle -> (Ptr () -> IO a) -> IO a
+withHandle (MPHandle p lock _ exception) f = withMVar lock $ \_ -> mask_ $
+  f p `onException` do
+    pending <- readIORef exception
+    writeIORef exception Nothing
+    maybe (pure ()) throwIO pending
+
+-- Exceptions cannot unwind through C; save them and rethrow in withHandle.
+callback :: MPHandle -> IO CInt -> IO CInt
+callback (MPHandle _ _ _ exception) action = do
+  outcome <- try action
+  case outcome of
+    Right rc -> pure rc
+    Left e -> writeIORef exception (Just e) >> pure (-1)
+
+newHandle :: Ptr () -> IO MPHandle
+newHandle p
+  | p == nullPtr = throwIO (userError "mp_trie: could not allocate store")
+  | otherwise = MPHandle p <$> newMVar () <*> newIORef nullFunPtr <*> newIORef Nothing
 
 foreign import ccall unsafe "mp_db_open"
   c_open :: Ptr () -> CUInt -> CUInt -> IO (Ptr ())
@@ -136,22 +164,29 @@ foreign import ccall unsafe "mp_db_overlay_end"
 foreign import ccall unsafe "mp_db_missing_hash"
   c_missing_hash :: Ptr () -> Ptr Word8 -> IO ()
 
+foreign import ccall unsafe "mp_db_error"
+  c_error :: Ptr () -> IO CString
+
 foreign import ccall unsafe "mp_free"
   c_free :: Ptr Word8 -> IO ()
 
 -- | A store with no LevelDB behind it; nothing is ever evicted.
 openMemory :: IO MPHandle
-openMemory = MPHandle <$> c_open nullPtr 0 1
+openMemory = c_open nullPtr 0 1 >>= newHandle
 
 -- | @openLevelDB ldb capacity flushEvery@: cache up to @capacity@ clean
 -- nodes over the @leveldb_t*@, writing new nodes through every
 -- @flushEvery@ ticks.
 openLevelDB :: Ptr () -> Int -> Int -> IO MPHandle
 openLevelDB ldb capacity flushEvery =
-  MPHandle <$> c_open ldb (fromIntegral capacity) (fromIntegral flushEvery)
+  c_open ldb (fromIntegral capacity) (fromIntegral flushEvery) >>= newHandle
 
 close :: MPHandle -> IO ()
-close (MPHandle p) = c_close p
+close h@(MPHandle _ _ fetcher _) = withHandle h $ \p ->
+  (c_flush p >>= check p "close") `finally` do
+    c_close p
+    cb <- readIORef fetcher
+    when (cb /= nullFunPtr) (freeHaskellFunPtr cb)
 
 {-# NOINLINE activeHandle #-}
 activeHandle :: IORef (Maybe MPHandle)
@@ -169,10 +204,8 @@ withBSs (b : bs) f = withBS b $ \p n -> withBSs bs $ \rest -> f ((p, n) : rest)
 
 -- | Copy out a C buffer and free it.
 takeBS :: Ptr Word8 -> CSize -> IO ByteString
-takeBS p n = do
-  bs <- B.packCStringLen (castPtr p, fromIntegral n)
-  c_free p
-  return bs
+takeBS p n =
+  B.packCStringLen (castPtr p, fromIntegral n) `finally` c_free p
 
 missing :: Ptr () -> IO ByteString
 missing p = allocaBytes 32 $ \h -> c_missing_hash p h >> B.packCStringLen (castPtr h, 32)
@@ -180,12 +213,18 @@ missing p = allocaBytes 32 $ \h -> c_missing_hash p h >> B.packCStringLen (castP
 result :: Ptr () -> CInt -> IO a -> IO (Either ByteString a)
 result p rc ok
   | rc == -2 = Left <$> missing p
-  | rc < 0 = error ("mp_trie: error " ++ show rc)
+  | rc < 0 = failure p ("operation failed (" ++ show rc ++ ")")
   | otherwise = Right <$> ok
+
+failure :: Ptr () -> String -> IO a
+failure p context = do
+  message <- c_error p
+  detail <- if message == nullPtr then pure context else peekCString message
+  throwIO (userError ("mp_trie: " ++ detail))
 
 -- | Value bytes for a key under a root.
 getKeyVal :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString (Maybe ByteString))
-getKeyVal (MPHandle p) root key =
+getKeyVal h root key = withHandle h $ \p ->
   withBS root $ \rootP _ -> withBS key $ \keyP keyN ->
     alloca $ \valPP -> alloca $ \valNP -> do
       rc <- c_get p rootP keyP keyN valPP valNP
@@ -200,7 +239,7 @@ getKeyVal (MPHandle p) root key =
 -- | Insert key/value pairs under a root; the new root and, per pair,
 -- whether the key already had a value.
 putManyKeyVal :: MPHandle -> ByteString -> [(ByteString, ByteString)] -> IO (Either ByteString (ByteString, [Bool]))
-putManyKeyVal (MPHandle p) root kvs =
+putManyKeyVal h root kvs = withHandle h $ \p ->
   withBS root $ \rootP _ ->
     withBSs (map fst kvs) $ \keys -> withBSs (map snd kvs) $ \vals ->
       allocaArray n $ \keyPs -> allocaArray n $ \keyNs ->
@@ -219,29 +258,29 @@ putManyKeyVal (MPHandle p) root kvs =
     n = length kvs
 
 deleteKey :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString ByteString)
-deleteKey (MPHandle p) root key =
+deleteKey h root key = withHandle h $ \p ->
   withBS root $ \rootP _ -> withBS key $ \keyP keyN -> allocaBytes 32 $ \newRoot -> do
     rc <- c_delete p rootP keyP keyN newRoot
     result p rc $ B.packCStringLen (castPtr newRoot, 32)
 
 -- | A block is done; the store may write pending nodes through.
 tick :: MPHandle -> IO ()
-tick (MPHandle p) = c_tick p >>= check "tick"
+tick h = withHandle h $ \p -> c_tick p >>= check p "tick"
 
 -- | Write every pending node through now.
 flush :: MPHandle -> IO ()
-flush (MPHandle p) = c_flush p >>= check "flush"
+flush h = withHandle h $ \p -> c_flush p >>= check p "flush"
 
-check :: String -> CInt -> IO ()
-check what rc
+check :: Ptr () -> String -> CInt -> IO ()
+check p what rc
   | rc == 0 = return ()
-  | otherwise = error ("mp_trie: " ++ what ++ " failed: " ++ show rc)
+  | otherwise = failure p (what ++ " failed: " ++ show rc)
 
 -- | Every key (as nibbles) and value under a root, in trie order.
 forEach :: MPHandle -> ByteString -> IO (Either ByteString [([Word8], ByteString)])
-forEach (MPHandle p) root = do
+forEach h root = withHandle h $ \p -> do
   acc <- newIORef []
-  cb <- mkKvFn $ \_ kP kN vP vN -> do
+  cb <- mkKvFn $ \_ kP kN vP vN -> callback h $ do
     k <- peekArray (fromIntegral kN) kP
     v <- B.packCStringLen (castPtr vP, fromIntegral vN)
     modifyIORef' acc ((k, v) :)
@@ -253,9 +292,9 @@ forEach (MPHandle p) root = do
 -- | The changes from the trie at the first root to the trie at the second:
 -- key nibbles, old value, new value.
 dbDiff :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString [([Word8], Maybe ByteString, Maybe ByteString)])
-dbDiff (MPHandle p) a b = do
+dbDiff h a b = withHandle h $ \p -> do
   acc <- newIORef []
-  cb <- mkDiffFn $ \_ op kP kN oP oN nP nN -> do
+  cb <- mkDiffFn $ \_ op kP kN oP oN nP nN -> callback h $ do
     k <- peekArray (fromIntegral kN) kP
     o <- if op == 0 then return Nothing else Just <$> B.packCStringLen (castPtr oP, fromIntegral oN)
     n <- if op == 2 then return Nothing else Just <$> B.packCStringLen (castPtr nP, fromIntegral nN)
@@ -268,57 +307,52 @@ dbDiff (MPHandle p) a b = do
 -- | The value under an unhashed key and the hashed nodes on the way to it,
 -- root first.
 getProof :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString (Maybe ByteString, [ByteString]))
-getProof (MPHandle p) root key = do
+getProof h root key = withHandle h $ \p -> do
   acc <- newIORef []
-  cb <- mkBytesFn $ \_ dP dN -> do
+  cb <- mkBytesFn $ \_ dP dN -> callback h $ do
     d <- B.packCStringLen (castPtr dP, fromIntegral dN)
     modifyIORef' acc (d :)
     return 0
-  r <- withBS root $ \rootP _ -> withBS key $ \keyP keyN ->
+  r <- (withBS root $ \rootP _ -> withBS key $ \keyP keyN ->
     alloca $ \valPP -> alloca $ \valNP -> do
       rc <- c_get_proof p rootP keyP keyN cb nullPtr valPP valNP
       result p rc $ do
         valP <- peek valPP
         if valP == nullPtr
           then return Nothing
-          else Just <$> (peek valNP >>= takeBS valP)
-  freeHaskellFunPtr cb
+          else Just <$> (peek valNP >>= takeBS valP)) `finally` freeHaskellFunPtr cb
   nodes <- reverse <$> readIORef acc
   return $ (\v -> (v, nodes)) <$> r
 
 -- | Ask @fetch@ for nodes the store lacks (and keep them); @Nothing@
 -- clears. The callback runs under the store lock and may not use the
--- store; an exception in it counts as "nobody has it".
+-- store; exceptions are rethrown after returning from C.
 setFetcher :: MPHandle -> Maybe (ByteString -> IO (Maybe ByteString)) -> IO ()
-setFetcher (MPHandle p) mfetch = do
+setFetcher h@(MPHandle _ _ fetcherPtr _) mfetch = withHandle h $ \p -> do
   old <- readIORef fetcherPtr
   new <- case mfetch of
     Nothing -> return nullFunPtr
-    Just fetch -> mkFetchFn $ \_ hP outPP outNP -> do
-      h <- B.packCStringLen (castPtr hP, 32)
-      r <- try (fetch h) :: IO (Either SomeException (Maybe ByteString))
-      case r of
-        Right (Just bs) -> do
+    Just fetch -> mkFetchFn $ \_ hP outPP outNP -> callback h $ do
+      hash <- B.packCStringLen (castPtr hP, 32)
+      value <- fetch hash
+      case value of
+        Just bs -> do
           buf <- mallocBytes (B.length bs)
           withBS bs $ \src n -> copyBytes buf src (fromIntegral n)
           poke outPP buf
           poke outNP (fromIntegral $ B.length bs)
           return 0
-        _ -> return 1
+        Nothing -> return 1
   c_set_fetcher p new nullPtr
   writeIORef fetcherPtr new
   if old == nullFunPtr then return () else freeHaskellFunPtr old
 
-{-# NOINLINE fetcherPtr #-}
-fetcherPtr :: IORef (FunPtr FetchFn)
-fetcherPtr = unsafePerformIO $ newIORef nullFunPtr
-
 -- | Raw node bytes by hash (cache, then LevelDB).
 lookupNode :: MPHandle -> ByteString -> IO (Maybe ByteString)
-lookupNode (MPHandle p) hash =
+lookupNode h hash = withHandle h $ \p ->
   withBS hash $ \hashP _ -> alloca $ \dataPP -> alloca $ \dataNP -> do
     rc <- c_node_get p hashP dataPP dataNP
-    if rc /= 0
+    if rc < 0 then failure p "lookup node failed" else if rc == 1
       then return Nothing
       else do
         dataP <- peek dataPP
@@ -326,15 +360,15 @@ lookupNode (MPHandle p) hash =
         Just <$> takeBS dataP dataN
 
 insertNode :: MPHandle -> ByteString -> ByteString -> IO ()
-insertNode (MPHandle p) hash bytes =
+insertNode h hash bytes = withHandle h $ \p ->
   withBS hash $ \hashP _ -> withBS bytes $ \dataP dataN ->
-    c_node_put p hashP dataP dataN >>= check "nodePut"
+    c_node_put p hashP dataP dataN >>= check p "nodePut"
 
 deleteNode :: MPHandle -> ByteString -> IO ()
-deleteNode (MPHandle p) hash =
-  withBS hash $ \hashP _ -> c_node_delete p hashP >>= check "nodeDelete"
+deleteNode h hash = withHandle h $ \p ->
+  withBS hash $ \hashP _ -> c_node_delete p hashP >>= check p "nodeDelete"
 
 -- | Nodes created until the matching 'overlayEnd' are never written through.
 overlayBegin, overlayEnd :: MPHandle -> IO ()
-overlayBegin (MPHandle p) = c_overlay_begin p
-overlayEnd (MPHandle p) = c_overlay_end p
+overlayBegin h = withHandle h c_overlay_begin
+overlayEnd h = withHandle h c_overlay_end

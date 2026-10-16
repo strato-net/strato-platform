@@ -171,7 +171,7 @@ static int rlp_decode_item(const uint8_t *data, size_t dlen, rlp_item_t *o) {
         int ll = b - 0xB7;
         if (1 + (size_t)ll > dlen) return -1;
         size_t l = decode_uint_be(data + 1, ll);
-        if (1 + (size_t)ll + l > dlen) return -1;
+        if (l > dlen - 1 - (size_t)ll) return -1;
         o->total = 1 + (size_t)ll + l; o->is_list = 0; o->content = data + 1 + ll; o->clen = l;
     } else if (b <= 0xF7) {
         size_t l = b - 0xC0;
@@ -181,7 +181,7 @@ static int rlp_decode_item(const uint8_t *data, size_t dlen, rlp_item_t *o) {
         int ll = b - 0xF7;
         if (1 + (size_t)ll > dlen) return -1;
         size_t l = decode_uint_be(data + 1, ll);
-        if (1 + (size_t)ll + l > dlen) return -1;
+        if (l > dlen - 1 - (size_t)ll) return -1;
         o->total = 1 + (size_t)ll + l; o->is_list = 1; o->content = data + 1 + ll; o->clen = l;
     }
     return 0;
@@ -276,6 +276,7 @@ struct mp_store {
     uint32_t ticks;
     int overlay_depth;
     int missing;
+    char *error;
     uint8_t missing_hash[32];
     mp_fetch_fn fetch;
     void *fetch_ctx;
@@ -284,6 +285,19 @@ struct mp_store {
     leveldb_writeoptions_t *wo;
     pthread_mutex_t lock;
 };
+
+/* Keep the first failure until the caller has read it. */
+static void store_error(mp_store_t *s, const char *operation, const char *detail) {
+    if (s->error) return;
+    size_t n = strlen(operation) + strlen(detail) + 3;
+    s->error = malloc(n);
+    if (!s->error) abort();
+    snprintf(s->error, n, "%s: %s", operation, detail);
+}
+
+static int failed(const mp_store_t *s) {
+    return s->missing || s->error;
+}
 
 static uint32_t store_slot(const mp_store_t *s, const uint8_t key[32]) {
     uint32_t h = (uint32_t)key[0] | ((uint32_t)key[1] << 8) |
@@ -351,6 +365,7 @@ static void store_insert(mp_store_t *s, const uint8_t key[32],
 /* A node produced by a trie operation (or handed in by the caller). */
 static void store_put(mp_store_t *s, const uint8_t key[32],
                       const uint8_t *val, size_t vlen) {
+    if (s->error) return;
     store_entry_t *e = store_find(s, key);
     if (e) {
         /* A sandbox node reborn outside the sandbox must now be written. */
@@ -391,7 +406,12 @@ static const uint8_t *store_get(mp_store_t *s, const uint8_t key[32],
         char *err = NULL;
         size_t vlen = 0;
         char *v = leveldb_get(s->ldb, s->ro, (const char *)key, 32, &vlen, &err);
-        if (err) leveldb_free(err);
+        if (err) {
+            store_error(s, "LevelDB read", err);
+            leveldb_free(err);
+            if (v) leveldb_free(v);
+            return NULL;
+        }
         if (v) {
             store_insert(s, key, (const uint8_t *)v, vlen, ENTRY_CLEAN);
             leveldb_free(v);
@@ -407,16 +427,24 @@ static const uint8_t *store_get(mp_store_t *s, const uint8_t key[32],
     if (s->fetch) {
         uint8_t *buf = NULL;
         size_t len = 0;
-        if (s->fetch(s->fetch_ctx, key, &buf, &len) == 0 && buf) {
+        int rc = s->fetch(s->fetch_ctx, key, &buf, &len);
+        if (rc < 0) {
+            free(buf);
+            store_error(s, "node fetch", "callback failed");
+            return NULL;
+        }
+        if (rc == 0 && buf) {
             uint8_t h[32];
             mp_keccak256(h, buf, len);
             int ok = memcmp(h, key, 32) == 0;
             if (ok) store_put(s, key, buf, len);
             free(buf);
             if (ok) return store_get(s, key, vlen_out);
+            store_error(s, "node fetch", "returned node has the wrong hash");
+            return NULL;
         }
     }
-    if (!s->missing) {
+    if (!failed(s)) {
         s->missing = 1;
         memcpy(s->missing_hash, key, 32);
     }
@@ -432,14 +460,22 @@ static int store_flush(mp_store_t *s) {
         if (!e || e->state != ENTRY_PENDING) continue;
         leveldb_writebatch_put(wb, (const char *)e->key, 32,
                                (const char *)e->value, e->value_len);
-        e->state = ENTRY_CLEAN;
-        s->evictable++;
     }
     char *err = NULL;
     leveldb_write(s->ldb, s->wo, wb, &err);
     leveldb_writebatch_destroy(wb);
+    if (err) {
+        store_error(s, "LevelDB write batch", err);
+        leveldb_free(err);
+        return -1;
+    }
+    for (uint32_t i = 0; i < s->pending_count; i++) {
+        store_entry_t *e = store_find(s, s->pending[i]);
+        if (!e || e->state != ENTRY_PENDING) continue;
+        e->state = ENTRY_CLEAN;
+        s->evictable++;
+    }
     s->pending_count = 0;
-    if (err) { leveldb_free(err); return -1; }
     return 0;
 }
 
@@ -732,7 +768,8 @@ static void store_node(mp_store_t *store, const mp_node_t *nd,
  * SECTION 8: Node decoding (RLP bytes → mp_node_t)
  * ================================================================ */
 
-static mp_node_t decode_rlp(const uint8_t *rlp, size_t rlp_len);
+static mp_node_t decode_rlp(mp_store_t *s, const uint8_t *rlp, size_t rlp_len,
+                            const uint8_t *hash);
 
 /* Decode a ref into a node_ref_t from an RLP item that appears as a child
  * in a branch node. The serialized bytes are [start..start+total). */
@@ -759,118 +796,99 @@ static node_ref_t decode_child_ref(const uint8_t *serial, size_t serial_len) {
     return ref;
 }
 
-static mp_node_t decode_rlp(const uint8_t *rlp, size_t rlp_len) {
-    mp_node_t nd;
-    memset(&nd, 0, sizeof(nd));
-
-    rlp_item_t top;
+/* Decode failures must never be indistinguishable from an empty trie. */
+static mp_node_t decode_rlp(mp_store_t *s, const uint8_t *rlp, size_t rlp_len,
+                            const uint8_t *hash) {
+    mp_node_t nd = {0};
+    const char *reason;
+    rlp_item_t top, items[17];
+    /* The Haskell store represents the canonical blank root with zero bytes. */
+    if (rlp_len == 0 && hash) {
+        uint8_t empty[32];
+        mp_empty_root(empty);
+        if (memcmp(hash, empty, 32) == 0) return nd;
+    }
     if (rlp_decode_item(rlp, rlp_len, &top) != 0) {
-        nd.type = NODE_EMPTY;
-        return nd;
+        reason = "invalid RLP"; goto invalid;
     }
-
-    /* Empty node: RLPString "" (\x80) or RLPScalar 0 (\x00) */
+    if (top.total != rlp_len) {
+        reason = "trailing bytes after node"; goto invalid;
+    }
     if (!top.is_list) {
-        if (top.clen == 0 || (top.clen == 1 && top.content[0] == 0)) {
-            nd.type = NODE_EMPTY;
-            return nd;
-        }
-        nd.type = NODE_EMPTY;
-        return nd;
+        if (rlp_len == 1 && (rlp[0] == 0x80 || rlp[0] == 0)) return nd;
+        reason = "invalid empty node"; goto invalid;
     }
-
-    /* Count list elements */
-    int elem_count = 0;
-    {
-        const uint8_t *p = top.content;
-        size_t rem = top.clen;
-        while (rem > 0) {
-            rlp_item_t it;
-            if (rlp_decode_item(p, rem, &it) != 0) break;
-            elem_count++;
-            p += it.total;
-            rem -= it.total;
+    const uint8_t *p = top.content;
+    size_t remaining = top.clen, count = 0;
+    while (remaining) {
+        if (count == 17) { reason = "too many node fields"; goto invalid; }
+        if (rlp_decode_item(p, remaining, &items[count]) != 0) {
+            reason = "invalid node field"; goto invalid;
+        }
+        p += items[count].total;
+        remaining -= items[count++].total;
+    }
+    if (count != 2 && count != 17) {
+        reason = "expected 2 or 17 node fields"; goto invalid;
+    }
+    int is_leaf = 0;
+    uint8_t hp_nibbles[128];
+    size_t hp_nlen = 0;
+    if (count == 2) {
+        if (items[0].is_list || items[0].clen == 0 || items[0].clen > 64) {
+            reason = "invalid hex-prefix path length"; goto invalid;
+        }
+        uint8_t w = items[0].content[0];
+        uint8_t flags = w > 0x0f ? w >> 4 : w;
+        if (flags > 3) { reason = "invalid hex-prefix flags"; goto invalid; }
+        hp_decode(items[0].content, items[0].clen, hp_nibbles, &hp_nlen, &is_leaf);
+        if (!is_leaf && hp_nlen == 0) {
+            reason = "empty extension path"; goto invalid;
         }
     }
-
-    if (elem_count == 17) {
-        /* Branch node */
+    if (!is_leaf) {
+        size_t first = count == 2 ? 1 : 0;
+        size_t end = count == 2 ? 2 : 16;
+        for (size_t i = first; i < end; i++) {
+            rlp_item_t *ref = &items[i];
+            if (ref->total == 1 && (*ref->start == 0x80 || *ref->start == 0)) continue;
+            if (ref->is_list && ref->total < 32) continue;
+            if (!ref->is_list && ref->clen == 32) continue;
+            reason = "invalid child reference"; goto invalid;
+        }
+    }
+    if (count == 17) {
         nd.type = NODE_BRANCH;
-        const uint8_t *p = top.content;
-        size_t rem = top.clen;
-        for (int i = 0; i < 17; i++) {
-            rlp_item_t it;
-            rlp_decode_item(p, rem, &it);
-            if (i < 16) {
-                nd.branch.children[i] = decode_child_ref(p, it.total);
-            } else {
-                /* Value slot */
-                if ((it.total == 1 && (p[0] == 0x80 || p[0] == 0x00)) ||
-                    (!it.is_list && it.clen == 0)) {
-                    nd.branch.value = NULL;
-                    nd.branch.value_len = 0;
-                } else {
-                    nd.branch.value = dup_bytes(p, it.total);
-                    nd.branch.value_len = (uint32_t)it.total;
-                }
-            }
-            p += it.total;
-            rem -= it.total;
+        for (int i = 0; i < 16; i++)
+            nd.branch.children[i] = decode_child_ref(items[i].start, items[i].total);
+        rlp_item_t *v = &items[16];
+        if (!(v->total == 1 && (*v->start == 0x80 || *v->start == 0))) {
+            nd.branch.value = dup_bytes(v->start, v->total);
+            nd.branch.value_len = (uint32_t)v->total;
         }
-        return nd;
+    } else if (is_leaf) {
+        nd.type = NODE_LEAF;
+        nd.leaf.nibbles = dup_nibs(hp_nibbles, hp_nlen);
+        nd.leaf.nlen = (uint16_t)hp_nlen;
+        nd.leaf.value = dup_bytes(items[1].start, items[1].total);
+        nd.leaf.value_len = (uint32_t)items[1].total;
+    } else {
+        nd.type = NODE_EXTENSION;
+        nd.ext.nibbles = dup_nibs(hp_nibbles, hp_nlen);
+        nd.ext.nlen = (uint16_t)hp_nlen;
+        nd.ext.child = decode_child_ref(items[1].start, items[1].total);
     }
-
-    if (elem_count == 2) {
-        /* Shortcut node: extension or leaf */
-        const uint8_t *p = top.content;
-        size_t rem = top.clen;
-
-        /* First element: HP-encoded key */
-        rlp_item_t key_item;
-        rlp_decode_item(p, rem, &key_item);
-        uint8_t hp_nibbles[128];
-        size_t hp_nlen;
-        int is_leaf;
-        hp_decode(key_item.content, key_item.clen, hp_nibbles, &hp_nlen, &is_leaf);
-
-        p += key_item.total;
-        rem -= key_item.total;
-
-        /* Second element: value (leaf) or child ref (extension) */
-        rlp_item_t val_item;
-        rlp_decode_item(p, rem, &val_item);
-
-        if (is_leaf) {
-            nd.type = NODE_LEAF;
-            nd.leaf.nibbles = dup_nibs(hp_nibbles, hp_nlen);
-            nd.leaf.nlen = (uint16_t)hp_nlen;
-            nd.leaf.value = dup_bytes(p, val_item.total);
-            nd.leaf.value_len = (uint32_t)val_item.total;
-        } else {
-            nd.type = NODE_EXTENSION;
-            nd.ext.nibbles = dup_nibs(hp_nibbles, hp_nlen);
-            nd.ext.nlen = (uint16_t)hp_nlen;
-            /* Child ref: check serialized size threshold */
-            if (val_item.total < 32) {
-                nd.ext.child.type = REF_INLINE;
-                memcpy(nd.ext.child.data, p, val_item.total);
-                nd.ext.child.data_len = (uint8_t)val_item.total;
-                /* Check if it's actually an empty ref */
-                if (val_item.total == 1 && (p[0] == 0x80 || p[0] == 0x00)) {
-                    nd.ext.child.type = REF_EMPTY;
-                    nd.ext.child.data_len = 0;
-                }
-            } else {
-                nd.ext.child.type = REF_HASH;
-                memcpy(nd.ext.child.data, val_item.content, 32);
-                nd.ext.child.data_len = 32;
-            }
-        }
-        return nd;
-    }
-
-    nd.type = NODE_EMPTY;
     return nd;
+
+invalid: {
+        uint8_t digest[32];
+        char context[96];
+        if (!hash) { mp_keccak256(digest, rlp, rlp_len); hash = digest; }
+        memcpy(context, "decode trie node ", 17);
+        for (int i = 0; i < 32; i++) snprintf(context + 17 + 2*i, 3, "%02x", hash[i]);
+        store_error(s, context, reason);
+        return nd;
+    }
 }
 
 /* Load a node from a ref. */
@@ -882,7 +900,7 @@ static mp_node_t load_ref(mp_store_t *store, const node_ref_t *ref) {
             nd.type = NODE_EMPTY;
             return nd;
         case REF_INLINE:
-            return decode_rlp(ref->data, ref->data_len);
+            return decode_rlp(store, ref->data, ref->data_len, NULL);
         case REF_HASH: {
             size_t vlen;
             const uint8_t *data = store_get(store, ref->data, &vlen);
@@ -890,7 +908,7 @@ static mp_node_t load_ref(mp_store_t *store, const node_ref_t *ref) {
                 nd.type = NODE_EMPTY;
                 return nd;
             }
-            return decode_rlp(data, vlen);
+            return decode_rlp(store, data, vlen, ref->data);
         }
     }
     nd.type = NODE_EMPTY;
@@ -1420,6 +1438,7 @@ void mp_db_close(mp_store_t *s) {
     }
     free(s->entries);
     free(s->pending);
+    free(s->error);
     if (s->ro) leveldb_readoptions_destroy(s->ro);
     if (s->wo) leveldb_writeoptions_destroy(s->wo);
     pthread_mutex_destroy(&s->lock);
@@ -1430,10 +1449,13 @@ static void op_begin(mp_store_t *s) {
     pthread_mutex_lock(&s->lock);
     store_maybe_evict(s);
     s->missing = 0;
+    free(s->error);
+    s->error = NULL;
 }
 
 static int op_end(mp_store_t *s, int rc) {
-    if (s->missing) rc = MP_ERR_MISSING;
+    if (s->error) rc = -1;
+    else if (s->missing) rc = MP_ERR_MISSING;
     pthread_mutex_unlock(&s->lock);
     return rc;
 }
@@ -1449,7 +1471,7 @@ static int load_root(mp_store_t *s, const uint8_t root[32], mp_node_t *out) {
     size_t len;
     const uint8_t *rlp = store_get(s, root, &len);
     if (!rlp) return -1;
-    *out = decode_rlp(rlp, len);
+    *out = decode_rlp(s, rlp, len, root);
     return 0;
 }
 
@@ -1468,7 +1490,7 @@ int mp_db_get_key_val(mp_store_t *s, const uint8_t root[32],
     size_t vlen = 0;
     int rc = trie_get_node(s, &root_nd, nibs, 64, &v, &vlen);
     free_node(&root_nd);
-    if (s->missing) { free(v); return op_end(s, rc); }
+    if (failed(s)) { free(v); return op_end(s, rc); }
     if (rc == 0) { *val_out = v; *val_len_out = vlen; }
     return op_end(s, rc);
 }
@@ -1481,14 +1503,14 @@ int mp_db_put_many_key_val(mp_store_t *s, const uint8_t root[32], size_t count,
     mp_node_t nd;
     if (load_root(s, root, &nd) != 0) return op_end(s, -1);
 
-    for (size_t i = 0; i < count && !s->missing; i++) {
+    for (size_t i = 0; i < count && !failed(s); i++) {
         uint8_t nibs[64];
         key_nibbles(keys[i], key_lens[i], nibs);
         int ex = 0;
         nd = put_node(s, nd, nibs, 64, vals[i], val_lens[i], &ex);
         if (existed_out) existed_out[i] = (uint8_t)ex;
     }
-    if (!s->missing) store_node(s, &nd, new_root);
+    if (!failed(s)) store_node(s, &nd, new_root);
     free_node(&nd);
     return op_end(s, 0);
 }
@@ -1503,13 +1525,13 @@ int mp_db_delete_key(mp_store_t *s, const uint8_t root[32],
     uint8_t nibs[64];
     key_nibbles(key, key_len, nibs);
     nd = delete_node(s, nd, nibs, 64);
-    if (!s->missing) store_node(s, &nd, new_root);
+    if (!failed(s)) store_node(s, &nd, new_root);
     free_node(&nd);
     return op_end(s, 0);
 }
 
 int mp_db_tick(mp_store_t *s) {
-    pthread_mutex_lock(&s->lock);
+    op_begin(s);
     int rc = 0;
     if (++s->ticks >= s->flush_every) {
         rc = store_flush(s);
@@ -1520,7 +1542,7 @@ int mp_db_tick(mp_store_t *s) {
 }
 
 int mp_db_flush(mp_store_t *s) {
-    pthread_mutex_lock(&s->lock);
+    op_begin(s);
     int rc = store_flush(s);
     s->ticks = 0;
     pthread_mutex_unlock(&s->lock);
@@ -1546,7 +1568,16 @@ int mp_db_insert_node(mp_store_t *s, const uint8_t hash[32],
 }
 
 int mp_db_delete_node(mp_store_t *s, const uint8_t hash[32]) {
-    pthread_mutex_lock(&s->lock);
+    op_begin(s);
+    if (s->ldb) {
+        char *err = NULL;
+        leveldb_delete(s->ldb, s->wo, (const char *)hash, 32, &err);
+        if (err) {
+            store_error(s, "LevelDB delete", err);
+            leveldb_free(err);
+            return op_end(s, -1);
+        }
+    }
     store_entry_t *e = store_find(s, hash);
     if (e) {
         if (e->state == ENTRY_PENDING) {
@@ -1564,13 +1595,7 @@ int mp_db_delete_node(mp_store_t *s, const uint8_t hash[32]) {
         s->count--;
         s->tombs++;
     }
-    if (s->ldb) {
-        char *err = NULL;
-        leveldb_delete(s->ldb, s->wo, (const char *)hash, 32, &err);
-        if (err) leveldb_free(err);
-    }
-    pthread_mutex_unlock(&s->lock);
-    return 0;
+    return op_end(s, 0);
 }
 
 /* Paths are at most this many nibbles: a hashed key, or a raw key of up to
@@ -1831,7 +1856,10 @@ int mp_db_get_proof(mp_store_t *s, const uint8_t root[32],
     *val_len_out = 0;
     /* The key is used as given (unhashed), the layout of transaction and
      * receipt tries. */
-    if (key_len * 2 > MAX_PATH) return op_end(s, -3);
+    if (key_len > MAX_PATH / 2) {
+        store_error(s, "get proof", "key exceeds 64 bytes");
+        return op_end(s, -3);
+    }
     uint8_t nibs[MAX_PATH];
     size_t klen = key_len * 2;
     for (size_t i = 0; i < key_len; i++) {
@@ -1846,12 +1874,12 @@ int mp_db_get_proof(mp_store_t *s, const uint8_t root[32],
         if (ref.type == REF_HASH) {
             size_t len;
             const uint8_t *bytes = store_get(s, ref.data, &len);
-            if (!bytes) { s->missing = 0; break; }
+            if (!bytes) break;
             int rc = fn(ctx, bytes, len);
             if (rc) return op_end(s, rc);
-            nd = decode_rlp(bytes, len);
+            nd = decode_rlp(s, bytes, len, ref.data);
         } else if (ref.type == REF_INLINE) {
-            nd = decode_rlp(ref.data, ref.data_len);
+            nd = decode_rlp(s, ref.data, ref.data_len, NULL);
         } else {
             break;
         }
@@ -1915,6 +1943,10 @@ void mp_db_overlay_end(mp_store_t *s) {
 
 void mp_db_missing_hash(const mp_store_t *s, uint8_t hash_out[32]) {
     memcpy(hash_out, s->missing_hash, 32);
+}
+
+const char *mp_db_error(const mp_store_t *s) {
+    return s->error;
 }
 
 void mp_free(void *ptr) {

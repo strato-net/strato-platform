@@ -10,7 +10,9 @@ import Blockchain.Data.RLP
 import "merkle-patricia-db" Blockchain.Database.MerklePatricia as HS
 import qualified "merkle-patricia-db-baremetal" Blockchain.Database.MerklePatricia as C
 import qualified Blockchain.Database.MerklePatriciaNative as N
-import Control.Exception (bracket)
+import Control.Exception (bracket, throwIO)
+import Data.List (isInfixOf)
+import System.IO.Error (ioeGetErrorString)
 import Control.Monad (foldM, forM)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString as B
@@ -70,6 +72,35 @@ main = hspec $ do
         (_, e2) <- C.putKeyValExisted sr1 (key 0x01) (rlpEncode (2 :: Integer))
         return (e1, e2)
       (ex1, ex2) `shouldBe` (False, True)
+
+  describe "failure propagation" $ do
+    it "throws IO exceptions with the malformed node hash and decoding reason" $
+      bracket N.openMemory N.close $ \h -> do
+        let hash = B.replicate 32 0x11
+        N.insertNode h hash (B.singleton 0xff)
+        N.getKeyVal h hash "key" `shouldThrow`
+          (\e -> "decode trie node 11111111" `isInfixOf` ioeGetErrorString e)
+
+    it "rethrows the original fetcher exception after returning from C" $
+      bracket N.openMemory N.close $ \h -> do
+        N.setFetcher h (Just (\_ -> throwIO (userError "fetch test failure")))
+        N.getKeyVal h (B.replicate 32 0x22) "key" `shouldThrow`
+          (\e -> ioeGetErrorString e == "fetch test failure")
+        N.setFetcher h Nothing
+        N.getKeyVal h (B.replicate 32 0x22) "key" `shouldReturn` Left (B.replicate 32 0x22)
+
+    it "keeps fetcher callbacks independent between stores" $
+      bracket N.openMemory N.close $ \a -> bracket N.openMemory N.close $ \b -> do
+        N.setFetcher a (Just (\_ -> throwIO (userError "first store")))
+        N.setFetcher b (Just (\_ -> pure Nothing))
+        N.getKeyVal a (B.replicate 32 0x22) "key" `shouldThrow`
+          (\e -> ioeGetErrorString e == "first store")
+        N.getKeyVal b (B.replicate 32 0x22) "key" `shouldReturn` Left (B.replicate 32 0x22)
+
+    it "reports missing proof nodes rather than returning an incomplete proof" $
+      bracket N.openMemory N.close $ \h -> do
+        let hash = B.replicate 32 0x33
+        N.getProof h hash "key" `shouldReturn` Left hash
 
   describe "C store over LevelDB" $ do
     it "nodes survive flush, close and a cold reopen" $ do
