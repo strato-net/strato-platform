@@ -60,7 +60,6 @@ import qualified Data.ByteString.Char8                 as BS8
 import           Data.Conduit
 import           Data.List                             hiding (insert, lookup)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Debug.Trace                           (trace)
@@ -250,13 +249,17 @@ handleEvents peer = awaitForever $ \case
 
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
 
-    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+    mCurrentSyncTask <- lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
 
-    maybeFetchNumber <-
+    maybeFetchNumber <- case mCurrentSyncTask of
+      -- Requested while holding no task (tip-following recovery, or the task
+      -- was marked NotReady meanwhile): nothing to account them to or continue.
+      Nothing -> return Nothing
+      Just currentSyncTask ->
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
@@ -282,9 +285,8 @@ handleEvents peer = awaitForever $ \case
         Nothing ->
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
         Just (task, fetchNumber) | fetchNumber <= worldNumber -> syncFetchTask task fetchNumber
-        _ -> do
-          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
-          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
+        Just (task, _) -> do
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad task) ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
           lift $ setSyncTaskNotReady (pPeerHost peer)
       else do
         yieldR $ GetBlockBodies bodyHashes'

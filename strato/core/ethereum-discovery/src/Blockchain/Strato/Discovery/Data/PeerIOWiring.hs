@@ -101,34 +101,32 @@ instance MonadIO m => HasPeerDB m where
 
   updateTcpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. enableTime]
+      SQL.updateWhere (thisPeer peer ++ [PPeerEnableTime SQL.<. enableTime]) [PPeerEnableTime SQL.=. enableTime]
 
   updateUdpPort peer (UDPPort pn) = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpPort SQL.=. pn]
 
-  updatePeerDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    -- The TCP deadline never moves closer (see disableTCPPeerForSeconds); the
-    -- backoff bookkeeping is updated regardless.
+  updatePeerDisable peer d = do
     let selector = thisPeer peer
-        setTcpEnableTime enableTime =
-          SQL.updateWhere (selector ++ [PPeerEnableTime SQL.<. enableTime]) [PPeerEnableTime SQL.=. enableTime]
-    flip runSqlPool sqldb $ case d of
-      ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor -> do
+        TcpEnableTime enableTime = case d of
+          ExtendPeerDisableTime t _ -> t
+          SetPeerDisableTime t _ _ -> t
+    liftIO $ withGlobalSQLPool $ \sqldb -> flip runSqlPool sqldb $ case d of
+      ExtendPeerDisableTime _ nextDisableWindowFactor ->
         SQL.updateWhere
           selector
           [ PPeerUdpEnableTime SQL.=. enableTime,
             PPeerNextDisableWindowSeconds SQL.*=. nextDisableWindowFactor
           ]
-        setTcpEnableTime enableTime
-      SetPeerDisableTime (TcpEnableTime enableTime) nextDisableWindow disableExpiration -> do
+      SetPeerDisableTime _ nextDisableWindow disableExpiration ->
         SQL.updateWhere
           selector
           [ PPeerUdpEnableTime SQL.=. enableTime,
             PPeerNextDisableWindowSeconds SQL.=. nextDisableWindow,
             PPeerDisableExpiration SQL.=. disableExpiration
           ]
-        setTcpEnableTime enableTime
+    updateTcpEnableTime peer enableTime
   updatePeerUdpDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     currentTime <- liftIO getCurrentTime
