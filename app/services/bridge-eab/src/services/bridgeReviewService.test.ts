@@ -339,10 +339,6 @@ test("deposit refund processing is quiet until a Safe action or confirmed refund
   records.nativeDeposits[0].value.refundEvidenceHash = hash;
   await service.notifyBridgeReviews();
   await service.notifyBridgeReviews();
-  assert.equal(sent.length, 3, "governance confirmation gets one new action email");
-  assert.equal(sent[2].item.safeProposalHash, undefined);
-  assert.equal(sent[2].item.refundEvidenceHash, hash);
-  assert.deepEqual(sent[2].item.actions, ["confirm_refund"]);
-  assert.equal(sent[2].resolved, false);
+  assert.equal(sent.length, 2, "automated confirmation creates no governance action email");
 
 });

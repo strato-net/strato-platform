@@ -327,7 +327,7 @@ test("recovery vote parsing binds the correct contract shape and preserves large
   assert.throws(() => parseBridgeReviewIssue("authorizeDepositDelivery", ["a".repeat(64)]), /arguments/);
 });
 
-test("native refund confirmation requires recorded evidence and tracks votes for that exact hash", async t => {
+test("native refund confirmation remains automated after recorded evidence", async t => {
   const { state, operations } = setup(t);
   const id = "e".repeat(64), key = `native:deposit:${id}:`;
   state.tables["/BlockApps-StratoNativeBridge-deposits"] = [{ key: id, value: {
@@ -337,26 +337,13 @@ test("native refund confirmation requires recorded evidence and tracks votes for
   } }];
   await assert.rejects(prepareAdminBridgeReview("token", key, "confirm_refund"), /unavailable/);
   state.tables["/BlockApps-StratoNativeBridge-depositRefundEvidence"] = [{ key: id, value: hash }];
-  const vote = await prepareAdminBridgeReview("token", key, "confirm_refund");
-  assert.deepEqual(vote, { target: address, func: "finalizeDepositRefund", args: [id, hash] });
-  assert.deepEqual(parseBridgeReviewIssue(vote.func, vote.args), { id: key, action: "confirm_refund", refundEvidenceHash: hash.slice(2) });
-  assert.throws(() => parseBridgeReviewIssue(vote.func, [id, "0x1234"]), /Invalid/);
-  assert.throws(() => parseBridgeReviewIssue(vote.func, [id, "0".repeat(64)]), /Invalid/);
-  const registry = `/${constants.AdminRegistry}`, issueId = "f".repeat(64);
-  state.tables[registry] = [{ defaultVotingThresholdBps: 10000 }];
-  state.tables[`${registry}-admins`] = [{ key: "0", value: address }];
-  state.tables[`${registry}-currentIssues`] = [{ key: issueId, value: true }];
-  state.tables[`${registry}-IssueCreated`] = [{ issueId, target: address, func: vote.func, args: vote.args }];
-  state.tables[`${registry}-votes`] = [{ key: issueId, key2: "0", value: address }];
-  let item = (await getAdminBridgeReviews("token", address)).find(item => item.id === key)!;
-  assert.equal(item.governance?.confirm_refund?.hasVoted, true);
+  const item = (await getAdminBridgeReviews("token", address)).find(item => item.id === key)!;
+  assert.deepEqual(item.actions, []);
+  assert.equal(item.governance, undefined);
+  assert.equal(item.refundEvidenceHash, hash);
   assert.equal(item.refundRedemptionId, "9007199254740993123456789");
   assert.equal(item.refundBridge, address);
-  assert.equal(item.recoveryStatus, "refund_pending", "votes are not proof of completed finalization");
-  state.tables["/BlockApps-StratoNativeBridge-depositRefundEvidence"][0].value = digest;
-  item = (await getAdminBridgeReviews("token", address)).find(item => item.id === key)!;
-  assert.equal(item.governance?.confirm_refund?.votesCast, 0, "old proof votes cannot approve a new hash");
-  state.tables["/BlockApps-StratoNativeBridge-deposits"][0].value.bridgeStatus = "8";
+  assert.equal(item.recoveryStatus, "refund_pending", "evidence is not proof of completed finalization");
   await assert.rejects(prepareAdminBridgeReview("token", key, "confirm_refund"), /unavailable/);
   assert.equal(operations.mock.callCount(), 0, "preparation must not submit transactions");
 });

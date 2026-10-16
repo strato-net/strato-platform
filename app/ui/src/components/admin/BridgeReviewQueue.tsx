@@ -12,7 +12,7 @@ import { getBridgeReviewNextStep, getChainName } from '@/lib/bridge/utils';
 import { formatUnits, truncateAddress } from '@/utils/numberUtils';
 import { AlertCircle, ChevronDown, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 
-const actionLabels = { approve: 'Approve deposit / vote', reject: 'Reject — no funds received / vote', refund: 'Refund / vote', confirm_refund: 'Confirm refund / vote', cancel_withdrawal: 'Request cancellation / vote', confirm_cancellation: 'Verify cancellation and refund / vote' };
+const actionLabels = { approve: 'Approve deposit / vote', reject: 'Reject — no funds received / vote', refund: 'Refund / vote', cancel_withdrawal: 'Request cancellation / vote', confirm_cancellation: 'Verify cancellation and refund / vote' };
 const reviewActionLabel = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction) =>
   action === 'refund' && item.kind !== 'withdrawal_refund' ? 'Reject and refund / vote'
     : action === 'approve' && item.kind === 'deposit_recovery' ? 'Complete delivery / vote' : actionLabels[action];
@@ -60,7 +60,7 @@ const BridgeReviewQueue = () => {
       const { data } = await api.post<BridgeReviewVote>('/bridge/admin/reviews/prepare', {
         id: selected.item.id, action: selected.action,
       });
-      if ((selected.action === 'confirm_refund' || selected.action === 'confirm_cancellation') && (data.func !== (selected.action === 'confirm_cancellation' ? 'refundCanceledWithdrawal' : 'finalizeDepositRefund') ||
+      if (selected.action === 'confirm_cancellation' && (data.func !== 'refundCanceledWithdrawal' ||
           data.args[0] !== selected.item.reference || data.args[1]?.replace(/^0x/i, '').toLowerCase() !== selected.item.refundEvidenceHash?.replace(/^0x/i, '').toLowerCase())) {
         setError('Refund evidence changed. Refresh the queue and review the new transaction before voting.');
         return;
@@ -160,9 +160,9 @@ const BridgeReviewQueue = () => {
               : progress.hasVoted ? 'Awaiting votes from other STRATO admins' : 'STRATO admins: remaining votes required';
             return <div key={action} className="space-y-1">
               <Button variant="outline" size="sm" disabled={!!disabled} onClick={() => { setError(''); setNoFundsConfirmed(false); setSelected({ item, action }); }}>
-                {pending ? quorum ? 'Execution submitted' : 'Vote submitted' : quorum ? `Execute ${action === 'cancel_withdrawal' ? 'cancellation request' : action === 'confirm_cancellation' ? 'verified cancellation refund' : action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : action === 'confirm_refund' ? 'refund confirmation' : item.kind === 'withdrawal_refund' ? 'refund' : 'return decision'}` : progress?.hasVoted ? 'You voted' : reviewActionLabel(item, action)}
+                {pending ? quorum ? 'Execution submitted' : 'Vote submitted' : quorum ? `Execute ${action === 'cancel_withdrawal' ? 'cancellation request' : action === 'confirm_cancellation' ? 'verified cancellation refund' : action === 'approve' ? 'approval' : action === 'reject' ? 'rejection' : item.kind === 'withdrawal_refund' ? 'refund' : 'return decision'}` : progress?.hasVoted ? 'You voted' : reviewActionLabel(item, action)}
               </Button>
-              {progress && <p className="text-xs text-muted-foreground">{action === 'cancel_withdrawal' ? 'Cancellation' : action === 'confirm_cancellation' ? 'Cancellation refund' : action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : action === 'confirm_refund' ? 'Refund confirmation' : 'Refund'}: {progress.votesCast} of {progress.votesRequired} votes{progress.hasVoted ? ' · You voted' : ''} · {nextVoteStep}</p>}
+              {progress && <p className="text-xs text-muted-foreground">{action === 'cancel_withdrawal' ? 'Cancellation' : action === 'confirm_cancellation' ? 'Cancellation refund' : action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : 'Refund'}: {progress.votesCast} of {progress.votesRequired} votes{progress.hasVoted ? ' · You voted' : ''} · {nextVoteStep}</p>}
               {pending && <p role="status" className="text-xs text-muted-foreground">Waiting for indexed status…</p>}
             </div>;
           })}
@@ -213,7 +213,6 @@ const BridgeReviewQueue = () => {
         <DialogHeader><DialogTitle>{selected && reviewActionLabel(selected.item, selected.action)}</DialogTitle><DialogDescription>
           {selected?.action === 'cancel_withdrawal' ? 'Before requesting cancellation, open Safe and verify that the mint proposal was rejected, replaced, or must not be executed. If it executed successfully, do not cancel. This stops normal withdrawal processing and requests permanent cancellation of its mint identity on the external bridge. Safe signers must execute the cancellation. Escrow remains locked until STRATO governance verifies the confirmed cancellation.'
             : selected?.action === 'confirm_cancellation' ? 'Independently verify the successful NativeMintCanceled transaction on the destination bridge, its source STRATO chain, source bridge, withdrawal ID and required confirmations. The operator report alone is not proof. This vote returns STRATO escrow; never approve it if the external mint occurred.'
-            : selected?.action === 'confirm_refund' ? 'Independently verify this transaction on the source network: successful execution, sufficient confirmations, the original bridge and redemption ID, representation token, sender and exact amount. The hash is an operator report, not independent proof. This vote marks the refund completed; it does not send funds.'
             : selected?.action === 'reject' ? 'Use this only after verifying that no external funds were received for this deposit (or no valid external burn occurred for a native redemption). This closes the record without crediting STRATO assets or issuing a refund. An unavailable RPC or missing index entry is not evidence that no funds were received.'
             : selected?.action === 'refund' ? selected.item.kind === 'withdrawal_refund'
               ? 'Verifier checks are complete. STRATO admin approval is now required to return the escrowed tokens to the user’s STRATO wallet. The contract rechecks verifier confirmation when the refund executes.'
@@ -221,21 +220,17 @@ const BridgeReviewQueue = () => {
             : selected?.item.kind === 'deposit_recovery' ? 'Reopen this deposit for verified delivery on STRATO. This does not bypass custody checks, policy limits or verifier requirements. The original route and fallback protections still apply.'
             : 'Vote to authorize this recorded deposit. Settlement still requires valid custody evidence and verifier attestations. After approval, the bridge automatically retries settlement.'}
         </DialogDescription></DialogHeader>
-        {(selected?.action === 'refund' || selected?.action === 'confirm_refund') && selected.item.kind !== 'withdrawal_refund' && <div className="space-y-2 text-sm">
+        {selected?.action === 'refund' && selected.item.kind !== 'withdrawal_refund' && <div className="space-y-2 text-sm">
           <p className="flex items-center gap-2">Return to: {truncateAddress(selected.item.refundRecipient || '')}<CopyButton address={selected.item.refundRecipient || ''} /></p>
           <p className="flex items-center gap-2">Original asset: {truncateAddress(selected.item.refundToken || '')}<CopyButton address={selected.item.refundToken || ''} /></p>
           <p>Amount (raw units): {selected.item.refundAmount}</p>
-          {selected.action === 'confirm_refund' && <>
-            <p className="flex items-center gap-2">External bridge: {truncateAddress(selected.item.refundBridge || '')}<CopyButton address={selected.item.refundBridge || ''} /></p>
-            <p>Redemption ID: {selected.item.refundRedemptionId}</p>
-          </>}
           {selected.item.source === 'eab' && <p className="text-muted-foreground">Verify that the refund vault received the original deposit, especially if custody has since migrated. This decision cannot be changed back to delivery.</p>}
         </div>}
         {selected?.action === 'reject' && <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" checked={noFundsConfirmed} onChange={event => setNoFundsConfirmed(event.target.checked)} />
           I independently verified that no funds were received or valid native redemption burn occurred. No refund is due.
         </label>}
-        {(selected?.action === 'confirm_refund' || selected?.action === 'confirm_cancellation') && <p className="text-sm break-all">External transaction to verify: {selected.item.refundEvidenceHash}</p>}
+        {selected?.action === 'confirm_cancellation' && <p className="text-sm break-all">External transaction to verify: {selected.item.refundEvidenceHash}</p>}
         {selected && <p className="text-sm break-all">Reference: {selected.item.id}</p>}
         {selected?.action === 'refund' && selected.item.refundVault && <p className="text-sm break-all">External custody vault: {selected.item.refundVault}</p>}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

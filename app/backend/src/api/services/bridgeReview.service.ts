@@ -209,7 +209,7 @@ const enrichReviewGovernance = async (
       const batch = ids.slice(offset, offset + BRIDGE_REVIEW_ID_BATCH_SIZE);
       const events = await readReviewRows(accessToken, AdminRegistry, adminRegistry, "IssueCreated", {
         issueId: `in.(${batch.join(",")})`, target: `in.(${[externalAssetBridge, stratoNativeBridge].filter(Boolean).join(",")})`,
-        func: "in.(approveReviewedDeposit,rejectDepositNoFunds,abortDeposit,refundWithdrawal,authorizeDepositDelivery,reopenDeposit,requestDepositRefund,finalizeDepositRefund,requestWithdrawalCancellation,refundCanceledWithdrawal)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
+        func: "in.(approveReviewedDeposit,rejectDepositNoFunds,abortDeposit,refundWithdrawal,authorizeDepositDelivery,reopenDeposit,requestDepositRefund,requestWithdrawalCancellation,refundCanceledWithdrawal)", select: "issueId,target,func,args", order: "issueId.asc,block_number.desc",
       }) as unknown as Array<{ issueId: string; target: string; func: string; args: unknown }>;
       const matched = await Promise.all(events.map(async event => {
         if (!batch.includes(event.issueId)) return undefined;
@@ -321,7 +321,7 @@ const getAdminBridgeReviewItem = async (accessToken: string, id: string): Promis
 };
 
 export const prepareAdminBridgeReview = async (accessToken: string, id: string, action: string): Promise<BridgeReviewVote> => {
-  if (!["approve", "reject", "refund", "confirm_refund", "cancel_withdrawal", "confirm_cancellation"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
+  if (!["approve", "reject", "refund", "cancel_withdrawal", "confirm_cancellation"].includes(action)) throw new StratoError("Review action is unavailable; settlement is handled automatically by the bridge", 409);
   const item = await getAdminBridgeReviewItem(accessToken, id);
   if (!item || !item.actions.some(allowed => allowed === action)) throw new StratoError("Review action is unavailable; refresh the queue", 409);
   const target = item.source === "native" ? constants.stratoNativeBridge : constants.externalAssetBridge;
@@ -335,10 +335,6 @@ export const prepareAdminBridgeReview = async (accessToken: string, id: string, 
     if (item.source === "native") return { target, func: "rejectDepositNoFunds", args: [item.reference] };
     const [, , chainId, router, depositId] = id.split(":");
     return { target, func: "rejectDepositNoFunds", args: [chainId, `0x${router.replace(/^0x/i, "")}`, depositId] };
-  }
-  if (action === "confirm_refund") {
-    if (item.source !== "native" || !item.refundEvidenceHash) throw new StratoError("Native refund evidence is unavailable", 409);
-    return { target, func: "finalizeDepositRefund", args: [item.reference, item.refundEvidenceHash] };
   }
   if (item.source === "native") return { target, func: bridgeReviewFunction(item, action as "approve" | "refund"), args: [item.reference] };
   if (item.kind === "deposit_recovery" || (item.kind === "deposit_review" && action === "refund")) {

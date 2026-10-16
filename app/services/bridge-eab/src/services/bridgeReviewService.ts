@@ -103,6 +103,12 @@ export const notifyBridgeReviews = async (): Promise<void> => {
         }
         continue;
       }
+      if (item.source === "native" && item.recoveryStatus === "refund_pending" && item.refundEvidenceHash) {
+        if (saved[item.id] && JSON.stringify(saved[item.id]) !== JSON.stringify(item)) {
+          saved[item.id] = item; await persist();
+        }
+        continue;
+      }
       if (item.kind === "withdrawal_cancellation" && !item.safeProposalHash && !item.refundEvidenceHash) continue;
       if (item.kind === "withdrawal_review" && !normalizeOptionalHash(item.safeProposalHash)) continue;
       if (item.kind === "withdrawal_refund") {

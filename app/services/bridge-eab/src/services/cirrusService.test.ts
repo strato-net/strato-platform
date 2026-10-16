@@ -450,7 +450,7 @@ test("native refund evidence is indexed into the review queue without implying c
   const item = buildBridgeReviewQueue(await getBridgeReviewRecords()).find(item => item.source === "native")!;
   assert.equal(item.refundEvidenceHash, hash);
   assert.equal(item.recoveryStatus, "refund_pending");
-  assert.deepEqual(item.actions, ["confirm_refund"]);
+  assert.deepEqual(item.actions, []);
   assert.equal(await getNativeDepositRefundEvidence(key), hash);
   assert.equal((await getNativeWithdrawalById("7"))?.externalTxHash, hash);
   assert.equal(await getNativeWithdrawalById("8"), undefined);

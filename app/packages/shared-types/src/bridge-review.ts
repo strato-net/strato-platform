@@ -81,7 +81,7 @@ export const buildBridgeReviewQueue = (
           : refunding ? "The bridge is restoring the external representation."
           : recovery ? "Choose verified STRATO delivery, an external representation refund, or rejection when no burn occurred."
           : "Verify whether the external representation was burned and choose its disposition.",
-        actions: source === "native" ? refunding ? evidence ? ["confirm_refund"] : [] : recovery ? ["approve", "refund", "reject"] : ["refund", "reject"] : [],
+        actions: source === "native" ? refunding ? [] : recovery ? ["approve", "refund", "reject"] : ["refund", "reject"] : [],
         ...(evidence ? { refundEvidenceHash: evidence } : {}),
         ...(!evidence && refunding && nonzeroHash(v.refundProposalHash) ? { safeProposalHash: nonzeroHash(v.refundProposalHash) } : {}),
       });

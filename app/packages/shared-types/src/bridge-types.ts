@@ -281,7 +281,7 @@ export interface BridgeReviewRecords {
   legacyWithdrawals: BridgeReviewRow[];
 }
 
-export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "confirm_refund" | "cancel_withdrawal" | "confirm_cancellation";
+export type BridgeReviewGovernanceAction = "approve" | "reject" | "refund" | "cancel_withdrawal" | "confirm_cancellation";
 
 export interface BridgeReviewGovernance {
   issueId?: string;

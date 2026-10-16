@@ -58,7 +58,6 @@ export const getBridgeReviewNextStep = (item: BridgeReviewItem, votePending = fa
   if (item.kind === "withdrawal_refund") return "STRATO admins — vote to return the escrowed tokens.";
   if (item.kind === "withdrawal_cancellation") return "STRATO admins — verify the mint cancellation and vote to refund STRATO escrow.";
   if (item.kind === "withdrawal_review") return "STRATO admins — vote to request permanent mint cancellation.";
-  if (item.refundEvidenceHash) return "STRATO admins — verify the external refund and vote to confirm it.";
   return item.actions.includes("approve")
     ? "STRATO admins — choose verified delivery, refund, or rejection without refund."
     : "STRATO admins — choose refund for a valid burn or rejection when no burn occurred.";

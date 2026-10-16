@@ -29,7 +29,6 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, vote
   const state = []; let cursor = 0;
   const votes = [], requests = [];
   const item = { id: 'eab:withdrawal:2', reference: '2', source: 'eab', kind, chainId: '11155111', account: 'abc', token: 'def', amount: '100', reason: 'Review required', actions: kind === 'withdrawal_review' ? [] : [action], safeProposalHash: kind === 'withdrawal_review' ? 'a'.repeat(64) : undefined };
-  if (action === 'confirm_refund') { item.source = 'native'; item.recoveryStatus = 'refund_pending'; item.refundEvidenceHash = refundEvidenceHash; }
   item.governanceStatus = governanceStatus;
   item.approvalStatus = approvalStatus;
   item.refundStatus = refundStatus;
@@ -57,7 +56,7 @@ function harness({ kind = 'withdrawal_refund', action = 'refund', response, vote
   const render = () => { cursor = 0; return exports.default(); };
   const nodes = tree => !tree || typeof tree !== 'object' ? [] : Array.isArray(tree) ? tree.flatMap(nodes) : [tree, ...nodes(tree.props?.children)];
   const text = tree => !tree || typeof tree !== 'object' ? String(tree ?? '') : Array.isArray(tree) ? tree.map(text).join(' ') : text(tree.props?.children);
-  const select = () => nodes(render()).find(node => node.props?.children === (action === 'cancel_withdrawal' ? 'Request cancellation / vote' : action === 'confirm_cancellation' ? 'Verify cancellation and refund / vote' : action === 'confirm_refund' ? 'Confirm refund / vote' : action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject — no funds received / vote' : action === 'approve' ? kind === 'deposit_recovery' ? 'Complete delivery / vote' : 'Approve deposit / vote' : kind === 'withdrawal_refund' ? 'Refund / vote' : 'Reject and refund / vote')).props.onClick();
+  const select = () => nodes(render()).find(node => node.props?.children === (action === 'cancel_withdrawal' ? 'Request cancellation / vote' : action === 'confirm_cancellation' ? 'Verify cancellation and refund / vote' : action === 'settle' ? 'Settle approved deposit' : action === 'reject' ? 'Reject — no funds received / vote' : action === 'approve' ? kind === 'deposit_recovery' ? 'Complete delivery / vote' : 'Approve deposit / vote' : kind === 'withdrawal_refund' ? 'Refund / vote' : 'Reject and refund / vote')).props.onClick();
   const confirm = () => nodes(render()).find(node => node.type === 'Button' && text(node).includes(action === 'settle' ? 'Confirm settlement' : 'Confirm vote')).props.onClick();
   return { select, confirm, render, text, nodes, votes, requests };
 }
@@ -213,7 +212,7 @@ test('deposit and Safe stages name the next actor without requesting an unnecess
     [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'reopened' } }, /Bridge service — retry verification and STRATO delivery/],
     [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending' } }, /Bridge service — prepare and verify the external refund/],
     [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending', source: 'native', safeProposalHash: 'a'.repeat(64) } }, /Safe signers — execute the external refund proposal/],
-    [{ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: 'a'.repeat(64) }, /STRATO admins — verify the external refund and vote to confirm it/],
+    [{ kind: 'deposit_recovery', overrides: { actions: [], recoveryStatus: 'refund_pending', source: 'native', refundEvidenceHash: 'a'.repeat(64) } }, /Bridge service — continue automated processing/],
     [{ kind: 'withdrawal_review' }, /Safe signers — review and execute the mint proposal/],
     [{ kind: 'withdrawal_review', overrides: { safeProposalHash: undefined } }, /Bridge service — prepare the Safe mint proposal/],
     [{ kind: 'deposit_review', overrides: { actions: [], source: 'legacy' } }, /Bridge service — continue automated processing/],
@@ -342,23 +341,6 @@ test('deposit recovery presents delivery and return as distinct governance decis
   }
 });
 
-
-test('native refund confirmation shows proof, casts its exact vote and rejects changed proof', async () => {
-  const hash = '0x' + 'a'.repeat(64);
-  const response = { target: 'bridge', func: 'finalizeDepositRefund', args: ['2', hash] };
-  const h = harness({ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: hash, response });
-  h.select();
-  assert.match(h.text(h.render()), /Independently verify this transaction/);
-  assert.match(h.text(h.render()), new RegExp(hash));
-  assert.doesNotMatch(h.text(h.render()), /Reopen this deposit/);
-  await h.confirm();
-  assert.deepEqual(h.votes, [['bridge', response.func, response.args, true]]);
-  const changed = harness({ kind: 'deposit_recovery', action: 'confirm_refund', refundEvidenceHash: hash,
-    response: { ...response, args: ['2', '0x' + 'b'.repeat(64)] } });
-  changed.select(); await changed.confirm();
-  assert.equal(changed.votes.length, 0);
-  assert.match(changed.text(changed.render()), /Refund evidence changed/);
-});
 
 test('native cancellation refund cannot vote with changed external evidence', async () => {
   const hash = 'a'.repeat(64);

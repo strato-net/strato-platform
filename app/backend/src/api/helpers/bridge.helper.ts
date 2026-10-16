@@ -32,7 +32,7 @@ const bridgeIssueJson = JSONBig({ storeAsString: true });
 export const parseBridgePolicyJson = (raw: string): unknown => bridgeIssueJson.parse(raw);
 
 export const bridgeReviewFunction = (item: BridgeReviewItem, action: BridgeReviewGovernanceAction): string =>
-  action === "cancel_withdrawal" ? "requestWithdrawalCancellation" : action === "confirm_cancellation" ? "refundCanceledWithdrawal" : action === "confirm_refund" ? "finalizeDepositRefund" : action === "refund" ? item.kind === "withdrawal_refund" ? "refundWithdrawal" : "requestDepositRefund"
+  action === "cancel_withdrawal" ? "requestWithdrawalCancellation" : action === "confirm_cancellation" ? "refundCanceledWithdrawal" : action === "refund" ? item.kind === "withdrawal_refund" ? "refundWithdrawal" : "requestDepositRefund"
     : action === "reject" ? "rejectDepositNoFunds" : item.kind === "deposit_recovery"
       ? item.source === "native" ? "reopenDeposit" : "authorizeDepositDelivery" : "approveReviewedDeposit";
 
@@ -41,11 +41,6 @@ export const parseBridgeReviewIssue = (func: string, rawArgs: unknown): { id: st
     if ((typeof value === "number" && !Number.isSafeInteger(value)) || !/^\d+$/.test(String(value))) throw new Error("Invalid bridge governance identifier");
     return BigInt(String(value)).toString();
   };
-  if (func === "finalizeDepositRefund") {
-    const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
-    if (!Array.isArray(args) || args.length !== 2 || args.some(arg => typeof arg !== "string" || !/^(0x)?[a-f0-9]{64}$/i.test(arg) || /^(0x)?0+$/i.test(arg))) throw new Error("Invalid native refund confirmation arguments");
-    return { id: `native:deposit:${args[0]}:`, action: "confirm_refund", refundEvidenceHash: args[1].replace(/^0x/i, "").toLowerCase() };
-  }
   if (func === "requestWithdrawalCancellation" || func === "refundCanceledWithdrawal") {
     const args = typeof rawArgs === "string" ? bridgeIssueJson.parse(normalizeLegacyEscapes(rawArgs)) : rawArgs;
     if (!Array.isArray(args) || args.length !== (func === "requestWithdrawalCancellation" ? 1 : 2) || !/^[1-9][0-9]*$/.test(String(args[0])) ||
