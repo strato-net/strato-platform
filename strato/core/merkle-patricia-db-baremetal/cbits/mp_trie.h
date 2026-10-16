@@ -51,7 +51,7 @@ int mp_db_insert_node(mp_store_t *db, const uint8_t hash[32],
                    const uint8_t *data, size_t data_len);
 int mp_db_delete_node(mp_store_t *db, const uint8_t hash[32]);
 
-/* Walkers (not yet implemented; bodies are stubs). Callbacks return 0 to
+/* Walkers. Callbacks return 0 to
  * continue, non-zero to stop the walk; that value is returned. Keys are
  * passed as nibbles (one per byte). */
 

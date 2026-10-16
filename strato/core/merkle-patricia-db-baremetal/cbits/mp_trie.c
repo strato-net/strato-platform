@@ -3,6 +3,7 @@
  * Bit-exact with the Haskell merkle-patricia-db implementation.
  */
 
+#define _POSIX_C_SOURCE 200809L
 #include "mp_trie.h"
 #include <stdlib.h>
 #include <string.h>
@@ -276,6 +277,8 @@ struct mp_store {
     int overlay_depth;
     int missing;
     uint8_t missing_hash[32];
+    mp_fetch_fn fetch;
+    void *fetch_ctx;
     leveldb_t *ldb;
     leveldb_readoptions_t *ro;
     leveldb_writeoptions_t *wo;
@@ -373,9 +376,10 @@ void mp_empty_root(uint8_t root_out[32]) {
     memcpy(root_out, EMPTY_ROOT, 32);
 }
 
-/* Node bytes by hash: cache, then LevelDB (caching the hit).  The empty
- * trie's root is answered without a store.  NULL means missing; the hash is
- * recorded so the caller can report it. */
+/* Node bytes by hash: cache, then LevelDB (caching the hit), then the
+ * fetcher (keeping the node).  The empty trie's root is answered without a
+ * store.  NULL means missing; the hash is recorded so the caller can report
+ * it. */
 static const uint8_t *store_get(mp_store_t *s, const uint8_t key[32],
                                 size_t *vlen_out) {
     store_entry_t *e = store_find(s, key);
@@ -399,6 +403,18 @@ static const uint8_t *store_get(mp_store_t *s, const uint8_t key[32],
     if (memcmp(key, empty, 32) == 0) {
         *vlen_out = 1;
         return EMPTY_NODE_RLP;
+    }
+    if (s->fetch) {
+        uint8_t *buf = NULL;
+        size_t len = 0;
+        if (s->fetch(s->fetch_ctx, key, &buf, &len) == 0 && buf) {
+            uint8_t h[32];
+            mp_keccak256(h, buf, len);
+            int ok = memcmp(h, key, 32) == 0;
+            if (ok) store_put(s, key, buf, len);
+            free(buf);
+            if (ok) return store_get(s, key, vlen_out);
+        }
     }
     if (!s->missing) {
         s->missing = 1;
@@ -1386,7 +1402,13 @@ mp_store_t *mp_db_open(void *ldb, uint32_t capacity, uint32_t flush_every) {
         s->ro = leveldb_readoptions_create();
         s->wo = leveldb_writeoptions_create();
     }
-    pthread_mutex_init(&s->lock, NULL);
+    /* Recursive: a fetcher callback that touches the store on the same
+     * thread must not deadlock. */
+    pthread_mutexattr_t attr;
+    pthread_mutexattr_init(&attr);
+    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&s->lock, &attr);
+    pthread_mutexattr_destroy(&attr);
     return s;
 }
 
@@ -1551,32 +1573,332 @@ int mp_db_delete_node(mp_store_t *s, const uint8_t hash[32]) {
     return 0;
 }
 
-/* ---- Walkers and fetcher: stubs, not yet implemented ---- */
+/* Paths are at most this many nibbles: a hashed key, or a raw key of up to
+ * 64 bytes. */
+#define MAX_PATH 128
 
-int mp_db_for_each(mp_store_t *s, const uint8_t root[32],
-                   mp_kv_fn fn, void *ctx) {
-    (void)s; (void)root; (void)fn; (void)ctx;
-    return -1;
+static node_ref_t hash_ref(const uint8_t hash[32]) {
+    node_ref_t r;
+    r.type = REF_HASH;
+    memcpy(r.data, hash, 32);
+    r.data_len = 32;
+    return r;
 }
 
-int mp_db_diff(mp_store_t *s, const uint8_t root_a[32], const uint8_t root_b[32],
+/* ================================================================
+ * SECTION 13: Walks — foreach, diff, proof
+ * ================================================================ */
+
+static int walk_ref(mp_store_t *s, const node_ref_t *ref,
+                    uint8_t *path, size_t plen, mp_kv_fn fn, void *ctx);
+
+/* Depth-first, children 0..15 then the branch's own value: the order the
+ * Haskell trie lists key/values in. */
+static int walk_node(mp_store_t *s, const mp_node_t *nd,
+                     uint8_t *path, size_t plen, mp_kv_fn fn, void *ctx) {
+    switch (nd->type) {
+        case NODE_BRANCH:
+            for (int i = 0; i < 16; i++) {
+                if (is_empty_ref(&nd->branch.children[i])) continue;
+                if (plen >= MAX_PATH) return -3;
+                path[plen] = (uint8_t)i;
+                int rc = walk_ref(s, &nd->branch.children[i], path, plen + 1, fn, ctx);
+                if (rc) return rc;
+            }
+            if (nd->branch.value)
+                return fn(ctx, path, plen, nd->branch.value, nd->branch.value_len);
+            return 0;
+        case NODE_EXTENSION:
+            if (plen + nd->ext.nlen > MAX_PATH) return -3;
+            memcpy(path + plen, nd->ext.nibbles, nd->ext.nlen);
+            return walk_ref(s, &nd->ext.child, path, plen + nd->ext.nlen, fn, ctx);
+        case NODE_LEAF:
+            if (plen + nd->leaf.nlen > MAX_PATH) return -3;
+            memcpy(path + plen, nd->leaf.nibbles, nd->leaf.nlen);
+            return fn(ctx, path, plen + nd->leaf.nlen, nd->leaf.value, nd->leaf.value_len);
+        default:
+            return 0;
+    }
+}
+
+static int walk_ref(mp_store_t *s, const node_ref_t *ref,
+                    uint8_t *path, size_t plen, mp_kv_fn fn, void *ctx) {
+    mp_node_t nd = load_ref(s, ref);
+    int rc = s->missing ? MP_ERR_MISSING : walk_node(s, &nd, path, plen, fn, ctx);
+    free_node(&nd);
+    return rc;
+}
+
+int mp_db_for_each(mp_store_t *s, const uint8_t root[32], mp_kv_fn fn, void *ctx) {
+    op_begin(s);
+    uint8_t path[MAX_PATH];
+    node_ref_t r = hash_ref(root);
+    return op_end(s, walk_ref(s, &r, path, 0, fn, ctx));
+}
+
+/* Diff, as the Haskell trie does it: a node is viewed as 17 choices — its
+ * own value, then what sits under each of the 16 nibbles: nothing, a value,
+ * a reference to a child, or (for a shortcut node whose key has more than
+ * one nibble left) the rest of the shortcut.  Two tries are compared choice
+ * by choice; equal choices are skipped whole, different ones are entered. */
+
+#define CH_NONE  0
+#define CH_VALUE 1
+#define CH_REF   2
+#define CH_DATA  3
+
+typedef struct {
+    uint8_t kind;
+    node_ref_t ref;     /* CH_REF */
+    uint8_t *val;       /* CH_VALUE, owned */
+    size_t vlen;
+    mp_node_t data;     /* CH_DATA: a shortcut node with its key shortened, owned */
+} choice_t;
+
+static void choice_clear(choice_t *c) {
+    memset(c, 0, sizeof(*c));
+    c->kind = CH_NONE;
+}
+
+static void choice_free(choice_t *c) {
+    free(c->val);
+    if (c->kind == CH_DATA) free_node(&c->data);
+    choice_clear(c);
+}
+
+static void choices_free(choice_t cs[17]) {
+    for (int i = 0; i < 17; i++) choice_free(&cs[i]);
+}
+
+static choice_t ch_value(const uint8_t *v, size_t n) {
+    choice_t c;
+    choice_clear(&c);
+    c.kind = CH_VALUE;
+    c.val = dup_bytes(v, n);
+    c.vlen = n;
+    return c;
+}
+
+static choice_t ch_ref(node_ref_t r) {
+    choice_t c;
+    choice_clear(&c);
+    c.kind = CH_REF;
+    c.ref = r;
+    return c;
+}
+
+static int refs_equal(const node_ref_t *a, const node_ref_t *b) {
+    if (is_empty_ref(a) || is_empty_ref(b)) return is_empty_ref(a) && is_empty_ref(b);
+    return a->type == b->type && a->data_len == b->data_len &&
+           memcmp(a->data, b->data, a->data_len) == 0;
+}
+
+static int bytes_equal(const uint8_t *a, size_t alen, const uint8_t *b, size_t blen) {
+    return alen == blen && (alen == 0 || memcmp(a, b, alen) == 0);
+}
+
+static int choice_eq(const choice_t *a, const choice_t *b) {
+    if (a->kind != b->kind) return 0;
+    switch (a->kind) {
+        case CH_NONE:  return 1;
+        case CH_VALUE: return bytes_equal(a->val, a->vlen, b->val, b->vlen);
+        case CH_REF:   return refs_equal(&a->ref, &b->ref);
+        case CH_DATA:
+            if (a->data.type != b->data.type) return 0;
+            if (a->data.type == NODE_LEAF)
+                return nibs_equal(a->data.leaf.nibbles, a->data.leaf.nlen,
+                                  b->data.leaf.nibbles, b->data.leaf.nlen) &&
+                       bytes_equal(a->data.leaf.value, a->data.leaf.value_len,
+                                   b->data.leaf.value, b->data.leaf.value_len);
+            return nibs_equal(a->data.ext.nibbles, a->data.ext.nlen,
+                              b->data.ext.nibbles, b->data.ext.nlen) &&
+                   refs_equal(&a->data.ext.child, &b->data.ext.child);
+    }
+    return 0;
+}
+
+static void simplify_node(mp_store_t *s, const mp_node_t *nd, choice_t out[17]) {
+    for (int i = 0; i < 17; i++) choice_clear(&out[i]);
+    switch (nd->type) {
+        case NODE_BRANCH:
+            if (nd->branch.value) out[0] = ch_value(nd->branch.value, nd->branch.value_len);
+            for (int i = 0; i < 16; i++) out[1 + i] = ch_ref(nd->branch.children[i]);
+            return;
+        case NODE_EXTENSION:
+        case NODE_LEAF: {
+            int leaf = nd->type == NODE_LEAF;
+            const uint8_t *nibs = leaf ? nd->leaf.nibbles : nd->ext.nibbles;
+            size_t nlen = leaf ? nd->leaf.nlen : nd->ext.nlen;
+            if (nlen == 0) {
+                /* Not produced by this trie; a value here, or go on down. */
+                if (leaf) {
+                    out[0] = ch_value(nd->leaf.value, nd->leaf.value_len);
+                } else {
+                    mp_node_t child = load_ref(s, &nd->ext.child);
+                    simplify_node(s, &child, out);
+                    free_node(&child);
+                }
+                return;
+            }
+            uint8_t h = nibs[0];
+            if (nlen == 1) {
+                out[1 + h] = leaf ? ch_value(nd->leaf.value, nd->leaf.value_len)
+                                  : ch_ref(nd->ext.child);
+                return;
+            }
+            choice_t c;
+            choice_clear(&c);
+            c.kind = CH_DATA;
+            c.data.type = nd->type;
+            if (leaf) {
+                c.data.leaf.nibbles = dup_nibs(nibs + 1, nlen - 1);
+                c.data.leaf.nlen = (uint16_t)(nlen - 1);
+                c.data.leaf.value = dup_bytes(nd->leaf.value, nd->leaf.value_len);
+                c.data.leaf.value_len = nd->leaf.value_len;
+            } else {
+                c.data.ext.nibbles = dup_nibs(nibs + 1, nlen - 1);
+                c.data.ext.nlen = (uint16_t)(nlen - 1);
+                c.data.ext.child = nd->ext.child;
+            }
+            out[1 + h] = c;
+            return;
+        }
+        default:
+            return;
+    }
+}
+
+/* The 17 choices under a choice; nothing and a bare value have none. */
+static void enter(mp_store_t *s, const choice_t *c, choice_t out[17]) {
+    if (c->kind == CH_REF) {
+        mp_node_t nd = load_ref(s, &c->ref);
+        simplify_node(s, &nd, out);
+        free_node(&nd);
+    } else if (c->kind == CH_DATA) {
+        simplify_node(s, &c->data, out);
+    } else {
+        for (int i = 0; i < 17; i++) choice_clear(&out[i]);
+    }
+}
+
+static int diff_choice(mp_store_t *s, uint8_t *path, size_t plen,
+                       const choice_t *a, const choice_t *b,
+                       mp_diff_fn fn, void *ctx) {
+    if (a->kind == CH_NONE && b->kind == CH_VALUE)
+        return fn(ctx, 0, path, plen, NULL, 0, b->val, b->vlen);
+    if (a->kind == CH_VALUE && b->kind == CH_NONE)
+        return fn(ctx, 2, path, plen, a->val, a->vlen, NULL, 0);
+    if (a->kind == CH_VALUE && b->kind == CH_VALUE) {
+        if (bytes_equal(a->val, a->vlen, b->val, b->vlen)) return 0;
+        return fn(ctx, 1, path, plen, a->val, a->vlen, b->val, b->vlen);
+    }
+    if (choice_eq(a, b)) return 0;
+
+    choice_t ca[17], cb[17];
+    enter(s, a, ca);
+    enter(s, b, cb);
+    int rc = s->missing ? MP_ERR_MISSING : 0;
+    for (int i = 0; i < 17 && rc == 0; i++) {
+        if (i == 0) {
+            rc = diff_choice(s, path, plen, &ca[0], &cb[0], fn, ctx);
+        } else if (plen >= MAX_PATH) {
+            rc = -3;
+        } else {
+            path[plen] = (uint8_t)(i - 1);
+            rc = diff_choice(s, path, plen + 1, &ca[i], &cb[i], fn, ctx);
+        }
+    }
+    choices_free(ca);
+    choices_free(cb);
+    return rc;
+}
+
+int mp_db_diff(mp_store_t *s, const uint8_t a[32], const uint8_t b[32],
                mp_diff_fn fn, void *ctx) {
-    (void)s; (void)root_a; (void)root_b; (void)fn; (void)ctx;
-    return -1;
+    op_begin(s);
+    uint8_t path[MAX_PATH];
+    choice_t ca = ch_ref(hash_ref(a));
+    choice_t cb = ch_ref(hash_ref(b));
+    return op_end(s, diff_choice(s, path, 0, &ca, &cb, fn, ctx));
 }
 
 int mp_db_get_proof(mp_store_t *s, const uint8_t root[32],
                     const uint8_t *key, size_t key_len,
                     mp_bytes_fn fn, void *ctx,
                     uint8_t **val_out, size_t *val_len_out) {
-    (void)s; (void)root; (void)key; (void)key_len; (void)fn; (void)ctx;
+    op_begin(s);
     *val_out = NULL;
     *val_len_out = 0;
-    return -1;
+    /* The key is used as given (unhashed), the layout of transaction and
+     * receipt tries. */
+    if (key_len * 2 > MAX_PATH) return op_end(s, -3);
+    uint8_t nibs[MAX_PATH];
+    size_t klen = key_len * 2;
+    for (size_t i = 0; i < key_len; i++) {
+        nibs[i * 2]     = key[i] >> 4;
+        nibs[i * 2 + 1] = key[i] & 0x0F;
+    }
+    const uint8_t *k = nibs;
+    node_ref_t ref = hash_ref(root);
+
+    for (;;) {
+        mp_node_t nd;
+        if (ref.type == REF_HASH) {
+            size_t len;
+            const uint8_t *bytes = store_get(s, ref.data, &len);
+            if (!bytes) { s->missing = 0; break; }
+            int rc = fn(ctx, bytes, len);
+            if (rc) return op_end(s, rc);
+            nd = decode_rlp(bytes, len);
+        } else if (ref.type == REF_INLINE) {
+            nd = decode_rlp(ref.data, ref.data_len);
+        } else {
+            break;
+        }
+
+        int done = 1;
+        switch (nd.type) {
+            case NODE_BRANCH:
+                if (klen == 0) {
+                    if (nd.branch.value) {
+                        *val_out = dup_bytes(nd.branch.value, nd.branch.value_len);
+                        *val_len_out = nd.branch.value_len;
+                    }
+                } else {
+                    ref = nd.branch.children[k[0]];
+                    k++;
+                    klen--;
+                    done = 0;
+                }
+                break;
+            case NODE_LEAF:
+                if (nibs_equal(nd.leaf.nibbles, nd.leaf.nlen, k, klen)) {
+                    *val_out = dup_bytes(nd.leaf.value, nd.leaf.value_len);
+                    *val_len_out = nd.leaf.value_len;
+                }
+                break;
+            case NODE_EXTENSION:
+                if (nibs_is_prefix(nd.ext.nibbles, nd.ext.nlen, k, klen)) {
+                    ref = nd.ext.child;
+                    k += nd.ext.nlen;
+                    klen -= nd.ext.nlen;
+                    done = 0;
+                }
+                break;
+            default:
+                break;
+        }
+        free_node(&nd);
+        if (done) break;
+    }
+    return op_end(s, 0);
 }
 
 void mp_db_set_fetcher(mp_store_t *s, mp_fetch_fn fn, void *ctx) {
-    (void)s; (void)fn; (void)ctx;
+    pthread_mutex_lock(&s->lock);
+    s->fetch = fn;
+    s->fetch_ctx = ctx;
+    pthread_mutex_unlock(&s->lock);
 }
 
 void mp_db_overlay_begin(mp_store_t *s) {
