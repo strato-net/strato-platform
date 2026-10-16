@@ -123,7 +123,7 @@ viaC h op = attempt 0
           case mnd of
             Nothing -> error $ "merkle-patricia-db-baremetal: missing trie node " ++ show (StateRoot hash)
             Just nd -> do
-              let !() = runC n (N.nodePut h hash (rlpSerialize (rlpEncode nd)))
+              let !() = runC n (N.insertNode h hash (rlpSerialize (rlpEncode nd)))
               attempt (n + 1)
 
 -- | Raw bytes of a key; the trie hashes them itself.
@@ -153,7 +153,7 @@ putKeyValExisted ::
   Val ->
   m (StateRoot, Bool)
 putKeyValExisted sr@(StateRoot root) key val = case active sr of
-  Just h -> viaC h $ fmap (\(r, ex) -> (StateRoot r, or ex)) <$> N.putMany h root [(keyBytes key, rlpSerialize val)]
+  Just h -> viaC h $ fmap (\(r, ex) -> (StateRoot r, or ex)) <$> N.putManyKeyVal h root [(keyBytes key, rlpSerialize val)]
   Nothing -> unsafePutKeyValExisted sr (keyToSafeKey key) val
 
 {-# NOINLINE getKeyVal #-}
@@ -163,7 +163,7 @@ getKeyVal ::
   Key ->
   m (Maybe Val)
 getKeyVal sr@(StateRoot root) key = case active sr of
-  Just h -> viaC h $ fmap (fmap rlpDeserialize) <$> N.get h root (keyBytes key)
+  Just h -> viaC h $ fmap (fmap rlpDeserialize) <$> N.getKeyVal h root (keyBytes key)
   Nothing -> fmap snd . listToMaybe <$> unsafeGetKeyVals sr (keyToSafeKey key)
 
 {-# NOINLINE deleteKey #-}
@@ -173,7 +173,7 @@ deleteKey ::
   Key ->
   m StateRoot
 deleteKey sr@(StateRoot root) key = case active sr of
-  Just h -> viaC h $ fmap StateRoot <$> N.delete h root (keyBytes key)
+  Just h -> viaC h $ fmap StateRoot <$> N.deleteKey h root (keyBytes key)
   Nothing -> unsafeDeleteKey sr (keyToSafeKey key)
 
 keyExists ::

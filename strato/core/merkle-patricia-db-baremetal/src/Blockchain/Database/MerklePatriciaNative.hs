@@ -21,16 +21,16 @@ module Blockchain.Database.MerklePatriciaNative
     setActiveHandle,
 
     -- * Trie operations (Left = hash of a node nobody has)
-    get,
-    putMany,
-    delete,
+    getKeyVal,
+    putManyKeyVal,
+    deleteKey,
     tick,
     flush,
 
     -- * Raw nodes by hash
-    nodeGet,
-    nodePut,
-    nodeDelete,
+    lookupNode,
+    insertNode,
+    deleteNode,
 
     -- * Sandbox
     overlayBegin,
@@ -58,16 +58,16 @@ foreign import ccall unsafe "mp_db_open"
 foreign import ccall safe "mp_db_close"
   c_close :: Ptr () -> IO ()
 
-foreign import ccall safe "mp_db_get"
+foreign import ccall safe "mp_db_get_key_val"
   c_get :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> Ptr (Ptr Word8) -> Ptr CSize -> IO CInt
 
-foreign import ccall safe "mp_db_put_many"
+foreign import ccall safe "mp_db_put_many_key_val"
   c_put_many ::
     Ptr () -> Ptr Word8 -> CSize ->
     Ptr (Ptr Word8) -> Ptr CSize -> Ptr (Ptr Word8) -> Ptr CSize ->
     Ptr Word8 -> Ptr Word8 -> IO CInt
 
-foreign import ccall safe "mp_db_delete"
+foreign import ccall safe "mp_db_delete_key"
   c_delete :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> IO CInt
 
 foreign import ccall safe "mp_db_tick"
@@ -76,13 +76,13 @@ foreign import ccall safe "mp_db_tick"
 foreign import ccall safe "mp_db_flush"
   c_flush :: Ptr () -> IO CInt
 
-foreign import ccall safe "mp_db_node_get"
+foreign import ccall safe "mp_db_lookup_node"
   c_node_get :: Ptr () -> Ptr Word8 -> Ptr (Ptr Word8) -> Ptr CSize -> IO CInt
 
-foreign import ccall unsafe "mp_db_node_put"
+foreign import ccall unsafe "mp_db_insert_node"
   c_node_put :: Ptr () -> Ptr Word8 -> Ptr Word8 -> CSize -> IO CInt
 
-foreign import ccall safe "mp_db_node_delete"
+foreign import ccall safe "mp_db_delete_node"
   c_node_delete :: Ptr () -> Ptr Word8 -> IO CInt
 
 foreign import ccall unsafe "mp_db_overlay_begin"
@@ -142,8 +142,8 @@ result p rc ok
   | otherwise = Right <$> ok
 
 -- | Value bytes for a key under a root.
-get :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString (Maybe ByteString))
-get (MPHandle p) root key =
+getKeyVal :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString (Maybe ByteString))
+getKeyVal (MPHandle p) root key =
   withBS root $ \rootP _ -> withBS key $ \keyP keyN ->
     alloca $ \valPP -> alloca $ \valNP -> do
       rc <- c_get p rootP keyP keyN valPP valNP
@@ -157,8 +157,8 @@ get (MPHandle p) root key =
 
 -- | Insert key/value pairs under a root; the new root and, per pair,
 -- whether the key already had a value.
-putMany :: MPHandle -> ByteString -> [(ByteString, ByteString)] -> IO (Either ByteString (ByteString, [Bool]))
-putMany (MPHandle p) root kvs =
+putManyKeyVal :: MPHandle -> ByteString -> [(ByteString, ByteString)] -> IO (Either ByteString (ByteString, [Bool]))
+putManyKeyVal (MPHandle p) root kvs =
   withBS root $ \rootP _ ->
     withBSs (map fst kvs) $ \keys -> withBSs (map snd kvs) $ \vals ->
       allocaArray n $ \keyPs -> allocaArray n $ \keyNs ->
@@ -176,8 +176,8 @@ putMany (MPHandle p) root kvs =
   where
     n = length kvs
 
-delete :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString ByteString)
-delete (MPHandle p) root key =
+deleteKey :: MPHandle -> ByteString -> ByteString -> IO (Either ByteString ByteString)
+deleteKey (MPHandle p) root key =
   withBS root $ \rootP _ -> withBS key $ \keyP keyN -> allocaBytes 32 $ \newRoot -> do
     rc <- c_delete p rootP keyP keyN newRoot
     result p rc $ B.packCStringLen (castPtr newRoot, 32)
@@ -196,8 +196,8 @@ check what rc
   | otherwise = error ("mp_trie: " ++ what ++ " failed: " ++ show rc)
 
 -- | Raw node bytes by hash (cache, then LevelDB).
-nodeGet :: MPHandle -> ByteString -> IO (Maybe ByteString)
-nodeGet (MPHandle p) hash =
+lookupNode :: MPHandle -> ByteString -> IO (Maybe ByteString)
+lookupNode (MPHandle p) hash =
   withBS hash $ \hashP _ -> alloca $ \dataPP -> alloca $ \dataNP -> do
     rc <- c_node_get p hashP dataPP dataNP
     if rc /= 0
@@ -207,13 +207,13 @@ nodeGet (MPHandle p) hash =
         dataN <- peek dataNP
         Just <$> takeBS dataP dataN
 
-nodePut :: MPHandle -> ByteString -> ByteString -> IO ()
-nodePut (MPHandle p) hash bytes =
+insertNode :: MPHandle -> ByteString -> ByteString -> IO ()
+insertNode (MPHandle p) hash bytes =
   withBS hash $ \hashP _ -> withBS bytes $ \dataP dataN ->
     c_node_put p hashP dataP dataN >>= check "nodePut"
 
-nodeDelete :: MPHandle -> ByteString -> IO ()
-nodeDelete (MPHandle p) hash =
+deleteNode :: MPHandle -> ByteString -> IO ()
+deleteNode (MPHandle p) hash =
   withBS hash $ \hashP _ -> c_node_delete p hashP >>= check "nodeDelete"
 
 -- | Nodes created until the matching 'overlayEnd' are never written through.

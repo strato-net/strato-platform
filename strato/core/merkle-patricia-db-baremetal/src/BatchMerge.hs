@@ -34,7 +34,7 @@ putManyKeyValExisted ::
   [(Key, Val)] ->
   m (StateRoot, [Key])
 putManyKeyValExisted sr@(StateRoot root) kvs = case active sr of
-  Just h -> viaC h $ fmap existed <$> N.putMany h root [(keyBytes k, rlpSerialize v) | (k, v) <- kvs]
+  Just h -> viaC h $ fmap existed <$> N.putManyKeyVal h root [(keyBytes k, rlpSerialize v) | (k, v) <- kvs]
   Nothing -> HS.putManyKeyValExisted sr kvs
   where
     existed (root', flags) = (StateRoot root', [k | ((k, _), True) <- zip kvs flags])

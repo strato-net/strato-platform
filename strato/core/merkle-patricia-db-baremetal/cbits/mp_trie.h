@@ -26,16 +26,16 @@ void mp_empty_root(uint8_t root_out[32]);
 
 /* Keys are raw key bytes; the trie key is keccak256(key). Values are the
  * caller's already-serialized bytes. */
-int mp_db_get(mp_store_t *db, const uint8_t root[32],
+int mp_db_get_key_val(mp_store_t *db, const uint8_t root[32],
               const uint8_t *key, size_t key_len,
               uint8_t **val_out, size_t *val_len_out);
 
-int mp_db_put_many(mp_store_t *db, const uint8_t root[32], size_t count,
+int mp_db_put_many_key_val(mp_store_t *db, const uint8_t root[32], size_t count,
                    const uint8_t **keys, const size_t *key_lens,
                    const uint8_t **vals, const size_t *val_lens,
                    uint8_t new_root[32], uint8_t *existed_out);
 
-int mp_db_delete(mp_store_t *db, const uint8_t root[32],
+int mp_db_delete_key(mp_store_t *db, const uint8_t root[32],
                  const uint8_t *key, size_t key_len,
                  uint8_t new_root[32]);
 
@@ -45,11 +45,46 @@ int mp_db_flush(mp_store_t *db);
 
 /* Raw node access by hash, for the few readers that walk nodes themselves.
  * node_get returns a copy the caller frees with mp_free. */
-int mp_db_node_get(mp_store_t *db, const uint8_t hash[32],
+int mp_db_lookup_node(mp_store_t *db, const uint8_t hash[32],
                    uint8_t **data_out, size_t *data_len_out);
-int mp_db_node_put(mp_store_t *db, const uint8_t hash[32],
+int mp_db_insert_node(mp_store_t *db, const uint8_t hash[32],
                    const uint8_t *data, size_t data_len);
-int mp_db_node_delete(mp_store_t *db, const uint8_t hash[32]);
+int mp_db_delete_node(mp_store_t *db, const uint8_t hash[32]);
+
+/* Walkers (not yet implemented; bodies are stubs). Callbacks return 0 to
+ * continue, non-zero to stop the walk; that value is returned. Keys are
+ * passed as nibbles (one per byte). */
+
+/* forEach: every key/value under root. */
+typedef int (*mp_kv_fn)(void *ctx, const uint8_t *key_nibs, size_t key_nlen,
+                        const uint8_t *val, size_t val_len);
+int mp_db_for_each(mp_store_t *db, const uint8_t root[32],
+                   mp_kv_fn fn, void *ctx);
+
+/* dbDiff: the changes from the trie at root_a to the trie at root_b.
+ * op: 0 create (old NULL), 1 update, 2 delete (new NULL). */
+typedef int (*mp_diff_fn)(void *ctx, int op,
+                          const uint8_t *key_nibs, size_t key_nlen,
+                          const uint8_t *old_val, size_t old_len,
+                          const uint8_t *new_val, size_t new_len);
+int mp_db_diff(mp_store_t *db, const uint8_t root_a[32], const uint8_t root_b[32],
+               mp_diff_fn fn, void *ctx);
+
+/* getProof: walk root along a pre-encoded (unhashed) key, handing each
+ * hashed node's RLP to fn in root-to-leaf order. val_out is the value at
+ * the key (caller frees with mp_free) or NULL when absent. */
+typedef int (*mp_bytes_fn)(void *ctx, const uint8_t *data, size_t data_len);
+int mp_db_get_proof(mp_store_t *db, const uint8_t root[32],
+                    const uint8_t *key, size_t key_len,
+                    mp_bytes_fn fn, void *ctx,
+                    uint8_t **val_out, size_t *val_len_out);
+
+/* Fetcher for nodes the store lacks: asked for hash, returns 0 and a
+ * malloc'd copy of the node's RLP in *data_out (the store frees it), or
+ * non-zero when nobody has it. fn NULL clears. */
+typedef int (*mp_fetch_fn)(void *ctx, const uint8_t hash[32],
+                           uint8_t **data_out, size_t *data_len_out);
+void mp_db_set_fetcher(mp_store_t *db, mp_fetch_fn fn, void *ctx);
 
 /* Sandbox: while depth > 0 new nodes are scratch, never written through. */
 void mp_db_overlay_begin(mp_store_t *db);

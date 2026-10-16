@@ -1431,7 +1431,7 @@ static int load_root(mp_store_t *s, const uint8_t root[32], mp_node_t *out) {
     return 0;
 }
 
-int mp_db_get(mp_store_t *s, const uint8_t root[32],
+int mp_db_get_key_val(mp_store_t *s, const uint8_t root[32],
               const uint8_t *key, size_t key_len,
               uint8_t **val_out, size_t *val_len_out) {
     op_begin(s);
@@ -1451,7 +1451,7 @@ int mp_db_get(mp_store_t *s, const uint8_t root[32],
     return op_end(s, rc);
 }
 
-int mp_db_put_many(mp_store_t *s, const uint8_t root[32], size_t count,
+int mp_db_put_many_key_val(mp_store_t *s, const uint8_t root[32], size_t count,
                    const uint8_t **keys, const size_t *key_lens,
                    const uint8_t **vals, const size_t *val_lens,
                    uint8_t new_root[32], uint8_t *existed_out) {
@@ -1471,7 +1471,7 @@ int mp_db_put_many(mp_store_t *s, const uint8_t root[32], size_t count,
     return op_end(s, 0);
 }
 
-int mp_db_delete(mp_store_t *s, const uint8_t root[32],
+int mp_db_delete_key(mp_store_t *s, const uint8_t root[32],
                  const uint8_t *key, size_t key_len,
                  uint8_t new_root[32]) {
     op_begin(s);
@@ -1505,7 +1505,7 @@ int mp_db_flush(mp_store_t *s) {
     return rc;
 }
 
-int mp_db_node_get(mp_store_t *s, const uint8_t hash[32],
+int mp_db_lookup_node(mp_store_t *s, const uint8_t hash[32],
                    uint8_t **data_out, size_t *data_len_out) {
     op_begin(s);
     size_t len;
@@ -1516,14 +1516,14 @@ int mp_db_node_get(mp_store_t *s, const uint8_t hash[32],
     return op_end(s, 0);
 }
 
-int mp_db_node_put(mp_store_t *s, const uint8_t hash[32],
+int mp_db_insert_node(mp_store_t *s, const uint8_t hash[32],
                    const uint8_t *data, size_t data_len) {
     op_begin(s);
     store_put(s, hash, data, data_len);
     return op_end(s, 0);
 }
 
-int mp_db_node_delete(mp_store_t *s, const uint8_t hash[32]) {
+int mp_db_delete_node(mp_store_t *s, const uint8_t hash[32]) {
     pthread_mutex_lock(&s->lock);
     store_entry_t *e = store_find(s, hash);
     if (e) {
@@ -1549,6 +1549,34 @@ int mp_db_node_delete(mp_store_t *s, const uint8_t hash[32]) {
     }
     pthread_mutex_unlock(&s->lock);
     return 0;
+}
+
+/* ---- Walkers and fetcher: stubs, not yet implemented ---- */
+
+int mp_db_for_each(mp_store_t *s, const uint8_t root[32],
+                   mp_kv_fn fn, void *ctx) {
+    (void)s; (void)root; (void)fn; (void)ctx;
+    return -1;
+}
+
+int mp_db_diff(mp_store_t *s, const uint8_t root_a[32], const uint8_t root_b[32],
+               mp_diff_fn fn, void *ctx) {
+    (void)s; (void)root_a; (void)root_b; (void)fn; (void)ctx;
+    return -1;
+}
+
+int mp_db_get_proof(mp_store_t *s, const uint8_t root[32],
+                    const uint8_t *key, size_t key_len,
+                    mp_bytes_fn fn, void *ctx,
+                    uint8_t **val_out, size_t *val_len_out) {
+    (void)s; (void)root; (void)key; (void)key_len; (void)fn; (void)ctx;
+    *val_out = NULL;
+    *val_len_out = 0;
+    return -1;
+}
+
+void mp_db_set_fetcher(mp_store_t *s, mp_fetch_fn fn, void *ctx) {
+    (void)s; (void)fn; (void)ctx;
 }
 
 void mp_db_overlay_begin(mp_store_t *s) {
