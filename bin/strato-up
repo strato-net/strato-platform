@@ -13,16 +13,8 @@ FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
+ROLE="node"
 SETUP_ARGS=()
-
-# The spellings HFlags accepts for a Bool flag given as --flag=VALUE.
-is_true() {
-    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-        true|yes|1) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
 for arg in "$@"; do
     case "$arg" in
         # --patch-app was removed - inform the user. To be removed soon.
@@ -51,22 +43,15 @@ for arg in "$@"; do
         # and a validator keeps no SQL databases. strato-setup matches the value
         # case-insensitively, so it is lowercased here too.
         --role=*)
-            ROLE_FLAG="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
+            ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
             SETUP_ARGS+=("$arg")
             ;;
-        # Shorthand for --role=validator, understood by strato-setup too.
-        --validator|--validator=*)
-            if [[ "$arg" == "--validator" ]] || is_true "${arg#*=}"; then
-                VALIDATOR_FLAG="true"
-            fi
-            SETUP_ARGS+=("$arg")
-            ;;
-        # Shorthand for --role=api-node, understood by strato-setup too.
-        --apiNode|--apiNode=*)
-            if [[ "$arg" == "--apiNode" ]] || is_true "${arg#*=}"; then
-                APINODE_FLAG="true"
-            fi
-            SETUP_ARGS+=("$arg")
+        # There are no role shorthands. Refused here because strato-setup
+        # would not: its option parser takes --validator as an abbreviation of
+        # --validatorBehavior and sets up a full node.
+        --validator|--validator=*|--apiNode|--apiNode=*)
+            echo "Error: ${arg%%=*} is not a flag; pick the role with --role=validator or --role=api-node." >&2
+            exit 1
             ;;
         *)
             SETUP_ARGS+=("$arg")
@@ -75,31 +60,6 @@ for arg in "$@"; do
 done
 
 NODE_DIR="$1"
-
-if [[ "${VALIDATOR_FLAG:-}" == "true" && -n "${ROLE_FLAG:-}" && "$ROLE_FLAG" != "validator" ]]; then
-    echo "Note: --validator overrides --role=$ROLE_FLAG; setting up a validator."
-fi
-
-# --apiNode does not override: strato-setup refuses these combinations too,
-# but by then it has created the node directory, so fail before it runs.
-if [[ "${APINODE_FLAG:-}" == "true" && "${VALIDATOR_FLAG:-}" == "true" ]]; then
-    echo "Error: --apiNode and --validator name different roles; pass one of them." >&2
-    exit 1
-fi
-if [[ "${APINODE_FLAG:-}" == "true" && -n "${ROLE_FLAG:-}" && "$ROLE_FLAG" != "api-node" && "$ROLE_FLAG" != "node" ]]; then
-    echo "Error: --apiNode conflicts with --role=$ROLE_FLAG; pass one of them." >&2
-    exit 1
-fi
-
-# The role strato-setup will build, with its precedence (parseRole in
-# strato-init): --validator wins over --role whatever the argument order, and
-# --apiNode has been checked to agree with --role above.
-ROLE="${ROLE_FLAG:-node}"
-if [[ "${VALIDATOR_FLAG:-}" == "true" ]]; then
-    ROLE="validator"
-elif [[ "${APINODE_FLAG:-}" == "true" ]]; then
-    ROLE="api-node"
-fi
 
 if [[ "$FROM_SNAPSHOT" == "true" && "$ROLE" == "api" ]]; then
     echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2

@@ -27,37 +27,26 @@ module Blockchain.Init.Role
   )
 where
 
-import Blockchain.Init.Options (flags_apiNode, flags_role, flags_validator)
+import Blockchain.Init.Options (flags_role)
 import Data.Char (toLower)
 
 data Role = RoleNode | RoleCore | RoleApi | RoleValidator | RoleApiNode
   deriving (Eq, Show)
 
--- | From @--role@, or the shorthands @--validator@ and @--apiNode@; unknown
--- values and contradictory flags are a setup error, not a silent default.
+-- | From @--role@; an unknown value is a setup error, not a silent default.
 currentRole :: Role
-currentRole = either error id $ parseRole flags_role flags_validator flags_apiNode
+currentRole = either error id $ parseRole flags_role
 
--- | The role named by @--role@ and the shorthand flags @--validator@ and
--- @--apiNode@, in that order. @--validator@ wins over @--role@, as it always
--- has (strato-up notes the override). @--apiNode@ is stricter: given together
--- with @--validator@, or with a @--role@ other than @api-node@ or the default
--- @node@, it is an error rather than a guess.
-parseRole :: String -> Bool -> Bool -> Either String Role
-parseRole roleFlag validator apiNode
-  | validator && apiNode = Left "--validator and --apiNode name different roles; pass one of them"
-  | apiNode && named `notElem` ["node", "api-node"] = Left $ "--apiNode conflicts with --role=" ++ roleFlag ++ "; pass one of them"
-  | apiNode = Right RoleApiNode
-  | validator = Right RoleValidator
-  | otherwise = case named of
-      "node" -> Right RoleNode
-      "core" -> Right RoleCore
-      "api" -> Right RoleApi
-      "api-node" -> Right RoleApiNode
-      "validator" -> Right RoleValidator
-      other -> Left $ "Unknown --role " ++ show other ++ "; expected node, core, api, api-node or validator"
-  where
-    named = map toLower roleFlag
+-- | The role named by @--role@, matched case-insensitively. The flag is the
+-- only way to pick a role: there are no shorthand flags.
+parseRole :: String -> Either String Role
+parseRole roleFlag = case map toLower roleFlag of
+  "node" -> Right RoleNode
+  "core" -> Right RoleCore
+  "api" -> Right RoleApi
+  "api-node" -> Right RoleApiNode
+  "validator" -> Right RoleValidator
+  other -> Left $ "Unknown --role " ++ show other ++ "; expected node, core, api, api-node or validator"
 
 roleName :: Role -> String
 roleName RoleNode = "node"

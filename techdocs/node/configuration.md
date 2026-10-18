@@ -26,7 +26,7 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |
-| `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, `validator` (a lite validator with only the chain processes, their stores and apex) or `api-node` (a full node without the app, SMD and Swagger docs). `--validator` and `--apiNode` are shorthands for `--role=validator` and `--role=api-node`. See [Validator mode](#validator-mode) and [API node](#api-node). |
+| `--role` | `node` | What the directory runs: `node` (everything), `core`, `api`, `validator` (a lite validator with only the chain processes, their stores and apex) or `api-node` (a full node without the app, SMD and Swagger docs). See [Validator mode](#validator-mode) and [API node](#api-node). |
 | `--monitoring` | `true` | API node only: `false` drops the `prometheus` and `apex` containers, and with them `/health`. Refused with any other `--role`. See [API node](#api-node). |
 | `--publicStratoRpc` | `false` | Allow the `strato_*` simulation and trace methods on the public `/rpc` endpoint. |
 | `--generateKey` | `true` | During setup, create a node key in the Vault if none exists. When `false`, setup waits for the key to be inserted manually. |
@@ -136,7 +136,7 @@ Where these variables take effect:
 
 ## Validator mode
 
-`--role=validator`, or `--validator` for short, sets up a lite validator: a node that takes part in consensus and does nothing else.
+`--role=validator` sets up a lite validator: a node that takes part in consensus and does nothing else.
 
 ```bash
 make validator   # the executables plus the apex and prometheus images, nothing else
@@ -160,7 +160,7 @@ What doesn't: the app, SMD, nginx, PostgREST, Swagger docs, `slipstream` (so no 
 
 ## API node
 
-`--role=api-node`, or `--apiNode` for short, sets up a full node without the services that only serve people. It syncs and serves the chain and every API, and runs no app, SMD or Swagger docs.
+`--role=api-node` sets up a full node without the services that only serve people. It syncs and serves the chain and every API, and runs no app, SMD or Swagger docs.
 
 ```bash
 make api-node    # the executables plus the nginx, apex, prometheus and postgrest images; add local-auth for --localAuth

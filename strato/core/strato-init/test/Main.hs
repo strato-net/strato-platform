@@ -5,8 +5,8 @@
 -- @-M@ heap cap: the 60%-of-RAM cap aborted 8GB nodes mid-sync (2026-09-29);
 -- the ≤16GB tiers compact the oldest generation (@-c@) instead.
 --
--- Also pins how strato-setup reads @--role@ and its shorthand flags, and which
--- role may turn monitoring off.
+-- Also pins how strato-setup reads @--role@, and which roles may turn
+-- monitoring off or run local auth.
 module Main (main) where
 
 import Blockchain.Init.Role
@@ -89,27 +89,16 @@ main = hspec $ do
       parseMemInfoMB "no meminfo here" `shouldBe` Nothing
 
   describe "parseRole" $ do
-    it "--role names the role, case-insensitively" $ do
-      parseRole "node" False False `shouldBe` Right RoleNode
-      parseRole "core" False False `shouldBe` Right RoleCore
-      parseRole "api" False False `shouldBe` Right RoleApi
-      parseRole "api-node" False False `shouldBe` Right RoleApiNode
-      parseRole "API-Node" False False `shouldBe` Right RoleApiNode
-      parseRole "validator" False False `shouldBe` Right RoleValidator
-    it "rejects an unknown --role" $
-      parseRole "lite" False False `shouldSatisfy` isLeft
-    it "--validator is shorthand for --role=validator and wins over --role" $ do
-      parseRole "node" True False `shouldBe` Right RoleValidator
-      parseRole "core" True False `shouldBe` Right RoleValidator
-    it "--apiNode is shorthand for --role=api-node" $ do
-      parseRole "node" False True `shouldBe` Right RoleApiNode
-      parseRole "api-node" False True `shouldBe` Right RoleApiNode
-    it "--apiNode with --validator is an error, not a guess" $
-      parseRole "node" True True `shouldSatisfy` isLeft
-    it "--apiNode with another --role is an error, not a guess" $ do
-      parseRole "core" False True `shouldSatisfy` isLeft
-      parseRole "api" False True `shouldSatisfy` isLeft
-      parseRole "validator" False True `shouldSatisfy` isLeft
+    it "--role names one of the five roles, case-insensitively" $ do
+      parseRole "node" `shouldBe` Right RoleNode
+      parseRole "core" `shouldBe` Right RoleCore
+      parseRole "api" `shouldBe` Right RoleApi
+      parseRole "api-node" `shouldBe` Right RoleApiNode
+      parseRole "API-Node" `shouldBe` Right RoleApiNode
+      parseRole "validator" `shouldBe` Right RoleValidator
+    it "rejects an unknown --role" $ do
+      parseRole "lite" `shouldSatisfy` isLeft
+      parseRole "" `shouldSatisfy` isLeft
 
   describe "roleRunsLocalAuth" $
     it "a node or an api-node may run the local identity provider and Vault" $
