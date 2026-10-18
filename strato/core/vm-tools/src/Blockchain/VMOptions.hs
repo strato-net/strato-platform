@@ -7,6 +7,8 @@ module Blockchain.VMOptions
     flags_svmDev,
     flags_sqlDiff,
     flags_diffPublish,
+    flags_disableSqlIndexing,
+    flags_disableCirrusIndexing,
     flags_queryBlocks,
   )
 where
@@ -24,6 +26,8 @@ defineFlag
   \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
 defineFlag "diffPublish" False "publishes all state changes to kafka"
+defineFlag "disableSqlIndexing" False "Skip SQL indexing messages; keep blocks and best-block updates for Redis"
+defineFlag "disableCirrusIndexing" False "Skip Cirrus indexing messages; keep transaction results"
 defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"

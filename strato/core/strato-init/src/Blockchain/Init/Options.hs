@@ -109,6 +109,8 @@ defineFlag "stakingActivationBlock" (-1 :: Integer) "Block number from which sta
 -- VM config flags
 defineFlag "sqlDiff" (True :: Bool) "Update account state and storage in SQL DB (set false for faster sync)"
 defineFlag "diffPublish" (True :: Bool) "Publish state changes to streaming for indexer"
+defineFlag "disableSqlIndexing" (False :: Bool) "Skip VM SQL indexing messages; keep blocks and best-block updates for Redis"
+defineFlag "disableCirrusIndexing" (False :: Bool) "Skip VM Cirrus indexing messages; keep transaction results"
 
 -- Kafka log retention flags (defaults match Kafka's own defaults / the current
 -- generated config, so behavior is unchanged unless overridden). Nodes whose

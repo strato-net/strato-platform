@@ -18,7 +18,7 @@ import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
-import Blockchain.Init.Options (flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_syncFromFile, flags_validatorBehavior, flags_vmQuery, flags_writer)
+import Blockchain.Init.Options (flags_disableSqlIndexing, flags_disableCirrusIndexing, flags_ingressPort, flags_jsonrpc, flags_localAuth, flags_httpPort, flags_password, flags_pghost, flags_regenerate, flags_sslDir, flags_syncFromFile, flags_validatorBehavior, flags_vmQuery, flags_writer)
 import Blockchain.Init.Role
 import Blockchain.Init.RtsFlags
 import Control.Monad.Composable.Streaming.DockerConfig (brokerVolumeDirs)
@@ -136,6 +136,8 @@ createCommandsFile role = do
       , restartable "strato-p2p +RTS -T -RTS"
       , "strato-sequencer " ++ sequencerRts ++ followerFlag
       , "vm-runner " ++ vmRunnerRts
+          ++ (if flags_disableSqlIndexing then " --disableSqlIndexing" else "")
+          ++ (if flags_disableCirrusIndexing then " --disableCirrusIndexing" else "")
       , restartable ("strato-indexer" ++ (if flags_writer then "" else " --writer=false"))
       , restartable "slipstream +RTS -T -RTS"
       , restartable "strato-network-monitor"
