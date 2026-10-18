@@ -103,6 +103,7 @@ generateDockerComposeAllDocker = do
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", "${NODE_HOST:-}")
             , ("ssl", "${ssl:-false}")
+            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
