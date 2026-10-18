@@ -84,6 +84,7 @@
     "bufferutil": "^4.0.8"
   },
   "overrides": {
+    "@walletconnect/ethereum-provider": "2.23.10",
     "qr": "0.5.3"
   }
 }
