@@ -22,6 +22,9 @@ const {
 } = require("./rolloutNativeInspection");
 const { buildTransactionBuilderBatch } = require("./depositRouterSafeOps");
 const { getExternalBridgeNetwork } = require("./externalBridgeNetworks");
+const { withExplicitEabPolicy, withExplicitNativePolicy } = require("../prepareBridgeRollout");
+
+const DEFAULT_PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
 function scopeOf(context) {
   const scope = context.manifest.scope || "combined";
@@ -135,14 +138,45 @@ async function expandDraft(manifestPath, options = {}) {
   }
 }
 
-function initializeDraft(discovered, nodeUrl) {
+function initializeDraft(discovered, nodeUrl, env = process.env) {
   const chainId = Number(discovered.target.chainId);
   const network = getExternalBridgeNetwork(chainId);
+  const safeEnv = `CHAIN_${chainId}_SAFE_ADDRESS`;
+  const configuredSafe = env[safeEnv];
+  if (!ethers.isAddress(configuredSafe) || configuredSafe === ethers.ZeroAddress) {
+    throw new Error(`Set valid nonzero ${safeEnv} in app/ethereum/.env before init`);
+  }
+  const safeAddress = ethers.getAddress(configuredSafe);
+  const permit2Env = `CHAIN_${chainId}_PERMIT2_ADDRESS`;
+  const configuredPermit2 = env[permit2Env] || DEFAULT_PERMIT2_ADDRESS;
+  if (!ethers.isAddress(configuredPermit2) || configuredPermit2 === ethers.ZeroAddress) {
+    throw new Error(`Set valid nonzero ${permit2Env} in app/ethereum/.env`);
+  }
+  const permit2Address = ethers.getAddress(configuredPermit2);
+  const roleVariables = {
+    vaultDefaultAdminAddress: "VAULT_DEFAULT_ADMIN_ADDRESS",
+    vaultUpgraderAddress: "VAULT_UPGRADER_ADDRESS",
+    vaultPolicyAdminAddress: "VAULT_POLICY_ADMIN_ADDRESS",
+    guardianAddress: "GUARDIAN_ADDRESS",
+    vaultUnpauserAddress: "VAULT_UNPAUSER_ADDRESS",
+    vaultAttestationAdminAddress: "VAULT_ATTESTATION_ADMIN_ADDRESS",
+    largeWithdrawalApproverAddress: "LARGE_WITHDRAWAL_APPROVER_ADDRESS",
+  };
+  const roles = Object.fromEntries(Object.entries(roleVariables).map(([name, suffix]) => {
+    const envName = `CHAIN_${chainId}_${suffix}`;
+    const value = env[envName] || safeAddress;
+    if (!ethers.isAddress(value) || value === ethers.ZeroAddress) {
+      throw new Error(`Set valid nonzero ${envName} in app/ethereum/.env`);
+    }
+    return [name, ethers.getAddress(value)];
+  }));
   return {
     schemaVersion: 0,
     scope: "combined",
     discovery: {
       ...discovered,
+      eabRoutes: (discovered.eabRoutes || []).map(withExplicitEabPolicy),
+      nativeRoutes: (discovered.nativeRoutes || []).map(withExplicitNativePolicy),
       target: {
         ...discovered.target,
         externalDeployment: ".deployment/external/external-deployment.json",
@@ -151,17 +185,17 @@ function initializeDraft(discovered, nodeUrl) {
         bridgeOperator: "REVIEW_REQUIRED",
         guardian: "REVIEW_REQUIRED",
         settlementVerifiers: Array(network.verifierCount).fill("REVIEW_REQUIRED"),
-        safeAddress: "REVIEW_REQUIRED",
-        permit2Address: "REVIEW_REQUIRED",
+        safeAddress,
+        permit2Address,
         deploymentConfirmations: "REVIEW_REQUIRED",
-        roles: {
-          vaultDefaultAdminAddress: "REVIEW_REQUIRED",
-          vaultUpgraderAddress: "REVIEW_REQUIRED",
-          vaultPolicyAdminAddress: "REVIEW_REQUIRED",
-          guardianAddress: "REVIEW_REQUIRED",
-          vaultUnpauserAddress: "REVIEW_REQUIRED",
-          vaultAttestationAdminAddress: "REVIEW_REQUIRED",
-          largeWithdrawalApproverAddress: "REVIEW_REQUIRED",
+        roles,
+        nativeConfig: {
+          executor: "REVIEW_REQUIRED",
+          eabExecutor: "REVIEW_REQUIRED",
+          attestationSigners: Array(network.verifierCount).fill("REVIEW_REQUIRED"),
+          attestationThreshold: network.verifierThreshold,
+          maxAttestationValiditySeconds: "REVIEW_REQUIRED",
+          ...discovered.target.nativeConfig,
         },
       },
     },
@@ -179,19 +213,27 @@ function initializeDraft(discovered, nodeUrl) {
       bridgeHealthUrl: "REVIEW_REQUIRED",
       safeProposerAddress: "REVIEW_REQUIRED",
       executorAddress: "REVIEW_REQUIRED",
+      runtimeAccessAddress: "REVIEW_REQUIRED",
     },
   };
 }
 
 async function preflightDraft(draft, options = {}) {
-  if (JSON.stringify(draft).includes("REVIEW_REQUIRED")) {
-    throw new Error("Resolve every REVIEW_REQUIRED value in deployment.json");
-  }
   if (!["combined", "eab-only", "native-extension"].includes(draft.scope)) {
     throw new Error("scope must be combined, eab-only, or native-extension");
   }
   const includedEab = draft.discovery.eabRoutes?.filter(({ include }) => include);
   const includedNative = draft.discovery.nativeRoutes?.filter(({ include }) => include);
+  const reviewed = structuredClone(draft);
+  reviewed.discovery.eabRoutes = includedEab;
+  reviewed.discovery.nativeRoutes = includedNative;
+  if (draft.scope === "eab-only") {
+    delete reviewed.discovery.target.nativeRepresentationBridge;
+    delete reviewed.discovery.target.nativeConfig;
+  }
+  if (JSON.stringify(reviewed).includes("REVIEW_REQUIRED")) {
+    throw new Error("Resolve every REVIEW_REQUIRED value used by this rollout");
+  }
   if (draft.scope === "combined" && (!includedEab?.length || !includedNative?.length)) {
     throw new Error("combined scope requires included EAB and native routes");
   }
@@ -208,14 +250,25 @@ async function preflightDraft(draft, options = {}) {
       draft.authorizationSigners?.length !== network.verifierCount) {
     throw new Error(`Provide ${network.verifierCount} verifier endpoints and authorization signers`);
   }
-  if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0 ||
-      services.verifiers.some(verifier =>
-        !/^https:\/\//.test(verifier.url || "") ||
-        !Number.isSafeInteger(verifier.confirmations) ||
-        verifier.confirmations < services.confirmations) ||
+  const confirmations = Number(services.confirmations);
+  if (!Number.isSafeInteger(confirmations) || confirmations <= 0 ||
+      services.verifiers.some(verifier => {
+        const verifierConfirmations = Number(verifier.confirmations);
+        return !/^https:\/\//.test(verifier.url || "") ||
+          !Number.isSafeInteger(verifierConfirmations) ||
+          verifierConfirmations < confirmations;
+      }) ||
       !/^https:\/\//.test(services.bridgeHealthUrl || "")) {
     throw new Error("Review Runtime/verifier URLs and positive finality confirmations");
   }
+  const normalizedServices = {
+    ...services,
+    confirmations,
+    verifiers: services.verifiers.map(verifier => ({
+      ...verifier,
+      confirmations: Number(verifier.confirmations),
+    })),
+  };
   const target = draft.discovery.target;
   const addresses = [
     ...[target.externalAssetBridge, target.tokenRouter]
@@ -233,7 +286,7 @@ async function preflightDraft(draft, options = {}) {
     throw new Error("deploymentConfirmations must be a positive safe integer");
   }
   const context = {
-    manifest: { ...draft, services: { ...services, permit2Address: target.permit2Address } },
+    manifest: { ...reviewed, services: { ...normalizedServices, permit2Address: target.permit2Address } },
     settings: { sourceChainId: draft.discovery.source.stratoChainId },
     rollout: { chainId, vaultConfig: { chains: [{ safeAddress: target.safeAddress }] } },
   };
@@ -377,7 +430,12 @@ function writeBootstrapPackage(current, artifacts, context, includeNative) {
   const index = {
     format: "eab-infra-bootstrap",
     chainId: String(context.rollout.chainId),
-    application: { initialRunning: false },
+    application: {
+      initialRunning: false,
+      provisioningOnly: true,
+      requiresFinalConfiguration: true,
+      phase: "verifier-identities",
+    },
     files: entries,
     requiredReturn: [
       "verifierUrls",
@@ -401,7 +459,47 @@ function writeBootstrapPackage(current, artifacts, context, includeNative) {
   }
 }
 
-function generateBootstrap(manifestPath, options = {}) {
+function writeFoundationBootstrapPackage(current, chainId, includeNative, artifacts) {
+  const bridgeTemplate = artifacts.serviceTemplates.find(file =>
+    path.basename(file) === "bridge.env.template");
+  if (!bridgeTemplate) throw new Error("Foundation bootstrap did not generate bridge.env.template");
+  const entry = {
+    name: path.basename(bridgeTemplate),
+    sha256: digest(fs.readFileSync(bridgeTemplate, "utf8")),
+  };
+  const index = {
+    format: "eab-infra-bootstrap",
+    chainId: String(chainId),
+    application: {
+      initialRunning: false,
+      provisioningOnly: true,
+      requiresFinalConfiguration: true,
+      phase: "foundation-identities",
+    },
+    files: [entry],
+    requiredReturn: [
+      "settlementVerifierAddresses",
+      "safeProposerAddress",
+      "executorAddress",
+      "bridgeHealthUrl",
+      "runtimeAccessAddress",
+      ...(includeNative ? ["nativeExecutorAddress"] : []),
+    ],
+  };
+  fs.mkdirSync(current, { recursive: true, mode: 0o700 });
+  writeJson(path.join(current, "infra-bootstrap.json"), index);
+  const staging = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-bootstrap-foundation-"));
+  try {
+    writeJson(path.join(staging, "infra-bootstrap.json"), index);
+    fs.copyFileSync(bridgeTemplate, path.join(staging, entry.name));
+    execFileSync("tar", ["-czf", path.join(current, "infra-bootstrap.tar.gz"), "-C", staging,
+      "infra-bootstrap.json", entry.name]);
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+async function generateBootstrap(manifestPath, options = {}) {
   const current = path.join(path.dirname(manifestPath), ".deployment", "bootstrap");
   fs.rmSync(current, { recursive: true, force: true });
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-bootstrap-"));
@@ -411,10 +509,56 @@ function generateBootstrap(manifestPath, options = {}) {
       throw new Error("Native extension reuses the existing Runtime and verifier infrastructure; complete its reviewed identities and run preflight");
     }
     const includeNative = reviewedManifest.scope !== "eab-only" &&
-      !!reviewedManifest.inputs?.nativeRoutes?.length;
-    const context = options.context || bootstrapContext(manifestPath, work);
+      (!!reviewedManifest.inputs?.nativeRoutes?.length ||
+        reviewedManifest.discovery?.nativeRoutes?.some(route => route.include !== false));
+    const chainId = reviewedManifest.discovery?.target?.chainId ||
+      reviewedManifest.inputs?.externalDeployment?.chainId || options.context?.rollout?.chainId;
+    const settlementVerifiers = reviewedManifest.discovery?.target?.settlementVerifiers ||
+      reviewedManifest.settings?.settlementVerifiers || [];
+    const expectedVerifierCount = getExternalBridgeNetwork(chainId).verifierCount;
+    const foundationPhase = settlementVerifiers.length !== expectedVerifierCount ||
+      new Set(settlementVerifiers.map(value => String(value).toLowerCase())).size !== expectedVerifierCount ||
+      !settlementVerifiers.every(value => ethers.isAddress(value) && value !== ethers.ZeroAddress);
+    let bootstrapManifest = manifestPath;
+    if (!options.context && reviewedManifest.schemaVersion === 0) {
+      const draft = structuredClone(reviewedManifest);
+      const base = path.dirname(path.resolve(manifestPath));
+      for (const field of ["externalDeployment", "nativeDeployment"]) {
+        if (draft.discovery.target?.[field]) {
+          draft.discovery.target[field] = path.resolve(base, draft.discovery.target[field]);
+        }
+      }
+      for (const route of draft.discovery.nativeRoutes || []) {
+        if (route.deployment) route.deployment = path.resolve(base, route.deployment);
+      }
+      for (const route of draft.discovery.eabRoutes || []) {
+        if (route.include === false) continue;
+        route.routePolicy = {
+          ...route.routePolicy,
+          autoRouteEnabled: false,
+        };
+        route.tokenPolicy = { ...route.tokenPolicy, migrateAmount: "0" };
+      }
+      if (foundationPhase) {
+        draft.discovery.target.settlementVerifiers = Array.from(
+          { length: expectedVerifierCount },
+          (_, index) => `0x${(index + 1).toString(16).padStart(40, "0")}`);
+      }
+      bootstrapManifest = path.join(work, "deployment.json");
+      writeJson(bootstrapManifest, draft);
+      await expandDraft(bootstrapManifest, options);
+    }
+    const context = options.context || bootstrapContext(bootstrapManifest, work);
     const artifacts = (options.generate || generate)(context, path.join(work, "artifacts"));
     fs.mkdirSync(current, { recursive: true, mode: 0o700 });
+    if (foundationPhase) {
+      writeFoundationBootstrapPackage(current, chainId, includeNative, artifacts);
+      return {
+        status: "INFRA_FOUNDATION_BOOTSTRAP_GENERATED",
+        directory: current,
+        files: fs.readdirSync(current).sort(),
+      };
+    }
     writeBootstrapPackage(current, artifacts, context, includeNative);
     return {
       status: "INFRA_BOOTSTRAP_GENERATED",
@@ -579,10 +723,6 @@ async function main(argv = process.argv.slice(2), options = {}) {
   }
   let draft = readJson(manifestPath);
   if (args.command === "bootstrap") {
-    if (draft.schemaVersion === 0) {
-      await expandDraft(manifestPath, options);
-      draft = readJson(manifestPath);
-    }
     return generateBootstrap(manifestPath, options);
   }
   if (args.command === "preflight" && draft.schemaVersion === 0) {

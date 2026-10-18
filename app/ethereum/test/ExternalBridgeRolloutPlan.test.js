@@ -324,7 +324,7 @@ test("derives five production verifiers with a three-signature threshold", () =>
   assert.equal(generated.vaultTemplate.chains[0].attestationThreshold, 3);
 });
 
-test("rejects withdrawals, AUTO_ROUTE, and migration during finalization", () => {
+test("allows reviewed withdrawals but rejects AUTO_ROUTE and migration during finalization", () => {
   const baseRollout = buildSynchronizedRollout({
     depositPlan,
     bridgeTemplate,
@@ -341,14 +341,11 @@ test("rejects withdrawals, AUTO_ROUTE, and migration during finalization", () =>
     chainId: 11155111,
   });
   assert.equal(validateInitialRollout(baseRollout), baseRollout);
-  assert.throws(
-    () =>
-      validateInitialRollout({
-        ...baseRollout,
-        summary: { ...baseRollout.summary, withdrawalsEnabledCount: 1 },
-      }),
-    /withdrawal route disabled/,
-  );
+  assert.doesNotThrow(() =>
+    validateInitialRollout({
+      ...baseRollout,
+      summary: { ...baseRollout.summary, withdrawalsEnabledCount: 1 },
+    }));
   assert.throws(
     () =>
       validateInitialRollout({
@@ -606,12 +603,12 @@ test("prepare and finalize derive templates and enforce initial policy", () => {
   assert.equal(expected.tokens.get(tokenKey).permitted, true);
 });
 
-test("requires explicit mint limits and keeps activation validation fail closed", () => {
+test("requires explicit mint limits and keeps migration validation fail closed", () => {
   const input = structuredClone(policy);
   for (const route of Object.values(input.routes)) route.autoRouteEnabled = false;
   input.routes[Object.keys(input.routes)[0]].withdrawalsEnabled = true;
   const build = () => buildSynchronizedRollout({ depositPlan, bridgeTemplate, vaultTemplate, policy: input, chainId: 11155111 });
-  assert.throws(() => validateInitialRollout(build()), /withdrawal route disabled/);
+  assert.doesNotThrow(() => validateInitialRollout(build()));
   assert.doesNotThrow(() => validateInitialRollout(build(), { activation: true }));
   input.tokens[tokenKey].migrateAmount = "1";
   assert.throws(() => validateInitialRollout(build(), { activation: true }), /migrateAmount/);

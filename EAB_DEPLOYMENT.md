@@ -51,9 +51,23 @@ source "$ROLLOUT_DIR/deployment.env"
 set +a
 cd "$REPO_ROOT/app/ethereum"
 eval "$(npm run --silent network:environment)"
+printf 'TARGET_NETWORK=%s\nTARGET_CHAIN_ID=%s\nTARGET_RPC_ENV=%s\nVERIFIERS=%s/%s\n' \
+  "$TARGET_NETWORK" "$TARGET_CHAIN_ID" "$TARGET_RPC_ENV" \
+  "$VERIFIER_THRESHOLD" "$VERIFIER_COUNT"
 ```
 
 The tooling loads `app/contracts/.env` and `app/ethereum/.env` directly.
+The `eval` command is silent. Confirm the printed network, chain ID, RPC variable, and verifier threshold/count match the intended deployment before continuing.
+
+The target Safe must already exist. Set its chain-scoped address in `app/ethereum/.env` before init:
+
+```dotenv
+CHAIN_<TARGET_CHAIN_ID>_SAFE_ADDRESS=<TARGET_SAFE_ADDRESS>
+```
+
+`init` validates this value and writes it to `discovery.target.safeAddress`; it never copies a Safe from the reference chain. It also assigns the Safe to all vault governance roles, matching the existing chain configurations. If a role uses a different address, set its chain-scoped role variable in `app/ethereum/.env` before init.
+
+`init` prefills the canonical Permit2 address `0x000000000022D473030F116dDEE9F6B43aC78BA3`. Set `CHAIN_<TARGET_CHAIN_ID>_PERMIT2_ADDRESS` only when the target uses a different deployment. Preflight confirms that the selected address has target-chain bytecode.
 
 ```bash
 npm run external:rollout -- init \
@@ -65,6 +79,69 @@ npm run external:rollout -- init \
 Set `include`, target Safe/Permit2/role addresses, deployment and finality confirmations, route limits, and known public identities. For a first STRATO EAB deployment, leave `target.externalAssetBridge` and `target.tokenRouter` as `DEPLOY_REQUIRED` until step 2. Leave Infra-created verifier URLs, authorization signers, Runtime health URL, proposer, and executor values as `REVIEW_REQUIRED` until step 3.
 
 Choose `scope: "combined"` (default EAB + native) or `"eab-only"`.
+
+Every included `eabRoutes` item must explicitly contain:
+
+```json
+{
+  "mintPolicy": {
+    "capacity": "<STRATO_TOKEN_RAW_AMOUNT>",
+    "refillRate": "<STRATO_TOKEN_RAW_AMOUNT_PER_SECOND>"
+  },
+  "tokenPolicy": {
+    "minDepositAmount": "<EXTERNAL_TOKEN_RAW_AMOUNT>",
+    "maxPerWithdrawal": "<EXTERNAL_TOKEN_RAW_AMOUNT>",
+    "manualReviewThreshold": "<EXTERNAL_TOKEN_RAW_AMOUNT>",
+    "bucketCapacity": "<EXTERNAL_TOKEN_RAW_AMOUNT>",
+    "refillRate": "<EXTERNAL_TOKEN_RAW_AMOUNT_PER_SECOND>",
+    "maxAutoWithdrawalAmount": "<EXTERNAL_TOKEN_RAW_AMOUNT>",
+    "migrateAmount": "0",
+    "enabled": true
+  },
+  "routePolicy": {
+    "depositsEnabled": true,
+    "withdrawalsEnabled": true,
+    "rebaseRequired": false,
+    "autoRouteEnabled": false,
+    "maxAutoDepositAmount": "0"
+  }
+}
+```
+
+Do not reformat values written by `init`. When replacing `REVIEW_REQUIRED`, use only this rule: flags are unquoted JSON booleans (`true` or `false`); editable integers are quoted decimal strings (`"120"` or `"0"`). Set zero explicitly when a numeric feature is disabled. `init` visibly prefills only equivalent MercataBridge fields: asset enablement, the withdrawal cap converted to target-token units, and the hot-wallet threshold converted to `manualReviewThreshold`. Review those values. Fields without an equivalent remain `REVIEW_REQUIRED`; expansion uses only the values recorded in this JSON and performs no hidden inheritance.
+
+For combined scope, `init` also writes each native route's current `nativePolicy`:
+
+```json
+{
+  "nativePolicy": {
+    "externalName": "<NAME>",
+    "externalSymbol": "<SYMBOL>",
+    "maxPerWithdrawal": "<STRATO_TOKEN_RAW_AMOUNT>",
+    "instantWithdrawalThreshold": "<STRATO_TOKEN_RAW_AMOUNT>",
+    "enabled": true,
+    "autoRouteEnabled": false,
+    "sharedTokenSettings": {
+      "depositsDisabled": false,
+      "withdrawalsDisabled": true,
+      "maxOutstandingWithdrawal": "<STRATO_TOKEN_RAW_AMOUNT>"
+    }
+  },
+  "destinationPolicy": {
+    "freezeRoute": "<REVIEW_BOOLEAN>",
+    "transfersEnabled": "<REVIEW_BOOLEAN>"
+  }
+}
+```
+
+Review `discovery.target.nativeConfig.attestationThreshold` and `maxAttestationValiditySeconds` as well. Source-native values are visibly prefilled from `StratoNativeBridge`; target-only destination controls remain `REVIEW_REQUIRED`. Excluded native routes may retain review values.
+
+### Funding checkpoints
+
+- Before step 2, fund the target-chain contract deployer with the target chain's native gas token.
+- Before executing generated batches, fund every STRATO admin with STRATO fee vouchers and fund the Safe transaction executor with the target chain's native gas token.
+- After Infra returns the service identities and before startup, fund the Runtime EAB executor and, for combined deployments, the native mint executor with the target chain's native gas token. Fund the Runtime bridge-operator account and every verifier settlement-attestor account with STRATO fee vouchers.
+- Check every distinct address separately. The Safe, authorization signers, and Safe proposer need no balance unless the same address also submits transactions.
 
 For a later native extension, reuse the existing schema-version-1 EAB `deployment.json`; do not run `init` or create a schema-version-0 draft. Set `"scope": "native-extension"` and add both `inputs.nativeRoutes` and `inputs.nativeConfig` in the generated shapes:
 
@@ -217,20 +294,18 @@ Check only `.deployment/bootstrap/`. Give Infra:
 - `infra-bootstrap.json`;
 - `infra-bootstrap.tar.gz`.
 
-Infra verifies the archive hashes and creates or reuses the Runtime and proposer foundations first, using the generated `bridge.env.template`. Infra records the Runtime access address and egress IP, but Runtime may remain not ready.
+For a new environment, the first package has `phase: foundation-identities`, a provisional `bridge.env.template`, and no verifier policies. Infra uses that template only to create or reuse the stopped Runtime foundations and each verifier's base account. The Runtime is expected to remain not ready. Infra returns the STRATO settlement-verifier addresses and Runtime values listed in `requiredReturn`. Record them in `discovery.target.settlementVerifiers` and the matching `services` fields, then run `bootstrap` again.
 
-Infra then gives each verifier operator its EAB policy and Runtime access address and creates the chain's verifier stack with `Running=No`:
+The second package has `phase: verifier-identities` and contains policies bound to the returned STRATO addresses. Infra gives each verifier operator its policy and Runtime access address and creates the chain's verifier stack with `Running=No`:
 
 ```bash
 eab-infra/guides/tools/deploy.sh <verifier-folder>/<network>.conf --preview
 eab-infra/guides/tools/deploy.sh <verifier-folder>/<network>.conf
 ```
 
-`Running=No` is provisioning mode: it creates the endpoint and KMS signer identities without starting traffic. It must not require the new attestor to be registered or funded yet; those checks apply when changing to `Running=Yes`. If the selected `eab-infra` version performs those checks for `Running=No`, update it before continuing.
+`Running=No` creates the endpoint and KMS signer identities without starting traffic. Registration and voucher checks apply only when changing to `Running=Yes`.
 
-Infra returns every value named in `infra-bootstrap.json`: verifier URLs and EAB/native signer addresses, Runtime EAB/native executors, proposer, Runtime access address, and Runtime health URL. New deployments use short-lived requests signed by the Runtime access KMS key; verifier API tokens are not exchanged.
-
-The Coordinator records those public values in `deployment.json`. For a combined rollout, also set `inputs.nativeConfig.executor`, `eabExecutor`, and `attestationSigners` from the returned identities. Resolve every remaining `REVIEW_REQUIRED`, then run:
+Infra returns every value named in the second package's `requiredReturn`. The Coordinator records the verifier URLs and signer addresses in the schema-version-0 `deployment.json`. For a combined rollout, also set `discovery.target.nativeConfig.executor`, `eabExecutor`, and `attestationSigners`. Resolve every remaining `REVIEW_REQUIRED`, then run:
 
 ```bash
 npm run external:rollout -- preflight --manifest "$ROLLOUT_DIR/deployment.json"
@@ -340,4 +415,46 @@ npm run external:rollout -- activate --manifest "$ROLLOUT_DIR/deployment.json"
 
 Never reuse an older admin file, Safe signature, or Safe nonce.
 
-`network:deploy-external --manifest` accepts only the reviewed schema-version-0 predeployment manifest. `bootstrap` expands it to schema version 1. After that, do not redeploy those contracts; recover from the existing deployment checkpoint and live transaction receipts. A separately approved replacement deployment must use the standalone chain-prefixed environment configuration and a new rollout directory.
+`network:deploy-external --manifest` accepts only the reviewed schema-version-0 predeployment manifest. `bootstrap` leaves it at schema version 0; `generate` expands it only after identities and policy are complete. Do not redeploy existing contracts after bootstrap; recover from the deployment checkpoint and live transaction receipts. A separately approved replacement deployment must use the standalone chain-prefixed environment configuration and a new rollout directory.
+
+## `REVIEW_REQUIRED` checkpoints
+
+`REVIEW_REQUIRED` means that the value is not known yet; it does not mean every value must be filled immediately after `init`. Resolve values by the following checkpoint. Values belonging only to excluded routes or to native configuration in an `eab-only` rollout may remain unresolved.
+
+### Before target contract deployment
+
+Resolve the target chain, Safe, Permit2, governance-role addresses, guardian, deployment confirmations, and selected route/token addresses. For a first STRATO EAB deployment, `externalAssetBridge` and `tokenRouter` remain `DEPLOY_REQUIRED` until their STRATO deployment completes.
+
+### Before the first `bootstrap`
+
+Record the external deployment artifact and, for a combined rollout, each native deployment artifact. Select the included routes and review their public token metadata and policy limits. Infra-created settlement verifiers, verifier URLs, signers, Runtime URL, proposer, executors, and Runtime access address may remain `REVIEW_REQUIRED`.
+
+Deployment addresses and blocks contained in referenced artifacts are artifact-derived values, not operator inputs. Do not hand-type `depositRouterDeploymentBlock`, deployed proxy addresses, native bridge addresses, or representation-token addresses.
+
+### Before the second `bootstrap`
+
+Record every value returned by the `foundation-identities` package:
+
+- `discovery.target.settlementVerifiers`;
+- `services.safeProposerAddress`, `executorAddress`, `bridgeHealthUrl`, and `runtimeAccessAddress`;
+- for a combined rollout, `discovery.target.nativeConfig.executor` and `eabExecutor`.
+
+Resolve every field of each included route using JSON booleans for flags and decimal strings for raw amounts. Verifier URLs, EAB authorization signers, and native attestation signers remain unresolved until Infra applies the second package with `Running=No`.
+
+### Before `preflight`
+
+Record every value returned by the `verifier-identities` package:
+
+- each `services.verifiers[i].url`;
+- each corresponding `authorizationSigners[i]`;
+- for a combined rollout, each `discovery.target.nativeConfig.attestationSigners[i]`.
+
+Use quoted decimal strings for confirmation counts and unquoted JSON booleans for policy flags. At this checkpoint no `REVIEW_REQUIRED` value may remain in the target, services, authorization signers, included EAB routes, or included native routes.
+
+### Before `generate`
+
+`preflight` must report `PREFLIGHT_PASSED`. No additional manifest values are added between `preflight` and `generate`.
+
+### Before `verify` and `activate`
+
+No manifest values are added. Execute the generated preactivation governance and Safe batches, apply the final Infra package, and start the Runtime and verifiers. `verify` must report `READY_FOR_ACTIVATION` before executing the activation batches.

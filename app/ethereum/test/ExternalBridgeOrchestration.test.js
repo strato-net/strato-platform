@@ -273,14 +273,16 @@ test("editing generated files or their hash index cannot bypass integrity checki
   assert.throws(() => generate(f.context, path.join(f.directory, "output")), /Generated artifact changed/);
 });
 
-test("withdrawals, actions and liquidity migration fail closed in initial rollout", (t) => {
+test("reviewed withdrawals are allowed while actions and liquidity migration fail closed", (t) => {
   const f = fixture(t);
-  for (const field of ["withdrawalsEnabled", "autoRouteEnabled"]) {
-    const candidate = structuredClone(f.manifest);
-    Object.values(candidate.policy.routes)[0][field] = true;
-    writeJson(f.manifestPath, candidate);
-    assert.throws(() => loadManifest(f.manifestPath), /Initial rollout/);
-  }
+  const withdrawals = structuredClone(f.manifest);
+  Object.values(withdrawals.policy.routes)[0].withdrawalsEnabled = true;
+  writeJson(f.manifestPath, withdrawals);
+  assert.doesNotThrow(() => loadManifest(f.manifestPath));
+  const actions = structuredClone(f.manifest);
+  Object.values(actions.policy.routes)[0].autoRouteEnabled = true;
+  writeJson(f.manifestPath, actions);
+  assert.throws(() => loadManifest(f.manifestPath), /Initial rollout/);
   f.manifest.policy.tokens[addr("b")].migrateAmount = "1";
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /migrateAmount/);
@@ -757,11 +759,11 @@ test("service templates derive shared addresses without storing secret values", 
 
 test("each verifier can use a distinct confirmation count at least as strict as Runtime", (t) => {
   const f = fixture(t);
-  f.manifest.services.confirmations = 12;
+  f.manifest.services.confirmations = "12";
   f.manifest.services.verifiers = [12, 18, 24].map((confirmations, index) => ({
     url: `https://verifier-${index + 1}.example`,
     tokenEnv: `VERIFIER_${index + 1}_TOKEN`,
-    confirmations,
+    confirmations: String(confirmations),
   }));
   writeJson(f.manifestPath, f.manifest);
   const context = loadManifest(f.manifestPath);
@@ -771,7 +773,7 @@ test("each verifier can use a distinct confirmation count at least as strict as 
     assert(template.includes(`VERIFIER_CONFIRMATIONS=${confirmations}`));
   });
 
-  f.manifest.services.verifiers[1].confirmations = 11;
+  f.manifest.services.verifiers[1].confirmations = "11";
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /at least services.confirmations/);
 });

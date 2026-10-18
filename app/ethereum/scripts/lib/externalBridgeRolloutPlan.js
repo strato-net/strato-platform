@@ -539,9 +539,6 @@ function buildSynchronizedRollout({
 }
 
 function validateInitialRollout(rollout, { activation = false } = {}) {
-  if (!activation && rollout.summary.withdrawalsEnabledCount !== 0) {
-    throw new Error("Initial rollout must keep every withdrawal route disabled");
-  }
   if (!activation && rollout.summary.autoRouteEnabledCount !== 0) {
     throw new Error("Initial rollout must keep every AUTO_ROUTE route disabled");
   }

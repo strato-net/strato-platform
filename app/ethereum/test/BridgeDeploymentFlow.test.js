@@ -155,18 +155,52 @@ test("live init refresh preserves reviewed route decisions in one file", () => {
 });
 
 test("initial discovery creates one complete public configuration draft", () => {
+  const safe = address("8");
+  const guardian = address("7");
   const draft = initializeDraft({
+    source: { stratoChainId: "114784819836269" },
+    target: { chainId: 11155111 },
+    eabRoutes: [{ externalToken: address("2"), stratoToken: address("3") }],
+    nativeRoutes: [{ stratoToken: address("4") }],
+  }, "https://strato.example", {
+    CHAIN_11155111_SAFE_ADDRESS: safe,
+    CHAIN_11155111_GUARDIAN_ADDRESS: guardian,
+  });
+  assert.equal(draft.scope, "combined");
+  assert.equal(draft.services.nodeUrl, "https://strato.example");
+  assert.equal(draft.services.verifiers.length, 3);
+  assert.equal(draft.services.runtimeAccessAddress, "REVIEW_REQUIRED");
+  assert.equal(draft.authorizationSigners.length, 3);
+  assert.equal(draft.discovery.target.safeAddress, safe);
+  assert.equal(draft.discovery.target.permit2Address, "0x000000000022D473030F116dDEE9F6B43aC78BA3");
+  assert.equal(draft.discovery.target.roles.guardianAddress, guardian);
+  assert.ok(Object.entries(draft.discovery.target.roles)
+    .filter(([name]) => name !== "guardianAddress").every(([, value]) => value === safe));
+  assert.equal(draft.discovery.eabRoutes[0].mintPolicy.capacity, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.eabRoutes[0].tokenPolicy.enabled, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.eabRoutes[0].routePolicy.depositsEnabled, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.nativeRoutes[0].nativePolicy.enabled, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.nativeRoutes[0].destinationPolicy.freezeRoute, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.target.nativeConfig.attestationThreshold, 2);
+  assert.equal(draft.discovery.target.nativeConfig.executor, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.target.nativeConfig.eabExecutor, "REVIEW_REQUIRED");
+  assert.equal(draft.discovery.target.nativeConfig.attestationSigners.length, 3);
+  assert.equal(draft.discovery.target.nativeConfig.maxAttestationValiditySeconds, "REVIEW_REQUIRED");
+});
+
+test("initial discovery requires the target chain Safe", () => {
+  const discovered = {
     source: { stratoChainId: "114784819836269" },
     target: { chainId: 11155111 },
     eabRoutes: [],
     nativeRoutes: [],
-  }, "https://strato.example");
-  assert.equal(draft.scope, "combined");
-  assert.equal(draft.services.nodeUrl, "https://strato.example");
-  assert.equal(draft.services.verifiers.length, 3);
-  assert.equal(draft.authorizationSigners.length, 3);
-  assert.equal(draft.discovery.target.safeAddress, "REVIEW_REQUIRED");
-  assert.equal(draft.discovery.target.roles.guardianAddress, "REVIEW_REQUIRED");
+  };
+  assert.throws(() => initializeDraft(discovered, "https://strato.example", {}),
+    /Set valid nonzero CHAIN_11155111_SAFE_ADDRESS in app\/ethereum\/.env before init/);
+  assert.throws(() => initializeDraft(discovered, "https://strato.example", {
+    CHAIN_11155111_SAFE_ADDRESS: address("1"),
+    CHAIN_11155111_PERMIT2_ADDRESS: address("0"),
+  }), /Set valid nonzero CHAIN_11155111_PERMIT2_ADDRESS in app\/ethereum\/.env/);
 });
 
 test("preflight validates the reviewed draft before deployment artifacts exist", async () => {
@@ -176,27 +210,39 @@ test("preflight validates the reviewed draft before deployment artifacts exist",
     target: { chainId: 11155111 },
     eabRoutes: [{ include: true }],
     nativeRoutes: [],
-  }, "https://strato.example");
+  }, "https://strato.example", { CHAIN_11155111_SAFE_ADDRESS: safe });
   draft.scope = "eab-only";
   draft.discovery.target.safeAddress = safe;
   draft.discovery.target.permit2Address = address("2");
   draft.discovery.target.bridgeOperator = address("3");
   draft.discovery.target.guardian = address("4");
   draft.discovery.target.settlementVerifiers = [address("5"), address("6"), address("7")];
-  draft.discovery.target.deploymentConfirmations = 12;
+  draft.discovery.target.deploymentConfirmations = "12";
   Object.keys(draft.discovery.target.roles).forEach((name, index) => {
     draft.discovery.target.roles[name] = address(String(index + 3));
   });
+  Object.assign(draft.discovery.eabRoutes[0], {
+    mintPolicy: { capacity: "1000", refillRate: "1" },
+    tokenPolicy: { minDepositAmount: "1", maxPerWithdrawal: "100", manualReviewThreshold: "50",
+      bucketCapacity: "1000", refillRate: "1", maxAutoWithdrawalAmount: "0", migrateAmount: "0", enabled: true },
+    routePolicy: { depositsEnabled: true, withdrawalsEnabled: false, rebaseRequired: false,
+      autoRouteEnabled: false, maxAutoDepositAmount: "0" },
+  });
+  draft.discovery.eabRoutes.push({ include: false, externalToken: "REVIEW_REQUIRED",
+    mintPolicy: { capacity: "REVIEW_REQUIRED" } });
+  draft.discovery.nativeRoutes.push({ include: false, representationToken: "REVIEW_REQUIRED" });
+  draft.discovery.target.nativeRepresentationBridge = "REVIEW_REQUIRED";
   draft.authorizationSigners = [address("a"), address("b"), address("c")];
   Object.assign(draft.services, {
-    confirmations: 12,
+    confirmations: "12",
     bridgeHealthUrl: "https://runtime.example/health",
     safeProposerAddress: address("d"),
     executorAddress: address("e"),
+    runtimeAccessAddress: address("f"),
   });
   draft.services.verifiers.forEach((verifier, index) => Object.assign(verifier, {
     url: `https://verifier-${index + 1}.example`,
-    confirmations: 12,
+    confirmations: "12",
   }));
   process.env.CHAIN_11155111_RPC_URL = "https://rpc.example";
   try {
@@ -270,20 +316,31 @@ test("generate writes only canonical atomic preactivation outputs and recovers b
   assert.equal(fs.existsSync(path.join(second.directory, "stale.json")), false);
 });
 
-test("bootstrap writes only the eab-infra package needed to provision stopped services", t => {
+test("bootstrap writes only the eab-infra package needed to provision stopped services", async t => {
   const f = fixture(t);
   fs.writeFileSync(f.manifestPath, JSON.stringify({
     scope: "combined",
     inputs: { nativeRoutes: [{}] },
+    discovery: {
+      target: {
+        settlementVerifiers: [address("b"), address("c"), address("d")],
+      },
+    },
   }));
-  const result = generateBootstrap(f.manifestPath, {
+  const result = await generateBootstrap(f.manifestPath, {
     context: f.context,
     generate: f.generated,
   });
   assert.deepEqual(result.files, ["infra-bootstrap.json", "infra-bootstrap.tar.gz"]);
   const index = JSON.parse(fs.readFileSync(path.join(result.directory, "infra-bootstrap.json")));
-  assert.deepEqual(index.application, { initialRunning: false });
+  assert.deepEqual(index.application, {
+    initialRunning: false,
+    provisioningOnly: true,
+    requiresFinalConfiguration: true,
+    phase: "verifier-identities",
+  });
   assert.equal(index.chainId, "11155111");
+  assert.equal(index.requiredReturn.includes("settlementVerifierAddresses"), false);
   assert.ok(index.requiredReturn.includes("nativeAttestationSigners"));
   assert.ok(index.requiredReturn.includes("nativeExecutorAddress"));
   assert.deepEqual(index.files.map(({ name }) => name), [
@@ -301,10 +358,51 @@ test("bootstrap writes only the eab-infra package needed to provision stopped se
   });
 });
 
-test("native extension reuses provisioned infrastructure instead of creating a bootstrap package", t => {
+test("bootstrap requests foundation identities before address-bound verifier policies", async t => {
+  const f = fixture(t, "combined");
+  const manifest = {
+    schemaVersion: 0,
+    scope: "combined",
+    discovery: {
+      target: {
+        chainId: 11155111,
+        settlementVerifiers: ["REVIEW_REQUIRED", "REVIEW_REQUIRED", "REVIEW_REQUIRED"],
+      },
+      nativeRoutes: [{ include: true }],
+    },
+  };
+  fs.writeFileSync(f.manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const before = fs.readFileSync(f.manifestPath, "utf8");
+
+  const result = await generateBootstrap(f.manifestPath, {
+    context: f.context,
+    generate: f.generated,
+  });
+
+  assert.equal(result.status, "INFRA_FOUNDATION_BOOTSTRAP_GENERATED");
+  assert.deepEqual(result.files, ["infra-bootstrap.json", "infra-bootstrap.tar.gz"]);
+  assert.equal(fs.readFileSync(f.manifestPath, "utf8"), before);
+  const index = JSON.parse(fs.readFileSync(path.join(result.directory, "infra-bootstrap.json")));
+  assert.deepEqual(index.application, {
+    initialRunning: false,
+    provisioningOnly: true,
+    requiresFinalConfiguration: true,
+    phase: "foundation-identities",
+  });
+  assert.deepEqual(index.files.map(({ name }) => name), ["bridge.env.template"]);
+  assert.ok(index.requiredReturn.includes("settlementVerifierAddresses"));
+  assert.ok(index.requiredReturn.includes("nativeExecutorAddress"));
+  const extracted = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-foundation-package-"));
+  t.after(() => fs.rmSync(extracted, { recursive: true, force: true }));
+  execFileSync("tar", ["-xzf", path.join(result.directory, "infra-bootstrap.tar.gz"), "-C", extracted]);
+  assert.equal(fs.existsSync(path.join(extracted, "bridge.env.template")), true);
+  assert.equal(fs.existsSync(path.join(extracted, "verifier-1.json")), false);
+});
+
+test("native extension reuses provisioned infrastructure instead of creating a bootstrap package", async t => {
   const f = fixture(t, "native-extension");
   fs.writeFileSync(f.manifestPath, JSON.stringify({ scope: "native-extension" }));
-  assert.throws(() => generateBootstrap(f.manifestPath, {
+  await assert.rejects(generateBootstrap(f.manifestPath, {
     context: f.context,
     generate: f.generated,
   }), /reuses the existing Runtime and verifier infrastructure/);

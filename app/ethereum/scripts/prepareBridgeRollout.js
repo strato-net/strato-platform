@@ -15,10 +15,80 @@ const mappingAddress = value => String(value) === "0" ? ethers.ZeroAddress : add
 // Preserve raw token units and STRATO network IDs before JSON.parse can round them.
 const parse = text => JSON.parse(text.replace(/"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
   token => token.startsWith('"') ? token : JSON.stringify(token)));
-const value = row => typeof row?.value === "string" ? parse(row.value) : row?.value;
+const value = row => typeof row?.value === "string"
+  ? row.value.trim() === "" ? "" : parse(row.value)
+  : row?.value;
 const uint = v => /^\d+$/.test(String(v)) ? String(v) : REQUIRED;
 const flag = v => v === true || v === "true" ? true
   : v === false || v === "false" || v === "" || /^0{40}$/.test(String(v)) ? false : REQUIRED;
+
+function withExplicitEabPolicy(route) {
+  return {
+    ...route,
+    mintPolicy: {
+      capacity: REQUIRED,
+      refillRate: REQUIRED,
+      ...route.mintPolicy,
+    },
+    tokenPolicy: {
+      minDepositAmount: REQUIRED,
+      maxPerWithdrawal: REQUIRED,
+      manualReviewThreshold: REQUIRED,
+      bucketCapacity: REQUIRED,
+      refillRate: REQUIRED,
+      maxAutoWithdrawalAmount: REQUIRED,
+      migrateAmount: REQUIRED,
+      enabled: REQUIRED,
+      ...route.tokenPolicy,
+    },
+    routePolicy: {
+      depositsEnabled: REQUIRED,
+      withdrawalsEnabled: REQUIRED,
+      rebaseRequired: REQUIRED,
+      autoRouteEnabled: REQUIRED,
+      maxAutoDepositAmount: REQUIRED,
+      ...route.routePolicy,
+    },
+  };
+}
+
+function withExplicitNativePolicy(route) {
+  return {
+    ...route,
+    nativePolicy: {
+      externalName: REQUIRED,
+      externalSymbol: REQUIRED,
+      maxPerWithdrawal: REQUIRED,
+      instantWithdrawalThreshold: REQUIRED,
+      enabled: REQUIRED,
+      autoRouteEnabled: REQUIRED,
+      sharedTokenSettings: {
+        depositsDisabled: REQUIRED,
+        withdrawalsDisabled: REQUIRED,
+        maxOutstandingWithdrawal: REQUIRED,
+        ...route.nativePolicy?.sharedTokenSettings,
+      },
+      ...route.nativePolicy,
+    },
+    destinationPolicy: {
+      freezeRoute: REQUIRED,
+      transfersEnabled: REQUIRED,
+      ...route.destinationPolicy,
+    },
+  };
+}
+
+function scaleAmount(valueToScale, fromDecimals, toDecimals) {
+  if (!/^\d+$/.test(String(valueToScale)) || !/^\d+$/.test(String(fromDecimals)) ||
+      !/^\d+$/.test(String(toDecimals))) return REQUIRED;
+  const value = BigInt(valueToScale);
+  if (value === 0n) return "0";
+  const from = BigInt(fromDecimals), to = BigInt(toDecimals);
+  if (from === to) return value.toString();
+  if (from < to) return (value * (10n ** (to - from))).toString();
+  const divisor = 10n ** (from - to);
+  return value % divisor === 0n ? (value / divisor).toString() : REQUIRED;
+}
 
 async function request(url, token, fetchImpl) {
   const response = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, signal: AbortSignal.timeout(30000) });
@@ -26,18 +96,6 @@ async function request(url, token, fetchImpl) {
   const body = await response.text();
   try { return parse(body); }
   catch { throw new Error(`Expected JSON from ${new URL(url).pathname} (HTTP ${response.status}); check the node API endpoint and authentication`); }
-}
-
-async function retryRead(read) {
-  let lastError;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try { return await read(); }
-    catch (error) {
-      lastError = error;
-      if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 250));
-    }
-  }
-  throw lastError;
 }
 
 async function readRows(source, table, filters, token, fetchImpl = fetch) {
@@ -111,19 +169,28 @@ async function discover(nodeUrl, chainId, token, fetchImpl = fetch, selections =
     else missing.push(`${name}: ${candidates[name].length ? "select a contract from candidates" : "no configured contract found; deploy or identify the current contract"}`);
   }
   const config = { source, target: { stratoChainId: source.stratoChainId, chainId: Number(chainId), depositRouterDeploymentBlock: REQUIRED, nativeRepresentationBridge: REQUIRED }, eabRoutes: [], nativeRoutes: [] };
+  const legacyThresholds = source.legacy ? await readRows(source, "mapping", {
+    address: `eq.${bare(source.eab)}`, collection_name: "eq.hotWithdrawalThresholds",
+    select: "collection_name,key,value", order: "collection_name.asc,key.asc",
+  }, token, fetchImpl) : [];
   for (const name of ["eab", "native"]) {
     if (!source[name]) continue;
-    const rows = await readRows(source, "mapping", { address: `eq.${bare(source[name])}`, collection_name: name === "eab" && !source.legacy ? "eq.routes" : "eq.assets", select: "collection_name,key,value", order: "collection_name.asc,key.asc" }, token, fetchImpl);
+    const collectionFilter = name === "native"
+      ? "in.(assets,tokenBridgeConfigs,autoRouteEnabled)"
+      : name === "eab" && !source.legacy ? "eq.routes" : "eq.assets";
+    const rows = await readRows(source, "mapping", { address: `eq.${bare(source[name])}`,
+      collection_name: collectionFilter, select: "collection_name,key,value",
+      order: "collection_name.asc,key.asc" }, token, fetchImpl);
     const parsed = rows.map(row => ({ row, asset: value(row), sourceChainId: String(row.key?.key2) }))
-      .filter(({ asset }) => asset?.stratoToken);
+      .filter(({ row, asset }) => name === "native" ? row.collection_name === "assets" : asset?.stratoToken);
     const targetAssets = name === "eab" ? parsed.filter(item => item.sourceChainId === String(chainId)) : [];
     for (const item of parsed) {
       const { row, asset, sourceChainId } = item;
       if (selections.sourceChainId && sourceChainId !== String(selections.sourceChainId)) continue;
       if (source.legacy && flag(asset.enabled) !== true) continue;
       if (!/^\d+$/.test(sourceChainId)) throw new Error("Invalid discovered route");
-      const stratoToken = address(row.key.key3 || asset.stratoToken);
-      const externalToken = mappingAddress(row.key.key);
+      const stratoToken = address(name === "native" ? row.key.key : row.key.key3 || asset.stratoToken);
+      const externalToken = name === "native" ? ethers.ZeroAddress : mappingAddress(row.key.key);
       const matches = targetAssets.filter(target => address(target.row.key.key3 || target.asset.stratoToken) === stratoToken);
       const enabledMatches = matches.filter(match => flag(match.asset.enabled) === true);
       const target = sourceChainId === String(chainId) ? item
@@ -131,14 +198,55 @@ async function discover(nodeUrl, chainId, token, fetchImpl = fetch, selections =
           : matches.length === 1 ? matches[0] : undefined;
       const targetToken = target ? mappingAddress(target.row.key.key) : externalToken === ethers.ZeroAddress ? ethers.ZeroAddress : REQUIRED;
       const metadata = target?.asset || (externalToken === ethers.ZeroAddress ? asset : undefined);
-      if (name === "eab") config.eabRoutes.push({ include: false, sourceChainId,
-        sourceExternalToken: externalToken, stratoToken,
-        externalToken: targetToken,
-        externalDecimals: metadata ? uint(metadata.externalDecimals) : REQUIRED,
-        externalName: metadata?.externalName || REQUIRED,
-        externalSymbol: metadata?.externalSymbol || REQUIRED });
-      else config.nativeRoutes.push({ include: false, sourceChainId, stratoToken: address(row.key.key),
-        representationToken: sourceChainId === String(chainId) ? address(asset.representationToken) : REQUIRED });
+      if (name === "eab") {
+        const externalDecimals = metadata ? uint(metadata.externalDecimals) : REQUIRED;
+        const legacyEnabled = source.legacy ? flag(asset.enabled) : REQUIRED;
+        const discoveredThreshold = source.legacy
+          ? lookup({ mappings: legacyThresholds }, "hotWithdrawalThresholds", sourceChainId, externalToken)
+          : undefined;
+        const legacyThreshold = discoveredThreshold === "" || discoveredThreshold === undefined
+          ? "0" : discoveredThreshold;
+        config.eabRoutes.push(withExplicitEabPolicy({
+          include: false, sourceChainId, sourceExternalToken: externalToken, stratoToken,
+          externalToken: targetToken,
+          externalDecimals,
+          externalName: metadata?.externalName || REQUIRED,
+          externalSymbol: metadata?.externalSymbol || REQUIRED,
+          tokenPolicy: source.legacy ? {
+            maxPerWithdrawal: scaleAmount(asset.maxPerWithdrawal, 18, externalDecimals),
+            manualReviewThreshold: scaleAmount(legacyThreshold, asset.externalDecimals, externalDecimals),
+            enabled: legacyEnabled,
+          } : undefined,
+          routePolicy: source.legacy ? {
+            depositsEnabled: legacyEnabled,
+            withdrawalsEnabled: legacyEnabled,
+            autoRouteEnabled: false,
+          } : undefined,
+        }));
+      }
+      else {
+        const stratoToken = address(row.key.key);
+        const tokenConfig = lookup({ mappings: rows }, "tokenBridgeConfigs", stratoToken) || {};
+        config.nativeRoutes.push(withExplicitNativePolicy({
+          include: false,
+          sourceChainId,
+          stratoToken,
+          representationToken: sourceChainId === String(chainId) ? address(asset.representationToken) : REQUIRED,
+          nativePolicy: {
+            externalName: asset.externalName || REQUIRED,
+            externalSymbol: asset.externalSymbol || REQUIRED,
+            maxPerWithdrawal: uint(asset.maxPerWithdrawal),
+            instantWithdrawalThreshold: uint(asset.instantWithdrawalThreshold),
+            enabled: flag(asset.enabled),
+            autoRouteEnabled: flag(lookup({ mappings: rows }, "autoRouteEnabled", stratoToken, sourceChainId)),
+            sharedTokenSettings: {
+              depositsDisabled: flag(tokenConfig.depositsDisabled),
+              withdrawalsDisabled: flag(tokenConfig.withdrawalsDisabled),
+              maxOutstandingWithdrawal: uint(tokenConfig.maxOutstandingWithdrawal),
+            },
+          },
+        }));
+      }
     }
   }
   return { config, candidates, missing };
@@ -197,7 +305,7 @@ function lookup(snapshot, collection, ...keys) {
   return value(matches?.[0]);
 }
 
-function prepare(input, state, external = {}) {
+function prepare(input, state) {
   if (state.stratoChainId !== input.target.stratoChainId) throw new Error("Snapshot network mismatch");
   const chainId = Number(input.target.chainId);
   if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error("Invalid target external chain ID");
@@ -205,42 +313,41 @@ function prepare(input, state, external = {}) {
   const policy = buildPolicyTemplate(inventory, chainId, input.target.depositRouterDeploymentBlock || REQUIRED);
   const items = [];
   const seen = new Set();
-  const current = (collection, ...keys) =>
-    lookup(state.targetEab, collection, ...keys) ?? lookup(state.eab, collection, ...keys);
   for (const route of input.eabRoutes || []) {
     const target = address(route.stratoToken), token = address(route.externalToken);
     const identity = `${token}:${target}`;
     if (seen.has(identity)) throw new Error("Duplicate target route");
     seen.add(identity);
-    const oldToken = address(route.sourceExternalToken);
-    const old = current("routes", oldToken, route.sourceChainId, target);
-    const legacy = lookup(state.eab, "assets", oldToken, route.sourceChainId);
-    const source = old || (bare(legacy?.stratoToken) === bare(target) ? legacy : undefined);
-    const mint = current("mintPolicies", target);
-    const sameDecimals = source && uint(source.externalDecimals) === uint(route.externalDecimals) && uint(route.externalDecimals) !== REQUIRED;
-    const externalState = sameDecimals ? external[`${route.sourceChainId}:${oldToken}`] || {} : {};
-    policy.mintPolicies[target] = { capacity: uint(mint?.capacity), refillRate: uint(mint?.refillRate) };
-    const tokenPolicy = {
-      ...policy.tokens[token], minDepositAmount: uint(externalState.minDepositAmount),
-      maxPerWithdrawal: uint(sameDecimals ? source?.maxPerWithdrawal : undefined), manualReviewThreshold: uint(sameDecimals ? source?.manualReviewThreshold : undefined),
-      bucketCapacity: uint(externalState.bucketCapacity), refillRate: uint(externalState.refillRate),
-      enabled: flag(externalState.enabled),
+    const mintPolicy = {
+      capacity: uint(route.mintPolicy?.capacity),
+      refillRate: uint(route.mintPolicy?.refillRate),
     };
-    if (items.some(i => i.token === token) && JSON.stringify(policy.tokens[token]) !== JSON.stringify(tokenPolicy)) throw new Error("Conflicting shared external-token limits");
-    policy.tokens[token] = tokenPolicy;
-    for (const name of ["maxPerWithdrawal", "manualReviewThreshold"]) {
-      if (externalState[name] !== undefined && tokenPolicy[name] !== uint(externalState[name])) tokenPolicy[name] = REQUIRED;
+    if (items.some(item => item.target === target) &&
+        JSON.stringify(policy.mintPolicies[target]) !== JSON.stringify(mintPolicy)) {
+      throw new Error("Conflicting shared STRATO-token mint policy");
     }
-    const action = current("depositActionConfigs", oldToken, route.sourceChainId, target);
-    const actionEnabled = flag(action?.autoRoute);
-    const autoRouteEnabled = oldToken === ethers.ZeroAddress && actionEnabled === true
-      ? flag(current("nativeAutoRouteEnabled", route.sourceChainId, target)) : actionEnabled;
-    policy.routes[`${token}:${target}`] = {
-      ...policy.routes[`${token}:${target}`],
-      depositsEnabled: flag(old?.depositsEnabled ?? legacy?.enabled),
-      withdrawalsEnabled: flag(old?.withdrawalsEnabled ?? legacy?.enabled),
-      rebaseRequired: flag(current("routeRebaseRequired", oldToken, route.sourceChainId, target)),
-      autoRouteEnabled: autoRouteEnabled === REQUIRED ? true : autoRouteEnabled,
+    policy.mintPolicies[target] = mintPolicy;
+    const tokenPolicy = {
+      minDepositAmount: uint(route.tokenPolicy?.minDepositAmount),
+      maxPerWithdrawal: uint(route.tokenPolicy?.maxPerWithdrawal),
+      manualReviewThreshold: uint(route.tokenPolicy?.manualReviewThreshold),
+      bucketCapacity: uint(route.tokenPolicy?.bucketCapacity),
+      refillRate: uint(route.tokenPolicy?.refillRate),
+      maxAutoWithdrawalAmount: uint(route.tokenPolicy?.maxAutoWithdrawalAmount),
+      migrateAmount: uint(route.tokenPolicy?.migrateAmount),
+      enabled: flag(route.tokenPolicy?.enabled),
+    };
+    if (items.some(item => item.token === token) &&
+        JSON.stringify(policy.tokens[token]) !== JSON.stringify(tokenPolicy)) {
+      throw new Error("Conflicting shared external-token policy");
+    }
+    policy.tokens[token] = tokenPolicy;
+    policy.routes[identity] = {
+      depositsEnabled: flag(route.routePolicy?.depositsEnabled),
+      withdrawalsEnabled: flag(route.routePolicy?.withdrawalsEnabled),
+      rebaseRequired: flag(route.routePolicy?.rebaseRequired),
+      autoRouteEnabled: flag(route.routePolicy?.autoRouteEnabled),
+      maxAutoDepositAmount: uint(route.routePolicy?.maxAutoDepositAmount),
     };
     items.push({ token, target, isPermitted: true, externalDecimals: uint(route.externalDecimals),
       externalName: route.externalName || REQUIRED,
@@ -249,19 +356,20 @@ function prepare(input, state, external = {}) {
   }
   const native = (input.nativeRoutes || []).map(route => {
     const token = address(route.stratoToken);
-    const asset = lookup(state.native, "assets", token, route.sourceChainId);
-    const config = lookup(state.native, "tokenBridgeConfigs", token);
-    const autoRouteEnabled = flag(lookup(state.native, "autoRouteEnabled", token, route.sourceChainId));
     return { "bridge-address": input.target.nativeBridge ? bare(address(input.target.nativeBridge)) : state.native?.address ? bare(state.native.address) : REQUIRED,
       "external-chain-id": String(chainId), "external-bridge": input.target.nativeRepresentationBridge || REQUIRED,
       "representation-token": route.representationToken || REQUIRED, "strato-token": bare(token),
-      "external-name": route.externalName || asset?.externalName || REQUIRED,
-      "external-symbol": route.externalSymbol || asset?.externalSymbol || REQUIRED,
-      "max-per-withdrawal": uint(asset?.maxPerWithdrawal), "instant-withdrawal-threshold": uint(asset?.instantWithdrawalThreshold),
-      "enabled": flag(asset?.enabled),
-      "auto-route-enabled": autoRouteEnabled === REQUIRED ? true : autoRouteEnabled,
-      sharedTokenSettings: { depositsDisabled: flag(config?.depositsDisabled), withdrawalsDisabled: flag(config?.withdrawalsDisabled),
-        maxOutstandingWithdrawal: uint(config?.maxOutstandingWithdrawal) } };
+      "external-name": route.nativePolicy?.externalName || REQUIRED,
+      "external-symbol": route.nativePolicy?.externalSymbol || REQUIRED,
+      "max-per-withdrawal": uint(route.nativePolicy?.maxPerWithdrawal),
+      "instant-withdrawal-threshold": uint(route.nativePolicy?.instantWithdrawalThreshold),
+      "enabled": flag(route.nativePolicy?.enabled),
+      "auto-route-enabled": flag(route.nativePolicy?.autoRouteEnabled),
+      sharedTokenSettings: {
+        depositsDisabled: flag(route.nativePolicy?.sharedTokenSettings?.depositsDisabled),
+        withdrawalsDisabled: flag(route.nativePolicy?.sharedTokenSettings?.withdrawalsDisabled),
+        maxOutstandingWithdrawal: uint(route.nativePolicy?.sharedTokenSettings?.maxOutstandingWithdrawal),
+      } };
   });
   const unresolved = [];
   const scan = (v, p) => { if (v === REQUIRED) unresolved.push(p); else if (v && typeof v === "object") Object.entries(v).forEach(([k, x]) => scan(x, `${p}.${k}`)); };
@@ -292,39 +400,6 @@ async function readTargetTokenMetadata(input, env = process.env) {
   } finally { provider.destroy(); }
 }
 
-async function readExternal(input, state, env = process.env) {
-  const result = {};
-  for (const route of input.eabRoutes || []) {
-    const legacyChain = lookup(state.eab, "chains", route.sourceChainId);
-    const policyChain = lookup(state.targetEab, "chains", route.sourceChainId);
-    if (!legacyChain?.depositRouter) continue;
-    const rpc = env[`CHAIN_${route.sourceChainId}_RPC_URL`];
-    if (!rpc) throw new Error(`Missing CHAIN_${route.sourceChainId}_RPC_URL for existing source chain`);
-    const provider = new ethers.JsonRpcProvider(rpc);
-    try {
-      if ((await provider.getNetwork()).chainId !== BigInt(route.sourceChainId)) throw new Error("Source external RPC chain mismatch");
-      const blockTag = await provider.getBlockNumber();
-      const token = address(route.sourceExternalToken), key = `${route.sourceChainId}:${token}`;
-      if (result[key]) continue;
-      const router = new ethers.Contract(address(legacyChain.depositRouter), ["function tokenConfig(address) view returns(uint96 min,bool isPermitted)"], provider);
-      const r = await router.tokenConfig(token, { blockTag });
-      result[key] = { blockTag, minDepositAmount: r.min.toString(), enabled: r.isPermitted };
-      const vaultAddress = policyChain?.vault || legacyChain.externalBridgeVault;
-      if (vaultAddress && bare(vaultAddress) !== "0".repeat(40)) {
-        const vault = new ethers.Contract(address(vaultAddress), ["function tokenPolicies(address) view returns(bool enabled,uint256 maxPerWithdrawal,uint256 bucketCapacity,uint256 refillRate,uint256 lastRefillAt,uint256 consumedCapacity,uint256 manualReviewThreshold)"], provider);
-        try {
-          const v = await vault.tokenPolicies(token, { blockTag });
-          Object.assign(result[key], { enabled: v.enabled, bucketCapacity: v.bucketCapacity.toString(), refillRate: v.refillRate.toString(),
-            maxPerWithdrawal: v.maxPerWithdrawal.toString(), manualReviewThreshold: v.manualReviewThreshold.toString() });
-        } catch (error) {
-          if (policyChain?.vault || (error?.code !== "CALL_EXCEPTION" && error?.code !== "BAD_DATA")) throw error;
-        }
-      }
-    } finally { provider.destroy(); }
-  }
-  return result;
-}
-
 function rolloutSettings(input, state) {
   const a = v => /^(0x)?[a-f0-9]{40}$/i.test(String(v)) && bare(v) !== "0".repeat(40) ? address(v) : REQUIRED;
   const configured = (...values) => values.find(value => a(value) !== REQUIRED);
@@ -353,43 +428,23 @@ function rolloutSettings(input, state) {
   };
 }
 
-async function readNativeBaseline(input, state, env = process.env) {
+async function readNativeBaseline(input) {
   const baseline = { chainId: Number(input.target.chainId), bridgeAddress: input.target.nativeRepresentationBridge || REQUIRED,
-    safeAddress: input.target.safeAddress || REQUIRED, executor: REQUIRED, eabExecutor: REQUIRED, attestationSigners: [], disabledAttestationSigners: [],
-    attestationThreshold: REQUIRED, maxAttestationValiditySeconds: REQUIRED, tokens: [] };
-  const thresholds = new Set(), validities = new Set();
-  const rpc = env[`CHAIN_${input.target.chainId}_RPC_URL`];
-  if (!rpc) throw new Error(`Missing CHAIN_${input.target.chainId}_RPC_URL for native baseline`);
-  const provider = new ethers.JsonRpcProvider(rpc);
-  try {
-    if ((await provider.getNetwork()).chainId !== BigInt(input.target.chainId)) throw new Error("Native baseline RPC chain mismatch");
-    const blockTag = await provider.getBlockNumber();
-    for (const route of input.nativeRoutes || []) {
+    safeAddress: input.target.safeAddress || REQUIRED,
+    executor: input.target.nativeConfig?.executor || REQUIRED,
+    eabExecutor: input.target.nativeConfig?.eabExecutor || REQUIRED,
+    attestationSigners: input.target.nativeConfig?.attestationSigners || [],
+    disabledAttestationSigners: [],
+    attestationThreshold: Number.isSafeInteger(Number(input.target.nativeConfig?.attestationThreshold))
+      ? Number(input.target.nativeConfig.attestationThreshold) : REQUIRED,
+    maxAttestationValiditySeconds: uint(input.target.nativeConfig?.maxAttestationValiditySeconds),
+    tokens: [] };
+  for (const route of input.nativeRoutes || []) {
     const target = { stratoToken: address(route.stratoToken), representationToken: route.representationToken || REQUIRED,
-      freezeRoute: REQUIRED, transfersEnabled: REQUIRED };
+      freezeRoute: flag(route.destinationPolicy?.freezeRoute),
+      transfersEnabled: flag(route.destinationPolicy?.transfersEnabled) };
     baseline.tokens.push(target);
-      if (!input.target.nativeRepresentationBridge || !route.representationToken) continue;
-      const bridge = new ethers.Contract(address(input.target.nativeRepresentationBridge), ["function routeFrozen(address) view returns(bool)",
-        "function maxAttestationValiditySeconds() view returns(uint256)", "function attestationThreshold() view returns(uint8)"], provider);
-      const token = new ethers.Contract(address(route.representationToken), ["function transfersEnabled() view returns(bool)"], provider);
-      const reads = await Promise.allSettled([
-        retryRead(() => bridge.routeFrozen(target.stratoToken, { blockTag })),
-        retryRead(() => token.transfersEnabled({ blockTag })),
-        retryRead(() => bridge.maxAttestationValiditySeconds({ blockTag })),
-        retryRead(() => bridge.attestationThreshold({ blockTag })),
-      ]);
-      // Older native contracts may not expose the newer authorization controls.
-      for (const read of reads) if (read.status === "rejected" && read.reason?.code !== "CALL_EXCEPTION" && read.reason?.code !== "BAD_DATA") throw read.reason;
-      target.freezeRoute = reads[0].status === "fulfilled" ? reads[0].value : REQUIRED;
-      target.transfersEnabled = reads[1].status === "fulfilled" ? reads[1].value : REQUIRED;
-      validities.add(reads[2].status === "fulfilled" ? String(reads[2].value) : REQUIRED);
-      thresholds.add(reads[3].status === "fulfilled" ? Number(reads[3].value) : REQUIRED);
-    }
-  } finally {
-    provider.destroy();
   }
-  if (validities.size === 1) baseline.maxAttestationValiditySeconds = [...validities][0];
-  if (thresholds.size === 1 && [...thresholds][0] >= 2) baseline.attestationThreshold = [...thresholds][0];
   return baseline;
 }
 
@@ -469,9 +524,8 @@ async function main(argv, options = {}) {
   if (fs.existsSync(directory)) throw new Error("Output directory exists; use a new directory to preserve reviewed inputs");
   const state = await snapshot(input, options.token || await getReadToken(), options.fetchImpl || fetch);
   await readTargetTokenMetadata(input);
-  const external = await readExternal(input, state);
-  const output = prepare(input, state, external);
-  const nativeBaseline = output.native.length ? await readNativeBaseline(input, state) : undefined;
+  const output = prepare(input, state);
+  const nativeBaseline = output.native.length ? await readNativeBaseline(input) : undefined;
   const settings = rolloutSettings(input, state);
   const findMissing = (v, name) => {
     if (v === REQUIRED) output.unresolved.push(name);
@@ -483,7 +537,7 @@ async function main(argv, options = {}) {
   }
   findMissing(settings, "settings");
   if (!settings.settlementVerifiers.length) output.unresolved.push("settings.settlementVerifiers");
-  writeJson(path.join(directory, "source-snapshot.json"), { ...state, external });
+  writeJson(path.join(directory, "source-snapshot.json"), state);
   writeJson(path.join(directory, "settings.json"), settings);
   writeJson(path.join(directory, "policy.json"), output.policy);
   writeJson(path.join(directory, "deposit-plan.json"), output.depositPlan);
@@ -492,4 +546,5 @@ async function main(argv, options = {}) {
   if (!options.quiet) console.log(`Prepared current-network inputs. ${output.unresolved.length} unresolved fields; no transactions submitted.`);
 }
 if (require.main === module) main(process.argv.slice(2)).catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { parse, lookup, prepare, snapshot, readRows, readExternal, discover, rolloutSettings, applyDeploymentArtifacts, getReadToken, writeNativeOutputs, main };
+module.exports = { parse, lookup, prepare, snapshot, readRows, discover, rolloutSettings, applyDeploymentArtifacts,
+  getReadToken, writeNativeOutputs, withExplicitEabPolicy, withExplicitNativePolicy, main };

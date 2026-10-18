@@ -6,9 +6,17 @@ const path = require('node:path');
 const { parse, lookup, prepare, snapshot, readRows, writeNativeOutputs } = require('../scripts/prepareBridgeRollout');
 const a = n => '0x' + String(n).padStart(40, '0');
 const row = (collection_name, keys, value) => ({ collection_name, key: Object.fromEntries(keys.map((k,i) => [i ? `key${i+1}` : 'key', k])), value });
+const explicitPolicy = {
+  mintPolicy: { capacity:'1000000000000000000001', refillRate:'17' },
+  tokenPolicy: { minDepositAmount:'10', maxPerWithdrawal:'1000000', manualReviewThreshold:'500000',
+    bucketCapacity:'9000000', refillRate:'10', maxAutoWithdrawalAmount:'0', migrateAmount:'0', enabled:true },
+  routePolicy: { depositsEnabled:true, withdrawalsEnabled:false, rebaseRequired:false,
+    autoRouteEnabled:false, maxAutoDepositAmount:'0' },
+};
 const input = { source: { nodeUrl: 'https://example.test', stratoChainId: '33056204878082667' },
-  target: { stratoChainId: '33056204878082667', chainId: 84532 },
-  eabRoutes: [{ stratoToken: a(1), externalToken: a(2), sourceExternalToken: a(3), sourceChainId: 1, externalDecimals: '6' }] };
+  target: { stratoChainId: '33056204878082667', chainId: 84532, depositRouterDeploymentBlock:'123' },
+  eabRoutes: [{ stratoToken: a(1), externalToken: a(2), sourceExternalToken: a(3), sourceChainId: 1,
+    externalDecimals: '6', externalName:'Token', externalSymbol:'TOK', ...explicitPolicy }] };
 const state = { stratoChainId: input.source.stratoChainId, tokens: { [a(1)]: { status: '2' } }, eab: { mappings: [
   row('routes', [a(3),1,a(1)], { externalDecimals: '6', maxPerWithdrawal: '1000000', manualReviewThreshold: '500000', depositsEnabled: true, withdrawalsEnabled: false }),
   row('mintPolicies', [a(1)], { capacity: '1000000000000000000001', refillRate: '17' }),
@@ -16,12 +24,16 @@ const state = { stratoChainId: input.source.stratoChainId, tokens: { [a(1)]: { s
 test('lossless JSON preserves large quantities and quoted strings', () => {
   assert.deepEqual(parse('{"x":1000000000000000000001,"s":"12 \\" hi","b":false}'), { x:'1000000000000000000001', s:'12 " hi', b:false });
 });
-test('current source limits prefill without inventing missing policy', () => {
+test('empty Cirrus mapping values remain empty instead of failing JSON parsing', () => {
+  assert.equal(lookup({ mappings:[row('hotWithdrawalThresholds',[1,a(3)],'')] }, 'hotWithdrawalThresholds', 1, a(3)), '');
+});
+test('reviewed route inputs produce the complete policy without source inheritance', () => {
   const result = prepare(input, state);
   assert.equal(result.policy.tokens[a(2)].maxPerWithdrawal, '1000000');
   assert.equal(result.policy.mintPolicies[a(1)].capacity, '1000000000000000000001');
-  assert.equal(result.policy.tokens[a(2)].bucketCapacity, 'REVIEW_REQUIRED');
-  assert.equal(result.policy.routes[`${a(2)}:${a(1)}`].autoRouteEnabled, true);
+  assert.equal(result.policy.tokens[a(2)].bucketCapacity, '9000000');
+  assert.equal(result.policy.routes[`${a(2)}:${a(1)}`].autoRouteEnabled, false);
+  assert.deepEqual(result.unresolved, []);
   assert.equal(result.depositPlan.operations[0].transactions[0].meta.items[0].stratoTokenStatus, '2');
 });
 test('network mixing, duplicate routes and ambiguous mapping rows fail', () => {
@@ -29,9 +41,9 @@ test('network mixing, duplicate routes and ambiguous mapping rows fail', () => {
   assert.throws(() => prepare({ ...input, eabRoutes:[...input.eabRoutes,...input.eabRoutes] }, state), /Duplicate/);
   assert.throws(() => lookup({ mappings:[...state.eab.mappings,...state.eab.mappings] }, 'mintPolicies', a(1)), /Ambiguous/);
 });
-test('different external decimals never copy raw limits', () => {
+test('reference token decimals do not alter explicit target policy', () => {
   const result = prepare({ ...input, eabRoutes:[{ ...input.eabRoutes[0], externalDecimals:'18' }] }, state);
-  assert.equal(result.policy.tokens[a(2)].maxPerWithdrawal, 'REVIEW_REQUIRED');
+  assert.equal(result.policy.tokens[a(2)].maxPerWithdrawal, '1000000');
 });
 test('native external routes use the canonical ETH symbol', () => {
   const route = { ...input.eabRoutes[0], externalToken: a(0), externalSymbol: 'Eth' };
@@ -51,10 +63,11 @@ test('metadata network mismatch aborts before Cirrus reads', async () => {
   await assert.rejects(snapshot(input, 'secret', async () => { requests++; return { ok:true, text:async () => '{"networkID":114784819836269}' }; }), /networkID mismatch/);
   assert.equal(requests,1);
 });
-test('disagreement between STRATO and vault limits requires review', () => {
-  const result = prepare(input, state, { [`1:${a(3)}`]: { maxPerWithdrawal:'2000000', manualReviewThreshold:'500000', bucketCapacity:'9000000', refillRate:'10' } });
-  assert.equal(result.policy.tokens[a(2)].maxPerWithdrawal, 'REVIEW_REQUIRED');
-  assert.equal(result.policy.tokens[a(2)].manualReviewThreshold, '500000');
+test('missing explicit policy remains review required', () => {
+  const route = { ...input.eabRoutes[0], tokenPolicy: { ...input.eabRoutes[0].tokenPolicy, bucketCapacity:undefined } };
+  const result = prepare({ ...input, eabRoutes:[route] }, state);
+  assert.equal(result.policy.tokens[a(2)].bucketCapacity, 'REVIEW_REQUIRED');
+  assert.ok(result.unresolved.some(name => name.endsWith('.bucketCapacity')));
 });
 test('native prefills keep token-wide settings separate from route calls', () => {
   const nativeState = { ...state, native: { address:a(9), mappings:[
@@ -62,7 +75,13 @@ test('native prefills keep token-wide settings separate from route calls', () =>
     row('tokenBridgeConfigs',[a(1)], { depositsDisabled:false, withdrawalsDisabled:true, maxOutstandingWithdrawal:'999999999999999999999' }),
     row('autoRouteEnabled',[a(1),1],true),
   ] } };
-  const result = prepare({ ...input, eabRoutes:[], nativeRoutes:[{ stratoToken:a(1), sourceChainId:1 }] }, nativeState);
+  const nativeRoute = { stratoToken:a(1), sourceChainId:1, nativePolicy: {
+    externalName:'Native', externalSymbol:'N', maxPerWithdrawal:'0', instantWithdrawalThreshold:'42',
+    enabled:true, autoRouteEnabled:true,
+    sharedTokenSettings:{ depositsDisabled:false, withdrawalsDisabled:true,
+      maxOutstandingWithdrawal:'999999999999999999999' },
+  } };
+  const result = prepare({ ...input, eabRoutes:[], nativeRoutes:[nativeRoute] }, nativeState);
   assert.equal(result.native[0]['instant-withdrawal-threshold'],'42');
   assert.equal(result.native[0]['auto-route-enabled'],true);
   assert.equal(result.native[0].sharedTokenSettings.maxOutstandingWithdrawal,'999999999999999999999');
@@ -94,8 +113,22 @@ test('discovery derives routes and selects canonical STRATO bridge addresses', a
     else if (!offset && url.pathname.endsWith('/storage')) data = url.searchParams.get('address') === `eq.${nativeBridge.slice(2)}`
       ? [{ address:nativeBridge, data:{ custodyVault:a(9) } }]
       : [{ address:mercataBridge, data:{ tokenFactory:a(8) } }];
+    else if (!offset && url.pathname.endsWith('/mapping') &&
+      url.searchParams.get('address') === `eq.${mercataBridge.slice(2)}` &&
+      url.searchParams.get('collection_name') === 'eq.hotWithdrawalThresholds') data = [
+      row('hotWithdrawalThresholds',[1,a(3)],'500000'),
+    ];
+    else if (!offset && url.pathname.endsWith('/mapping') &&
+      url.searchParams.get('address') === `eq.${nativeBridge.slice(2)}`) data = [
+      row('assets',[a(7),1], { enabled:true, externalBridge:a(8), representationToken:a(9),
+        externalName:'Native', externalSymbol:'N', maxPerWithdrawal:'1000', instantWithdrawalThreshold:'100' }),
+      row('tokenBridgeConfigs',[a(7)], { depositsDisabled:false, withdrawalsDisabled:true,
+        maxOutstandingWithdrawal:'5000' }),
+      row('autoRouteEnabled',[a(7),1],true),
+    ];
     else if (!offset && url.pathname.endsWith('/mapping') && url.searchParams.get('address') === `eq.${mercataBridge.slice(2)}`) data = [
-      row('assets',[a(3),1], { enabled:true, stratoToken:a(1), externalDecimals:'6', externalName:'Token', externalSymbol:'TOK' }),
+      row('assets',[a(3),1], { enabled:true, stratoToken:a(1), externalDecimals:'6', externalName:'Token', externalSymbol:'TOK',
+        maxPerWithdrawal:'1000000000000000000' }),
       row('assets',[a(4),1], { enabled:false, stratoToken:a(2), externalDecimals:'18', externalName:'Disabled', externalSymbol:'OFF' }),
       row('assets',[a(5),84532], { enabled:false, stratoToken:a(1), externalDecimals:'18', externalName:'Target Token', externalSymbol:'TT' }),
       row('assets',[a(6),999], { enabled:true, stratoToken:a(3), externalDecimals:'18', externalName:'Other Chain', externalSymbol:'OTHER' }),
@@ -115,6 +148,18 @@ test('discovery derives routes and selects canonical STRATO bridge addresses', a
   assert.equal(result.config.eabRoutes[0].externalName,'Target Token');
   assert.equal(result.config.eabRoutes[0].externalSymbol,'TT');
   assert.equal(result.config.eabRoutes[0].include,false);
+  assert.equal(result.config.eabRoutes[0].mintPolicy.capacity,'REVIEW_REQUIRED');
+  assert.equal(result.config.eabRoutes[0].tokenPolicy.maxPerWithdrawal,'1000000000000000000');
+  assert.equal(result.config.eabRoutes[0].tokenPolicy.manualReviewThreshold,'500000000000000000');
+  assert.equal(result.config.eabRoutes[0].tokenPolicy.enabled,true);
+  assert.equal(result.config.eabRoutes[0].routePolicy.depositsEnabled,true);
+  assert.equal(result.config.eabRoutes[0].routePolicy.withdrawalsEnabled,true);
+  assert.equal(result.config.eabRoutes[0].routePolicy.autoRouteEnabled,false);
+  assert.equal(result.config.nativeRoutes.length,1);
+  assert.equal(result.config.nativeRoutes[0].nativePolicy.maxPerWithdrawal,'1000');
+  assert.equal(result.config.nativeRoutes[0].nativePolicy.autoRouteEnabled,true);
+  assert.equal(result.config.nativeRoutes[0].nativePolicy.sharedTokenSettings.withdrawalsDisabled,true);
+  assert.equal(result.config.nativeRoutes[0].destinationPolicy.freezeRoute,'REVIEW_REQUIRED');
   assert.ok(requests.every(url => url.hostname === 'current.test'));
   assert.equal(result.missing.length,0);
 });

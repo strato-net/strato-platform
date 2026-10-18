@@ -231,14 +231,16 @@ function loadManifest(file, stage = "initial") {
     if (!/^[A-Z][A-Z0-9_]*$/.test(verifier.tokenEnv || "")) throw new Error("Verifier tokenEnv must name an environment variable");
   }
   if (services.verifiers.length) {
+    services.confirmations = Number(services.confirmations);
     if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) {
       throw new Error("services.confirmations must be a positive integer");
     }
     services.verifiers.forEach((verifier, index) => {
-      const confirmations = verifier.confirmations ?? services.confirmations;
+      const confirmations = Number(verifier.confirmations ?? services.confirmations);
       if (!Number.isSafeInteger(confirmations) || confirmations < services.confirmations) {
         throw new Error(`services.verifiers[${index}].confirmations must be an integer at least services.confirmations`);
       }
+      verifier.confirmations = confirmations;
     });
   }
   if (typeof manifest.settings?.sourceChainId !== "string") throw new Error("settings.sourceChainId must be a decimal string");
