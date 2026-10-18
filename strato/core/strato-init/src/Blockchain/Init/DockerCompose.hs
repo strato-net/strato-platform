@@ -111,6 +111,7 @@ generateDockerCompose = do
         , depends_on = Just $ DependsOnList ["apex", "postgrest", "prometheus"]
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
+        , environment = Just $ Map.fromList [("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
         , restart = Just "unless-stopped"
