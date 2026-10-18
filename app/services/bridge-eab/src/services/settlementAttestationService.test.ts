@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import axios from "axios";
+import { Wallet } from "ethers";
+import * as kmsSigner from "../utils/kmsSigner";
 
 for (const name of [
   "ALCHEMY_API_KEY",
@@ -28,6 +30,13 @@ for (const name of [
   process.env[name] ||= "1111111111111111111111111111111111111111";
 }
 process.env.SENDGRID_API_KEY = "SG.test.test";
+// The runtime calls verifiers with tokens signed by its access key; a test wallet stands in for AWS KMS.
+const runtimeAccess = Wallet.createRandom();
+process.env.RUNTIME_ACCESS_ADDRESS = runtimeAccess.address;
+process.env.RUNTIME_ACCESS_KMS_KEY_ID = "runtime-access-key";
+process.env.RUNTIME_ACCESS_KMS_REGION = "us-east-1";
+(kmsSigner as any).signTypedDataWithKms = (_config: unknown, domain: any, types: any, value: any) =>
+  runtimeAccess.signTypedData(domain, types, value);
 
 const deposit = {
   externalChainId: 1,
@@ -63,8 +72,6 @@ test("settles before a stalled verifier deadline and cancels the remaining reque
   );
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
     "https://one,https://two,https://three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
-    "token-one,token-two,token-three";
   const originalPost = axios.post;
   const originalTimeout = AbortSignal.timeout;
   let deadlineFired = false;
@@ -79,6 +86,7 @@ test("settles before a stalled verifier deadline and cancels the remaining reque
   (axios as any).post = async (url: string, payload: unknown, options: any) => {
     requests.push({ url, payload });
     assert.equal(options.timeout, 60_000);
+    assert.match(options.headers.Authorization, /^Bearer eab-access-v1\./);
     if (url.startsWith("https://three")) {
       return new Promise((_, reject) => {
         options.signal.addEventListener("abort", () => { cancelled = true; reject(options.signal.reason); }, { once: true });
@@ -132,8 +140,6 @@ test("reports verifier manual review when automatic threshold is not reached", a
   } = await import("./settlementAttestationService");
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
     "https://one,https://two,https://three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
-    "token-one,token-two,token-three";
   const originalPost = axios.post;
   (axios as any).post = async (url: string) => {
     if (url.startsWith("https://one")) {
@@ -202,7 +208,6 @@ test("a mixed quorum authorizes fallback only; duplicate or malformed votes cann
   const { attestDepositSettlement } = await import("./settlementAttestationService");
   t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two,token-three";
   let mode: unknown = true;
   let duplicate = false;
   t.mock.method(axios, "post", async (url: string) => {
@@ -308,7 +313,6 @@ test("release confirmation waits stay pending without hiding real verifier failu
   const { attestWithdrawalRelease, attestDepositSettlement } = await import("./settlementAttestationService");
   t.mock.method(cirrusService, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two,token-three";
   const errors = t.mock.method(logger, "logError", () => undefined);
   const authorization = { destinationChainId: "1" } as any;
   let mode = "pending";
@@ -350,7 +354,6 @@ test("refund quorum requires matching digests from distinct eligible attestors",
   t.mock.method(logger, "logError", () => undefined);
   t.mock.method(cirrus, "getSettlementVerifierConfig", async () => ({ threshold: 2, count: 3, verifiers: ["one", "two", "three"] }));
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two,https://three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "one,two,three";
   const digest = "0x" + "a".repeat(64);
   let mode = "stale";
   t.mock.method(axios, "post", async (url: string) => {
@@ -382,7 +385,6 @@ test("native settlement uses the native source quorum and native verifier route"
     throw new Error("EAB quorum must not authorize native settlement");
   });
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one,https://two";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "token-one,token-two";
   const requests: Array<{ url: string; payload: any }> = [];
   t.mock.method(axios, "post", async (url: string, payload: any) => {
     requests.push({ url, payload });

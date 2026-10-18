@@ -1,4 +1,4 @@
-import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
+import { verifierAuthorizationHeader } from "../utils/verifierAccessToken";
 import { ExternalBridgeStatus } from "@strato/shared-types";
 import { AbiCoder, keccak256, id } from "ethers";
 import { NATIVE_CANCELLATION_ABI } from "../config/bridgeAbi";
@@ -21,7 +21,6 @@ import {
   EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
   getChainRpcUrl,
   getNativeMintExecutorKmsConfig,
-  getNativeVerifierApiTokens,
   getNativeVerifierUrls,
   NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
 } from "../config";
@@ -208,10 +207,9 @@ export const signNativeMintAttestation = async (
   const normalized = normalizeAttestation(attestation);
   const destinationChainId = BigInt(normalized.destinationChainId);
   const urls = getNativeVerifierUrls(destinationChainId);
-  const tokens = getNativeVerifierApiTokens(destinationChainId);
-  if (urls.length === 0 || verifierCredentialsError(urls, tokens)) {
+  if (urls.length === 0) {
     throw new Error(
-      `Native verifier URLs and API tokens or the runtime access key are not configured for chain ${destinationChainId}`,
+      `Native verifier URLs are not configured for chain ${destinationChainId}`,
     );
   }
   const provider = new JsonRpcProvider(getChainRpcUrl(destinationChainId));
@@ -221,12 +219,12 @@ export const signNativeMintAttestation = async (
     throw new Error("Native verifier count does not satisfy the on-chain threshold");
   }
   const responses = await Promise.allSettled(
-    urls.map(async (url, index) =>
+    urls.map(async (url) =>
       axios.post(
         `${url}/v1/sign-native-mint`,
         { attestation: normalized },
         {
-          headers: await verifierAuthorizationHeader(url, destinationChainId, tokens[index]),
+          headers: await verifierAuthorizationHeader(url, destinationChainId),
           timeout: NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
           maxRedirects: 0,
         },

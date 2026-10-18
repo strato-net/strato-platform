@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { prepareRefund, collectRefundAttestations } = require('./refund-external-withdrawal');
+const { prepareRefund, checkRecordedRefundAttestations } = require('./refund-external-withdrawal');
 
 test('refund preflight checks confirmed state at the original vault and pins both networks', async () => {
   const bridge = '1'.repeat(40);
@@ -68,34 +68,34 @@ test('refund preflight checks confirmed state at the original vault and pins bot
   await assert.rejects(check(), /not eligible/);
 });
 
-test('refund quorum requires the expected digest and indexed on-chain attestations', async () => {
-  const names = ['NODE_URL', 'CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS', 'CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS'];
-  const previous = names.map((name) => process.env[name]);
-  const originalFetch = global.fetch;
-  process.env.NODE_URL = 'https://source.example';
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = 'https://one.example,https://two.example';
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = 'one,two';
+test('execute requires the refund attestations the runtime recorded on STRATO for the expected digest', async () => {
   const evidence = { threshold: 2, digest: `0x${'a'.repeat(64)}`,
     authorization: { destinationChainId: '1', sourceBridge: '1'.repeat(40) } };
-  let count = 1;
-  let responseDigest = evidence.digest;
-  global.fetch = async (url) => {
-    if (url.includes('/attest-refund')) return { ok: true, json: async () => ({
-      digest: responseDigest, transactionHash: 'recorded-tx', settlementAttestor: url.includes('one.') ? 'one' : 'two',
-    }) };
-    assert.equal(new URL(url).searchParams.get('or'), `(key.eq.${evidence.digest},key.eq.${evidence.digest.slice(2)})`);
-    return { ok: true, json: async () => [{ value: count }] };
+  let rows = [{ value: 1 }];
+  let ok = true;
+  const requested = [];
+  const options = {
+    nodeUrl: 'https://source.example/',
+    fetchImpl: async (url, init) => {
+      requested.push(url);
+      assert.equal(init.headers.Authorization, 'Bearer source-token');
+      const query = new URL(url);
+      assert.equal(query.origin + query.pathname, 'https://source.example/cirrus/search/BlockApps-ExternalAssetBridge-settlementAttestationCounts');
+      assert.equal(query.searchParams.get('address'), `eq.${'1'.repeat(40)}`);
+      assert.equal(query.searchParams.get('or'), `(key.eq.${evidence.digest},key.eq.${evidence.digest.slice(2)})`);
+      return { ok, status: ok ? 200 : 503, json: async () => rows };
+    },
   };
-  try {
-    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /not recorded on chain/);
-    count = 'invalid';
-    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /not recorded on chain/);
-    count = 2;
-    await collectRefundAttestations(evidence, 'source-token');
-    responseDigest = `0x${'b'.repeat(64)}`;
-    await assert.rejects(collectRefundAttestations(evidence, 'source-token'), /expected source digest/);
-  } finally {
-    global.fetch = originalFetch;
-    names.forEach((name, i) => previous[i] === undefined ? delete process.env[name] : process.env[name] = previous[i]);
-  }
+  const check = () => checkRecordedRefundAttestations(evidence, 'source-token', options);
+  await assert.rejects(check(), /records 1 of 2 refund attestations.*processing stage withdrawal-refund.*no governance vote submitted/);
+  rows = [];
+  await assert.rejects(check(), /records 0 of 2 refund attestations/);
+  rows = [{ value: 'invalid' }];
+  await assert.rejects(check(), /invalid refund attestation count/);
+  ok = false;
+  await assert.rejects(check(), /query failed: 503/);
+  ok = true;
+  rows = [{ value: '2' }];
+  assert.equal(await check(), 2);
+  assert.ok(requested.every((url) => !url.includes('/attest-refund')), 'the tool never calls verifiers');
 });

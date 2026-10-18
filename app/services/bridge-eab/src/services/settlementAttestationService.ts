@@ -1,9 +1,8 @@
-import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
+import { verifierAuthorizationHeader } from "../utils/verifierAccessToken";
 import axios from "axios";
 import { verifierIssues } from "../utils/processingIssues";
 import {
   VERIFIER_REQUEST_TIMEOUT_MS,
-  getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
 import {
@@ -30,7 +29,6 @@ export const requestVerifierQuorum = async (
   expectedDigest?: string,
 ): Promise<boolean> => {
   const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
-  const apiTokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
   const { threshold, verifiers } = path.startsWith("/v1/attest-native-")
     ? await getNativeSettlementVerifierConfig()
     : await getSettlementVerifierConfig();
@@ -42,12 +40,6 @@ export const requestVerifierQuorum = async (
   if (threshold < 2 || threshold > urls.length) {
     throw new Error(
       `Invalid settlement verifier threshold ${threshold} for ${urls.length} verifier services`,
-    );
-  }
-  const credentialsError = verifierCredentialsError(urls, apiTokens);
-  if (credentialsError) {
-    throw new Error(
-      `External bridge verifiers for chain ${chainId} need ${credentialsError}`,
     );
   }
   const eligible = new Set(verifiers.map((address) => address.toLowerCase().replace(/^0x/, "")));
@@ -67,7 +59,7 @@ export const requestVerifierQuorum = async (
         const response = await axios.post(`${url}${path}`, payload, {
           timeout: VERIFIER_REQUEST_TIMEOUT_MS,
           signal: AbortSignal.any([controller.signal, AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS)]),
-          headers: await verifierAuthorizationHeader(url, chainId, apiTokens[index]),
+          headers: await verifierAuthorizationHeader(url, chainId),
         });
         if (completed) return;
         const attestor = String(response.data?.settlementAttestor || "").toLowerCase().replace(/^0x/, "");

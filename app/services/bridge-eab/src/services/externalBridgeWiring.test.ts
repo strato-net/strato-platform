@@ -6,6 +6,9 @@ import test from "node:test";
 import { RouteAction } from "@strato/shared-types";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { Wallet } from "ethers";
+import * as kmsSigner from "../utils/kmsSigner";
+import { verifySignedVerifierAccess } from "../signer/accessControl";
 
 for (const name of [
   "ALCHEMY_API_KEY",
@@ -33,6 +36,13 @@ for (const name of [
   process.env[name] ||= "1111111111111111111111111111111111111111";
 }
 process.env.SENDGRID_API_KEY = "SG.test.test";
+// The runtime calls verifiers with tokens signed by its access key; a test wallet stands in for AWS KMS.
+const runtimeAccess = Wallet.createRandom();
+process.env.RUNTIME_ACCESS_ADDRESS = runtimeAccess.address;
+process.env.RUNTIME_ACCESS_KMS_KEY_ID = "runtime-access-key";
+process.env.RUNTIME_ACCESS_KMS_REGION = "us-east-1";
+(kmsSigner as any).signTypedDataWithKms = (_config: unknown, domain: any, types: any, value: any) =>
+  runtimeAccess.signTypedData(domain, types, value);
 
 const externalBridgeAddress = process.env.EXTERNAL_ASSET_BRIDGE_ADDRESS!;
 const bridgeSource = readFileSync(path.resolve(__dirname, "../../../../contracts/concrete/Bridge/ExternalAssetBridge.sol"), "utf8");
@@ -633,8 +643,6 @@ test("pre-flight requires every verifier and surfaces dissent as manual review",
   const axios = (await import("axios")).default;
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
     "https://check-one,https://check-two,https://check-three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
-    "token-one,token-two,token-three";
   const authorization = {
     destinationChainId: "1",
     sourceWithdrawalId: "7",
@@ -643,7 +651,11 @@ test("pre-flight requires every verifier and surfaces dissent as manual review",
   const originalPost = axios.post;
   (axios as any).post = async (url: string, _payload: unknown, options: any) => {
     assert.match(url, /\/v1\/check-withdrawal$/);
-    assert.match(options.headers.Authorization, /^Bearer token-/);
+    assert.ok(verifySignedVerifierAccess(options.headers.Authorization, {
+      runtimeAccessAddress: runtimeAccess.address,
+      verifierUrl: new URL(url).origin,
+      chainId: 1n,
+    }, Date.now()), "signed access for this verifier and chain");
     const verifier = url.includes("one") ? "one" : url.includes("two") ? "two" : "three";
     if (behavior[verifier] === "manual_review") {
       throw {
@@ -1635,8 +1647,6 @@ test("collects valid signatures when one signer stalls until the deadline", asyn
   const signerTwo = new Wallet(`0x${"32".repeat(32)}`);
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS =
     "https://signer-one,https://signer-two,https://signer-three";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS =
-    "token-one,token-two,token-three";
 
   const authorization = {
     sourceChainId: "9001",
@@ -1738,6 +1748,43 @@ test("requires workload-identity KMS for the external vault executor", async () 
     development.errors.join("\n"),
     /requires .*KMS_KEY_ID.*KMS_REGION/,
   );
+});
+
+test("requires the runtime access key once verifiers are configured and ignores legacy verifier tokens", async () => {
+  const { validateRuntimeAccessConfig } = await import("../utils/configValidator");
+  const names = ["RUNTIME_ACCESS_ADDRESS", "RUNTIME_ACCESS_KMS_KEY_ID", "RUNTIME_ACCESS_KMS_REGION",
+    "CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS", "CHAIN_84532_NATIVE_VERIFIER_URLS",
+    "CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS", "CHAIN_84532_NATIVE_VERIFIER_API_TOKENS"];
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  try {
+    for (const name of names) delete process.env[name];
+    assert.deepEqual(validateRuntimeAccessConfig(), { runtimeAccess: undefined, errors: [], warnings: [] });
+
+    process.env.CHAIN_84532_NATIVE_VERIFIER_URLS = "https://verifier-1.example";
+    const missing = validateRuntimeAccessConfig();
+    assert.equal(missing.runtimeAccess, undefined);
+    assert.match(missing.errors.join("\n"),
+      /runtime access key is not configured.*RUNTIME_ACCESS_ADDRESS, RUNTIME_ACCESS_KMS_KEY_ID, RUNTIME_ACCESS_KMS_REGION/);
+
+    delete process.env.CHAIN_84532_NATIVE_VERIFIER_URLS;
+    process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://verifier-1.example";
+    process.env.RUNTIME_ACCESS_ADDRESS = runtimeAccess.address;
+    process.env.RUNTIME_ACCESS_KMS_KEY_ID = "runtime-access-key";
+    process.env.RUNTIME_ACCESS_KMS_REGION = "us-east-1";
+    process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "legacy-one";
+    process.env.CHAIN_84532_NATIVE_VERIFIER_API_TOKENS = "legacy-two";
+    const configured = validateRuntimeAccessConfig();
+    assert.deepEqual(configured.errors, []);
+    assert.equal(configured.runtimeAccess?.address, runtimeAccess.address);
+    assert.equal(configured.warnings.length, 1);
+    assert.match(configured.warnings[0],
+      /CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS, CHAIN_84532_NATIVE_VERIFIER_API_TOKENS ignored/);
+  } finally {
+    for (const name of names) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+  }
 });
 
 test("validates external vault executor workload-identity KMS config", async () => {

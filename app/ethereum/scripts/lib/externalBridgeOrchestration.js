@@ -227,9 +227,6 @@ function loadManifest(file, stage = "initial") {
     const url = new URL(value);
     if (url.protocol !== "https:" || /[\r\n]/.test(value) || url.username || url.password || url.search || url.hash) throw new Error("Service base URLs must be HTTPS without credentials, query strings or control characters");
   }
-  for (const verifier of services.verifiers) {
-    if (!/^[A-Z][A-Z0-9_]*$/.test(verifier.tokenEnv || "")) throw new Error("Verifier tokenEnv must name an environment variable");
-  }
   if (services.verifiers.length) {
     services.confirmations = Number(services.confirmations);
     if (!Number.isSafeInteger(services.confirmations) || services.confirmations <= 0) {
@@ -390,6 +387,7 @@ function generate(context, outputDirectory, options = {}) {
     for (const name of ["BRIDGE_IMAGE", "BRIDGENGINX_IMAGE", "BRIDGE_ADDRESS", "STRATO_APP_API_URL", "BA_USERNAME", "BA_PASSWORD", "CLIENT_ID", "CLIENT_SECRET", "OPENID_DISCOVERY_URL",
       "RELAYER_BA_USERNAME", "RELAYER_BA_PASSWORD", "RELAYER_CLIENT_ID", "RELAYER_CLIENT_SECRET", "RELAYER_OPENID_DISCOVERY_URL",
       "SAFE_PROPOSER_ADDRESS", "SAFE_PROPOSER_KMS_KEY_ID", "SAFE_PROPOSER_KMS_REGION", "SAFE_API_KEY", "DEPOSIT_WEBHOOK_TOKEN", "DEPOSIT_OPERATIONS_TOKEN",
+      "RUNTIME_ACCESS_ADDRESS", "RUNTIME_ACCESS_KMS_KEY_ID", "RUNTIME_ACCESS_KMS_REGION",
       ...["WS_RPC_URL", "VERIFICATION_RPC_URLS", "EXTERNAL_BRIDGE_EXECUTOR_ADDRESS", "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID", "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION"].map((suffix) => `CHAIN_${rollout.chainId}_${suffix}`)]) bridgeEnvironment[name] = reference(name);
     bridgeEnvironment.SAFE_PROPOSER_ADDRESS = services.safeProposerAddress || "REVIEW_REQUIRED";
     bridgeEnvironment[`CHAIN_${rollout.chainId}_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS`] = services.executorAddress || "REVIEW_REQUIRED";
@@ -415,7 +413,7 @@ function generate(context, outputDirectory, options = {}) {
         SETTLEMENT_ATTESTOR_OPENID_DISCOVERY_URL: reference(`${prefix}_OPENID_DISCOVERY_URL`),
         SETTLEMENT_ATTESTOR_CLIENT_ID: reference(`${prefix}_CLIENT_ID`), SETTLEMENT_ATTESTOR_CLIENT_SECRET: reference(`${prefix}_CLIENT_SECRET`),
         SETTLEMENT_ATTESTOR_BA_USERNAME: reference(`${prefix}_BA_USERNAME`), SETTLEMENT_ATTESTOR_BA_PASSWORD: reference(`${prefix}_BA_PASSWORD`),
-        EXTERNAL_BRIDGE_VERIFIER_API_TOKEN: reference(services.verifiers[index]?.tokenEnv || `${prefix}_API_TOKEN`),
+        RUNTIME_ACCESS_ADDRESS: reference("RUNTIME_ACCESS_ADDRESS"), VERIFIER_PUBLIC_URL: verifier?.url || "REVIEW_REQUIRED",
         ...(nativeVerifierPolicyPaths.length ? {
           STRATO_NATIVE_BRIDGE_ADDRESS: context.nativeInputs.nativeRoutes[0]["bridge-address"],
           NATIVE_REPRESENTATION_BRIDGE_ADDRESS: context.nativeInputs.nativeConfig.bridgeAddress,

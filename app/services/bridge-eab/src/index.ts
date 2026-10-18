@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import { verifierAccessControl } from "./signer/accessControl";
+import { serviceTokenAccessControl } from "./signer/accessControl";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { logInfo, logError } from "./utils/logger";
@@ -30,9 +30,9 @@ const port = process.env.PORT || 3003;
 
 app.set("env", "production");
 app.use(cors());
-app.use("/webhooks/deposits", verifierAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
-app.use("/operations/deposits", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
-app.use("/operations/reviews", verifierAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use("/webhooks/deposits", serviceTokenAccessControl(process.env.DEPOSIT_WEBHOOK_TOKEN));
+app.use("/operations/deposits", serviceTokenAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
+app.use("/operations/reviews", serviceTokenAccessControl(process.env.DEPOSIT_OPERATIONS_TOKEN));
 app.use(bodyParser.json());
 
 // Global error handler

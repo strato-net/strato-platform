@@ -96,7 +96,7 @@ function completeHandoff(f, native = false) {
   f.manifest.authorizationSigners = [addr("d"), addr("e"), addr("f")];
   Object.assign(f.manifest.services, {
     confirmations: 12, safeProposerAddress: addr("b"), executorAddress: addr("c"),
-    verifiers: [1, 2, 3].map(index => ({ url: `https://verifier-${index}.example`, tokenEnv: `VERIFIER_${index}_API_TOKEN`, confirmations: 12 })),
+    verifiers: [1, 2, 3].map(index => ({ url: `https://verifier-${index}.example`, confirmations: 12 })),
   });
   if (native) {
     f.manifest.inputs.nativeRoutes = [{ "bridge-address": addr("9").slice(2), "external-chain-id": "11155111",
@@ -240,7 +240,6 @@ test("coordinator bundle loads without the original deployment files", (t) => {
   f.manifest.services.executorAddress = addr("c");
   f.manifest.services.verifiers = [1, 2, 3].map((index) => ({
     url: `https://verifier-${index}.example`,
-    tokenEnv: `VERIFIER_${index}_API_TOKEN`,
     confirmations: 12,
   }));
   writeJson(f.manifestPath, f.manifest);
@@ -749,8 +748,14 @@ test("service templates derive shared addresses without storing secret values", 
   const bridge = fs.readFileSync(path.join(f.artifacts.directory, "bridge.env.template"), "utf8");
   assert(bridge.includes(`TOKEN_ROUTER=${addr("4")}`));
   assert(bridge.includes("BA_PASSWORD=${BA_PASSWORD}"));
-  assert.equal(bridge.includes("VERIFIER_API_TOKENS"), false);
+  assert.equal(bridge.includes("API_TOKEN"), false);
+  for (const name of ["RUNTIME_ACCESS_ADDRESS", "RUNTIME_ACCESS_KMS_KEY_ID", "RUNTIME_ACCESS_KMS_REGION"]) {
+    assert(bridge.includes(`${name}=\${${name}}`));
+  }
   const verifier = fs.readFileSync(path.join(f.artifacts.directory, "verifier-2.env.template"), "utf8");
+  assert(verifier.includes("RUNTIME_ACCESS_ADDRESS=${RUNTIME_ACCESS_ADDRESS}"));
+  assert(verifier.includes("VERIFIER_PUBLIC_URL="));
+  assert.equal(verifier.includes("API_TOKEN"), false);
   assert(verifier.includes("VERIFIER_INDEPENDENT_RPC_URLS=${VERIFIER_2_INDEPENDENT_RPC_URLS}"));
   assert(verifier.includes("SETTLEMENT_ATTESTOR_BA_PASSWORD=${VERIFIER_2_BA_PASSWORD}"));
   assert(verifier.includes(`DESTINATION_VAULT_ADDRESS=${addr("2")}`));
@@ -762,7 +767,6 @@ test("each verifier can use a distinct confirmation count at least as strict as 
   f.manifest.services.confirmations = "12";
   f.manifest.services.verifiers = [12, 18, 24].map((confirmations, index) => ({
     url: `https://verifier-${index + 1}.example`,
-    tokenEnv: `VERIFIER_${index + 1}_TOKEN`,
     confirmations: String(confirmations),
   }));
   writeJson(f.manifestPath, f.manifest);
@@ -771,6 +775,7 @@ test("each verifier can use a distinct confirmation count at least as strict as 
   [12, 18, 24].forEach((confirmations, index) => {
     const template = fs.readFileSync(path.join(artifacts.directory, `verifier-${index + 1}.env.template`), "utf8");
     assert(template.includes(`VERIFIER_CONFIRMATIONS=${confirmations}`));
+    assert(template.includes(`VERIFIER_PUBLIC_URL=https://verifier-${index + 1}.example\n`));
   });
 
   f.manifest.services.verifiers[1].confirmations = "11";
@@ -778,13 +783,10 @@ test("each verifier can use a distinct confirmation count at least as strict as 
   assert.throws(() => loadManifest(f.manifestPath), /at least services.confirmations/);
 });
 
-test("service URL line injection and secret literals in tokenEnv are rejected", (t) => {
+test("service URL line injection and secret literals in environment names are rejected", (t) => {
   const f = fixture(t);
   f.manifest.services.confirmations = 12;
-  f.manifest.services.verifiers = [{ url: "https://verifier.invalid", tokenEnv: "secret-token-value", confirmations: 12 }];
-  writeJson(f.manifestPath, f.manifest);
-  assert.throws(() => loadManifest(f.manifestPath), /tokenEnv/);
-  f.manifest.services.verifiers[0] = { url: "https://verifier.invalid\nINJECTED=value", tokenEnv: "TOKEN_1", confirmations: 12 };
+  f.manifest.services.verifiers = [{ url: "https://verifier.invalid\nINJECTED=value", confirmations: 12 }];
   writeJson(f.manifestPath, f.manifest);
   assert.throws(() => loadManifest(f.manifestPath), /control characters/);
   f.manifest.services.verifiers[0].url = "https://verifier.invalid";

@@ -393,11 +393,15 @@ addresses from STRATO and requires these environment variables per chain:
 CHAIN_11155111_RPC_URL=https://...
 CHAIN_11155111_VAULT_AUTHORIZATION_SIGNER_ADDRESSES=0x...,0x...
 CHAIN_11155111_EXTERNAL_BRIDGE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
-CHAIN_11155111_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS=verifier-1-token,verifier-2-token,verifier-3-token
 CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_ADDRESS=0x...
 CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID=alias/eab-executor
 CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION=us-east-1
 ```
+
+It calls the verifiers with short-lived tokens signed by its KMS access key
+(`RUNTIME_ACCESS_ADDRESS`, `RUNTIME_ACCESS_KMS_KEY_ID`,
+`RUNTIME_ACCESS_KMS_REGION`). Each verifier sets `RUNTIME_ACCESS_ADDRESS` to
+that address and `VERIFIER_PUBLIC_URL` to its own URL from the list above.
 
 Production deployments must use the KMS/HSM executor configuration above. The
 `CHAIN_11155111_EXTERNAL_BRIDGE_EXECUTOR_PRIVATE_KEY` setting is only a local or

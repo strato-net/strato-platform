@@ -18,19 +18,13 @@ import {
   config,
   getExternalBridgeExecutorKmsConfig,
   getExternalBridgeExecutorPrivateKey,
-  getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
   getDepositReconciliationDepth,
   getNativeMintExecutorKmsConfig,
-  getNativeVerifierApiTokens,
   getNativeVerifierUrls,
   NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
 } from "../config";
 import { ensureHexPrefix } from "./utils";
-
-const getRuntimeAccessKmsConfigSafe = (): AwsKmsConfig | undefined => {
-  try { return getRuntimeAccessKmsConfig(); } catch { return undefined; }
-};
 
 const REPRESENTATION_BRIDGE_ABI = [
   "function attestationSigners(address) view returns (bool)",
@@ -142,6 +136,34 @@ export const validateExternalBridgeExecutorConfig = (
   return { executorAddress, errors, warnings };
 };
 
+// Signed verifier access: the runtime calls verifiers only with tokens signed by its KMS access key, so the key is
+// required as soon as any chain has verifier URLs. The former static verifier API tokens are ignored.
+export const validateRuntimeAccessConfig = (): {
+  runtimeAccess?: AwsKmsConfig;
+  errors: string[];
+  warnings: string[];
+} => {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const configuredEnv = (pattern: RegExp) =>
+    Object.keys(process.env).filter((name) => pattern.test(name) && process.env[name]?.trim()).sort();
+  let runtimeAccess: AwsKmsConfig | undefined;
+  if (configuredEnv(/^CHAIN_\d+_(EXTERNAL_BRIDGE|NATIVE)_VERIFIER_URLS$/).length > 0) {
+    try {
+      runtimeAccess = getRuntimeAccessKmsConfig();
+    } catch (error) {
+      errors.push((error as Error).message);
+    }
+  }
+  const legacyVerifierTokens = configuredEnv(/^CHAIN_\d+_(EXTERNAL_BRIDGE|NATIVE)_VERIFIER_API_TOKENS$/);
+  if (legacyVerifierTokens.length > 0) {
+    warnings.push(
+      `${legacyVerifierTokens.join(", ")} ignored: verifiers accept only tokens signed by the runtime access key; remove them`,
+    );
+  }
+  return { runtimeAccess, errors, warnings };
+};
+
 export async function validateBridgeConfig(): Promise<boolean> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -194,6 +216,11 @@ export async function validateBridgeConfig(): Promise<boolean> {
       errors.push(`${name} must contain at least ${MIN_SERVICE_TOKEN_LENGTH} characters`);
     }
   }
+
+  const runtimeAccessValidation = validateRuntimeAccessConfig();
+  errors.push(...runtimeAccessValidation.errors);
+  warnings.push(...runtimeAccessValidation.warnings);
+  const runtimeAccess = runtimeAccessValidation.runtimeAccess;
 
   // Initialize OAuth first (required for chain/asset validation)
   let oauthInitialized = false;
@@ -471,13 +498,13 @@ export async function validateBridgeConfig(): Promise<boolean> {
       );
 
       // Signed verifier access: the runtime's KMS access key must match its address, and every verifier must
-      // accept that address (its /health access.runtimeAccessAddress). Without the key the legacy tokens apply.
-      let runtimeAccess: AwsKmsConfig | undefined;
-      try {
-        runtimeAccess = getRuntimeAccessKmsConfig();
-        if (runtimeAccess) await validateAwsKmsAddress(runtimeAccess);
-      } catch (error) {
-        errors.push(`Runtime access key: ${(error as Error).message}`);
+      // accept that address (its /health access.runtimeAccessAddress).
+      if (runtimeAccess) {
+        try {
+          await validateAwsKmsAddress(runtimeAccess);
+        } catch (error) {
+          errors.push(`Runtime access key: ${(error as Error).message}`);
+        }
       }
 
       for (const chain of enabledChainsArr) {
@@ -494,7 +521,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
           );
         }
         const signerUrls = getExternalBridgeVerifierUrls(chainId);
-        const signerApiTokens = getExternalBridgeVerifierApiTokens(chainId);
         const executorKmsConfig = getExternalBridgeExecutorKmsConfig(chainId);
         const executorPrivateKey = getExternalBridgeExecutorPrivateKey(chainId);
         const executorValidation = validateExternalBridgeExecutorConfig(
@@ -516,15 +542,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
             `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS must contain distinct URLs`,
           );
         }
-        if (!runtimeAccess && signerApiTokens.length !== signerUrls.length) {
-          errors.push(
-            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain one token per verifier URL, unless the runtime access key is configured`,
-          );
-        } else if (new Set(signerApiTokens).size !== signerApiTokens.length) {
-          errors.push(
-            `CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS must contain distinct tokens`,
-          );
-        }
         errors.push(...validateExternalBridgeVerifierUrls(signerUrls));
         if (!chain.vault || !isAddress(chain.vault)) {
           errors.push(`Invalid external bridge vault for chain ${chainId}`);
@@ -535,7 +552,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
         if (
           !rpcUrl ||
           signerUrls.length === 0 ||
-          (!runtimeAccess && signerApiTokens.length !== signerUrls.length) ||
           !executorAddress
         ) {
           continue;
@@ -712,12 +728,10 @@ export async function validateBridgeConfig(): Promise<boolean> {
             `CHAIN_${chainId}_NATIVE_REPRESENTATION_BRIDGE_ADDRESS`;
           const executorEnv = `CHAIN_${chainId}_NATIVE_MINT_EXECUTOR`;
           const verifierUrlsEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_URLS`;
-          const verifierTokensEnv = `CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS`;
           const rpcEnv = `CHAIN_${chainId}_RPC_URL`;
           const representationBridgeAddress = process.env[representationBridgeEnv];
           const executorKms = getNativeMintExecutorKmsConfig(chainId);
           const verifierUrls = getNativeVerifierUrls(chainId);
-          const verifierTokens = getNativeVerifierApiTokens(chainId);
 
           if (!representationBridgeAddress) {
             missingNativeBridgeEnvVars.push(representationBridgeEnv);
@@ -734,9 +748,6 @@ export async function validateBridgeConfig(): Promise<boolean> {
           }
           if (verifierUrls.length === 0) {
             missingNativeBridgeEnvVars.push(verifierUrlsEnv);
-          }
-          if (!getRuntimeAccessKmsConfigSafe() && verifierTokens.length !== verifierUrls.length) {
-            errors.push(`${verifierTokensEnv} must contain one token per native verifier URL, unless the runtime access key is configured`);
           }
 
           if (

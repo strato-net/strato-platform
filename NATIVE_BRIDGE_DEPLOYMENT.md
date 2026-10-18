@@ -300,7 +300,7 @@ Before running the native flow end to end, update the bridge service environment
 - `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<full-key-arn>`
 - `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION=<aws-region>`
 - `CHAIN_11155111_NATIVE_VERIFIER_URLS=<comma-separated-independent-verifiers>`
-- `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<matching-comma-separated-tokens>`
+- `RUNTIME_ACCESS_ADDRESS`, `RUNTIME_ACCESS_KMS_KEY_ID`, `RUNTIME_ACCESS_KMS_REGION` if they are not already configured: the runtime's KMS access key, which signs a short-lived token for each verifier call
 
 Confirm that `StratoNativeBridge` has the bridge service STRATO address configured as its bridge operator before starting native withdrawals. The operator must be the STRATO address for the same `BA_USERNAME` account running the service.
 
@@ -313,7 +313,7 @@ The native runtime uses the `bridge` Compose service in `docker-compose.bridge-e
 - `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID`
 - `CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION`
 - `CHAIN_11155111_NATIVE_VERIFIER_URLS`
-- `CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS`
+- `RUNTIME_ACCESS_ADDRESS`, `RUNTIME_ACCESS_KMS_KEY_ID`, `RUNTIME_ACCESS_KMS_REGION`
 
 The bridge service now has a native mint path:
 - instant withdrawals move to `PENDING_REVIEW`, wait until `nativeMintNotBefore`, collect lane-bound V2 signatures from independent verifiers, execute directly through the authorized instant executor, verify destination confirmations and event fields, then finalize on STRATO
@@ -329,7 +329,7 @@ Native verifier rollout order:
 2. Add at least two independent representation-bridge attestation signers, then set `attestationThreshold` to at least `2`. The contract rejects `0` and `1`.
 3. Through STRATO governance, enable each verifier's settlement-attestor STRATO account with `setSettlementVerifier(account, true)`, then set `settlementVerifierThreshold` to at least `2`.
 4. Grant `MINT_EXECUTOR_ROLE` only to the dedicated instant executor; retain `DEFAULT_ADMIN_ROLE` on the custody Safe.
-5. Configure independent native verifier KMS signers, the native policy baseline, verifier URLs, API tokens, and each verifier's `SETTLEMENT_ATTESTOR_*` credentials.
+5. Configure independent native verifier KMS signers, the native policy baseline, verifier URLs, each verifier's `RUNTIME_ACCESS_ADDRESS` and `VERIFIER_PUBLIC_URL`, and each verifier's `SETTLEMENT_ATTESTOR_*` credentials.
 6. Deploy the verifier and bridge services and confirm their health checks.
 7. Exercise one manual Safe withdrawal, then one capped instant withdrawal.
 8. Enable the native route only after both verifier quorums and service health checks pass.
@@ -693,8 +693,12 @@ CHAIN_11155111_NATIVE_MINT_EXECUTOR_ADDRESS=<gas-paying-executor-address>
 CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<full-key-arn>
 CHAIN_11155111_NATIVE_MINT_EXECUTOR_KMS_REGION=<aws-region>
 CHAIN_11155111_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
-CHAIN_11155111_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
+RUNTIME_ACCESS_ADDRESS=<runtime-access-kms-address>
+RUNTIME_ACCESS_KMS_KEY_ID=<runtime-access-key-id>
+RUNTIME_ACCESS_KMS_REGION=<aws-region>
 ```
+
+The runtime calls the verifiers only with short-lived tokens signed by its access key. Each verifier accepts them from its configured `RUNTIME_ACCESS_ADDRESS`, for its own `VERIFIER_PUBLIC_URL` and chain.
 
 Each verifier process additionally needs:
 

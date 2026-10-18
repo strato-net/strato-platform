@@ -247,6 +247,10 @@ npm run refund:external-withdrawal -- \
 
 The command is a dry run unless `--execute` is supplied. Each required administrator must submit the same vote before the refund executes.
 
+**What it does**:
+- Verifies confirmed non-payment on the original destination vault, using `SOURCE_CHAIN_ID`, `CHAIN_<chainId>_RPC_URL` and `CHAIN_<chainId>_DEPOSIT_CONFIRMATIONS`
+- With `--execute`, requires that STRATO records at least the settlement verifier threshold of refund attestations for the expected refund digest, then submits the vote. The tool does not call the verifiers: the bridge runtime collects the `/v1/attest-refund` quorum while it prepares the refund (processing stage `withdrawal-refund`). If fewer are recorded, it submits no vote; wait for the runtime to prepare the refund and retry
+
 #### `smoke-native-bridge.js`
 Run a read-only smoke check against the deployed native STRATO bridge route.
 

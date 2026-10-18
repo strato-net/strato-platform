@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "crypto";
 import type { RequestHandler } from "express";
-import { getAddress, verifyTypedData } from "ethers";
+import { getAddress, isAddress, verifyTypedData } from "ethers";
 import {
   MIN_SERVICE_TOKEN_LENGTH,
   VERIFIER_ACCESS_CLOCK_TOLERANCE_SECONDS,
@@ -21,11 +21,29 @@ export interface SignedVerifierAccess {
   chainId: bigint;
 }
 
-// A verifier accepts the legacy bearer token, signed access, or both while a deployment moves to signed access.
-export interface VerifierAccessOptions {
-  token?: string;
-  signed?: SignedVerifierAccess;
-}
+// The verifier's access configuration: RUNTIME_ACCESS_ADDRESS (the runtime's access key address) and
+// VERIFIER_PUBLIC_URL (the verifier's own public URL, the audience of every token). Both are required.
+export const signedVerifierAccessFromEnv = (
+  env: NodeJS.ProcessEnv,
+  chainId: bigint,
+  warn: (message: string) => void = console.warn,
+): SignedVerifierAccess => {
+  const address = env.RUNTIME_ACCESS_ADDRESS?.trim();
+  if (!address) throw new Error("RUNTIME_ACCESS_ADDRESS is required: the address of the runtime's access key");
+  if (!isAddress(address)) throw new Error("RUNTIME_ACCESS_ADDRESS must be a valid address");
+  const url = env.VERIFIER_PUBLIC_URL?.trim();
+  if (!url) throw new Error("VERIFIER_PUBLIC_URL is required: this verifier's public URL, as the runtime calls it");
+  let verifierUrl: string;
+  try {
+    verifierUrl = normalizeVerifierUrl(url);
+  } catch (error) {
+    throw new Error(`VERIFIER_PUBLIC_URL must be this verifier's public https URL: ${(error as Error).message}`);
+  }
+  if (env.EXTERNAL_BRIDGE_VERIFIER_API_TOKEN?.trim()) {
+    warn("EXTERNAL_BRIDGE_VERIFIER_API_TOKEN is ignored: the verifier accepts only signed access from RUNTIME_ACCESS_ADDRESS. Remove it from the environment.");
+  }
+  return { runtimeAccessAddress: getAddress(address), verifierUrl, chainId };
+};
 
 export const verifySignedVerifierAccess = (
   authorization: string,
@@ -48,17 +66,8 @@ export const verifySignedVerifierAccess = (
   }
 };
 
-export const verifierAccessControl = (access: string | undefined | VerifierAccessOptions, now = Date.now): RequestHandler => {
-  const token = (typeof access === "object" ? access.token : access) || undefined;
-  const signed = typeof access === "object" ? access.signed : undefined;
-  if (!token && !signed) return (_req, res) => { res.status(503).json({ error: "Authentication is not configured" }); };
-  if (token !== undefined && token.length < MIN_SERVICE_TOKEN_LENGTH) throw new Error(`Bearer tokens must contain at least ${MIN_SERVICE_TOKEN_LENGTH} characters`);
-  const expected = token ? createHash("sha256").update(`Bearer ${token}`).digest() : undefined;
-  const audience = signed && {
-    runtimeAccessAddress: getAddress(signed.runtimeAccessAddress),
-    verifierUrl: normalizeVerifierUrl(signed.verifierUrl),
-    chainId: signed.chainId,
-  };
+// Bounds authenticated requests and failed attempts per client around an authorization check.
+const rateLimitedAccess = (authorized: (authorization: string) => boolean, now: () => number): RequestHandler => {
   const attempts = new Map<string, number>();
   let windowStart = now();
   let accepted = 0;
@@ -69,10 +78,7 @@ export const verifierAccessControl = (access: string | undefined | VerifierAcces
       windowStart = now();
     }
     const limited = () => { res.setHeader("Retry-After", "60"); res.status(429).json({ error: "Rate limit exceeded" }); };
-    const authorization = req.headers.authorization || "";
-    const tokenMatches = expected !== undefined &&
-      timingSafeEqual(createHash("sha256").update(authorization).digest(), expected);
-    if (!tokenMatches && !(audience && verifySignedVerifierAccess(authorization, audience, now()))) {
+    if (!authorized(req.headers.authorization || "")) {
       const client = req.socket.remoteAddress || "unknown";
       const count = attempts.get(client) || 0;
       if (count >= VERIFIER_AUTH_ATTEMPTS_PER_MINUTE || (!attempts.has(client) && attempts.size >= VERIFIER_RATE_LIMIT_MAX_CLIENTS)) {
@@ -85,4 +91,26 @@ export const verifierAccessControl = (access: string | undefined | VerifierAcces
     accepted++;
     next();
   };
+};
+
+// A verifier accepts only signed access: an eab-access-v1 token from the runtime access address for its own URL and chain.
+export const verifierAccessControl = (signed: SignedVerifierAccess, now = Date.now): RequestHandler => {
+  const audience = {
+    runtimeAccessAddress: getAddress(signed.runtimeAccessAddress),
+    verifierUrl: normalizeVerifierUrl(signed.verifierUrl),
+    chainId: signed.chainId,
+  };
+  return rateLimitedAccess((authorization) => verifySignedVerifierAccess(authorization, audience, now()), now);
+};
+
+// The runtime's own webhook and operations endpoints: one static bearer token each (DEPOSIT_WEBHOOK_TOKEN,
+// DEPOSIT_OPERATIONS_TOKEN). Not used between the runtime and the verifiers.
+export const serviceTokenAccessControl = (token: string | undefined, now = Date.now): RequestHandler => {
+  if (!token) return (_req, res) => { res.status(503).json({ error: "Authentication is not configured" }); };
+  if (token.length < MIN_SERVICE_TOKEN_LENGTH) throw new Error(`Bearer tokens must contain at least ${MIN_SERVICE_TOKEN_LENGTH} characters`);
+  const expected = createHash("sha256").update(`Bearer ${token}`).digest();
+  return rateLimitedAccess(
+    (authorization) => timingSafeEqual(createHash("sha256").update(authorization).digest(), expected),
+    now,
+  );
 };

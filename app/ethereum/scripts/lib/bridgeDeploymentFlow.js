@@ -205,9 +205,8 @@ function initializeDraft(discovered, nodeUrl, env = process.env) {
       rpcUrlEnv: `CHAIN_${chainId}_RPC_URL`,
       sourceTokenEnv: "ACCESS_TOKEN",
       confirmations: "REVIEW_REQUIRED",
-      verifiers: Array.from({ length: network.verifierCount }, (_, index) => ({
+      verifiers: Array.from({ length: network.verifierCount }, () => ({
         url: "REVIEW_REQUIRED",
-        tokenEnv: `VERIFIER_${index + 1}_API_TOKEN`,
         confirmations: "REVIEW_REQUIRED",
       })),
       bridgeHealthUrl: "REVIEW_REQUIRED",
