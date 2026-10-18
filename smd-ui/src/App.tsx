@@ -5,6 +5,7 @@ import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -29,30 +30,32 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
         <WagmiProvider config={wagmiConfig}>
-          <RainbowKitProvider>
-            <UserProvider>
-              <TooltipProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter basename="/smd">
-                  <Routes>
-                    <Route element={<DashboardLayout />}>
-                      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/accounts" element={<AccountsPage />} />
-                      <Route path="/contracts" element={<ContractsPage />} />
-                      <Route path="/explorer" element={<ExplorerPage />} />
-                      <Route path="/explorer/blocks/:number" element={<BlockDetailPage />} />
-                      <Route path="/explorer/transactions/:hash" element={<TransactionDetailPage />} />
-                      <Route path="/explorer/accounts/:address" element={<AddressDetailPage />} />
-                      <Route path="/explorer/search" element={<SearchPage />} />
-                    </Route>
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </BrowserRouter>
-              </TooltipProvider>
-            </UserProvider>
-          </RainbowKitProvider>
+          <ErrorBoundary>
+            <RainbowKitProvider>
+              <UserProvider>
+                <TooltipProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter basename="/smd">
+                    <Routes>
+                      <Route element={<DashboardLayout />}>
+                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/accounts" element={<AccountsPage />} />
+                        <Route path="/contracts" element={<ContractsPage />} />
+                        <Route path="/explorer" element={<ExplorerPage />} />
+                        <Route path="/explorer/blocks/:number" element={<BlockDetailPage />} />
+                        <Route path="/explorer/transactions/:hash" element={<TransactionDetailPage />} />
+                        <Route path="/explorer/accounts/:address" element={<AddressDetailPage />} />
+                        <Route path="/explorer/search" element={<SearchPage />} />
+                      </Route>
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </BrowserRouter>
+                </TooltipProvider>
+              </UserProvider>
+            </RainbowKitProvider>
+          </ErrorBoundary>
         </WagmiProvider>
       </ThemeProvider>
     </QueryClientProvider>
