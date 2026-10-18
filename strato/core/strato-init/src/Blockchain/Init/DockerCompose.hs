@@ -25,20 +25,22 @@ import System.Process (readProcess)
 apexPort :: Int
 apexPort = 80
 
--- | Which of the node's containers a role runs. A core keeps the stores the
--- chain processes write; an API tier keeps what fronts strato-api.
-roleHasService :: Role -> String -> Bool
-roleHasService RoleNode _ = True
-roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
-roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- | Which of the node's containers a role runs, given whether Prometheus and
+-- apex are wanted (@--monitoring@, meaningful on an api-node only). A core
+-- keeps the stores the chain processes write; an API tier keeps what fronts
+-- strato-api.
+roleHasService :: Bool -> Role -> String -> Bool
+roleHasService _ RoleNode _ = True
+roleHasService _ RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService _ RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
 -- A validator keeps its stores and Prometheus, plus apex: the network monitor
 -- polls its /health, published directly since there is no nginx.
-roleHasService RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
+roleHasService _ RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
 -- An api-node keeps everything the APIs need and drops what only serves
 -- people: no docs, smd or app-*. Prometheus and apex produce /health for the
 -- network monitor and stay unless --monitoring=false; local-auth is in the
 -- service list only with --localAuth, as on a node.
-roleHasService RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | flags_monitoring, svc <- ["prometheus", "apex"] ])
+roleHasService monitoring RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | monitoring, svc <- ["prometheus", "apex"] ])
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -50,6 +52,10 @@ generateDockerCompose role = do
       -- PostgREST (Cirrus at /cirrus) too, unless the API tier serves Cirrus.
       -- A node or an api-node honours the flag; an API directory always runs it.
       bundledPostgrest = role `notElem` [RoleNode, RoleApiNode] || flags_bundledPostgrest
+      -- Prometheus and apex, which produce /health. Only an api-node may turn
+      -- them off (the Generator refuses --monitoring=false elsewhere).
+      monitoring = flags_monitoring
+      hasService = roleHasService monitoring role
       -- A remote --pghost (a managed cluster) replaces the postgres container:
       -- containers reach it by that name instead of the service name.
       externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
@@ -162,7 +168,7 @@ generateDockerCompose role = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | roleHasService role "redis" ])
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | hasService "redis" ])
         , extra_hosts = hostGateway
         , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
@@ -382,8 +388,8 @@ generateDockerCompose role = do
   -- their targets sit DOWN forever.
   let prometheusSkipJobs =
         [ "core-api" | not (roleRunsApi role) ]
-        ++ [ "nginx" | not (roleHasService role "nginx") ]
-        ++ [ "apex" | not (roleHasService role "apex") ]
+        ++ [ "nginx" | not (hasService "nginx") ]
+        ++ [ "apex" | not (hasService "apex") ]
         ++ [ "slipstream" | not (roleIndexesSql role) ]
         ++ [ "strato-ingest" | role /= RoleCore ]
 
@@ -470,7 +476,7 @@ generateDockerCompose role = do
       -- either (/health and /apex-api answer 502). With --localAuth it waits
       -- for a healthy local-auth like the node's nginx: it fetches the OpenID
       -- discovery document from there at startup.
-      apiNodeUpstreams = [ svc | flags_monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
+      apiNodeUpstreams = [ svc | monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
       apiNodeNginx = nginx
         { depends_on = Just $
             if flags_localAuth
@@ -482,7 +488,7 @@ generateDockerCompose role = do
             [ ("BUNDLED_SMD", "false")
             , ("SMD_URL", flags_smdUrl)
             , ("DOCS_HOST", "127.0.0.1:1")
-            ] ++ [ kv | not flags_monitoring, kv <- [("APEX_HOST", "127.0.0.1:1"), ("PROMETHEUS_HOST", "127.0.0.1:1")] ]
+            ] ++ [ kv | not monitoring, kv <- [("APEX_HOST", "127.0.0.1:1"), ("PROMETHEUS_HOST", "127.0.0.1:1")] ]
             ) <$> environment nginx
         }
       roleNginx = case role of
@@ -492,7 +498,7 @@ generateDockerCompose role = do
       roleServices =
         [ (name, if name == "nginx" then roleNginx else svc)
         | (name, svc) <- allServices
-        , roleHasService role name
+        , hasService name
         , bundledApp || name `notElem` ["app-backend", "app-ui"]
         , bundledSmd || name /= "smd"
         , bundledPostgrest || name /= "postgrest"

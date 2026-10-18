@@ -13,8 +13,16 @@ FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
 NETWORK="upquark"
-ROLE="node"
 SETUP_ARGS=()
+
+# The spellings HFlags accepts for a Bool flag given as --flag=VALUE.
+is_true() {
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+        true|yes|1) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 for arg in "$@"; do
     case "$arg" in
         # --patch-app was removed - inform the user. To be removed soon.
@@ -39,22 +47,25 @@ for arg in "$@"; do
             SETUP_ARGS+=("$arg")
             ;;
         # --role is passed through to strato-setup; remembered here because a
-        # snapshot (chain state) has nothing to restore into an API-only directory.
+        # snapshot (chain state) has nothing to restore into an API-only directory
+        # and a validator keeps no SQL databases. strato-setup matches the value
+        # case-insensitively, so it is lowercased here too.
         --role=*)
-            ROLE="${arg#*=}"
-            ROLE_FLAG="$ROLE"
+            ROLE_FLAG="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
             SETUP_ARGS+=("$arg")
             ;;
         # Shorthand for --role=validator, understood by strato-setup too.
-        --validator|--validator=true)
-            ROLE="validator"
-            VALIDATOR_FLAG="true"
+        --validator|--validator=*)
+            if [[ "$arg" == "--validator" ]] || is_true "${arg#*=}"; then
+                VALIDATOR_FLAG="true"
+            fi
             SETUP_ARGS+=("$arg")
             ;;
         # Shorthand for --role=api-node, understood by strato-setup too.
-        --apiNode|--apiNode=true)
-            ROLE="api-node"
-            APINODE_FLAG="true"
+        --apiNode|--apiNode=*)
+            if [[ "$arg" == "--apiNode" ]] || is_true "${arg#*=}"; then
+                APINODE_FLAG="true"
+            fi
             SETUP_ARGS+=("$arg")
             ;;
         *)
@@ -80,7 +91,17 @@ if [[ "${APINODE_FLAG:-}" == "true" && -n "${ROLE_FLAG:-}" && "$ROLE_FLAG" != "a
     exit 1
 fi
 
-if [[ "$FROM_SNAPSHOT" == "true" && "${ROLE:-node}" == "api" ]]; then
+# The role strato-setup will build, with its precedence (parseRole in
+# strato-init): --validator wins over --role whatever the argument order, and
+# --apiNode has been checked to agree with --role above.
+ROLE="${ROLE_FLAG:-node}"
+if [[ "${VALIDATOR_FLAG:-}" == "true" ]]; then
+    ROLE="validator"
+elif [[ "${APINODE_FLAG:-}" == "true" ]]; then
+    ROLE="api-node"
+fi
+
+if [[ "$FROM_SNAPSHOT" == "true" && "$ROLE" == "api" ]]; then
     echo "Error: --snapshot restores chain state, which an API-only directory (--role=api) does not hold." >&2
     exit 1
 fi
