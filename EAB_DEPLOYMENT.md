@@ -396,7 +396,27 @@ Check: `READY_FOR_ACTIVATION`. Verify performs fresh Cirrus, target RPC, contrac
 npm run external:rollout -- activate --manifest "$ROLLOUT_DIR/deployment.json"
 ```
 
-This re-runs verify gates and replaces `.deployment/current/` with activation-only handoffs. The Coordinator gives the STRATO admin the absolute `activation-admin.json` path. Set `ADMIN_APPROVAL_FILE` to that path and execute it with `approve --file "$ADMIN_APPROVAL_FILE" --env-file "$REPO_ROOT/app/contracts/.env"`. Execute `activation-safe-<safe>.json` with `safe:batch`. Activation is never included in preactivation.
+This re-runs verify gates and replaces `.deployment/current/` with activation-only handoffs. The Coordinator gives the STRATO admin the absolute `activation-admin.json` path. The admin confirms that `app/contracts/.env` contains their credentials and a current `OAUTH_TOTP` when required, then runs:
+
+```bash
+export REPO_ROOT=<ABSOLUTE_REPOSITORY_PATH>
+export ADMIN_APPROVAL_FILE=<ABSOLUTE_ACTIVATION_ADMIN_JSON_FROM_COORDINATOR>
+
+cd "$REPO_ROOT/app/ethereum"
+npm run external:rollout -- approve \
+  --file "$ADMIN_APPROVAL_FILE" \
+  --env-file "$REPO_ROOT/app/contracts/.env"
+```
+
+Execute `activation-safe-<safe>.json` with `safe:batch`. Activation is never included in preactivation.
+
+After both activation handoffs execute, run the final read-only verification:
+
+```bash
+npm run external:rollout -- verify --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+Check: `ACTIVE_VERIFIED`. Then complete one deposit and one withdrawal canary before declaring the launch complete.
 
 ## Recovery
 

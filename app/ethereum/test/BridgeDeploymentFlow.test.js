@@ -11,7 +11,7 @@ const {
 } = require("../scripts/lib/rolloutRuntime");
 const {
   scopeOf, mergeDiscovery, initializeDraft, preflightDraft, preflight,
-  activationReady, generateBootstrap, generateCurrent,
+  activationReady, activationVerified, generateBootstrap, generateCurrent,
 } = require("../scripts/lib/bridgeDeploymentFlow");
 
 const address = digit => `0x${digit.repeat(40)}`;
@@ -469,6 +469,28 @@ test("activation is separate and remains blocked by live readiness gates", async
     activate,
   });
   assert.deepEqual(result.files, [`activation-safe-${f.safe}.json`]);
+});
+
+test("final verification requires active contracts and complete live checks", () => {
+  const checks = [
+    "external-identity", "deposit-router", "withdrawal-pause",
+    "safe-runtime-identities", "vault-configuration", "verifiers", "bridge-health",
+  ].map(name => ({ name, status: "PASSED" }));
+  const inspection = {
+    externalReady: true,
+    router: { paused: false },
+    report: {
+      status: "DEPOSITS_ACTIVE_CANARY_REQUIRED",
+      checks,
+      calls: [{ status: "COMPLETE" }],
+    },
+  };
+  assert.equal(activationVerified(inspection), true);
+  inspection.router.paused = true;
+  assert.equal(activationVerified(inspection), false);
+  inspection.router.paused = false;
+  checks.at(-1).status = "FAILED";
+  assert.equal(activationVerified(inspection), false);
 });
 
 test("scope validation covers combined, EAB-only, and native extension", () => {

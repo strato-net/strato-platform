@@ -18,7 +18,7 @@ const {
   portableSnapshot, createApprovalRequest, runApproval,
 } = require("./rolloutHandoff");
 const {
-  validateNativeReadiness, nativeApprovalInspection, nativeOnlyEabVerified,
+  validateNativeReadiness, nativeApprovalInspection, nativeOnlyEabVerified, verifyNativeActivation,
 } = require("./rolloutNativeInspection");
 const { buildTransactionBuilderBatch } = require("./depositRouterSafeOps");
 const { getExternalBridgeNetwork } = require("./externalBridgeNetworks");
@@ -587,6 +587,17 @@ function activationReady(context, inspection) {
       .every(({ status }) => status === "COMPLETE");
 }
 
+function activationVerified(inspection) {
+  const required = [
+    "external-identity", "deposit-router", "withdrawal-pause",
+    "safe-runtime-identities", "vault-configuration", "verifiers", "bridge-health",
+  ];
+  return inspection.externalReady && inspection.router?.paused === false &&
+    inspection.report.status === "DEPOSITS_ACTIVE_CANARY_REQUIRED" &&
+    required.every(name => inspection.report.checks.find(check => check.name === name)?.status === "PASSED") &&
+    inspection.report.calls.every(({ status }) => status === "COMPLETE");
+}
+
 async function generateCurrent(context, manifestPath, phase, options = {}) {
   validateReviewedInputs(context);
   const current = path.join(path.dirname(manifestPath), ".deployment", "current");
@@ -737,6 +748,10 @@ async function main(argv = process.argv.slice(2), options = {}) {
   try {
     const artifacts = (options.generate || generate)(context, work);
     const inspection = await (options.inspect || inspect)(context, artifacts);
+    if (args.command === "verify" && activationVerified(inspection)) {
+      await (options.verifyNativeActivation || verifyNativeActivation)(context, artifacts, inspection);
+      return { status: "ACTIVE_VERIFIED", next: "Run deposit and withdrawal canaries before declaring launch complete" };
+    }
     if (!activationReady(context, inspection)) {
       throw new Error("Preactivation is incomplete or Runtime is not ready");
     }
@@ -758,6 +773,6 @@ async function main(argv = process.argv.slice(2), options = {}) {
 }
 
 module.exports = {
-  scopeOf, mergeDiscovery, initializeDraft, expandDraft, preflightDraft, preflight, activationReady,
+  scopeOf, mergeDiscovery, initializeDraft, expandDraft, preflightDraft, preflight, activationReady, activationVerified,
   generateBootstrap, generateCurrent, main,
 };
