@@ -216,8 +216,8 @@ mkFilesAndGenesis nodeDir hasFlags network = do
 
     when (role == RoleValidator && flags_localAuth) $ liftIO $
       error "--role=validator cannot be combined with --localAuth: a validator runs no identity provider; its node key comes from the shared Vault (run strato-login first)"
-    when (role /= RoleNode && flags_localAuth) $
-      liftIO $ error "--localAuth is only supported with --role=node"
+    when (not (roleRunsLocalAuth role) && flags_localAuth) $
+      liftIO $ error "--localAuth is only supported with --role=node or --role=api-node"
     when (role /= RoleNode && flags_dockerMode == "allDocker") $
       liftIO $ error "--dockerMode=allDocker is only supported with --role=node; use docker-compose.api.yml for a containerized API tier"
     when (not flags_monitoring && not (roleAllowsMonitoringOff role)) $

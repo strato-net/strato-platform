@@ -35,9 +35,10 @@ roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
 -- polls its /health, published directly since there is no nginx.
 roleHasService RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
 -- An api-node keeps everything the APIs need and drops what only serves
--- people: no docs, smd, app-* or local-auth. Prometheus and apex produce
--- /health for the network monitor and stay unless --monitoring=false.
-roleHasService RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest"] ++ [ svc | flags_monitoring, svc <- ["prometheus", "apex"] ])
+-- people: no docs, smd or app-*. Prometheus and apex produce /health for the
+-- network monitor and stay unless --monitoring=false; local-auth is in the
+-- service list only with --localAuth, as on a node.
+roleHasService RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | flags_monitoring, svc <- ["prometheus", "apex"] ])
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -466,10 +467,17 @@ generateDockerCompose role = do
       -- SMD is treated the same, so / and /smd answer 404, or redirect when
       -- --appUrl or --smdUrl names them elsewhere. There are no Swagger docs
       -- (/docs answers 502), and without --monitoring no apex or Prometheus
-      -- either (/health and /apex-api answer 502).
+      -- either (/health and /apex-api answer 502). With --localAuth it waits
+      -- for a healthy local-auth like the node's nginx: it fetches the OpenID
+      -- discovery document from there at startup.
+      apiNodeUpstreams = [ svc | flags_monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
       apiNodeNginx = nginx
-        { depends_on = Just $ DependsOnList $
-            [ svc | flags_monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
+        { depends_on = Just $
+            if flags_localAuth
+              then DependsOnMap $ Map.fromList $
+                ("local-auth", DependsOnCondition "service_healthy")
+                  : [ (svc, DependsOnCondition "service_started") | svc <- apiNodeUpstreams ]
+              else DependsOnList apiNodeUpstreams
         , environment = Map.union (Map.fromList $
             [ ("BUNDLED_SMD", "false")
             , ("SMD_URL", flags_smdUrl)

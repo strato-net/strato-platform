@@ -22,6 +22,7 @@ module Blockchain.Init.Role
     roleRunsCore,
     roleRunsApi,
     roleIndexesSql,
+    roleRunsLocalAuth,
     roleAllowsMonitoringOff,
   )
 where
@@ -78,6 +79,14 @@ roleRunsApi role = role `elem` [RoleNode, RoleApi, RoleApiNode]
 -- keeps the chain and the Redis block index only.
 roleIndexesSql :: Role -> Bool
 roleIndexesSql = (/= RoleValidator)
+
+-- | May run the bundled identity provider and node-local Vault
+-- (@--localAuth@): the roles that serve the API through nginx and hold a node
+-- key, so the local-auth container, its @/auth/@ and @/vault/@ routes and the
+-- vault-wrapper process all have a home. An API tier has no node key and a
+-- validator no nginx.
+roleRunsLocalAuth :: Role -> Bool
+roleRunsLocalAuth role = role `elem` [RoleNode, RoleApiNode]
 
 -- | May drop Prometheus and apex (@--monitoring=false@), and with them
 -- @/health@: only an api-node, for operators with their own monitoring.

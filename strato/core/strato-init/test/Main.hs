@@ -111,6 +111,11 @@ main = hspec $ do
       parseRole "api" False True `shouldSatisfy` isLeft
       parseRole "validator" False True `shouldSatisfy` isLeft
 
+  describe "roleRunsLocalAuth" $
+    it "a node or an api-node may run the local identity provider and Vault" $
+      filter roleRunsLocalAuth [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
+        `shouldBe` [RoleNode, RoleApiNode]
+
   describe "roleAllowsMonitoringOff" $
     it "only an api-node may drop prometheus and apex (--monitoring=false)" $
       filter roleAllowsMonitoringOff [RoleNode, RoleCore, RoleApi, RoleValidator, RoleApiNode]
