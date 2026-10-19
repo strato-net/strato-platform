@@ -16,6 +16,8 @@
 module Blockchain.Event
   ( module Blockchain.EventModel,
     handleEvents,
+    getNewSyncFetch,
+    syncFetchTask,
   )
 where
 
@@ -58,7 +60,6 @@ import qualified Data.ByteString.Char8                 as BS8
 import           Data.Conduit
 import           Data.List                             hiding (insert, lookup)
 import qualified Data.Map.Strict                       as M
-import           Data.Maybe
 import qualified Data.Text                             as T
 import           Data.Time.Clock
 import           Debug.Trace                           (trace)
@@ -248,28 +249,33 @@ handleEvents peer = awaitForever $ \case
 
     yieldL . ToUnseq $ IEBlock . blockToIngestBlock (Origin.PeerString $ peerString peer) <$> blocks'
 
-    currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
+    mCurrentSyncTask <- lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
         maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
 
-    maybeFetchNumber <-
+    maybeFetchNumber <- case mCurrentSyncTask of
+      -- Requested while holding no task (tip-following recovery, or the task
+      -- was marked NotReady meanwhile): nothing to account them to or continue.
+      Nothing -> return Nothing
+      Just currentSyncTask ->
         if maxBlockNumber >= 1000 * fromIntegral (syncTaskChiliad currentSyncTask) + 999
           then do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            lift $ setSyncTaskFinished (pPeerHost peer)
+            lift $ setSyncTaskFinished currentSyncTask
 
             $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
 
-            syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
-            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
-            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
+            BestSequencedBlock _ myNumber _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
+            newSyncFetch <- lift $ getNewSyncFetch peer myNumber worldNumber
+            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show (fst <$> newSyncFetch)
+            return newSyncFetch
           else do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
-            return $ Just $ maxBlockNumber + 1
+            return $ Just (currentSyncTask, maxBlockNumber + 1)
 
-    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show maybeFetchNumber
+    $logInfoS "handleEvents/BlockBodies" $ T.pack $ "blockHeaders :: maybeFetchNumber is " ++ show (snd <$> maybeFetchNumber)
 
     bodyHashes' <- lift getBodiesToFetch
 
@@ -278,10 +284,9 @@ handleEvents peer = awaitForever $ \case
       case maybeFetchNumber of
         Nothing ->
           $logInfoS "handleEvents/BlockBodies" $ T.pack $ "No new sync tasks available, done downloading"
-        Just fetchNumber | fetchNumber <= worldNumber -> syncFetch Forward fetchNumber
-        _ -> do
-          currentSyncTask' <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
-          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad currentSyncTask') ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
+        Just (task, fetchNumber) | fetchNumber <= worldNumber -> syncFetchTask task fetchNumber
+        Just (task, _) -> do
+          $logInfoS "handleEvents/BlockBodies" $ T.pack $ "remaining blocks in chiliad #" ++ show (syncTaskChiliad task) ++ " are higher than the world best block, marking that chiliad as 'NotReady'"
           lift $ setSyncTaskNotReady (pPeerHost peer)
       else do
         yieldR $ GetBlockBodies bodyHashes'
@@ -427,11 +432,11 @@ handleEvents peer = awaitForever $ \case
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do
           $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
-          maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
-          $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
-          case maybeNewSyncTask of
+          maybeNewSyncFetch <- lift $ getNewSyncFetch peer myNumber worldNumber
+          $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show (fst <$> maybeNewSyncFetch)
+          case maybeNewSyncFetch of
             Nothing -> return ()
-            Just syncTask -> syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+            Just (task, fetchNumber) -> syncFetchTask task fetchNumber
 
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
@@ -487,6 +492,37 @@ alignFetchNumber n = (max 0 n `div` step) * step
   where
     step = fromIntegral . max 1 $ Conf.maxReturnedHeaders (p2pConfig ethConf)
 
+-- | Take a new sync task for this peer, with the block to start downloading
+-- it from: the first block of its chiliad above our sequenced tip.
+--
+-- Starting at the chiliad boundary re-requests headers we already have. The
+-- header cache drops every header at or below the tip, so no bodies are
+-- requested, the BlockBodies continuation never runs, and a minute later the
+-- task is handed to the next peer to repeat the same request. A node restored
+-- from a snapshot mid-chiliad sat in that loop until it was asked for the
+-- missing blocks by hand.
+--
+-- A chiliad we have already sequenced in full has nothing left to download,
+-- so no fetch could ever finish it; it is marked finished here and the next
+-- one taken instead. These appear when the sync_task table lags the chain,
+-- e.g. chiliads handed out while we were in sync.
+getNewSyncFetch ::
+  (Monad m, HasSyncDB m) =>
+  PPeer ->
+  Integer ->
+  Integer ->
+  m (Maybe (SyncTask, Integer))
+getNewSyncFetch peer myBest worldNumber =
+  getNewSyncTask (pPeerHost peer) worldNumber >>= \case
+    Nothing -> pure Nothing
+    Just task
+      | myBest >= chiliadStart + 999 -> do
+          setSyncTaskFinished task
+          getNewSyncFetch peer myBest worldNumber
+      | otherwise -> pure $ Just (task, max chiliadStart (myBest + 1))
+      where
+        chiliadStart = 1000 * fromIntegral (syncTaskChiliad task)
+
 syncFetch ::
   ( MonadIO m,
     Modifiable ActionTimestamp m
@@ -496,6 +532,22 @@ syncFetch ::
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
   yieldR $ GetBlockHeaders (BlockNumber num) (Conf.maxReturnedHeaders (p2pConfig ethConf)) 0 d
+  lift stampActionTimestamp
+
+-- | Fetch a sync task's headers from @start@, never past the end of its
+-- chiliad: the batch of bodies that reaches the end finishes the task, and
+-- bodies beyond it would arrive with no task to account them to.
+syncFetchTask ::
+  ( MonadIO m,
+    Modifiable ActionTimestamp m
+  ) =>
+  SyncTask ->
+  Integer ->
+  ConduitM Event (Either P2PCNC Message) m ()
+syncFetchTask task start = do
+  let chiliadEnd = 1000 * fromIntegral (syncTaskChiliad task) + 999
+      count = min (Conf.maxReturnedHeaders (p2pConfig ethConf)) (fromIntegral $ chiliadEnd - start + 1)
+  yieldR $ GetBlockHeaders (BlockNumber start) count 0 Forward
   lift stampActionTimestamp
 
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool
