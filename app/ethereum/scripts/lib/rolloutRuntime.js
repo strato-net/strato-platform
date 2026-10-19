@@ -134,7 +134,6 @@ function redact(message, env = process.env, secretNames = []) {
 
 const redactFor = (context, message) => redact(message, process.env, [
   context.manifest.services.sourceTokenEnv, context.manifest.services.rpcUrlEnv,
-  ...context.manifest.services.verifiers.map(({ tokenEnv }) => tokenEnv),
 ]);
 
 async function jsonFetch(url, token, fetchImpl = fetch) {

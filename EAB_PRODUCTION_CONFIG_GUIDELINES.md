@@ -78,8 +78,8 @@ STRATO settlement verifier accounts and external vault authorization signers are
 
 - STRATO relayer and bridge operator accounts must not be enabled settlement verifiers;
 - the external bridge executor must not be a vault authorization signer;
-- each verifier URL must be HTTPS and have its own API token;
-- configured verifier URLs, API tokens, authorization signers and expected verifier count must agree.
+- each verifier URL must be HTTPS and be the verifier's own `VERIFIER_PUBLIC_URL`; every verifier accepts only tokens signed by the Runtime access key (`RUNTIME_ACCESS_ADDRESS`);
+- configured verifier URLs, authorization signers and expected verifier count must agree.
 
 Do not reduce quorum for a faster rollout. Testnet uses three verifiers with a two-signature threshold, but testnet values are not production defaults.
 

@@ -27,7 +27,6 @@ async function worker() {
   process.env.CHAIN_1_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID = "test-key";
   process.env.CHAIN_1_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION = "us-east-1";
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one.invalid,https://two.invalid";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "one,two";
 
   const { config } = await import("../config");
   config.safe.address = `0x${"1".repeat(40)}`;

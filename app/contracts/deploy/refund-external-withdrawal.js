@@ -9,6 +9,8 @@
  *     [--execute]
  *
  * Without --execute, this script verifies confirmed non-payment evidence and prints the planned governance call.
+ * With --execute, it also requires that STRATO records the refund attestation quorum for the expected digest, which
+ * the bridge runtime collects from the verifiers while it prepares the refund, and then submits the governance vote.
  */
 require('dotenv').config();
 const config = require('./config');
@@ -168,36 +170,26 @@ async function prepareRefund(bridgeAddress, withdrawalId, token, options = {}) {
   }
 }
 
-async function collectRefundAttestations(evidence, token) {
-  const chainId = evidence.authorization.destinationChainId;
-  const urls = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_URLS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
-  const tokens = (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || '').split(',').map((v) => v.trim()).filter(Boolean);
-  if (!urls.length || urls.length !== tokens.length || urls.some((url) => new URL(url).protocol !== 'https:')) {
-    throw new Error('HTTPS verifier URLs and matching API tokens are required');
-  }
-  const results = await Promise.allSettled(urls.map(async (url, index) => {
-    const response = await fetch(`${url.replace(/\/$/, '')}/v1/attest-refund`, {
-      method: 'POST', headers: { Authorization: `Bearer ${tokens[index]}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ authorization: evidence.authorization }), signal: AbortSignal.timeout(60000),
-    });
-    if (!response.ok) throw new Error(`Refund verifier rejected evidence: ${response.status}`);
-    return response.json();
-  }));
-  const accepted = new Set(results.filter((result) => result.status === 'fulfilled' &&
-    result.value.transactionHash && result.value.digest === evidence.digest)
-    .map((result) => String(result.value.settlementAttestor || '').toLowerCase()).filter(Boolean));
-  if (accepted.size < evidence.threshold) throw new Error('Refund verifier quorum for the expected source digest was not reached; no governance vote submitted');
+// The bridge runtime collects the /v1/attest-refund quorum itself while it prepares the refund (processing stage
+// withdrawal-refund). This tool only checks that STRATO records at least the threshold for the expected digest.
+async function checkRecordedRefundAttestations(evidence, token, options = {}) {
+  const nodeUrl = (options.nodeUrl || process.env.NODE_URL || '').replace(/\/$/, '');
+  const fetchImpl = options.fetchImpl || fetch;
   const digest = evidence.digest;
-  const nodeUrl = process.env.NODE_URL.replace(/\/$/, '');
   const query = new URLSearchParams({ address: `eq.${normalizeAddress(evidence.authorization.sourceBridge, 'bridge')}`,
     or: `(key.eq.${digest},key.eq.${digest.replace(/^0x/, '')})`, select: 'value' });
-  const response = await fetch(`${nodeUrl}/cirrus/search/BlockApps-ExternalAssetBridge-settlementAttestationCounts?${query}`, {
+  const response = await fetchImpl(`${nodeUrl}/cirrus/search/BlockApps-ExternalAssetBridge-settlementAttestationCounts?${query}`, {
     headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60000),
   });
-  const count = response.ok ? Number((await response.json())?.[0]?.value) : NaN;
-  if (!Number.isSafeInteger(count) || count < evidence.threshold) {
-    throw new Error('Refund quorum is not recorded on chain; wait for indexing and retry');
+  if (!response.ok) throw new Error(`Refund attestation query failed: ${response.status}; no governance vote submitted`);
+  const value = (await response.json())?.[0]?.value;
+  const count = value === undefined ? 0 : Number(value);
+  if (!Number.isSafeInteger(count) || count < 0) throw new Error('STRATO returned an invalid refund attestation count; no governance vote submitted');
+  if (count < evidence.threshold) {
+    throw new Error(`STRATO records ${count} of ${evidence.threshold} refund attestations for digest ${digest}. ` +
+      'Wait for the bridge runtime to prepare the refund (processing stage withdrawal-refund) and retry; no governance vote submitted');
   }
+  return count;
 }
 
 async function main() {
@@ -240,10 +232,10 @@ async function main() {
   const evidence = await prepareRefund(bridgeAddress, withdrawalId, token);
   console.log(JSON.stringify({ evidence, contract: adminRegistry, method: 'castVoteOnIssue', args: voteArgs }, null, 2));
   if (!args.execute) {
-    console.log('Evidence verified. Dry run only; no attestations or governance votes submitted.');
+    console.log('Evidence verified. Dry run only; no governance vote submitted.');
     return;
   }
-  await collectRefundAttestations(evidence, token);
+  await checkRecordedRefundAttestations(evidence, token);
   const result = await callAndWait({ token }, adminRegistry, voteArgs);
   console.log(`Refund vote submitted successfully (${result.hash})`);
 }
@@ -259,4 +251,4 @@ module.exports = main;
 module.exports.prepareRefund = prepareRefund;
 
 module.exports.withdrawalRefundDigest = withdrawalRefundDigest;
-module.exports.collectRefundAttestations = collectRefundAttestations;
+module.exports.checkRecordedRefundAttestations = checkRecordedRefundAttestations;

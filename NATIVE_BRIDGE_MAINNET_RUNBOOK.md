@@ -465,7 +465,9 @@ CHAIN_1_NATIVE_MINT_EXECUTOR_ADDRESS=<KMS_EXECUTOR_ADDRESS>
 CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_KEY_ID=<KMS_KEY_ARN>
 CHAIN_1_NATIVE_MINT_EXECUTOR_KMS_REGION=<AWS_REGION>
 CHAIN_1_NATIVE_VERIFIER_URLS=https://verifier-1.example,https://verifier-2.example,https://verifier-3.example
-CHAIN_1_NATIVE_VERIFIER_API_TOKENS=<token-1>,<token-2>,<token-3>
+RUNTIME_ACCESS_ADDRESS=<RUNTIME_ACCESS_KMS_ADDRESS>
+RUNTIME_ACCESS_KMS_KEY_ID=<RUNTIME_ACCESS_KMS_KEY_ARN>
+RUNTIME_ACCESS_KMS_REGION=<AWS_REGION>
 ```
 
 The Ethereum Safe must grant `MINT_EXECUTOR_ROLE` on the representation bridge
@@ -474,7 +476,10 @@ refund processing is enabled. Verify the role on-chain. Private-key executor
 configuration is rejected; Runtime uses workload-identity KMS.
 
 Run each native verifier with a separate KMS key, AWS identity, native policy file,
-RPC provider, API token, and `SETTLEMENT_ATTESTOR_*` STRATO credentials. Enable
+RPC provider, and `SETTLEMENT_ATTESTOR_*` STRATO credentials. Each verifier sets
+`RUNTIME_ACCESS_ADDRESS` to the runtime's access key address and
+`VERIFIER_PUBLIC_URL` to its own public URL; it accepts only short-lived tokens
+that key signs for that URL and its chain. Enable
 each verifier's KMS address through `setAttestationSigner` on the representation
 bridge and its STRATO settlement-attestor account through
 `setSettlementVerifier` on `StratoNativeBridge`; never enable the executor
@@ -756,7 +761,7 @@ If a native withdrawal is stuck in `INITIATED`:
 ```text
 1. Confirm bridge service is running with STRATO_NATIVE_BRIDGE_ADDRESS.
 2. Confirm BRIDGE_OPERATOR matches the bridge service STRATO account.
-3. Confirm the representation bridge, executor, source settlement-attestor accounts, verifier URLs, and verifier tokens are configured.
+3. Confirm the representation bridge, executor, source settlement-attestor accounts, verifier URLs, and runtime access key are configured, and that each verifier's /health reports the runtime access address.
 4. Check bridge service logs for queueManualNativeWithdrawalBatch or finalizeNativeWithdrawalBatch.
 ```
 

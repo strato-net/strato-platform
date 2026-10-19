@@ -103,19 +103,21 @@ test("runtime compose exposes complete EAB and native settings for every support
     "EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID",
     "EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION",
     "EXTERNAL_BRIDGE_VERIFIER_URLS",
-    "EXTERNAL_BRIDGE_VERIFIER_API_TOKENS",
     "NATIVE_REPRESENTATION_BRIDGE_ADDRESS",
     "NATIVE_MINT_EXECUTOR_ADDRESS",
     "NATIVE_MINT_EXECUTOR_KMS_KEY_ID",
     "NATIVE_MINT_EXECUTOR_KMS_REGION",
     "NATIVE_VERIFIER_URLS",
-    "NATIVE_VERIFIER_API_TOKENS",
   ];
   for (const chainId of [1, 11155111, 59141, 59144, 8453, 84532, 4663, 46630, 999]) {
     for (const suffix of suffixes) {
       assert.match(compose, new RegExp(`CHAIN_${chainId}_${suffix}=\\$\\{CHAIN_${chainId}_${suffix}\\}`));
     }
   }
+  for (const name of ["RUNTIME_ACCESS_ADDRESS", "RUNTIME_ACCESS_KMS_KEY_ID", "RUNTIME_ACCESS_KMS_REGION"]) {
+    assert.match(compose, new RegExp(`${name}=\\$\\{${name}`));
+  }
+  assert.doesNotMatch(compose, /_API_TOKENS/, "verifiers accept only signed access");
 });
 
 test("email token metadata batches and paginates, retaining precision without guessing malformed decimals", async t => {

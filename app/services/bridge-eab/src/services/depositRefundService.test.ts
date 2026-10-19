@@ -66,9 +66,14 @@ test("native Safe refunds survive restart, deduplicate proposals, replace stale 
   process.chdir(directory); t.after(async () => { process.chdir(cwd); await rm(directory, { recursive: true, force: true }); });
   const wallets = [Wallet.createRandom(), Wallet.createRandom()];
   t.mock.method(configModule, "getNativeVerifierUrls", () => ["https://native-verifier-1.test", "https://native-verifier-2.test"]);
-  t.mock.method(configModule, "getNativeVerifierApiTokens", () => ["token-1", "token-2"]);
+  const kms = await import("../utils/kmsSigner"), { verifySignedVerifierAccess } = await import("../signer/accessControl");
+  const runtimeAccess = Wallet.createRandom();
+  Object.assign(process.env, { RUNTIME_ACCESS_ADDRESS: runtimeAccess.address, RUNTIME_ACCESS_KMS_KEY_ID: "runtime-access-key", RUNTIME_ACCESS_KMS_REGION: "us-east-1" });
+  t.mock.method(kms, "signTypedDataWithKms", async (_config: unknown, domain: any, types: any, value: any) => runtimeAccess.signTypedData(domain, types, value));
   t.mock.method(configModule, "getNativeMintExecutorKmsConfig", () => undefined);
-  t.mock.method(axios.default, "post", async (url: string, body: any) => {
+  t.mock.method(axios.default, "post", async (url: string, body: any, options: any) => {
+    const verifierUrl = new URL(url).origin;
+    assert.ok(verifySignedVerifierAccess(options.headers.Authorization, { runtimeAccessAddress: runtimeAccess.address, verifierUrl, chainId: 1n }, Date.now()));
     const wallet = wallets[url.includes("-1.") ? 0 : 1];
     return ({
     data: {

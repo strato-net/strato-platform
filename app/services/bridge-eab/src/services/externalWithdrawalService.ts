@@ -1,4 +1,4 @@
-import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
+import { verifierAuthorizationHeader } from "../utils/verifierAccessToken";
 import { withSafeProposalQueue } from "./safeProposalService";
 import { promises as fs } from "fs";
 import path from "path";
@@ -24,7 +24,6 @@ import {
   EXTERNAL_BRIDGE_LOG_BLOCK_RANGE,
   getDepositConfirmationPolicy,
   getExternalBridgeExecutorKmsConfig,
-  getExternalBridgeVerifierApiTokens,
   getExternalBridgeVerifierUrls,
 } from "../config";
 import { PersistedWithdrawalReview, WithdrawalInfo, ProcessingIssue } from "../types";
@@ -306,27 +305,18 @@ export const checkWithdrawalPolicy = async (
   const signerUrls = getExternalBridgeVerifierUrls(
     BigInt(authorization.destinationChainId),
   );
-  const signerApiTokens = getExternalBridgeVerifierApiTokens(
-    BigInt(authorization.destinationChainId),
-  );
   if (signerUrls.length === 0) {
     throw new Error(
       `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
     );
   }
-  const credentialsError = verifierCredentialsError(signerUrls, signerApiTokens);
-  if (credentialsError) {
-    throw new Error(
-      `External bridge verifiers for chain ${authorization.destinationChainId} need ${credentialsError}`,
-    );
-  }
 
   const results = await Promise.allSettled(
-    signerUrls.map(async (url, index) =>
+    signerUrls.map(async (url) =>
       axios.post(`${url}/v1/check-withdrawal`, authorization, {
         timeout: VERIFIER_REQUEST_TIMEOUT_MS,
         signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
-        headers: await verifierAuthorizationHeader(url, authorization.destinationChainId, signerApiTokens[index]),
+        headers: await verifierAuthorizationHeader(url, authorization.destinationChainId),
       }),
     ),
   );
@@ -355,30 +345,21 @@ export const signWithdrawalAuthorization = async (
   const signerUrls = getExternalBridgeVerifierUrls(
     BigInt(authorization.destinationChainId),
   );
-  const signerApiTokens = getExternalBridgeVerifierApiTokens(
-    BigInt(authorization.destinationChainId),
-  );
   if (signerUrls.length === 0) {
     throw new Error(
       `CHAIN_${authorization.destinationChainId}_EXTERNAL_BRIDGE_VERIFIER_URLS is not configured`,
     );
   }
-  const credentialsError = verifierCredentialsError(signerUrls, signerApiTokens);
-  if (credentialsError) {
-    throw new Error(
-      `External bridge verifiers for chain ${authorization.destinationChainId} need ${credentialsError}`,
-    );
-  }
 
   const results = await Promise.allSettled(
-    signerUrls.map(async (url, index) => {
+    signerUrls.map(async (url) => {
       const response = await axios.post(
         `${url}/v1/sign-withdrawal`,
         authorization,
         {
           timeout: VERIFIER_REQUEST_TIMEOUT_MS,
           signal: AbortSignal.timeout(VERIFIER_REQUEST_TIMEOUT_MS),
-          headers: await verifierAuthorizationHeader(url, authorization.destinationChainId, signerApiTokens[index]),
+          headers: await verifierAuthorizationHeader(url, authorization.destinationChainId),
         },
       );
       const signature = Signature.from(response.data.signature).serialized;

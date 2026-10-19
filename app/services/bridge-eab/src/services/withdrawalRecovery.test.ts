@@ -28,12 +28,19 @@ async function worker() {
   process.env.CHAIN_1_EXTERNAL_BRIDGE_EXECUTOR_KMS_KEY_ID = "test-key";
   process.env.CHAIN_1_EXTERNAL_BRIDGE_EXECUTOR_KMS_REGION = "us-east-1";
   process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_URLS = "https://one.invalid,https://two.invalid";
-  process.env.CHAIN_1_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS = "one,two";
 
-  const { Interface, JsonRpcProvider } = await import("ethers");
+  const { Interface, JsonRpcProvider, Wallet } = await import("ethers");
   const api = await import("../utils/api");
   const strato = await import("../utils/stratoHelper");
-  const { DigestKmsSigner } = await import("../utils/kmsSigner");
+  const kmsSigner = await import("../utils/kmsSigner");
+  const { DigestKmsSigner } = kmsSigner;
+  // The runtime calls verifiers with tokens signed by its access key; a test wallet stands in for AWS KMS.
+  const runtimeAccess = Wallet.createRandom();
+  process.env.RUNTIME_ACCESS_ADDRESS = runtimeAccess.address;
+  process.env.RUNTIME_ACCESS_KMS_KEY_ID = "runtime-access-key";
+  process.env.RUNTIME_ACCESS_KMS_REGION = "us-east-1";
+  (kmsSigner as any).signTypedDataWithKms = (_config: unknown, domain: any, types: any, value: any) =>
+    runtimeAccess.signTypedData(domain, types, value);
   const axios = (await import("axios")).default;
   const { validateWithdrawalRelease } = await import("../signer/settlementValidation");
   const vault = await import("./externalWithdrawalService");
@@ -130,8 +137,9 @@ async function worker() {
     return { status: "Success" };
   };
   let attestations = 0;
-  (axios as any).post = async (url: string, payload: any) => {
+  (axios as any).post = async (url: string, payload: any, options: any) => {
     assert.ok(url.endsWith("/v1/attest-release"), "must not request fresh release authorization");
+    assert.match(options.headers.Authorization, /^Bearer eab-access-v1\./);
     assert.deepEqual(payload.authorization, authorization);
     assert.equal(payload.reservationId, reservationId);
     await validateWithdrawalRelease(new JsonRpcProvider() as any, {

@@ -45,7 +45,6 @@ function fixture(t, scope = "eab-only") {
         executorAddress: address("7"),
         verifiers: [1, 2, 3].map(index => ({
           url: `https://verifier-${index}.example`,
-          tokenEnv: `VERIFIER_${index}_TOKEN`,
           confirmations: 12,
         })),
       },

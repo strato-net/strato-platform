@@ -231,28 +231,12 @@ export const getExternalBridgeVerifierUrls = (
     .map((url) => url.trim().replace(/\/$/, ""))
     .filter(Boolean);
 
-export const getExternalBridgeVerifierApiTokens = (
-  chainId: number | bigint,
-): string[] =>
-  (process.env[`CHAIN_${chainId}_EXTERNAL_BRIDGE_VERIFIER_API_TOKENS`] || "")
-    .split(",")
-    .map((token) => token.trim())
-    .filter(Boolean);
-
 export const getNativeVerifierUrls = (
   chainId: number | bigint,
 ): string[] =>
   (process.env[`CHAIN_${chainId}_NATIVE_VERIFIER_URLS`] || "")
     .split(",")
     .map((url) => url.trim().replace(/\/$/, ""))
-    .filter(Boolean);
-
-export const getNativeVerifierApiTokens = (
-  chainId: number | bigint,
-): string[] =>
-  (process.env[`CHAIN_${chainId}_NATIVE_VERIFIER_API_TOKENS`] || "")
-    .split(",")
-    .map((token) => token.trim())
     .filter(Boolean);
 
 export const getNativeMintExecutorKmsConfig = (

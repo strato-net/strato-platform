@@ -1,11 +1,11 @@
-import { verifierAuthorizationHeader, verifierCredentialsError } from "../utils/verifierAccessToken";
+import { verifierAuthorizationHeader } from "../utils/verifierAccessToken";
 import { withSafeProposalQueue } from "./safeProposalService";
 import { Contract, Interface, id, verifyTypedData } from "ethers";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { OperationType } from "@safe-global/types-kit";
 import axios from "axios";
-import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getNativeVerifierApiTokens, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, getExternalBridgeVerifierApiTokens, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
+import { config, getNativeMintExecutorKmsConfig, getNativeVerifierUrls, getExternalBridgeExecutorKmsConfig, getExternalBridgeVerifierUrls, NATIVE_VERIFIER_REQUEST_TIMEOUT_MS, VERIFIER_REQUEST_TIMEOUT_MS } from "../config";
 import { DEPOSIT_REFUND_ABI, DEPOSIT_REFUND_TYPES, NATIVE_REFUND_ABI, NATIVE_REFUND_TYPES } from "../config/bridgeAbi";
 import { DepositRefundAuthorization, NativeDepositInfo, NativeRefundProposal } from "../types";
 import { getChainProvider, getTransactionReceiptsBatch } from "./rpcService";
@@ -35,10 +35,8 @@ const collectNativeRefundSignatures = async (
   refund: Record<string, unknown>,
 ): Promise<string[]> => {
   const urls = getNativeVerifierUrls(chainId);
-  const tokens = getNativeVerifierApiTokens(chainId);
   const threshold = Number(await bridge.attestationThreshold());
   if (
-    verifierCredentialsError(urls, tokens) ||
     !Number.isSafeInteger(threshold) ||
     threshold < 2 ||
     urls.length < threshold
@@ -46,12 +44,12 @@ const collectNativeRefundSignatures = async (
     throw new Error("Native refund verifier configuration does not satisfy quorum");
   }
   const responses = await Promise.allSettled(
-    urls.map(async (url, index) =>
+    urls.map(async (url) =>
       axios.post(
         `${url}/v1/sign-native-refund`,
         { depositId, refund },
         {
-          headers: await verifierAuthorizationHeader(url, chainId, tokens[index]),
+          headers: await verifierAuthorizationHeader(url, chainId),
           timeout: NATIVE_VERIFIER_REQUEST_TIMEOUT_MS,
           maxRedirects: 0,
         },
@@ -244,14 +242,13 @@ export const recoverExternalDepositRefund = async (chainId: number, router: stri
     refundTxHash = await getEventTransactionHash(provider, vaultAddress, "DepositRefunded", refundId, "0", new Interface(DEPOSIT_REFUND_ABI));
   } else {
     const urls = getExternalBridgeVerifierUrls(BigInt(chainId));
-    const tokens = getExternalBridgeVerifierApiTokens(BigInt(chainId));
     const threshold = Number(await vault.attestationThreshold());
-    if (threshold < 2 || threshold > urls.length || verifierCredentialsError(urls, tokens)) throw new Error("Invalid refund verifier configuration");
+    if (threshold < 2 || threshold > urls.length) throw new Error("Invalid refund verifier configuration");
     const domain = { name: "ExternalBridgeVault", version: "1", chainId, verifyingContract: vaultAddress };
     const signatures = new Map<string, string>();
-    const results = await Promise.allSettled(urls.map(async (url, index) => {
+    const results = await Promise.allSettled(urls.map(async (url) => {
       const { data } = await axios.post(`${url}/v1/sign-deposit-refund`, { authorization: a, deposit }, {
-        timeout: VERIFIER_REQUEST_TIMEOUT_MS, headers: await verifierAuthorizationHeader(url, chainId, tokens[index]),
+        timeout: VERIFIER_REQUEST_TIMEOUT_MS, headers: await verifierAuthorizationHeader(url, chainId),
       });
       const signer = verifyTypedData(domain, DEPOSIT_REFUND_TYPES, a, data.signature).toLowerCase();
       if (!(await vault.attestationSigners(signer))) throw new Error("Unregistered deposit refund signer");
