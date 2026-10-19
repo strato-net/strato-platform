@@ -368,7 +368,11 @@ Infra must:
 
 1. Verify the archive against `services.json` and distribute the final EAB policy and, when present, native policy to each verifier operator.
 2. After the preactivation STRATO and Safe batches have registered every signer, set `Running=Yes`, preview, and deploy each verifier. Confirm every verifier is healthy.
-3. Give the Runtime operator the final `bridge.env.template`. Preserve its data volume, journals, and polling cursors; run only one Runtime for the STRATO environment.
+3. Apply `bridge.env.template`:
+   - For the first chain in a new Runtime, upload the generated template unchanged.
+   - For an existing Runtime, the generated file is a chain-specific input, not a complete replacement. Infra starts from the currently deployed canonical template, merges only the new `CHAIN_<TARGET_CHAIN_ID>_*` rows, and preserves every existing chain row.
+   - Compare global rows such as `NODE_URL`, bridge addresses, `TOKEN_ROUTER`, `SAFE_ADDRESS`, proposer, and shared token addresses. Do not overwrite a conflicting global value; stop and return the conflict to the Coordinator.
+   - Upload the resulting complete merged template unchanged. Preserve the Runtime data volume, journals, and polling cursors; run only one Runtime for the STRATO environment.
 4. Resolve the Runtime secrets, increase `RestartRevision`, then preview and deploy:
 
    ```bash
