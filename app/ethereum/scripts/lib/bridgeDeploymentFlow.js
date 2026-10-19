@@ -55,11 +55,12 @@ function validateReviewedInputs(context) {
   const identities = [
     services.safeProposerAddress,
     services.executorAddress,
+    services.runtimeAccessAddress,
     ...context.manifest.authorizationSigners,
   ];
   if (identities.some(value => !ethers.isAddress(value)) ||
       new Set(identities.map(value => value.toLowerCase())).size !== identities.length) {
-    throw new Error("Runtime proposer, executor, and authorization signer identities must be valid and distinct");
+    throw new Error("Runtime access, proposer, executor, and authorization signer identities must be valid and distinct");
   }
   if (!/^https:\/\//.test(services.bridgeHealthUrl || "")) {
     throw new Error("Review services.bridgeHealthUrl");
@@ -275,10 +276,20 @@ async function preflightDraft(draft, options = {}) {
     target.safeAddress,
     target.permit2Address, ...Object.values(target.roles || {}),
     target.bridgeOperator, target.guardian, ...(target.settlementVerifiers || []),
-    services.safeProposerAddress, services.executorAddress, ...draft.authorizationSigners,
+    services.safeProposerAddress, services.executorAddress, services.runtimeAccessAddress,
+    ...draft.authorizationSigners,
   ];
   if (addresses.some(value => !ethers.isAddress(value))) {
     throw new Error("Deployment addresses and identities must be valid");
+  }
+  const runtimeIdentities = [
+    services.safeProposerAddress,
+    services.executorAddress,
+    services.runtimeAccessAddress,
+    ...draft.authorizationSigners,
+  ];
+  if (new Set(runtimeIdentities.map(value => value.toLowerCase())).size !== runtimeIdentities.length) {
+    throw new Error("Runtime access, proposer, executor, and authorization signer identities must be distinct");
   }
   if (!Number.isSafeInteger(Number(target.deploymentConfirmations)) ||
       Number(target.deploymentConfirmations) <= 0) {

@@ -1,5 +1,5 @@
 import { AwsKmsConfig, validateAwsKmsAddress } from "./kmsSigner";
-import { getRuntimeAccessKmsConfig } from "./verifierAccessToken";
+import { getRuntimeAccessKmsConfig, validateVerifierRuntimeAccess } from "./verifierAccessToken";
 import { NATIVE_EXECUTOR_FORBIDDEN_BRIDGE_ROLES, NATIVE_EXECUTOR_FORBIDDEN_TOKEN_ROLES } from "../config/bridgeAbi";
 import { readOAuthDiscovery } from "../auth/discovery";
 import { MIN_SERVICE_TOKEN_LENGTH } from "../config/verifierAccess";
@@ -748,6 +748,17 @@ export async function validateBridgeConfig(): Promise<boolean> {
           }
           if (verifierUrls.length === 0) {
             missingNativeBridgeEnvVars.push(verifierUrlsEnv);
+          }
+          if (runtimeAccess && verifierUrls.length > 0) {
+            try {
+              await validateVerifierRuntimeAccess(
+                verifierUrls,
+                runtimeAccess.address,
+                "Native verifier",
+              );
+            } catch (error) {
+              errors.push(`Failed to validate native verifier access for chain ${chainId}: ${(error as Error).message}`);
+            }
           }
 
           if (

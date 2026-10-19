@@ -96,6 +96,7 @@ function completeHandoff(f, native = false) {
   f.manifest.authorizationSigners = [addr("d"), addr("e"), addr("f")];
   Object.assign(f.manifest.services, {
     confirmations: 12, safeProposerAddress: addr("b"), executorAddress: addr("c"),
+    runtimeAccessAddress: addr("4"),
     verifiers: [1, 2, 3].map(index => ({ url: `https://verifier-${index}.example`, confirmations: 12 })),
   });
   if (native) {
@@ -238,6 +239,7 @@ test("coordinator bundle loads without the original deployment files", (t) => {
   f.manifest.services.confirmations = 12;
   f.manifest.services.safeProposerAddress = addr("b");
   f.manifest.services.executorAddress = addr("c");
+  f.manifest.services.runtimeAccessAddress = addr("4");
   f.manifest.services.verifiers = [1, 2, 3].map((index) => ({
     url: `https://verifier-${index}.example`,
     confirmations: 12,
@@ -1462,7 +1464,7 @@ test("aborted queued STRATO reads are never sent to the server", async () => {
   assert.equal(calls, 1);
 });
 
-async function stagedFixture(t, { paused = true, enabling = false, inventoryError = false, routerMismatch = false, vaultMismatch = false, previousReport, sourceErrors = [], servicesReady = false } = {}) {
+async function stagedFixture(t, { paused = true, enabling = false, inventoryError = false, routerMismatch = false, vaultMismatch = false, previousReport, sourceErrors = [], servicesReady = false, runtimeAccessMismatch = false } = {}) {
   const f = fixture(t); completeHandoff(f);
   const context = loadManifest(f.manifestPath, "activation");
   if (servicesReady) context.manifest.services.bridgeHealthUrl = "https://runtime.example/health";
@@ -1508,6 +1510,7 @@ async function stagedFixture(t, { paused = true, enabling = false, inventoryErro
         const policy = context.rollout.verifierPolicies[index];
         return { status: "ok", destinationChainId: "11155111", destinationVault: policy.destinationVault,
           authorizationSigner: context.manifest.authorizationSigners[index], settlementAttestor: policy.settlementAttestor,
+          access: { runtimeAccessAddress: runtimeAccessMismatch ? addr("0") : context.manifest.services.runtimeAccessAddress },
           verifierIndex: index + 1, baselinePolicyHash: context.rollout.baselinePolicyHash,
           policyDigest: `sha256:${digest(fs.readFileSync(artifacts.verifierPolicyPaths[index], "utf8"))}`,
           verificationRpcHostCount: 2, verifierConfirmations: verifier.confirmations };
@@ -1517,6 +1520,11 @@ async function stagedFixture(t, { paused = true, enabling = false, inventoryErro
   });
   return { ...f, context, artifacts, inspection, history, voteReads, progress };
 }
+
+test("verification rejects verifiers that trust a different Runtime access address", async t => {
+  const { inspection } = await stagedFixture(t, { enabling: true, servicesReady: true, runtimeAccessMismatch: true });
+  assert.equal(inspection.report.checks.find(check => check.name === "verifiers").status, "FAILED");
+});
 
 test("generate defers history and vote reads while a pause handoff is pending", async t => {
   const { inspection, history, voteReads } = await stagedFixture(t, { paused: false });

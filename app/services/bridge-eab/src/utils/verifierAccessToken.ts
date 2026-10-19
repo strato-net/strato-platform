@@ -39,6 +39,29 @@ const cache = new Map<string, { token: string; expiresAt: number }>();
 
 export const clearVerifierAccessCache = (): void => cache.clear();
 
+export const validateVerifierRuntimeAccess = async (
+  urls: string[],
+  runtimeAccessAddress: string,
+  label: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> => {
+  const metadata = await Promise.all(urls.map(async (url) => {
+    const response = await fetchImpl(`${url}/health`);
+    if (!response.ok) throw new Error(`${label} ${url} health returned ${response.status}`);
+    return (await response.json()) as {
+      access?: { runtimeAccessAddress?: string | null; verifierUrl?: string | null };
+    };
+  }));
+  metadata.forEach((health, index) => {
+    if (String(health.access?.runtimeAccessAddress || "").toLowerCase() !== runtimeAccessAddress.toLowerCase()) {
+      throw new Error(`${label} ${urls[index]} does not accept signed access from runtime access address ${runtimeAccessAddress}`);
+    }
+    if (health.access?.verifierUrl !== normalizeVerifierUrl(urls[index])) {
+      throw new Error(`${label} ${urls[index]} reports a different VERIFIER_PUBLIC_URL`);
+    }
+  });
+};
+
 export const verifierAuthorizationHeader = async (
   url: string,
   chainId: bigint | number | string,

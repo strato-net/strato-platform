@@ -43,6 +43,7 @@ function fixture(t, scope = "eab-only") {
         confirmations: 12,
         safeProposerAddress: address("6"),
         executorAddress: address("7"),
+        runtimeAccessAddress: address("b"),
         verifiers: [1, 2, 3].map(index => ({
           url: `https://verifier-${index}.example`,
           confirmations: 12,
@@ -256,6 +257,8 @@ test("preflight validates the reviewed draft before deployment artifacts exist",
       fetchJson: async () => ({ networkID: "114784819836269" }),
     });
     assert.equal(result.status, "PREFLIGHT_PASSED");
+    draft.services.runtimeAccessAddress = "invalid";
+    await assert.rejects(preflightDraft(draft), /Deployment addresses and identities must be valid/);
   } finally {
     delete process.env.CHAIN_11155111_RPC_URL;
   }
@@ -279,6 +282,9 @@ test("preflight gates review values and verifies STRATO, RPC, and Safe", async t
     fetchJson: async () => ({ networkID: "114784819836269" }),
   });
   assert.equal(result.status, "PREFLIGHT_PASSED");
+  f.context.manifest.services.runtimeAccessAddress = "invalid";
+  await assert.rejects(preflight(f.context, { provider }), /Runtime access.*valid and distinct/);
+  f.context.manifest.services.runtimeAccessAddress = address("b");
   f.context.manifest.limit = "REVIEW_REQUIRED";
   await assert.rejects(preflight(f.context, { provider }), /Resolve every REVIEW_REQUIRED/);
 });

@@ -120,6 +120,7 @@ function initializeManifest(settingsPath, policyPath, manifestPath) {
       bridgeHealthUrlEnv: "BRIDGE_HEALTH_URL",
       safeProposerAddress: "REVIEW_REQUIRED",
       executorAddress: "REVIEW_REQUIRED",
+      runtimeAccessAddress: "REVIEW_REQUIRED",
     },
   };
   const nativeInputs = readNativeInputs(manifest, path.dirname(settingsPath));
@@ -153,6 +154,7 @@ function createPortableBundle(manifestPath, bundlePath, stage = "activation") {
   const identities = [
     services.safeProposerAddress,
     services.executorAddress,
+    services.runtimeAccessAddress,
     ...manifest.authorizationSigners,
   ];
   if (stage === "activation" && (services.verifiers.length !== network.verifierCount ||
@@ -162,7 +164,7 @@ function createPortableBundle(manifestPath, bundlePath, stage = "activation") {
       !(/^https:\/\//.test(services.bridgeHealthUrl || "") ||
         /^[A-Z][A-Z0-9_]*$/.test(services.bridgeHealthUrlEnv || "")) ||
       JSON.stringify(context.nativeInputs).includes("REVIEW_REQUIRED"))) {
-    throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 2} distinct KMS identities, and bridgeHealthUrl`);
+    throw new Error(`Bundle requires ${network.verifierCount} verifiers, ${network.verifierCount + 3} distinct KMS identities, and bridgeHealthUrl`);
   }
   const directory = path.dirname(manifestPath);
   const externalDeployment = manifest.inputs?.externalDeployment ||

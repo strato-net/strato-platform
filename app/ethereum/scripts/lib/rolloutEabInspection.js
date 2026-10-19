@@ -278,6 +278,7 @@ async function inspect(context, artifacts, options = {}) {
         ? !Number.isSafeInteger(data.verifierConfirmations) || data.verifierConfirmations < expectedConfirmations
         : data.verifierConfirmations !== expectedConfirmations;
       if (data.status !== "ok" || String(data.destinationChainId) !== String(context.rollout.chainId) ||
+          address(data.access?.runtimeAccessAddress) !== address(services.runtimeAccessAddress) ||
           address(data.destinationVault) !== address(policy.destinationVault) || address(data.authorizationSigner) !== address(context.manifest.authorizationSigners[index]) ||
           address(data.settlementAttestor) !== address(policy.settlementAttestor) || data.verifierIndex !== index + 1 ||
           data.baselinePolicyHash !== context.rollout.baselinePolicyHash ||

@@ -5,6 +5,7 @@ import { verifySignedVerifierAccess } from "../signer/accessControl";
 import {
   clearVerifierAccessCache,
   getRuntimeAccessKmsConfig,
+  validateVerifierRuntimeAccess,
   verifierAuthorizationHeader,
 } from "./verifierAccessToken";
 
@@ -54,4 +55,31 @@ test("with the runtime access key the runtime signs a short-lived token per veri
   await verifierAuthorizationHeader("https://base-sepolia.verifier.example", 84532, { now, sign });
   assert.equal(signatures, 3, "one token per verifier");
   setAccess({});
+});
+
+test("native verifier health must trust the configured Runtime access address", async () => {
+  const runtime = Wallet.createRandom();
+  const response = (address: string, verifierUrl = "https://native-verifier.example") => async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({ access: { runtimeAccessAddress: address, verifierUrl } }),
+  }) as Response;
+  await validateVerifierRuntimeAccess(
+    ["https://native-verifier.example"],
+    runtime.address,
+    "Native verifier",
+    response(runtime.address),
+  );
+  await assert.rejects(validateVerifierRuntimeAccess(
+    ["https://native-verifier.example"],
+    runtime.address,
+    "Native verifier",
+    response(Wallet.createRandom().address),
+  ), /does not accept signed access from runtime access address/);
+  await assert.rejects(validateVerifierRuntimeAccess(
+    ["https://native-verifier.example"],
+    runtime.address,
+    "Native verifier",
+    response(runtime.address, "https://wrong-verifier.example"),
+  ), /reports a different VERIFIER_PUBLIC_URL/);
 });

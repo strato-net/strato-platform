@@ -824,7 +824,10 @@ app.get("/health", (_, res) => {
     policyDigest: verifierPolicyDigest,
     baselinePolicyHash: verifierPolicy.baselinePolicyHash,
     verifierIndex: verifierPolicy.verifierIndex,
-    access: { runtimeAccessAddress: verifierAccess.runtimeAccessAddress },
+    access: {
+      runtimeAccessAddress: verifierAccess.runtimeAccessAddress,
+      verifierUrl: verifierAccess.verifierUrl,
+    },
     native: nativeVerifier
       ? {
           attestationSigner: nativeVerifier.signerAddress,
