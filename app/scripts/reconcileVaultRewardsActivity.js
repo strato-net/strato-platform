@@ -21,7 +21,7 @@
     ENV_FILE          optional env file path (default app/scripts/.env)
     NETWORK           testnet or prod (required)
     VAULT             profile key (required): saveusdst, eth, wbtc, usdc, goldst,
-                      silvst (testnet also hype)
+                      silvst, hype
     NODE_URL          optional profile override
     POLLER_TOKEN      optional rewards-poller OAuth bearer token
     POLLER_NAME, POLLER_PASSWORD (or BA_USERNAME, BA_PASSWORD)
@@ -164,6 +164,7 @@ const NETWORK_PROFILES = {
       usdc: { kind: "yield", address: "afcfc4d847d59fbc402856fd6934aff6796812b1", activityId: "29" },
       goldst: { kind: "yield", address: "ddf7c27f27ac43b25043e100c2076e515526b9ae", activityId: "30" },
       silvst: { kind: "yield", address: "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", activityId: "31" },
+      hype: { kind: "yield", address: "fc6b457bf1629c74acd4b33ba49ddc2365d9855b", activityId: "32" },
     },
   },
 };
