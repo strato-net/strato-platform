@@ -185,6 +185,19 @@ function fundingShortfall(instance, row, balance) {
   return instance.fundWei - held;
 }
 
+// Supply that was minted outside the schedules. Released tokens still belong to
+// their original schedule allocation, so count both current balances and
+// cumulative releases when removing scheduled supply from the total.
+function externalSupply(totalSupply, schedules, balances) {
+  const scheduled = schedules.reduce((sum, row) => {
+    const balance = BigInt(balances[normalizeAddress(row.address)] || 0);
+    const released = BigInt((row.contract === 'VestingSchedule' ? row.totalReleased : row.released) || 0);
+    return sum + balance + released;
+  }, 0n);
+  return BigInt(totalSupply) - scheduled;
+}
+
 module.exports = {
   buildPlan, fillPlaceholders, toWei, formatWei, parseTge, normalizeAddress, isTrue, scheduleProblems, fundingShortfall,
+  externalSupply,
 };

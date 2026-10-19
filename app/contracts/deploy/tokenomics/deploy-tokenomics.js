@@ -26,7 +26,7 @@ const axios = require('axios');
 const config = require('../config');
 const { rest, util, importer } = require('blockapps-rest');
 const {
-  buildPlan, fillPlaceholders, formatWei, normalizeAddress, isTrue, scheduleProblems, fundingShortfall,
+  buildPlan, fillPlaceholders, formatWei, normalizeAddress, isTrue, scheduleProblems, fundingShortfall, externalSupply,
 } = require('./plan');
 
 const SOURCES = { VestingSchedule: 'Tokenomics/VestingSchedule.sol', EmissionSchedule: 'Tokenomics/EmissionSchedule.sol' };
@@ -131,10 +131,13 @@ async function readChain(tokenObj, deployment, schedule) {
     const a = normalizeAddress(r.address);
     if (details[a]) details[a].yearlyWei[Number(r.key)] = BigInt(r.value);
   }
-  const held = instanceAddrs.reduce((s, a) => s + (balances[a] || 0n), 0n);
   const totalSupply = BigInt(tokenRows[0]._totalSupply);
   const maxSupply = BigInt(tokenRows[0].maxSupply || 0);
-  return { found, balances, details, totalSupply, maxSupply, externalSupply: totalSupply - held, problems };
+  return {
+    found, balances, details, totalSupply, maxSupply,
+    externalSupply: externalSupply(totalSupply, Object.values(found), balances),
+    problems,
+  };
 }
 
 function loadPlan(deployment, schedule, chain) {

@@ -1,7 +1,7 @@
 // node --test deploy/tokenomics/plan.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const { buildPlan, fillPlaceholders, toWei, scheduleProblems, fundingShortfall } = require('./plan');
+const { buildPlan, fillPlaceholders, toWei, scheduleProblems, fundingShortfall, externalSupply } = require('./plan');
 const schedule = require('./schedule.json');
 const deployment = require('./deployment.json');
 
@@ -127,4 +127,23 @@ test('a finalized schedule is never funded again after releases', () => {
   assert.deepStrictEqual(scheduleProblems(team, state.row, state.details, plan), []);
   assert.strictEqual(fundingShortfall(team, { finalized: true }, 0n), 0n);
   assert.strictEqual(fundingShortfall(team, { finalized: false }, team.fundWei - 1n), 1n);
+});
+
+test('released tokens remain attributed to their schedules', () => {
+  const total = toWei('100000000');
+  const vesting = { address: '1'.repeat(40), contract: 'VestingSchedule', totalReleased: 0 };
+  const emission = { address: '2'.repeat(40), contract: 'EmissionSchedule', released: 0 };
+  const balances = {
+    [vesting.address]: toWei('80000000'),
+    [emission.address]: toWei('17250000'),
+  };
+  assert.strictEqual(externalSupply(total, [vesting, emission], balances), toWei('2750000'));
+
+  balances[vesting.address] -= toWei('1000000');
+  vesting.totalReleased = toWei('1000000');
+  balances[emission.address] -= toWei('250000');
+  emission.released = toWei('250000');
+  const external = externalSupply(total, [vesting, emission], balances);
+  assert.strictEqual(external, toWei('2750000'));
+  assert.deepStrictEqual(buildPlan(schedule, filled(), external).problems, []);
 });
