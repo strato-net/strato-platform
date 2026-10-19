@@ -22,13 +22,13 @@ import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
 import Blockchain.EthConf (runStreamMPooled, ethConf)
 import qualified Blockchain.EthConf.Model as EthConf
-import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress)
+import Blockchain.EthConf.Model (networkConfig, networkID, contractsConfig, nativeTokenAddress, stratoGasForkBlock)
 import Blockchain.Data.Block (Block, blockBlockData, blockReceiptTransactions)
 import qualified Blockchain.Strato.Model.Class as Class
 import Blockchain.Data.AddressStateDB (AddressState (..), blankAddressState, codePtrToSHA)
 import Blockchain.Data.BlockHeader (BlockHeader (..), clearBlockSignatures, getBlockSignatures)
 import Blockchain.Data.DataDefs (AddressStateRef (..), TransactionResult(..))
-import Blockchain.Data.RLP (rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
+import Blockchain.Data.RLP (RLPObject (..), rlpDecode, rlpDeserialize, rlpEncode, rlpSerialize)
 import Blockchain.Strato.Model.Secp256k1 (exportSignature)
 import Data.Aeson (ToJSON(..), (.=), object)
 import Blockchain.Data.Transaction (Transaction(..), transactionHash, txAndTime2RawTX)
@@ -109,6 +109,7 @@ methods =
     eth_mining,
     eth_hashrate,
     eth_gasPrice,
+    eth_maxPriorityFeePerGas,
     eth_accounts,
     eth_blockNumber,
     eth_getBalance,
@@ -271,20 +272,20 @@ wordAt i = B.foldl' (\acc b -> acc * 256 + fromIntegral b) 0 . B.take 32 . B.dro
 -- so wallets are quoted that fee spread across the fixed gas estimate, rounding
 -- up: the STRATO fee the installed FeeRouter froze for the current block, or
 -- 0.01 USDST where DeciderState still runs its own legacy payFees.
-eth_gasPrice :: Method Server
-eth_gasPrice = toMethod "eth_gasPrice" f ()
+-- | The flat per-transaction fee spread over the fixed billable gas units,
+-- rounded up: the installed fee implementation's frozen quote for the current
+-- block, or the legacy 0.01 USDST where the implementation keeps no quote.
+feePerGas :: RpcResult Server Integer
+feePerGas = do
+  fromSql <- liftIO feeQuoteFromSql
+  fee <- case fromSql of
+    Right quote -> return $ fromMaybe legacyFee quote
+    Left why -> do
+      liftIO . putStrLn $ "feePerGas: falling back to vm-runner: " ++ why
+      viaVm
+  return $ (fee + walletGasEstimate - 1) `div` walletGasEstimate
   where
     legacyFee = 10000000000000000 :: Integer
-
-    f :: RpcResult Server String
-    f = do
-      fromSql <- liftIO feeQuoteFromSql
-      fee <- case fromSql of
-        Right quote -> return $ fromMaybe legacyFee quote
-        Left why -> do
-          liftIO . putStrLn $ "eth_gasPrice: falling back to vm-runner: " ++ why
-          viaVm
-      return $ "0x" ++ showHex ((fee + walletGasEstimate - 1) `div` walletGasEstimate) ""
 
     -- DeciderState.getImplContract(), then stratoFeeQuote() on what it names;
     -- an implementation without a quote is the legacy one.
@@ -299,6 +300,27 @@ eth_gasPrice = toMethod "eth_gasPrice" f ()
         _ -> legacyFee
 
     selector hex = either (const B.empty) id (B16.decode hex)
+
+eth_gasPrice :: Method Server
+eth_gasPrice = toMethod "eth_gasPrice" f ()
+  where
+    f :: RpcResult Server String
+    f = (\fee -> "0x" ++ showHex fee "") <$> feePerGas
+
+-- | The whole per-unit price is the base fee (see 'blockBaseFee'); no tip.
+eth_maxPriorityFeePerGas :: Method Server
+eth_maxPriorityFeePerGas = toMethod "eth_maxPriorityFeePerGas" f ()
+  where
+    f :: RpcResult Server String
+    f = return "0x0"
+
+-- | From the STRATO-gas fork a block carries a base fee, which is what makes
+-- wallets send type-2 envelopes; before it there is none, so they keep
+-- sending legacy ones. Historical blocks answer for their own height.
+blockBaseFee :: Block' -> RpcResult Server (Maybe Integer)
+blockBaseFee blk
+  | getBlockNumber blk >= stratoGasForkBlock (EthConf.network $ networkConfig ethConf) = Just <$> feePerGas
+  | otherwise = return Nothing
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
@@ -829,7 +851,12 @@ eth_sendRawTransaction = toMethod "eth_sendRawTransaction" f (Required "data" :+
     f :: HexData -> RpcResult Server Keccak256
     f (HexData rawTxBytes) = do
       liftIO $ putStrLn $ "eth_sendRawTransaction received " ++ show (B.length rawTxBytes) ++ " bytes"
-      let ethTx = rlpDecode (rlpDeserialize rawTxBytes) :: Transaction
+      -- An EIP-2718 typed envelope (type byte, then payload) is not itself
+      -- an RLP item; the decoder takes it as the string it travels as.
+      let envelope = case B.uncons rawTxBytes of
+            Just (typeByte, _) | typeByte > 0 && typeByte < 0x80 -> RLPString rawTxBytes
+            _ -> rlpDeserialize rawTxBytes
+          ethTx = rlpDecode envelope :: Transaction
           rawTx = txAndTime2RawTX API ethTx (-1) (UTCTime (fromGregorian 2000 1 1) 0)
           tx = RawTransaction' rawTx
           h = transactionHash ethTx
@@ -853,7 +880,7 @@ eth_getBlockByHash = toMethod "eth_getBlockByHash" f (Required "blockHash" :+: R
     f :: EthHex Keccak256 -> Bool -> RpcResult Server (Maybe EthBlock)
     f (EthHex blockHash) fullTxs = do
       mBlk <- liftIO $ fetchBlockByHash (keccak256ToHex blockHash)
-      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
+      traverse (toEthBlock fullTxs) mBlk
 
 eth_getBlockByNumber :: Method Server
 eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber" :+: Required "fullTransactions" :+: ())
@@ -861,11 +888,13 @@ eth_getBlockByNumber = toMethod "eth_getBlockByNumber" f (Required "blockNumber"
     f :: String -> Bool -> RpcResult Server (Maybe EthBlock)
     f blockNumber fullTxs = do
       mBlk <- liftIO $ fetchBlockByNumber blockNumber
-      return $ (\blk -> toEthBlock (blockBloom blk) fullTxs blk) <$> mBlk
+      traverse (toEthBlock fullTxs) mBlk
 
 -- | Select the Ethereum block representation based on the @fullTransactions@ flag.
-toEthBlock :: B.ByteString -> Bool -> Block' -> EthBlock
-toEthBlock bloom fullTxs = (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) bloom . bPrimeToB
+toEthBlock :: Bool -> Block' -> RpcResult Server EthBlock
+toEthBlock fullTxs blk = do
+  baseFee <- blockBaseFee blk
+  return $ (if fullTxs then EthBlockWithFullTxs else EthBlockWithTxHashes) (blockBloom blk) baseFee (bPrimeToB blk)
 
 -- | Resolve a block's @logsBloom@ for the Ethereum RPC shape. STRATO
 -- historically stored a dummy bloom in block headers; serve the stored value

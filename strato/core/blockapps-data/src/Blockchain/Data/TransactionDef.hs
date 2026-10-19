@@ -79,7 +79,11 @@ data Transaction
         chainId :: Maybe Integer,
         r :: Integer,
         s :: Integer,
-        v :: Word8
+        v :: Word8,
+        -- | 0 for a legacy envelope; 2 for an EIP-1559 envelope, whose
+        -- 'gasPrice' is its maxFeePerGas and whose 'v' is its yParity.
+        txVersion :: Word8,
+        maxPriorityFeePerGas :: Integer
       }
   deriving (Show, Read, Eq, Ord, Generic, Data, NFData)
 
@@ -250,7 +254,9 @@ instance RLPSerializable Transaction where
         chainId = ethVToChainId rawV,
         r = rlpDecode rVal,
         s = rlpDecode sVal,
-        v = ethVToRecoveryId rawV
+        v = ethVToRecoveryId rawV,
+        txVersion = 0,
+        maxPriorityFeePerGas = 0
       }
   -- EIP-2718 style typed transaction envelope: type_byte || rlp_payload
   rlpDecode (RLPString bytes)
@@ -258,6 +264,25 @@ instance RLPSerializable Transaction where
         let typeByte = B.head bytes
             inner = rlpDeserialize (B.tail bytes)
         in case inner of
+            -- EIP-1559 (type 2) Ethereum envelope; the access list must be empty.
+            RLPArray [cid, n, prio, fee, gl, toAddr, val, dat, RLPArray [], yParity, rVal, sVal]
+              | typeByte == 2 ->
+                  EthereumTX
+                    { nonce = rlpDecode n,
+                      gasPrice = rlpDecode fee,
+                      gasLimit = rlpDecode gl,
+                      ethTo = case toAddr of
+                        RLPString "" -> Nothing
+                        _ -> Just (rlpDecode toAddr),
+                      value = rlpDecode val,
+                      txData = rlpDecode dat,
+                      chainId = Just (rlpDecode cid),
+                      r = rlpDecode rVal,
+                      s = rlpDecode sVal,
+                      v = fromInteger (rlpDecode yParity),
+                      txVersion = 2,
+                      maxPriorityFeePerGas = rlpDecode prio
+                    }
             RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7, vVal, rVal, sVal] ->
               let partial = partialRLPDecode $ RLPArray [txType, arg2, arg3, arg4, arg5, arg6, arg7]
               in case partial of
@@ -292,12 +317,11 @@ instance RLPSerializable Transaction where
 
   rlpEncode t@EthereumTX{..} =
     case partialRLPEncode t of
-      RLPArray items ->
-        RLPArray $ items ++
-        [ rlpEncode (toEthV v chainId),
-          rlpEncode r,
-          rlpEncode s
-        ]
+      RLPArray items
+        | txVersion == 2 ->
+            RLPString $ B.cons 2 $ rlpSerialize $ RLPArray $ items ++ [rlpEncode (toInteger v), rlpEncode r, rlpEncode s]
+        | otherwise ->
+            RLPArray $ items ++ [rlpEncode (toEthV v chainId), rlpEncode r, rlpEncode s]
       x -> error $ "rlpEncode Transaction: Expected RLPArray, but got: " ++ show x
   -- Version > 0: EIP-2718 style typed envelope (type_byte || rlp_payload)
   rlpEncode t
@@ -404,12 +428,25 @@ partialRLPEncode ContractCreationTX {..} =
       rlpEncode network,
       rlpEncode code
     ]
-partialRLPEncode EthereumTX {..} =
-  RLPArray $
-    [ rlpEncode nonce,
-      rlpEncode gasPrice,
-      rlpEncode gasLimit,
-      maybe (RLPString "") rlpEncode ethTo,
-      rlpEncode value,
-      rlpEncode txData
-    ]
+partialRLPEncode EthereumTX {..}
+  | txVersion == 2 =
+      RLPArray
+        [ rlpEncode (maybe 0 id chainId),
+          rlpEncode nonce,
+          rlpEncode maxPriorityFeePerGas,
+          rlpEncode gasPrice,
+          rlpEncode gasLimit,
+          maybe (RLPString "") rlpEncode ethTo,
+          rlpEncode value,
+          rlpEncode txData,
+          RLPArray []
+        ]
+  | otherwise =
+      RLPArray
+        [ rlpEncode nonce,
+          rlpEncode gasPrice,
+          rlpEncode gasLimit,
+          maybe (RLPString "") rlpEncode ethTo,
+          rlpEncode value,
+          rlpEncode txData
+        ]

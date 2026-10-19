@@ -104,6 +104,7 @@ test-suite contextm-test
       CrossLangFixtureSpec
       ReceiptSpec
       ReplayProtectionSpec
+      StratoGasEnvelopeSpec
       TypedArgConversionSpec
       Paths_vm_tools
   hs-source-dirs:
@@ -127,6 +128,7 @@ test-suite contextm-test
     , ordered-containers
     , quickcheck-instances
     , solid-vm-model
+    , strato-conf
     , strato-model
     , text
     , vector

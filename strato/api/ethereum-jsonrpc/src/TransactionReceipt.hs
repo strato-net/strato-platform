@@ -10,6 +10,7 @@ module TransactionReceipt
 import Blockchain.Data.DataDefs (TransactionResult(..))
 import qualified Blockchain.Data.TransactionResultStatus as TRS
 import Blockchain.Data.Transaction (Transaction, whoSignedThisTransaction)
+import Blockchain.Strato.Model.Class (txEnvelopeType)
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.Strato.Model.Address (Address)
 import Blockchain.Strato.Model.Keccak256 (Keccak256, keccak256ToHex, stringKeccak256)
@@ -83,7 +84,7 @@ mkTransactionReceipt tr tx blkNum theLogs theLogsBloom = TransactionReceipt
   , logs              = theLogs
   , logsBloom         = theLogsBloom
   , status            = EthHex $ if transactionResultStatus tr == Just TRS.Success then 1 else 0
-  , type_             = EthHex 0
+  , type_             = EthHex (toInteger $ txEnvelopeType tx)
   }
   where
     gas = toInteger (transactionResultGasUsed tr)

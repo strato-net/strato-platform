@@ -19,6 +19,7 @@ import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
 import Control.Lens.Setter (set)
 import Control.Monad.IO.Class (MonadIO)
+import qualified Data.ByteString as B
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import Data.List (foldl')
@@ -55,6 +56,7 @@ data TransactionFailureCause
   | TFNonceMismatch Integer Integer OutputTx -- expectedNonce, actualNonce
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
   | TFIncorrectChainId Integer OutputTx
+  | TFInvalidEnvelope String OutputTx -- why
   deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -83,6 +85,7 @@ data TxRejection
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | ChainIdMismatch BaggerStage BaggerTxQueue Integer OutputTx
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
+  | InvalidEnvelope BaggerStage BaggerTxQueue String OutputTx -- why
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -93,6 +96,7 @@ rejectedTx (LessLucrative _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
 rejectedTx (ChainIdMismatch _ _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
+rejectedTx (InvalidEnvelope _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -153,6 +157,9 @@ instance Format TxRejection where
       ++ format hash
       ++ "\n"
       ++ format o
+  format (InvalidEnvelope stage queue why OutputTx {otHash = hash}) =
+    "Invalid envelope at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": " ++ why ++ "\n\ttx hash " ++ format hash
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -169,6 +176,8 @@ txRejectionToAPIFailureCause (ChainIdMismatch stage queue expected tx) =
   Failure (show stage) (Just $ show queue) IncorrectChainId (Just expected) (TD.chainId $ otBaseTx tx) (Just "A matching signed chain ID is required")
 txRejectionToAPIFailureCause (AdminFlushed stage queue scope t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.AdminFlushedError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " was administratively flushed from mempool with scope " ++ show scope)
+txRejectionToAPIFailureCause (InvalidEnvelope stage queue why _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InvalidEnvelopeError Nothing Nothing (Just why)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -177,9 +186,25 @@ tfToBaggerTxRejection TFBlockGasLimitExceeded {} = error "please dont do that (c
 tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Queued expected tx
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFIncorrectChainId expected tx) = ChainIdMismatch Execution Queued expected tx
+tfToBaggerTxRejection (TFInvalidEnvelope why tx) = InvalidEnvelope Execution Queued why tx
 
 transactionChainIdValid :: Integer -> TD.Transaction -> Bool
 transactionChainIdValid expected tx = TD.chainId tx == Just expected
+
+-- | The STRATO-gas envelope boundary, given whether the fork is active at the
+-- height the transaction would run. Before it only legacy Ethereum envelopes
+-- exist, so nothing signed as a type-2 envelope can be a USDST transfer; from
+-- it a native-value transfer must be a type-2 envelope, so nothing signed as a
+-- USDST transfer can move STRATO. Legacy calls carrying data keep working on
+-- both sides: their value is not a transfer.
+envelopeRejection :: Bool -> TD.Transaction -> Maybe String
+envelopeRejection stratoGas tx = case tx of
+  TD.EthereumTX {TD.txVersion = ver, TD.value = val, TD.txData = dat}
+    | not stratoGas, ver /= 0 ->
+        Just "typed Ethereum envelopes are accepted from the STRATO-gas fork"
+    | stratoGas, ver == 0, val > 0, B.null dat ->
+        Just "a native-value transfer must be a type-2 (EIP-1559) envelope from the STRATO-gas fork"
+  _ -> Nothing
 
 instance Format TransactionFailureCause where
   format (TFInsufficientFunds cost bal _) = "Insufficient funds: cost " ++ show cost ++ " > balance " ++ show bal
@@ -188,6 +213,7 @@ instance Format TransactionFailureCause where
   format (TFNonceMismatch expected actual _) = "Nonce mismatch: expecting " ++ show expected ++ ", actual " ++ show actual
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFIncorrectChainId expected tx) = "Incorrect chain ID: expected " ++ show expected ++ ", actual " ++ show (TD.chainId $ otBaseTx tx)
+  format (TFInvalidEnvelope why _) = "Invalid envelope: " ++ why
 
 getDeltasFromResults :: [TxRunResult] -> ValidatorDelta
 getDeltasFromResults = foldr go mempty

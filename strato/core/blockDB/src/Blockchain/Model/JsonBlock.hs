@@ -86,7 +86,8 @@ instance ToJSON RawTransaction' where
         "gasPrice" .= rawTransactionGasPrice,
         "value" .= rawTransactionValue,
         "txData" .= fmap B.unpack rawTransactionTxData,
-        "attribution" .= fmap B.unpack rawTransactionAttribution
+        "attribution" .= fmap B.unpack rawTransactionAttribution,
+        "maxPriorityFeePerGas" .= rawTransactionMaxPriorityFeePerGas
       ] ++ ["txVersion" .= rawTransactionTxVersion | rawTransactionTxVersion > 0]
 
 parseHexStr :: (Integral a) => Parser String -> Parser a
@@ -127,6 +128,7 @@ instance FromJSON RawTransaction' where
     td <- fmap (fmap B.pack) (t .:? "txData")
     txVer <- t .:? "txVersion" .!= (0 :: Word8)
     attr <- fmap (fmap B.pack) (t .:? "attribution")
+    prio <- t .:? "maxPriorityFeePerGas"
 
     return
       ( RawTransaction'
@@ -153,6 +155,7 @@ instance FromJSON RawTransaction' where
               td
               txVer
               attr
+              prio
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -225,6 +228,7 @@ instance FromJSON UnsignedRawTransaction' where
               Nothing
               0
               Nothing
+              Nothing
           )
       )
   parseJSON _ = error "bad param when calling parseJSON for RawTransaction'"
@@ -278,7 +282,7 @@ instance ToJSON Transaction' where
         "transactionType" .= show (transactionSemantics tx),
         "txVersion" .= txVer
       ]
-  toJSON (Transaction' tx@(EthereumTX n gp gl eto val d cid tr ts tv)) =
+  toJSON (Transaction' tx@(EthereumTX n gp gl eto val d cid tr ts tv ver prio)) =
     object $
       [ "kind" .= ("Transaction" :: String),
         "from" .= fromMaybe (Address 0) (whoSignedThisTransaction tx),
@@ -288,11 +292,15 @@ instance ToJSON Transaction' where
         "to" .= eto,
         "value" .= val,
         "txData" .= B.unpack d,
+        "chainId" .= cid,
         "r" .= showHex tr "",
         "s" .= showHex ts "",
-        "v" .= showHex (toEthV tv cid) "",
+        -- A type-2 envelope carries its yParity; a legacy one its EIP-155 v.
+        "v" .= showHex (if ver == 2 then toInteger tv else toEthV tv cid) "",
         "hash" .= transactionHash tx,
-        "transactionType" .= ("EthereumTX" :: String)
+        "transactionType" .= ("EthereumTX" :: String),
+        "txVersion" .= ver,
+        "maxPriorityFeePerGas" .= prio
       ]
 
 instance FromJSON Transaction' where
@@ -339,8 +347,12 @@ instance FromJSON Transaction' where
             tr <- parseHexStr (t .: "r")
             ts <- parseHexStr (t .: "s")
             txData <- fmap (maybe B.empty B.pack) (t .:? "txData")
-            return . Transaction' $ EthereumTX n gp gl eto val txData
-              (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV)
+            ver <- t .:? "txVersion" .!= 0
+            prio <- t .:? "maxPriorityFeePerGas" .!= 0
+            cid <- t .:? "chainId"
+            return . Transaction' $ if ver == 2
+              then EthereumTX n gp gl eto val txData cid tr ts (fromInteger rawV) ver prio
+              else EthereumTX n gp gl eto val txData (ethVToChainId rawV) tr ts (ethVToRecoveryId rawV) 0 0
   parseJSON _ = fail "expected a Transaction object with 'init' (contract deploy), 'funcName' (SolidVM call), or neither (Ethereum transaction)"
 
 

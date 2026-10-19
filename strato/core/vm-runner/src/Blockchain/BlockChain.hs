@@ -51,7 +51,7 @@ import Blockchain.Data.TransactionResultStatus
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.StateDB
 import Blockchain.Event
-import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive)
+import Blockchain.Forks (isReceiptsRootForkActive, isReplayProtectionForkActive, isStratoGasForkActive)
 import qualified Blockchain.Verification as V
 import Blockchain.JsonRpcCommand (resolveFunction)
 import Blockchain.Model.WrappedBlock
@@ -435,6 +435,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       expectedChainId = Conf.chainId $ networkConfig ethConf
       precheck
         | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
+        | Just why <- envelopeRejection (isStratoGasForkActive (number b)) bt = Left $ TFInvalidEnvelope why t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
         | not nonceValid = Left $ TFNonceMismatch (TD.nonce bt) acctNonce t
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t
