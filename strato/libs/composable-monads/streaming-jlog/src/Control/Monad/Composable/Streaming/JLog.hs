@@ -81,7 +81,7 @@ import System.FilePath ((</>))
 
 import JLog.FFI (JLogCtx, JLogId(..), JLogMessage(..), jlog_new, jlog_ctx_init, jlog_ctx_open_writer,
                  jlog_ctx_write, jlog_ctx_close, jlog_ctx_add_subscriber, jlog_ctx_add_subscriber_copy_checkpoint,
-                 jlog_ctx_remove_subscriber,
+                 jlog_ctx_remove_subscriber, jlog_clean,
                  jlog_ctx_open_reader, jlog_ctx_err_string, jlog_ctx_read_interval,
                  jlog_ctx_read_message, jlog_ctx_read_checkpoint, jlog_ctx_advance_id)
 
@@ -417,10 +417,13 @@ seedConsumerGroupFrom new old topicName = do
               jlog_ctx_close ctx'
               return (rc == 0)
 
--- | Drop a consumer group's checkpoint from a topic. JLog trims a segment
--- only once every subscriber has passed it, so a group whose consumer this
--- node never runs would pin the log for good. False when the group has no
--- checkpoint there (nothing to do).
+-- | Drop a consumer group's checkpoint from a topic, and the segments it
+-- alone was pinning. JLog trims a segment only once every subscriber has
+-- passed it, so a group whose consumer this node never runs would pin the
+-- log for good; and it trims only while a checkpoint moves, so the segments
+-- the dropped group held below the others' positions are swept here
+-- (jlog_clean), or they would stay on disk for good. False when the group
+-- has no checkpoint there (nothing to do).
 removeConsumerGroup :: HasStreaming m => ConsumerGroup -> TopicName -> m Bool
 removeConsumerGroup group topicName = do
   env <- getStreamEnv
@@ -434,6 +437,7 @@ removeConsumerGroup group topicName = do
           -- 1 when the checkpoint file was unlinked; an error code otherwise.
           rc <- jlog_ctx_remove_subscriber ctx cgroup
           jlog_ctx_close ctx
+          when (rc == 1) $ void $ jlog_clean cpath
           return (rc == 1)
 
 consumeFromLatest :: (Binary a, HasStreaming m) =>
