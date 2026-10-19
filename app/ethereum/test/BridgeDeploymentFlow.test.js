@@ -203,8 +203,15 @@ test("initial discovery requires the target chain Safe", () => {
   }), /Set valid nonzero CHAIN_11155111_PERMIT2_ADDRESS in app\/ethereum\/.env/);
 });
 
-test("preflight validates the reviewed draft before deployment artifacts exist", async () => {
+test("preflight derives the deposit router block from the reviewed deployment artifact", async t => {
   const safe = address("1");
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-draft-preflight-"));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const externalDeployment = path.join(directory, "external-deployment.json");
+  fs.writeFileSync(externalDeployment, JSON.stringify({
+    chainId: "11155111",
+    depositRouterDeploymentBlock: 1234,
+  }));
   const draft = initializeDraft({
     source: { stratoChainId: "114784819836269" },
     target: { chainId: 11155111 },
@@ -218,6 +225,8 @@ test("preflight validates the reviewed draft before deployment artifacts exist",
   draft.discovery.target.guardian = address("4");
   draft.discovery.target.settlementVerifiers = [address("5"), address("6"), address("7")];
   draft.discovery.target.deploymentConfirmations = "12";
+  draft.discovery.target.depositRouterDeploymentBlock = "REVIEW_REQUIRED";
+  draft.discovery.target.externalDeployment = "external-deployment.json";
   Object.keys(draft.discovery.target.roles).forEach((name, index) => {
     draft.discovery.target.roles[name] = address(String(index + 3));
   });
@@ -255,8 +264,18 @@ test("preflight validates the reviewed draft before deployment artifacts exist",
       readSafe: async () => ({ owners: [safe], threshold: 1n }),
       resolveToken: async () => "token",
       fetchJson: async () => ({ networkID: "114784819836269" }),
+      manifestPath: path.join(directory, "deployment.json"),
     });
     assert.equal(result.status, "PREFLIGHT_PASSED");
+    assert.equal(draft.discovery.target.depositRouterDeploymentBlock, "REVIEW_REQUIRED");
+    fs.writeFileSync(externalDeployment, JSON.stringify({
+      chainId: "84532",
+      depositRouterDeploymentBlock: 1234,
+    }));
+    await assert.rejects(preflightDraft(draft, {
+      manifestPath: path.join(directory, "deployment.json"),
+    }), /EAB deployment artifact chain mismatch/);
+    draft.discovery.target.depositRouterDeploymentBlock = "1234";
     draft.services.runtimeAccessAddress = "invalid";
     await assert.rejects(preflightDraft(draft), /Deployment addresses and identities must be valid/);
   } finally {

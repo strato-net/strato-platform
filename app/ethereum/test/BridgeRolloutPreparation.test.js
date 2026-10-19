@@ -184,9 +184,10 @@ test('EAB settings use live storage over canonical dependency defaults', () => {
   assert.equal(settings.dependencies.priceOracle,'0x0000000000000000000000000000000000001002');
   assert.equal(settings.sourceChainId,state.stratoChainId);
   assert.equal(rolloutSettings({...input,source:{...input.source,legacy:true}},state).externalAssetBridge,'REVIEW_REQUIRED');
-  const targetEab = { address:a(10), storage:{ _owner:a(8), bridgeOperator:a(7), guardian:a(6), priceOracle:a(4) },
+  const targetEab = { address:a(10), storage:{ initialized:true, _owner:a(8), bridgeOperator:a(7), guardian:a(6), priceOracle:a(4) },
     mappings:[row('settlementVerifiers',[a(3)],true)] };
-  const migrated = rolloutSettings({...input,source:{...input.source,legacy:true}}, { ...state, targetEab });
+  const migrated = rolloutSettings({...input,source:{...input.source,legacy:true},
+    target:{...input.target,guardian:a(5)}}, { ...state, targetEab });
   assert.equal(migrated.externalAssetBridge,a(10));
   assert.equal(migrated.guardian,a(6));
   assert.deepEqual(migrated.settlementVerifiers,[a(3)]);
@@ -199,7 +200,7 @@ test('fresh EAB settings preserve reviewed target identities and source dependen
     settlementVerifiers:[a(14),a(15)] } };
   const settings = rolloutSettings(freshInput, { ...state,
     eab:{ address:a(9), storage:{ _owner:a(8), tokenFactory:a(7), USDST_ADDRESS:a(6), priceOracle:a(5) }, mappings:[] },
-    targetEab:{ address:a(10), storage:{ _owner:a(8), tokenFactory:a(0), USDST_ADDRESS:a(0), priceOracle:a(0) }, mappings:[] } });
+    targetEab:{ address:a(10), storage:{ initialized:false, _owner:a(8), tokenFactory:a(0), USDST_ADDRESS:a(0), priceOracle:a(0) }, mappings:[] } });
   assert.equal(settings.externalAssetBridge,a(10));
   assert.equal(settings.tokenRouter,a(11));
   assert.equal(settings.bridgeOperator,a(12));

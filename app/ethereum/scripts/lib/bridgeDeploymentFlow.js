@@ -225,6 +225,18 @@ async function preflightDraft(draft, options = {}) {
   const includedEab = draft.discovery.eabRoutes?.filter(({ include }) => include);
   const includedNative = draft.discovery.nativeRoutes?.filter(({ include }) => include);
   const reviewed = structuredClone(draft);
+  const target = reviewed.discovery.target;
+  if (target.depositRouterDeploymentBlock === "REVIEW_REQUIRED" && target.externalDeployment) {
+    if (!options.manifestPath) throw new Error("Schema-version-0 preflight requires the deployment.json path");
+    const deployment = readJson(path.resolve(path.dirname(options.manifestPath), target.externalDeployment));
+    if (String(deployment.chainId) !== String(target.chainId)) {
+      throw new Error("EAB deployment artifact chain mismatch");
+    }
+    if (!/^\d+$/.test(String(deployment.depositRouterDeploymentBlock))) {
+      throw new Error("EAB deployment artifact has an invalid depositRouterDeploymentBlock");
+    }
+    target.depositRouterDeploymentBlock = String(deployment.depositRouterDeploymentBlock);
+  }
   reviewed.discovery.eabRoutes = includedEab;
   reviewed.discovery.nativeRoutes = includedNative;
   if (draft.scope === "eab-only") {
@@ -269,7 +281,6 @@ async function preflightDraft(draft, options = {}) {
       confirmations: Number(verifier.confirmations),
     })),
   };
-  const target = draft.discovery.target;
   const addresses = [
     ...[target.externalAssetBridge, target.tokenRouter]
       .filter(value => value !== "DEPLOY_REQUIRED"),
@@ -747,7 +758,7 @@ async function main(argv = process.argv.slice(2), options = {}) {
     return generateBootstrap(manifestPath, options);
   }
   if (args.command === "preflight" && draft.schemaVersion === 0) {
-    return preflightDraft(draft, options);
+    return preflightDraft(draft, { ...options, manifestPath });
   }
   await expandDraft(manifestPath, options);
   const context = loadManifest(manifestPath, "activation");

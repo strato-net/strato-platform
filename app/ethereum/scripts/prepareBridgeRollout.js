@@ -407,6 +407,7 @@ function rolloutSettings(input, state) {
   const defaults = STRATO_BRIDGES[state.stratoChainId]?.dependencies || {};
   const bridge = targetEab?.storage || state.eab?.storage || {}, router = state.router?.storage || {};
   const sourceBridge = state.eab?.storage || {};
+  const targetEabInitialized = flag(targetEab?.storage?.initialized) === true;
   const configuredVerifiers = (targetEab?.mappings || [])
     .filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true)
     .map(r => a(r.key?.key));
@@ -415,7 +416,8 @@ function rolloutSettings(input, state) {
     tokenRouter: a(input.target.tokenRouter || state.router?.address),
     externalAssetBridge: targetEab ? a(targetEab.address) : input.source.legacy ? REQUIRED : a(state.eab?.address),
     bridgeOperator: a(input.target.bridgeOperator || bridge.bridgeOperator || sourceBridge.bridgeOperator),
-    guardian: a(input.target.guardian || bridge.guardian || sourceBridge.guardian),
+    guardian: a(targetEabInitialized ? bridge.guardian :
+      input.target.guardian || bridge.guardian || sourceBridge.guardian),
     settlementVerifiers: input.target.settlementVerifiers?.map(a) ||
       (configuredVerifiers.length ? configuredVerifiers :
         (state.eab?.mappings || []).filter(r => r.collection_name === "settlementVerifiers" && flag(value(r)) === true).map(r => a(r.key?.key))),

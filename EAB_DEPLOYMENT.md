@@ -108,6 +108,8 @@ Every included `eabRoutes` item must explicitly contain:
 }
 ```
 
+`mintPolicy` is shared by STRATO destination token, not isolated by external chain. If the `stratoToken` is already used by another route, changing its capacity or refill rate changes the existing routes too. Compare against the live policy and obtain explicit approval before generating the rollout.
+
 Do not reformat values written by `init`. When replacing `REVIEW_REQUIRED`, use only this rule: flags are unquoted JSON booleans (`true` or `false`); editable integers are quoted decimal strings (`"120"` or `"0"`). Set zero explicitly when a numeric feature is disabled. `init` visibly prefills only equivalent MercataBridge fields: asset enablement, the withdrawal cap converted to target-token units, and the hot-wallet threshold converted to `manualReviewThreshold`. Review those values. Fields without an equivalent remain `REVIEW_REQUIRED`; expansion uses only the values recorded in this JSON and performs no hidden inheritance.
 
 For combined scope, `init` also writes each native route's current `nativePolicy`:
@@ -329,30 +331,48 @@ Check only `.deployment/current/`. It contains the current bound outputs:
 
 Generation fails if EAB and native use different Safes. It never emits activation calls.
 
-STRATO admins use the same existing `app/contracts/.env` from step 2:
+When a preactivation Safe file is generated, Safe owners execute it before any STRATO admin approval:
 
 ```bash
-export ADMIN_APPROVAL_FILE=<ABSOLUTE_GENERATED_ADMIN_JSON_FROM_COORDINATOR>
+export SAFE_JSON=<ABSOLUTE_PREACTIVATION_SAFE_JSON>
+export SAFE=<SAFE_ADDRESS>
+export OWNER_SIGNATURE_FILE="$ROLLOUT_DIR/preactivation-owner-signature.json"
+
+cd "$REPO_ROOT/app/ethereum"
+npm run safe:batch -- inspect --file "$SAFE_JSON" --chain-id "$TARGET_CHAIN_ID" --safe "$SAFE"
+
+export REVIEWED_SAFE_TX_HASH=<SAFE_TX_HASH_PRINTED_BY_INSPECT>
+
+set -a
+source "$REPO_ROOT/app/ethereum/.env"
+set +a
+export SAFE_OWNER_PRIVATE_KEY="$PRIVATE_KEY"
+npm run safe:batch -- sign --file "$SAFE_JSON" --chain-id "$TARGET_CHAIN_ID" --safe "$SAFE" --output "$OWNER_SIGNATURE_FILE"
+unset SAFE_OWNER_PRIVATE_KEY
+
+export SAFE_TX_EXECUTOR_PRIVATE_KEY="$PRIVATE_KEY"
+npm run safe:batch -- execute --file "$SAFE_JSON" --chain-id "$TARGET_CHAIN_ID" --safe "$SAFE" --signature "$OWNER_SIGNATURE_FILE" --confirm "$REVIEWED_SAFE_TX_HASH"
+unset SAFE_TX_EXECUTOR_PRIVATE_KEY PRIVATE_KEY
+```
+
+These commands assume `app/ethereum/.env` `PRIVATE_KEY` is both a Safe owner and the funded transaction executor. If they are different accounts, export each corresponding private key explicitly under `SAFE_OWNER_PRIVATE_KEY` and `SAFE_TX_EXECUTOR_PRIVATE_KEY`; `safe:batch` does not use `PRIVATE_KEY` as an automatic fallback.
+
+On chains supported by Safe Transaction Builder, upload the generated `preactivation-safe-<safe>.json` unchanged, review it, and sign/execute it in the Safe UI instead of running the CLI `sign` and `execute` commands.
+
+After the Safe transaction confirms, the Coordinator reruns `generate`. Discard the previous `.deployment/current/` outputs and use only the replacements:
+
+```bash
+npm run external:rollout -- generate --manifest "$ROLLOUT_DIR/deployment.json"
+```
+
+If no preactivation Safe file was generated, no rerun is required. STRATO admins then use the current `preactivation-admin.json` and the same existing `app/contracts/.env` from step 2:
+
+```bash
+export ADMIN_APPROVAL_FILE=<ABSOLUTE_CURRENT_ADMIN_JSON_FROM_COORDINATOR>
 cd "$REPO_ROOT/app/ethereum"
 npm run external:rollout -- approve \
   --file "$ADMIN_APPROVAL_FILE" \
   --env-file "$REPO_ROOT/app/contracts/.env"
-```
-
-Safe owners run:
-
-```bash
-npm run safe:batch -- inspect --file <SAFE_JSON> --chain-id "$TARGET_CHAIN_ID" --safe <SAFE>
-
-read -rsp "Safe owner private key: " SAFE_OWNER_PRIVATE_KEY; echo
-export SAFE_OWNER_PRIVATE_KEY
-npm run safe:batch -- sign --file <SAFE_JSON> --chain-id "$TARGET_CHAIN_ID" --safe <SAFE> --output "$OWNER_SIGNATURE_FILE"
-unset SAFE_OWNER_PRIVATE_KEY
-
-read -rsp "Safe transaction executor private key: " SAFE_TX_EXECUTOR_PRIVATE_KEY; echo
-export SAFE_TX_EXECUTOR_PRIVATE_KEY
-npm run safe:batch -- execute --file <SAFE_JSON> --chain-id "$TARGET_CHAIN_ID" --safe <SAFE> --signature "$OWNER_SIGNATURE_FILE" --confirm "$REVIEWED_SAFE_TX_HASH"
-unset SAFE_TX_EXECUTOR_PRIVATE_KEY
 ```
 
 ### Infra handoff and service startup
