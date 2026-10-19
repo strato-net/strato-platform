@@ -3,7 +3,7 @@
     chainId: "0x7030addddcf2",
     chainName: "STRATO",
     nativeCurrency: { name: "USDST", symbol: "USDST", decimals: 18 },
-    rpcUrls: ["https://app.strato.nexus/rpc", "https://noderpc.strato.nexus/rpc"],
+    rpcUrls: ["https://noderpc.strato.nexus/rpc", "https://app.strato.nexus/rpc"],
     blockExplorerUrls: ["https://stratoscan.strato.nexus"],
   };
 
