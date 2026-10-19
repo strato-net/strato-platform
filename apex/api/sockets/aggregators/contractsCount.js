@@ -16,7 +16,7 @@ function getContractsCount() {
 }
 
 getContractsCount()
-setInterval(getContractsCount, config.webSockets.dbPollFrequency)
+setInterval(getContractsCount, config.webSockets.countPollFrequency)
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${CONTRACTS_COUNT}`, contractsCount);

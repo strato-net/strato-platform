@@ -28,7 +28,7 @@ function getUserCount() {
 }
 
 getUserCount()
-setInterval(getUserCount, config.webSockets.dbPollFrequency)
+setInterval(getUserCount, config.webSockets.countPollFrequency)
 
 function initialHydrate(socket) {
   socket.emit(`PRELOAD_${USERS_COUNT}`, userCount);
