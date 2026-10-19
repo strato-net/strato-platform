@@ -16,6 +16,7 @@ module SqlState
   ( NativeBalance (..),
     nativeBalanceFromSql,
     storageAtFromSql,
+    feeQuoteFromSql,
     basicValueToWord,
     AccountKind (..),
     accountKind,
@@ -132,6 +133,40 @@ nativeBalanceFromSql addr
         Right k -> return $ NativeBalanceUnavailable $ "native token is not a contract in the mirror: " ++ show k
   where
     nativeAddr = nativeTokenAddress $ contractsConfig ethConf
+
+-- | One mirrored storage value; 'BDefault' when the path has no row.
+storageValue :: Address -> StoragePath -> IO (Either String BasicValue)
+storageValue addr path = do
+  r <- runLocal $ Storage.getStorageClient Storage.storageFilterParams
+    { Storage.qsAddress = Just addr
+    , Storage.qsKey = Just path
+    , Storage.qsLimit = Just 1
+    }
+  return $ case r of
+    Left e -> Left $ "storage lookup failed: " ++ T.unpack (formatClientError e)
+    Right [] -> Right BDefault
+    Right (row : _) -> Right (Storage.value row)
+
+-- | The flat per-transaction fee the installed fee implementation froze for the
+-- current block, from the mirror: DeciderState (0xDEC1DE02) names the
+-- implementation and a FeeRouter keeps the quote in its own @quotedFee@.
+-- 'Nothing' when the implementation keeps no quote (DeciderState's legacy
+-- payFees) or has not priced yet.
+feeQuoteFromSql :: IO (Either String (Maybe Integer))
+feeQuoteFromSql =
+  storageValue (Address 0xDEC1DE02) (StoragePath [Field "currentFeeContract"]) >>= \case
+    Left e -> return $ Left e
+    Right (BAddress impl) -> quoteOf impl
+    Right (BContract _ impl) -> quoteOf impl
+    Right other -> return $ Left $ "unexpected currentFeeContract in mirror: " ++ show other
+  where
+    quoteOf impl =
+      storageValue impl (StoragePath [Field "quotedFee"]) >>= \case
+        Left e -> return $ Left e
+        Right (BInteger n) | n > 0 -> return $ Right (Just n)
+        Right (BInteger _) -> return $ Right Nothing
+        Right BDefault -> return $ Right Nothing
+        Right other -> return $ Left $ "unexpected quotedFee in mirror: " ++ show other
 
 zeroWord :: String
 zeroWord = "0x" ++ replicate 64 '0'

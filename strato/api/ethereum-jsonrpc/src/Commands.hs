@@ -85,7 +85,7 @@ import LocalApi (formatClientError, runLocal, sharedManager)
 import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
 import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
-import SqlState (NativeBalance (..), nativeBalanceFromSql, storageAtFromSql)
+import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
@@ -244,12 +244,61 @@ eth_hashrate = toMethod "eth_hashrate" f ()
 walletGasEstimate :: Integer
 walletGasEstimate = 21000
 
+-- | A selector call against the latest state on vm-runner: the raw return
+-- data, or Nothing when the call fails.
+callVmRaw :: String -> Address -> B.ByteString -> RpcResult Server (Maybe B.ByteString)
+callVmRaw label to calldata = do
+  rpcId <- mkRpcId label
+  resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
+  return $ case resp of
+    Success _ result -> Just result
+    _ -> Nothing
+  where
+    txObj = TxCallObject
+      { TxCall.from = Address 0
+      , TxCall.to = Just to
+      , TxCall.gas = "0x0"
+      , TxCall.gasPrice = "0x0"
+      , TxCall.value = "0x0"
+      , TxCall.data_ = HexData calldata
+      }
+
+-- | The i-th 32-byte word of ABI return data as an unsigned integer.
+wordAt :: Int -> B.ByteString -> Integer
+wordAt i = B.foldl' (\acc b -> acc * 256 + fromIntegral b) 0 . B.take 32 . B.drop (32 * i)
+
+-- The platform charges one flat fee per transaction and ignores the gas fields,
+-- so wallets are quoted that fee spread across the fixed gas estimate, rounding
+-- up: the STRATO fee the installed FeeRouter froze for the current block, or
+-- 0.01 USDST where DeciderState still runs its own legacy payFees.
 eth_gasPrice :: Method Server
 eth_gasPrice = toMethod "eth_gasPrice" f ()
   where
+    legacyFee = 10000000000000000 :: Integer
+
     f :: RpcResult Server String
-    -- Quote the fixed 0.01 USDST fee across the wallet's gas estimate, rounding up.
-    f = return $ "0x" ++ showHex ((10000000000000000 + walletGasEstimate - 1) `div` walletGasEstimate) ""
+    f = do
+      fromSql <- liftIO feeQuoteFromSql
+      fee <- case fromSql of
+        Right quote -> return $ fromMaybe legacyFee quote
+        Left why -> do
+          liftIO . putStrLn $ "eth_gasPrice: falling back to vm-runner: " ++ why
+          viaVm
+      return $ "0x" ++ showHex ((fee + walletGasEstimate - 1) `div` walletGasEstimate) ""
+
+    -- DeciderState.getImplContract(), then stratoFeeQuote() on what it names;
+    -- an implementation without a quote is the legacy one.
+    viaVm :: RpcResult Server Integer
+    viaVm = do
+      impl <- callVmRaw "eth_gasPrice_impl" (Address 0xDEC1DE02) (selector "56557016")
+      quote <- case impl of
+        Just w | B.length w == 32 -> callVmRaw "eth_gasPrice_quote" (Address $ fromInteger $ wordAt 0 w) (selector "462d073f")
+        _ -> return Nothing
+      return $ case quote of
+        Just w | B.length w == 96, wordAt 0 w > 0 -> wordAt 0 w
+        _ -> legacyFee
+
+    selector hex = either (const B.empty) id (B16.decode hex)
 
 eth_accounts :: Method Server
 eth_accounts = toMethod "eth_accounts" f ()
@@ -405,26 +454,12 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     viaVm :: Address -> RpcResult Server String
     viaVm addr = do
-          let padding = BC.replicate 24 '0'
-              calldataHex = balanceOfSelector <> padding <> addressToHex addr
-              calldata = case B16.decode calldataHex of
-                Right bs -> bs
-                Left _ -> B.empty
-              txObj = TxCallObject
-                { TxCall.from = Address 0
-                , TxCall.to = Just nativeAddr
-                , TxCall.gas = "0x0"
-                , TxCall.gasPrice = "0x0"
-                , TxCall.value = "0x0"
-                , TxCall.data_ = HexData calldata
-                }
-          rpcId <- mkRpcId $ "eth_getBalance_" ++ showHex addr ""
-          resp <- liftIO $ callVM $ JRCCall txObj rpcId "latest"
-          case resp of
-            Success _ result | B.length result == 32 -> do
-              let balance = foldl (\acc b -> acc * 256 + fromIntegral b) (0 :: Integer) (B.unpack result)
-              return $ "0x" ++ showHex balance ""
-            _ -> return "0x0"
+          let calldata = either (const B.empty) id $
+                B16.decode (balanceOfSelector <> BC.replicate 24 '0' <> addressToHex addr)
+          resp <- callVmRaw ("eth_getBalance_" ++ showHex addr "") nativeAddr calldata
+          return $ case resp of
+            Just result | B.length result == 32 -> "0x" ++ showHex (wordAt 0 result) ""
+            _ -> "0x0"
 
 eth_getCode :: Method Server
 eth_getCode = toMethod "eth_getCode" f (Required "address" :+: Required "block" :+: ())
