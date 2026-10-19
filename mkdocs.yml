@@ -44,6 +44,9 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/add-network.js
+
 extra:
   social:
     - icon: fontawesome/brands/telegram
