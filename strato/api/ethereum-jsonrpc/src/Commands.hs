@@ -16,7 +16,7 @@ import CallTrace (BlockTrace(..), mkCallFrame)
 import EthBlock (EthBlock(..), txToEthValue)
 import EthLog (EthLog, eventRowToLogMaybe, ethLogsBloom, matchesTopics)
 import Blockchain.Data.LogsBloom (emptyLogsBloom)
-import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex)
+import TransactionReceipt (TransactionReceipt, EthHex(..), mkTransactionReceipt, transactionIndex, walletGasEstimate)
 import ResponseDispatcher (withPendingResponse)
 import Strato.Version (stratoVersion)
 import Blockchain.CommunicationConduit (ethVersion)
@@ -86,7 +86,7 @@ import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, req
 import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
 import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, nativeToken, storageAtFromSql)
-import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
+import Control.Monad.Composable.CodeDB (EventRow (..), runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
 
@@ -242,8 +242,10 @@ eth_hashrate = toMethod "eth_hashrate" f ()
     f :: RpcResult Server String
     f = return "0x0"
 
-walletGasEstimate :: Integer
-walletGasEstimate = 21000
+-- | The flat fee of DeciderState's own payFees: 0.01 USDST, the native
+-- currency before the STRATO-gas fork.
+legacyFee :: Integer
+legacyFee = 10000000000000000
 
 -- | A selector call against the latest state on vm-runner: the raw return
 -- data, or Nothing when the call fails.
@@ -285,8 +287,6 @@ feePerGas = do
       viaVm
   return $ (fee + walletGasEstimate - 1) `div` walletGasEstimate
   where
-    legacyFee = 10000000000000000 :: Integer
-
     -- DeciderState.getImplContract(), then stratoFeeQuote() on what it names;
     -- an implementation without a quote is the legacy one.
     viaVm :: RpcResult Server Integer
@@ -910,10 +910,29 @@ blockBloom blk =
 -- | Reconstruct a transaction's logs from the Cirrus @event@ table, skipping any
 -- event that cannot be resolved (missing code / event def) so one bad event does
 -- not fail the whole receipt.
-txEthLogs :: Keccak256 -> RpcResult Server [EthLog]
-txEthLogs txHash = do
+-- | The transaction's events as Ethereum logs, and what its payer was charged
+-- in the native currency: the STRATO a FeePaid event reports burning, nothing
+-- when it reports a voucher, and the legacy flat fee where the fee
+-- implementation emits no FeePaid at all. FeePaid is emitted inside the fee
+-- DELEGATECALL, so it is attributed to the payer and matched by name only.
+txLogsAndFee :: Keccak256 -> RpcResult Server ([EthLog], Integer)
+txLogsAndFee txHash = do
   rows <- runCodeDBM $ queryEventsByTxHash (T.pack (keccak256ToHex txHash)) (maxLogResults + 1)
-  catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
+  ethLogs <- catMaybes <$> runCodeDBM (mapM eventRowToLogMaybe rows)
+  return (ethLogs, feeCharged rows)
+  where
+    feeCharged rows = case find ((== "FeePaid") . erEventName) rows of
+      Nothing -> legacyFee
+      Just row -> case (attr "method" row, attr "amount" row >>= readInteger) of
+        (Just "FeeMethod.VOUCHER", _) -> 0
+        (_, Just amount) -> amount
+        _ -> legacyFee
+    attr name row = case M.lookup name (erAttributes row) of
+      Just (String s) -> Just s
+      _ -> Nothing
+    readInteger s = case reads (T.unpack s) of
+      [(n, "")] -> Just n
+      _ -> Nothing
 
 -- | Hex-encoded (@0x@-prefixed) Ethereum logs bloom for a set of logs.
 logsBloomHex :: [EthLog] -> String
@@ -993,8 +1012,8 @@ eth_getTransactionReceipt = toMethod "eth_getTransactionReceipt" f (Required "tx
           txs = maybe [] (blockReceiptTransactions . bPrimeToB) mBlk
       case find (\t -> transactionHash t == transactionResultTransactionHash tr) txs of
         Just tx -> do
-          ethLogs <- txEthLogs (transactionResultTransactionHash tr)
-          return $ mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)
+          (ethLogs, fee) <- txLogsAndFee (transactionResultTransactionHash tr)
+          return $ mkTransactionReceipt tr tx blkNum fee (map toJSON ethLogs) (logsBloomHex ethLogs)
         Nothing -> throwError $ rpcError (-32603) "Transaction not found in block"
 
 -- | All transaction receipts for a block. The block parameter is a 32-byte
@@ -1028,8 +1047,8 @@ eth_getBlockReceipts = toMethod "eth_getBlockReceipts" f (Required "block" :+: (
       response <- liftIO $ runLocal $ TxResults.getTransactionResultClient (transactionHash tx)
       case response of
         Right (tr : _) -> do
-          ethLogs <- txEthLogs (transactionHash tx)
-          return $ (mkTransactionReceipt tr tx blkNum (map toJSON ethLogs) (logsBloomHex ethLogs)) { transactionIndex = EthHex idx }
+          (ethLogs, fee) <- txLogsAndFee (transactionHash tx)
+          return $ (mkTransactionReceipt tr tx blkNum fee (map toJSON ethLogs) (logsBloomHex ethLogs)) { transactionIndex = EthHex idx }
         Right []       -> throwError $ rpcError (-32603) "receipt not found for transaction in block"
         Left err       -> throwError $ rpcError (-32603) (formatClientError err)
 
