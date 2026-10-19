@@ -424,20 +424,25 @@ instance HasPeerStore m => HasSyncDB m where
     case result of
       oneTask:_ -> return $ Just $ entityVal oneTask
       [] -> do
-        --No existing task, make a new one
+        -- No existing task, make a new one, unless the chiliad it would get
+        -- lies beyond the peer's tip. The bound is the chiliad about to be
+        -- allocated (MAX + 1 on SQLite, the sequence's next value on
+        -- Postgres), not the row count: a task table seeded at the chiliad of
+        -- the Redis best block (see strato-p2p's initConfig) is sparse, and a
+        -- row count would let tasks past the tip through.
         results <- if rdbms == "sqlite"
           then SQL.rawSql
             [r|
               INSERT INTO "sync_task" ("chiliad", "assignment_time", "host", "status")
               SELECT (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task"), ?, ?, 'Assigned'
-              WHERE (SELECT COUNT(*) FROM "sync_task") < ?
+              WHERE (SELECT COALESCE(MAX("chiliad") + 1, 0) FROM "sync_task") < ?
               RETURNING ??
             |] [toPersistValue now, toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
           else SQL.rawSql
             [r|
               INSERT INTO sync_task (host)
               SELECT ?
-              WHERE (select count(*) from "sync_task") < ?
+              WHERE (SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM chiliad) < ?
               RETURNING
             |] [toPersistValue host, toPersistValue $ 1 + highestBlockNum `div` 1000]
 

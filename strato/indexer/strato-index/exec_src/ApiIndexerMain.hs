@@ -6,7 +6,7 @@ import BlockApps.Init
 import BlockApps.Logging
 import Blockchain.DB.SQLDB (sqlQueryWriter)
 import Blockchain.Data.WriterLease
-import Blockchain.Strato.Indexer.ApiIndexer (p2pIndexerLoop, seedSqlConsumerGroup, sqlIndexerLoop)
+import Blockchain.Strato.Indexer.ApiIndexer (p2pIndexerLoop, retireSqlConsumerGroup, seedSqlConsumerGroup, sqlIndexerLoop)
 import Blockchain.Strato.Indexer.Bootstrap
 import Blockchain.NodeStatusMirror (nodeStatusMirrorLoop)
 import Control.Concurrent (forkIO)
@@ -47,8 +47,10 @@ main = do
         -- No SQL side at all: no lease, no node_status mirror, and the eth
         -- database is neither created nor migrated here. The Redis side runs
         -- under its usual consumer group, so a node can switch between the two
-        -- modes without replaying the topic.
+        -- modes without replaying the topic; the SQL group's checkpoint, if a
+        -- snapshot brought one, is retired so it does not pin the log.
         bootstrapIndexerTopic
+        runStreamMConfigured "strato-indexer-sql" retireSqlConsumerGroup
         runStreamMConfigured "strato-indexer" $
           runRedisM lookupRedisBlockDBConfig $
             p2pIndexerLoop

@@ -31,3 +31,4 @@ export STRATO_PORT_API
 export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 export stratoRoot=${stratoRoot:-http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2}
 export vaultUrl=$(yq '.urlConfig.vaultUrl' "$ETHCONF_FILE")
+export redis_db_number=$(yq '.redisBlockDBConfig.redisDBNumber' "$ETHCONF_FILE")

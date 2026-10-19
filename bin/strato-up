@@ -46,6 +46,12 @@ for arg in "$@"; do
             ROLE="$(printf '%s' "${arg#*=}" | tr '[:upper:]' '[:lower:]')"
             SETUP_ARGS+=("$arg")
             ;;
+        # strato-setup would also take "--role validator" (two arguments), which
+        # the loop above cannot see; the snapshot decisions below need the value.
+        --role)
+            echo "Error: write the role as --role=<node|core|api|api-node|validator>." >&2
+            exit 1
+            ;;
         # There are no role shorthands. Refused here because strato-setup
         # would not: its option parser takes --validator as an abbreviation of
         # --validatorBehavior and sets up a full node.

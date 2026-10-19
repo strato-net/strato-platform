@@ -185,7 +185,7 @@ What answers:
 
 - **`--monitoring=false`** drops `prometheus` and `apex`, for operators who scrape the node processes themselves. `/health` and `/apex-api/` then answer 502, and the network monitor cannot watch the node. The flag is refused with any other `--role`.
 - **Identity, snapshots, ports.** As on a full node: the node key comes from the Vault, `--snapshot` restores the chain state and the `eth` and `cirrus` databases, and the node listens on 30303, `--httpPort` and 443.
-- **`--localAuth`** works as on a full node: the `local-auth` container and the node-local Vault are added, nginx serves `/auth/` and `/vault/`, and the first `strato-up` creates the admin user. The login pages come from the `local-auth` container, so they do not need the app. See [Local auth mode](#local-auth-mode).
+- **`--localAuth`** works as on a full node: the `local-auth` container and the node-local Vault are added, nginx serves `/auth/` and `/vault/`, and the first `strato-up` creates the admin user. The login pages come from the `local-auth` container, so they do not need the app; after a browser login the user lands on `/`, which answers 404 unless `--appUrl` is set. See [Local auth mode](#local-auth-mode).
 - **Resources.** An API node needs the same host as a full node. On a testnet node, the app, SMD and docs containers use about 170 MB of memory between them and prometheus and apex about 350 MB more, while Postgres, Redis, `vm-runner` and `strato-p2p` use several GB and Cirrus is the disk. What you get is a faster build and fewer containers, not a smaller machine.
 
 ## JSON-RPC and the STRATO RPC extensions

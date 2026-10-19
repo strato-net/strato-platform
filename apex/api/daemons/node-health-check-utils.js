@@ -195,15 +195,20 @@ async function getIndexedBlockNumber() {
   }
 }
 
-// Whether the node considers itself synced: the Redis flag strato writes (the
-// value /eth/v1.2/metadata reports as isSynced), or metadata itself where there
-// is no Redis block cache. A lite validator runs no strato-api.
+// Whether the node considers itself synced. /eth/v1.2/metadata's isSynced is
+// the verdict wherever strato-api runs: it is the Redis sync flag AND Cirrus
+// caught up to the node's best block, and health must not report synced
+// while slipstream is still behind. A lite validator runs no strato-api and
+// no slipstream, so there the Redis flag alone is the answer.
 async function getIsSynced() {
-  try {
-    const status = await redisBlockDB.getSyncStatus();
-    if (status !== null) return status;
-  } catch (err) {
-    winston.debug(`No Redis block cache here, reading the sync status from metadata: ${err.message}`);
+  if (process.env.APEX_ROLE === "validator") {
+    try {
+      const status = await redisBlockDB.getSyncStatus();
+      if (status !== null) return status;
+    } catch (err) {
+      winston.debug(`No Redis sync status here: ${err.message}`);
+    }
+    return false;
   }
   const { isSynced = false } = await getStratoMetadata();
   return isSynced;

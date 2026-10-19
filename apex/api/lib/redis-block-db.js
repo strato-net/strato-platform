@@ -43,8 +43,11 @@ function getClient() {
 
   const host = process.env.redis_host || "redis";
   const port = parseInt(process.env.redis_port || "6379", 10);
+  // The database the node's processes use (--redisDBNumber, from ethconf).
+  const database = parseInt(process.env.redis_db_number, 10);
 
   const client = createClient({
+    database: Number.isFinite(database) ? database : 0,
     socket: {
       host,
       port,

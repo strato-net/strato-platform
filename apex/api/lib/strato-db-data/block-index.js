@@ -4,9 +4,11 @@ const db = require("../../models/strato/eth/connection");
 // Whether this node keeps the SQL block index (block_data_ref, raw_transaction,
 // address_state_ref and friends). A lite validator (strato-indexer --sql=false)
 // does not, and the SMD pollers that read it would otherwise fail every second
-// for good, filling the log as they go. Probed once: the answer does not change
-// while the node runs.
+// for good, filling the log as they go. Only a positive answer is kept: on a
+// fresh full node the containers start before the host indexer creates the
+// table, so an early "absent" must be asked again on the next poll.
 let probe = null;
+let warned = false;
 
 function hasBlockIndex() {
   if (!probe) {
@@ -19,9 +21,13 @@ function hasBlockIndex() {
       .then(([[row]]) => {
         const known = row.t !== null;
         if (!known) {
-          winston.warn(
-            "This node has no SQL block index (block_data_ref is absent): the SMD block, transaction and contract pollers stay idle"
-          );
+          probe = null;
+          if (!warned) {
+            warned = true;
+            winston.warn(
+              "This node has no SQL block index (block_data_ref is absent): the SMD block, transaction and contract pollers stay idle until it appears"
+            );
+          }
         }
         return known;
       })
