@@ -154,6 +154,7 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress p
     Just f@TFTXSizeLimitExceeded {} -> recoverable f
     Just f@TFIncorrectChainId {} -> recoverable f
     Just f@TFInvalidEnvelope {} -> recoverable f
+    Just f@TFFeeBoundExceeded {} -> recoverable f
 
 
 -- todo batch insert results
@@ -230,6 +231,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ "administratively flushed from mempool with scope " ++ show scope, hsh)
   InvalidEnvelope s q why OutputTx {otHash = hsh} ->
     (p s q ++ "an invalid envelope: " ++ why, hsh)
+  FeeBoundExceeded s q quote bound OutputTx {otHash = hsh} ->
+    (p s q ++ "the quoted fee (" ++ show quote ++ ") exceeding the signed fee bound (" ++ show bound ++ "); requote and resubmit", hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -604,10 +607,14 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = do
       nextBlock = number (B.bestBlockHeader $ B.miningCache state) + 1
       expectedChainId = Conf.chainId $ networkConfig ethConf
   (addressNonce, addressBalance) <- getAddressNonceAndBalance address
+  -- The best block's quote: the block being built requotes when it starts, so
+  -- this is a first filter and execution has the final say.
+  quote <- if isStratoGasForkActive nextBlock then quotedStratoFee else return 0
   return $
     if
       | isReplayProtectionForkActive nextBlock && not (transactionChainIdValid expectedChainId bt) -> Left $ ChainIdMismatch Validation Incoming expectedChainId t
       | Just why <- envelopeRejection (isStratoGasForkActive nextBlock) bt -> Left $ InvalidEnvelope Validation Incoming why t
+      | Just (q, bound) <- feeBoundRejection quote bt -> Left $ FeeBoundExceeded Validation Incoming q bound t
       | intrinsicGas >= gLimit -> Left $ GasLimitTooLow Validation Incoming intrinsicGas gLimit t
       | addressNonce > txn -> Left $ NonceTooLow Validation Incoming addressNonce t
       | addressBalance < txFee -> Left $ BalanceTooLow Validation Incoming txFee addressBalance t

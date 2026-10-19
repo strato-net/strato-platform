@@ -429,6 +429,8 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   let bt = otBaseTx t
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
+  -- This block's quote: payBlockRewards froze it before any transaction ran.
+  quote <- if isStratoGasForkActive (number b) then quotedStratoFee else return 0
 
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
       sizeLimit = toInteger (Conf.txSizeLimit (networkConfig ethConf))
@@ -436,6 +438,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       precheck
         | isReplayProtectionForkActive (number b) && not (transactionChainIdValid expectedChainId bt) = Left $ TFIncorrectChainId expectedChainId t
         | Just why <- envelopeRejection (isStratoGasForkActive (number b)) bt = Left $ TFInvalidEnvelope why t
+        | Just (q, bound) <- feeBoundRejection quote bt = Left $ TFFeeBoundExceeded q bound t
         | TD.gasLimit bt > min remainingBlockGas maxGas = Left $ TFBlockGasLimitExceeded (TD.gasLimit bt) remainingBlockGas t
         | not nonceValid = Left $ TFNonceMismatch (TD.nonce bt) acctNonce t
         | txSize >= sizeLimit = Left $ TFTXSizeLimitExceeded txSize sizeLimit t

@@ -2,7 +2,7 @@
 
 module StratoGasEnvelopeSpec (spec) where
 
-import Blockchain.Bagger.Transactions (envelopeRejection)
+import Blockchain.Bagger.Transactions (envelopeRejection, feeBoundRejection, signedFeeBound)
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (transactionHash, whoSignedThisTransaction)
 import Blockchain.Data.TransactionDef (Transaction (..))
@@ -82,6 +82,16 @@ spec = describe "STRATO-gas envelope boundary" $ do
     envelopeRejection True (legacy 1000000000000000000 "\xa9") `shouldSatisfy` isNothing
     envelopeRejection True valueTransfer `shouldSatisfy` isNothing
     envelopeRejection True callWithData `shouldSatisfy` isNothing
+  it "bounds the fee at the signed gas limit times fee per gas" $ do
+    signedFeeBound valueTransfer `shouldBe` Just 42000 -- maxFeePerGas 2 x 21000
+    signedFeeBound legacyTransfer `shouldBe` Just (20000000000 * 21000)
+    signedFeeBound (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldBe` Nothing
+  it "rejects a quote above the signed bound and asks for a requote" $ do
+    feeBoundRejection 42000 valueTransfer `shouldBe` Nothing
+    feeBoundRejection 42001 valueTransfer `shouldBe` Just (42001, 42000)
+    feeBoundRejection 0 (legacy 0 B.empty) `shouldBe` Nothing -- nothing quoted: legacy fee implementation
+    feeBoundRejection 1 (legacy 0 B.empty) `shouldBe` Nothing -- 20 gwei x 21000 covers it
+    feeBoundRejection (10 ^ (30 :: Int)) (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldBe` Nothing
   it "never rejects STRATO-native transactions" $
     mapM_ (\active -> envelopeRejection active (MessageTX 0 1000000 1 "ping" ["7"] "mercata" (Just 1) 0 0 27 1 B.empty) `shouldSatisfy` isNothing) [False, True]
   it "schedules helium, leaves upquark unscheduled and new networks at genesis" $ do

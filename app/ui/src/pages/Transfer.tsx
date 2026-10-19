@@ -168,8 +168,6 @@ const Transfer = () => {
           args: [ensureHexPrefix(recipient), BigInt(weiValue)],
           nonce: Number(nonce),
           gas: 1000000n,
-          type: "legacy",
-          gasPrice: 0n,
         });
         captureApi("token_transfer", "succeeded", {
           transport: "wagmi",

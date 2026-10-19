@@ -92,7 +92,9 @@ function createStratoProvider(userAddress: Address, chainId: number): EIP1193Pro
           // it only legacy envelopes are accepted.
           const latest = (await rpcProxy("eth_getBlockByNumber", ["latest", false])) as { baseFeePerGas?: string } | null;
           if (latest?.baseFeePerGas) {
-            const maxFee = BigInt(tx.maxFeePerGas || tx.gasPrice || latest.baseFeePerGas);
+            // The node bounds the fee at maxFeePerGas × gas, so a dapp's zero
+            // price (the pre-fork convention) is raised to the quoted base fee.
+            const maxFee = BigInt(tx.maxFeePerGas || tx.gasPrice || 0) || BigInt(latest.baseFeePerGas);
             const maxPriority = BigInt(tx.maxPriorityFeePerGas || 0);
             const unsigned = [
               toMinimalHex(chainId),

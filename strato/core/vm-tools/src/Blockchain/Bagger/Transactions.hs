@@ -1,9 +1,12 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Bagger.Transactions where
 
 import Blockchain.DB.MemAddressStateDB
+import Blockchain.DB.SolidStorageDB (HasSolidStorageDB, getSolidStorageKeyVal')
 import Blockchain.Data.ExecResults
 import Blockchain.Data.Receipt
 import Blockchain.Data.TXOrigin
@@ -14,6 +17,7 @@ import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import SolidVM.Model.Delta
 import SolidVM.Model.Event
+import SolidVM.Model.Storable (BasicValue (..), StoragePath (..), StoragePathPiece (..))
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
@@ -57,6 +61,7 @@ data TransactionFailureCause
   | TFTXSizeLimitExceeded Integer Integer OutputTx -- txSizeLimit, actualSize
   | TFIncorrectChainId Integer OutputTx
   | TFInvalidEnvelope String OutputTx -- why
+  | TFFeeBoundExceeded Integer Integer OutputTx -- quotedFee, signedBound
   deriving (Eq, Read, Show, Generic)
 
 instance NFData TransactionFailureCause
@@ -86,6 +91,7 @@ data TxRejection
   | ChainIdMismatch BaggerStage BaggerTxQueue Integer OutputTx
   | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   | InvalidEnvelope BaggerStage BaggerTxQueue String OutputTx -- why
+  | FeeBoundExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx -- quotedFee, signedBound
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -97,6 +103,7 @@ rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
 rejectedTx (ChainIdMismatch _ _ _ t) = t
 rejectedTx (AdminFlushed _ _ _ t) = t
 rejectedTx (InvalidEnvelope _ _ _ t) = t
+rejectedTx (FeeBoundExceeded _ _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
 
@@ -160,6 +167,9 @@ instance Format TxRejection where
   format (InvalidEnvelope stage queue why OutputTx {otHash = hash}) =
     "Invalid envelope at stage " ++ show stage ++ " in queue " ++ show queue
       ++ ": " ++ why ++ "\n\ttx hash " ++ format hash
+  format (FeeBoundExceeded stage queue quote bound OutputTx {otHash = hash}) =
+    "Fee bound exceeded at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ ": quoted fee " ++ show quote ++ " > signed bound " ++ show bound ++ "\n\ttx hash " ++ format hash
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -178,6 +188,8 @@ txRejectionToAPIFailureCause (AdminFlushed stage queue scope t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.AdminFlushedError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " was administratively flushed from mempool with scope " ++ show scope)
 txRejectionToAPIFailureCause (InvalidEnvelope stage queue why _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.InvalidEnvelopeError Nothing Nothing (Just why)
+txRejectionToAPIFailureCause (FeeBoundExceeded stage queue quote bound _) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.FeeBoundExceededError (Just quote) (Just bound) (Just feeBoundAdvice)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx
@@ -187,6 +199,46 @@ tfToBaggerTxRejection (TFNonceMismatch expected _ tx) = NonceTooLow Execution Qu
 tfToBaggerTxRejection (TFTXSizeLimitExceeded limit actual tx) = TXSizeLimitExceeded Execution Queued actual limit tx
 tfToBaggerTxRejection (TFIncorrectChainId expected tx) = ChainIdMismatch Execution Queued expected tx
 tfToBaggerTxRejection (TFInvalidEnvelope why tx) = InvalidEnvelope Execution Queued why tx
+tfToBaggerTxRejection (TFFeeBoundExceeded quote bound tx) = FeeBoundExceeded Execution Queued quote bound tx
+
+feeBoundAdvice :: String
+feeBoundAdvice = "The block's STRATO fee exceeds the fee the transaction signed for; requote (eth_gasPrice) and resubmit"
+
+-- | The fee a signed Ethereum envelope permits: its gas limit at its fee per
+-- gas (maxFeePerGas for a type-2 envelope), the bound a wallet shows its user.
+-- STRATO-native transactions sign no price and set no bound.
+signedFeeBound :: TD.Transaction -> Maybe Integer
+signedFeeBound TD.EthereumTX {TD.gasPrice = price, TD.gasLimit = limit} = Just (price * limit)
+signedFeeBound _ = Nothing
+
+-- | The STRATO fee the installed fee implementation charges in the block being
+-- built, read from state the same way the RPC quotes it: DeciderState
+-- (0xDEC1DE02) names the implementation and a FeeRouter keeps the block's
+-- quote in its own @quotedFee@. 0 where the implementation keeps no quote
+-- (DeciderState's legacy payFees) or has not priced yet, so nothing is bound.
+quotedStratoFee :: HasSolidStorageDB m => m Integer
+quotedStratoFee = do
+  impl <- getSolidStorageKeyVal' (Address 0xDEC1DE02) (StoragePath [Field "currentFeeContract"])
+  case impl of
+    BAddress router -> quoteOf router
+    BContract _ router -> quoteOf router
+    _ -> return 0
+  where
+    quoteOf router = do
+      quote <- getSolidStorageKeyVal' router (StoragePath [Field "quotedFee"])
+      return $ case quote of
+        BInteger n -> n
+        _ -> 0
+
+-- | Why a transaction cannot pay the block's fee: the fee it signed for does
+-- not cover the quote. Only an Ethereum envelope signs a bound, and the quote
+-- is 0 wherever nothing is quoted, so STRATO-native transactions and legacy
+-- fee implementations are never rejected here. A stale bound means the price
+-- moved since the wallet quoted; the fix is a requote, not an open-ended debit.
+feeBoundRejection :: Integer -> TD.Transaction -> Maybe (Integer, Integer)
+feeBoundRejection quote tx = case signedFeeBound tx of
+  Just bound | quote > bound -> Just (quote, bound)
+  _ -> Nothing
 
 transactionChainIdValid :: Integer -> TD.Transaction -> Bool
 transactionChainIdValid expected tx = TD.chainId tx == Just expected
@@ -214,6 +266,7 @@ instance Format TransactionFailureCause where
   format (TFTXSizeLimitExceeded limit actual _) = "TX size limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
   format (TFIncorrectChainId expected tx) = "Incorrect chain ID: expected " ++ show expected ++ ", actual " ++ show (TD.chainId $ otBaseTx tx)
   format (TFInvalidEnvelope why _) = "Invalid envelope: " ++ why
+  format (TFFeeBoundExceeded quote bound _) = "Fee bound exceeded: quoted fee " ++ show quote ++ " > signed bound " ++ show bound
 
 getDeltasFromResults :: [TxRunResult] -> ValidatorDelta
 getDeltasFromResults = foldr go mempty
