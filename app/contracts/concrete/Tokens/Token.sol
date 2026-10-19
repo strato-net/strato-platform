@@ -41,8 +41,12 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     uint8 public customDecimals;
     TokenStatus public status;
     TokenFactory public tokenFactory;
+    // Optional and permanent once set. Existing and ordinary factory tokens keep
+    // zero (unlimited); token-specific deployments such as STRATO may opt in.
+    uint256 public maxSupply;
 
     event StatusChanged(TokenStatus newStatus);
+    event MaxSupplySet(uint256 maxSupply);
 
     modifier onlyTokenFactory() {
         require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
@@ -107,7 +111,16 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
+    function setMaxSupply(uint256 _maxSupply) external onlyOwner {
+        require(maxSupply == 0, "Token: max supply already set");
+        require(_maxSupply > 0, "Token: max supply is zero");
+        require(_maxSupply >= totalSupply(), "Token: max supply below current supply");
+        maxSupply = _maxSupply;
+        emit MaxSupplySet(_maxSupply);
+    }
+
     function mint(address to, uint256 amount) external onlyOwner {
+        require(maxSupply == 0 || amount <= maxSupply - totalSupply(), "Token: max supply exceeded");
         _mint(to, amount);
     }
 

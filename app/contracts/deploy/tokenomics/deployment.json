@@ -5,8 +5,7 @@
   "setupAdmin": "<SETUP_ADMIN>",
   "treasury": "<TREASURY_MULTISIG>",
   "preMinted": {
-    "publicSales": "2750000",
-    "remainder": "bootstrapping"
+    "publicSales": "2750000"
   },
   "beneficiaries": {
     "team": [{ "address": "<TEAM_MEMBER_1>", "tokens": "14040000" }],

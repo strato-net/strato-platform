@@ -3,14 +3,14 @@
 // chain input is externalSupplyWei, the STRATO already minted outside these
 // contracts.
 //
-// Pre-minted supply counts against the categories named in deployment.preMinted:
-// fixed amounts come off those categories' funding, and whatever else exists
-// ("remainder") comes off the first year of the named emission stream. So the
-// categories plus everything already minted add up to exactly the total supply.
+// Pre-minted supply counts against the categories named in deployment.preMinted.
+// Every token already outside these schedules must be assigned explicitly; unknown
+// supply is an error rather than an implicit deduction from another category.
 const crypto = require('crypto');
 
 const ADDRESS_RE = /^(0x)?[0-9a-fA-F]{40}$/;
 const PLACEHOLDER_RE = /^<[^>]+>$/;
+const ZERO_ADDRESS = '0'.repeat(40);
 
 function toWei(tokens) {
   const m = /^(\d+)(?:\.(\d{1,18}))?$/.exec(String(tokens));
@@ -28,6 +28,14 @@ function formatWei(wei) {
 function parseTge(iso) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(iso)) throw new Error(`tge must look like 2026-10-26T00:00:00Z: ${iso}`);
   return Date.parse(iso) / 1000;
+}
+
+function normalizeAddress(value) {
+  return String(value || '').replace(/^0x/, '').toLowerCase();
+}
+
+function isTrue(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
 }
 
 // Replace every "<NAME>" placeholder with a random address (the same one for every
@@ -61,32 +69,33 @@ function buildPlan(schedule, deployment, externalSupplyWei) {
   const token = address('token', deployment.token);
   const totalSupply = BigInt(schedule.totalSupplyWei);
 
-  const { remainder: remainderKey, ...fixed } = deployment.preMinted || {};
-  const preMinted = Object.fromEntries(Object.entries(fixed).map(([k, t]) => [k, toWei(t)]));
-  const fixedTotal = Object.values(preMinted).reduce((a, b) => a + b, 0n);
-  const remainder = externalSupplyWei - fixedTotal;
-  if (remainder < 0n) problems.push(`pre-minted supply ${formatWei(externalSupplyWei)} is less than the fixed pre-minted amounts ${formatWei(fixedTotal)}`);
-  if (remainder > 0n && !remainderKey) problems.push(`${formatWei(remainder)} pre-minted STRATO is not assigned to a category`);
+  const preMinted = Object.fromEntries(Object.entries(deployment.preMinted || {}).map(([k, t]) => [k, toWei(t)]));
+  const preMintedTotal = Object.values(preMinted).reduce((a, b) => a + b, 0n);
+  if (preMintedTotal < externalSupplyWei) {
+    problems.push(`${formatWei(externalSupplyWei - preMintedTotal)} pre-minted STRATO is not assigned to a category`);
+  } else if (preMintedTotal > externalSupplyWei) {
+    problems.push(`assigned pre-minted supply ${formatWei(preMintedTotal)} exceeds live external supply ${formatWei(externalSupplyWei)}`);
+  }
 
   const keys = new Set(schedule.categories.map(c => c.key));
-  for (const k of [...Object.keys(preMinted), ...(remainderKey ? [remainderKey] : [])]) {
+  for (const k of Object.keys(preMinted)) {
     if (!keys.has(k)) problems.push(`preMinted names unknown category ${k}`);
   }
 
   const instances = [];
   for (const c of schedule.categories) {
-    const wei = BigInt(c.wei) - (preMinted[c.key] || 0n);
+    const alreadyMinted = preMinted[c.key] || 0n;
+    const wei = BigInt(c.wei) - alreadyMinted;
     if (c.kind === 'emission') {
       const yearly = c.yearlyWei.map(BigInt);
-      if (c.key === remainderKey && remainder > 0n) {
-        if (remainder > yearly[0]) problems.push(`${c.key}: pre-minted remainder ${formatWei(remainder)} exceeds year 1`);
-        else yearly[0] -= remainder;
+      if (alreadyMinted > 0n) {
+        if (alreadyMinted > yearly[0]) problems.push(`${c.key}: pre-minted amount ${formatWei(alreadyMinted)} exceeds year 1`);
+        else yearly[0] -= alreadyMinted;
       }
       instances.push({ key: c.key, label: c.label, contract: 'EmissionSchedule', recipient: treasury,
         yearlyWei: yearly, fundWei: yearly.reduce((a, b) => a + b, 0n) });
       continue;
     }
-    if (c.key === remainderKey) problems.push(`${c.key}: the remainder must go to an emission stream`);
     if (wei < 0n) problems.push(`${c.key}: pre-minted exceeds the allocation`);
     if (wei <= 0n) continue;
 
@@ -108,7 +117,74 @@ function buildPlan(schedule, deployment, externalSupplyWei) {
   if (funded + externalSupplyWei !== totalSupply) {
     problems.push(`contracts ${formatWei(funded)} + pre-minted ${formatWei(externalSupplyWei)} != total supply ${formatWei(totalSupply)}`);
   }
-  return { tgeTimestamp, setupAdmin, treasury, token, totalSupply, externalSupplyWei, remainder, instances, problems };
+  return { tgeTimestamp, setupAdmin, treasury, token, totalSupply, externalSupplyWei, preMintedTotal, instances, problems };
 }
 
-module.exports = { buildPlan, fillPlaceholders, toWei, formatWei, parseTge };
+// Compare one deployed schedule with the plan. Setup may repair TGE, yearly
+// amounts and missing grants, but constructor fields are immutable and must always
+// match. Funding and finalization require the complete configured state.
+function scheduleProblems(instance, row, details, plan, configured = true) {
+  const problems = [];
+  const mismatch = (field, got, want) => problems.push(`${instance.key}: ${field} on chain ${got} != plan ${want}`);
+  const number = (field, got, want) => {
+    try {
+      if (BigInt(got) !== BigInt(want)) mismatch(field, got, want);
+    } catch {
+      mismatch(field, got, want);
+    }
+  };
+  const address = (field, got, want) => {
+    if (normalizeAddress(got) !== normalizeAddress(want)) mismatch(field, got, want);
+  };
+
+  if (!row) return [`${instance.key}: not created yet`];
+  if (row.contract !== instance.contract) mismatch('contract', row.contract, instance.contract);
+  if (row.category !== instance.label) mismatch('category', row.category, instance.label);
+  address('token', row.token, plan.token);
+  if (!isTrue(row.finalized)) address('setupAdmin', row.setupAdmin, plan.setupAdmin);
+  else if (normalizeAddress(row.setupAdmin) !== ZERO_ADDRESS) mismatch('finalized setupAdmin', row.setupAdmin, ZERO_ADDRESS);
+
+  if (instance.contract === 'VestingSchedule') {
+    number('cliffMonths', row.cliffMonths, instance.cliffMonths);
+    number('cliffUnlockBps', row.cliffUnlockBps, instance.cliffUnlockBps);
+    number('vestingMonths', row.vestingMonths, instance.vestingMonths);
+  } else {
+    address('recipient', row.recipient, instance.recipient);
+  }
+
+  if (!configured) return problems;
+  number('tgeTimestamp', row.tgeTimestamp, plan.tgeTimestamp);
+  number('required total', instance.contract === 'VestingSchedule' ? row.totalGranted : row.total, instance.fundWei);
+
+  if (instance.contract === 'EmissionSchedule') {
+    const have = details.yearlyWei || [];
+    if (have.length !== instance.yearlyWei.length) {
+      mismatch('year count', have.length, instance.yearlyWei.length);
+    } else {
+      for (let i = 0; i < have.length; i++) number(`yearlyAmounts[${i}]`, have[i], instance.yearlyWei[i]);
+    }
+  } else {
+    const have = details.grants || {};
+    const want = Object.fromEntries(instance.grants.map(g => [normalizeAddress(g.address), g.wei]));
+    for (const [account, amount] of Object.entries(have)) {
+      const key = normalizeAddress(account);
+      if (!(key in want)) problems.push(`${instance.key}: unexpected on-chain grant ${key}`);
+      else number(`grant ${key}`, amount, want[key]);
+    }
+    for (const [account, amount] of Object.entries(want)) {
+      if (!(account in have)) mismatch(`grant ${account}`, 0, amount);
+    }
+  }
+  return problems;
+}
+
+function fundingShortfall(instance, row, balance) {
+  if (isTrue(row.finalized)) return 0n;
+  const held = BigInt(balance);
+  if (held > instance.fundWei) throw new Error(`${instance.key}: holds ${formatWei(held)}, more than ${formatWei(instance.fundWei)}`);
+  return instance.fundWei - held;
+}
+
+module.exports = {
+  buildPlan, fillPlaceholders, toWei, formatWei, parseTge, normalizeAddress, isTrue, scheduleProblems, fundingShortfall,
+};

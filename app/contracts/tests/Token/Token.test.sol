@@ -40,6 +40,42 @@ contract Describe_Token {
         require(ERC20(token).totalSupply() == 1000000e18 + mintAmount, "Mint should update total supply");
     }
 
+    function it_can_permanently_cap_one_token_without_capping_others() {
+        try token.setMaxSupply(0) { revert("Accepted zero cap"); } catch Error(string e) {
+            require(e == "Token: max supply is zero", e);
+        }
+        try token.setMaxSupply(token.totalSupply() - 1) { revert("Accepted cap below supply"); } catch Error(string e) {
+            require(e == "Token: max supply below current supply", e);
+        }
+
+        uint256 cap = 1001000e18;
+        token.setMaxSupply(cap);
+        token.mint(user1, 1000e18);
+        require(token.totalSupply() == cap, "Mint should reach cap");
+
+        try token.mint(user1, 1) { revert("Mint exceeded cap"); } catch Error(string e) {
+            require(e == "Token: max supply exceeded", e);
+        }
+        try token.setMaxSupply(cap + 1) { revert("Cap changed"); } catch Error(string e) {
+            require(e == "Token: max supply already set", e);
+        }
+
+        address uncappedAddress = factory.createTokenWithInitialOwner(
+            "Uncapped Token",
+            "Uncapped",
+            new string[](0),
+            new string[](0),
+            new string[](0),
+            "OPEN",
+            cap,
+            18,
+            owner
+        );
+        Token uncapped = Token(uncappedAddress);
+        uncapped.mint(user1, 1);
+        require(uncapped.totalSupply() == cap + 1, "Other token should remain uncapped");
+    }
+
     function it_token_can_burn_tokens() {
         uint256 burnAmount = 1000e18;
         token.burn(owner, burnAmount);

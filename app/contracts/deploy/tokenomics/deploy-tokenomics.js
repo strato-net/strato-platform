@@ -5,24 +5,29 @@
 //   node tokenomics/deploy-tokenomics.js plan        the plan and chain state; run any time
 //   node tokenomics/deploy-tokenomics.js gen         combine sources, identical for every admin
 //   node tokenomics/deploy-tokenomics.js create      each admin: vote to create missing schedules
+//   edit deployment.addresses to pin every created schedule before continuing
 //   node tokenomics/deploy-tokenomics.js setup       setup admin: push TGE, grants, emission tables
 //   node tokenomics/deploy-tokenomics.js fund        each admin: vote STRATO.mint for each shortfall
+//   node upgrade.js --proxy-address <token> --contract-name Token --contract-file concrete/Tokens/Token.sol
+//   node tokenomics/deploy-tokenomics.js cap         each admin: permanently cap STRATO at 100M
 //   node tokenomics/deploy-tokenomics.js finalize    setup admin: lock everything; needs supply == 100M
 //   node tokenomics/deploy-tokenomics.js ephemeral   write a copy of the config with random addresses
 //
 // Options: --config <file> (default tokenomics/deployment.json).
 //
 // TGE: edit "tge" and rerun setup; it can move until finalize.
-// Freeze other STRATO mints between setup and finalize: the bootstrapping deduction
-// is computed from live supply, so a mint in between leaves admins voting on
-// different amounts or the total above 100M (finalize refuses).
+// Every STRATO already outside these schedules must be assigned explicitly in
+// preMinted. Freeze other mints during deployment or the plan will reject the
+// resulting unexplained supply.
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const config = require('../config');
 const { rest, util, importer } = require('blockapps-rest');
-const { buildPlan, fillPlaceholders, formatWei } = require('./plan');
+const {
+  buildPlan, fillPlaceholders, formatWei, normalizeAddress, isTrue, scheduleProblems, fundingShortfall,
+} = require('./plan');
 
 const SOURCES = { VestingSchedule: 'Tokenomics/VestingSchedule.sol', EmissionSchedule: 'Tokenomics/EmissionSchedule.sol' };
 const sourceFile = (name) => path.join(__dirname, `${name}-source.txt`);
@@ -83,29 +88,53 @@ async function readChain(tokenObj, deployment, schedule) {
   const [vesting, emission, tokenRows] = await Promise.all([
     cirrus(tokenObj, `${prefix}-VestingSchedule`, { token: `eq.${deployment.token}` }),
     cirrus(tokenObj, `${prefix}-EmissionSchedule`, { token: `eq.${deployment.token}` }),
-    cirrus(tokenObj, `${prefix}-Token`, { address: `eq.${deployment.token}`, select: '_totalSupply' }),
+    cirrus(tokenObj, `${prefix}-Token`, { address: `eq.${deployment.token}`, select: '_totalSupply,maxSupply' }),
   ]);
   if (!tokenRows.length) throw new Error(`token ${deployment.token} not found in ${prefix}-Token`);
-  const rows = [...vesting.map(r => ({ ...r, contract: 'VestingSchedule' })), ...emission.map(r => ({ ...r, contract: 'EmissionSchedule' }))];
+  const rows = [
+    ...vesting.map(r => ({ ...r, address: normalizeAddress(r.address), contract: 'VestingSchedule' })),
+    ...emission.map(r => ({ ...r, address: normalizeAddress(r.address), contract: 'EmissionSchedule' })),
+  ];
 
   const found = {};
   const problems = [];
   for (const c of schedule.categories) {
     const pinned = deployment.addresses?.[c.key];
-    const matches = rows.filter(r => (pinned ? r.address === pinned : r.category === c.label));
+    const matches = rows.filter(r => (pinned ? r.address === normalizeAddress(pinned) : r.category === c.label));
+    if (pinned && matches.length === 0) problems.push(`${c.key}: pinned schedule ${pinned} not found`);
     if (matches.length > 1) problems.push(`${c.key}: ${matches.length} schedules named "${c.label}"; pin one in addresses.${c.key}`);
     else if (matches.length === 1) found[c.key] = matches[0];
   }
 
   const instanceAddrs = Object.values(found).map(r => r.address);
+  const vestingAddrs = Object.values(found).filter(r => r.contract === 'VestingSchedule').map(r => r.address);
+  const emissionAddrs = Object.values(found).filter(r => r.contract === 'EmissionSchedule').map(r => r.address);
   const balances = {};
-  if (instanceAddrs.length) {
-    const rowsB = await cirrus(tokenObj, `${prefix}-Token-_balances`, { address: `eq.${deployment.token}`, key: `in.(${instanceAddrs.join(',')})` });
-    for (const r of rowsB) balances[r.key] = BigInt(r.value);
+  const details = Object.fromEntries(instanceAddrs.map(a => [a, { grants: {}, yearlyWei: [] }]));
+  const [balanceRows, grantRows, yearlyRows] = await Promise.all([
+    instanceAddrs.length
+      ? cirrus(tokenObj, `${prefix}-Token-_balances`, { address: `eq.${deployment.token}`, key: `in.(${instanceAddrs.join(',')})` })
+      : [],
+    vestingAddrs.length
+      ? cirrus(tokenObj, `${prefix}-VestingSchedule-granted`, { address: `in.(${vestingAddrs.join(',')})`, select: 'address,key,value' })
+      : [],
+    emissionAddrs.length
+      ? cirrus(tokenObj, `${prefix}-EmissionSchedule-yearlyAmounts`, { address: `in.(${emissionAddrs.join(',')})`, select: 'address,key,value' })
+      : [],
+  ]);
+  for (const r of balanceRows) balances[normalizeAddress(r.key)] = BigInt(r.value);
+  for (const r of grantRows) {
+    const a = normalizeAddress(r.address);
+    if (details[a] && BigInt(r.value) > 0n) details[a].grants[normalizeAddress(r.key)] = BigInt(r.value);
+  }
+  for (const r of yearlyRows) {
+    const a = normalizeAddress(r.address);
+    if (details[a]) details[a].yearlyWei[Number(r.key)] = BigInt(r.value);
   }
   const held = instanceAddrs.reduce((s, a) => s + (balances[a] || 0n), 0n);
   const totalSupply = BigInt(tokenRows[0]._totalSupply);
-  return { found, balances, totalSupply, externalSupply: totalSupply - held, problems };
+  const maxSupply = BigInt(tokenRows[0].maxSupply || 0);
+  return { found, balances, details, totalSupply, maxSupply, externalSupply: totalSupply - held, problems };
 }
 
 function loadPlan(deployment, schedule, chain) {
@@ -118,20 +147,40 @@ function requireClean(plan) {
   if (plan.problems.length) throw new Error('plan has problems:\n  ' + plan.problems.join('\n  '));
 }
 
-function onChainRequired(row) {
-  return BigInt(row.contract === 'VestingSchedule' ? row.totalGranted : row.total);
+function requireSchedule(plan, chain, instance, configured) {
+  const row = chain.found[instance.key];
+  const problems = scheduleProblems(instance, row, row ? chain.details[row.address] : {}, plan, configured);
+  if (problems.length) throw new Error(problems.join('\n'));
+  return row;
+}
+
+function sameAmounts(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    try {
+      if (BigInt(a[i]) !== BigInt(b[i])) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function requirePinnedAddresses(deployment, plan) {
+  const missing = plan.instances.filter(i => !/^(0x)?[0-9a-fA-F]{40}$/.test(String(deployment.addresses?.[i.key] || '')));
+  if (missing.length) throw new Error(`pin deployed schedule addresses before this step: ${missing.map(i => `addresses.${i.key}`).join(', ')}`);
 }
 
 function printPlan(plan, chain) {
   console.log(`TGE ${new Date(plan.tgeTimestamp * 1000).toISOString()} (${plan.tgeTimestamp})`);
-  console.log(`STRATO supply ${formatWei(chain.totalSupply)}, of which outside the schedules ${formatWei(chain.externalSupply)}`);
-  console.log(`  pre-minted remainder taken from bootstrapping year 1: ${formatWei(plan.remainder)}`);
+  console.log(`STRATO supply ${formatWei(chain.totalSupply)}, cap ${chain.maxSupply ? formatWei(chain.maxSupply) : 'not set'}, of which outside the schedules ${formatWei(chain.externalSupply)}`);
+  console.log(`  explicitly assigned pre-minted supply: ${formatWei(plan.preMintedTotal)}`);
   for (const i of plan.instances) {
     const row = chain.found[i.key];
     const terms = i.contract === 'VestingSchedule'
       ? `cliff ${i.cliffMonths}m, ${i.cliffUnlockBps / 100}% at cliff, ${i.vestingMonths}m vest, ${i.grants.length} grant(s)`
       : `10y emission to ${i.recipient}, year 1 ${formatWei(i.yearlyWei[0])}`;
-    const state = row ? `${row.address}${row.finalized ? ' finalized' : ''} holds ${formatWei(chain.balances[row.address] || 0n)}` : 'not created';
+    const state = row ? `${row.address}${isTrue(row.finalized) ? ' finalized' : ''} holds ${formatWei(chain.balances[row.address] || 0n)}` : 'not created';
     console.log(`${i.key.padEnd(14)} ${formatWei(i.fundWei).padStart(26)}  ${terms}\n${''.padEnd(16)}${state}`);
   }
   if (plan.problems.length) console.log('PROBLEMS:\n  ' + plan.problems.join('\n  '));
@@ -148,18 +197,15 @@ async function gen() {
   }
 }
 
-async function create(tokenObj, plan, chain, { schedule }) {
+async function create(tokenObj, plan, chain) {
   const { getCreatedAddress, getIssueId, pollForCreateIssueExecution } = require('../util');
   for (const i of plan.instances) {
     if (chain.found[i.key]) continue;
-    const sheet = schedule.categories.find(c => c.key === i.key);
-    // Created with the sheet's own figures, so every admin votes on identical args;
-    // setup applies the supply-dependent adjustment afterwards.
     const args = i.contract === 'VestingSchedule'
       ? { _category: i.label, _token: addr(plan.token), _tgeTimestamp: plan.tgeTimestamp, _cliffMonths: i.cliffMonths,
           _cliffUnlockBps: i.cliffUnlockBps, _vestingMonths: i.vestingMonths, _setupAdmin: addr(plan.setupAdmin) }
       : { _category: i.label, _token: addr(plan.token), _tgeTimestamp: plan.tgeTimestamp, _recipient: addr(i.recipient),
-          _yearlyAmounts: sheet.yearlyWei, _setupAdmin: addr(plan.setupAdmin) };
+          _yearlyAmounts: i.yearlyWei.map(String), _setupAdmin: addr(plan.setupAdmin) };
     const submittedAt = new Date().toISOString();
     const resp = await rest.createContract(tokenObj, {
       name: i.contract, source: fs.readFileSync(sourceFile(i.contract), 'utf8'), args,
@@ -175,26 +221,24 @@ async function create(tokenObj, plan, chain, { schedule }) {
   }
 }
 
-async function setup(tokenObj, plan, chain, { deployment }) {
+async function setup(tokenObj, plan, chain) {
   if (tokenObj.me !== plan.setupAdmin) throw new Error(`signed in as ${tokenObj.me}, setup admin is ${plan.setupAdmin}`);
   for (const i of plan.instances) {
-    const row = chain.found[i.key];
-    if (!row) throw new Error(`${i.key}: not created yet`);
-    if (row.finalized) continue;
+    const row = requireSchedule(plan, chain, i, isTrue(chain.found[i.key]?.finalized));
+    if (isTrue(row.finalized)) continue;
     console.log(`${i.key} (${row.address})`);
     if (BigInt(row.tgeTimestamp) !== BigInt(plan.tgeTimestamp)) {
       await send(tokenObj, row.address, i.contract, 'setTgeTimestamp', { _tgeTimestamp: plan.tgeTimestamp }, `setTgeTimestamp ${plan.tgeTimestamp}`);
     }
     if (i.contract === 'EmissionSchedule') {
-      if (onChainRequired(row) !== i.fundWei) {
+      if (!sameAmounts(chain.details[row.address].yearlyWei, i.yearlyWei)) {
         await send(tokenObj, row.address, i.contract, 'setYearlyAmounts', { _yearlyAmounts: i.yearlyWei.map(String) }, `setYearlyAmounts total ${formatWei(i.fundWei)}`);
       }
       continue;
     }
     // Grants cannot be edited, only added: anything on chain that disagrees with
     // the plan means redeploying this schedule (before it is funded).
-    const onChain = await cirrus(tokenObj, `${deployment.cirrusPrefix}-VestingSchedule-granted`, { address: `eq.${row.address}` });
-    const have = Object.fromEntries(onChain.filter(r => BigInt(r.value) > 0n).map(r => [r.key, BigInt(r.value)]));
+    const have = chain.details[row.address].grants;
     const want = Object.fromEntries(i.grants.map(g => [g.address, g.wei]));
     for (const [a, v] of Object.entries(have)) {
       if (want[a] !== v) throw new Error(`${i.key}: on-chain grant ${a} = ${formatWei(v)} is not in the plan; redeploy this schedule`);
@@ -211,32 +255,38 @@ async function setup(tokenObj, plan, chain, { deployment }) {
 
 async function fund(tokenObj, plan, chain) {
   for (const i of plan.instances) {
-    const row = chain.found[i.key];
-    if (!row) throw new Error(`${i.key}: not created yet`);
-    if (onChainRequired(row) !== i.fundWei) throw new Error(`${i.key}: on-chain total ${formatWei(onChainRequired(row))} != plan ${formatWei(i.fundWei)}; run setup first`);
+    const row = requireSchedule(plan, chain, i, true);
+    // A finalized schedule may already have released tokens. Its lower balance is
+    // not a funding shortfall and must never trigger another mint.
     const balance = chain.balances[row.address] || 0n;
-    if (balance > i.fundWei) throw new Error(`${i.key}: holds ${formatWei(balance)}, more than ${formatWei(i.fundWei)}`);
-    if (balance === i.fundWei) continue;
-    const amount = i.fundWei - balance;
+    const amount = fundingShortfall(i, row, balance);
+    if (amount === 0n) continue;
     // STRATO is owned by AdminRegistry: an admin's mint is a vote, executed at quorum.
     await send(tokenObj, plan.token, 'Token', 'mint', { to: addr(row.address), amount: amount.toString() },
       `${i.key}: mint ${formatWei(amount)} to ${row.address} (vote)`);
   }
 }
 
+async function cap(tokenObj, plan, chain) {
+  if (chain.totalSupply !== plan.totalSupply) throw new Error(`STRATO supply is ${formatWei(chain.totalSupply)}, not ${formatWei(plan.totalSupply)}; run fund first`);
+  if (chain.maxSupply === plan.totalSupply) return;
+  if (chain.maxSupply !== 0n) throw new Error(`STRATO cap is ${formatWei(chain.maxSupply)}, expected ${formatWei(plan.totalSupply)}`);
+  await send(tokenObj, plan.token, 'Token', 'setMaxSupply', { _maxSupply: plan.totalSupply.toString() },
+    `permanently cap STRATO at ${formatWei(plan.totalSupply)} (vote)`);
+}
+
 async function finalize(tokenObj, plan, chain) {
   if (tokenObj.me !== plan.setupAdmin) throw new Error(`signed in as ${tokenObj.me}, setup admin is ${plan.setupAdmin}`);
   if (chain.totalSupply !== plan.totalSupply) throw new Error(`STRATO supply is ${formatWei(chain.totalSupply)}, not ${formatWei(plan.totalSupply)}`);
+  if (chain.maxSupply !== plan.totalSupply) throw new Error(`STRATO cap is ${formatWei(chain.maxSupply)}, not ${formatWei(plan.totalSupply)}; run cap first`);
   for (const i of plan.instances) {
-    const row = chain.found[i.key];
-    if (!row) throw new Error(`${i.key}: not created yet`);
-    if (BigInt(row.tgeTimestamp) !== BigInt(plan.tgeTimestamp)) throw new Error(`${i.key}: TGE on chain ${row.tgeTimestamp} != plan; run setup`);
-    if (onChainRequired(row) !== i.fundWei) throw new Error(`${i.key}: on-chain total != plan; run setup`);
+    const row = requireSchedule(plan, chain, i, true);
+    if (isTrue(row.finalized)) continue;
     if ((chain.balances[row.address] || 0n) < i.fundWei) throw new Error(`${i.key}: underfunded; run fund`);
   }
   for (const i of plan.instances) {
     const row = chain.found[i.key];
-    if (!row.finalized) await send(tokenObj, row.address, i.contract, 'finalize', {}, `${i.key}: finalize`);
+    if (!isTrue(row.finalized)) await send(tokenObj, row.address, i.contract, 'finalize', {}, `${i.key}: finalize`);
   }
 }
 
@@ -256,12 +306,13 @@ async function finalize(tokenObj, plan, chain) {
     return;
   }
 
-  const steps = { plan: null, create, setup, fund, finalize };
-  if (!(cmd in steps)) throw new Error('usage: node tokenomics/deploy-tokenomics.js <plan|gen|create|setup|fund|finalize|ephemeral> [--config file]');
+  const steps = { plan: null, create, setup, fund, cap, finalize };
+  if (!(cmd in steps)) throw new Error('usage: node tokenomics/deploy-tokenomics.js <plan|gen|create|setup|fund|cap|finalize|ephemeral> [--config file]');
   const tokenObj = await login();
   const chain = await readChain(tokenObj, deployment, schedule);
   const plan = loadPlan(deployment, schedule, chain);
   if (cmd === 'plan') return printPlan(plan, chain);
   requireClean(plan);
+  if (cmd === 'setup' || cmd === 'fund' || cmd === 'finalize') requirePinnedAddresses(deployment, plan);
   await steps[cmd](tokenObj, plan, chain, { schedule, deployment });
 })().catch(e => { console.error(process.env.GLOBAL_ADMIN_NAME || '', 'FAILED:', e.message.slice(0, 600)); process.exit(1); });
