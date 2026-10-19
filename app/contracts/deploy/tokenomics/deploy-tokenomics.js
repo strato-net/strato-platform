@@ -7,9 +7,9 @@
 //   node tokenomics/deploy-tokenomics.js create      each admin: vote to create missing schedules
 //   edit deployment.addresses to pin every created schedule before continuing
 //   node tokenomics/deploy-tokenomics.js setup       setup admin: push TGE, grants, emission tables
-//   node tokenomics/deploy-tokenomics.js fund        each admin: vote STRATO.mint for each shortfall
 //   node upgrade.js --proxy-address <token> --contract-name Token --contract-file concrete/Tokens/Token.sol
 //   node tokenomics/deploy-tokenomics.js cap         each admin: permanently cap STRATO at 100M
+//   node tokenomics/deploy-tokenomics.js fund        each admin: vote STRATO.mint for each shortfall
 //   node tokenomics/deploy-tokenomics.js finalize    setup admin: lock everything; needs supply == 100M
 //   node tokenomics/deploy-tokenomics.js ephemeral   write a copy of the config with random addresses
 //
@@ -257,6 +257,9 @@ async function setup(tokenObj, plan, chain) {
 }
 
 async function fund(tokenObj, plan, chain) {
+  if (chain.maxSupply !== plan.totalSupply) {
+    throw new Error(`STRATO cap is ${chain.maxSupply ? formatWei(chain.maxSupply) : 'not set'}, not ${formatWei(plan.totalSupply)}; upgrade STRATO and run cap first`);
+  }
   for (const i of plan.instances) {
     const row = requireSchedule(plan, chain, i, true);
     // A finalized schedule may already have released tokens. Its lower balance is
@@ -271,7 +274,7 @@ async function fund(tokenObj, plan, chain) {
 }
 
 async function cap(tokenObj, plan, chain) {
-  if (chain.totalSupply !== plan.totalSupply) throw new Error(`STRATO supply is ${formatWei(chain.totalSupply)}, not ${formatWei(plan.totalSupply)}; run fund first`);
+  if (chain.totalSupply > plan.totalSupply) throw new Error(`STRATO supply ${formatWei(chain.totalSupply)} exceeds cap ${formatWei(plan.totalSupply)}`);
   if (chain.maxSupply === plan.totalSupply) return;
   if (chain.maxSupply !== 0n) throw new Error(`STRATO cap is ${formatWei(chain.maxSupply)}, expected ${formatWei(plan.totalSupply)}`);
   await send(tokenObj, plan.token, 'Token', 'setMaxSupply', { _maxSupply: plan.totalSupply.toString() },
