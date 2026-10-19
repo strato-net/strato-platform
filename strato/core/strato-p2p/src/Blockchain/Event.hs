@@ -128,7 +128,7 @@ handleEvents peer = awaitForever $ \case
     case parentHeader of
       Nothing -> do
         BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-        let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
+        let fetchNumber = alignFetchNumber $ bestBlockNum + 1
         -- Debounced: while we are far behind, every gossiped block misses its
         -- parent, and one 500-header request per gossiped block buries the
         -- BlockBodies responses we actually need.
@@ -143,7 +143,7 @@ handleEvents peer = awaitForever $ \case
   MsgEvt (NewBlockHashes _) -> do
     lift stampActionTimestamp
     BestSequencedBlock _ bestBlockNum _ _ _ <- lift $ Mod.get (Proxy @BestSequencedBlock)
-    let fetchNumber = alignFetchNumber $ if bestBlockNum < 2 then 1 else bestBlockNum - 1
+    let fetchNumber = alignFetchNumber $ bestBlockNum + 1
     shouldFetch <- lift $ tryResyncFrom fetchNumber
     when shouldFetch $ do
       $logInfoS "handleEvents/NewBlockHashes" $ T.pack $ "newBlockHashes :: fetchNumber is " ++ show fetchNumber
