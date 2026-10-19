@@ -2,7 +2,7 @@ import { createConnector } from "wagmi";
 import { type WalletDetailsParams } from "@rainbow-me/rainbowkit";
 import { type Wallet } from "@rainbow-me/rainbowkit";
 import { PENDING_STRATO_WALLET_CONNECT_KEY, redirectToLogin } from "@/lib/auth";
-import { type Address, type EIP1193Provider, type Hex, keccak256, toRlp } from "viem";
+import { type Address, type EIP1193Provider, type Hex, concatHex, keccak256, toRlp } from "viem";
 import { getStratoChainId, rpcUrl } from "@/lib/stratoChain";
 
 const EXTERNAL_WALLET_KEY = "bridge-external-wallet";
@@ -86,6 +86,29 @@ function createStratoProvider(userAddress: Address, chainId: number): EIP1193Pro
           const to = (tx.to || "0x") as Hex;
           const value = tx.value ? BigInt(tx.value) : 0n;
           const data = (tx.data || "0x") as Hex;
+
+          // From the STRATO-gas fork the node advertises a base fee and a
+          // native-value transfer must be a type-2 (EIP-1559) envelope; before
+          // it only legacy envelopes are accepted.
+          const latest = (await rpcProxy("eth_getBlockByNumber", ["latest", false])) as { baseFeePerGas?: string } | null;
+          if (latest?.baseFeePerGas) {
+            const maxFee = BigInt(tx.maxFeePerGas || tx.gasPrice || latest.baseFeePerGas);
+            const maxPriority = BigInt(tx.maxPriorityFeePerGas || 0);
+            const unsigned = [
+              toMinimalHex(chainId),
+              toMinimalHex(nonce),
+              toMinimalHex(maxPriority),
+              toMinimalHex(maxFee),
+              toMinimalHex(gasLimit),
+              to,
+              toMinimalHex(value),
+              data,
+              [] as Hex[],
+            ];
+            const sig = await signViaVault(keccak256(concatHex(["0x02", toRlp(unsigned)])));
+            const rawTx = concatHex(["0x02", toRlp([...unsigned, toMinimalHex(sig.v), sig.r, sig.s])]);
+            return rpcProxy("eth_sendRawTransaction", [rawTx]);
+          }
 
           const unsignedFields: Hex[] = [
             toMinimalHex(nonce),
