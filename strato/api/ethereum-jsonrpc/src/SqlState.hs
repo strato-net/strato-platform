@@ -14,6 +14,7 @@
 -- always resolve to the newest indexed block.
 module SqlState
   ( NativeBalance (..),
+    nativeToken,
     nativeBalanceFromSql,
     storageAtFromSql,
     feeQuoteFromSql,
@@ -23,11 +24,14 @@ module SqlState
   )
 where
 
+import Blockchain.Data.Block (blockBlockData)
+import Blockchain.Data.BlockHeader (BlockHeader (..))
 import Blockchain.Data.DataDefs (AddressStateRef (..))
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (contractsConfig, nativeTokenAddress, nativeTokenBalancesField)
-import Blockchain.Model.JsonBlock (AddressStateRef' (..))
+import Blockchain.EthConf.Model (contractsConfig, nativeTokenAt, nativeTokenBalancesField, network, networkConfig, stratoGasForkBlock)
+import Blockchain.Model.JsonBlock (AddressStateRef' (..), bPrimeToB)
 import Blockchain.Strato.Model.Address (Address (..))
+import Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -36,6 +40,7 @@ import Data.IORef
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Handlers.AccountInfo as Accounts
+import qualified Handlers.BlkLast as BlkLast
 import qualified Handlers.Storage as Storage
 import LocalApi (formatClientError, runLocal)
 import Numeric (showHex)
@@ -72,21 +77,48 @@ accountBalance addr = do
     Right [] -> Right 0
     Right (AddressStateRef' a : _) -> Right (addressStateRefBalance a)
 
--- | Whether the configured native token is a SolidVM contract, resolved once:
--- a deployed contract never changes kind. 'NoAccount' is not cached so a token
--- deployed after the RPC server started is picked up on the next call.
+-- | The native token at the newest indexed block (see 'nativeTokenAt'). The
+-- latest-block lookup is skipped where the height cannot matter (no STRATO
+-- token, or the fork from genesis) and once the fork has been seen active,
+-- since it never deactivates.
+{-# NOINLINE stratoGasActiveRef #-}
+stratoGasActiveRef :: IORef Bool
+stratoGasActiveRef = unsafePerformIO $ newIORef False
+
+nativeToken :: IO (Either String Address)
+nativeToken
+  | nativeTokenAt ethConf 0 == postFork = return $ Right postFork
+  | otherwise =
+      readIORef stratoGasActiveRef >>= \case
+        True -> return $ Right postFork
+        False -> do
+          r <- runLocal $ BlkLast.getBlkLastClient 1
+          case r of
+            Left e -> return $ Left $ "latest block lookup failed: " ++ T.unpack (formatClientError e)
+            Right [] -> return $ Left "no block indexed yet"
+            Right (blk : _) -> do
+              let tok = nativeTokenAt ethConf (number . blockBlockData $ bPrimeToB blk)
+              when (tok == postFork) $ writeIORef stratoGasActiveRef True
+              return $ Right tok
+  where
+    postFork = nativeTokenAt ethConf (stratoGasForkBlock . network $ networkConfig ethConf)
+
+-- | Whether the native token is a SolidVM contract, resolved once per token:
+-- a deployed contract never changes kind, and the token itself changes only
+-- at the STRATO-gas fork. 'NoAccount' is not cached so a token deployed after
+-- the RPC server started is picked up on the next call.
 {-# NOINLINE nativeTokenKindRef #-}
-nativeTokenKindRef :: IORef (Maybe AccountKind)
+nativeTokenKindRef :: IORef (Maybe (Address, AccountKind))
 nativeTokenKindRef = unsafePerformIO $ newIORef Nothing
 
-nativeTokenKind :: IO (Either String AccountKind)
-nativeTokenKind =
+nativeTokenKind :: Address -> IO (Either String AccountKind)
+nativeTokenKind nativeAddr =
   readIORef nativeTokenKindRef >>= \case
-    Just k -> return $ Right k
-    Nothing -> do
-      r <- accountKind (nativeTokenAddress $ contractsConfig ethConf)
+    Just (a, k) | a == nativeAddr -> return $ Right k
+    _ -> do
+      r <- accountKind nativeAddr
       case r of
-        Right k | k `elem` [SolidVMContract, EvmContract] -> writeIORef nativeTokenKindRef (Just k)
+        Right k | k `elem` [SolidVMContract, EvmContract] -> writeIORef nativeTokenKindRef (Just (nativeAddr, k))
         _ -> return ()
       return r
 
@@ -107,14 +139,16 @@ data NativeBalance
     NativeBalanceUnavailable String
   deriving (Show)
 
--- | eth_getBalance from the SQL mirror. With no native token configured the
--- account's own balance column is the answer; with a SolidVM token, its
--- balances mapping row (a missing row is a zero balance).
+-- | eth_getBalance from the SQL mirror. With no native token the account's
+-- own balance column is the answer; with a SolidVM token, its balances
+-- mapping row (a missing row is a zero balance).
 nativeBalanceFromSql :: Address -> IO NativeBalance
-nativeBalanceFromSql addr
-  | nativeAddr == Address 0 = either NativeBalanceUnavailable NativeBalance <$> accountBalance addr
-  | otherwise =
-      nativeTokenKind >>= \case
+nativeBalanceFromSql addr =
+  nativeToken >>= \case
+    Left e -> return $ NativeBalanceUnavailable e
+    Right (Address 0) -> either NativeBalanceUnavailable NativeBalance <$> accountBalance addr
+    Right nativeAddr ->
+      nativeTokenKind nativeAddr >>= \case
         Left e -> return $ NativeBalanceUnavailable e
         Right SolidVMContract -> do
           r <- runLocal $ Storage.getStorageClient Storage.storageFilterParams
@@ -131,8 +165,6 @@ nativeBalanceFromSql addr
               other -> NativeBalanceUnavailable $ "unexpected balance value in mirror: " ++ show other
         Right EvmContract -> return $ NativeBalanceUnavailable "native token is an EVM contract; its storage is not mirrored"
         Right k -> return $ NativeBalanceUnavailable $ "native token is not a contract in the mirror: " ++ show k
-  where
-    nativeAddr = nativeTokenAddress $ contractsConfig ethConf
 
 -- | One mirrored storage value; 'BDefault' when the path has no row.
 storageValue :: Address -> StoragePath -> IO (Either String BasicValue)

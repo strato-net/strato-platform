@@ -14,8 +14,10 @@ strato-api's Postgres-backed endpoints (`/eth/v1.2/account`, `/eth/v1.2/storage`
 which on an API-role node read the Aurora reader endpoint:
 
 - **`eth_getBalance`**: the native token's balances mapping row
-  `_balances[<40 lowercase hex digits>]` on `nativeTokenAddress`
-  (`storage` table, joined to `address_state_ref`). A missing row is a zero
+  `_balances[<40 lowercase hex digits>]` on the native token at the latest
+  block (`nativeTokenAt`: `nativeTokenAddress` until the STRATO-gas fork,
+  the network's STRATO token after it; `storage` table, joined to
+  `address_state_ref`). A missing row is a zero
   balance. The mapping name is configurable as
   `contracts.nativeTokenBalancesField` in ethconf (default `_balances`,
   the OpenZeppelin layout the Mercata token uses). With no native token

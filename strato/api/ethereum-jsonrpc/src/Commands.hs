@@ -85,7 +85,7 @@ import LocalApi (formatClientError, runLocal, sharedManager)
 import Network.HTTP.Client (RequestBody (..), httpLbs, method, parseRequest, requestBody, requestHeaders, responseBody, responseStatus, responseTimeout, responseTimeoutMicro)
 import Network.HTTP.Types (statusCode)
 import qualified Strato.Tracing as Tr
-import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, storageAtFromSql)
+import SqlState (NativeBalance (..), feeQuoteFromSql, nativeBalanceFromSql, nativeToken, storageAtFromSql)
 import Control.Monad.Composable.CodeDB (runCodeDBM, lookupCode, queryEvents, queryEventsByTxHash)
 
 type Server = IO
@@ -439,8 +439,6 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
   where
     balanceOfSelector = "70a08231"
 
-    nativeAddr = nativeTokenAddress (contractsConfig ethConf)
-
     f :: Address -> String -> RpcResult Server String
     f addr _blockString = do
       -- Served from the SQL state mirror (latest block); the vm-runner round
@@ -454,6 +452,9 @@ eth_getBalance = toMethod "eth_getBalance" f (Required "address" :+: Required "b
 
     viaVm :: Address -> RpcResult Server String
     viaVm addr = do
+          -- With strato-api unreachable the fork state is unknown as well; the
+          -- configured (pre-fork) token is the best guess.
+          nativeAddr <- liftIO $ either (const $ nativeTokenAddress (contractsConfig ethConf)) id <$> nativeToken
           let calldata = either (const B.empty) id $
                 B16.decode (balanceOfSelector <> BC.replicate 24 '0' <> addressToHex addr)
           resp <- callVmRaw ("eth_getBalance_" ++ showHex addr "") nativeAddr calldata

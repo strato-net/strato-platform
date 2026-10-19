@@ -79,7 +79,7 @@ import Control.Monad.Composable.NodeDB (tickNodeDB)
 import Blockchain.VMMetrics
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
-import Blockchain.EthConf (ethConf, networkConfig, contractsConfig, nativeTokenAddress, vmConfig)
+import Blockchain.EthConf (ethConf, networkConfig, nativeTokenAt, vmConfig)
 import qualified Blockchain.EthConf.Model as Conf
 import Blockchain.Verifier
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -526,7 +526,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
    in case ut of
         TD.EthereumTX {TD.ethTo = Just toAddr, TD.value = val, TD.txData = callData}
           | B.null callData && val > 0 -> do
-            let nativeAddr = nativeTokenAddress (contractsConfig ethConf)
+            let nativeAddr = nativeTokenAt ethConf (number b)
                 recipientArg = T.pack $ "0x" ++ formatAddressWithoutColor toAddr
                 amountArg = T.pack $ show val
             $logInfoS "runCodeForTransaction" $ T.pack $
