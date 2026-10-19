@@ -441,11 +441,13 @@ const OperatorPanel = ({
 
   const openProfile = () => {
     if (!validator) return;
+    // A forty-zero value is the indexer's rendering of an unset string, never a real profile field.
+    const text = (value?: string) => (/^(0x)?0{40}$/i.test((value || "").trim()) ? "" : value || "");
     setProfileDraft({
-      name: validator.name || "",
-      description: validator.description || "",
-      metadataURI: validator.metadataURI || "",
-      protocolValidatorId: validator.protocolValidatorId || "",
+      name: text(validator.name),
+      description: text(validator.description),
+      metadataURI: text(validator.metadataURI),
+      protocolValidatorId: text(validator.protocolValidatorId),
     });
   };
 

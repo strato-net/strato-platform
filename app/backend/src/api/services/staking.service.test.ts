@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { StratoError } from "../../errors/StratoError";
-import { authorizationDigest, findOperatedValidator, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
+import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
 
 // Pinned by tests/Staking/ValidatorRegistry.test.sol (it_matches_off_chain_digests_and_recovers_real_signatures).
 const VECTOR = {
@@ -95,4 +95,13 @@ test("findOperatedValidator returns the active record the account operates, case
   assert.equal(findOperatedValidator(records, "0x2222222222222222222222222222222222222222"), null);
   assert.equal(findOperatedValidator([], "0x3b23c91aedc1c0f4ad442c7248f6e49cc1547c1d"), null);
   assert.equal(findOperatedValidator(records, ""), null);
+});
+
+test("profileText blanks the forty-zero placeholder Cirrus emits for unset strings", () => {
+  assert.equal(profileText("0000000000000000000000000000000000000000"), "");
+  assert.equal(profileText("0x0000000000000000000000000000000000000000"), "");
+  assert.equal(profileText(undefined), "");
+  assert.equal(profileText(null), "");
+  assert.equal(profileText("ipfs://meta"), "ipfs://meta");
+  assert.equal(profileText("node1-0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82"), "node1-0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82");
 });

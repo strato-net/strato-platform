@@ -1,7 +1,7 @@
 import { bloc, cirrus, strato } from "../../utils/appApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { authorizationDigest, findOperatedValidator, mapRegistryRevert, splitSignature } from "./stakingAuthorization";
+import { authorizationDigest, findOperatedValidator, mapRegistryRevert, profileText, splitSignature } from "./stakingAuthorization";
 import { StratoError } from "../../errors/StratoError";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
@@ -580,12 +580,27 @@ const getOperatorRows = async (accessToken: string): Promise<Array<{ key: string
   }
 };
 
-// Registry profiles, keyed by operator on v1 and by validator on v2. Only display fields
-// are read here (their meaning did not change), so Cirrus serves both layouts.
-const getValidatorProfiles = async (accessToken: string): Promise<Map<string, Record<string, any>>> => {
+// Registry profiles, keyed by operator on v1 and by validator on v2. On v2 they come from the
+// registry proxy's bloc state: it is the storage the running logic wrote, it omits never-written
+// fields (Cirrus renders those as forty zeros, see profileText) and it is not reshaped by code
+// uploads. v1 keeps the Cirrus read.
+const getValidatorProfiles = async (
+  accessToken: string,
+  version: StakingContractVersion = "v1"
+): Promise<Map<string, Record<string, any>>> => {
   const address = validatorRegistryAddress();
   const profiles = new Map<string, Record<string, any>>();
   if (!address) return profiles;
+
+  if (version === "v2") {
+    try {
+      const state = await getBlocState(accessToken, extractContractName(ValidatorRegistry), address);
+      for (const [key, value] of addressKeyed(state.operators)) profiles.set(key, value || {});
+    } catch {
+      // empty map: the page degrades to addresses without names
+    }
+    return profiles;
+  }
 
   try {
     const { data } = await cirrus.get(accessToken, `/${ValidatorRegistry}-operators`, {
@@ -1146,7 +1161,7 @@ const getV1StakingInfo = async (
     getUserMap(accessToken, "pendingDelegatorRewards", userAddress),
     getUserMap(accessToken, "userRewardPerStakePaid", userAddress),
     getUnbondingRequests(accessToken, userAddress),
-    getValidatorProfiles(accessToken),
+    getValidatorProfiles(accessToken, "v1"),
     getLifetimeClaimedRewards(accessToken, userAddress),
     getStratoTokenPriceWad(accessToken),
   ] as const);
@@ -1214,10 +1229,10 @@ const getV1StakingInfo = async (
       active,
       registryActive: parseBoolLike(profile.active),
       operator: operatorAddress,
-      name: String(profile.name || ""),
-      description: String(profile.description || ""),
-      metadataURI: String(profile.metadataURI || ""),
-      protocolValidatorId: String(profile.protocolValidatorId || ""),
+      name: profileText(profile.name),
+      description: profileText(profile.description),
+      metadataURI: profileText(profile.metadataURI),
+      protocolValidatorId: profileText(profile.protocolValidatorId),
       validatorAddress: normalizeAddress(profile.validatorAddress),
       status,
       isValidator: active,
@@ -1356,7 +1371,7 @@ const getV2StakingInfo = async (
   ] = await Promise.all([
     getTokenInfo(accessToken, tokenAddress),
     getTokenBalance(accessToken, tokenAddress, user),
-    getValidatorProfiles(accessToken),
+    getValidatorProfiles(accessToken, "v2"),
     getLifetimeClaimedRewards(accessToken, user),
     getStratoTokenPriceWad(accessToken),
     getRecentBlockRewards(accessToken),
@@ -1425,10 +1440,10 @@ const getV2StakingInfo = async (
       active: record.active,
       registryActive: parseBoolLike(profile.active),
       operator: record.operator,
-      name: String(profile.name || ""),
-      description: String(profile.description || ""),
-      metadataURI: String(profile.metadataURI || ""),
-      protocolValidatorId: String(profile.protocolValidatorId || ""),
+      name: profileText(profile.name),
+      description: profileText(profile.description),
+      metadataURI: profileText(profile.metadataURI),
+      protocolValidatorId: profileText(profile.protocolValidatorId),
       validatorAddress: validator,
       status: record.status,
       isValidator: record.isValidator,

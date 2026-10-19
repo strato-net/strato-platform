@@ -94,3 +94,12 @@ export const mapRegistryRevert = (error: unknown): unknown => {
   (mapped as any).detail = text;
   return mapped;
 };
+
+// Cirrus renders a never-written string member of a struct as forty zeros (the zero address in
+// text form). Profile display fields must never carry that through: the staking page would
+// prefill it, send it back, and the VM parses a 40-hex literal as an address, which the
+// registry's string parameters reject ("unknown function").
+export const profileText = (value: unknown): string => {
+  const text = value === undefined || value === null ? "" : String(value);
+  return /^(0x)?0{40}$/i.test(text.trim()) ? "" : text;
+};
