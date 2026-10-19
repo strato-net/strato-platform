@@ -5,13 +5,13 @@ const { buildPlan, fillPlaceholders, toWei, scheduleProblems, fundingShortfall, 
 const schedule = require('./schedule.json');
 const deployment = require('./deployment.json');
 
-// Live mainnet supply on 2026-10-15: not a whole number of tokens.
-const LIVE = 3143580465753424700000000n;
+// Live mainnet supply on 2026-10-19: not a whole number of tokens.
+const LIVE = 3143581465753424700000000n;
 
 const filled = () => fillPlaceholders(deployment).deployment;
 const explicitlyAssigned = () => {
   const d = filled();
-  d.preMinted.bootstrapping = '393580.4657534247';
+  d.preMinted.bootstrapping = '393581.4657534247';
   return d;
 };
 const byKey = (plan, key) => plan.instances.find(i => i.key === key);
@@ -19,7 +19,7 @@ const byKey = (plan, key) => plan.instances.find(i => i.key === key);
 test('the checked-in deployment reports placeholders and unassigned supply', () => {
   const plan = buildPlan(schedule, deployment, LIVE);
   assert.ok(plan.problems.some(p => p.includes('placeholder')), plan.problems.join('\n'));
-  assert.ok(plan.problems.some(p => p.includes('393580.4657534247 pre-minted STRATO is not assigned')), plan.problems.join('\n'));
+  assert.ok(plan.problems.some(p => p.includes('393581.4657534247 pre-minted STRATO is not assigned')), plan.problems.join('\n'));
 });
 
 test('explicit pre-minted allocations come off their categories and land on 100M', () => {
@@ -31,7 +31,7 @@ test('explicit pre-minted allocations come off their categories and land on 100M
 
   const sheet = schedule.categories.find(c => c.key === 'bootstrapping').yearlyWei.map(BigInt);
   const boot = byKey(plan, 'bootstrapping');
-  assert.strictEqual(boot.yearlyWei[0], sheet[0] - toWei('393580.4657534247'));
+  assert.strictEqual(boot.yearlyWei[0], sheet[0] - toWei('393581.4657534247'));
   assert.deepStrictEqual(boot.yearlyWei.slice(1), sheet.slice(1));
 
   const funded = plan.instances.reduce((s, i) => s + i.fundWei, 0n);
