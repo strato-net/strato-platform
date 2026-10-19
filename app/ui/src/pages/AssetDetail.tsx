@@ -230,7 +230,8 @@ const AssetDetail = () => {
     const foundAsset = 
       assets.find(a => a?.address === id) ||
       inactiveTokens.find(a => a?.address === id) ||
-      allActiveTokens.find(a => a?.address === id);
+      allActiveTokens.find(a => a?.address === id) ||
+      earningAssets.find(a => a?.address === id);
 
     if (foundAsset) {
       setupAsset(foundAsset);
@@ -252,7 +253,7 @@ const AssetDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, assets, inactiveTokens, allActiveTokens, getToken]);
+  }, [id, assets, inactiveTokens, allActiveTokens, earningAssets, getToken]);
 
   if (!asset) {
     const isLoading = !lookupComplete || loading;
@@ -280,6 +281,8 @@ const AssetDetail = () => {
       </div>
     );
   }
+
+  const decimals = asset?.customDecimals || asset?.token?.customDecimals || 18;
 
   // const handleConnectWallet = () => { };
 
@@ -398,7 +401,7 @@ const AssetDetail = () => {
                       let supplyLabel = '—';
                       try {
                         if (totalSupply && totalSupply !== '0') {
-                          supplyLabel = formatLargeNumber(parseFloat(formatUnits(BigInt(totalSupply), 18)));
+                          supplyLabel = formatLargeNumber(parseFloat(formatUnits(BigInt(totalSupply), decimals)));
                         }
                       } catch { /* invalid supply */ }
                       return (
@@ -420,7 +423,7 @@ const AssetDetail = () => {
                     {isLoggedIn && (
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Balance:</span>
-                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), 18)}</span>
+                      <span className="font-medium">{formatUnits(BigInt(asset?.balance || "0") + BigInt(asset?.collateralBalance || "0"), decimals)}</span>
                     </div>
                     )}
 

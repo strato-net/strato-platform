@@ -16,6 +16,7 @@ import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPairs } from "./poolV3.service";
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/vaultPerformance.helper";
+import { getFreeportTokens } from "./freeport.service";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
 
@@ -175,7 +176,7 @@ export const getEarningAssets = async (
   userAddress: string,
   includeHeldNonActive = false
 ): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato] = await Promise.all([
+  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato, freeportTokens] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
       params: {
         "balances.key": `eq.${userAddress}`,
@@ -206,6 +207,7 @@ export const getEarningAssets = async (
     getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
     getRebaseFactors(accessToken),
     getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
+    getFreeportTokens(accessToken, {}, userAddress).catch(() => [] as Token[]),
   ]);
 
   const collateralMap = new Map<string, bigint>();
@@ -259,6 +261,11 @@ export const getEarningAssets = async (
       String(asset.status) === "2" ||
       BigInt(asset.totalBalance || "0") > 0n
   );
+
+  // Freeport tokens have no oracle price, collateral or staking, so value is left at zero.
+  for (const t of freeportTokens) {
+    earningAssets.push({ ...t, collateralBalance: "0", totalBalance: t.balance, value: "0.00" });
+  }
 
   const saveUsdstAsset = saveUsdstInfo?.deployed
     ? buildSaveUsdstEarningAsset(saveUsdstInfo, saveUsdstUserInfo ?? undefined)

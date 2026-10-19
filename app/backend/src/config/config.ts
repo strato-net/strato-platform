@@ -216,6 +216,12 @@ export const defaultSilvstYieldVaultFor: Record<string, string> = {
   "33056204878082667": "f8884c44d7cfbfb7c6326c515f375f8572f03e2b", // Upquark mainnet
 };
 
+// Freeport is its own token registry; its Cirrus tables are prefixed by the deployer's username.
+export const defaultFreeportFor: Record<string, { address: string; prefix: string }> = {
+  "114784819836269": { address: "04c5c88aeafc788973ccb483646fce34f9f860ec", prefix: "portal" }, // Helium testnet
+  "33056204878082667": { address: "1c3d98d6ce8bb0200519104b5c69ba38efb9db4c", prefix: "Freeport" }, // Upquark mainnet
+};
+
 /*
    How far back the admin "Executed Issues" list looks. IssueExecuted grows with every
    whitelisted call, not just governance votes, so an unbounded sort/count is proportional
@@ -245,6 +251,8 @@ export let ethCarryVault: string = '';
 export let hypeYieldVault: string = '';
 export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
+export let freeport: string = '';
+export let freeportTokenTable: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -374,6 +382,12 @@ export function setDirectMintPsmConfig(networkId: string) {
   }
 }
 
+function setFreeportConfig(networkId: string) {
+  const defaults = defaultFreeportFor[networkId];
+  freeport = defaults?.address || "";
+  freeportTokenTable = defaults ? `${defaults.prefix}-FreeportToken` : "";
+}
+
 export function setVaultConfig(networkId: string) {
   if (process.env.VAULT) {
     vault = process.env.VAULT;
@@ -427,6 +441,7 @@ export async function initNetworkConfig() {
   setVaultConfig(networkId);
   setCarryVaultConfig(networkId);
   setDirectMintPsmConfig(networkId);
+  setFreeportConfig(networkId);
   setUsdcYieldVaultConfig(networkId);
   setMetalYieldVaultConfig(networkId);
   setExecutedIssuesLookbackConfig(networkId);

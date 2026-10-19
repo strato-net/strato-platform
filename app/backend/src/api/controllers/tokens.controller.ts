@@ -14,6 +14,7 @@ import {
   getTokenStats,
   getAccountNonce,
 } from "../services/tokens.service";
+import { getFreeportTokens } from "../services/freeport.service";
 import {
   validateAddressArgs,
   validateCreateTokensArgs,
@@ -38,7 +39,9 @@ class TokensController {
       const token = await getTokens(accessToken, {
         address: "eq." + params.address,
       });
-      res.status(RestStatus.OK).json(token);
+      res.status(RestStatus.OK).json(
+        token.length ? token : await getFreeportTokens(accessToken, { address: "eq." + params.address })
+      );
     } catch (error) {
       next(error);
     }

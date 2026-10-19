@@ -318,7 +318,7 @@ const AssetsList = ({
                         <p className="font-medium text-foreground">
                           {guestMode || !asset?.balance || asset.balance === "0"
                             ? "-"
-                            : formatBalance(asset.balance, undefined, 18, 1, 2)}
+                            : formatBalance(asset.balance, undefined, asset.customDecimals || 18, 1, 2)}
                         </p>
                       </td>
                       <td className="hidden md:table-cell py-4 px-4 whitespace-nowrap text-right">
@@ -348,7 +348,7 @@ const AssetsList = ({
                         ) : (
                           <div>
                             <p className="font-medium text-sm md:text-base text-foreground">
-                              {formatBalance(asset.totalBalance, undefined, 18, 1, 4)}
+                              {formatBalance(asset.totalBalance, undefined, asset.customDecimals || 18, 1, 4)}
                             </p>
                             {asset.rebaseFactor && asset.rebasingExternalSymbol && (
                               <p className="text-xs text-muted-foreground mt-0.5">

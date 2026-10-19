@@ -55,3 +55,13 @@ export const buildTokenSelectFields = (options: TokenSelectOptions = {}): string
   
   return fields;
 };
+
+export const FREEPORT_TOKEN_FIELDS = [
+  "address",
+  "name",
+  "symbol",
+  "decimals",
+  "nativeFlag",
+  "originChainId::text",
+  "totalSupply::text",
+] as const;
