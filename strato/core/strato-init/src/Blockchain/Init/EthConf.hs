@@ -129,7 +129,7 @@ flagsNetworkIdentity :: (String, Integer, Integer)
 flagsNetworkIdentity = (flags_network, computeNetworkID, computeChainId flags_network)
 
 genEthConf :: Role -> IO EthConf
-genEthConf role = do
+genEthConf nodeRole = do
   pgPass <- filter (/= '\n') <$> readFile "secrets/postgres_password"
 
   localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
@@ -143,7 +143,7 @@ genEthConf role = do
   -- An API-only directory has no node identity: it signs nothing.
   if Opts.flags_localAuth
     then putStrLn $ "  ✓ Local auth mode (hostname: " ++ localHostname ++ "): node key will be provisioned during first admin setup"
-    else if not (roleRunsCore role)
+    else if not (roleRunsCore nodeRole)
       then putStrLn "  ✓ API role: no node key needed"
       else do
         (pub, _addr) <- getNodeKey
@@ -151,7 +151,7 @@ genEthConf role = do
 
   -- An API-only directory reads through the replica endpoint when one is
   -- given; its writes (and consistency-sensitive reads) stay on --pghost.
-  let readerHost = if null flags_pgReaderHost || role /= RoleApi then Nothing else Just flags_pgReaderHost
+  let readerHost = if null flags_pgReaderHost || nodeRole /= RoleApi then Nothing else Just flags_pgReaderHost
       writerSql = (sqlConfig runtimeConfig)
         { user = flags_pguser
         , host = preferIPv4Loopback flags_pghost
@@ -165,14 +165,14 @@ genEthConf role = do
     , vmConfig = (vmConfig runtimeConfig)
         { vmQueryUrls = ["http://127.0.0.1:8546" | flags_vmQuery] ++ commaList flags_vmQueryUrls
         -- An API directory runs no vm-runner: the mirror answers or nobody does.
-        , vmQueryOnly = role == RoleApi
+        , vmQueryOnly = nodeRole == RoleApi
         -- A validator serves no API and runs no slipstream: no SQL state mirror
         -- (sqlDiff), no state diffs on the VM event stream (diffPublish), and no
         -- VM event stream at all (publishVmEvents): with nobody reading it, JLog
         -- would never trim it.
-        , sqlDiff = flags_sqlDiff && roleIndexesSql role
-        , diffPublish = flags_diffPublish && roleIndexesSql role
-        , publishVmEvents = roleIndexesSql role
+        , sqlDiff = flags_sqlDiff && roleIndexesSql nodeRole
+        , diffPublish = flags_diffPublish && roleIndexesSql nodeRole
+        , publishVmEvents = roleIndexesSql nodeRole
         }
     , cellId = if null flags_cellId then Nothing else Just flags_cellId
     , peerDbConfig = if null flags_peerDatabase then Nothing else Just writerSql { database = flags_peerDatabase }
@@ -217,6 +217,7 @@ genEthConf role = do
         }
     , networkConfig = def
         { network = flags_network
+        , role = roleName nodeRole
         , networkID = computeNetworkID
         , chainId = computeChainId flags_network
         , httpPort = flags_httpPort

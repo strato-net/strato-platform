@@ -249,6 +249,11 @@ instance FromJSON UrlConfig where
 
 data NetworkConf = NetworkConf
   { network :: String
+  -- | What strato-setup set this directory up as (its @--role@: node, core,
+  -- api, api-node or validator). Written for every directory and only read
+  -- back, by strato-ps; no process acts on it. Absent from files written
+  -- before it existed, which reads as node.
+  , role :: String
   , networkID :: Integer
   , chainId :: Integer
   , httpPort :: Int
@@ -277,7 +282,8 @@ instance FromJSON NetworkConf where
   parseJSON = withObject "NetworkConf" $ \v -> do
     net <- v .:? "network" .!= "upquark"
     NetworkConf net
-      <$> v .:? "networkID" .!= (-1)
+      <$> v .:? "role" .!= "node"
+      <*> v .:? "networkID" .!= (-1)
       <*> v .:? "chainId" .!= computeChainId net
       <*> v .:? "httpPort" .!= 8081
       <*> v .:? "txSizeLimit" .!= 2097152
@@ -485,6 +491,7 @@ instance Default UrlConfig where
 instance Default NetworkConf where
   def = NetworkConf
     { network = "upquark"
+    , role = "node"
     , networkID = -1  -- will be computed from network name
     , chainId = computeChainId "upquark"
     , httpPort = 8081

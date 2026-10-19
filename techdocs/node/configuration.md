@@ -76,7 +76,7 @@ Main sections:
 
 | Section | Contains |
 |---|---|
-| `networkConfig` | `network`, `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, and the staking activation settings |
+| `networkConfig` | `network`, `role` (what the directory was set up as, `node` unless `--role` was given), `networkID`, `chainId`, `httpPort`, `txSizeLimit`, `gasLimit`, `blockPeriodMs`, `roundPeriodS`, and the staking activation settings |
 | `urlConfig` | `nodeUrl` (from the host name), `vaultUrl`, `vaultTimeoutSec`, `cookieRealm` |
 | `p2pConfig`, `discoveryConfig` | Peer limits and timeouts |
 | `quarryConfig` | Block building: `maxTxsPerBlock`, `mempoolLivenessCutoff` |
