@@ -89,6 +89,19 @@ function chainState(plan, instance) {
   return { row, details: { yearlyWei: [...instance.yearlyWei] } };
 }
 
+test('deployment TGE controls the on-chain schedule independently of spreadsheet metadata', () => {
+  const d = explicitlyAssigned();
+  d.tge = '2027-01-15T00:00:00Z';
+  const plan = buildPlan({ ...schedule, sheetTgeDate: '2000-01-01' }, d, LIVE);
+  assert.strictEqual(plan.tgeTimestamp, Date.parse(d.tge) / 1000);
+
+  const team = byKey(plan, 'team');
+  const state = chainState(plan, team);
+  assert.deepStrictEqual(scheduleProblems(team, state.row, state.details, plan), []);
+  state.row.tgeTimestamp += 1;
+  assert.ok(scheduleProblems(team, state.row, state.details, plan).some(p => p.includes('tgeTimestamp')));
+});
+
 test('schedule verification rejects stale immutable terms and recipients', () => {
   const plan = buildPlan(schedule, explicitlyAssigned(), LIVE);
   const team = byKey(plan, 'team');
