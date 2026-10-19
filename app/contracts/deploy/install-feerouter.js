@@ -17,7 +17,7 @@ const axios = require('axios');
 const { rest, util } = require('blockapps-rest');
 
 const DECIDER_STATE = '00000000000000000000000000000000dec1de02';
-const FEE_ROUTER = '44769a27b4339f1dbdab8920be9b5689b6652178'; // payFees + payBlockRewards
+const FEE_ROUTER = '76a6839f96b8265a0edcbfc141f7cc89b09da9d6'; // HeliumFeeRouterV4: voucher, else STRATO burn priced from pool 6df32c9b…, shortfall bought with USDST
 const LEGACY = DECIDER_STATE; // DeciderState is its own default implementation
 
 async function deciderState() {

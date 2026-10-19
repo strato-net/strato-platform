@@ -1,10 +1,12 @@
 abstract contract ERC20_Template {
   function transfer(address _to, uint _amount) public;
   function approve(address _spender, uint _amount) public;
+  function allowance(address _owner, address _spender) public view returns (uint);
 }
 
 interface IGasToken {
     function burn(uint amount) external; // holder-only Token.burn(uint256)
+    function balanceOf(address account) external view returns (uint);
     function decimals() external view returns (uint8);
 }
 
@@ -22,6 +24,7 @@ interface ICanonicalPool {
     function liquidity() external view returns (uint);
     function observe(uint[] secondsAgos) external view returns (int[] tickCumulatives, int[] secondsPerLiquidityCumulativeX128s);
     function getSqrtRatioAtTick(int tick) external pure returns (uint);
+    function swap(address recipient, bool zeroForOne, int amountSpecified, uint sqrtPriceLimitX96, uint amountLimit, uint deadline) external returns (int amount0, int amount1);
 }
 
 interface IStakingGovernanceLookup {
@@ -34,7 +37,7 @@ interface IStakingFeeHook {
     function creditBlockReward(address validator, uint256 amount) external;
 }
 
-enum FeeMethod { NONE, VOUCHER, STRATO_BURN }
+enum FeeMethod { NONE, VOUCHER, STRATO_BURN, USDST_SWAP_BURN }
 
 // Transaction fee implementation for Decider (0xDEC1DE), installed with
 // DeciderState.updatePayFeeContract. The platform DELEGATECALLs payFees for every
@@ -45,8 +48,11 @@ enum FeeMethod { NONE, VOUCHER, STRATO_BURN }
 // Fee policy, $0.01 per submitted transaction, paid with the first of:
 //   1. one whole voucher;
 //   2. STRATO worth 0.01 USDST, burned from the signer. Nothing is collected or split.
-// A signer with neither has not paid, and the platform rejects the transaction before
-// it runs. Included transactions that revert have still paid.
+//      A signer short of STRATO first buys exactly the shortfall from the canonical pool
+//      with its own USDST, paying at most the shortfall's time-weighted value plus a
+//      bounded premium, so a USDST-only account keeps transacting through the switch.
+// A signer with none of these has not paid, and the platform rejects the transaction
+// before it runs. Included transactions that revert have still paid.
 //
 // The STRATO amount is priced once per block, before any of the block's transactions,
 // from the canonical STRATO/USDST PoolV3's time-weighted average price over committed
@@ -86,6 +92,12 @@ contract record FeeRouter {
     // In-range liquidity below which the pool is not trusted to price. A time average
     // alone does not make a thin pool reliable; set from depth and manipulation cost.
     function _minPoolLiquidity() internal view virtual returns (uint) { return 0; }
+
+    // How far the USDST spent buying a STRATO shortfall may exceed the shortfall's
+    // time-weighted value (pool fee, slippage, spot drift since the block's quote)
+    // before the fallback refuses and the transaction is rejected. At 100% a $0.01
+    // fee can never cost more than $0.02 in USDST.
+    function _maxSwapPremiumBps() internal view virtual returns (uint) { return 10000; }
 
     // Chains whose genesis governance predates staking have no stakingContract() to
     // ask, so they subclass this with the deployed address. It cannot be storage:
@@ -264,10 +276,17 @@ contract record FeeRouter {
             address router = IFeeContractLookup(_deciderState()).getImplContract();
             (uint fee, uint ver, bool valid) = IStratoFeeQuote(router).stratoFeeQuote();
             require(valid, "FeeRouter: no STRATO price, a voucher is required");
-            // A short signer reverts here, and the platform rejects the transaction
-            // before it runs: nothing is burned for a transaction that is not included.
-            IGasToken(_strato()).burn(fee);
+            address strato = _strato();
+            uint held = IGasToken(strato).balanceOf(address(this));
             method = FeeMethod.STRATO_BURN;
+            if (held < fee) {
+                _buyStratoShortfall(fee - held, fee);
+                method = FeeMethod.USDST_SWAP_BURN;
+            }
+            // A signer still short reverts here, and the platform rejects the
+            // transaction before it runs: nothing is burned or swapped for a
+            // transaction that is not included.
+            IGasToken(strato).burn(fee);
             amount = fee;
             version = ver;
         }
@@ -278,5 +297,22 @@ contract record FeeRouter {
             } catch {
             }
         }
+    }
+
+    // Buy exactly `shortfall` STRATO from the canonical pool with the signer's USDST.
+    // Still the signer's context: the approval and the swap are the signer's own, and
+    // any allowance the signer already gave the pool is put back afterwards. `fee`
+    // STRATO is worth USD_FEE at the block's quote, which prices the shortfall; the
+    // pool may charge up to that plus the premium, else it reverts and nothing moves.
+    function _buyStratoShortfall(uint shortfall, uint fee) internal {
+        address pool = _pool();
+        address usdst = _usdst();
+        uint maxIn = (shortfall * USD_FEE * (10000 + _maxSwapPremiumBps()) + fee * 10000 - 1) / (fee * 10000);
+        bool usdstIsToken0 = address(ICanonicalPool(pool).token0()) == usdst;
+
+        uint allowance = ERC20_Template(usdst).allowance(address(this), pool);
+        ERC20_Template(usdst).approve(pool, allowance + maxIn);
+        ICanonicalPool(pool).swap(address(this), usdstIsToken0, -int(shortfall), 0, maxIn, block.timestamp);
+        ERC20_Template(usdst).approve(pool, allowance);
     }
 }

@@ -66,6 +66,7 @@ contract record FeeRouterHarness is FeeRouter {
     address public poolAddr;
     address public deciderStateAddr;
     uint public minLiquidity;
+    uint public swapPremiumBps = 10000;
 
     function configure(address v, address u, address g, address d) public {
         voucherAddr = v;
@@ -81,6 +82,7 @@ contract record FeeRouterHarness is FeeRouter {
 
     function setStakingFallback(address s) public { stakingFallbackAddr = s; }
     function setMinLiquidity(uint l) public { minLiquidity = l; }
+    function setSwapPremium(uint bps) public { swapPremiumBps = bps; }
 
     function _voucher() internal view override returns (address) { return voucherAddr; }
     function _usdst() internal view override returns (address) { return usdstAddr; }
@@ -90,11 +92,16 @@ contract record FeeRouterHarness is FeeRouter {
     function _strato() internal view override returns (address) { return stratoAddr; }
     function _pool() internal view override returns (address) { return poolAddr; }
     function _minPoolLiquidity() internal view override returns (uint) { return minLiquidity; }
+    function _maxSwapPremiumBps() internal view override returns (uint) { return swapPremiumBps; }
 }
 
 contract record Signer is FeeRouterHarness {
     function pay(address router) public {
         address(router).delegatecall("payFees");
+    }
+
+    function approve(address token, address spender, uint amount) public {
+        Token(token).approve(spender, amount);
     }
 }
 
@@ -430,6 +437,65 @@ contract Describe_FeeRouter {
         broke.configure(address(voucher), address(usdst), address(gov), address(decider));
         broke.configureStrato(address(strato), address(0));
         require(_paymentReverts(broke), "unpaid fee fails the transaction");
+    }
+
+    // ---- payment: a STRATO shortfall is bought from the canonical pool with USDST ----
+
+    // A signer pointed at the canonical pool, holding `held` STRATO and `usdstHeld` USDST.
+    function _shortSigner(uint held, uint usdstHeld) internal returns (Signer) {
+        Signer s = _signer();
+        s.configureStrato(address(strato), address(pool));
+        strato.burn(address(s), 1e18 - held);
+        usdst.mint(address(s), usdstHeld);
+        return s;
+    }
+
+    function it_buys_a_strato_shortfall_with_usdst() public {
+        _pricedPool(0, true);
+        Signer s = _shortSigner(5e15, 1e18); // half the fee in hand
+        uint supply = strato.totalSupply();
+
+        s.pay(address(router));
+        require(strato.balanceOf(address(s)) == 0, "exactly the shortfall bought, then the fee burned");
+        require(strato.totalSupply() == supply - 1e16, "the whole fee is burned");
+        uint spent = 1e18 - usdst.balanceOf(address(s));
+        require(spent >= 5e15 && spent <= 5e15 * 101 / 100, "shortfall bought at the pool price plus its fee");
+    }
+
+    function it_buys_the_whole_fee_when_the_signer_holds_no_strato() public {
+        _pricedPool(HALF_PRICE_TICK, true);
+        Signer s = _shortSigner(0, 1e18);
+
+        s.pay(address(router));
+        require(strato.balanceOf(address(s)) == 0, "fee bought and burned");
+        uint spent = 1e18 - usdst.balanceOf(address(s));
+        require(spent >= 1e16 && spent <= 1e16 * 101 / 100, "a cent of USDST plus the pool fee, whatever the STRATO price");
+    }
+
+    function it_puts_back_the_signers_own_pool_allowance() public {
+        _pricedPool(0, true);
+        Signer s = _shortSigner(0, 1e18);
+        s.approve(address(usdst), address(pool), 777);
+
+        s.pay(address(router));
+        require(usdst.allowance(address(s), address(pool)) == 777, "an in-flight approval survives the fee");
+    }
+
+    function it_reverts_when_the_shortfall_cannot_be_bought() public {
+        _pricedPool(0, true);
+        Signer s = _shortSigner(5e15, 0);
+
+        require(_paymentReverts(s), "no USDST and short of STRATO: unpaid");
+        require(strato.balanceOf(address(s)) == 5e15, "nothing burned");
+    }
+
+    function it_refuses_to_overpay_for_the_shortfall() public {
+        _pricedPool(0, true);
+        Signer s = _shortSigner(0, 1e18);
+        s.setSwapPremium(0); // the pool's own 0.30% already exceeds a zero premium
+
+        require(_paymentReverts(s), "pool price above the cap: unpaid");
+        require(strato.balanceOf(address(s)) == 0 && usdst.balanceOf(address(s)) == 1e18, "nothing bought or burned");
     }
 
     // ---- staking notification ----
