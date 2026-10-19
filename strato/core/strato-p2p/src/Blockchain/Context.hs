@@ -48,6 +48,7 @@ module Blockchain.Context
     , getActionTimestamp
     , clearActionTimestamp
     , getPeerByIP
+    , getPeersByIP
     , setPeerAddrIfUnset
     , shouldSendToPeer
     , withActivePeer
@@ -439,16 +440,19 @@ instance AccessibleEnv SQLDB ContextM where
 instance AccessibleEnv PeerStore ContextM where
   accessEnv = asks (PeerStore . configPeerDB)
 
+-- | Every stored record for a host: a peer can be stored under a DNS name
+-- (with its resolved address in pPeerIp) as well as under the address itself.
+peersByHost :: Host -> ContextM [PPeer]
+peersByHost host' = map SQL.entityVal <$> peerQuery (SQL.selectList filters [])
+  where
+    byHost = [PPeerHost SQL.==. host']
+    filters = maybe byHost (\ip -> byHost SQL.||. [PPeerIp SQL.==. Just ip]) (readMaybe $ hostToString host')
+
 instance A.Selectable Host PPeer ContextM where
-  select _ host' =
-    peerQuery actions >>= \case
-      [] -> return Nothing
-      (x:_) -> return . Just $ SQL.entityVal x
-    where
-      byHost = [PPeerHost SQL.==. host']
-      -- A peer stored under a DNS name keeps its resolved address in pPeerIp,
-      -- so a numeric host must match that too.
-      actions = SQL.selectList (maybe byHost (\ip -> byHost SQL.||. [PPeerIp SQL.==. Just ip]) (readMaybe $ hostToString host')) []
+  select _ = fmap listToMaybe . peersByHost
+
+instance A.Selectable Host [PPeer] ContextM where
+  select _ = fmap Just . peersByHost
 
 instance A.Selectable Point PPeer ContextM where
   select _ pk =
@@ -497,7 +501,8 @@ type MonadP2P m =
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
          '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer)
+         '(Host, PPeer),
+         '(Host, [PPeer])
        ]
       m,
     All2
@@ -580,6 +585,12 @@ getPeerByIP ::
   Host ->
   m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
+
+getPeersByIP ::
+  A.Selectable Host [PPeer] m =>
+  Host ->
+  m [PPeer]
+getPeersByIP = fmap (fromMaybe []) . A.select (Proxy @[PPeer])
 
 setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)

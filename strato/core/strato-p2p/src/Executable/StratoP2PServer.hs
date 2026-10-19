@@ -121,16 +121,16 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
         e' | Just SelfConnection <- fromException e' -> do
           $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: our own public address, or another node running with this node's key"
           -- p carries this connection's source port, but stored peers are
-          -- matched by (host, listening port), so disable the stored record.
-          getPeerByIP host >>= \case
-            Nothing -> return $ Right ()
-            Just stored -> do
-              disErr <- storeDisableException stored (T.pack "SelfConnection")
-              whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-              selfErr <- disableTCPPeerForSeconds stored 86400
-              whenLeft selfErr $ \theSelfErr -> do
-                $logErrorLS "stratoP2PServer/runEthServer" theSelfErr
-              return selfErr
+          -- matched by (host, listening port), so disable the stored records:
+          -- the address may be stored under a DNS name and under its IP.
+          stored <- getPeersByIP host
+          fmap sequence_ . forM stored $ \s -> do
+            disErr <- storeDisableException s (T.pack "SelfConnection")
+            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
+            selfErr <- disableTCPPeerForSeconds s 86400
+            whenLeft selfErr $ \theSelfErr -> do
+              $logErrorLS "stratoP2PServer/runEthServer" theSelfErr
+            return selfErr
         e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
           case ioErrType of
             NoSuchThing -> do
