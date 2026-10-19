@@ -308,7 +308,7 @@ cells_wait_ready() {
   for id in $ids; do
     log "cell $id: waiting until it follows the chain (bootstrap and snapshot restore run first)"
     # The last line the check printed; SSM's own "failed to run commands" line says nothing.
-    until ssm_run "$(instance_of "$id")" 120 "$(cell_script --check)" 2>/dev/null | grep -v '^failed to run commands' | grep . | tail -1; do
+    until ssm_run "$(instance_of "$id")" 120 "$(cell_script --check)" 2>/dev/null | grep -v 'failed to run commands' | grep '[^[:space:]]' | tail -1; do
       (( $(date +%s) < deadline )) || die "cell $id is not following the chain after ${READY_TIMEOUT_MINUTES:-360} minutes; see /var/log/strato-cell-bootstrap.log on it"
       sleep 60
     done
