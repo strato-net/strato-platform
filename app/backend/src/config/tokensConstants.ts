@@ -63,5 +63,14 @@ export const FREEPORT_TOKEN_FIELDS = [
   "decimals",
   "nativeFlag",
   "originChainId::text",
+  "originToken::text",
   "totalSupply::text",
+  "issuer",
+  "creatorNonce::text",
 ] as const;
+
+export const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+
+// SmolDapp/tokenAssets serves logos by (chainId, lowercase address) and 404s for unknown tokens.
+export const evmLogoUrl = (chainId: string, address: string) =>
+  `https://cdn.jsdelivr.net/gh/SmolDapp/tokenAssets@main/tokens/${chainId}/${address}/logo-128.png`;

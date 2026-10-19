@@ -33,6 +33,7 @@ export interface Token {
     images?: {value: string}[];
     _owner?: string;
     _totalSupply?: string;
+    customDecimals?: number;
     description?: string;
     status?: string;
   },

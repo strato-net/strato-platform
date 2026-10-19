@@ -217,8 +217,9 @@ export const defaultSilvstYieldVaultFor: Record<string, string> = {
 };
 
 // Freeport is its own token registry; its Cirrus tables are prefixed by the deployer's username.
-export const defaultFreeportFor: Record<string, { address: string; prefix: string }> = {
-  "114784819836269": { address: "04c5c88aeafc788973ccb483646fce34f9f860ec", prefix: "portal" }, // Helium testnet
+// launchpadPrefix is the diamondszn Launchpad's prefix, whose uriOf holds native coin metadata.
+export const defaultFreeportFor: Record<string, { address: string; prefix: string; launchpadPrefix?: string }> = {
+  "114784819836269": { address: "04c5c88aeafc788973ccb483646fce34f9f860ec", prefix: "portal", launchpadPrefix: "portal" }, // Helium testnet
   "33056204878082667": { address: "1c3d98d6ce8bb0200519104b5c69ba38efb9db4c", prefix: "Freeport" }, // Upquark mainnet
 };
 
@@ -253,6 +254,7 @@ export let wbtcCarryVault: string = '';
 export let directMintPsm: string = '';
 export let freeport: string = '';
 export let freeportTokenTable: string = '';
+export let launchpadUriTable: string = '';
 export let stratoNativeBridge: string = '';
 export let stratoNativeCustodyVault: string = '';
 export let stratoToken: string = '';
@@ -386,6 +388,7 @@ function setFreeportConfig(networkId: string) {
   const defaults = defaultFreeportFor[networkId];
   freeport = defaults?.address || "";
   freeportTokenTable = defaults ? `${defaults.prefix}-FreeportToken` : "";
+  launchpadUriTable = defaults?.launchpadPrefix ? `${defaults.launchpadPrefix}-Launchpad-uriOf` : "";
 }
 
 export function setVaultConfig(networkId: string) {

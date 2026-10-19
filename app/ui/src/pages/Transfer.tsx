@@ -73,6 +73,8 @@ const Transfer = () => {
   const [nonceWarning, setNonceWarning] = useState(false);
   const [nonceOverride, setNonceOverride] = useState(false);
 
+  const decimals = fromAsset?.token?.customDecimals || 18;
+
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
     return computeMaxTransferable(
@@ -138,7 +140,7 @@ const Transfer = () => {
     try {
       setSwapLoading(true);
       setShowConfirmModal(false);
-      const weiValue = safeParseUnits(fromAmount, 18).toString();
+      const weiValue = safeParseUnits(fromAmount, decimals).toString();
 
       if (isVaultUser) {
         await transferToken({
@@ -428,8 +430,8 @@ const Transfer = () => {
                       onClick={() => {
                         if (guestMode) return;
                         try {
-                          const raw = formatUnits(maxAmount);
-                          const clampedAmount = roundToDecimals(raw, 18);
+                          const raw = formatUnits(maxAmount, decimals);
+                          const clampedAmount = roundToDecimals(raw, decimals);
                           setFromAmount(clampedAmount);
                         } catch (error) {
                           console.error("Error setting max amount:", error);
@@ -438,7 +440,7 @@ const Transfer = () => {
                       className="font-medium text-blue-600 hover:underline focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={guestMode}
                     >
-                      Max: {formatBalance(maxAmount, undefined, 18, 0, 4)}
+                      Max: {formatBalance(maxAmount, undefined, decimals, 0, 4)}
                     </button>
                     {")"}</>
                 )}
@@ -449,7 +451,7 @@ const Transfer = () => {
                 value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
                   if (guestMode) return;
-                  handleAmountInputChange(e.target.value, setFromAmount, setAmountError, maxAmount, 18);
+                  handleAmountInputChange(e.target.value, setFromAmount, setAmountError, maxAmount, decimals);
                 }}
                 placeholder="0.00"
                 className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""

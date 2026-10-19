@@ -10,6 +10,7 @@ import { getOraclePrices, getTokenPriceMetrics } from "./oracle.service";
 import { getTokenDetails } from "../helpers/cirrusHelpers";
 import * as config from "../../config/config";
 import { listVaultDefs } from "./yieldVault.service";
+import { getFreeportTokens, isFreeportToken } from "./freeport.service";
 
 const {
   tokenSelectFields,
@@ -96,6 +97,14 @@ const getTransferContractName = (address?: string | null) => {
   if (isConfiguredYieldVault(address)) return "YieldVault";
   return extractContractName(Token);
 };
+
+// FreeportToken.transfer names its amount parameter `amount`, and bloc matches args by name.
+const getTransferCall = (isFreeport: boolean, tokenAddress: string, to?: string, value?: string) => ({
+  contractName: isFreeport ? "FreeportToken" : getTransferContractName(tokenAddress),
+  contractAddress: tokenAddress,
+  method: "transfer",
+  args: isFreeport ? { to, amount: value } : { to, value },
+});
 
 const getYieldVaultTransferableTokens = async (accessToken: string, userAddress: string) => {
   const vaultDefs = getConfiguredYieldVaultDefs();
@@ -377,13 +386,15 @@ export const getBalance = async (
  * Returns tokens with positive balance that are not paused
  */
 export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
-  const [tokens, yieldVaultTokens] = await Promise.all([
+  const [tokens, yieldVaultTokens, freeportTokens] = await Promise.all([
     getBalance(accessToken, userAddress),
     getYieldVaultTransferableTokens(accessToken, userAddress),
+    getFreeportTokens(accessToken, {}, userAddress).catch(() => []),
   ]);
+  const freeportBalances = freeportTokens.map((t) => ({ address: t.address, user: userAddress, balance: t.balance, token: t }));
 
   // Filter out paused tokens and ensure nonzero balance
-  return [...tokens, ...yieldVaultTokens].filter((tokenData: any) => {
+  return [...tokens, ...yieldVaultTokens, ...freeportBalances].filter((tokenData: any) => {
     const hasBalance = tokenData.balance !== "0";
     const isNotPaused = tokenData.token?._paused !== true;
     return hasBalance && isNotPaused;
@@ -422,15 +433,12 @@ export const transferToken = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = await buildFunctionTx({
-      contractName: getTransferContractName(body.address),
-      contractAddress: body.address || "",
-      method: "transfer",
-      args: {
-        to: body.to,
-        value: body.value,
-      },
-    }, userAddress, accessToken);
+    const isFreeport = await isFreeportToken(accessToken, body.address).catch(() => false);
+    const tx = await buildFunctionTx(
+      getTransferCall(isFreeport, body.address || "", body.to, body.value),
+      userAddress,
+      accessToken
+    );
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -472,17 +480,15 @@ export const bulkTransferToken = async (
   let successCount = 0;
   let failureCount = 0;
 
+  const isFreeport = await isFreeportToken(accessToken, tokenAddress).catch(() => false);
+
   for (const transfer of transfers) {
     try {
-      const tx = await buildFunctionTx({
-        contractName: getTransferContractName(tokenAddress),
-        contractAddress: tokenAddress,
-        method: "transfer",
-        args: {
-          to: transfer.to,
-          value: transfer.value,
-        },
-      }, userAddress, accessToken);
+      const tx = await buildFunctionTx(
+        getTransferCall(isFreeport, tokenAddress, transfer.to, transfer.value),
+        userAddress,
+        accessToken
+      );
 
       const { status, hash } = await postAndWaitForTx(accessToken, () =>
         strato.post(accessToken, StratoPaths.transactionParallel, tx)

@@ -244,6 +244,9 @@ const BulkTransferModal = ({
     }
   }, [handleFileUpload]);
 
+  const decimalsOf = (tokenAddress: string) =>
+    tokens.find(t => t.address.toLowerCase() === tokenAddress.toLowerCase())?.token?.customDecimals || 18;
+
   const validTransfers = parsedTransfers.filter(t => !t.error);
   const invalidTransfers = parsedTransfers.filter(t => t.error);
 
@@ -254,7 +257,7 @@ const BulkTransferModal = ({
       acc[key] = { transfers: [], total: 0n };
     }
     acc[key].transfers.push(t);
-    acc[key].total += safeParseUnits(t.amount, 18);
+    acc[key].total += safeParseUnits(t.amount, decimalsOf(key));
     return acc;
   }, {} as Record<string, { transfers: ParsedTransfer[]; total: bigint }>);
 
@@ -302,7 +305,7 @@ const BulkTransferModal = ({
       try {
         const transferItem: BulkTransferItem = {
           to: transfer.to,
-          value: safeParseUnits(transfer.amount, 18).toString(),
+          value: safeParseUnits(transfer.amount, decimalsOf(transfer.tokenAddress)).toString(),
         };
 
         const response = await onConfirm(transfer.tokenAddress, [transferItem]);
@@ -335,7 +338,7 @@ const BulkTransferModal = ({
 
         allResults.push({
           to: transfer.to,
-          value: safeParseUnits(transfer.amount, 18).toString(),
+          value: safeParseUnits(transfer.amount, decimalsOf(transfer.tokenAddress)).toString(),
           status: "failed",
           error: errorMessage,
           tokenAddress: transfer.tokenAddress,
@@ -749,7 +752,7 @@ const BulkTransferModal = ({
                       {result.to.length > 14 ? `${result.to.slice(0, 6)}...${result.to.slice(-4)}` : result.to}
                     </TableCell>
                     <TableCell className="text-right text-sm">
-                      {formatBalance(result.value, undefined, 18, 0, 4)}
+                      {formatBalance(result.value, undefined, decimalsOf(result.tokenAddress), 0, 4)}
                     </TableCell>
                     <TableCell>
                       {isTxSubmitted(result.status) ? (
