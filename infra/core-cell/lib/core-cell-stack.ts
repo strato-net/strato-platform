@@ -28,10 +28,11 @@ export interface CoreCellStackProps extends StackProps {
  * running follower is `strato-promote`, see design-documents/standby-core.md.
  *
  * What the host reads at boot, with the instance role: the strato image from
- * ECR, the Aurora master secret (the password reaches strato-setup on the
- * host and nowhere else), the bootstrap script from this stack's asset
- * bucket, and, when configured, the collector configs the observability app
- * published in SSM.
+ * its registry (ghcr.io is public and needs no login; ECR uses the role), the
+ * Aurora master secret (the password reaches strato-setup on the host and
+ * nowhere else), the bootstrap script from this stack's asset bucket, and,
+ * when configured, the collector configs the observability app published in
+ * SSM.
  */
 export class CoreCellStack extends Stack {
   readonly instance: ec2.Instance;

@@ -11,7 +11,7 @@ away from the node.
 
 ## Before deploying
 
-1. Build and push the images: `make app-backend app-nginx` at the repo root, then push to ECR. The sidecar must be the **app-nginx** image (app/nginx: it proxies /api to the backend beside it and the node paths to `NODE_URL`, listens on 80); the node's `nginx` image expects the node's layout and will not start here.
+1. The images: `app-nginx` and `app-backend`, as strato-platform's autobuild publishes them for every commit it builds under `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>` (public, pulled without credentials). The sidecar must be the **app-nginx** image (app/nginx: it proxies /api to the backend beside it and the node paths to `NODE_URL`, listens on 80); the node's `nginx` image expects the node's layout and will not start here.
 2. Create the secrets in Secrets Manager (names are context values, defaults shown):
    - `ha-<env>/app/oauth`: JSON `{"discoveryUrl": ..., "clientId": ..., "clientSecret": ...}` for the app's own OIDC client
    - `ha-<env>/app/postgres-password`: the node's Postgres password (plain string)
@@ -33,7 +33,8 @@ away from the node.
 cd app-tier && npm ci
 npx cdk synth --strict \
   -c envName=testnet \
-  -c nginxImage=<ecr>/app-nginx:<tag> -c backendImage=<ecr>/app-backend:<tag> \
+  -c nginxImage=ghcr.io/strato-net/strato-platform/app-nginx:<tag> \
+  -c backendImage=ghcr.io/strato-net/strato-platform/app-backend:<tag> \
   -c nodeUrl=https://node.testnet.example -c postgresHost=10.0.1.10 \
   -c chainId=8081 -c networkName=helium \
   -c domainName=app.testnet.example -c albCertificateArn=<regional cert> \

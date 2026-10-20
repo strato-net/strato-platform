@@ -19,7 +19,7 @@ export interface CoreCellConfig {
   /** SSM public parameter naming the AMI. Default: Canonical's Ubuntu 24.04, the strato image's base. */
   amiParameter: string;
   keyPairName?: string;
-  /** ECR URI of the strato image (tag included); its binaries are extracted onto the host. */
+  /** Registry URI of the strato image, tag included, as strato-platform's autobuild publishes it: ghcr.io/strato-net/strato-platform/strato:<VERSION>-<commit>-<hash> (public; an ECR URI is pulled with the instance role). Its binaries are extracted onto the host. */
   stratoImage: string;
   /** Registry prefix the generated compose pulls prometheus and streaming from (`--repoUrl`); derived from stratoImage. */
   repoUrl: string;

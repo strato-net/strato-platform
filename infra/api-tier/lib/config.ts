@@ -5,7 +5,7 @@ import { deploymentPrefix } from "./naming";
 export interface ApiTierConfig {
   envName: string;
   vpcId?: string;
-  /** ECR image URIs. */
+  /** Image URIs, as strato-platform's autobuild publishes them: ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash> (public; an ECR URI is pulled with the task's ECR permissions). */
   stratoImage: string;
   nginxImage: string;
   postgrestImage: string;

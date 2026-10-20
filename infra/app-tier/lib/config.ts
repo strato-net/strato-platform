@@ -11,7 +11,7 @@ export interface AppTierConfig {
   envName: string;
   /** Existing VPC to deploy into; a new one is created when absent. */
   vpcId?: string;
-  /** ECR image URIs for the app's nginx and backend (from `make app-nginx` / `make app-backend`). */
+  /** Image URIs for the app's nginx and backend, as strato-platform's autobuild publishes them: ghcr.io/strato-net/strato-platform/app-nginx:<VERSION>-<commit>-<hash>, app-backend likewise (public; an ECR URI is pulled with the task's ECR permissions). */
   nginxImage: string;
   backendImage: string;
   /** Public URL of the STRATO API tier or node the app talks to. */

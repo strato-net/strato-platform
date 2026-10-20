@@ -21,7 +21,7 @@ host unchanged). At first boot the instance, with its own role:
 
 1. installs docker, the binaries' runtime libraries and the CloudWatch agent;
 2. formats and mounts the data volume at `/var/lib/strato`;
-3. pulls the strato image from ECR and copies its `/usr/local/bin` onto the
+3. pulls the strato image from its registry and copies its `/usr/local/bin` onto the
    host, plus strato-platform's `bin/strato-*` scripts (shipped as a stack asset);
 4. reads the Aurora master secret and runs `strato-up --role=core ...` once,
    which sets the node directory up (`/var/lib/strato/node`), restores a
@@ -37,9 +37,14 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
 
 ## Before deploying
 
-1. The `strato` image in ECR (`make docker`), and the `prometheus` image
-   beside it under the same registry prefix (the generated compose pulls it
-   with `--repoUrl`).
+1. The `strato` image, and the `prometheus` image beside it under the same
+   registry prefix (the generated compose pulls it with `--repoUrl`).
+   strato-platform's autobuild publishes them for every commit it builds
+   (develop, branches, release tags) as
+   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`,
+   strato also as `strato:<VERSION>-<commit>` and, for a release tag, as
+   `strato:<tag>`. The packages are public: the host logs in nowhere (an
+   ECR URI still works, through the instance role).
 2. The Aurora cluster (`data-plane`), allowing this stack's security
    group (output `SecurityGroupId`) on 5432, and its master secret
    `ha-<env>/postgres`.
@@ -54,7 +59,7 @@ are under `/var/lib/strato/node/logs`. `aws ssm start-session --target
 npm install
 npx cdk synth --strict \
   -c envName=testnet -c cellId=core-b -c vpcId=vpc-0123 \
-  -c stratoImage=123456789012.dkr.ecr.us-east-1.amazonaws.com/strato:18.10-abcdef \
+  -c stratoImage=ghcr.io/strato-net/strato-platform/strato:19.5-d13a271-4d78dd856e44 \
   -c postgresWriterHost=strato-testnet.cluster-xyz.us-east-1.rds.amazonaws.com \
   -c postgresReaderHost=strato-testnet.cluster-ro-xyz.us-east-1.rds.amazonaws.com \
   -c network=upquark \
@@ -84,7 +89,7 @@ through `clientSecurityGroupIds`).
 | `rootVolumeGiB` / `dataVolumeGiB` | 40 / 200 | the data volume holds the node directory and survives the instance |
 | `amiParameter` | Canonical Ubuntu 24.04 | SSM public parameter naming the AMI |
 | `keyPairName` | none | SSH key; Session Manager works without one |
-| `stratoImage` | required | ECR URI with tag |
+| `stratoImage` | required | registry URI with tag: `ghcr.io/strato-net/strato-platform/strato:<VERSION>-<commit>-<hash>` |
 | `repoUrl` | registry prefix of `stratoImage` | `--repoUrl` for the generated compose |
 | `extraBinariesS3` | none | `s3://bucket/prefix/` of extra binaries installed into `/usr/local/bin` (for an image that lacks one) |
 | `network` | `upquark` | `--network`; carries the bootnodes and chain id |

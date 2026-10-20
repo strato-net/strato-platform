@@ -86,7 +86,7 @@ FIRST_CELL=${CELLS%% *}
 FIRST_CELL=${FIRST_CELL%%:*}
 existing_cells() { local id; for id in $(cell_ids); do exists "$(host_stack "$id")" && echo "$id"; done; return 0; }
 
-# The image set: from the environment when the pipeline built one, else the one last deployed.
+# The image set: from the environment when the pipeline resolved one, else the one last deployed.
 load_images() {
   local saved="" k v
   for k in $IMAGE_KEYS; do
