@@ -22,12 +22,12 @@ import Database.Persist.Postgresql
 -- 'peerSqlitePath' is set, else this cell's own database when the node
 -- shares a Postgres cluster with other cores (created here on first use),
 -- else the eth database.
-setup :: (MonadLoggerIO m, MonadUnliftIO m) => [String] -> m ()
+setup :: (MonadLoggerIO m, MonadUnliftIO m) => [(String, UDPPort, TCPPort)] -> m ()
 setup nodes = do
   unless peerStoreIsSqlite $ liftIO $ mapM_ ensureDatabaseExists (peerDbConfig ethConf)
   withPeerStoreConn (setupSQL nodes)
 
-setupSQL :: (MonadLoggerIO m, MonadUnliftIO m) => [String] -> SqlBackend -> m ()
+setupSQL :: (MonadLoggerIO m, MonadUnliftIO m) => [(String, UDPPort, TCPPort)] -> SqlBackend -> m ()
 setupSQL nodes = runSqlConn $ do
   runPeerStoreMigration migrateAll
 
@@ -35,6 +35,6 @@ setupSQL nodes = runSqlConn $ do
   existingPeer <- selectFirst [] []
   when (isNothing (existingPeer :: Maybe (Entity PPeer))) $ do
     logInfoN $ T.pack $ "Inserting " ++ show (length nodes) ++ " bootnodes"
-    forM_ nodes $ \node -> do
-      peer <- mkPeer Nothing (Host $ T.pack node) Nothing (UDPPort 30303) (TCPPort 30303)
+    forM_ nodes $ \(node, udpPort, tcpPort) -> do
+      peer <- mkPeer Nothing (Host $ T.pack node) Nothing udpPort tcpPort
       void $ insert peer

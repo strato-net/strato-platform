@@ -9,7 +9,7 @@ import Blockchain.EthConf.Model (apiConfig, apiPort, jsonRpcPort, networkConfig,
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_publicStratoRpc, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -19,12 +19,28 @@ import qualified Data.Yaml as Yaml
 import System.Posix.User (getEffectiveUserID, getEffectiveGroupID)
 import System.Process (readProcess)
 
--- | Which of the node's containers a role runs. A core keeps the stores the
--- chain processes write; an API tier keeps what fronts strato-api.
-roleHasService :: Role -> String -> Bool
-roleHasService RoleNode _ = True
-roleHasService RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
-roleHasService RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- | The host port a validator publishes apex (/health, /status) on for the
+-- network monitor: plain HTTP on 80, because a CDN such as Cloudflare only
+-- proxies 80, 8080, 443 and 8443. Inside its container apex listens on 3009.
+apexPort :: Int
+apexPort = 80
+
+-- | Which of the node's containers a role runs, given whether Prometheus and
+-- apex are wanted (@--monitoring@, meaningful on an api-node only). A core
+-- keeps the stores the chain processes write; an API tier keeps what fronts
+-- strato-api.
+roleHasService :: Bool -> Role -> String -> Bool
+roleHasService _ RoleNode _ = True
+roleHasService _ RoleCore name = name `elem` ["postgres", "redis", "streaming", "prometheus"]
+roleHasService _ RoleApi name = name `elem` ["nginx", "postgrest", "docs"]
+-- A validator keeps its stores and Prometheus, plus apex: the network monitor
+-- polls its /health, published directly since there is no nginx.
+roleHasService _ RoleValidator name = name `elem` ["postgres", "redis", "streaming", "prometheus", "apex"]
+-- An api-node keeps everything the APIs need and drops what only serves
+-- people: no docs, smd or app-*. Prometheus and apex produce /health for the
+-- network monitor and stay unless --monitoring=false; local-auth is in the
+-- service list only with --localAuth, as on a node.
+roleHasService monitoring RoleApiNode name = name `elem` (["postgres", "redis", "streaming", "nginx", "postgrest", "local-auth"] ++ [ svc | monitoring, svc <- ["prometheus", "apex"] ])
 
 generateDockerCompose :: Role -> IO ()
 generateDockerCompose role = do
@@ -34,8 +50,12 @@ generateDockerCompose role = do
       -- The SMD rides along too, unless it is served from its own deployment.
       bundledSmd = role == RoleNode && flags_bundledSmd
       -- PostgREST (Cirrus at /cirrus) too, unless the API tier serves Cirrus.
-      -- An API directory always runs it.
-      bundledPostgrest = role /= RoleNode || flags_bundledPostgrest
+      -- A node or an api-node honours the flag; an API directory always runs it.
+      bundledPostgrest = role `notElem` [RoleNode, RoleApiNode] || flags_bundledPostgrest
+      -- Prometheus and apex, which produce /health. Only an api-node may turn
+      -- them off (the Generator refuses --monitoring=false elsewhere).
+      monitoring = flags_monitoring
+      hasService = roleHasService monitoring role
       -- A remote --pghost (a managed cluster) replaces the postgres container:
       -- containers reach it by that name instead of the service name.
       externalPostgres = flags_pghost `notElem` ["localhost", "127.0.0.1"]
@@ -139,6 +159,7 @@ generateDockerCompose role = do
         , depends_on = Just $ DependsOnList (["apex"] ++ [ "postgrest" | bundledPostgrest ] ++ ["prometheus"])
         , extra_hosts = hostGateway
         , volumes = Just ["./logs:/logs", "./.ethereumH/ethconf.yaml:/config/ethconf.yaml:ro"]
+        , environment = Just $ Map.fromList [("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
         , restart = Just "unless-stopped"
@@ -148,13 +169,21 @@ generateDockerCompose role = do
   let apex = def
         { image = "apex:" ++ stratoVersionTag ++ "-" ++ hashApex
         , user = Just userGid
-        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"])
+        , depends_on = Just $ DependsOnList (withPostgres ["postgres", "prometheus"] ++ [ "redis" | hasService "redis" ])
         , extra_hosts = hostGateway
-        , environment = Just $ Map.fromList
+        , environment = Just $ Map.fromList $
             [ ("postgres_host", pgWriterHost)
             , ("postgres_port", "5432")
             , ("postgres_user", "postgres")
             ]
+            -- apex reads the last block and validators from Redis wherever the
+            -- node has one, so it starts after Redis. On a validator it requires
+            -- only the Prometheus jobs the node runs, serves the health routes
+            -- alone (no /user, no SMD socket rooms), and is published for the
+            -- network monitor on apexPort.
+            ++ [ ("HEALTH_CHECK_JOBS", "strato_p2p=strato-p2p,vm_main=vm-runner,seq_main=strato-sequencer") | role == RoleValidator ]
+            ++ [ ("APEX_ROLE", "validator") | role == RoleValidator ]
+        , ports = if role == RoleValidator then Just [show apexPort ++ ":3009"] else Nothing
         , volumes = Just
             [ "./logs:/logs"
             , "./secrets/postgres_password:/run/secrets/postgres_password:ro"
@@ -355,12 +384,14 @@ generateDockerCompose role = do
 
   -- Scrape jobs whose process this node does not run. Kept in step with
   -- Generator.hs's commands.txt and roleHasService above: strato-api (the
-  -- "core-api" job) only with roleRunsApi, apex and nginx only on RoleNode,
-  -- strato-ingest only on a core cell. Without this their targets sit DOWN
-  -- forever.
+  -- "core-api" job) only with roleRunsApi, apex and nginx only where
+  -- roleHasService has them, strato-ingest only on a core cell. Without this
+  -- their targets sit DOWN forever.
   let prometheusSkipJobs =
         [ "core-api" | not (roleRunsApi role) ]
-        ++ [ j | not (roleHasService role "nginx"), j <- ["nginx", "apex"] ]
+        ++ [ "nginx" | not (hasService "nginx") ]
+        ++ [ "apex" | not (hasService "apex") ]
+        ++ [ "slipstream" | not (roleIndexesSql role) ]
         ++ [ "strato-ingest" | role /= RoleCore ]
 
   let prometheus = def
@@ -438,10 +469,37 @@ generateDockerCompose role = do
             , ("PROMETHEUS_HOST", "127.0.0.1:1")
             ]) <$> environment nginx
         }
+      -- An api-node's nginx fronts the APIs alone. BUNDLED_APP and APP_URL
+      -- are already set above (the app is never bundled off a full node); the
+      -- SMD is treated the same, so / and /smd answer 404, or redirect when
+      -- --appUrl or --smdUrl names them elsewhere. There are no Swagger docs
+      -- (/docs answers 502), and without --monitoring no apex or Prometheus
+      -- either (/health and /apex-api answer 502). With --localAuth it waits
+      -- for a healthy local-auth like the node's nginx: it fetches the OpenID
+      -- discovery document from there at startup.
+      apiNodeUpstreams = [ svc | monitoring, svc <- ["apex", "prometheus"] ] ++ [ "postgrest" | bundledPostgrest ]
+      apiNodeNginx = nginx
+        { depends_on = Just $
+            if flags_localAuth
+              then DependsOnMap $ Map.fromList $
+                ("local-auth", DependsOnCondition "service_healthy")
+                  : [ (svc, DependsOnCondition "service_started") | svc <- apiNodeUpstreams ]
+              else DependsOnList apiNodeUpstreams
+        , environment = Map.union (Map.fromList $
+            [ ("BUNDLED_SMD", "false")
+            , ("SMD_URL", flags_smdUrl)
+            , ("DOCS_HOST", "127.0.0.1:1")
+            ] ++ [ kv | not monitoring, kv <- [("APEX_HOST", "127.0.0.1:1"), ("PROMETHEUS_HOST", "127.0.0.1:1")] ]
+            ) <$> environment nginx
+        }
+      roleNginx = case role of
+        RoleApi -> apiOnlyNginx
+        RoleApiNode -> apiNodeNginx
+        _ -> nginx
       roleServices =
-        [ (name, if role == RoleApi && name == "nginx" then apiOnlyNginx else svc)
+        [ (name, if name == "nginx" then roleNginx else svc)
         | (name, svc) <- allServices
-        , roleHasService role name
+        , hasService name
         , bundledApp || name `notElem` ["app-backend", "app-ui"]
         , bundledSmd || name /= "smd"
         , bundledPostgrest || name /= "postgrest"

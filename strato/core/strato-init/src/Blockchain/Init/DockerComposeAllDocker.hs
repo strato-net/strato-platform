@@ -5,7 +5,7 @@ module Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker) w
 import Prelude hiding (init)
 
 import Blockchain.EthConf (ethConf)
-import Blockchain.EthConf.Model (networkConfig, httpPort)
+import Blockchain.EthConf.Model (discoveryConfig, discoveryPort, httpPort, listenPort, networkConfig, p2pConfig)
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.ComposeTypes
 import Blockchain.Init.Options (flags_composeOnly, flags_repoUrl)
@@ -21,6 +21,8 @@ generateDockerComposeAllDocker :: IO ()
 generateDockerComposeAllDocker = do
   let conf = ethConf
       portNum = show $ httpPort (networkConfig conf)
+      p2pPort = show $ listenPort (p2pConfig conf)
+      udpPort = show $ discoveryPort (discoveryConfig conf)
       repoUrl = flags_repoUrl
       stratoVersion = stratoVersionTag
       noLogging = Just Logging { driver = "none", options = Nothing }
@@ -103,6 +105,7 @@ generateDockerComposeAllDocker = do
         , environment = Just $ Map.fromList
             [ ("NODE_HOST", "${NODE_HOST:-}")
             , ("ssl", "${ssl:-false}")
+            , ("WAGMI_PROJECT_ID", "${WAGMI_PROJECT_ID:-}")
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec docker-entrypoint.sh sh /usr/src/app/docker-run.sh >> /logs/smd.log 2>&1"]
@@ -227,7 +230,7 @@ generateDockerComposeAllDocker = do
             ]
         , entrypoint = Just ["/bin/sh", "-c"]
         , command = Just ["exec /strato/doit.sh >> /logs/strato.log 2>&1"]
-        , ports = Just ["30303:30303", "30303:30303/udp"]
+        , ports = Just [p2pPort ++ ":" ++ p2pPort, udpPort ++ ":" ++ udpPort ++ "/udp"]
         , volumes = Just ["./logs:/logs", "./nodedata:/var/lib/strato", "./nodedata/secrets:/run/secrets:ro"]
         , restart = Just "unless-stopped"
         , logging = noLogging

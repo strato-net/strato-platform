@@ -36,7 +36,7 @@ import qualified Data.ByteString.Char8                   as BC
 import           Data.Default                            (def)
 import           Data.Either.Combinators
 import           Data.Foldable                           (for_)
-import           Data.Maybe                              (catMaybes)
+import           Data.Maybe                              (catMaybes, fromMaybe)
 import qualified Data.Text                               as T
 import           Data.Time.Clock.POSIX
 import           Network.Socket
@@ -179,25 +179,28 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
         Just p' -> do
           setPeerPubkey p' otherPubKey
           updateUdpPort p' otherUdpPort
+          updateTcpPort p' otherTcpPort
           return $ Just p'
     case mPeer' of
       Nothing -> pure ()
       Just peer -> do
         let (UDPPort up') = otherUdpPort
-        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50)
+        ownTcpPort <- Mod.access (Mod.Proxy @TCPPort)
+        sendPacket peer{pPeerUdpPort = up'} $ Pong ep 4 (time + 50) (Just ownTcpPort)
         eErr' <- setPeerBondingState (pPeerHost peer) otherPubKey 2
         whenLeft eErr' $ \err -> do
           $logErrorS "handleValidPacket" . T.pack $ "Unable to set peer bonding state: " ++ show err
           throwM err
-  Pong {} -> do
+  Pong _ _ _ mOtherTcpPort -> do
     mPeer <- getPeerByIP' ip
     mPeer' <-
       case mPeer of
         Nothing -> do
-          addPeer' otherUdpPort (TCPPort 30303)
+          addPeer' otherUdpPort (fromMaybe (TCPPort 30303) mOtherTcpPort)
           getPeerByIP' ip
         Just p' -> do
           setPeerPubkey p' otherPubKey
+          for_ mOtherTcpPort $ updateTcpPort p'
           return $ Just p'
     for_ mPeer' $ \peer -> do
       setPeerPubkey peer otherPubKey

@@ -118,6 +118,19 @@ ethServerHandler pSource pSink seqSrc host (TCPPort port) = do
           whenLeft udpErr $ \theUDPErr -> do
             $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
           logAndLengthenPeerDisableBy (24 * 60 * 60) p
+        e' | Just SelfConnection <- fromException e' -> do
+          $logErrorS "runEthServer" . T.pack $ "Inbound peer " ++ hostToString host ++ " presents this node's key: our own public address, or another node running with this node's key"
+          -- p carries this connection's source port, but stored peers are
+          -- matched by (host, listening port), so disable the stored records:
+          -- the address may be stored under a DNS name and under its IP.
+          stored <- getPeersByIP host
+          fmap sequence_ . forM stored $ \s -> do
+            disErr <- storeDisableException s (T.pack "SelfConnection")
+            whenLeft disErr $ \err2 -> $logErrorS "stratoP2PServer/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
+            selfErr <- disableTCPPeerForSeconds s 86400
+            whenLeft selfErr $ \theSelfErr -> do
+              $logErrorLS "stratoP2PServer/runEthServer" theSelfErr
+            return selfErr
         e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
           case ioErrType of
             NoSuchThing -> do
@@ -184,8 +197,9 @@ stratoP2PServer ::
   IO ()
 stratoP2PServer runner = labelTheThread "stratoP2PServer" . runner $ \_ -> do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
-  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-  liftIO $ runEthServer flags_listen runner
+  let listenPort' = Conf.listenPort (p2pConfig ethConf)
+  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show listenPort'
+  liftIO $ runEthServer listenPort' runner
 
 logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
 logAndLengthenPeerDisableBy disableBy peer = do
