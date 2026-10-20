@@ -1,7 +1,8 @@
 import axios from "axios";
 import { cirrus } from "../../utils/appApiHelper";
 import * as config from "../../config/config";
-import { FREEPORT_TOKEN_FIELDS, IPFS_GATEWAY, evmLogoUrl } from "../../config/tokensConstants";
+import { FREEPORT_TOKEN_FIELDS, IPFS_GATEWAY, evmLogoUrl, trustWalletLogoUrl } from "../../config/tokensConstants";
+import { keccak256 } from "../../utils/keccak256";
 import { Token } from "@strato/shared-types";
 
 const toHttp = (uri: string) => uri.replace(/^ipfs:\/\//, IPFS_GATEWAY);
@@ -19,11 +20,22 @@ const getMetadataImage = (uri: string) =>
   cachedLogo(uri, () => axios.get(toHttp(uri), { timeout: 5000 })
     .then(({ data }) => (typeof data?.image === "string" ? toHttp(data.image) : "")));
 
+// EIP-55: uppercase each hex letter whose keccak nibble of the lowercase address is >= 8.
+const toChecksumAddress = (hex: string) => {
+  const hash = keccak256(Buffer.from(hex)).toString("hex");
+  return "0x" + [...hex].map((c, i) => (parseInt(hash[i], 16) >= 8 ? c.toUpperCase() : c)).join("");
+};
+
+const headOk = (url: string) =>
+  axios.head(url, { timeout: 5000, validateStatus: () => true }).then(({ status }) => status === 200);
+
 // Ported EVM coins use their origin token's public logo; originToken holds the address in its low 160 bits.
 const getEvmLogo = (chainId: string, originToken: string) => {
-  const url = evmLogoUrl(chainId, "0x" + (BigInt(originToken) & ((1n << 160n) - 1n)).toString(16).padStart(40, "0"));
-  return cachedLogo(url, () => axios.head(url, { timeout: 5000, validateStatus: () => true })
-    .then(({ status }) => (status === 200 ? url : "")));
+  const hex = (BigInt(originToken) & ((1n << 160n) - 1n)).toString(16).padStart(40, "0");
+  const smol = evmLogoUrl(chainId, "0x" + hex);
+  const trust = trustWalletLogoUrl(chainId, toChecksumAddress(hex));
+  return cachedLogo(smol, async () =>
+    (await headOk(smol)) ? smol : trust && (await headOk(trust)) ? trust : "");
 };
 
 const isEvmChain = (chainId: string) => chainId !== "0" && Number.isSafeInteger(Number(chainId));

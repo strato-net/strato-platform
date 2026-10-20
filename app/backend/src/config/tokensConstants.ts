@@ -75,6 +75,21 @@ export const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 export const evmLogoUrl = (chainId: string, address: string) =>
   `https://cdn.jsdelivr.net/gh/SmolDapp/tokenAssets@main/tokens/${chainId}/${address}/logo-128.png`;
 
+// Trust Wallet's asset repo covers tokens SmolDapp lacks (e.g. WLD, PEPE, ONDO); it is keyed by
+// chain name and EIP-55 checksummed address.
+const TRUST_WALLET_CHAINS: Record<string, string> = {
+  "1": "ethereum",
+  "10": "optimism",
+  "56": "smartchain",
+  "137": "polygon",
+  "8453": "base",
+  "42161": "arbitrum",
+  "43114": "avalanchec",
+};
+export const trustWalletLogoUrl = (chainId: string, checksumAddress: string) =>
+  TRUST_WALLET_CHAINS[chainId] &&
+  `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${TRUST_WALLET_CHAINS[chainId]}/assets/${checksumAddress}/logo.png`;
+
 // Inline data: images are served through /tokens/:address/image so lists stay small and browsers can cache them.
 export const SERVABLE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/svg+xml"];
 export const tokenImagePath = (address: string) => `/api/tokens/${address}/image`;
