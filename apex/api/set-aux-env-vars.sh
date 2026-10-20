@@ -32,17 +32,25 @@ export STRATO_PORT_VAULT_PROXY=${STRATO_PORT_VAULT_PROXY:-8013}
 export stratoRoot=${stratoRoot:-http://${STRATO_HOSTNAME}:${STRATO_PORT_API}/eth/v1.2}
 export vaultUrl=$(yq '.urlConfig.vaultUrl' "$ETHCONF_FILE")
 # The Redis block cache the node's processes use (--redisHost, --redisPort,
-# --redisDBNumber). A host-local address is the bundled redis container, which
-# this container reaches by its service name; anything else is an external
-# Redis, reached as configured. An explicit redis_host (an API-tier task) wins.
+# --redisDBNumber). localhost:6379 is the bundled redis container, which this
+# container reaches by its service name; a host-local address on another port
+# is a Redis running on the docker host, reached through the host gateway
+# like strato-api; anything else is an external Redis, reached as configured.
+# An explicit redis_host (an API-tier task) wins.
 if [ -z "${redis_host:-}" ]; then
   _redis_host=$(yq '.redisBlockDBConfig.redisHost' "$ETHCONF_FILE")
+  _redis_port=$(yq '.redisBlockDBConfig.redisPort' "$ETHCONF_FILE")
+  case "$_redis_port" in null|"") _redis_port=6379 ;; esac
   case "$_redis_host" in
-    localhost|127.0.0.1|::1|null|"") redis_host=redis; redis_port=6379 ;;
-    *) redis_host="$_redis_host"
-       _redis_port=$(yq '.redisBlockDBConfig.redisPort' "$ETHCONF_FILE")
-       case "$_redis_port" in null|"") ;; *) redis_port="$_redis_port" ;; esac ;;
+    localhost|127.0.0.1|::1|null|"")
+      if [ "$_redis_port" = "6379" ]; then
+        redis_host=redis
+      else
+        redis_host="$STRATO_HOSTNAME"
+      fi ;;
+    *) redis_host="$_redis_host" ;;
   esac
+  redis_port="$_redis_port"
 fi
 export redis_host
 export redis_port=${redis_port:-6379}
