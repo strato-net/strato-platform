@@ -20,8 +20,11 @@ answer (a non-latest block tag, `eth_getProof`, a block replay) is an error.
 
 ## Before deploying
 
-1. Images in ECR: `strato`, `nginx`, `postgrest`, and optionally `smd` and
-   `apex` (`make docker`).
+1. Images: `strato`, `nginx`, `postgrest`, and optionally `smd` and `apex`,
+   as strato-platform's autobuild publishes them for every commit it builds:
+   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`,
+   public, so the tasks pull them without credentials (an ECR URI is pulled
+   with the task's ECR permissions).
 2. The Aurora cluster (`data-plane`) and the core cells, each admitting this
    stack's task security group (output `TaskSecurityGroupId`): the cluster on
    5432, the cells on 8600 (the core-cell app's `clientSecurityGroupIds`).
@@ -42,8 +45,10 @@ answer (a non-latest block tag, `eth_getProof`, a block replay) is an error.
 cd api-tier && npm ci
 npx cdk deploy --all \
   -c envName=testnet -c vpcId=vpc-0123 \
-  -c stratoImage=<ecr>/strato:<tag> -c nginxImage=<ecr>/nginx:<tag> -c postgrestImage=<ecr>/postgrest:<tag> \
-  -c smdImage=<ecr>/smd:<tag> -c apexImage=<ecr>/apex:<tag> \
+  -c stratoImage=ghcr.io/strato-net/strato-platform/strato:<tag> \
+  -c nginxImage=ghcr.io/strato-net/strato-platform/nginx:<tag> \
+  -c postgrestImage=ghcr.io/strato-net/strato-platform/postgrest:<tag> \
+  -c smdImage=ghcr.io/strato-net/strato-platform/smd:<tag> -c apexImage=ghcr.io/strato-net/strato-platform/apex:<tag> \
   -c postgresWriterHost=<writer> -c postgresReaderHost=<reader> \
   -c ingressUrls=http://<cell-a private DNS name>:8600,http://<cell-b private DNS name>:8600 \
   -c albCertificateArn=<cert> \

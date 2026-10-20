@@ -69,6 +69,8 @@ install_oauth_credentials() {
 }
 
 registry_login() {
+  # Only ECR needs a login; the public GitHub registry (ghcr.io) pulls without one.
+  [[ "$registry" == *.dkr.ecr.*.amazonaws.com ]] || return 0
   aws ecr get-login-password | docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
   aws ecr get-login-password | sudo -u $NODE_USER -H docker login --username AWS --password-stdin "$registry" >/dev/null 2>&1
 }

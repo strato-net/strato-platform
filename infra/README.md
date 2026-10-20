@@ -61,9 +61,13 @@ reads whatever a target needs from the stacks already deployed (the VPC,
 Aurora endpoints, security groups, load balancer and instance names), so the
 same run builds the environment from nothing and updates it:
 
-1. strato-platform's images from `STRATO_BRANCH` (default `develop`) are
-   built and pushed to ECR; its `bin/strato-*` and
-   `core-cell/bootstrap/strato-cell-upgrade` go to `NODE_SCRIPTS_S3`.
+1. The image set is what strato-platform's autobuild published for the
+   `STRATO_BRANCH` commit checked out (default `develop`), under
+   `ghcr.io/strato-net/strato-platform/<image>:<VERSION>-<commit>-<hash>`;
+   the packages are public, so nothing logs in anywhere, and a commit not
+   published yet fails the run before it deploys. strato-platform's
+   `bin/strato-*` and `core-cell/bootstrap/strato-cell-upgrade` go to
+   `NODE_SCRIPTS_S3`.
 2. `data-plane` and `obs-core`.
 3. Missing cells are created one at a time, each from the latest snapshot, the
    first of them restoring eth and cirrus into the empty cluster; the run
