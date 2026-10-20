@@ -23,10 +23,20 @@ NETWORK=$(grep "^  network:" .ethereumH/ethconf.yaml | awk '{print $2}')
 # Written by strato-setup; a directory set up before the field existed is a node.
 ROLE=$(grep "^  role:" .ethereumH/ethconf.yaml | awk '{print $2}')
 ROLE="${ROLE:-node}"
+# A --dockerMode=all node (strato-setup) runs convoke
+# and the node processes in the strato container.
+CONTAINER_MODE=false
+if grep -qx '  strato:' docker-compose.yml 2>/dev/null; then
+    CONTAINER_MODE=true
+fi
 
 # Check if anything is running
 CONVOKE_RUNNING=false
-if [[ -f .strato.pid ]]; then
+if [[ "$CONTAINER_MODE" == "true" ]]; then
+    if [[ -n "$(docker compose -p strato ps -q --status running strato 2>/dev/null)" ]]; then
+        CONVOKE_RUNNING=true
+    fi
+elif [[ -f .strato.pid ]]; then
     source .strato.pid
     if [[ -n "$CONVOKE_PID" ]] && kill -0 "$CONVOKE_PID" 2>/dev/null; then
         CONVOKE_RUNNING=true
@@ -46,7 +56,11 @@ echo "Network: $NETWORK"
 
 # Sync status
 if [[ "$CONVOKE_RUNNING" == "true" ]]; then
-    BAROMETER=$(strato-barometer syncstats 2>/dev/null)
+    if [[ "$CONTAINER_MODE" == "true" ]]; then
+        BAROMETER=$(docker compose -p strato exec -T strato strato-barometer syncstats 2>/dev/null)
+    else
+        BAROMETER=$(strato-barometer syncstats 2>/dev/null)
+    fi
     # Positions come from the "Block Positions:" table (label: number description).
     pos() { echo "$BAROMETER" | awk -v l="$1:" '$1 == l {print $2}'; }
     SEQ_BLOCK=$(pos sequencer)
@@ -82,7 +96,9 @@ docker compose -p strato ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null 
 
 echo ""
 echo "Convoke:"
-if [[ "$CONVOKE_RUNNING" == "true" ]]; then
+if [[ "$CONTAINER_MODE" == "true" && "$CONVOKE_RUNNING" == "true" ]]; then
+    echo "  Running in the strato container"
+elif [[ "$CONVOKE_RUNNING" == "true" ]]; then
     echo "  Running (PID $CONVOKE_PID)"
     echo "  Processes:"
     for pid in $(pgrep -P "$CONVOKE_PID" 2>/dev/null); do

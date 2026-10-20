@@ -131,6 +131,12 @@ fi
 if [[ -n "${VAULT_PORT}" ]]; then
   VAULT_PORT=":${VAULT_PORT}"
 fi
+# In --localAuth mode vaultUrl points back at this nginx (its /vault/ location),
+# so loop back over 127.0.0.1: the resolver cannot look up the node's public
+# host name when it is only known from /etc/hosts.
+if [[ "${OAUTH_DISCOVERY_URL:-}" == *"local-auth"* ]]; then
+  VAULT_HOSTNAME=127.0.0.1
+fi
 
 # If container is running for the first time - generate config:
 if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then

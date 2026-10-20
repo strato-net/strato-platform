@@ -23,6 +23,9 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--sslDir` | *(empty)* | Directory holding `server.pem` and `server.key`. Setting it enables HTTPS on 443 and redirects HTTP to HTTPS. |
 | `--localAuth` | `false` | Use the bundled identity provider (Ory Kratos and Hydra) and a node-local Vault instead of external Keycloak and the shared Vault. |
 | `--httpPort` | `8081` | nginx HTTP port. |
+| `--nodeHost` | *(the machine's host name)* | The node's public host name. The node URL, the auth cookie domain and, with `--localAuth`, the OpenID discovery URL are built from it. See [Host name](#host-name). |
+| `--dockerMode` | `services` | What runs in Docker. `services`: only the service containers, the node processes run on the host under `convoke`. `all`: the node processes too, in a `strato` container of the generated `docker-compose.yml`; `strato-up` then starts and stops the compose project. See [Run from prebuilt images](prebuilt.md). |
+| `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/`. `strato-up --prebuilt` sets it. |
 | `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |
@@ -121,6 +124,13 @@ Where these variables take effect:
 - **`strato-logrotate` variables** are read at runtime, so set them in the environment you run `strato-up` from.
 - **App variables:** the generated `docker-compose.yml` also passes app settings through from your environment, such as the `RPC_URL_*` external-chain RPC endpoints. Docker Compose substitutes them each time the containers start, so pass the same variables on every `strato-up`.
 
+## Host name
+
+`strato-setup` builds the node URL (`urlConfig.nodeUrl`), the auth cookie domain (`urlConfig.cookieRealm`) and, with `--localAuth`, the OpenID discovery URL from one host name: `--nodeHost`, or the machine's `hostname` when the flag is not given. The name has to meet two rules:
+
+- **Without `--sslDir`, no dot.** The node processes accept a plain-HTTP discovery URL only for `localhost` or a single-label name such as `stratonode`. A dotted name such as `node.example.com` needs `--sslDir` and a certificate the browsers and the node processes trust.
+- **Resolvable from the host and the browsers.** The name must resolve to the machine on the machine itself (DNS or `/etc/hosts`) and from every browser that uses the node. The containers need no DNS for it: the generated `docker-compose.yml` aliases it to the Docker host gateway, so they reach nginx through the host's published port.
+
 ## Local auth mode
 
 `--localAuth` makes the node self-contained for identity:
@@ -130,6 +140,8 @@ Where these variables take effect:
 - **Secrets.** `strato-setup` generates the Vault password, the Hydra and Kratos secrets, and the OAuth client credentials into `secrets/`. `strato-login` is not needed.
 - **First admin.** On the first `strato-up`, the admin user and the node's operator key are created together from a BIP-39 recovery phrase.
 - **More users.** Add users with `strato-user-add` (see [Operations](operations.md#add-users-local-auth)).
+
+Without `--sslDir`, the machine's host name must be a single label (no dot): the node processes accept a plain-HTTP discovery URL only for `localhost` or an unqualified name. That name must resolve to the host on the machine itself and from the browsers that use the node, through DNS or an `/etc/hosts` entry; inside the containers, nginx reaches the identity provider by its container name, so the name does not need to resolve there. With a dotted name, `--sslDir` and a certificate the browsers and the node processes trust are required.
 
 !!! warning "Local-auth keys live only in the node directory"
     With `--localAuth`, the node key and user keys are stored in the node's own Postgres `oauth` database. Snapshots never include that database, so removing the node directory deletes the keys. To recover them, keep the recovery phrases.

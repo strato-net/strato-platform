@@ -1,6 +1,6 @@
 # Install a Node
 
-This guide builds STRATO from source and starts a node with `strato-up`. Check the [requirements](requirements.md) first.
+This guide builds STRATO from source and starts a node with `strato-up`. Check the [requirements](requirements.md) first. To run a release without building, see [Run from prebuilt images](prebuilt.md).
 
 ## 1. Clone the repository
 

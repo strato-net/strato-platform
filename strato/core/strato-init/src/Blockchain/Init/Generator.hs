@@ -13,8 +13,6 @@ import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.DB.CodeDB
 import Blockchain.Data.GenesisBlock (populateMPTAndWriteGenesis, populateMPTFromGenesis)
 import Blockchain.Init.DockerCompose
-import Blockchain.Init.DockerComposeAllDocker (generateDockerComposeAllDocker)
-import Blockchain.Init.Options (flags_dockerMode)
 import Blockchain.Init.EthConf
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.Init.LocalAuth (setupLocalAuthSecrets)
@@ -35,7 +33,6 @@ import Data.Maybe
 import qualified Data.Yaml as YAML
 import System.Environment (lookupEnv)
 import System.FilePath ((</>))
-import System.Process (readProcess)
 import System.Entropy (getEntropy)
 import qualified Data.ByteString as BS
 import Data.Char (toLower)
@@ -96,11 +93,12 @@ createCommandsFile role = do
   localAuthCommands <- if flags_localAuth
     then do
       pgPassword <- filter (/= '\n') <$> readFile "secrets/postgres_password"
-      -- The vault wrapper runs on the host, so it needs the same IPv4-loopback
-      -- pinning that genEthConf applies to the other local processes: postgres
-      -- publishes on 127.0.0.1 only, but "localhost" resolves to ::1 first on
-      -- macOS. See preferIPv4Loopback.
-      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ preferIPv4Loopback flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
+      -- The vault wrapper runs next to the other node processes, so it reaches
+      -- Postgres the way genEthConf's sqlConfig does: on a host the IPv4
+      -- loopback (postgres publishes on 127.0.0.1 only, but "localhost"
+      -- resolves to ::1 first on macOS), in a container the service name. See
+      -- storeHost.
+      return [restartable $ "blockapps-vault-wrapper-server --pghost " ++ storeHost "postgres" flags_pghost ++ " --password " ++ pgPassword ++ " --port 8093 --vaultPasswordFile secrets/vault_password +RTS -T -RTS"]
     else return []
 
   coreCommands <- if not (roleRunsCore role) then return [] else do
@@ -218,8 +216,6 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       error "--role=validator cannot be combined with --localAuth: a validator runs no identity provider; its node key comes from the shared Vault (run strato-login first)"
     when (not (roleRunsLocalAuth role) && flags_localAuth) $
       liftIO $ error "--localAuth is only supported with --role=node or --role=api-node"
-    when (role /= RoleNode && flags_dockerMode == "allDocker") $
-      liftIO $ error "--dockerMode=allDocker is only supported with --role=node; use docker-compose.api.yml for a containerized API tier"
     when (not flags_monitoring && not (roleAllowsMonitoringOff role)) $
       liftIO $ error "--monitoring=false is only supported with --role=api-node"
 
@@ -315,7 +311,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
     unless destOauthExists $ liftIO $ do
       if flags_localAuth
         then do
-          localHostname <- filter (/= '\n') <$> readProcess "hostname" [] ""
+          localHostname <- nodeHostname
           envClientId <- lookupEnv "OAUTH_CLIENT_ID"
           envClientSecret <- lookupEnv "OAUTH_CLIENT_SECRET"
           clientId <- case envClientId of
@@ -382,9 +378,7 @@ mkFilesAndGenesis nodeDir hasFlags network = do
       writeFile defaultNodeFile cwd
 
     -- Generate docker-compose.yml
-    liftIO $ case flags_dockerMode of
-      "allDocker" -> generateDockerComposeAllDocker
-      _ -> generateDockerCompose role
+    liftIO $ generateDockerCompose role
 
     liftIO $ createCommandsFile role
     liftIO $ putStrLn "  ✓ Generated commands.txt"
