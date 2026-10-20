@@ -2,13 +2,20 @@
 
 set -e
 
-# Usage: strato-patch-app <node-directory> <app-backend-image:tag> <app-ui-image:tag>
+# Usage: strato-patch-app [--up] <node-directory> <app-backend-image:tag> <app-ui-image:tag>
 #
 # Updates the app-backend and app-ui image tags in the node's
-# docker-compose.yml and restarts just those two services in place.
+# docker-compose.yml. With --up, also recreates those two services in place
+# on a running node.
+
+UP="false"
+if [[ "$1" == "--up" ]]; then
+    UP="true"
+    shift
+fi
 
 if [[ $# -ne 3 ]]; then
-    echo "Usage: strato-patch-app <node-directory> <app-backend-image:tag> <app-ui-image:tag>"
+    echo "Usage: strato-patch-app [--up] <node-directory> <app-backend-image:tag> <app-ui-image:tag>"
     exit 1
 fi
 
@@ -45,7 +52,21 @@ sed "s|image:.*app-ui:.*|image: ${UI_IMAGE}|" docker-compose.yml > docker-compos
     && mv docker-compose.yml.tmp docker-compose.yml
 
 RUNNING=$(docker compose -p strato ps --status running -q app-backend app-ui 2>/dev/null || true)
-if [[ -n "$RUNNING" ]]; then
+if [[ -n "$RUNNING" && "$UP" == "true" ]]; then
+    # Compose fills ${VAR} from the caller's environment, so a bare `up` would blank the
+    # values the node was started with. Recover them from the running containers;
+    # anything already set in this shell takes precedence.
+    for cid in $RUNNING; do
+        while IFS= read -r kv; do
+            key="${kv%%=*}"
+            if [[ -n "$key" && -z "${!key+x}" ]] && grep -q "\${${key}[:}]" docker-compose.yml; then
+                export "$kv"
+            fi
+        done < <(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$cid")
+    done
+    echo "Recreating app-backend and app-ui..."
+    docker compose -p strato up -d --no-deps app-backend app-ui
+elif [[ -n "$RUNNING" ]]; then
     echo "Now you can restart the app containers on a running node with - make sure to reuse the ENV VARS from your original run script (e.g. run.sh):"
     echo "<ENV VARS> docker compose -p strato up -d --no-deps app-backend app-ui"
     echo "Alternatively restart the full node without wiping its data: \`strato-down && ./run.sh\`"

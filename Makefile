@@ -215,12 +215,24 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose highway highway-nginx local oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app update-app
 
 app: app-backend app-ui
 	@echo ""
 	@echo "Both app images built. To patch a running node:"
 	@echo "  strato-patch-app <node-dir> $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)"
+
+# Usage: make update-app <node-dir>
+# Builds the app images like `make app`, points <node-dir>/docker-compose.yml at
+# them and recreates the running app containers in place.
+ifeq (update-app,$(firstword $(MAKECMDGOALS)))
+UPDATE_APP_DIR := $(word 2,$(MAKECMDGOALS))
+$(eval $(UPDATE_APP_DIR):;@:)
+endif
+
+update-app: app-backend app-ui
+	@test -n "$(UPDATE_APP_DIR)" || { echo "Usage: make update-app <node-dir>"; exit 1; }
+	./bin/strato-patch-app --up $(UPDATE_APP_DIR) $(REPO_URL)app-backend:$(VERSION)-$(HASH_APP_BACKEND) $(REPO_URL)app-ui:$(VERSION)-$(HASH_APP_UI)
 
 # Force rebuild targets (unconditional)
 apex-force:
