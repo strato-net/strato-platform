@@ -1,5 +1,5 @@
-// Wallet-mode authorization for POST /redeem-referral: a self-custody wallet
-// has no Keycloak login, so the redeem signature itself is the authorization.
+// Authorization for POST /redeem-referral: the redeem signature itself. There
+// is no login; a self-custody wallet and the STRATO app alike send the claim.
 // Only the holder of the ephemeral key can produce it, and the recipient is
 // inside the signed digest, so a third party can change nothing. The service
 // still pays the gas, so before submitting it checks that the recovered
@@ -26,13 +26,16 @@ export function recoverEphemeral(recipient: string, v: number, r: string, s: str
 }
 
 /**
- * Checks the wallet-mode request and returns the claimant's address.
- * @throws when the header, body or signature is not acceptable, or nothing is left to claim.
+ * Checks a redeem request and returns the recipient's address. The request
+ * authorizes itself: a valid signature over the recipient by an ephemeral key
+ * that still has a deposit. When an X-Wallet-Address header is sent, it must
+ * be the recipient.
+ * @throws when the body or signature is not acceptable, or nothing is left to claim.
  */
 export async function walletClaimAddress(walletAddress: unknown, body: WalletClaimBody | undefined): Promise<string> {
   const { v, r, s, recipient } = body ?? {};
-  if (typeof walletAddress !== "string" || !/^(0x)?[0-9a-f]{40}$/i.test(walletAddress)) throw new Error("X-Wallet-Address is not an address");
-  if (typeof recipient !== "string" || bare(recipient) !== bare(walletAddress)) throw new Error("recipient must be the wallet address");
+  if (typeof recipient !== "string" || !/^(0x)?[0-9a-f]{40}$/i.test(recipient)) throw new Error("recipient must be an address");
+  if (walletAddress !== undefined && (typeof walletAddress !== "string" || bare(walletAddress) !== bare(recipient))) throw new Error("X-Wallet-Address must be the recipient");
   if (typeof r !== "string" || typeof s !== "string" || (v !== 27 && v !== 28)) throw new Error("A redeem signature (v, r, s) is required");
 
   let ephemeral: string;
@@ -63,5 +66,5 @@ export async function walletClaimAddress(walletAddress: unknown, body: WalletCla
   const expiry = Number(struct?.v?.expiry ?? 0);
   if (!(quantity > 0)) throw new Error("Nothing is left to claim under this link");
   if (expiry > 0 && expiry * 1000 <= Date.now()) throw new Error("This airdrop has expired");
-  return bare(walletAddress);
+  return bare(recipient);
 }

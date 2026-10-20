@@ -6,12 +6,13 @@ export const STRATO_DECIMALS = 18;
 export const ERROR_FILE_NAME = "referral-error.flag";
 
 const config = {
-  auth: {
-    baUsername: process.env.BA_USERNAME,
-    baPassword: process.env.BA_PASSWORD,
-    clientSecret: process.env.CLIENT_SECRET,
-    clientId: process.env.CLIENT_ID,
-    openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
+  signer: {
+    // Optional: without it the service keeps its own key in data/signer.key (utils/signer.ts).
+    privateKey: process.env.SIGNER_PRIVATE_KEY,
+  },
+  strato_chain: {
+    // Optional: the STRATO chain the Escrow lives on, when it is not the node's main chain.
+    chainId: process.env.CHAIN_ID,
   },
   escrow: {
     address: process.env.ESCROW_ADDRESS,
@@ -60,14 +61,7 @@ const config = {
 export { config };
 
 // Validate required environment variables
-const requiredEnvVars = [
-  "BA_USERNAME",
-  "BA_PASSWORD",
-  "CLIENT_SECRET",
-  "CLIENT_ID",
-  "OPENID_DISCOVERY_URL",
-  "ESCROW_ADDRESS",
-];
+const requiredEnvVars = ["NODE_URL", "ESCROW_ADDRESS"];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 

@@ -6,7 +6,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { logInfo, logError } from "./utils/logger";
 import { validateReferralConfig } from "./utils/configValidator";
-import { initOpenIdConfig} from "./auth";
+import { signerAddress } from "./utils/signer";
 import { healthMonitor } from "./utils/healthMonitor";
 import ReferralController from "./controllers/referral.controller";
 import AuthHandler from "./auth/tokenMiddleware";
@@ -36,7 +36,7 @@ app.use(
 // Exposed Routes
 app.get("/health", async (_, res) => {
   const errorFileExists = await healthMonitor.errorFileExists();
-  res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
+  res.status(errorFileExists ? 500 : 200).json({ status: !errorFileExists, message: "pong", signer: signerAddress() });
 });
 app.post("/redeem-referral", AuthHandler.authorizeRequest(), ReferralController.redeemReferral);
 
@@ -53,9 +53,6 @@ app.listen(port, async () => {
       logError("ReferralService", error);
       process.exit(1);
     }
-
-    // Initialize OAuth
-    await initOpenIdConfig();
 
     logInfo(
       "ReferralService",

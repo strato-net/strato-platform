@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from "axios";
-import { getBAUserToken } from "../auth";
 import { config } from "../config";
 import { RetryConfig, ClientOptions, ApiClient } from "../types";
 
@@ -79,18 +78,16 @@ const createClient = (
     data?: any,
     config?: AxiosRequestConfig,
   ): Promise<T> => {
+    // No login: the service signs its own transactions (./signer). The node's
+    // nginx lets unauthenticated wallets through on this User-Agent.
     const headers = {
       Accept: "application/json",
       "Content-Type": "application/json",
       "X-Requested-With": "XMLHttpRequest",
+      "User-Agent": "STRATO-Wallet-Extension axios/1.0",
       ...config?.headers,
     };
-
-    if (authenticated) {
-      const token = await getBAUserToken();
-      if (!token) throw new Error("No access token available");
-      headers["Authorization"] = `Bearer ${token}`;
-    }
+    void authenticated;
 
     // For external clients with empty baseURL, use the url directly
     const requestUrl = baseURL ? `${baseURL}${url}` : url;

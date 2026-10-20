@@ -1,4 +1,5 @@
-import { bloc, strato, extractErrorMessage } from "./api";
+import { bloc, eth, extractErrorMessage } from "./api";
+import { signerAddress, signStratoTx, type UnsignedStratoTx } from "./signer";
 import { config } from "../config";
 import { logInfo } from "./logger";
 import { FunctionInput, BuiltTx, TxResult, TxResponse } from "../types";
@@ -87,8 +88,16 @@ export const postAndWaitForTx = async (
   };
 };
 
+/** The chain query, when the Escrow is not on the node's main chain. */
+const chainQuery = () => (config.strato_chain.chainId ? `?chainid=${config.strato_chain.chainId}` : "");
+
 /**
- * Execute transaction(s) with logging
+ * Submit transaction(s) signed with the service's own key:
+ *   1. POST bloc/transaction/unsigned        the node builds the unsigned tx(s)
+ *   2. sign each EIP-712 digest locally      (utils/signer.ts)
+ *   3. POST strato-api/eth/v1.2/transaction  submit each
+ *   4. POST bloc/transactions/results        poll to resolution
+ * A bundle gets sequential nonces, since the node hands every tx the same base nonce.
  */
 export const execute = async (
   inputs: FunctionInput | FunctionInput[],
@@ -97,17 +106,38 @@ export const execute = async (
   const inputArray = Array.isArray(inputs) ? inputs : [inputs];
   const { method = "unknown", contractName = "unknown" } = inputArray[0] || {};
   const context = `${method} on ${contractName}`;
+  const from = signerAddress().replace(/^0x/, "").toLowerCase();
 
-  logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx)`);
+  logInfo("StratoHelper", `Executing ${context} (${inputArray.length} tx) as ${from}`);
 
-  const result = await postAndWaitForTx(
-    () =>
-      strato.post(
-        "/transaction/parallel?resolve=true",
-        buildFunctionTx(inputs),
-      ),
-    timeout,
-  );
+  const built = buildFunctionTx(inputs);
+  const raw = await bloc.post(`/transaction/unsigned${chainQuery()}`, { txs: built.txs, address: from, txParams: built.txParams });
+  const unsigned: UnsignedStratoTx[] = Array.isArray(raw) ? raw : Array.isArray(raw?._unsignedTxs) ? raw._unsignedTxs : Array.isArray(raw?.txs) ? raw.txs : [];
+  if (!unsigned.length) throw new Error("The node returned no unsigned transactions");
+
+  const result = await postAndWaitForTx(async () => {
+    const base = BigInt(unsigned[0].data.nonce ?? 0);
+    const out: { hash: string }[] = [];
+    for (let i = 0; i < unsigned.length; i++) {
+      const tx = unsigned[i];
+      tx.data.nonce = (base + BigInt(i)).toString();
+      const sig = signStratoTx(tx);
+      const submitted = await eth.post(`/transaction${chainQuery()}`, {
+        nonce: Number(tx.data.nonce),
+        gasLimit: tx.data.gasLimit,
+        to: tx.data.to,
+        funcName: tx.data.functionName,
+        args: tx.data.args,
+        network: "STRATO",
+        r: sig.r,
+        s: sig.s,
+        v: sig.v,
+        txVersion: 1,
+      });
+      out.push({ hash: typeof submitted === "string" ? submitted : submitted?.hash ?? tx.hash ?? "" });
+    }
+    return out;
+  }, timeout);
 
   logInfo("StratoHelper", `${result.status}: ${context} (${result.hash})`);
   return result;
