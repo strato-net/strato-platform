@@ -47,7 +47,7 @@ performSlipstreamQueries conn queries =
     executeStatements :: MonadUnliftIO n => [SlipstreamQuery] -> E.SqlPersistT n ()
     executeStatements batch =
       let statements =
-            filter (not . T.null . T.strip) $ slipstreamQueryPostgres <$> batch
+            filter (not . T.null . T.strip) $ slipstreamQueryPostgres <$> batchStateQueries batch
        in unless (null statements) $
             withStatementCacheCleanup $
               rawExecute (T.concat $ (<> ";\n") <$> statements) []
@@ -58,10 +58,10 @@ performSlipstreamQueries conn queries =
     executeIndividually query =
       catch
         (E.runSqlPool (executeQueries [query]) conn)
-        (\e -> handleIndividualError (e :: SqlError))
+        (\e -> handleIndividualError query (e :: SqlError))
 
-    handleIndividualError e
-      | crashOnSQLError || not (isRecoverableSqlState $ sqlState e) = throwIO e
+    handleIndividualError query e
+      | crashOnSQLError || maybe False (const True) (stateKind query) || not (isRecoverableSqlState $ sqlState e) = throwIO e
       | otherwise = $logErrorLS "performSlipstreamQueries/individual" e
 
 isRecoverableSqlState :: B.ByteString -> Bool
