@@ -9,13 +9,14 @@ import { getLoan } from "./lending.service";
 import { getVaults } from "./cdp.service";
 import { listVaultDefs, getYieldVaultInfo, getYieldVaultUserInfo } from "./yieldVault.service";
 import { Token, EarningAsset, BalanceSnapshot } from "@strato/shared-types";
-import { buildTokenSelectFields } from "../../config/tokensConstants";
+import { buildTokenSelectFields, tokenImagePath } from "../../config/tokensConstants";
 import { getHistory, HistoryParams, HistorySnapshot, MappingHistoryElement, StorageHistoryElement } from "../helpers/history.helper";
 import { getHistoryDirect, fetchActiveRequestIds, fetchVaultHistoryConfig, fetchUserV3PoolMeta, fetchUserV3NftMeta, PoolV3Meta } from "../helpers/historyDb.helper";
 import { calculateLPTokenPrice } from "../helpers/swapping.helper";
 import { getPositions as getV3Positions, getPoolTokenPairs as getV3PoolTokenPairs } from "./poolV3.service";
 import * as v3Math from "../helpers/poolV3Math.helper";
 import { safeBigInt } from "../helpers/vaultPerformance.helper";
+import { ttlCache } from "../../utils/utils";
 import { getFreeportTokens } from "./freeport.service";
 
 const { Token, CollateralVault, CDPEngine, MercataBridge, mercataBridge, DECIMALS, priceOracle } = constants;
@@ -168,25 +169,21 @@ export const getTokens = async (
   };
 };
 
-// `includeHeldNonActive` is for the net balance calculation only: it widens the query to
-// every status and then keeps non-ACTIVE tokens only where the user actually holds them.
-// The default stays ACTIVE-only so the My Tokens list is unaffected.
-export const getEarningAssets = async (
-  accessToken: string,
-  userAddress: string,
-  includeHeldNonActive = false
-): Promise<EarningAsset[]> => {
-  const [tokens, collaterals, cdps, rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, stakedStrato, freeportTokens] = await Promise.all([
+// Swaps inline data: images (often tens of KB each) for the cacheable image endpoint.
+const withImageUrls = (t: any) => ({
+  ...t,
+  images: (t.images || []).map((image: { value: string }) =>
+    image.value?.startsWith("data:") ? { value: tokenImagePath(t.address) } : image
+  ),
+});
+
+const earningTokenSelect = buildTokenSelectFields({ images: true, attributes: true, balance: true }).join(",");
+
+// Everything needed to list a user's tokens and balances, without prices or vault positions.
+const loadCoreInputs = async (accessToken: string, userAddress: string) => {
+  const [tokens, collaterals, cdps, stakedStrato, freeportTokens] = await Promise.all([
     cirrus.get(accessToken, "/" + Token, {
-      params: {
-        "balances.key": `eq.${userAddress}`,
-        select: buildTokenSelectFields({
-          images: true,
-          attributes: true,
-          balance: true,
-        }).join(","),
-        ...(includeHeldNonActive ? {} : { status: "eq.2" }),
-      },
+      params: { "balances.key": `eq.${userAddress}`, select: earningTokenSelect, status: "eq.2" },
     }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
@@ -202,10 +199,6 @@ export const getEarningAssets = async (
         "value->>collateral": `gt.0`,
       },
     }),
-    getCompletePriceMap(accessToken),
-    getSaveUsdstInfo(accessToken).catch(() => null),
-    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
-    getRebaseFactors(accessToken),
     getUserStakedStratoBalance(accessToken, userAddress).catch(() => ({ tokenAddress: "", amount: 0n })),
     getFreeportTokens(accessToken, {}, userAddress).catch(() => [] as Token[]),
   ]);
@@ -217,6 +210,88 @@ export const getEarningAssets = async (
       (collateralMap.get(item.asset) || 0n) + BigInt(item.amount || "0")
     )
   );
+
+  return { tokens: (tokens.data || []) as any[], collateralMap, stakedStrato, freeportTokens };
+};
+
+// Prices plus the synthetic SaveUSDST and yield vault positions.
+const loadPricedInputs = async (accessToken: string, userAddress: string) => {
+  const [rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, yieldVaultPairs] = await Promise.all([
+    getCompletePriceMap(accessToken),
+    getSaveUsdstInfo(accessToken).catch(() => null),
+    getSaveUsdstUserInfo(accessToken, userAddress).catch(() => null),
+    getRebaseFactors(accessToken),
+    Promise.all(
+      listVaultDefs().map(async (def) => {
+        const [info, userInfo] = await Promise.all([
+          getYieldVaultInfo(accessToken, def.key).catch(() => null),
+          getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
+        ]);
+        return { info, userInfo };
+      })
+    ),
+  ]);
+  return { rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, yieldVaultPairs };
+};
+
+type PricedInputs = Awaited<ReturnType<typeof loadPricedInputs>>;
+
+const emptyPricedInputs = (): PricedInputs => ({
+  rawPrices: new Map(),
+  saveUsdstInfo: null,
+  saveUsdstUserInfo: null,
+  rebaseFactorMap: new Map(),
+  yieldVaultPairs: [],
+});
+
+// The portfolio list and the net balance load together, so concurrent calls for a user share one load.
+const coreInputsInFlight = ttlCache<Awaited<ReturnType<typeof loadCoreInputs>>>(0);
+const pricedInputsInFlight = ttlCache<PricedInputs>(0);
+
+// Non-ACTIVE tokens the user holds or has posted as collateral (status is NULL for some old tokens).
+const getHeldNonActiveTokens = async (
+  accessToken: string,
+  userAddress: string,
+  collateralAddresses: string[]
+): Promise<any[]> => {
+  const { data: held } = await cirrus.get(accessToken, `/${Token}-_balances`, {
+    params: { key: `eq.${userAddress}`, value: "gt.0", select: "address" },
+  });
+  const addresses = [...new Set([...(held || []).map((r: any) => r.address as string), ...collateralAddresses])];
+  if (!addresses.length) return [];
+  const { data } = await cirrus.get(accessToken, "/" + Token, {
+    params: {
+      address: `in.(${addresses.join(",")})`,
+      or: "(status.neq.2,status.is.null)",
+      "balances.key": `eq.${userAddress}`,
+      select: earningTokenSelect,
+    },
+  });
+  return data || [];
+};
+
+// `includeHeldNonActive` is for the net balance calculation only: it adds non-ACTIVE tokens
+// only where the user actually holds them. The default stays ACTIVE-only so the My Tokens list
+// is unaffected. `coreOnly` skips prices and vault positions for a fast first render.
+export const getEarningAssets = async (
+  accessToken: string,
+  userAddress: string,
+  includeHeldNonActive = false,
+  coreOnly = false
+): Promise<EarningAsset[]> => {
+  const [core, priced] = await Promise.all([
+    coreInputsInFlight(userAddress, () => loadCoreInputs(accessToken, userAddress)),
+    coreOnly
+      ? emptyPricedInputs()
+      : pricedInputsInFlight(userAddress, () => loadPricedInputs(accessToken, userAddress)),
+  ]);
+  const { collateralMap, stakedStrato, freeportTokens } = core;
+  const { rawPrices, saveUsdstInfo, saveUsdstUserInfo, rebaseFactorMap, yieldVaultPairs } = priced;
+  const tokens = {
+    data: includeHeldNonActive
+      ? [...core.tokens, ...(await getHeldNonActiveTokens(accessToken, userAddress, [...collateralMap.keys()]))]
+      : core.tokens,
+  };
 
   const rebasingAddresses = (tokens.data || [])
     .map((t: any) => t.address as string)
@@ -245,7 +320,7 @@ export const getEarningAssets = async (
     const rebasingExternalSymbol = rebaseFactor ? rebasingExternalSymbolMap.get(t.address) : undefined;
 
     return {
-      ...t,
+      ...withImageUrls(t),
       balance,
       price,
       collateralBalance,
@@ -282,12 +357,6 @@ export const getEarningAssets = async (
     }
   }
 
-  const yieldVaultPairs = await Promise.all(
-    listVaultDefs().map(async (def) => ({
-      info: await getYieldVaultInfo(accessToken, def.key).catch(() => null),
-      userInfo: await getYieldVaultUserInfo(accessToken, def.key, userAddress).catch(() => null),
-    }))
-  );
   for (const { info, userInfo } of yieldVaultPairs) {
     if (!info?.deployed) continue;
     const yvAsset = buildYieldVaultEarningAsset(info, userInfo ?? undefined);
@@ -333,7 +402,7 @@ export const getPublicEarningAssets = async (
     const value = "0.00";
 
     return {
-      ...t,
+      ...withImageUrls(t),
       balance,
       price,
       collateralBalance,

@@ -74,3 +74,7 @@ export const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
 // SmolDapp/tokenAssets serves logos by (chainId, lowercase address) and 404s for unknown tokens.
 export const evmLogoUrl = (chainId: string, address: string) =>
   `https://cdn.jsdelivr.net/gh/SmolDapp/tokenAssets@main/tokens/${chainId}/${address}/logo-128.png`;
+
+// Inline data: images are served through /tokens/:address/image so lists stay small and browsers can cache them.
+export const SERVABLE_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif", "image/svg+xml"];
+export const tokenImagePath = (address: string) => `/api/tokens/${address}/image`;

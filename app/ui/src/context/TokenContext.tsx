@@ -258,10 +258,22 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Use different API endpoints based on login status
       const endpoint = isLoggedIn ? `/tokens/v2/earning-assets` : `/tokens/v2/earning-assets/public`;
-      const res = await api.get<EarningAsset[]>(
-        endpoint,
-        { signal: earningAssetsAbortControllerRef.current.signal }
-      );
+      const { signal } = earningAssetsAbortControllerRef.current;
+      let fullLoaded = false;
+
+      // On first load, show tokens and balances while prices and vault positions are still loading.
+      if (isLoggedIn && showLoading) {
+        api.get<EarningAsset[]>(endpoint, { signal, params: { core: true } })
+          .then((coreRes) => {
+            if (signal.aborted || fullLoaded) return;
+            setEarningAssets(coreRes.data || []);
+            setLoadingEarningAssets(false);
+          })
+          .catch(() => {});
+      }
+
+      const res = await api.get<EarningAsset[]>(endpoint, { signal });
+      fullLoaded = true;
 
       if (!earningAssetsAbortControllerRef.current.signal.aborted) {
         setEarningAssets(res.data || []);

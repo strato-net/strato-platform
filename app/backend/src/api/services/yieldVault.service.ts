@@ -10,6 +10,7 @@ import {
   OFF_CHAIN_EVENT_WINDOW_DAYS,
 } from "../../config/config";
 import { getServiceToken } from "../../utils/authHelper";
+import { ttlCache } from "../../utils/utils";
 import { fetchPriceEvents, getOraclePrices } from "./oracle.service";
 import {
   computePerSecondRateApy,
@@ -1515,7 +1516,22 @@ const computeApy = async (
   }
 };
 
-export const getYieldVaultInfo = async (
+// Vault-level info is read with the service token and is identical for every caller,
+// so one build per vault is shared for a short window.
+const yieldVaultInfoCache = ttlCache<YieldVaultInfo>(15_000);
+
+export const getYieldVaultInfo = async (accessToken: string, key: string): Promise<YieldVaultInfo> => {
+  const info = await yieldVaultInfoCache(key, () => loadYieldVaultInfo(accessToken, key));
+  // The not-deployed fallback can come from a transient read failure, so only deployed vaults stay cached.
+  if (!info.deployed) yieldVaultInfoCache.delete(key);
+  return info;
+};
+
+// Any vault transaction can change vault-level state, so drop the cached info once it lands.
+const postVaultTx: typeof postAndWaitForTx = (...args) =>
+  postAndWaitForTx(...args).finally(() => yieldVaultInfoCache.clear());
+
+const loadYieldVaultInfo = async (
   _accessToken: string,
   key: string
 ): Promise<YieldVaultInfo> => {
@@ -1879,7 +1895,7 @@ export const depositYieldVault = async (
   ];
 
   const builtTx = await buildFunctionTx(txs, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
+  return await postVaultTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
@@ -1904,7 +1920,7 @@ export const redeemYieldVault = async (
     accessToken
   );
 
-  return await postAndWaitForTx(accessToken, () =>
+  return await postVaultTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
@@ -1944,7 +1960,7 @@ export const claimYieldVault = async (
     accessToken
   );
 
-  return await postAndWaitForTx(accessToken, () =>
+  return await postVaultTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
@@ -1970,7 +1986,7 @@ const executeYieldVaultAdminCall = async (
     accessToken
   );
 
-  return await postAndWaitForTx(accessToken, () =>
+  return await postVaultTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };

@@ -45,8 +45,8 @@ class TokensV2Controller {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address: userAddress } = req;
-      const tokens = await getEarningAssets(accessToken, userAddress);
+      const { accessToken, address: userAddress, query } = req;
+      const tokens = await getEarningAssets(accessToken, userAddress, false, query.core === "true");
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);

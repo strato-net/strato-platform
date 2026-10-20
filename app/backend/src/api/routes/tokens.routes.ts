@@ -119,6 +119,29 @@ router.get("/check-recipient", authHandler.authorizeRequest(), TokensController.
 
 /**
  * @openapi
+ * /tokens/{address}/image:
+ *   get:
+ *     summary: Fetch a token's image
+ *     tags: [Tokens]
+ *     parameters:
+ *       - name: address
+ *         in: path
+ *         required: true
+ *         description: Token contract address
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Image bytes for inline images (cacheable)
+ *       302:
+ *         description: Redirect to the token's image URL
+ *       404:
+ *         description: Token has no servable image
+ */
+router.get("/:address/image", authHandler.authorizeRequest(true), TokensController.getImage);
+
+/**
+ * @openapi
  * /tokens/{address}:
  *   get:
  *     summary: Fetch token metadata by address

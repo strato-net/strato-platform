@@ -6,6 +6,8 @@ import { getOraclePrices } from "../services/oracle.service";
 import { getSafetyModuleConfig } from "../services/safety.service";
 import { getVaultShareTokenPrice } from "../services/vault.service";
 import * as config from "../../config/config";
+import { ttlCache } from "../../utils/utils";
+import { getServiceToken } from "../../utils/authHelper";
 import { OraclePriceMap } from "@strato/shared-types";
 
 const { Token, DECIMALS, Pool, LendingPool, SaveUSDSTVault, lendingRegistry, YieldVault } = constants;
@@ -349,8 +351,10 @@ const addYieldVaultTokenPrices = async (
   );
   if (!vaultAddrs.length) return;
 
-  for (const vaultAddress of vaultAddrs) {
-    const vault = await getYieldVaultPricingState(accessToken, vaultAddress);
+  const vaults = await Promise.all(
+    vaultAddrs.map((vaultAddress) => getYieldVaultPricingState(accessToken, vaultAddress))
+  );
+  for (const vault of vaults) {
     if (!vault) continue;
     const pricePerShare =
       vault.totalShares === 0n
@@ -405,17 +409,24 @@ export const getCarryVaultUsdPriceMap = async (
   return out;
 };
 
+// Prices are the same for every caller, so one build (read with the service token) is shared for a short window.
+const priceMapCache = ttlCache<Map<string, string>>(15_000);
+
 export const getCompletePriceMap = async (
-  accessToken: string
+  _accessToken: string
 ): Promise<Map<string, string>> => {
-  const priceMap = await getOraclePrices(accessToken);
-  await Promise.all([
-    addMTokenPrice(accessToken, priceMap),
-    addSTokenPrice(accessToken, priceMap),
-    addLPTokenPrices(accessToken, priceMap),
-    addVaultTokenPrice(accessToken, priceMap),
-    addSaveUsdstTokenPrice(accessToken, priceMap),
-    addYieldVaultTokenPrices(accessToken, priceMap),
-  ]);
-  return priceMap;
+  const priceMap = await priceMapCache("complete", async () => {
+    const accessToken = await getServiceToken();
+    const prices = await getOraclePrices(accessToken);
+    await Promise.all([
+      addMTokenPrice(accessToken, prices),
+      addSTokenPrice(accessToken, prices),
+      addLPTokenPrices(accessToken, prices),
+      addVaultTokenPrice(accessToken, prices),
+      addSaveUsdstTokenPrice(accessToken, prices),
+      addYieldVaultTokenPrices(accessToken, prices),
+    ]);
+    return prices;
+  });
+  return new Map(priceMap);
 };

@@ -42,6 +42,13 @@ router.get("/", authHandler.authorizeRequest(), TokensV2Controller.getUserTokens
  *   get:
  *     summary: Get earning assets for the signed-in user (v2)
  *     tags: [Tokens]
+ *     parameters:
+ *       - name: core
+ *         in: query
+ *         required: false
+ *         description: When "true", return tokens and balances only (no prices, values or vault positions)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: Earning assets list

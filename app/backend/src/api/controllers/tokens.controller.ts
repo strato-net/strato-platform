@@ -13,6 +13,7 @@ import {
   getTransferableTokens,
   getTokenStats,
   getAccountNonce,
+  getTokenImage,
 } from "../services/tokens.service";
 import { getFreeportTokens } from "../services/freeport.service";
 import {
@@ -42,6 +43,35 @@ class TokensController {
       res.status(RestStatus.OK).json(
         token.length ? token : await getFreeportTokens(accessToken, { address: "eq." + params.address })
       );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getImage(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, params } = req;
+      validateAddressArgs(params);
+
+      const image = await getTokenImage(accessToken, params.address);
+      if (!image) {
+        res.sendStatus(RestStatus.NOT_FOUND);
+      } else if ("url" in image) {
+        res.redirect(image.url);
+      } else {
+        res
+          .set({
+            "Content-Type": image.contentType,
+            "Cache-Control": "public, max-age=3600",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+          })
+          .send(image.body);
+      }
     } catch (error) {
       next(error);
     }

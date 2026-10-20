@@ -11,6 +11,7 @@ import { getTokenDetails } from "../helpers/cirrusHelpers";
 import * as config from "../../config/config";
 import { listVaultDefs } from "./yieldVault.service";
 import { getFreeportTokens, isFreeportToken } from "./freeport.service";
+import { SERVABLE_IMAGE_TYPES } from "../../config/tokensConstants";
 
 const {
   tokenSelectFields,
@@ -206,6 +207,25 @@ const getSaveUsdstVaultTransferableTokens = async (accessToken: string, userAddr
     });
     return [];
   }
+};
+
+// A token's first image: inline data: images are decoded, anything else is returned as a URL.
+export const getTokenImage = async (
+  accessToken: string,
+  address: string
+): Promise<{ contentType: string; body: Buffer } | { url: string } | null> => {
+  const { data } = await cirrus.get(accessToken, `/${Token}-images`, {
+    params: { address: `eq.${address}`, select: "value", limit: "1" },
+  });
+  const value: string = data?.[0]?.value || "";
+  const match = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(value);
+  if (!match) return /^https?:\/\//.test(value) ? { url: value } : null;
+  const [, contentType, base64, payload] = match;
+  if (!SERVABLE_IMAGE_TYPES.includes(contentType.toLowerCase())) return null;
+  return {
+    contentType,
+    body: base64 ? Buffer.from(payload, "base64") : Buffer.from(decodeURIComponent(payload)),
+  };
 };
 
 // Get all tokens
