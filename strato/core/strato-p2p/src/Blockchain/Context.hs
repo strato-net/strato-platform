@@ -221,8 +221,8 @@ instance RunsClient ContextM where
         (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
 
 instance RunsServer ContextM where
-  runServer (TCPPort listenPort) runner handler = do
-    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+  runServer (TCPPort listenPort') runner handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
           pSink = appSink app
@@ -512,7 +512,6 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '((Host, UDPPort, B.ByteString), Point),
          '(Host, PPeer),
          '(Host, [PPeer])
        ]

@@ -67,13 +67,14 @@ runtimeConfig = def
       { streamingHost = bcHost brokerConfig
       , streamingPort = bcPort brokerConfig
       }
-  , discoveryConfig = def { minAvailablePeers = flags_minPeers }
+  , discoveryConfig = def { discoveryPort = flags_discoveryPort, minAvailablePeers = flags_minPeers }
   , p2pConfig = def
       { maxConnections = flags_maxConn
       , connectionTimeout = flags_connectionTimeout
       , maxReturnedHeaders = flags_maxReturnedHeaders
       , averageTxsPerBlock = flags_averageTxsPerBlock
       , maxHeadersTxsLens = flags_maxHeadersTxsLens
+      , listenPort = flags_p2pPort
       }
   , apiConfig = def
       { apiListenAddress = getApiListenAddress
