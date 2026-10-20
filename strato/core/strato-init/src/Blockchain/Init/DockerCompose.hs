@@ -10,7 +10,7 @@ import Blockchain.Init.ComposeTypes
 import Blockchain.Init.BuildMetadata
 import Blockchain.Init.EthConf (containerMode, nodeHostname)
 import Blockchain.Init.Role
-import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_jsonrpc, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
+import Blockchain.Init.Options (flags_appUrl, flags_bundledApp, flags_bundledSmd, flags_smdUrl, flags_bundledPostgrest, flags_discoveryPort, flags_jsonrpc, flags_p2pPort, flags_pghost, flags_pgReaderHost, flags_kafkaLogRetentionBytes, flags_kafkaLogRetentionHours, flags_kafkaLogSegmentBytes, flags_localAuth, flags_monitoring, flags_publicStratoRpc, flags_repoUrl, flags_sslDir)
 import Control.Monad.Composable.Streaming.DockerConfig (BrokerConfig(..), brokerConfig)
 import Strato.Version (stratoVersionTag)
 import Data.Default (def)
@@ -531,7 +531,9 @@ generateDockerCompose role = do
             [ (svc, DependsOnCondition "service_healthy")
             | svc <- withPostgres ["postgres"] ++ [ "redis" | hasService "redis" ] ++ [ "local-auth" | flags_localAuth ] ]
         , extra_hosts = hostGateway
-        , ports = Just ["30303:30303", "30303:30303/udp"]
+        -- The peer ports ethconf names (--p2pPort, --discoveryPort), published
+        -- one to one: ethereum-discover advertises them to the peers.
+        , ports = Just [show flags_p2pPort ++ ":" ++ show flags_p2pPort, show flags_discoveryPort ++ ":" ++ show flags_discoveryPort ++ "/udp"]
         , volumes = Just [".:/var/lib/strato"]
         , restart = Just "unless-stopped"
         -- convoke's shutdown is SIGTERM to the children, five seconds, then

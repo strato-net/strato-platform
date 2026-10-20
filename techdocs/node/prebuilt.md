@@ -1,6 +1,6 @@
 # Run from Prebuilt Images
 
-Every release publishes its images to `ghcr.io/strato-net`, so a node can run without building anything. `strato-up` works as in [Install](install.md), with two flags: `--dockerMode=all` runs the node processes in a `strato` container next to the usual service containers, and `--prebuilt` pulls the release images instead of using a local build.
+CI publishes the images of every commit it builds (develop, feature branches, pull requests and release tags) to `ghcr.io/strato-net`, so a node can run without building anything. `strato-up` works as in [Install](install.md), with two flags: `--dockerMode=all` runs the node processes in a `strato` container next to the usual service containers, and `--prebuilt` pulls the published images of the checked-out commit instead of using a local build.
 
 ## Requirements
 
@@ -8,15 +8,15 @@ Every release publishes its images to `ghcr.io/strato-net`, so a node can run wi
 - The [ports](requirements.md#network): 30303 TCP and UDP, 443 with `--sslDir`, otherwise `--httpPort` (default 8081).
 - A host name that follows the [host name rules](configuration.md#host-name): without `--sslDir` a single label such as `stratonode`, with `--sslDir` the DNS name of the certificate.
 
-## 1. Check out the release
+## 1. Check out the commit to run
 
 ```bash
 git clone https://github.com/strato-net/strato-platform
 cd strato-platform
-git checkout 19.5        # the release to run; images exist for release tags only
+git checkout 19.5        # a release tag, or any commit CI has built (develop, a branch)
 ```
 
-The checkout provides the scripts in `bin/` and the release's `VERSION` file, which names the image to run. `make` and `install_deps.sh` are not needed.
+The checkout provides the scripts in `bin/` and names the images to run: `strato-up` looks for `strato:<VERSION>-<commit>` (the `VERSION` file plus the short commit, as CI tags every build) and, for a checkout without git history, `strato:<VERSION>`, which release tag builds also publish. `--prebuilt=<tag>` names an image explicitly, for example `--prebuilt=19.5` or a build of another commit. `make` and `install_deps.sh` are not needed. Images appear a few minutes after a commit is pushed, once its CI build has run.
 
 ## 2. Start the node
 
@@ -36,12 +36,12 @@ Every other flag works as on a built node, including `--snapshot` and `--role` (
 
 What `strato-up` does with the two flags:
 
-1. **Image.** It pulls `ghcr.io/strato-net/strato:<VERSION>` and runs `strato-setup` from it, as your user and with the host's name, over the new node directory. The generated `docker-compose.yml` references the release's images and a `strato` service that runs `convoke` over the node directory.
+1. **Image.** It pulls the `ghcr.io/strato-net/strato` image of the checked-out commit and runs `strato-setup` from it, as your user and with the host's name, over the new node directory. The generated `docker-compose.yml` references the matching images of that build and a `strato` service that runs `convoke` over the node directory.
 2. **Start.** It runs `docker compose up -d --wait`. Postgres, Redis and the identity provider become healthy first, then the `strato` container starts the node processes, then nginx and the rest.
 3. **First admin.** With `--localAuth` it creates the admin user and the node's identity through `strato-user-add`, as on a built node: it prompts for a password and a recovery phrase, or runs unattended with `LOCAL_AUTH_ADMIN_PASSWORD` set and no terminal (the phrase is then written to `secrets/admin_recovery_phrase`).
 
 !!! note "The two flags are independent"
-    `--dockerMode=all` with locally built binaries runs the processes from the local `strato` image; `--prebuilt` without it keeps the processes on local binaries and pulls only the service images, which needs binaries built with the release version (`VERSION=19.5 make build_common`) so the image tags match.
+    `--dockerMode=all` with locally built binaries runs the processes from the local `strato` image; `--prebuilt` without it keeps the processes on local binaries and pulls only the service images, which needs binaries built by `make` from the same commit so the image tags match.
 
 ## 3. Verify and operate
 
@@ -58,4 +58,4 @@ curl -s https://<host>/health
 
 - **Logs.** The node processes and the containers write to `mynode/logs/`, as with a built node (see [Logs](operations.md#logs)). `convoke`'s own output is the `strato` container's log: `docker compose -p strato logs -f strato`.
 - **Stop and start.** `strato-down` runs `docker compose down`; `strato-up` on the existing directory runs `docker compose up -d --wait`. Data is kept.
-- **Upgrade.** Check out the new release tag and do a [clean restart](operations.md#clean-restart) with the same flags. With `--localAuth`, keep the recovery phrases: the keys live in the node directory.
+- **Upgrade.** Check out the new release tag or commit and do a [clean restart](operations.md#clean-restart) with the same flags. With `--localAuth`, keep the recovery phrases: the keys live in the node directory.

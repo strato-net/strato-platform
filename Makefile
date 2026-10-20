@@ -224,7 +224,7 @@ all_develop: build_develop docker-compose
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx app-backend app-ui app-nginx bridge bridge-nginx oracle local-auth
 
-.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose push-node-images highway highway-nginx local validator api-node oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
+.PHONY: all_develop build_buildbase build_common build_common_docker build_common_profiled build_develop docker docker-compose push-node-images push-release-alias highway highway-nginx local validator api-node oracle strato strato_docker vault-nginx vault-wrapper vault-wrapper_docker migrate-key change-vault-password install-completions install-bash-completions install-zsh-completions apex-force nginx-force postgrest-force prometheus-force smd-force app-backend-force app-ui-force bridge-force bridge-nginx-force app
 
 app: app-backend app-ui
 	@echo ""
@@ -474,6 +474,14 @@ push-node-images:
 	./scripts/docker-push-ecr.sh --registry-glob '$(REPO_GHCR_URL)*' $(addprefix $(REPO_GHCR_URL),$(NODE_IMAGES))
 	docker tag $(REPO_GHCR_URL)strato:$(VERSION)-$(HASH_STRATO) $(REPO_GHCR_URL)strato:$(VERSION)
 	docker push $(REPO_GHCR_URL)strato:$(VERSION)
+
+# A release or release-candidate tag build (RELEASE_TAG=19.5, 19.5-rc0) also
+# publishes the strato image under the tag itself, which a release checkout
+# without git history and `strato-up --prebuilt=<tag>` resolve.
+push-release-alias:
+	@test -n "$(RELEASE_TAG)" || { echo "RELEASE_TAG is not set"; exit 1; }
+	docker tag $(REPO_GHCR_URL)strato:$(VERSION)-$(HASH_STRATO) $(REPO_GHCR_URL)strato:$(RELEASE_TAG)
+	docker push $(REPO_GHCR_URL)strato:$(RELEASE_TAG)
 
 docker-build:
 	cp -fr strato/extraFiles/* ${STRATODIR}

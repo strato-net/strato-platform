@@ -15,11 +15,15 @@ set -e
 #                              in the strato container of the generated compose
 #                              file instead of under a host convoke; strato-up
 #                              then starts and stops the compose project itself.
-#   --prebuilt                 (strato-up only) use the published images instead
+#   --prebuilt[=<tag>]         (strato-up only) use the published images instead
 #                              of a local build: --repoUrl is set to the public
 #                              registry, and with --dockerMode=all strato-setup
-#                              runs from the strato image of the checkout's
-#                              VERSION, so no host binaries are needed.
+#                              runs from the published strato image, so no host
+#                              binaries are needed. CI publishes the images of
+#                              every commit it builds as strato:<VERSION>-<commit>
+#                              and a release tag build also as strato:<tag>; the
+#                              checkout's VERSION file and commit pick the image,
+#                              or name the tag explicitly.
 FROM_SNAPSHOT="false"
 SNAPSHOT_TIMESTAMP=""
 SNAPSHOT_SOURCE=""
@@ -27,6 +31,7 @@ NETWORK="upquark"
 ROLE="node"
 CONTAINER_MODE="false"
 PREBUILT="false"
+PREBUILT_TAG=""
 REPO_URL=""
 SETUP_ARGS=()
 for arg in "$@"; do
@@ -80,6 +85,10 @@ for arg in "$@"; do
         --prebuilt)
             PREBUILT="true"
             ;;
+        --prebuilt=*)
+            PREBUILT="true"
+            PREBUILT_TAG="${arg#*=}"
+            ;;
         --repoUrl=*)
             REPO_URL="${arg#*=}"
             SETUP_ARGS+=("$arg")
@@ -119,17 +128,44 @@ strato_tool() {
 }
 
 if [[ "$PREBUILT" == "true" ]]; then
-    # Images are published for release versions only, the strato image also
-    # under the plain version, which is the checkout's VERSION at a release tag.
+    # CI tags the images of every build with the Makefile's VERSION, the VERSION
+    # file plus the short commit (19.5-abc1234), and a release tag build also
+    # aliases the strato image to the tag itself (19.5). The strato image carries
+    # an alias under that VERSION alone; strato-setup inside it knows the full
+    # <VERSION>-<hash> tags of the other images from its BUILD_METADATA. So the
+    # checkout's VERSION file and commit name the image, with the plain VERSION
+    # as the fallback for a checkout without git history (a release tarball),
+    # unless --prebuilt=<tag> names one.
     if [[ -z "$REPO_URL" ]]; then
         REPO_URL="ghcr.io/strato-net/"
         SETUP_ARGS+=("--repoUrl=$REPO_URL")
     fi
-    if [[ ! -f "$SCRIPT_DIR/../VERSION" ]]; then
-        echo "Error: --prebuilt needs the checkout's VERSION file next to bin/; run bin/strato-up from a checkout at a release tag." >&2
+    if [[ -n "$PREBUILT_TAG" ]]; then
+        IMAGE_TAGS=("$PREBUILT_TAG")
+    else
+        if [[ ! -f "$SCRIPT_DIR/../VERSION" ]]; then
+            echo "Error: --prebuilt needs the checkout's VERSION file next to bin/; run bin/strato-up from a strato-platform checkout, or pass --prebuilt=<tag>." >&2
+            exit 1
+        fi
+        VERSION_FILE="$(tr -d '[:space:]' < "$SCRIPT_DIR/../VERSION")"
+        COMMIT="$(git -C "$SCRIPT_DIR/.." rev-parse --short=7 HEAD 2>/dev/null || true)"
+        IMAGE_TAGS=()
+        [[ -n "$COMMIT" ]] && IMAGE_TAGS+=("$VERSION_FILE-$COMMIT")
+        IMAGE_TAGS+=("$VERSION_FILE")
+    fi
+    STRATO_IMAGE=""
+    for tag in "${IMAGE_TAGS[@]}"; do
+        if docker image inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1 || docker manifest inspect "${REPO_URL}strato:$tag" >/dev/null 2>&1; then
+            STRATO_IMAGE="${REPO_URL}strato:$tag"
+            break
+        fi
+    done
+    if [[ -z "$STRATO_IMAGE" ]]; then
+        echo "Error: no prebuilt strato image for this checkout (tried: ${IMAGE_TAGS[*]} under ${REPO_URL}strato)." >&2
+        echo "CI publishes a commit's images a few minutes after it is pushed: wait for that build, check out a commit that has one, or pass --prebuilt=<tag>." >&2
         exit 1
     fi
-    STRATO_IMAGE="${REPO_URL}strato:$(tr -d '[:space:]' < "$SCRIPT_DIR/../VERSION")"
+    echo "Prebuilt images: $STRATO_IMAGE"
 fi
 
 if [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
@@ -138,7 +174,7 @@ if [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
     # the host's name (the node URL is built from it) and home (the default
     # node file, and the OAuth credentials strato-login stored).
     if ! docker image inspect "$STRATO_IMAGE" >/dev/null 2>&1 && ! docker pull "$STRATO_IMAGE"; then
-        echo "Error: no prebuilt image $STRATO_IMAGE: images are published for release versions only. Check out a release tag, or build with make and drop --prebuilt." >&2
+        echo "Error: could not pull $STRATO_IMAGE." >&2
         exit 1
     fi
     mkdir -p "$(dirname "$NODE_DIR")" "$HOME/.strato"

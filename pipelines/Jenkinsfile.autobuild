@@ -11,7 +11,9 @@ pipeline {
         sh 'git fetch --tags'
         sh 'git fetch origin develop --quiet'
         script {
-          if (env.BRANCH_NAME != 'develop' && sh(script: 'git diff --quiet origin/develop...HEAD', returnStatus: true) == 0) {
+          // A tag build (the job's "Discover tags" behaviour: release and rc tags)
+          // publishes the tagged images and is never skipped as "same as develop".
+          if (!env.TAG_NAME && env.BRANCH_NAME != 'develop' && sh(script: 'git diff --quiet origin/develop...HEAD', returnStatus: true) == 0) {
             currentBuild.result = 'NOT_BUILT'
             currentBuild.description = "Skipped - no changes vs develop"
             error('No changes compared to develop, skipping build.')
@@ -43,6 +45,9 @@ pipeline {
 
           strato-down || true
           pkill convoke || true
+          # Node processes a dead convoke left behind (an earlier build whose
+          # terminal went away) keep the ports: kill them by name as well.
+          pkill -f '^(ethereum-discover|strato-p2p|strato-sequencer|vm-runner|strato-indexer|slipstream|strato-network-monitor|strato-api|ethereum-jsonrpc|blockapps-vault-wrapper-server|strato-ingest|vm-query)( |$)' || true
           docker rm -f $(docker ps -aq) || true
           docker system prune -f || true
           docker volume prune -fa || true
@@ -67,7 +72,9 @@ pipeline {
         // Build central services
         // Need to clean sentinels here again in order for image tags to match what will be added in the docker-compose - TODO: find out why
         // TODO: replace vault-wrapper and highway make-targets with ones that don't rely on build_common_docker (should depend on build_common instead)
-        sh 'make vault-wrapper vault-nginx bridge bridge-nginx oracle highway highway-nginx docker-compose'
+        // strato_docker, app-nginx and history are not in `make local` (a developer's
+        // node runs its processes on the host and no app tier) but are published.
+        sh 'make strato_docker app-nginx history vault-wrapper vault-nginx bridge bridge-nginx oracle highway highway-nginx docker-compose'
       }
     }
 
@@ -177,6 +184,9 @@ pipeline {
                 export DOCKER_CONFIG=$(mktemp -d)
                 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
                 make push-node-images 2>&1
+                # A release or rc tag build also publishes strato:<tag>, the alias a
+                # release checkout and strato-up --prebuilt=<tag> resolve.
+                if [[ -n "${TAG_NAME:-}" ]]; then make push-release-alias RELEASE_TAG="$TAG_NAME" 2>&1; fi
                 rm -rf "$DOCKER_CONFIG"
               '''
             }
