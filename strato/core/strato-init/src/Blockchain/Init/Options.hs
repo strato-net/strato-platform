@@ -74,7 +74,7 @@ defineFlag "bundledPostgrest" (True :: Bool) "Run PostgREST (the Cirrus API at /
 defineFlag "role" ("node" :: String) "What this directory runs: 'node' (everything, the default), 'core' (consensus, VM, indexers and their Postgres/Redis/broker), 'api' (strato-api, ethereum-jsonrpc, PostgREST and the nginx sidecar; point --pghost at a core, --ingressUrls at the cells' ingress, and pass the core's Postgres password with --password), 'api-node' (a full node without the services that only serve people: the chain, Cirrus and every API behind nginx, but no app, SMD or Swagger docs; see --monitoring; --localAuth works as on a node), or 'validator' (a lite validator: the chain processes, the Redis block index and apex for the network monitor; no app, SMD, nginx, PostgREST, Cirrus, strato-api or JSON-RPC, no SQL block index or state mirror). This flag is the only way to pick a role: a bare --validator is taken as an abbreviation of --validatorBehavior and sets up a node"
 defineFlag "monitoring" (True :: Bool) "Run the prometheus and apex containers, which produce /health and /apex-api for the network monitor (default). Only --role=api-node may turn this off, for operators who scrape the processes themselves; /health then answers 502"
 
-defineFlag "repoUrl" ("" :: String) "Registry prefix of the node's images in docker-compose.yml, e.g. 'ghcr.io/strato-net/' (bin/strato-up --prebuilt sets it); images built locally have none"
+defineFlag "repoUrl" ("" :: String) "Registry prefix of the node's images in docker-compose.yml, e.g. 'ghcr.io/strato-net/strato-platform/' (bin/strato-up --prebuilt sets it); images built locally have none"
 
 -- P2P config flags
 -- The ethconf.yaml flag migration silently raised these from 20/30 to

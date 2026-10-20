@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Push locally built images to a registry (AWS ECR by default, any registry
-# with --registry-glob, e.g. 'ghcr.io/strato-net/*'), tolerating immutable tags.
+# with --registry-glob, e.g. 'ghcr.io/strato-net/strato-platform/*'), tolerating immutable tags.
 #
 # ECR repositories with tag immutability reject a push of a tag that already
 # exists ("... cannot be overwritten because the repository is immutable").
@@ -24,7 +24,7 @@
 #
 # Examples:
 #   scripts/docker-push-ecr.sh -f docker-compose.vault.push.yml -f docker-compose.highway.push.yml
-#   scripts/docker-push-ecr.sh --registry-glob 'ghcr.io/strato-net/*' ghcr.io/strato-net/strato:19.5-abc1234-0123456789ab
+#   scripts/docker-push-ecr.sh --registry-glob 'ghcr.io/strato-net/strato-platform/*' ghcr.io/strato-net/strato-platform/strato:19.5-abc1234-0123456789ab
 #   scripts/docker-push-ecr.sh 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/bridge:19.0-abc1234-0123456789ab
 #
 # Requires an authenticated docker CLI (run `aws ecr get-login-password | docker login ...` first).

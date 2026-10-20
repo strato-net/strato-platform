@@ -137,7 +137,7 @@ if [[ "$PREBUILT" == "true" ]]; then
     # as the fallback for a checkout without git history (a release tarball),
     # unless --prebuilt=<tag> names one.
     if [[ -z "$REPO_URL" ]]; then
-        REPO_URL="ghcr.io/strato-net/"
+        REPO_URL="ghcr.io/strato-net/strato-platform/"
         SETUP_ARGS+=("--repoUrl=$REPO_URL")
     fi
     if [[ -n "$PREBUILT_TAG" ]]; then

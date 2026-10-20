@@ -25,7 +25,7 @@ strato-up mynode --network=helium --sslDir=/path/to/ssl --snapshot
 | `--httpPort` | `8081` | nginx HTTP port. |
 | `--nodeHost` | *(the machine's host name)* | The node's public host name. The node URL, the auth cookie domain and, with `--localAuth`, the OpenID discovery URL are built from it. See [Host name](#host-name). |
 | `--dockerMode` | `services` | What runs in Docker. `services`: only the service containers, the node processes run on the host under `convoke`. `all`: the node processes too, in a `strato` container of the generated `docker-compose.yml`; `strato-up` then starts and stops the compose project. See [Run from prebuilt images](prebuilt.md). |
-| `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/`. `strato-up --prebuilt` sets it. |
+| `--repoUrl` | *(empty)* | Registry prefix of the node's images in `docker-compose.yml`, for example `ghcr.io/strato-net/strato-platform/`. `strato-up --prebuilt` sets it. |
 | `--vaultUrl` | `https://vault.blockapps.net:8093/strato/v2.3` | Vault that holds the node key and user keys. Ignored with `--localAuth`, which uses the node-local Vault. |
 | `--vaultTimeoutSec` | `12` | HTTP response timeout, in seconds, for Vault key and signature requests. |
 | `--jsonrpc` | `true` | Run the Ethereum JSON-RPC server (`ethereum-jsonrpc`, port 8545) and expose it at `/rpc`. |

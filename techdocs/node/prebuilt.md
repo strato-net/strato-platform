@@ -36,7 +36,7 @@ Every other flag works as on a built node, including `--snapshot` and `--role` (
 
 What `strato-up` does with the two flags:
 
-1. **Image.** It pulls the `ghcr.io/strato-net/strato` image of the checked-out commit and runs `strato-setup` from it, as your user and with the host's name, over the new node directory. The generated `docker-compose.yml` references the matching images of that build and a `strato` service that runs `convoke` over the node directory.
+1. **Image.** It pulls the `ghcr.io/strato-net/strato-platform/strato` image of the checked-out commit and runs `strato-setup` from it, as your user and with the host's name, over the new node directory. The generated `docker-compose.yml` references the matching images of that build and a `strato` service that runs `convoke` over the node directory.
 2. **Start.** It runs `docker compose up -d --wait`. Postgres, Redis and the identity provider become healthy first, then the `strato` container starts the node processes, then nginx and the rest.
 3. **First admin.** With `--localAuth` it creates the admin user and the node's identity through `strato-user-add`, as on a built node: it prompts for a password and a recovery phrase, or runs unattended with `LOCAL_AUTH_ADMIN_PASSWORD` set and no terminal (the phrase is then written to `secrets/admin_recovery_phrase`).
 

@@ -4,7 +4,7 @@
 # the private AWS ECR. Every image is built once, under the name it is pushed
 # with; the node images also get a bare local tag (apex:<tag>) because the
 # docker-compose.yml of a local node refers to them that way.
-REPO_GHCR_URL ?= ghcr.io/strato-net/
+REPO_GHCR_URL ?= ghcr.io/strato-net/strato-platform/
 REPO_AWS_ECR_URL ?= 406773134706.dkr.ecr.us-east-1.amazonaws.com/strato/
 $(info REPO_GHCR_URL is "${REPO_GHCR_URL}", REPO_AWS_ECR_URL is "${REPO_AWS_ECR_URL}" (REPO: "${REPO}"))
 
