@@ -197,8 +197,9 @@ stratoP2PServer ::
   IO ()
 stratoP2PServer runner = labelTheThread "stratoP2PServer" . runner $ \_ -> do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
-  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-  liftIO $ runEthServer flags_listen runner
+  let listenPort' = Conf.listenPort (p2pConfig ethConf)
+  $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show listenPort'
+  liftIO $ runEthServer listenPort' runner
 
 logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
 logAndLengthenPeerDisableBy disableBy peer = do

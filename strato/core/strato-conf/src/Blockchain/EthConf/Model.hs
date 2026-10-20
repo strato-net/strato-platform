@@ -146,8 +146,21 @@ data P2PConf = P2PConf
   , maxReturnedHeaders :: Int
   , averageTxsPerBlock :: Int
   , maxHeadersTxsLens :: Int
+  , listenPort :: Int
   }
-  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+  deriving (Show, Eq, Generic, ToJSON)
+
+-- listenPort (the TCP port strato-p2p listens on and ethereum-discover
+-- advertises) is optional so ethconf.yaml files written before it existed
+-- still parse.
+instance FromJSON P2PConf where
+  parseJSON = withObject "P2PConf" $ \v -> P2PConf
+    <$> v .: "maxConnections"
+    <*> v .: "connectionTimeout"
+    <*> v .: "maxReturnedHeaders"
+    <*> v .: "averageTxsPerBlock"
+    <*> v .: "maxHeadersTxsLens"
+    <*> v .:? "listenPort" .!= 30303
 
 data SqlConf = SqlConf
   { user :: String,
@@ -435,6 +448,7 @@ instance Default P2PConf where
     , maxReturnedHeaders = 500
     , averageTxsPerBlock = 40
     , maxHeadersTxsLens = 2500
+    , listenPort = 30303
     }
 
 instance Default ApiConfig where

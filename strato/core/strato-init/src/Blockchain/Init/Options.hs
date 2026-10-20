@@ -35,6 +35,8 @@ defineFlag "redisPort" (6379 :: Int) "Redis BlockDB port"
 defineFlag "redisDBNumber" (0 :: Integer) "Redis database number"
 
 defineFlag "minPeers" (10 :: Int) "Threshold for discovery to stop querying for more peers"
+defineFlag "p2pPort" (30303 :: Int) "TCP port strato-p2p listens on, which ethereum-discover advertises to peers"
+defineFlag "discoveryPort" (30303 :: Int) "UDP port ethereum-discover listens on"
 
 defineFlag "apiIPAddress" "" "Address strato-api binds to, which is also how the nginx container reaches it (default: the docker bridge 172.17.0.1 on Linux, 127.0.0.1 elsewhere)"
 
