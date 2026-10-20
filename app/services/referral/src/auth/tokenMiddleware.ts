@@ -1,5 +1,6 @@
 import {RequestHandler, Request, Response, NextFunction} from "express";
 import { verifyAccessTokenSignature, getTokenFromHeader, getUserKey } from "../auth";
+import { walletClaimAddress } from "./walletClaim";
 
 class AuthHandler {
   /**
@@ -11,7 +12,14 @@ class AuthHandler {
       try {
         // Get token from header
         const token = getTokenFromHeader(req);
-        if (!token) throw new Error("Missing or invalid authorization header");
+        if (!token) {
+          // Wallet mode (a self-custody wallet, no login): the claim's own
+          // signature is the authorization. See ./walletClaim.
+          const walletAddress = req.headers["x-wallet-address"];
+          if (walletAddress === undefined) throw new Error("Missing or invalid authorization header");
+          res.locals.userAddress = await walletClaimAddress(walletAddress, req.body);
+          return next();
+        }
 
         // Verify token signature
         await verifyAccessTokenSignature(token);
