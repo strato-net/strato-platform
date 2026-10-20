@@ -168,7 +168,11 @@ if [[ "$PREBUILT" == "true" ]]; then
     echo "Prebuilt images: $STRATO_IMAGE"
 fi
 
-if [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
+# A node set up from the prebuilt images is restarted on a host that has no
+# strato-setup; on a directory that is already set up it would only report so.
+if [[ -f "$NODE_DIR/.ethereumH/ethconf.yaml" && " ${SETUP_ARGS[*]} " != *" --regenerate"* ]] && ! command -v strato-setup >/dev/null 2>&1; then
+    echo "Node already exists at $NODE_DIR, skipping setup."
+elif [[ "$CONTAINER_MODE" == "true" && "$PREBUILT" == "true" ]]; then
     # No host binaries: strato-setup runs from the strato image, over the node
     # directory's parent mounted at its own path, as the invoking user, with
     # the host's name (the node URL is built from it) and home (the default
